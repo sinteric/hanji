@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Synthetic Korean test document for the hanji remainder prototype.
+     Written by hand for this project; released under CC0 1.0.
+     Converted to korean-report.docx by make_korean.sh (LibreOffice). -->
+<office:document xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+  xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+  xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+  xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+  xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+  xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+  xmlns:xlink="http://www.w3.org/1999/xlink"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0"
+  office:version="1.3" office:mimetype="application/vnd.oasis.opendocument.text">
+ <office:font-face-decls>
+  <style:font-face style:name="Noto Sans CJK KR" svg:font-family="'Noto Sans CJK KR'"/>
+ </office:font-face-decls>
+ <office:styles>
+  <style:default-style style:family="paragraph">
+   <style:text-properties style:font-name-asian="Noto Sans CJK KR" fo:language="en" fo:country="US" style:language-asian="ko" style:country-asian="KR"/>
+  </style:default-style>
+  <style:style style:name="Standard" style:family="paragraph" style:class="text"/>
+  <style:style style:name="Heading" style:family="paragraph" style:parent-style-name="Standard"/>
+  <style:style style:name="Heading_20_1" style:display-name="Heading 1" style:family="paragraph" style:parent-style-name="Heading" style:default-outline-level="1">
+   <style:text-properties fo:font-size="16pt" fo:font-weight="bold" style:font-weight-asian="bold"/>
+  </style:style>
+  <style:style style:name="Heading_20_2" style:display-name="Heading 2" style:family="paragraph" style:parent-style-name="Heading" style:default-outline-level="2">
+   <style:text-properties fo:font-size="13pt" fo:font-weight="bold" style:font-weight-asian="bold"/>
+  </style:style>
+  <style:style style:name="Note" style:family="paragraph" style:parent-style-name="Standard">
+   <style:paragraph-properties fo:background-color="#eeeeee" fo:padding="0.1cm"/>
+  </style:style>
+  <style:style style:name="Quotations" style:family="paragraph" style:parent-style-name="Standard">
+   <style:paragraph-properties fo:margin-left="1cm"/>
+  </style:style>
+ </office:styles>
+ <office:automatic-styles>
+  <style:style style:name="T1" style:family="text"><style:text-properties fo:color="#c00000"/></style:style>
+  <style:style style:name="T2" style:family="text"><style:text-properties fo:font-weight="bold" style:font-weight-asian="bold"/></style:style>
+  <style:style style:name="T3" style:family="text"><style:text-properties fo:font-size="14pt" style:font-size-asian="14pt" fo:color="#1f4e79"/></style:style>
+  <style:style style:name="T4" style:family="text"><style:text-properties fo:font-style="italic" style:font-style-asian="italic"/></style:style>
+  <style:style style:name="P9" style:family="paragraph" style:parent-style-name="Standard" style:master-page-name="Landscape"><style:paragraph-properties style:page-number="auto"/></style:style>
+  <style:page-layout style:name="pm1"><style:page-layout-properties fo:page-width="21cm" fo:page-height="29.7cm" fo:margin-top="2cm" fo:margin-bottom="2cm" fo:margin-left="2cm" fo:margin-right="2cm"/></style:page-layout>
+  <style:page-layout style:name="pm2"><style:page-layout-properties fo:page-width="29.7cm" fo:page-height="21cm" style:print-orientation="landscape" fo:margin-top="2cm" fo:margin-bottom="2cm" fo:margin-left="2cm" fo:margin-right="2cm"/></style:page-layout>
+  <style:style style:name="Tbl" style:family="table"><style:table-properties style:width="16cm"/></style:style>
+ </office:automatic-styles>
+ <office:master-styles>
+  <style:master-page style:name="Standard" style:page-layout-name="pm1">
+   <style:header><text:p text:style-name="Standard">3분기 영업 보고 — 내부용</text:p></style:header>
+   <style:footer><text:p text:style-name="Standard">쪽 <text:page-number text:select-page="current">1</text:page-number></text:p></style:footer>
+  </style:master-page>
+  <style:master-page style:name="Landscape" style:page-layout-name="pm2"/>
+ </office:master-styles>
+ <office:body>
+  <office:text>
+   <text:tracked-changes>
+    <text:changed-region text:id="ct1"><text:insertion><office:change-info><dc:creator>김민지</dc:creator><dc:date>2026-09-20T10:00:00</dc:date></office:change-info></text:insertion></text:changed-region>
+   </text:tracked-changes>
+   <text:h text:style-name="Heading_20_1" text:outline-level="1">3분기 영업 보고</text:h>
+   <text:p text:style-name="Standard">매출은 전년 대비 <text:span text:style-name="T2">12%</text:span> 증가했다.<text:note text:id="ftn1" text:note-class="footnote"><text:note-citation>1</text:note-citation><text:note-body><text:p text:style-name="Standard">내부 집계 기준.</text:p></text:note-body></text:note> 신규 고객은 <text:bookmark-start text:name="신규고객"/>34곳<text:bookmark-end text:name="신규고객"/>이며, 그중 <text:span text:style-name="T1">21곳이 수도권</text:span>이다.</text:p>
+   <text:p text:style-name="Note">신규 고객 34곳 중 21곳이 수도권.</text:p>
+   <text:p text:style-name="Standard"><office:annotation><dc:creator>박서준</dc:creator><dc:date>2026-09-21T09:30:00</dc:date><text:p>지방 수치 재확인 필요</text:p></office:annotation>지방 지점의 매출은 1,204억 원으로 <text:span text:style-name="T3">15% 성장</text:span>했다.<office:annotation-end/></text:p>
+   <text:h text:style-name="Heading_20_2" text:outline-level="2">지역별 현황</text:h>
+   <text:p text:style-name="Standard">아래 표는 지점별 매출을 정리한 것이다.</text:p>
+   <text:p text:style-name="Standard"><draw:frame draw:name="조직도" text:anchor-type="as-char" svg:width="4cm" svg:height="2cm"><draw:image><office:binary-data>iVBORw0KGgoAAAANSUhEUgAAABAAAAAICAIAAAB/FOjAAAAAE0lEQVR4nGPQiFpAEmIY1UALDQDP+pEBhst/TQAAAABJRU5ErkJggg==</office:binary-data></draw:image><svg:title>조직도, 상자 5개</svg:title></draw:frame></text:p>
+   <table:table table:name="매출표" table:style-name="Tbl">
+    <table:table-column table:number-columns-repeated="3"/>
+    <table:table-row><table:table-cell office:value-type="string"><text:p>지역</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>지점</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>매출</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell table:number-rows-spanned="2" office:value-type="string"><text:p>서울</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>강남</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>120</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:covered-table-cell/><table:table-cell office:value-type="string"><text:p>종로</text:p></table:table-cell><table:table-cell office:value-type="string"><text:p>95</text:p></table:table-cell></table:table-row>
+    <table:table-row><table:table-cell table:number-columns-spanned="2" office:value-type="string"><text:p>합계</text:p></table:table-cell><table:covered-table-cell/><table:table-cell office:value-type="string"><text:p>215</text:p></table:table-cell></table:table-row>
+   </table:table>
+   <text:p text:style-name="Standard">강남 지점은 <text:span text:style-name="T4">전년 대비</text:span> <text:change-start text:change-id="ct1"/>8% <text:change-end text:change-id="ct1"/>성장했다.</text:p>
+   <text:h text:style-name="Heading_20_2" text:outline-level="2">향후 계획</text:h>
+   <text:p text:style-name="Standard">4분기에는 <text:span text:style-name="T1">부산</text:span>과 <text:span text:style-name="T1">대구</text:span>에 지점을 연다.</text:p>
+   <text:p text:style-name="Quotations">“고객이 있는 곳에 지점이 있어야 한다.” — 영업본부장</text:p>
+   <text:p text:style-name="P9">부록: 지점 목록</text:p>
+   <text:p text:style-name="Standard">서울 강남, 서울 종로, 경기 분당, 인천 송도.</text:p>
+  </office:text>
+ </office:body>
+</office:document>

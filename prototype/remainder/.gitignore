@@ -1,0 +1,7 @@
+__pycache__/
+results/out/
+results/pdf-work/
+results/run.log
+results/remainder/*
+!results/remainder/korean-report.jsonl
+!results/remainder/testWORD_various.jsonl
