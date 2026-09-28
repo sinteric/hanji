@@ -22,8 +22,7 @@ pub struct Para {
 pub struct Table {
     /// Table style name; `None` is the file's default table style.
     pub style: Option<String>,
-    /// Cell paragraphs take their style from the remainder (a pipe table
-    /// cannot name one).
+    /// Cell paragraph styles: `None` is the default paragraph style.
     pub rows: Vec<Vec<Cell>>,
 }
 
@@ -141,12 +140,18 @@ pub fn resolve(
                 Inline { units: vec![fmt::Unit { atom: Atom::PageBreak, marks: fmt::Marks::NONE }], spans: vec![] },
             )),
             fmt::Block::Table(t) => {
-                for c in t.rows.iter().flatten() {
-                    if let Cell::Text(i) = c {
-                        check_inline(i, caps, is_block_keep, &mut err);
+                let mut rows = t.rows.clone();
+                for c in rows.iter_mut().flatten() {
+                    if let Cell::Text(ps) = c {
+                        for p in ps {
+                            check_inline(&p.content, caps, is_block_keep, &mut err);
+                            if p.style.as_deref() == Some(styles.default_paragraph.as_str()) {
+                                p.style = None;
+                            }
+                        }
                     }
                 }
-                out.push(Block::Table(Table { style: t.style.clone(), rows: t.rows.clone() }));
+                out.push(Block::Table(Table { style: t.style.clone(), rows }));
             }
             fmt::Block::FootnoteDef(f) => {
                 if !caps.footnotes {
@@ -209,10 +214,12 @@ pub fn unresolve(
             Block::Keep(id) => fmt::Block::Keep(keep(id)),
             Block::Table(t) => fmt::Block::Table(fmt::Table { style: t.style.clone(), rows: t.rows.clone() }),
             Block::Para(p) => {
+                // Empty: `<p/>` / `<p style="Name"/>`. Spaces only: a `<div>`.
+                let empty = p.content.is_empty();
                 let blank = p.content.units.iter().all(|u| u.atom.is_space());
                 let style = match styles.heading_level(&p.style) {
                     Some(n) if !blank => fmt::ParaStyle::Heading(n),
-                    _ if p.style == styles.default_paragraph && !blank => fmt::ParaStyle::Plain,
+                    _ if p.style == styles.default_paragraph && (empty || !blank) => fmt::ParaStyle::Plain,
                     _ => fmt::ParaStyle::Named(p.style.clone()),
                 };
                 fmt::Block::Para(fmt::Para { style, content: p.content.clone() })
@@ -225,8 +232,9 @@ pub fn unresolve(
 }
 
 /// Units of every paragraph position in document order: `(path, Some(content))`
-/// for paragraphs and cells (`^^` cells are empty), `(path, None)` for block
-/// placeholders. `||` cells have no paragraph.
+/// for paragraphs and cell paragraphs (`[block, row, col, paragraph]`; a `^^`
+/// cell has one empty one), `(path, None)` for block placeholders. `||`
+/// cells have no paragraph.
 pub fn paras(blocks: &[Block]) -> Vec<(Path, Option<&Inline>)> {
     static EMPTY: Inline = Inline { units: Vec::new(), spans: Vec::new() };
     let mut out = vec![];
@@ -238,8 +246,10 @@ pub fn paras(blocks: &[Block]) -> Vec<(Path, Option<&Inline>)> {
                 for (r, row) in t.rows.iter().enumerate() {
                     for (c, cell) in row.iter().enumerate() {
                         match cell {
-                            Cell::Text(i) => out.push((vec![j, r, c], Some(i))),
-                            Cell::Up => out.push((vec![j, r, c], Some(&EMPTY))),
+                            Cell::Text(ps) => {
+                                out.extend(ps.iter().enumerate().map(|(k, p)| (vec![j, r, c, k], Some(&p.content))))
+                            }
+                            Cell::Up => out.push((vec![j, r, c, 0], Some(&EMPTY))),
                             Cell::Left => {}
                         }
                     }
@@ -254,8 +264,8 @@ pub fn paras(blocks: &[Block]) -> Vec<(Path, Option<&Inline>)> {
 pub fn content_at<'a>(blocks: &'a [Block], path: &[usize]) -> Option<&'a Inline> {
     match (blocks.get(*path.first()?)?, path.len()) {
         (Block::Para(p), 1) => Some(&p.content),
-        (Block::Table(t), 3) => match t.rows.get(path[1])?.get(path[2])? {
-            Cell::Text(i) => Some(i),
+        (Block::Table(t), 4) => match t.rows.get(path[1])?.get(path[2])? {
+            Cell::Text(ps) => ps.get(path[3]).map(|p| &p.content),
             _ => None,
         },
         _ => None,

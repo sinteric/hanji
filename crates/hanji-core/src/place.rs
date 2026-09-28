@@ -39,6 +39,21 @@ impl Outcome {
 
 // ------------------------------------------------------------------ block alignment
 
+fn cell_keys(cell: &Cell, out: &mut Vec<u32>) {
+    match cell {
+        Cell::Text(ps) => {
+            for (k, p) in ps.iter().enumerate() {
+                if k > 0 {
+                    out.push(4);
+                }
+                out.extend(keys(&p.content));
+            }
+        }
+        Cell::Up => out.extend([0x5e, 0x5e]),
+        Cell::Left => out.extend([0x7c, 0x7c]),
+    }
+}
+
 fn content(b: &Block) -> Vec<u32> {
     match b {
         Block::Para(p) => keys(&p.content),
@@ -52,11 +67,7 @@ fn content(b: &Block) -> Vec<u32> {
                     if c > 0 {
                         out.push(2);
                     }
-                    match cell {
-                        Cell::Text(i) => out.extend(keys(i)),
-                        Cell::Up => out.extend([0x5e, 0x5e]),
-                        Cell::Left => out.extend([0x7c, 0x7c]),
-                    }
+                    cell_keys(cell, &mut out);
                 }
             }
             out
@@ -233,11 +244,7 @@ fn cell_map(ot: &[Vec<Cell>], nt: &[Vec<Cell>]) -> CellMap {
             if c > 0 {
                 out.push(2);
             }
-            match cell {
-                Cell::Text(i) => out.extend(keys(i)),
-                Cell::Up => out.extend([0x5e, 0x5e]),
-                Cell::Left => out.extend([0x7c, 0x7c]),
-            }
+            cell_keys(cell, &mut out);
         }
         out
     };
@@ -521,8 +528,8 @@ impl<'a> Placer<'a> {
         if !self.al.cross.is_empty() {
             self.cross_map();
         }
-        if self.al.global.is_some() {
-            self.global_map();
+        if let Some(g) = &self.al.global {
+            self.global_map(g);
         }
         for i in 0..self.old.len() {
             let j = self.al.bmap[i];
@@ -603,10 +610,13 @@ impl<'a> Placer<'a> {
         }
         for path in paths {
             for e in self.entries_at(&path) {
-                if matches!(e.kind, Kind::Keep | Kind::Bkeep | Kind::Bmarker) || self.handled.contains(&e.id) {
+                if matches!(e.kind, Kind::Keep | Kind::Bkeep)
+                    || (e.kind == Kind::Bmarker && path.len() == 1)
+                    || self.handled.contains(&e.id)
+                {
                     continue;
                 }
-                if e.kind == Kind::Marker && e.meta.durable {
+                if (e.kind == Kind::Marker && e.meta.durable) || e.kind == Kind::Bmarker {
                     self.relocate(e, i);
                 } else {
                     self.set(e, Status::Removed("its block was deleted".into()));
@@ -622,7 +632,6 @@ impl<'a> Placer<'a> {
             }
         }
         let cm = cell_map(&ot.rows, &nt.rows);
-        static EMPTY: Inline = Inline { units: Vec::new(), spans: Vec::new() };
         for (r, row) in ot.rows.iter().enumerate() {
             let nr = cm(r, 0);
             for e in self.entries_at(&vec![i, r]) {
@@ -653,9 +662,90 @@ impl<'a> Placer<'a> {
                         self.put(e, npath.clone(), None, None);
                     }
                 }
-                let oc = if let Cell::Text(x) = cell { x } else { &EMPTY };
-                let nc_ = if let Cell::Text(x) = ncell { x } else { &EMPTY };
-                self.para(oc, path, nc_, npath, &[Kind::Tc]);
+                let olds = self.cell_paras(cell, &path);
+                let news = self.cell_paras_new(ncell);
+                self.cell(&path, &olds, &npath, &news, matches!((cell, ncell), (Cell::Up, Cell::Up)));
+            }
+        }
+    }
+
+    /// An old cell's paragraphs; a `^^` cell has as many empty ones as the
+    /// remainder holds.
+    fn cell_paras(&self, cell: &Cell, path: &Path) -> Vec<Inline> {
+        match cell {
+            Cell::Text(ps) => ps.iter().map(|p| p.content.clone()).collect(),
+            _ => {
+                let n = self
+                    .by_path
+                    .keys()
+                    .filter(|p| p.len() == 4 && p[..3] == path[..])
+                    .map(|p| p[3] + 1)
+                    .max()
+                    .unwrap_or(1);
+                vec![Inline::default(); n]
+            }
+        }
+    }
+
+    fn cell_paras_new(&self, cell: &Cell) -> Vec<Inline> {
+        match cell {
+            Cell::Text(ps) => ps.iter().map(|p| p.content.clone()).collect(),
+            _ => vec![Inline::default()],
+        }
+    }
+
+    /// Paragraphs of a cell: aligned like blocks; when the text changed, one
+    /// character diff over the whole cell lets text carry its entries across
+    /// a split or join inside it.
+    fn cell(&mut self, path: &Path, olds: &[Inline], npath: &Path, news: &[Inline], both_covered: bool) {
+        let pmap: Vec<Option<usize>> = if both_covered || olds.len() == news.len() {
+            (0..olds.len()).map(|k| (k < news.len()).then_some(k)).collect()
+        } else {
+            let as_blocks = |xs: &[Inline]| -> Vec<Block> {
+                xs.iter()
+                    .map(|x| Block::Para(crate::model::Para { style: String::new(), content: x.clone() }))
+                    .collect()
+            };
+            align(&as_blocks(olds), &as_blocks(news))
+        };
+        let sub = |base: &Path, k: usize| -> Path { base.iter().copied().chain([k]).collect() };
+        let changed = olds.len() != news.len() || olds.iter().zip(news).any(|(a, b)| keys(a) != keys(b));
+        if changed && olds.len() + news.len() > 2 && !both_covered {
+            let o = Stream::new(olds.iter().enumerate().map(|(k, x)| (sub(path, k), x)));
+            let n = Stream::new(news.iter().enumerate().map(|(k, x)| (sub(npath, k), x)));
+            let ops = diff::opcodes(&o.text, &n.text);
+            self.global_map(&Global { old: o, new: n, ops, min_equal: 3 });
+        }
+        // Markers before a cell paragraph (or after the last) go with it.
+        for k in 0..=olds.len() {
+            let to = if k == olds.len() { Some(news.len()) } else { (k..olds.len()).find_map(|x| pmap[x]) };
+            for e in self.entries_at(&sub(path, k)) {
+                if e.kind == Kind::Bmarker {
+                    self.put(e, sub(npath, to.unwrap_or(news.len())), None, None);
+                }
+            }
+        }
+        for (k, op) in olds.iter().enumerate() {
+            let p = sub(path, k);
+            match pmap[k] {
+                Some(k2) => self.para(op, p, &news[k2], sub(npath, k2), &[]),
+                None => {
+                    let target = (k + 1..olds.len())
+                        .find_map(|x| pmap[x])
+                        .map(|k2| (k2, 0))
+                        .or_else(|| (0..k).rev().find_map(|x| pmap[x]).map(|k2| (k2, news[k2].units.len())));
+                    for e in self.entries_at(&p) {
+                        if matches!(e.kind, Kind::Keep | Kind::Bkeep | Kind::Bmarker) || self.handled.contains(&e.id) {
+                            continue;
+                        }
+                        match target {
+                            Some((k2, at)) if e.kind == Kind::Marker && e.meta.durable => {
+                                self.put(e, sub(npath, k2), Some(at), Some(at))
+                            }
+                            _ => self.set(e, Status::Removed("its paragraph was deleted".into())),
+                        }
+                    }
+                }
             }
         }
     }
@@ -817,8 +907,7 @@ impl<'a> Placer<'a> {
 
     /// The document-level map: text can carry its entries into another
     /// paragraph (split, join, move-and-edit).
-    fn global_map(&mut self) {
-        let g = self.al.global.as_ref().unwrap();
+    fn global_map(&mut self, g: &Global) {
         let (old, new, ops) = (&g.old, &g.new, &g.ops);
         let mut survived = vec![false; old.text.len()];
         for o in ops {
@@ -868,7 +957,9 @@ impl<'a> Placer<'a> {
                 continue; // wholly deleted (or moved unchanged): the per-block rules apply
             }
             for e in self.offset_entries(&path) {
-                self.handled.insert(e.id);
+                if !self.handled.insert(e.id) {
+                    continue; // already placed by a wider map
+                }
                 let (s, en) = (e.start.unwrap(), e.end.unwrap());
                 let o = match e.kind {
                     Kind::Run if en > s => {

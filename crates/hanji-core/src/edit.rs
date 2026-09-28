@@ -208,9 +208,9 @@ fn para_maps<'a>(blocks: &'a [Block], parsed: &'a Parsed) -> Vec<(Path, Option<&
         match (b, &m.kind) {
             (Block::Table(_), BlockMapKind::Table(cells)) => {
                 for (r, row) in cells.iter().enumerate() {
-                    for (c, pm) in row.iter().enumerate() {
-                        if let Some(pm) = pm {
-                            out.push((vec![j, r, c], model::content_at(blocks, &[j, r, c]), pm, j));
+                    for (c, pms) in row.iter().enumerate() {
+                        for (k, pm) in pms.iter().flatten().enumerate() {
+                            out.push((vec![j, r, c, k], model::content_at(blocks, &[j, r, c, k]), pm, j));
                         }
                     }
                 }

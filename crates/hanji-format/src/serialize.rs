@@ -14,7 +14,9 @@ pub fn serialize(doc: &Document) -> String {
     out.push(format!("schema: {}", f.schema));
     out.push("---".into());
     for (k, b) in doc.blocks.iter().enumerate() {
-        if k > 0 {
+        // Consecutive empty paragraphs are consecutive lines; a blank line
+        // separates the group from other blocks.
+        if k > 0 && !(is_empty_para(b) && is_empty_para(&doc.blocks[k - 1])) {
             out.push(String::new());
         }
         block(&mut out, b);
@@ -35,8 +37,8 @@ fn block(out: &mut Vec<String>, b: &Block) {
                     match c {
                         Cell::Left => line.push('|'),
                         Cell::Up => line.push_str(" ^^ |"),
-                        Cell::Text(i) => {
-                            let mut s = serialize_inline(i).replace('|', "\\|");
+                        Cell::Text(ps) => {
+                            let mut s = cell_text(ps).replace('|', "\\|");
                             if s.trim() == "^^" {
                                 let k = s.find('^').unwrap();
                                 s.insert(k, '\\');
@@ -62,6 +64,33 @@ fn block(out: &mut Vec<String>, b: &Block) {
     }
 }
 
+/// `<p/>` / `<p style="Name"/>` lines.
+fn is_empty_para(b: &Block) -> bool {
+    matches!(b, Block::Para(p) if p.content.is_empty() && !matches!(p.style, ParaStyle::Heading(_)))
+}
+
+fn p_tag(style: Option<&str>) -> String {
+    match style {
+        Some(s) => format!("<p style=\"{}\"/>", attr(s)),
+        None => "<p/>".into(),
+    }
+}
+
+/// A cell's paragraphs: the first one's text, then `<p/>` before each other
+/// one. A leading plain `<p/>` is written only where it is needed (an empty
+/// first paragraph followed by others).
+fn cell_text(ps: &[CellPara]) -> String {
+    let mut s = String::new();
+    for (k, p) in ps.iter().enumerate() {
+        let lead_needed = k > 0 || p.style.is_some() || (p.content.is_empty() && ps.len() > 1);
+        if lead_needed {
+            s.push_str(&p_tag(p.style.as_deref()));
+        }
+        s.push_str(&serialize_inline(&p.content));
+    }
+    s
+}
+
 fn para_line(p: &Para) -> String {
     let body = serialize_inline(&p.content);
     match &p.style {
@@ -73,9 +102,11 @@ fn para_line(p: &Para) -> String {
                 format!("{hashes} {body}")
             }
         }
+        ParaStyle::Named(s) if body.is_empty() => p_tag(Some(s)),
         ParaStyle::Named(s) => format!("<div style=\"{}\">{body}</div>", attr(s)),
-        // §10.8 extension point: an empty (or all-space) paragraph has no
-        // Markdown form yet; engines name the default style instead.
+        ParaStyle::Plain if body.is_empty() => p_tag(None),
+        // A plain paragraph of spaces only has no line form; engines name the
+        // default style instead.
         ParaStyle::Plain if body.trim().is_empty() => format!("<div style=\"Normal\">{body}</div>"),
         ParaStyle::Plain => escape_line_start(body),
     }

@@ -51,11 +51,9 @@ impl<'a> Exporter<'a> {
     pub fn body(&self, blocks: &[Block]) -> Result<Vec<Node>, String> {
         let mut out = vec![];
         for (bi, b) in blocks.iter().enumerate() {
-            let mut ms = self.at(&[bi], Kind::Bmarker);
-            ms.sort_by_key(|e| e.seq);
-            for m in ms {
-                out.push(node(fragment(&m.xml[0])));
-            }
+            let mut holder = el("x");
+            self.bmarkers(&mut holder, &[bi]);
+            out.extend(holder.children);
             match b {
                 Block::Para(p) => out.push(node(self.para(&p.content, Some(&p.style), &[bi])?)),
                 Block::Table(t) => out.push(node(self.table(t, bi)?)),
@@ -423,15 +421,47 @@ impl<'a> Exporter<'a> {
                 if let Some(x) = merge_props(tcpr, span, *cell == Cell::Up, below_up) {
                     tc.children.push(node(x));
                 }
-                static EMPTY: Inline = Inline { units: Vec::new(), spans: Vec::new() };
-                let content = if let Cell::Text(i) = cell { i } else { &EMPTY };
-                tc.children.push(node(self.para(content, None, &path)?));
+                let n_paras = match cell {
+                    Cell::Text(ps) => {
+                        for (k, p) in ps.iter().enumerate() {
+                            self.bmarkers(&mut tc, &[bi, ri, ci, k]);
+                            let style = p.style.as_deref().unwrap_or(&self.styles.default_paragraph);
+                            tc.children.push(node(self.para(&p.content, Some(style), &[bi, ri, ci, k])?));
+                        }
+                        ps.len()
+                    }
+                    _ => {
+                        // A covered cell keeps the paragraphs the remainder has.
+                        let n = self
+                            .by
+                            .keys()
+                            .filter(|(p, k)| *k == Kind::Ppr && p.len() == 4 && p[..3] == path)
+                            .map(|(p, _)| p[3] + 1)
+                            .max()
+                            .unwrap_or(1);
+                        for k in 0..n {
+                            self.bmarkers(&mut tc, &[bi, ri, ci, k]);
+                            tc.children.push(node(self.para(&Inline::default(), None, &[bi, ri, ci, k])?));
+                        }
+                        n
+                    }
+                };
+                self.bmarkers(&mut tc, &[bi, ri, ci, n_paras]);
                 tr.children.push(node(tc));
                 ci += span;
             }
             tbl.children.push(node(tr));
         }
         Ok(tbl)
+    }
+
+    /// Markers stored before the block or cell paragraph at `path`.
+    fn bmarkers(&self, parent: &mut Element, path: &[usize]) {
+        let mut ms = self.at(path, Kind::Bmarker);
+        ms.sort_by_key(|e| e.seq);
+        for m in ms {
+            parent.children.push(node(fragment(&m.xml[0])));
+        }
     }
 
     fn set_table_style(&self, tbl: &mut Element, style: Option<&str>) -> Result<(), String> {
