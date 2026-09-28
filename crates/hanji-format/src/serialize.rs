@@ -1,0 +1,278 @@
+//! Canonical serializer (§5.1): one paragraph per line, no table padding,
+//! fixed attribute order, boundary spaces outside emphasis markers, and
+//! escapes only where the parser would otherwise misread a character.
+
+use crate::ast::*;
+use crate::parse::delim;
+
+pub fn serialize(doc: &Document) -> String {
+    let f = &doc.front;
+    let mut out = vec!["---".to_string(), format!("type: {}", f.doc_type), format!("format: {}", f.format)];
+    if let Some(t) = &f.template {
+        out.push(format!("template: {t}"));
+    }
+    out.push(format!("schema: {}", f.schema));
+    out.push("---".into());
+    for (k, b) in doc.blocks.iter().enumerate() {
+        if k > 0 {
+            out.push(String::new());
+        }
+        block(&mut out, b);
+    }
+    out.join("\n") + "\n"
+}
+
+fn block(out: &mut Vec<String>, b: &Block) {
+    match b {
+        Block::Para(p) => out.push(para_line(p)),
+        Block::Table(t) => {
+            if let Some(s) = &t.style {
+                out.push(format!("{{style=\"{}\"}}", attr(s)));
+            }
+            for (r, row) in t.rows.iter().enumerate() {
+                let mut line = String::from("|");
+                for c in row {
+                    match c {
+                        Cell::Left => line.push('|'),
+                        Cell::Up => line.push_str(" ^^ |"),
+                        Cell::Text(i) => {
+                            let mut s = serialize_inline(i).replace('|', "\\|");
+                            if s.trim() == "^^" {
+                                let k = s.find('^').unwrap();
+                                s.insert(k, '\\');
+                            }
+                            line.push(' ');
+                            line.push_str(&s);
+                            line.push_str(" |");
+                        }
+                    }
+                }
+                out.push(line);
+                if r == 0 {
+                    out.push(format!("|{}", "---|".repeat(row.len())));
+                }
+            }
+        }
+        Block::Keep(k) => out.push(keep_tag(k)),
+        Block::PageBreak => out.push("<pagebreak/>".into()),
+        Block::FootnoteDef(f) => {
+            let body = serialize_inline(&f.content);
+            out.push(if body.is_empty() { format!("[^{}]:", f.label) } else { format!("[^{}]: {body}", f.label) });
+        }
+    }
+}
+
+fn para_line(p: &Para) -> String {
+    let body = serialize_inline(&p.content);
+    match &p.style {
+        ParaStyle::Heading(n) => {
+            let hashes = "#".repeat(*n as usize);
+            if body.is_empty() {
+                hashes
+            } else {
+                format!("{hashes} {body}")
+            }
+        }
+        ParaStyle::Named(s) => format!("<div style=\"{}\">{body}</div>", attr(s)),
+        // §10.8 extension point: an empty (or all-space) paragraph has no
+        // Markdown form yet; engines name the default style instead.
+        ParaStyle::Plain if body.trim().is_empty() => format!("<div style=\"Normal\">{body}</div>"),
+        ParaStyle::Plain => escape_line_start(body),
+    }
+}
+
+/// A plain line must not read as another block.
+fn escape_line_start(mut s: String) -> String {
+    let lead = s.len() - s.trim_start().len();
+    if matches!(s[lead..].chars().next(), Some('|') | Some('{')) {
+        s.insert(lead, '\\');
+        return s;
+    }
+    let first = s.chars().next().unwrap();
+    let second = s.chars().nth(1);
+    let thematic = matches!(first, '-' | '_') && s.len() >= 3 && s.trim_end().chars().all(|c| c == first || c == ' ');
+    if first == '#' || first == '>' || thematic || (matches!(first, '-' | '+') && second == Some(' ')) {
+        s.insert(0, '\\');
+        return s;
+    }
+    let digits = s.chars().take_while(|c| c.is_ascii_digit()).count();
+    if digits > 0
+        && matches!(s.chars().nth(digits), Some('.') | Some(')'))
+        && matches!(s.chars().nth(digits + 1), Some(' ') | None)
+    {
+        s.insert(digits, '\\');
+    }
+    s
+}
+
+pub fn serialize_inline(inl: &Inline) -> String {
+    let mut out = Out { dollar: dollar_escapes(inl), ..Out::default() };
+    for (a, b, span) in inl.segments() {
+        match span.map(|s| &s.kind) {
+            Some(SpanKind::Link(url)) => {
+                out.s.push('[');
+                run(&mut out, &inl.units, a, b, true);
+                out.s.push_str("](");
+                out.s.push_str(&link_url(url));
+                out.s.push(')');
+            }
+            Some(SpanKind::Field(name)) => {
+                out.s.push_str(&format!("<field name=\"{}\">", attr(name)));
+                run(&mut out, &inl.units, a, b, false);
+                out.s.push_str("</field>");
+            }
+            None => run(&mut out, &inl.units, a, b, false),
+        }
+    }
+    out.s
+}
+
+/// Which literal `$` units need `\$`: those that could open math (a
+/// non-space follows) while some later `$` in the output could close it.
+/// Conservative, since delimiters, tags and urls also put characters
+/// between units.
+fn dollar_escapes(inl: &Inline) -> Vec<bool> {
+    let u = &inl.units;
+    let span_starts: Vec<usize> = inl.spans.iter().flat_map(|s| [s.start, s.end]).collect();
+    let span_dollar = |j: usize| {
+        inl.spans
+            .iter()
+            .any(|s| s.start >= j && matches!(&s.kind, SpanKind::Link(x) | SpanKind::Field(x) if x.contains('$')))
+    };
+    let closer_after = |i: usize| {
+        (i + 1..u.len()).any(|j| match &u[j].atom {
+            Atom::Char('$') => !u[j - 1].atom.is_space() || u[j - 1].marks != u[j].marks || span_starts.contains(&j),
+            Atom::Math(_) => true,
+            Atom::Keep(k) => (k.id.clone() + &k.kind + &k.summary).contains('$'),
+            _ => false,
+        }) || span_dollar(i + 1)
+    };
+    (0..u.len())
+        .map(|i| {
+            let opens = u
+                .get(i + 1)
+                .is_some_and(|n| !n.atom.is_space() || n.marks != u[i].marks || span_starts.contains(&(i + 1)));
+            u[i].atom == Atom::Char('$') && opens && closer_after(i)
+        })
+        .collect()
+}
+
+#[derive(Default)]
+struct Out {
+    s: String,
+    dollar: Vec<bool>,
+    /// Byte index of a trailing unescaped literal `~`, if any.
+    bare_tilde: Option<usize>,
+}
+
+impl Out {
+    fn delim(&mut self, d: &str) {
+        if d == "~~" {
+            if let Some(k) = self.bare_tilde.take() {
+                self.s.insert(k, '\\');
+            }
+        }
+        self.bare_tilde = None;
+        self.s.push_str(d);
+    }
+    fn text(&mut self, t: &str) {
+        self.bare_tilde = None;
+        self.s.push_str(t);
+    }
+    fn tilde(&mut self) {
+        if self.s.ends_with('~') {
+            self.text("\\~");
+        } else {
+            self.bare_tilde = Some(self.s.len());
+            self.s.push('~');
+        }
+    }
+}
+
+fn closer(m: Marks) -> &'static str {
+    if m == Marks::UNDERLINE {
+        "</u>"
+    } else {
+        delim(m)
+    }
+}
+
+/// One marked stretch `units[a..b]`: nested where possible (the
+/// longest-lasting mark opens first), toggled where marks cross.
+fn run(out: &mut Out, all: &[Unit], a: usize, b: usize, in_link: bool) {
+    let units = &all[a..b];
+    let mut open: Vec<Marks> = vec![];
+    for i in 0..units.len() {
+        let want = units[i].marks;
+        for k in (0..open.len()).rev() {
+            if !want.has(open[k]) {
+                out.delim(closer(open[k]));
+                open.remove(k);
+            }
+        }
+        let mut new: Vec<Marks> = Marks::ALL.into_iter().filter(|&m| want.has(m) && !open.contains(&m)).collect();
+        let end = |m: Marks| (i..units.len()).find(|&j| !units[j].marks.has(m)).unwrap_or(units.len());
+        new.sort_by_key(|&m| std::cmp::Reverse(end(m)));
+        for m in new {
+            out.delim(delim(m));
+            open.push(m);
+        }
+        unit(out, all, a + i, in_link);
+    }
+    for m in open.into_iter().rev() {
+        out.delim(closer(m));
+    }
+}
+
+fn unit(out: &mut Out, units: &[Unit], i: usize, in_link: bool) {
+    let next_char = match units.get(i + 1).map(|u| &u.atom) {
+        Some(Atom::Char(c)) => Some(*c),
+        _ => None,
+    };
+    match &units[i].atom {
+        Atom::Char(c) => match c {
+            '\\' => out.text("\\\\"),
+            '*' => out.text("\\*"),
+            '~' => out.tilde(),
+            '<' if next_char.is_some_and(|c| c.is_ascii_alphabetic() || matches!(c, '/' | '!' | '?')) => {
+                out.text("\\<")
+            }
+            '[' if in_link || next_char == Some('^') => out.text("\\["),
+            '^' if in_link && out.s.ends_with('[') => out.text("\\^"),
+            ']' if in_link || next_char == Some('(') => out.text("\\]"),
+            '$' if out.dollar[i] => out.text("\\$"),
+            c => {
+                let mut b = [0u8; 4];
+                out.text(c.encode_utf8(&mut b));
+            }
+        },
+        Atom::Break => out.text("<br/>"),
+        Atom::Keep(k) => out.text(&keep_tag(k)),
+        Atom::NoteRef(l) => out.text(&format!("[^{l}]")),
+        Atom::Math(m) => out.text(&format!("${m}$")),
+        Atom::PageBreak => out.text("<pagebreak/>"),
+    }
+}
+
+pub(crate) fn keep_tag(k: &Keep) -> String {
+    format!("<keep id=\"{}\" kind=\"{}\" summary=\"{}\"/>", attr(&k.id), attr(&k.kind), attr(&k.summary))
+}
+
+fn attr(s: &str) -> String {
+    s.replace('&', "&amp;").replace('"', "&quot;").replace('<', "&lt;")
+}
+
+fn link_url(url: &str) -> String {
+    let mut o = String::new();
+    for c in url.chars() {
+        match c {
+            '\\' | ')' => {
+                o.push('\\');
+                o.push(c);
+            }
+            c if c.is_whitespace() => o.push_str(&format!("%{:02X}", c as u32)),
+            c => o.push(c),
+        }
+    }
+    o
+}

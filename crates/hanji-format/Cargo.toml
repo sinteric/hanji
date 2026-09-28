@@ -1,0 +1,10 @@
+[package]
+name = "hanji-format"
+description = "The hanji text format: parser, canonical serializer and validator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
