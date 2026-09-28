@@ -250,6 +250,13 @@ impl<'a> Exporter<'a> {
                     for m in rm_at.get(&Target::Zrun(z.id)).into_iter().flatten() {
                         r.children.push(node(fragment(&m.xml[0])));
                     }
+                    // Its own text: empty `w:t`s, and a spaces-only paragraph's
+                    // spaces while the paragraph is still empty.
+                    for t in z.meta.aux.iter().map(|x| fragment(x)) {
+                        if p.units.is_empty() || t.text_of(&["w:t"]).is_empty() {
+                            r.children.push(node(t));
+                        }
+                    }
                     stack.last_mut().unwrap().1.children.push(node(r));
                 }
                 It::Seg(si) => {

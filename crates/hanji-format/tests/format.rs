@@ -553,3 +553,16 @@ fn table_style_line_sits_on_the_header_row() {
     // Trailing whitespace on the style line is not part of it.
     assert_eq!(roundtrip(&doc("{style=\"Grid Table 4\"}  \n| a |\n|---|\n")), ok);
 }
+
+#[test]
+fn spaces_only_paragraphs_are_empty_ones() {
+    // No line form holds a paragraph of spaces alone: it is canonically empty.
+    assert_eq!(roundtrip(&doc("<div style=\"Note\">   </div>\n")), doc("<p style=\"Note\"/>\n"));
+    assert_eq!(roundtrip(&doc("|    |\n|---|\n")), doc("|  |\n|---|\n"));
+    let mut d = parse(&doc("x\n")).unwrap();
+    let Block::Para(p) = &mut d.blocks[0] else { panic!() };
+    p.content = Inline::plain("   ");
+    assert_eq!(serialize(&d), doc("<p/>\n"));
+    // A tab is content: it stays in a named paragraph.
+    assert_eq!(roundtrip(&doc("<div style=\"Note\">\t</div>\n")), doc("<div style=\"Note\">\t</div>\n"));
+}

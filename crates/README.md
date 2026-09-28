@@ -46,7 +46,4 @@ The LibreOffice conversion runs natively only.
 - §4 rule 5: rendering and preview.
 - §9 validity in Word: exports are checked for well-formed XML and a
   LibreOffice PDF conversion only.
-- An embedded macro-enabled workbook behind a chart (`.xlsm` in
-  `word/embeddings`) is not neutralised; only OLE objects, ActiveX, `vbaProject`,
-  fetching fields and external non-hyperlink relationships are.
 - Lists (`- `, `1. `) are not in §5.2 yet; the parser rejects them with a hint.

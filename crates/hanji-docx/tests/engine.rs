@@ -322,3 +322,86 @@ fn a_zip_bomb_is_refused() {
     assert!(e.contains("expands to more than"), "{e}");
     assert!(package::read(&pkg).is_ok());
 }
+
+#[test]
+fn a_spaces_only_paragraph_is_an_empty_one_and_keeps_its_spaces() {
+    let spaces = |style: &str| {
+        format!("<w:p>{style}<w:r><w:rPr><w:b/></w:rPr><w:t xml:space=\"preserve\">   </w:t></w:r></w:p>")
+    };
+    let body = format!("{}{}{}{}", p("a"), spaces(""), spaces("<w:pPr><w:pStyle w:val=\"Note\"/></w:pPr>"), p("b"));
+    let pkg = docx(&body, vec![]);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(imp.text.ends_with("a\n\n<p/>\n<p style=\"Note\"/>\n\nb\n"), "{}", imp.text);
+    let doc = |pkg: &[u8]| {
+        String::from_utf8(package::get(&package::read(pkg).unwrap(), "word/document.xml").unwrap().to_vec()).unwrap()
+    };
+    let canon = |pkg: &[u8]| hanji_docx::xml::canon_part(doc(pkg).as_bytes()).unwrap();
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon(&out), canon(&pkg));
+    // Text written into it replaces the spaces (and says its own marks).
+    let new = imp.text.replacen("<p/>\n", "new\n\n", 1);
+    let r = rewrite(&imp.remainder, &imp.text, &new, CAPS).unwrap();
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    let xml = doc(&out);
+    assert!(xml.contains("<w:t>new</w:t>"), "{xml}");
+    assert_eq!(xml.matches("   </w:t>").count(), 1, "{xml}");
+    assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, r.text);
+}
+
+#[test]
+fn embedded_macro_packages_are_neutralised() {
+    let inner = |names: &[&str]| {
+        let parts: Vec<Part> = names.iter().map(|n| part(n, "x")).collect();
+        package::write(&parts).unwrap()
+    };
+    let bin = |name: &str, data: Vec<u8>| Part { data, ..part(name, "") };
+    let rels = |t: &str| {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/package" Target="{t}"/></Relationships>"#
+        )
+    };
+    let chart = |n: u8| {
+        format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="{R}"><c:chart/><c:externalData r:id="rId1"><c:autoUpdate val="0"/></c:externalData><c:note n="{n}"/></c:chartSpace>"#
+        )
+    };
+    let pkg = docx(
+        &p("a"),
+        vec![
+            part("word/charts/chart1.xml", &chart(1)),
+            part("word/charts/_rels/chart1.xml.rels", &rels("../embeddings/Book1.xlsm")),
+            bin("word/embeddings/Book1.xlsm", inner(&["[Content_Types].xml", "xl/workbook.xml", "xl/vbaProject.bin"])),
+            part("word/charts/chart2.xml", &chart(2)),
+            part("word/charts/_rels/chart2.xml.rels", &rels("../embeddings/Book2.xlsx")),
+            bin("word/embeddings/Book2.xlsx", inner(&["[Content_Types].xml", "xl/workbook.xml", "xl/vbaProject.bin"])),
+            bin("word/embeddings/Other.docm", inner(&["[Content_Types].xml", "word/document.xml"])),
+            part("word/charts/chart3.xml", &chart(3)),
+            part("word/charts/_rels/chart3.xml.rels", &rels("../embeddings/Clean.xlsx")),
+            bin("word/embeddings/Clean.xlsx", inner(&["[Content_Types].xml", "xl/workbook.xml"])),
+        ],
+    );
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    let got: Vec<(&str, &str)> = imp
+        .report
+        .neutralised
+        .iter()
+        .filter(|n| n.kind == "macro-package")
+        .map(|n| (n.location.as_str(), n.detail.as_str()))
+        .collect();
+    assert_eq!(got.len(), 3, "{:?}", imp.report.neutralised);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    let parts = package::read(&out).unwrap();
+    let names: Vec<&str> = parts.iter().map(|p| p.name.as_str()).collect();
+    for gone in ["word/embeddings/Book1.xlsm", "word/embeddings/Book2.xlsx", "word/embeddings/Other.docm"] {
+        assert!(!names.contains(&gone), "{gone} survived: {names:?}");
+    }
+    assert!(names.contains(&"word/embeddings/Clean.xlsx"), "{names:?}");
+    let text = |n: &str| String::from_utf8(package::get(&parts, n).unwrap().to_vec()).unwrap();
+    for n in ["word/charts/chart1.xml", "word/charts/chart2.xml"] {
+        assert!(!text(n).contains("externalData"), "{n}: {}", text(n));
+        assert!(text(n).contains("<c:note"), "{n}: the rest of the chart stays");
+    }
+    assert!(text("word/charts/chart3.xml").contains("<c:externalData r:id=\"rId1\">"));
+    assert!(text("word/charts/_rels/chart3.xml.rels").contains("Clean.xlsx"));
+    assert!(!text("word/charts/_rels/chart1.xml.rels").contains("Book1"));
+}

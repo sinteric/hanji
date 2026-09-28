@@ -1251,3 +1251,18 @@ fn neutralised_import_keeps_getput_for_the_rest() {
         assert_eq!(again.text, imp.text, "{name}");
     }
 }
+
+#[test]
+fn a_serialized_remainder_exports_the_same_package() {
+    for (name, bytes) in corpus() {
+        let imp = DocxEngine.import(&bytes, &ImportOptions { neutralise: false, template: None }).unwrap();
+        let json = imp.remainder.to_json();
+        let back = Remainder::from_json(&json).unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert_eq!(back, imp.remainder, "{name}: the remainder does not round-trip through JSON");
+        let a = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+        let b = DocxEngine.export(&imp.text, &back).unwrap();
+        assert_eq!(a, b, "{name}: export from the deserialized remainder differs");
+        // GetPut from the deserialized remainder.
+        assert_eq!(xml::canon_part(&doc_xml(&bytes)).unwrap(), xml::canon_part(&doc_xml(&b)).unwrap(), "{name}");
+    }
+}

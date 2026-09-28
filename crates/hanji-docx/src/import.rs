@@ -458,10 +458,22 @@ impl<'a> Importer<'a> {
         let xml = std::iter::once(self.frag(&shell)).chain(ppr.map(|x| self.frag(x))).collect();
         self.entry(Kind::Ppr, xml, f, path, None, None, Meta { style: Some(sid.clone()), ..Default::default() });
         self.buf.clear();
+        let first = self.entries.len();
         let page_break_only = sid == default_id && is_page_break_para(p);
         self.walk(p, path, page_break_only)?;
         self.inherited.truncate(saved);
+        // Spaces alone have no text form but an empty paragraph, `<p/>`: the
+        // spaces stay in their runs' own `w:t` (aux), written back while the
+        // paragraph stays empty.
         let mut content = Inline { units: std::mem::take(&mut self.buf), spans: vec![] };
+        if content.spaces_only() {
+            content.units.clear();
+            for e in &mut self.entries[first..] {
+                if e.start.is_some() {
+                    (e.start, e.end) = (Some(0), Some(0));
+                }
+            }
+        }
         content.normalize();
         Ok(Para { style, content })
     }
