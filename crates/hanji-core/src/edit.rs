@@ -130,6 +130,12 @@ pub fn reanchor_span(
     new: &str,
     caps: Capabilities,
 ) -> Result<Reanchored, Refusal> {
+    if start > end || end > text.len() || !text.is_char_boundary(start) || !text.is_char_boundary(end) {
+        return Err(Refusal::Edit(format!(
+            "bytes {start}..{end} are not a span of characters of the text ({} bytes).",
+            text.len()
+        )));
+    }
     let (s, e, repl) = trim_span(text, start, end, new);
     let new_text = format!("{}{}{}", &text[..s], repl, &text[e..]);
     let (op, old) = model_of(text, rem, caps).map_err(Refusal::Invalid)?;
@@ -153,7 +159,13 @@ pub fn edit(rem: &Remainder, text: &str, old: &str, new: &str, caps: Capabilitie
     if old.is_empty() {
         return Err(Refusal::Edit("the old text is empty; include the text around the place to edit.".into()));
     }
-    let hits: Vec<usize> = text.match_indices(old).map(|m| m.0).collect();
+    // Every occurrence, overlapping ones included ("aa" occurs twice in "aaa").
+    let mut hits: Vec<usize> = vec![];
+    let mut from = 0;
+    while let Some(k) = text[from..].find(old) {
+        hits.push(from + k);
+        from += k + text[from + k..].chars().next().map_or(1, char::len_utf8);
+    }
     let s = match hits.as_slice() {
         [s] => *s,
         [] => {

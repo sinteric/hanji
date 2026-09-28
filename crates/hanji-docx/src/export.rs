@@ -136,16 +136,14 @@ impl<'a> Exporter<'a> {
                 *slot = Some(r);
             }
         }
-        // Marks as exported: a space at the edge of a mark cannot say it in
-        // the text, so it keeps what its run had.
+        // Marks as exported: a unit the text cannot state a mark on (a space
+        // at a mark's edge, a page break) keeps what its run had.
         let eff: Vec<Marks> = (0..n)
             .map(|c| {
                 let mut m = p.units[c].marks;
-                if p.units[c].atom.is_space() {
-                    for x in Marks::ALL {
-                        if !p.mark_expressible(c, x) && !m.has(x) {
-                            m = m.with(x, owner[c].is_some_and(|o| o.meta.marks.has(x)));
-                        }
+                for x in Marks::ALL {
+                    if !m.has(x) && !p.mark_expressible(c, x) {
+                        m = m.with(x, owner[c].is_some_and(|o| o.meta.marks.has(x)));
                     }
                 }
                 m

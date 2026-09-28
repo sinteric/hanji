@@ -404,7 +404,7 @@ impl<'a> Parser<'a> {
             return Some((Block::PageBreak, dummy(at), i + 1));
         }
         // Reuse the tag attribute parser on `{…}` by treating the braces as a tag.
-        let src = chars_of(line, lead);
+        let src = chars_of(&Line { text: line.text.trim_end(), ..*line }, lead);
         let inner: Vec<Src> = src[1..src.len() - 1].to_vec();
         let attrs = parse_attrs(&inner);
         let style = match attrs {

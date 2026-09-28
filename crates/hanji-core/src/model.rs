@@ -111,8 +111,11 @@ pub fn resolve(
 ) -> Result<Vec<Block>, Vec<Diagnostic>> {
     let mut out = vec![];
     let mut errs = vec![];
+    // Line of each block, counted incrementally (blocks are in text order).
+    let (mut line, mut counted) = (1, 0);
     for (b, m) in parsed.doc.blocks.iter().zip(&parsed.map.blocks) {
-        let line = text[..m.start].matches('\n').count() + 1;
+        line += text[counted..m.start].matches('\n').count();
+        counted = m.start;
         let mut err = |msg: String| errs.push(Diagnostic { line, col: 1, message: msg });
         let para = |style: String, content: Inline| Block::Para(Para { style, content });
         match b {

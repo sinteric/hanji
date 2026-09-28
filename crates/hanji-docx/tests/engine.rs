@@ -281,3 +281,44 @@ fn a_marker_among_table_properties_keeps_the_table_whole() {
     };
     assert_eq!(canon(&out), canon(&pkg));
 }
+
+#[test]
+fn a_bold_page_break_keeps_its_bold() {
+    // Survey GetPut failures (7 of 167 files): `<pagebreak/>` cannot state
+    // marks, so the run's own marks must survive export.
+    let body = format!("{}<w:p><w:r><w:rPr><w:b/></w:rPr><w:br w:type=\"page\"/></w:r></w:p>{}", p("a"), p("b"));
+    let pkg = docx(&body, vec![]);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(imp.text.contains("\n<pagebreak/>\n"), "{}", imp.text);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    let canon = |pkg: &[u8]| {
+        hanji_docx::xml::canon_part(package::get(&package::read(pkg).unwrap(), "word/document.xml").unwrap()).unwrap()
+    };
+    assert_eq!(canon(&out), canon(&pkg));
+}
+
+#[test]
+fn overlapping_old_text_is_ambiguous_and_bad_spans_are_refused() {
+    let pkg = docx(&p("x aaa"), vec![]);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    match edit(&imp.remainder, &imp.text, "aa", "b", CAPS) {
+        Err(Refusal::Edit(m)) => assert!(m.contains("occurs 2 times"), "{m}"),
+        other => panic!("{other:?}"),
+    }
+    let k = imp.text.find("aaa").unwrap();
+    let n = imp.text.len();
+    for (s, e) in [(k + 1, k), (k, n + 1)] {
+        let r = hanji_core::reanchor_span(&imp.remainder, &imp.text, s, e, "b", CAPS);
+        assert!(matches!(r, Err(Refusal::Edit(_))), "{s}..{e}: {r:?}");
+    }
+}
+
+#[test]
+fn a_zip_bomb_is_refused() {
+    let big = "a".repeat(1 << 20);
+    let pkg = docx(&p(&big), vec![]);
+    assert!(pkg.len() < 1 << 16, "the test package compresses well");
+    let e = package::read_limited(&pkg, 1 << 19).unwrap_err();
+    assert!(e.contains("expands to more than"), "{e}");
+    assert!(package::read(&pkg).is_ok());
+}

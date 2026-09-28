@@ -266,10 +266,14 @@ impl Inline {
         }
     }
 
-    /// Whether the text can state mark `m` on unit `i` (a space at the edge
-    /// of a mark cannot carry it; see [`Inline::normalize`]).
+    /// Whether the text can state mark `m` on unit `i`. A space at the edge
+    /// of a mark cannot carry it (see [`Inline::normalize`]), and a page
+    /// break, written as the block line `<pagebreak/>`, carries none.
     pub fn mark_expressible(&self, i: usize, m: Marks) -> bool {
         let u = &self.units[i];
+        if u.atom == Atom::PageBreak {
+            return false;
+        }
         if !u.atom.is_space() {
             return true;
         }
