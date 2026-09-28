@@ -525,7 +525,7 @@ fn e7_overlap_run(d: &Doc) -> Option<Edit> {
         }
     }
     // Python's sort(reverse=True) is stable.
-    cands.sort_by(|a, b| b.0.cmp(&a.0));
+    cands.sort_by_key(|c| std::cmp::Reverse(c.0));
     let (_, path, b) = cands.into_iter().next()?;
     let p = chars(paras(&d.blocks).into_iter().find(|x| x.0 == path).unwrap().1);
     let old: String = p[b - 2..b + 2].iter().collect();
