@@ -24,15 +24,16 @@ pub struct BlockMap {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum BlockMapKind {
     Para(ParaMap),
-    /// Per row and column; `None` for a `||` cell.
-    Table(Vec<Vec<Option<ParaMap>>>),
+    /// Per row and column, one map per cell paragraph; `None` for a `||` cell.
+    Table(Vec<Vec<Option<Vec<ParaMap>>>>),
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ParaMap {
     /// Source offset of each unit (for a `Block::Keep` or `PageBreak`: its tag).
     pub units: Vec<usize>,
-    /// Offset of the paragraph mark: the line end, or the pipe closing a cell.
+    /// Offset of the paragraph mark: the line end, the `<p/>` that starts the
+    /// next paragraph of a cell, or the pipe closing the cell.
     pub mark: usize,
 }
 
@@ -49,7 +50,15 @@ pub fn parse(text: &str) -> Result<Document, Vec<Diagnostic>> {
 
 /// Parse and check names (styles, fields, placeholders) against `names`.
 pub fn parse_with(text: &str, names: &Names) -> Result<Parsed, Vec<Diagnostic>> {
-    let mut p = Parser { names, errors: vec![], lines: split_lines(text), keeps: vec![], refs: vec![], defs: vec![] };
+    let mut p = Parser {
+        names,
+        errors: vec![],
+        lines: split_lines(text),
+        keeps: vec![],
+        refs: vec![],
+        defs: vec![],
+        in_cell: false,
+    };
     let (front, first) = p.front_matter();
     let mut blocks = vec![];
     let mut map = SourceMap::default();
@@ -124,10 +133,15 @@ struct Parser<'a> {
     keeps: Vec<(usize, usize, Keep)>,
     refs: Vec<(usize, usize, String)>,
     defs: Vec<(usize, usize, String)>,
+    /// Parsing a table cell: `<p/>` starts another paragraph.
+    in_cell: bool,
 }
 
 const FM_FORM: &str = "a line ---, the lines type: document, format: …, template: …, schema: 1, and a closing line ---";
-const INLINE_TAGS: &str = "<u>…</u>, <br/>, <field name=\"…\">…</field>, <keep id=\"…\" kind=\"…\" summary=\"…\"/>";
+const P_FORM: &str =
+    "<p/> and <p style=\"Name\"/> are single tags that start a paragraph: no </p>, and no attribute but style.";
+const INLINE_TAGS: &str =
+    "<u>…</u>, <br/>, <field name=\"…\">…</field>, <keep id=\"…\" kind=\"…\" summary=\"…\"/>, and <p/> in a table cell";
 
 impl<'a> Parser<'a> {
     fn err(&mut self, line: usize, col: usize, msg: impl Into<String>) {
@@ -245,6 +259,9 @@ impl<'a> Parser<'a> {
             let lead = text.len() - text.trim_start().len();
             return para(Block::PageBreak, vec![at + lead]);
         }
+        if trimmed.starts_with("<p") && trimmed[2..].starts_with(['/', ' ', '>']) || trimmed.starts_with("</p") {
+            return self.empty_para(i).and_then(|p| para(Block::Para(p), vec![]));
+        }
         if trimmed.starts_with("<table") || trimmed.starts_with("</table") {
             self.err(i, 1, "a table style is a line {style=\"Name\"} directly before the header row of the pipe table; there is no <table> tag.");
             return Some((Block::PageBreak, dummy(at), i + 1));
@@ -282,6 +299,35 @@ impl<'a> Parser<'a> {
         para(Block::Para(Para { style: ParaStyle::Plain, content }), units)
     }
 
+    /// A line holding only `<p/>` or `<p style="Name"/>`: an empty paragraph.
+    fn empty_para(&mut self, i: usize) -> Option<Para> {
+        let line = &self.lines[i];
+        let lead = line.text.len() - line.text.trim_start().len();
+        let src = chars_of(line, lead);
+        let tag = parse_tag(&src, 0).filter(|t| src[t.1..].iter().all(|c| c.2.is_whitespace()));
+        let tag = match tag {
+            Some((t, _)) if t.name == "p" && t.self_closing && !t.closing => t,
+            Some((t, _)) if t.name == "p" => {
+                self.err(i, lead + 1, P_FORM);
+                let _ = t;
+                return None;
+            }
+            _ => {
+                self.err(
+                    i,
+                    lead + 1,
+                    format!("an empty paragraph is a line holding only <p/> or <p style=\"Name\"/>. {P_FORM}"),
+                );
+                return None;
+            }
+        };
+        if tag.attrs.is_empty() {
+            return Some(Para { style: ParaStyle::Plain, content: Inline::default() });
+        }
+        let style = self.style_attr(i, &tag, "p", "paragraph")?;
+        Some(Para { style: ParaStyle::Named(style), content: Inline::default() })
+    }
+
     fn div(&mut self, i: usize) -> Option<(Para, Vec<usize>)> {
         let src = chars_of(&self.lines[i], 0);
         let form = "a styled paragraph is <div style=\"Name\">text</div> on one line";
@@ -307,12 +353,20 @@ impl<'a> Parser<'a> {
             self.err(i, extra.1, format!("nothing may follow </div> on its line: {form}."));
             return None;
         }
+        if content.is_empty() {
+            self.err(i, 1, format!("an empty paragraph is <p style=\"{style}\"/>, not an empty <div>."));
+            return None;
+        }
         Some((Para { style: ParaStyle::Named(style), content }, units))
     }
 
     /// Checks the single `style="Name"` attribute of a div or table style line.
     fn style_attr(&mut self, i: usize, tag: &Tag, elem: &str, kind: &str) -> Option<String> {
-        let form = if elem == "div" { "<div style=\"Name\">text</div>" } else { "{style=\"Name\"}" };
+        let form = match elem {
+            "div" => "<div style=\"Name\">text</div>",
+            "p" => "<p style=\"Name\"/>",
+            _ => "{style=\"Name\"}",
+        };
         for (k, _, col) in &tag.attrs {
             if k != "style" {
                 let msg = format!("{elem} has no attribute \"{k}\". Its only attribute is style=\"Name\", one {kind} style of this file: {form}.");
@@ -369,7 +423,7 @@ impl<'a> Parser<'a> {
     }
 
     #[allow(clippy::type_complexity)]
-    fn table(&mut self, i: usize, style: Option<String>) -> Option<(Table, Vec<Vec<Option<ParaMap>>>, usize)> {
+    fn table(&mut self, i: usize, style: Option<String>) -> Option<(Table, Vec<Vec<Option<Vec<ParaMap>>>>, usize)> {
         let mut j = i;
         while j < self.lines.len() && self.lines[j].text.trim_start().starts_with('|') {
             j += 1;
@@ -444,7 +498,7 @@ impl<'a> Parser<'a> {
                     }
                     let at = cell.chars.iter().find(|s| s.2 == '^').map_or(cell.close, |s| s.0);
                     row.push(Cell::Up);
-                    mrow.push(Some(ParaMap { units: vec![], mark: at }));
+                    mrow.push(Some(vec![ParaMap { units: vec![], mark: at }]));
                 } else {
                     let mut src: &[Src] = &cell.chars;
                     if src.first().is_some_and(|s| s.2 == ' ') {
@@ -453,9 +507,12 @@ impl<'a> Parser<'a> {
                     if src.last().is_some_and(|s| s.2 == ' ') {
                         src = &src[..src.len() - 1];
                     }
-                    let ((content, units), _) = self.inline(*ln, src, false).unwrap_or_default();
-                    row.push(Cell::Text(content));
-                    mrow.push(Some(ParaMap { units, mark: cell.close }));
+                    self.in_cell = true;
+                    let out = self.inline_full(*ln, src, false);
+                    self.in_cell = false;
+                    let (paras, pmaps) = out.map(|o| o.cell_paras(cell.close)).unwrap_or_default();
+                    row.push(Cell::Text(paras));
+                    mrow.push(Some(pmaps));
                 }
             }
             rows.push(row);
@@ -464,7 +521,7 @@ impl<'a> Parser<'a> {
         if self.errors.len() == before {
             if let Some((r, c)) = merge_problem(&rows) {
                 let text = match &rows[r][c] {
-                    Cell::Text(t) => t.text(),
+                    Cell::Text(ps) => ps.first().map(|p| p.content.text()).unwrap_or_default(),
                     _ => String::new(),
                 };
                 self.err(body[r].0, 1, format!("the merged area of the cell \"{text}\" (row {}, column {}) is not a rectangle. Every cell it covers is ^^ (the cell above belongs to it) or || (the cell to the left belongs to it); a 2×2 merge is the text and || in the first row, then ^^ || in the row below.", r + 1, c + 1));
@@ -528,6 +585,10 @@ impl<'a> Parser<'a> {
     /// returns its index in `src`.
     #[allow(clippy::type_complexity)]
     fn inline(&mut self, line: usize, src: &[Src], stop_at_div: bool) -> Option<((Inline, Vec<usize>), Option<usize>)> {
+        self.inline_full(line, src, stop_at_div).map(|o| ((o.inline, o.offsets), o.stop))
+    }
+
+    fn inline_full(&mut self, line: usize, src: &[Src], stop_at_div: bool) -> Option<InlineOut> {
         let mut st = InlineState::default();
         let n = src.len();
         let mut x = 0;
@@ -700,6 +761,19 @@ impl<'a> Parser<'a> {
                             };
                             st.spans.push(Span { start, end: st.units.len(), kind: SpanKind::Field(name) });
                         }
+                        ("p", false) if tag.self_closing && self.in_cell => {
+                            if st.link.is_some() || st.field.is_some() {
+                                fail!(x, "a <p/> cannot be inside a link or a field.");
+                            }
+                            if let Some(m) = Marks::ALL.into_iter().find(|&m| st.marks.has(m)) {
+                                let d = if m == Marks::UNDERLINE { "</u>" } else { delim(m) };
+                                fail!(x, "close {m} with {d} before <p/>: each paragraph of a cell carries its own emphasis.");
+                            }
+                            let style = if tag.attrs.is_empty() { None } else { Some(self.style_attr(line, &tag, "p", "paragraph")?) };
+                            st.splits.push((st.units.len(), style, off));
+                        }
+                        ("p", false) if tag.self_closing => fail!(x, "<p/> inside a line starts a paragraph only in a table cell; elsewhere a paragraph is its own line, and an empty paragraph is a line holding only <p/>."),
+                        ("p", _) => fail!(x, "{P_FORM}"),
                         ("div", true) if stop_at_div => {
                             stop = Some(after);
                             break;
@@ -734,7 +808,12 @@ impl<'a> Parser<'a> {
             }
         }
         st.spans.sort_by_key(|s| s.start);
-        Some(((Inline { units: st.units, spans: st.spans }, st.offsets), stop))
+        Some(InlineOut {
+            inline: Inline { units: st.units, spans: st.spans },
+            offsets: st.offsets,
+            stop,
+            splits: st.splits,
+        })
     }
 
     fn keep_tag(&mut self, line: usize, tag: &Tag) -> Option<Keep> {
@@ -864,6 +943,51 @@ struct InlineState {
     link: Option<(usize, String, usize, usize)>,
     link_close: Option<usize>,
     field: Option<(usize, String, usize)>,
+    /// Cell paragraph starts: (unit index, style, source offset).
+    splits: Vec<(usize, Option<String>, usize)>,
+}
+
+struct InlineOut {
+    inline: Inline,
+    offsets: Vec<usize>,
+    stop: Option<usize>,
+    splits: Vec<(usize, Option<String>, usize)>,
+}
+
+impl InlineOut {
+    /// A cell's paragraphs: the text starts the first, each `<p/>` another;
+    /// a tag written first starts the first paragraph itself.
+    fn cell_paras(self, close: usize) -> (Vec<CellPara>, Vec<ParaMap>) {
+        let (mut paras, mut maps) = (vec![], vec![]);
+        let (mut style, mut from) = (None, 0);
+        for (k, (at, st, off)) in self.splits.into_iter().enumerate() {
+            if k == 0 && at == 0 {
+                style = st;
+                continue;
+            }
+            let content = Inline {
+                units: self.inline.units[from..at].to_vec(),
+                spans: slice_spans(&self.inline.spans, from, at),
+            };
+            paras.push(CellPara { style: std::mem::replace(&mut style, st), content });
+            maps.push(ParaMap { units: self.offsets[from..at].to_vec(), mark: off });
+            from = at;
+        }
+        let n = self.inline.units.len();
+        let content =
+            Inline { units: self.inline.units[from..].to_vec(), spans: slice_spans(&self.inline.spans, from, n) };
+        paras.push(CellPara { style, content });
+        maps.push(ParaMap { units: self.offsets[from..].to_vec(), mark: close });
+        (paras, maps)
+    }
+}
+
+fn slice_spans(spans: &[Span], a: usize, b: usize) -> Vec<Span> {
+    spans
+        .iter()
+        .filter(|s| s.start >= a && s.end <= b)
+        .map(|s| Span { start: s.start - a, end: s.end - a, kind: s.kind.clone() })
+        .collect()
 }
 
 impl InlineState {
@@ -938,6 +1062,9 @@ fn math_close(src: &[Src], from: usize) -> Option<usize> {
     let mut y = from;
     while y < src.len() {
         let c = src[y].2;
+        if p_tag_at(src, y) {
+            return None;
+        }
         if c == '\\' {
             y += 2;
             continue;
@@ -954,6 +1081,13 @@ fn math_close(src: &[Src], from: usize) -> Option<usize> {
     None
 }
 
+/// A cell paragraph tag starts here: math and link text end at it.
+fn p_tag_at(src: &[Src], y: usize) -> bool {
+    src[y].2 == '<'
+        && src.get(y + 1).is_some_and(|s| s.2 == 'p')
+        && src.get(y + 2).is_some_and(|s| matches!(s.2, '/' | ' ' | '>'))
+}
+
 /// A link starting at `[`: (index of `]`, url, index after `)`). The
 /// link text runs to the first unescaped `]`; a `[` before it makes this
 /// `[` literal (the later one may open the link).
@@ -968,6 +1102,7 @@ fn link_at(src: &[Src], x: usize) -> Option<(usize, String, usize)> {
             }
             '[' => return None,
             ']' => break,
+            '<' if p_tag_at(src, y) => return None,
             '<' => y = parse_tag(src, y).map_or(y + 1, |t| t.1),
             '$' => {
                 let opens = src.get(y + 1).is_some_and(|s| !s.2.is_whitespace() && s.2 != '$');

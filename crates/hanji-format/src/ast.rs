@@ -69,11 +69,26 @@ pub struct Table {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Cell {
-    Text(Inline),
+    /// One or more paragraphs (§5.2: `<p/>` starts another).
+    Text(Vec<CellPara>),
     /// `^^`: merged into the cell above.
     Up,
     /// `||`: the cell to the left extends into this column.
     Left,
+}
+
+impl Cell {
+    /// A cell of one default-style paragraph.
+    pub fn text(content: Inline) -> Cell {
+        Cell::Text(vec![CellPara { style: None, content }])
+    }
+}
+
+/// A paragraph in a table cell; `None` is the default paragraph style.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct CellPara {
+    pub style: Option<String>,
+    pub content: Inline,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -287,8 +302,10 @@ impl Document {
                 Block::Table(t) => {
                     for row in &mut t.rows {
                         for c in row {
-                            if let Cell::Text(i) = c {
-                                i.normalize();
+                            if let Cell::Text(ps) = c {
+                                for p in ps {
+                                    p.content.normalize();
+                                }
                             }
                         }
                     }

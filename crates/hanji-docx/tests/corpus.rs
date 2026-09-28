@@ -67,8 +67,8 @@ fn paras(blocks: &[Block]) -> Vec<(Path, &Inline)> {
             Block::Table(t) => {
                 for (r, row) in t.rows.iter().enumerate() {
                     for (c, cell) in row.iter().enumerate() {
-                        if let Cell::Text(x) = cell {
-                            out.push((vec![i, r, c], x));
+                        if let Cell::Text(ps) = cell {
+                            out.extend(ps.iter().enumerate().map(|(k, p)| (vec![i, r, c, k], &p.content)));
                         }
                     }
                 }
@@ -83,7 +83,7 @@ fn get_para<'a>(blocks: &'a mut [Block], path: &[usize]) -> &'a mut Inline {
     match &mut blocks[path[0]] {
         Block::Para(p) => &mut p.content,
         Block::Table(t) => match &mut t.rows[path[1]][path[2]] {
-            Cell::Text(x) => x,
+            Cell::Text(ps) => &mut ps[path[3]].content,
             _ => panic!("not a text cell"),
         },
         _ => panic!("not a paragraph"),
@@ -259,9 +259,13 @@ fn has_drawing(d: &Doc, rem: &Remainder, b: &Block) -> bool {
         _ => {
             let ps: Vec<&Inline> = match b {
                 Block::Para(p) => vec![&p.content],
-                Block::Table(t) => {
-                    t.rows.iter().flatten().filter_map(|c| if let Cell::Text(x) = c { Some(x) } else { None }).collect()
-                }
+                Block::Table(t) => t
+                    .rows
+                    .iter()
+                    .flatten()
+                    .filter_map(|c| if let Cell::Text(ps) = c { Some(ps.iter().map(|p| &p.content)) } else { None })
+                    .flatten()
+                    .collect(),
                 _ => vec![],
             };
             ps.iter().any(|p| p.units.iter().any(|u| matches!(&u.atom, Atom::Keep(k) if kind_of(&k.id) == "drawing")))
@@ -442,8 +446,8 @@ fn e6_cell_next_to_merge(d: &Doc) -> Option<Edit> {
         let rows = &t.rows;
         for (r, row) in rows.iter().enumerate() {
             for (c, cell) in row.iter().enumerate() {
-                let Cell::Text(x) = cell else { continue };
-                if x.units.is_empty() {
+                let Cell::Text(ps) = cell else { continue };
+                if ps[0].content.units.is_empty() {
                     continue;
                 }
                 let is_anchor =
@@ -463,11 +467,11 @@ fn e6_cell_next_to_merge(d: &Doc) -> Option<Edit> {
                             .is_some_and(|c| !matches!(c, Cell::Text(_)))
                 });
                 if adj && !is_anchor {
-                    return Some(cell_edit(d, &[i, r, c], "cell next to a merged cell"));
+                    return Some(cell_edit(d, &[i, r, c, 0], "cell next to a merged cell"));
                 }
                 if fallback.is_none() {
                     fallback = Some((
-                        vec![i, r, c],
+                        vec![i, r, c, 0],
                         if adj || is_anchor {
                             "merged anchor cell (no free neighbour)"
                         } else {
@@ -1010,7 +1014,7 @@ fn text_span(old_text: &str, new_text: &str, rem: &Remainder, ed: &Edit) -> (usi
         let parsed = hanji_format::parse_with(old_text, &hanji_core::edit::names(rem)).unwrap();
         let pm = match &parsed.map.blocks[path[0]].kind {
             hanji_format::BlockMapKind::Para(pm) => pm.clone(),
-            hanji_format::BlockMapKind::Table(cells) => cells[path[1]][path[2]].clone().unwrap(),
+            hanji_format::BlockMapKind::Table(cells) => cells[path[1]][path[2]].clone().unwrap()[path[3]].clone(),
         };
         let at = |k: usize| if k < pm.units.len() { pm.units[k] } else { pm.mark };
         let (a, b) = (at(*s), at(*e));
@@ -1063,6 +1067,7 @@ fn corpus_getput_putget_remainder() {
         );
         let out = DocxEngine.export(&text, &re.remainder).unwrap();
         save(name, "getput", &out);
+        save(name, "ORIGINAL", bytes);
         let same = xml::canon_part(&doc_xml(bytes)).unwrap() == xml::canon_part(&doc_xml(&out)).unwrap();
         let a = package::read(bytes).unwrap();
         let b = package::read(&out).unwrap();
@@ -1189,7 +1194,24 @@ fn soffice() {
         println!("soffice: not available");
         return;
     };
-    let (mut ok, mut total) = (0, 0);
+    // `/Type /Page` objects (not `/Pages`).
+    let pages = |p: &std::path::Path| -> Option<usize> {
+        let d = std::fs::read(p).ok().filter(|d| !d.is_empty())?;
+        let mut n = 0;
+        for k in 0..d.len().saturating_sub(5) {
+            if &d[k..k + 5] == b"/Type" {
+                let mut x = k + 5;
+                while d.get(x).is_some_and(|c| c.is_ascii_whitespace()) {
+                    x += 1;
+                }
+                if d[x..].starts_with(b"/Page") && d.get(x + 5) != Some(&b's') {
+                    n += 1;
+                }
+            }
+        }
+        Some(n)
+    };
+    let (mut ok, mut total, mut differ) = (0, 0, vec![]);
     for dir in std::fs::read_dir(out_dir()).unwrap() {
         let dir = dir.unwrap().path();
         let files: Vec<PathBuf> = std::fs::read_dir(&dir)
@@ -1204,16 +1226,22 @@ fn soffice() {
             .arg(&pdf)
             .args(&files)
             .output();
-        for f in &files {
+        let original = pages(&pdf.join("ORIGINAL.pdf"));
+        for f in files.iter().filter(|f| !f.ends_with("ORIGINAL.docx")) {
             total += 1;
             let p = pdf.join(f.with_extension("pdf").file_name().unwrap());
-            if std::fs::metadata(&p).is_ok_and(|m| m.len() > 0) {
-                ok += 1;
-            } else {
-                println!("soffice: failed {}", f.display());
+            match pages(&p) {
+                Some(n) => {
+                    ok += 1;
+                    if f.ends_with("getput.docx") && Some(n) != original {
+                        differ.push(format!("{}: {n} pages, original {original:?}", dir.display()));
+                    }
+                }
+                None => println!("soffice: failed {}", f.display()),
             }
         }
     }
+    println!("soffice: GetPut exports whose page count differs from the original: {differ:?}");
     println!("soffice ({}): {ok}/{total} exports converted to PDF", String::from_utf8_lossy(&v.stdout).trim());
 }
 

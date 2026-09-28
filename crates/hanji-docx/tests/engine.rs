@@ -1,0 +1,215 @@
+//! Engine behaviour on small synthetic packages: exact edits, refusals,
+//! §8 neutralisation and the surface-before-export list.
+
+use hanji_core::{edit, rewrite, Capabilities, Engine, EngineError, ImportOptions, Part, Refusal};
+use hanji_docx::{package, DocxEngine};
+
+const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const CAPS: Capabilities = Capabilities { links: false, fields: false, footnotes: false, math: false };
+
+fn part(name: &str, data: &str) -> Part {
+    Part { name: name.into(), data: data.as_bytes().to_vec(), dos_time: 0x5b21_0000, external_attr: 0, deflate: true }
+}
+
+const STYLES: &str = r#"<?xml version="1.0" encoding="UTF-8"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/></w:style><w:style w:type="paragraph" w:styleId="Note"><w:name w:val="Note"/></w:style><w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/></w:style><w:style w:type="table" w:styleId="Grid"><w:name w:val="Table Grid"/></w:style></w:styles>"#;
+
+/// A package whose body is `body` (WordprocessingML), with extra parts.
+fn docx(body: &str, extra: Vec<Part>) -> Vec<u8> {
+    let doc = format!(
+        r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="{W}" xmlns:r="{R}" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:v="urn:schemas-microsoft-com:vml"><w:body>{body}<w:sectPr/></w:body></w:document>"#
+    );
+    let mut parts = vec![
+        part(
+            "[Content_Types].xml",
+            r#"<?xml version="1.0" encoding="UTF-8"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.ms-word.document.macroEnabled.main+xml"/><Override PartName="/word/vbaProject.bin" ContentType="application/vnd.ms-office.vbaProject"/></Types>"#,
+        ),
+        part(
+            "_rels/.rels",
+            r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+        ),
+        part("word/document.xml", &doc),
+        part("word/styles.xml", STYLES),
+    ];
+    parts.extend(extra);
+    package::write(&parts).unwrap()
+}
+
+fn p(text: &str) -> String {
+    format!("<w:p><w:r><w:t xml:space=\"preserve\">{text}</w:t></w:r></w:p>")
+}
+
+#[test]
+fn exact_edit_lands_and_refuses_ambiguous_old_text() {
+    let body = format!(
+        "{}<w:p><w:r><w:rPr><w:color w:val=\"FF0000\"/></w:rPr><w:t>매출 2023</w:t></w:r><w:bookmarkStart w:id=\"0\" w:name=\"b\"/><w:r><w:t xml:space=\"preserve\"> 증가</w:t></w:r><w:bookmarkEnd w:id=\"0\"/></w:p>{}",
+        p("반복"),
+        p("반복")
+    );
+    let pkg = docx(&body, vec![]);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    let r = edit(&imp.remainder, &imp.text, "2023", "2024", CAPS).unwrap();
+    assert!(r.text.contains("매출 2024 증가"), "{}", r.text);
+    assert!(r.report.refused.is_empty() && r.report.removed.is_empty(), "{:?}", r.report);
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    let again = DocxEngine.import(&out, &ImportOptions::default()).unwrap();
+    assert_eq!(again.text, r.text);
+    // the colour and the bookmark stay on their text
+    let xml =
+        String::from_utf8(package::get(&package::read(&out).unwrap(), "word/document.xml").unwrap().to_vec()).unwrap();
+    assert!(xml.contains("<w:color w:val=\"FF0000\"/></w:rPr><w:t>매출 2024</w:t>"), "{xml}");
+    assert!(xml.contains("</w:r><w:bookmarkStart"), "{xml}");
+    match edit(&imp.remainder, &imp.text, "반복", "x", CAPS) {
+        Err(Refusal::Edit(m)) => assert!(m.contains("occurs 2 times"), "{m}"),
+        other => panic!("{other:?}"),
+    }
+    assert!(matches!(edit(&imp.remainder, &imp.text, "없음", "x", CAPS), Err(Refusal::Edit(_))));
+}
+
+#[test]
+fn a_wrapper_split_across_paragraphs_is_refused() {
+    let body =
+        r#"<w:p><w:hyperlink r:id="rId9"><w:r><w:t xml:space="preserve">alpha beta</w:t></w:r></w:hyperlink></w:p>"#;
+    let pkg = docx(body, vec![]);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    let new = imp.text.replace("alpha beta", "alpha\n\nbeta");
+    match rewrite(&imp.remainder, &imp.text, &new, CAPS) {
+        Err(Refusal::Unplaceable(r)) => {
+            assert!(r.refused.iter().any(|x| x.2.contains("different paragraphs")), "{r:?}")
+        }
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn identical_blocks_with_different_properties_are_refused_not_swapped() {
+    let spacing = |n: u32| format!("<w:p><w:pPr><w:spacing w:after=\"{n}\"/></w:pPr></w:p>");
+    let body = format!("{}{}{}{}{}", p("A"), spacing(100), p("B"), spacing(200), p("C"));
+    let imp = DocxEngine.import(&docx(&body, vec![]), &ImportOptions::default()).unwrap();
+    assert!(imp.text.contains("A\n\n<p/>\n\nB"), "{}", imp.text);
+    // Both empty paragraphs move; the text cannot say which is which.
+    let new = imp.text.replace("A\n\n<p/>\n\nB\n\n<p/>\n\nC", "<p/>\n<p/>\n\nA\n\nB\n\nC");
+    match rewrite(&imp.remainder, &imp.text, &new, CAPS) {
+        Err(Refusal::Unplaceable(r)) => assert!(r.refused.iter().any(|x| x.2.contains("identical blocks")), "{r:?}"),
+        other => panic!("{other:?}"),
+    }
+    // Moving just one of them, next to a unique neighbour, is fine.
+    let one = imp.text.replace("\n\nC", "\n\nC\n\n<p/>");
+    assert!(rewrite(&imp.remainder, &imp.text, &one, CAPS).is_ok());
+}
+
+#[test]
+fn empty_paragraphs_and_multi_paragraph_cells_round_trip() {
+    let cell = |inner: &str| format!("<w:tc>{inner}</w:tc>");
+    let tbl = format!(
+        "<w:tbl><w:tblPr><w:tblStyle w:val=\"Grid\"/></w:tblPr><w:tblGrid><w:gridCol/><w:gridCol/></w:tblGrid><w:tr>{}{}</w:tr><w:tr>{}{}</w:tr></w:tbl>",
+        cell(&p("지역")),
+        cell(&p("비고")),
+        cell(&p("부산")),
+        cell(&format!("{}<w:p/>{}", p("해운대 1곳"), "<w:p><w:pPr><w:pStyle w:val=\"Note\"/></w:pPr><w:r><w:t>잠정치</w:t></w:r></w:p>"))
+    );
+    let body = format!("{}<w:p/><w:p><w:pPr><w:pStyle w:val=\"Note\"/></w:pPr></w:p>{tbl}", p("앞"));
+    let pkg = docx(&body, vec![]);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(
+        imp.text.contains("앞\n\n<p/>\n<p style=\"Note\"/>\n\n{style=\"Table Grid\"}\n| 지역 | 비고 |"),
+        "{}",
+        imp.text
+    );
+    assert!(imp.text.contains("| 부산 | 해운대 1곳<p/><p style=\"Note\"/>잠정치 |"), "{}", imp.text);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, imp.text);
+    // split a cell paragraph with an exact edit
+    let r = edit(&imp.remainder, &imp.text, "해운대 1곳", "해운대<p/>1곳", CAPS).unwrap();
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, r.text);
+}
+
+#[test]
+fn invalid_text_is_refused_with_the_allowed_names() {
+    let imp = DocxEngine.import(&docx(&p("hello"), vec![]), &ImportOptions::default()).unwrap();
+    let bad = imp.text.replace("hello", "<div style=\"Nope\">hello</div>");
+    match DocxEngine.export(&bad, &imp.remainder) {
+        Err(EngineError::Invalid(d)) => {
+            let m = d[0].to_string();
+            assert!(m.contains("Allowed paragraph styles: \"Normal\", \"heading 1\", \"Note\""), "{m}");
+        }
+        other => panic!("{other:?}"),
+    }
+    let bad = imp.text.replace("hello", "[link](https://example.org)");
+    assert!(matches!(DocxEngine.export(&bad, &imp.remainder), Err(EngineError::Invalid(_))));
+}
+
+#[test]
+fn active_and_remote_content_is_neutralised_and_reported() {
+    let body = format!(
+        "{}{}{}{}{}{}",
+        r#"<w:p><w:fldSimple w:instr=" DDEAUTO Excel Sheet1 R1C1 "><w:r><w:t>42</w:t></w:r></w:fldSimple></w:p>"#,
+        r#"<w:p><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText xml:space="preserve"> INCLUDEPICTURE "http://example.org/a.png" \d </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>picture</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#,
+        r#"<w:p><w:r><w:object><v:shape id="s1"><v:imagedata r:id="rId3"/></v:shape><o:OLEObject Type="Embed" ProgID="Excel.Sheet.12" ShapeID="s1" r:id="rId4"/></w:object></w:r></w:p>"#,
+        r#"<w:p><w:r><w:rPr><w:vanish/></w:rPr><w:t>secret</w:t></w:r></w:p>"#,
+        r#"<w:p><w:del w:id="1" w:author="Kim"><w:r><w:delText>gone</w:delText></w:r></w:del></w:p>"#,
+        p("kept"),
+    );
+    let rels = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/p.png"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/package" Target="embeddings/x.xlsx"/><Relationship Id="rId5" Type="http://schemas.microsoft.com/office/2006/relationships/vbaProject" Target="vbaProject.bin"/><Relationship Id="rId6" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="http://example.org/linked.png" TargetMode="External"/><Relationship Id="rId7" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="http://example.org/" TargetMode="External"/></Relationships>"#;
+    let settings_rels = r#"<?xml version="1.0" encoding="UTF-8"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/attachedTemplate" Target="http://evil.example/t.dotm" TargetMode="External"/></Relationships>"#;
+    let settings = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><w:settings xmlns:w="{W}" xmlns:r="{R}"><w:attachedTemplate r:id="rId1"/></w:settings>"#
+    );
+    let comments = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><w:comments xmlns:w="{W}"><w:comment w:id="0" w:author="Park"><w:p><w:r><w:t>check this</w:t></w:r></w:p></w:comment></w:comments>"#
+    );
+    let core = r#"<?xml version="1.0" encoding="UTF-8"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:creator>Hong</dc:creator></cp:coreProperties>"#;
+    let pkg = docx(
+        &body,
+        vec![
+            part("word/_rels/document.xml.rels", rels),
+            part("word/settings.xml", &settings),
+            part("word/_rels/settings.xml.rels", settings_rels),
+            part("word/vbaProject.bin", "MACRO"),
+            part("word/embeddings/x.xlsx", "OLE"),
+            part("word/media/p.png", "PNG"),
+            part("word/comments.xml", &comments),
+            part("docProps/core.xml", core),
+        ],
+    );
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    let kinds: Vec<&str> = imp.report.neutralised.iter().map(|n| n.kind.as_str()).collect();
+    for k in ["fetching-field", "ole-object", "macros", "linked-image", "remote-template"] {
+        assert!(kinds.contains(&k), "{k} not in {kinds:?}");
+    }
+    assert_eq!(kinds.iter().filter(|k| **k == "fetching-field").count(), 2, "{kinds:?}");
+    let surface: Vec<&str> = imp.report.surface.iter().map(|n| n.kind.as_str()).collect();
+    for k in ["hidden-text", "tracked-deletion", "comment", "metadata"] {
+        assert!(surface.contains(&k), "{k} not in {surface:?}");
+    }
+    // Field results stay as text; the instructions are gone.
+    assert!(imp.text.contains("42") && imp.text.contains("picture"), "{}", imp.text);
+    assert!(!imp.text.contains("field"), "{}", imp.text);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    let parts = package::read(&out).unwrap();
+    let names: Vec<&str> = parts.iter().map(|p| p.name.as_str()).collect();
+    assert!(!names.contains(&"word/vbaProject.bin") && !names.contains(&"word/embeddings/x.xlsx"), "{names:?}");
+    assert!(names.contains(&"word/media/p.png"));
+    let all: String = parts
+        .iter()
+        .filter(|p| p.name.ends_with(".xml") || p.name.ends_with(".rels"))
+        .map(|p| String::from_utf8_lossy(&p.data).into_owned())
+        .collect();
+    for gone in [
+        "DDEAUTO",
+        "INCLUDEPICTURE",
+        "OLEObject",
+        "vbaProject",
+        "attachedTemplate",
+        "linked.png",
+        "evil.example",
+        "macroEnabled",
+    ] {
+        assert!(!all.contains(gone), "{gone} still in the export");
+    }
+    assert!(all.contains("http://example.org/\""), "the hyperlink relationship is kept");
+    let again = DocxEngine.import(&out, &ImportOptions::default()).unwrap();
+    assert!(again.report.neutralised.is_empty(), "{:?}", again.report.neutralised);
+    assert_eq!(again.text, imp.text);
+}

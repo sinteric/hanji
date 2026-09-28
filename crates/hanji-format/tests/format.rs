@@ -37,7 +37,7 @@ fn design_example_is_canonical() {
     match &d.blocks[3] {
         Block::Table(t) => {
             assert_eq!(t.rows[2][0], Cell::Up);
-            assert_eq!(t.rows[3][2], Cell::Text(Inline::plain("215")));
+            assert_eq!(t.rows[3][2], Cell::text(Inline::plain("215")));
             assert_eq!(t.rows[3][1], Cell::Left);
         }
         b => panic!("{b:?}"),
@@ -73,7 +73,7 @@ fn three_column_span_and_spaced_pipes() {
     assert!(e[0].contains("this row has 5 cells but the header row has 4"), "{e:?}");
     let d = parse(&doc("| a | b | c | d | e |\n|---|---|---|---|---|\n| 합계 || || 215 |\n")).unwrap();
     let Block::Table(t) = &d.blocks[0] else { panic!() };
-    assert_eq!(t.rows[1][1..4], [Cell::Left, Cell::Text(Inline::default()), Cell::Left]);
+    assert_eq!(t.rows[1][1..4], [Cell::Left, Cell::text(Inline::default()), Cell::Left]);
 }
 
 #[test]
@@ -143,7 +143,7 @@ fn escapes_only_where_needed() {
 
 #[test]
 fn table_cell_escapes() {
-    let cell = |s: &str| Cell::Text(Inline::plain(s));
+    let cell = |s: &str| Cell::text(Inline::plain(s));
     let d = Document {
         front: FrontMatter::document("docx", None),
         blocks: vec![Block::Table(Table {
@@ -244,7 +244,7 @@ fn random_doc(seed: u64) -> Document {
     let mut notes = vec![];
     let mut blocks = vec![];
     for _ in 0..1 + r.below(6) {
-        let b = match r.below(6) {
+        let b = match r.below(7) {
             0 | 1 => {
                 let style = match r.below(3) {
                     0 => ParaStyle::Plain,
@@ -252,7 +252,10 @@ fn random_doc(seed: u64) -> Document {
                     _ => ParaStyle::Named("Body Text".into()),
                 };
                 let mut content = random_inline(&mut r, &mut notes, true);
-                if style == ParaStyle::Plain && content.units.iter().all(|u| u.atom.is_space()) {
+                if style == ParaStyle::Plain
+                    && !content.units.is_empty()
+                    && content.units.iter().all(|u| u.atom.is_space())
+                {
                     content = Inline::plain("x");
                 }
                 Block::Para(Para { style, content })
@@ -261,12 +264,29 @@ fn random_doc(seed: u64) -> Document {
                 let w = 1 + r.below(4);
                 let h = 1 + r.below(3);
                 let rows = (0..h)
-                    .map(|_| (0..w).map(|_| Cell::Text(random_inline(&mut r, &mut notes, true))).collect())
+                    .map(|_| {
+                        (0..w)
+                            .map(|_| {
+                                let n = 1 + r.below(3) * r.below(2);
+                                let ps = (0..n)
+                                    .map(|_| CellPara {
+                                        style: (r.below(3) == 0).then(|| "표 참고".to_string()),
+                                        content: random_inline(&mut r, &mut notes, true),
+                                    })
+                                    .collect();
+                                Cell::Text(ps)
+                            })
+                            .collect()
+                    })
                     .collect();
                 Block::Table(Table { style: (r.below(2) == 0).then(|| "Grid Table 4".into()), rows })
             }
             3 => Block::Keep(Keep { id: "kb".into(), kind: "table".into(), summary: "x".into() }),
             4 => Block::PageBreak,
+            5 => Block::Para(Para {
+                style: if r.below(2) == 0 { ParaStyle::Plain } else { ParaStyle::Named("좁은 간격".into()) },
+                content: Inline::default(),
+            }),
             _ => Block::Para(Para { style: ParaStyle::Plain, content: Inline::plain("plain") }),
         };
         blocks.push(b);
@@ -298,7 +318,14 @@ fn random_documents_roundtrip() {
                                 .rows
                                 .iter()
                                 .flatten()
-                                .filter_map(|c| if let Cell::Text(i) = c { Some(i.clone()) } else { None })
+                                .filter_map(|c| {
+                                    if let Cell::Text(ps) = c {
+                                        Some(ps.iter().map(|p| p.content.clone()))
+                                    } else {
+                                        None
+                                    }
+                                })
+                                .flatten()
                                 .collect(),
                             _ => vec![],
                         }
@@ -333,7 +360,7 @@ fn source_map_points_at_units() {
     assert_eq!(at, vec!['a', 'b', ' ', 'c']);
     assert_eq!(&text[pm.mark..pm.mark + 1], "\n");
     let BlockMapKind::Table(cells) = &p.map.blocks[1].kind else { panic!() };
-    assert_eq!(&text[cells[0][1].as_ref().unwrap().units[0]..][..1], "^");
+    assert_eq!(&text[cells[0][1].as_ref().unwrap()[0].units[0]..][..1], "^");
 }
 
 // ---------------------------------------------------------------- errors
@@ -409,4 +436,118 @@ fn name_errors_list_allowed_names() {
         &names
     )
     .is_empty());
+}
+
+// ---------------------------------------------------------------- §5.2 bullets (DESIGN.md at 6a3530b)
+
+#[test]
+fn spans_three_columns_and_two_by_two_merges() {
+    // `|||` spans three columns; `|| ||` is a || and then another cell.
+    let d = parse(&doc("| a | b | c | d |\n|---|---|---|---|\n| 합계 ||| 215 |\n")).unwrap();
+    let Block::Table(t) = &d.blocks[0] else { panic!() };
+    assert_eq!(t.rows[1][..3], [Cell::text(Inline::plain("합계")), Cell::Left, Cell::Left]);
+    // 2×2: text + || in the first row, ^^ || below.
+    let two = doc("| 합산 || 10 |\n|---|---|---|\n| ^^ || 20 |\n");
+    let d = parse(&two).unwrap();
+    let Block::Table(t) = &d.blocks[0] else { panic!() };
+    assert_eq!(t.rows[1][..2], [Cell::Up, Cell::Left]);
+    assert_eq!(serialize(&d), two);
+}
+
+#[test]
+fn empty_paragraph_lines() {
+    // consecutive <p/> lines stay consecutive; a blank line separates the group
+    let text = doc("앞 문단\n\n<p/>\n<p/>\n<p style=\"좁은 간격\"/>\n\n뒤 문단\n");
+    assert_eq!(roundtrip(&text), text);
+    let d = parse(&text).unwrap();
+    assert_eq!(d.blocks.len(), 5);
+    assert_eq!(d.blocks[1], Block::Para(Para { style: ParaStyle::Plain, content: Inline::default() }));
+    assert_eq!(
+        d.blocks[3],
+        Block::Para(Para { style: ParaStyle::Named("좁은 간격".into()), content: Inline::default() })
+    );
+    // blank lines between them are dropped in canonical form; a <br/> line is text, not an empty paragraph
+    let loose = parse(&doc("<p/>\n\n<p/>\n\n<br/>\n")).unwrap();
+    assert_eq!(serialize(&loose), doc("<p/>\n<p/>\n\n<br/>\n"));
+    assert!(
+        matches!(&loose.blocks[2], Block::Para(p) if p.content.units == vec![Unit { atom: Atom::Break, marks: Marks::NONE }])
+    );
+}
+
+#[test]
+fn p_tag_errors() {
+    for (body, want) in [
+        ("<p></p>\n", "single tags that start a paragraph: no </p>"),
+        ("</p>\n", "no </p>"),
+        ("<p class=\"x\"/>\n", "has no attribute \"class\""),
+        ("<div style=\"Note\"></div>\n", "an empty paragraph is <p style=\"Note\"/>, not an empty <div>"),
+        ("text<p/>more\n", "<p/> inside a line starts a paragraph only in a table cell"),
+        ("| a |\n|---|\n| <div style=\"Note\">x</div> |\n", "cannot contain another <div>"),
+        ("| a |\n|---|\n| **a<p/>b** |\n", "close bold with ** before <p/>"),
+        ("| a |\n|---|\n| x<p></p> |\n", "no </p>"),
+    ] {
+        let e = errors(body);
+        assert!(e.iter().any(|m| m.contains(want)), "{body:?}: {e:?}");
+    }
+    let names = Names { paragraph_styles: Some(vec!["Normal".into(), "표 참고".into()]), ..Default::default() };
+    let e = errors_with("<p style=\"표참고\"/>\n", &names);
+    assert!(e[0].contains("did you mean \"표 참고\"?"), "{e:?}");
+    let e = errors_with("| a |\n|---|\n| x<p style=\"Nope\"/>y |\n", &names);
+    assert!(e[0].contains("Allowed paragraph styles"), "{e:?}");
+}
+
+#[test]
+fn multi_paragraph_cells() {
+    let cp = |style: Option<&str>, t: &str| CellPara { style: style.map(str::to_string), content: Inline::plain(t) };
+    let cell = |src: &str| -> Vec<CellPara> {
+        let d = parse(&doc(&format!("| h |\n|---|\n| {src} |\n"))).unwrap();
+        let Block::Table(t) = &d.blocks[0] else { panic!() };
+        let Cell::Text(ps) = &t.rows[1][0] else { panic!() };
+        ps.clone()
+    };
+    assert_eq!(cell("해운대 1곳<p/>서면 1곳"), vec![cp(None, "해운대 1곳"), cp(None, "서면 1곳")]);
+    assert_eq!(
+        cell("812<p/>부산 신규 2곳<p style=\"표 참고\"/>잠정치"),
+        vec![cp(None, "812"), cp(None, "부산 신규 2곳"), cp(Some("표 참고"), "잠정치")]
+    );
+    // a tag written first starts the first paragraph itself
+    assert_eq!(cell("<p style=\"표 참고\"/>a"), vec![cp(Some("표 참고"), "a")]);
+    assert_eq!(cell("<p/>a"), vec![cp(None, "a")]);
+    // <p/><p/> gives an empty paragraph; a trailing <p/> ends with one
+    assert_eq!(cell("a<p/><p/>b"), vec![cp(None, "a"), cp(None, ""), cp(None, "b")]);
+    assert_eq!(cell("a<p/>"), vec![cp(None, "a"), cp(None, "")]);
+    assert_eq!(cell("<p/><p/>b"), vec![cp(None, ""), cp(None, "b")]);
+    // <br/> is a line break inside one paragraph
+    assert_eq!(cell("a<br/>b").len(), 1);
+    // canonical form drops a leading plain <p/>, keeps the others
+    let text = doc("| h |\n|---|\n| <p/>a<p/>b |\n");
+    assert_eq!(serialize(&parse(&text).unwrap()), doc("| h |\n|---|\n| a<p/>b |\n"));
+    for canon in [
+        "| a<p/><p/>b |",
+        "| <p/><p/>b |",
+        "| a<p/> |",
+        "| <p style=\"표 참고\"/> |",
+        "| <p/><p/> |",
+        "| 지방 | 812 | +4%<p/>부산 신규 2곳<p style=\"표 참고\"/>잠정치 |",
+    ] {
+        let width = canon.matches(" | ").count() + 1;
+        let t = doc(&format!("{}\n|{}\n{canon}\n", "| h ".repeat(width) + "|", "---|".repeat(width)));
+        assert_eq!(roundtrip(&t), t, "{canon}");
+    }
+    // the source map gives each cell paragraph its mark: the next <p/> or the closing pipe
+    let t = doc("| h |\n|---|\n| a<p/>b |\n");
+    let p = parse_with(&t, &Names::default()).unwrap();
+    let BlockMapKind::Table(cells) = &p.map.blocks[0].kind else { panic!() };
+    let ms = cells[1][0].as_ref().unwrap();
+    assert_eq!(&t[ms[0].mark..ms[0].mark + 4], "<p/>");
+    assert_eq!(&t[ms[1].mark..ms[1].mark + 1], "|");
+    assert_eq!(&t[ms[1].units[0]..ms[1].units[0] + 1], "b");
+}
+
+#[test]
+fn table_style_line_sits_on_the_header_row() {
+    let ok = doc("{style=\"Grid Table 4\"}\n| a |\n|---|\n");
+    assert_eq!(roundtrip(&ok), ok);
+    let e = errors("{style=\"Grid Table 4\"}\n\n| a |\n|---|\n");
+    assert!(e[0].contains("directly followed by the header row"), "{e:?}");
 }

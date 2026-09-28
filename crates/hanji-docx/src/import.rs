@@ -5,7 +5,7 @@
 use std::collections::{HashMap, HashSet};
 
 use hanji_core::{Block, Entry, Kind, Meta, Para, StyleDef, StyleSet, Table};
-use hanji_format::{Atom, Cell, Inline, Keep, Marks, Unit};
+use hanji_format::{Atom, Cell, CellPara, Inline, Keep, Marks, Unit};
 
 use crate::ooxml::*;
 use crate::xml::{Element, Node, Scope};
@@ -121,22 +121,14 @@ impl<'a> Importer<'a> {
         for b in fp.bytes() {
             h = (h ^ b as u64).wrapping_mul(0x0100_0000_01b3);
         }
-        let digits: Vec<char> =
-            (0..13).map(|k| char::from_digit(((h >> (k * 5)) & 31) as u32 % 36, 36).unwrap()).collect();
-        for n in 4..=digits.len() {
-            let id: String = std::iter::once('k').chain(digits[..n].iter().copied()).collect();
-            if self.keep_ids.insert(id.clone()) {
-                return id;
-            }
+        // Four base-32 digits; the same object again gets `-2`, `-3`, … in document order.
+        let base: String = std::iter::once('k')
+            .chain((0..4).map(|k| char::from_digit(((h >> (k * 5)) & 31) as u32, 32).unwrap()))
+            .collect();
+        if self.keep_ids.insert(base.clone()) {
+            return base;
         }
-        let mut k = 2;
-        loop {
-            let id = format!("k{}-{k}", digits.iter().collect::<String>());
-            if self.keep_ids.insert(id.clone()) {
-                return id;
-            }
-            k += 1;
-        }
+        (2..).map(|k| format!("{base}-{k}")).find(|id| self.keep_ids.insert(id.clone())).unwrap()
     }
 
     fn keep_entry(
@@ -291,29 +283,29 @@ impl<'a> Importer<'a> {
                 let ps: Vec<&Node> = tc
                     .children
                     .iter()
-                    .filter(|n| !is_blank(n) && !matches!(n, Node::El(e) if e.is("w:tcPr")))
+                    .filter(|n| {
+                        !is_blank(n)
+                            && !matches!(n, Node::El(e) if e.is("w:tcPr") || MARKERS.contains(&e.name.as_str()))
+                    })
                     .collect();
                 let all_p = ps.iter().all(|n| matches!(n, Node::El(e) if e.is("w:p")));
-                if ps.len() != 1 || !all_p {
-                    return Some(if all_p {
-                        format!("cell with {} blocks", ps.len())
+                if ps.is_empty() || !all_p {
+                    let mut kinds: Vec<&str> = ps
+                        .iter()
+                        .filter_map(
+                            |n| if let Node::El(e) = n { (!e.is("w:p")).then(|| e.local()) } else { Some("#text") },
+                        )
+                        .collect();
+                    kinds.sort();
+                    kinds.dedup();
+                    return Some(if ps.is_empty() {
+                        "cell without a paragraph".into()
                     } else {
-                        let mut kinds: Vec<&str> = ps
-                            .iter()
-                            .filter_map(|n| {
-                                if let Node::El(e) = n {
-                                    (!e.is("w:p")).then(|| e.local())
-                                } else {
-                                    Some("#text")
-                                }
-                            })
-                            .collect();
-                        kinds.sort();
-                        kinds.dedup();
                         format!("cell holds {}", kinds.join(","))
                     });
                 }
-                let Node::El(p) = ps[0] else { unreachable!() };
+                let paras: Vec<&Element> =
+                    ps.iter().filter_map(|n| if let Node::El(e) = n { Some(e) } else { None }).collect();
                 let tcpr = tc.child("w:tcPr");
                 let span = tcpr
                     .and_then(|t| t.child("w:gridSpan"))
@@ -326,14 +318,14 @@ impl<'a> Importer<'a> {
                     if ri == 0 {
                         return Some("vMerge continue in first row".into());
                     }
-                    if !para_is_blank(p) {
+                    if !paras.iter().all(|p| para_is_blank(p)) {
                         return Some("content in a covered cell".into());
                     }
                 }
                 if tcpr.is_some_and(|t| t.child("w:hMerge").is_some()) {
                     return Some("hMerge".into());
                 }
-                row.push(if covered { Cell::Up } else { Cell::Text(Inline::default()) });
+                row.push(if covered { Cell::Up } else { Cell::text(Inline::default()) });
                 row.extend((1..span).map(|_| Cell::Left));
             }
             grid.push(row);
@@ -403,8 +395,19 @@ impl<'a> Importer<'a> {
                 let xml = std::iter::once(self.frag(&tcs)).chain(tcpr.map(|t| self.frag(t))).collect();
                 let f = self.fp(&[Some(&tcs), tcpr]);
                 self.entry(Kind::Tc, xml, f, &[bi, ri, gc], None, None, Meta::default());
-                let p = tc.child("w:p").unwrap();
-                let para = self.para(p, &[bi, ri, gc])?;
+                let mut paras = vec![];
+                for e in tc.elements().filter(|e| !e.is("w:tcPr")) {
+                    let k = paras.len();
+                    if e.is("w:p") {
+                        let para = self.para(e, &[bi, ri, gc, k])?;
+                        let style = (para.style != self.styles.default_paragraph).then_some(para.style);
+                        paras.push(CellPara { style, content: para.content });
+                    } else {
+                        // A marker between a cell's paragraphs: before paragraph k.
+                        let (x, f) = (self.frag(e), self.fp(&[Some(e)]));
+                        self.entry(Kind::Bmarker, vec![x], f, &[bi, ri, gc, k], None, None, Meta::default());
+                    }
+                }
                 let span = tcpr
                     .and_then(|t| t.child("w:gridSpan"))
                     .and_then(|g| g.get("w:val"))
@@ -416,10 +419,10 @@ impl<'a> Importer<'a> {
                 if covered {
                     row.push(Cell::Up);
                 } else {
-                    if !cell_writable(&para.content) {
+                    if !paras.iter().all(|p| cell_writable(&p.content)) {
                         return Ok(None);
                     }
-                    row.push(Cell::Text(para.content));
+                    row.push(Cell::Text(paras));
                 }
                 row.extend((1..span).map(|_| Cell::Left));
             }
