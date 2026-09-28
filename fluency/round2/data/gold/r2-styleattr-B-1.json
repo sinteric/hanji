@@ -1,0 +1,40 @@
+{
+ "answers": [
+  {
+   "task_id": "memo1-w",
+   "text": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 2026년 10월 영업전략회의 회의록\n\n<div class=\"Body Text\">일시: 2026년 10월 8일(목) 14:00 ~ 15:00</div>\n\n<div class=\"Caption\">표 1. 참석자</div>\n\n<table class=\"Table Grid\">\n| 구분 | 성명 | 소속 |\n|---|---|---|\n| 의장 | 박태윤 | 영업본부 |\n| 참석 | 정다은 | 영업기획팀 |\n| 참석 | 한도윤 | 온라인영업팀 |\n</table>\n\n<div class=\"Intense Quote\">온라인영업팀은 11월 프로모션 계획을 10월 22일까지 보고한다.</div>\n\n<div class=\"Note\">세부 일정은 별도 공지.</div>\n\n<div class=\"Signature\">작성: 영업기획팀 정다은</div>\n"
+  },
+  {
+   "task_id": "memo1-e1",
+   "edits": [
+    {
+     "old": "\n<table class=\"Grid Table 4\">\n| 조치 | 담당 | 기한 |\n",
+     "new": "\n<table class=\"Grid Table 4 Accent 1\">\n| 조치 | 담당 | 기한 |\n"
+    }
+   ]
+  },
+  {
+   "task_id": "memo1-e2",
+   "text": "REFUSE: no style of this file makes text red.",
+   "edits": []
+  },
+  {
+   "task_id": "memo1-e3",
+   "edits": [
+    {
+     "old": "인건비는 동결하되, 신규 채용 5명분은 별도로 반영한다.\n\n<div class=\"Body Text\">마케팅 예산은 온라인 채널 중심으로 재배분한다.</div>\n",
+     "new": "<div class=\"Body Text Indent\">인건비는 동결하되, 신규 채용 5명분은 별도로 반영한다.</div>\n\n<div class=\"Body Text Indent\">마케팅 예산은 온라인 채널 중심으로 재배분한다.</div>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "memo1-e4",
+   "edits": [
+    {
+     "old": "작성: 경영지원팀 박소영 / 확인: 경영지원본부장 이수민\n",
+     "new": "<div class=\"Signature\">작성: 경영지원팀 박소영 / 확인: 경영지원본부장 이수민</div>\n"
+    }
+   ]
+  }
+ ]
+}

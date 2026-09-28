@@ -1,0 +1,40 @@
+{
+ "answers": [
+  {
+   "task_id": "form1-w",
+   "text": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 협력업체 현장 점검 계획\n\n<div style=\"Body Text\">점검 기간: 2026. 11. 2. ~ 11. 20.</div>\n\n<div style=\"Caption\">표 1. 점검 일정</div>\n\n{style=\"Grid Table 4 Accent 1\"}\n| 분야 | 업체 | 점검일 | 점검자 |\n|---|---|---|---|\n| 제조 | 성진테크 | 11월 3일 | 품질팀 김도현 |\n| ^^ | 우림산업 | 11월 5일 | ^^ |\n| ^^ | 한결부품 | 11월 10일 | 품질팀 오세린 |\n| 물류 | 서해운송 | 11월 12일 | 구매팀 정민재 |\n| ^^ | 누리물류 | 11월 19일 | ^^ |\n\n<div style=\"Note\">점검 결과는 11월 27일까지 보고한다.</div>\n"
+  },
+  {
+   "task_id": "form1-e1",
+   "edits": [
+    {
+     "old": "\n| 등급 | 조치 | 시기 | 담당 |\n",
+     "new": "\n{style=\"Grid Table 4\"}\n| 등급 | 조치 | 시기 | 담당 |\n"
+    }
+   ]
+  },
+  {
+   "task_id": "form1-e2",
+   "text": "REFUSE: no table style of this file has a red header row.",
+   "edits": []
+  },
+  {
+   "task_id": "form1-e3",
+   "edits": [
+    {
+     "old": "| ^^ | 한결부품 | 25 | 22 | 11 | 5 | 63 | C |\n",
+     "new": "| ^^ | 한결부품 | 25 | 22 | 11 | 5 | 63 | C |\n\n<div style=\"Caption\">물류 분야</div>\n\n{style=\"Grid Table 4\"}\n| 분야 | 업체 | 품질 | 납기 | 가격 | 협력 | 총점 | 등급 |\n|---|---|---|---|---|---|---|---|\n"
+    }
+   ]
+  },
+  {
+   "task_id": "form1-e4",
+   "edits": [
+    {
+     "old": "\n{style=\"Table Grid\"}\n| 구분 | 항목 | 배점 | 비고 |\n",
+     "new": "\n| 구분 | 항목 | 배점 | 비고 |\n"
+    }
+   ]
+  }
+ ]
+}

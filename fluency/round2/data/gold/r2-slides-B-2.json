@@ -1,0 +1,48 @@
+{
+ "answers": [
+  {
+   "task_id": "deck2-w",
+   "text": "---\ntype: presentation\nformat: pptx\ntemplate: org/sales-deck\nschema: 1\n---\n\nlayout: Section Header\n::title::\n4분기 과제 점검\n::body::\n11월 경영회의\n\n---\n\nlayout: Two Content\n::title::\n과제 진행 현황\n::left::\n- 완료: 원가 절감 TF 구성\n- 완료: 갱신 캠페인 착수\n::right::\n- 진행 중: 파이프라인 점검\n- 지연: 재고 회전율 개선\n::notes::\n지연 과제는 담당 임원이 설명\n\n---\n\nlayout: Title and Content\n::title::\n다음 달 계획\n::body::\n- 재고 회전율 개선안 보고\n- 인력 재배치안 확정\n- 12월 경영회의 준비\n\n---\n\nlayout: Title Only\n::title::\nQ&A\n"
+  },
+  {
+   "task_id": "deck2-e1",
+   "edits": [
+    {
+     "old": "<shape id=\"s4\" name=\"기준\">기준: 3분기 누계, 잠정치</shape>\n",
+     "new": "<shape id=\"s4\" name=\"기준\">기준: 3분기 누계, 잠정치</shape>\n\n---\n\nlayout: Two Content\n::title::\n고객 만족도\n::left::\n- 3분기: 4.3 / 5.0\n- 2분기: 4.1 / 5.0\n::right::\n- 불만 접수: 132건\n- 평균 처리: 2.4일\n::notes::\n질문 시 상세 설명\n<shape id=\"s11\" name=\"출처\">출처: 고객지원센터 월간 보고</shape>\n"
+    },
+    {
+     "old": "\nlayout: Two Content\n::title::\n고객 만족도\n::left::\n- 3분기: 4.3 / 5.0\n- 2분기: 4.1 / 5.0\n::right::\n- 불만 접수: 132건\n- 평균 처리: 2.4일\n::notes::\n질문 시 상세 설명\n<shape id=\"s11\" name=\"출처\">출처: 고객지원센터 월간 보고</shape>\n\n---\n\nlayout: Title and Content\n",
+     "new": "\nlayout: Title and Content\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e2",
+   "edits": [
+    {
+     "old": "Q&A\n",
+     "new": "Q&A\n\n---\n\nlayout: Two Content\n::title::\n부록: 사업부별 수주 현황\n::left::\n- 부품: 목표 대비 80%\n- 완성품: 목표 대비 95%\n::right::\n- 서비스: 목표 대비 90%\n- 전사: 목표 대비 88%\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e3",
+   "edits": [
+    {
+     "old": "- 서비스 계약 갱신 캠페인\n",
+     "new": "- 서비스 계약 갱신 캠페인\n\n---\n\nlayout: Title and Content\n::title::\n4분기 과제 (계속)\n::body::\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e4",
+   "edits": [
+    {
+     "old": "- 고객 만족도: 4.3 / 5.0\n",
+     "new": "- 고객 만족도: 4.3 / 5.0\n::notes::\n수치는 잠정치, 10월 20일 확정\n"
+    }
+   ]
+  }
+ ]
+}

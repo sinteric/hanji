@@ -1,0 +1,44 @@
+{
+ "answers": [
+  {
+   "task_id": "report3-w",
+   "text": "---\ntype: document\nformat: hwpx\ntemplate: org/gov-form\nschema: 1\n---\n\n# 2026년 하반기 청사 시설 점검 계획\n\n<table>\n<tr><th>구역</th><th>층</th><th>점검 항목</th><th>점검일</th><th>담당</th></tr>\n<tr><td rowspan=\"3\">본관</td><td rowspan=\"2\">1~3층</td><td>소방 설비</td><td>10월 12일</td><td rowspan=\"3\">시설관리팀</td></tr>\n<tr><td>전기 설비</td><td>10월 13일</td></tr>\n<tr><td>4~6층</td><td>소방 설비</td><td>10월 14일</td></tr>\n<tr><td rowspan=\"2\">별관</td><td rowspan=\"2\">전층</td><td>소방 설비</td><td>10월 19일</td><td rowspan=\"2\">외부 위탁</td></tr>\n<tr><td>승강기</td><td>10월 20일</td></tr>\n</table>\n\n점검 결과는 10월 30일까지 시설관리팀에 제출한다.\n"
+  },
+  {
+   "task_id": "report3-e1",
+   "edits": [
+    {
+     "old": "<tr><th>분야</th><th>사업명</th><th>담당 부서</th><th>2026 예산</th><th>2027 요구</th><th>증감</th></tr>\n<tr><td rowspan=\"3\">행정</td><td>전자결재 고도화</td><td rowspan=\"3\">기획예산과</td><td>320</td><td>410</td><td>+90</td></tr>\n<tr><td>민원 키오스크 유지보수</td><td>180</td><td>120</td><td>-60</td></tr>\n<tr><td>행정정보 DB 이중화</td><td>250</td><td>300</td><td>+50</td></tr>\n<tr><td rowspan=\"2\">교통</td><td>스마트 교차로 확대</td><td rowspan=\"2\">교통정책과</td><td>900</td><td>1,150</td><td>+250</td></tr>\n<tr><td>버스정보시스템 교체</td><td>620</td><td>700</td><td>+80</td></tr>\n<tr><td rowspan=\"2\">안전</td><td>CCTV 통합관제 증설</td><td>안전총괄과</td><td>1,050</td><td>1,120</td><td>+70</td></tr>\n<tr><td>재난문자 연계 개선</td><td>재난대응과</td><td>170</td><td>160</td><td>-10</td></tr>\n<tr><td>복지</td><td>돌봄 서비스 플랫폼</td><td>복지정책과</td><td>1,000</td><td>900</td><td>-100</td></tr>\n<tr><td colspan=\"3\">합계</td><td>4,490</td><td>4,860</td><td>+370</td></tr>\n",
+     "new": "<tr><th>분야</th><th>사업명</th><th>비고</th><th>담당 부서</th><th>2026 예산</th><th>2027 요구</th><th>증감</th></tr>\n<tr><td rowspan=\"3\">행정</td><td>전자결재 고도화</td><td>클라우드 전환</td><td rowspan=\"3\">기획예산과</td><td>320</td><td>410</td><td>+90</td></tr>\n<tr><td>민원 키오스크 유지보수</td><td>계약 만료</td><td>180</td><td>120</td><td>-60</td></tr>\n<tr><td>행정정보 DB 이중화</td><td></td><td>250</td><td>300</td><td>+50</td></tr>\n<tr><td rowspan=\"2\">교통</td><td>스마트 교차로 확대</td><td>국비 50%</td><td rowspan=\"2\">교통정책과</td><td>900</td><td>1,150</td><td>+250</td></tr>\n<tr><td>버스정보시스템 교체</td><td></td><td>620</td><td>700</td><td>+80</td></tr>\n<tr><td rowspan=\"2\">안전</td><td>CCTV 통합관제 증설</td><td>국비 30%</td><td>안전총괄과</td><td>1,050</td><td>1,120</td><td>+70</td></tr>\n<tr><td>재난문자 연계 개선</td><td></td><td>재난대응과</td><td>170</td><td>160</td><td>-10</td></tr>\n<tr><td>복지</td><td>돌봄 서비스 플랫폼</td><td></td><td>복지정책과</td><td>1,000</td><td>900</td><td>-100</td></tr>\n<tr><td colspan=\"4\">합계</td><td>4,490</td><td>4,860</td><td>+370</td></tr>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "report3-e2",
+   "edits": [
+    {
+     "old": "<tr><td rowspan=\"3\">행정</td><td>전자결재 고도화</td><td rowspan=\"3\">기획예산과</td><td>320</td><td>410</td><td>+90</td></tr>\n<tr><td>민원 키오스크 유지보수</td><td>180</td><td>120</td><td>-60</td></tr>\n<tr><td>행정정보 DB 이중화</td><td>250</td><td>300</td><td>+50</td></tr>\n",
+     "new": "<tr><td rowspan=\"3\">행정</td><td>전자결재 고도화</td><td rowspan=\"2\">기획예산과</td><td>320</td><td>410</td><td>+90</td></tr>\n<tr><td>민원 키오스크 유지보수</td><td>180</td><td>120</td><td>-60</td></tr>\n<tr><td>행정정보 DB 이중화</td><td>정보통신과</td><td>250</td><td>300</td><td>+50</td></tr>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "report3-e3",
+   "edits": [
+    {
+     "old": "<tr><td>6급</td><td>정규직</td><td>4</td><td>280</td></tr>\n<tr><td>6급</td><td>기간제</td><td>1</td><td>55</td></tr>\n<tr><td>7급</td><td>정규직</td><td>3</td><td>180</td></tr>\n<tr><td>7급</td><td>기간제</td><td>2</td><td>96</td></tr>\n",
+     "new": "<tr><td rowspan=\"2\">6급</td><td>정규직</td><td>4</td><td>280</td></tr>\n<tr><td>기간제</td><td>1</td><td>55</td></tr>\n<tr><td rowspan=\"2\">7급</td><td>정규직</td><td>3</td><td>180</td></tr>\n<tr><td>기간제</td><td>2</td><td>96</td></tr>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "report3-e4",
+   "edits": [
+    {
+     "old": "<tr><td rowspan=\"2\">교통</td><td>스마트 교차로 확대</td><td rowspan=\"2\">교통정책과</td><td>900</td><td>1,150</td><td>+250</td></tr>\n",
+     "new": "<tr><td rowspan=\"3\">교통</td><td>교통 빅데이터 분석</td><td rowspan=\"3\">교통정책과</td><td>0</td><td>230</td><td>+230</td></tr>\n<tr><td>스마트 교차로 확대</td><td>900</td><td>1,150</td><td>+250</td></tr>\n"
+    }
+   ]
+  }
+ ]
+}

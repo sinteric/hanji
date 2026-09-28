@@ -1,0 +1,152 @@
+{
+ "unit_id": "r2-styleattr-A-2",
+ "decision": "styleattr",
+ "candidate": "A",
+ "replicate": 2,
+ "names": {
+  "paragraph_styles": [
+   "Body Text",
+   "Key Message",
+   "Key Message Small",
+   "Callout",
+   "Callout Warning",
+   "Footnote Text",
+   "Caption"
+  ],
+  "table_styles": [
+   "Light List",
+   "Light List Accent 2",
+   "Medium Shading 1",
+   "Medium Shading 1 Accent 2"
+  ]
+ },
+ "fm": {
+  "type": "document",
+  "format": "docx",
+  "template": "org/report",
+  "schema": "1"
+ },
+ "shape_ids": [],
+ "seed": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 이천 통합 물류센터 구축 제안서\n\n<div style=\"Body Text\">제안 부서: 물류혁신TF / 제출일: 2026년 9월 30일 / 보고 대상: 경영위원회</div>\n\n## 1. 추진 배경\n\n<div style=\"Key Message\">분산된 3개 창고를 하나로 통합해 연간 물류비 18%를 절감한다.</div>\n\n<div style=\"Body Text\">현재 수도권 물량은 이천, 용인, 광주(경기) 3개 임차 창고에서 나누어 처리하고 있다.</div>\n\n<div style=\"Body Text\">창고 간 재고 이동이 월 1,200건에 달하고, 출고 리드타임은 평균 2일이다.</div>\n\n<div style=\"Body Text\">온라인 주문 증가로 2025년 이후 일 출고 건수가 해마다 15%씩 늘고 있다.</div>\n\n<div style=\"Callout\">임차 계약 3건 중 2건이 2027년 6월에 만료된다.</div>\n\n<div style=\"Caption\">표 1. 현행 창고 현황</div>\n\n<table style=\"Light List\">\n| 창고 | 면적 (㎡) | 일 출고 (건) | 계약 만료 |\n|---|---|---|---|\n| 이천 | 9,900 | 8,000 | 2027년 6월 |\n| 용인 | 6,600 | 5,500 | 2027년 6월 |\n| 광주(경기) | 4,300 | 3,200 | 2028년 12월 |\n</table>\n\n## 2. 추진 방안\n\n<div style=\"Key Message Small\">이천 부지에 연면적 23,000㎡ 규모의 통합 센터를 신축한다.</div>\n\n<div style=\"Body Text\">자동 분류기와 WMS를 도입하고, 용인·광주 창고는 계약 만료 시 반납한다.</div>\n\n<div style=\"Body Text\">신축 센터는 지상 4층 규모로, 1~2층은 입출고 구역, 3~4층은 보관 구역으로 쓴다.</div>\n\n<div style=\"Footnote Text\">연면적은 기본 설계 전 추정치이다.</div>\n\n공사 기간 중 성수기 물량이 몰리면 출고 지연이 생길 수 있다.\n\n<div style=\"Caption\">표 2. 투자 계획 (단위: 억 원)</div>\n\n<table style=\"Medium Shading 1\">\n| 항목 | 2027년 | 2028년 | 합계 |\n|---|---|---|---|\n| 토지·건축 | 180 | 60 | 240 |\n| 설비 | 40 | 55 | 95 |\n| 시스템 | 12 | 18 | 30 |\n| 합계 | 232 | 133 | 365 |\n</table>\n\n<div style=\"Footnote Text\">금액은 VAT 별도, 설계 전 추정치이다.</div>\n\n## 3. 기대 효과\n\n<div style=\"Body Text\">통합 후 연간 물류비 18% 절감과 출고 리드타임 단축이 예상된다.</div>\n\n<div style=\"Caption\">표 3. 기대 효과</div>\n\n<table style=\"Medium Shading 1\">\n| 항목 | 현행 | 통합 후 |\n|---|---|---|\n| 연간 물류비 | 142억 원 | 116억 원 |\n| 출고 리드타임 | 2일 | 1일 |\n| 창고 간 재고 이동 | 월 1,200건 | 없음 |\n</table>\n\n<div style=\"Callout\">물류비 절감액은 연간 약 26억 원으로 추정된다.</div>\n\n<div style=\"Footnote Text\">금액은 VAT 별도, 설계 전 추정치이다.</div>\n\n## 4. 추진 일정\n\n<div style=\"Key Message Small\">2028년 6월 통합 센터 가동을 목표로 한다.</div>\n\n<div style=\"Caption\">표 4. 추진 일정</div>\n\n<table style=\"Light List\">\n| 단계 | 기간 | 내용 |\n|---|---|---|\n| 설계 | 2027년 1월 ~ 4월 | 기본·실시 설계 |\n| 시공 | 2027년 5월 ~ 2028년 4월 | 건축 및 설비 공사 |\n| 이전 | 2028년 5월 ~ 6월 | 재고 이전 및 시범 운영 |\n</table>\n\n<div style=\"Body Text\">이전 기간에는 기존 이천 창고 운영을 유지해 출고 공백을 막는다.</div>\n\n<div style=\"Callout\">이사회 승인 후 설계 발주까지 약 2개월이 소요된다.</div>\n\n## 5. 위험 요인 및 대응\n\n<div style=\"Callout Warning\">인허가가 지연되면 착공이 최대 3개월 늦어질 수 있다.</div>\n\n<div style=\"Body Text\">인허가는 설계 단계부터 이천시와 사전 협의를 진행해 지연 가능성을 줄인다.</div>\n\n<div style=\"Caption\">표 5. 위험 요인별 대응</div>\n\n<table style=\"Light List\">\n| 위험 요인 | 영향 | 대응 |\n|---|---|---|\n| 인허가 지연 | 착공 지연 | 설계 단계 사전 협의 |\n| 공사비 상승 | 투자비 증가 | 주요 자재 단가 계약 |\n| 성수기 출고 지연 | 고객 불만 | 임시 창고 확보 |\n</table>\n\n## 6. 요청 사항\n\n<div style=\"Key Message Small\">경영위원회에 투자 계획 승인을 요청한다.</div>\n\n<div style=\"Body Text\">승인 시 10월 중 설계 용역을 발주하고, 11월에 이천시와 인허가 사전 협의를 시작한다.</div>\n\n## 7. 검토 의견\n\n<div style=\"Body Text\">재무팀: 2027년 차입 한도 안에서 조달할 수 있다.</div>\n\n<div style=\"Body Text\">법무팀: 임차 계약에 중도 해지 조항은 없으며, 만료 시 원상 복구 의무가 있다.</div>\n\n<div style=\"Body Text\">인사팀: 용인 창고 인력 32명은 이천 센터로 전환 배치한다.</div>\n\n<div style=\"Footnote Text\">금액은 VAT 별도, 설계 전 추정치이다.</div>\n",
+ "tasks": [
+  {
+   "task_id": "memo2-w",
+   "type": "write",
+   "instruction": "Write a new document, in this order: a heading level 1 \"용인 창고 반납 계획\"; the main point of the document, \"용인 창고는 2027년 6월 계약 만료와 함께 반납한다.\", as a large bold statement; the ordinary body paragraph \"재고는 2027년 4월부터 이천 센터로 단계적으로 옮긴다.\"; the label \"표 1. 반납 일정\" in the file's style for a label above a table; directly after it a table whose only line is a thin orange line under the header row, with the columns 단계, 시기 and the rows 재고 이전 / 2027년 4월 ~ 5월 and 원상 복구 / 2027년 6월; the source line \"자료: 물류혁신TF\" in small text for sources; and the risk \"원상 복구 비용이 보증금을 넘을 수 있다.\" in a box with an orange border.",
+   "front_matter": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---",
+   "expect": {
+    "mode": "subsequence",
+    "items": [
+     {
+      "k": "h",
+      "level": 1,
+      "text": "용인 창고 반납 계획"
+     },
+     {
+      "k": "p",
+      "style": "Key Message",
+      "text": "용인 창고는 2027년 6월 계약 만료와 함께 반납한다."
+     },
+     {
+      "k": "p",
+      "style": "Body Text",
+      "text": "재고는 2027년 4월부터 이천 센터로 단계적으로 옮긴다."
+     },
+     {
+      "k": "p",
+      "style": "Caption",
+      "text": "표 1. 반납 일정"
+     },
+     {
+      "k": "table",
+      "style": "Light List Accent 2",
+      "grid": {
+       "rows": 3,
+       "cols": 2,
+       "cells": [
+        [
+         0,
+         0,
+         "단계",
+         1,
+         1,
+         true
+        ],
+        [
+         0,
+         1,
+         "시기",
+         1,
+         1,
+         true
+        ],
+        [
+         1,
+         0,
+         "재고 이전",
+         1,
+         1,
+         false
+        ],
+        [
+         1,
+         1,
+         "2027년 4월 ~ 5월",
+         1,
+         1,
+         false
+        ],
+        [
+         2,
+         0,
+         "원상 복구",
+         1,
+         1,
+         false
+        ],
+        [
+         2,
+         1,
+         "2027년 6월",
+         1,
+         1,
+         false
+        ]
+       ]
+      }
+     },
+     {
+      "k": "p",
+      "style": "Footnote Text",
+      "text": "자료: 물류혁신TF"
+     },
+     {
+      "k": "p",
+      "style": "Callout Warning",
+      "text": "원상 복구 비용이 보증금을 넘을 수 있다."
+     }
+    ]
+   }
+  },
+  {
+   "task_id": "memo2-e1",
+   "type": "edit",
+   "instruction": "The sentence \"공사 기간 중 성수기 물량이 몰리면 출고 지연이 생길 수 있다.\" describes a risk. Give it the file's style for risks. Change nothing else."
+  },
+  {
+   "task_id": "memo2-e2",
+   "type": "edit",
+   "instruction": "Give the table under \"2. 추진 방안\" the orange version of its current style. Change nothing else."
+  },
+  {
+   "task_id": "memo2-e3",
+   "type": "edit",
+   "instruction": "In the paragraph under \"3. 기대 효과\", highlight the phrase \"연간 물류비 18% 절감\" in yellow."
+  },
+  {
+   "task_id": "memo2-e4",
+   "type": "edit",
+   "instruction": "Right after the heading \"3. 기대 효과\", add the paragraph \"출고 리드타임을 2일에서 1일로 줄인다.\" as a secondary main-point statement, at body size."
+  }
+ ]
+}

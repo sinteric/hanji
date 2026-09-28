@@ -1,0 +1,266 @@
+[
+ {
+  "unit_id": "r2-merge-A-1",
+  "decision": "merge",
+  "candidate": "A",
+  "replicate": 1,
+  "prompt_file": "prompts/r2-merge-A-1.md",
+  "prompt_chars": 9728,
+  "seed_chars": 4983,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r2-merge-B-1",
+  "decision": "merge",
+  "candidate": "B",
+  "replicate": 1,
+  "prompt_file": "prompts/r2-merge-B-1.md",
+  "prompt_chars": 7783,
+  "seed_chars": 3060,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r2-merge-A-2",
+  "decision": "merge",
+  "candidate": "A",
+  "replicate": 2,
+  "prompt_file": "prompts/r2-merge-A-2.md",
+  "prompt_chars": 8996,
+  "seed_chars": 4574,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r2-merge-B-2",
+  "decision": "merge",
+  "candidate": "B",
+  "replicate": 2,
+  "prompt_file": "prompts/r2-merge-B-2.md",
+  "prompt_chars": 7412,
+  "seed_chars": 3012,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r2-merge-A-3",
+  "decision": "merge",
+  "candidate": "A",
+  "replicate": 3,
+  "prompt_file": "prompts/r2-merge-A-3.md",
+  "prompt_chars": 9230,
+  "seed_chars": 4628,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r2-merge-B-3",
+  "decision": "merge",
+  "candidate": "B",
+  "replicate": 3,
+  "prompt_file": "prompts/r2-merge-B-3.md",
+  "prompt_chars": 7599,
+  "seed_chars": 3019,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r2-styleattr-A-1",
+  "decision": "styleattr",
+  "candidate": "A",
+  "replicate": 1,
+  "prompt_file": "prompts/r2-styleattr-A-1.md",
+  "prompt_chars": 8058,
+  "seed_chars": 3045,
+  "refusal_tasks": [
+   "memo1-e2"
+  ]
+ },
+ {
+  "unit_id": "r2-styleattr-B-1",
+  "decision": "styleattr",
+  "candidate": "B",
+  "replicate": 1,
+  "prompt_file": "prompts/r2-styleattr-B-1.md",
+  "prompt_chars": 8058,
+  "seed_chars": 3045,
+  "refusal_tasks": [
+   "memo1-e2"
+  ]
+ },
+ {
+  "unit_id": "r2-styleattr-A-2",
+  "decision": "styleattr",
+  "candidate": "A",
+  "replicate": 2,
+  "prompt_file": "prompts/r2-styleattr-A-2.md",
+  "prompt_chars": 7728,
+  "seed_chars": 3017,
+  "refusal_tasks": [
+   "memo2-e3"
+  ]
+ },
+ {
+  "unit_id": "r2-styleattr-B-2",
+  "decision": "styleattr",
+  "candidate": "B",
+  "replicate": 2,
+  "prompt_file": "prompts/r2-styleattr-B-2.md",
+  "prompt_chars": 7728,
+  "seed_chars": 3017,
+  "refusal_tasks": [
+   "memo2-e3"
+  ]
+ },
+ {
+  "unit_id": "r2-styleattr-A-3",
+  "decision": "styleattr",
+  "candidate": "A",
+  "replicate": 3,
+  "prompt_file": "prompts/r2-styleattr-A-3.md",
+  "prompt_chars": 7694,
+  "seed_chars": 3036,
+  "refusal_tasks": [
+   "memo3-e2"
+  ]
+ },
+ {
+  "unit_id": "r2-styleattr-B-3",
+  "decision": "styleattr",
+  "candidate": "B",
+  "replicate": 3,
+  "prompt_file": "prompts/r2-styleattr-B-3.md",
+  "prompt_chars": 7694,
+  "seed_chars": 3036,
+  "refusal_tasks": [
+   "memo3-e2"
+  ]
+ },
+ {
+  "unit_id": "r2-tablestyle-A-1",
+  "decision": "tablestyle",
+  "candidate": "A",
+  "replicate": 1,
+  "prompt_file": "prompts/r2-tablestyle-A-1.md",
+  "prompt_chars": 8734,
+  "seed_chars": 3152,
+  "refusal_tasks": [
+   "form1-e2"
+  ]
+ },
+ {
+  "unit_id": "r2-tablestyle-B-1",
+  "decision": "tablestyle",
+  "candidate": "B",
+  "replicate": 1,
+  "prompt_file": "prompts/r2-tablestyle-B-1.md",
+  "prompt_chars": 8617,
+  "seed_chars": 3062,
+  "refusal_tasks": [
+   "form1-e2"
+  ]
+ },
+ {
+  "unit_id": "r2-tablestyle-A-2",
+  "decision": "tablestyle",
+  "candidate": "A",
+  "replicate": 2,
+  "prompt_file": "prompts/r2-tablestyle-A-2.md",
+  "prompt_chars": 8744,
+  "seed_chars": 3098,
+  "refusal_tasks": [
+   "form2-e3"
+  ]
+ },
+ {
+  "unit_id": "r2-tablestyle-B-2",
+  "decision": "tablestyle",
+  "candidate": "B",
+  "replicate": 2,
+  "prompt_file": "prompts/r2-tablestyle-B-2.md",
+  "prompt_chars": 8642,
+  "seed_chars": 3023,
+  "refusal_tasks": [
+   "form2-e3"
+  ]
+ },
+ {
+  "unit_id": "r2-tablestyle-A-3",
+  "decision": "tablestyle",
+  "candidate": "A",
+  "replicate": 3,
+  "prompt_file": "prompts/r2-tablestyle-A-3.md",
+  "prompt_chars": 8849,
+  "seed_chars": 3144,
+  "refusal_tasks": [
+   "form3-e3"
+  ]
+ },
+ {
+  "unit_id": "r2-tablestyle-B-3",
+  "decision": "tablestyle",
+  "candidate": "B",
+  "replicate": 3,
+  "prompt_file": "prompts/r2-tablestyle-B-3.md",
+  "prompt_chars": 8747,
+  "seed_chars": 3069,
+  "refusal_tasks": [
+   "form3-e3"
+  ]
+ },
+ {
+  "unit_id": "r2-slides-A-1",
+  "decision": "slides",
+  "candidate": "A",
+  "replicate": 1,
+  "prompt_file": "prompts/r2-slides-A-1.md",
+  "prompt_chars": 8378,
+  "seed_chars": 3627,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r2-slides-B-1",
+  "decision": "slides",
+  "candidate": "B",
+  "replicate": 1,
+  "prompt_file": "prompts/r2-slides-B-1.md",
+  "prompt_chars": 7855,
+  "seed_chars": 3041,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r2-slides-A-2",
+  "decision": "slides",
+  "candidate": "A",
+  "replicate": 2,
+  "prompt_file": "prompts/r2-slides-A-2.md",
+  "prompt_chars": 8341,
+  "seed_chars": 3654,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r2-slides-B-2",
+  "decision": "slides",
+  "candidate": "B",
+  "replicate": 2,
+  "prompt_file": "prompts/r2-slides-B-2.md",
+  "prompt_chars": 7766,
+  "seed_chars": 3016,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r2-slides-A-3",
+  "decision": "slides",
+  "candidate": "A",
+  "replicate": 3,
+  "prompt_file": "prompts/r2-slides-A-3.md",
+  "prompt_chars": 8228,
+  "seed_chars": 3667,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r2-slides-B-3",
+  "decision": "slides",
+  "candidate": "B",
+  "replicate": 3,
+  "prompt_file": "prompts/r2-slides-B-3.md",
+  "prompt_chars": 7639,
+  "seed_chars": 3015,
+  "refusal_tasks": []
+ }
+]

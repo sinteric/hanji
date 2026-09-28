@@ -1,0 +1,44 @@
+{
+ "answers": [
+  {
+   "task_id": "form3-w",
+   "text": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 2026년 10월 상담원 교육 일정\n\n<div style=\"Caption\">표 1. 교육 일정</div>\n\n{style=\"Light Grid\"}\n| 주차 | 과정 | 대상 | 시간 |\n|---|---|---|---|\n| 1주차 | 응대 화법 | 신입 상담원 | 4시간 |\n| ^^ | 불만 고객 응대 | ^^ | ^^ |\n| 2주차 | 환불 규정 개정 안내 | 전 상담원 | 2시간 |\n| ^^ | 채팅 상담 도구 | ^^ | ^^ |\n| 3주차 | 사례 발표회 (전 상담원 참석) |||\n\n<div style=\"Note\">교육은 매주 수요일 14시에 시작한다.</div>\n"
+  },
+  {
+   "task_id": "form3-e1",
+   "edits": [
+    {
+     "old": "| ^^ | 온라인 | 1.6 | 1.5 | ^^ |\n",
+     "new": "| ^^ | 온라인 | 1.6 | 1.5 | ^^ |\n| ^^ | 모바일 앱 | - | 1.2 | ^^ |\n"
+    }
+   ]
+  },
+  {
+   "task_id": "form3-e2",
+   "edits": [
+    {
+     "old": "\n| 유형 | 대책 | 담당 | 기한 |\n",
+     "new": "\n{style=\"Medium Grid 3 - Accent 1\"}\n| 유형 | 대책 | 담당 | 기한 |\n"
+    }
+   ]
+  },
+  {
+   "task_id": "form3-e3",
+   "text": "REFUSE: no table style of this file sets the table width or column widths.",
+   "edits": []
+  },
+  {
+   "task_id": "form3-e4",
+   "edits": [
+    {
+     "old": "<div style=\"Caption\">표 1. 오프라인 채널 접수 (단위: 건)</div>\n",
+     "new": "<div style=\"Caption\">표 1. 채널별 접수 (단위: 건)</div>\n"
+    },
+    {
+     "old": "\n<div style=\"Body Text\">온라인 채널 접수는 다음과 같다.</div>\n\n<div style=\"Caption\">표 2. 온라인 채널 접수 (단위: 건)</div>\n\n{style=\"Light Grid - Accent 1\"}\n| 채널 | 유형 | 접수 | 처리 완료 | 처리 중 |\n|---|---|---|---|---|\n",
+     "new": ""
+    }
+   ]
+  }
+ ]
+}

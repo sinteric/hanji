@@ -1,0 +1,130 @@
+{
+ "unit_id": "r2-slides-A-1",
+ "decision": "slides",
+ "candidate": "A",
+ "replicate": 1,
+ "names": {
+  "layouts": {
+   "Title Slide": [
+    "title",
+    "body"
+   ],
+   "Title and Content": [
+    "title",
+    "body"
+   ],
+   "Two Content": [
+    "title",
+    "left",
+    "right"
+   ],
+   "Section Header": [
+    "title",
+    "body"
+   ],
+   "Title Only": [
+    "title"
+   ]
+  }
+ },
+ "fm": {
+  "type": "presentation",
+  "format": "pptx",
+  "template": "org/sales-deck",
+  "schema": "1"
+ },
+ "shape_ids": [
+  "s12",
+  "s16",
+  "s4",
+  "s5"
+ ],
+ "seed": "---\ntype: presentation\nformat: pptx\ntemplate: org/sales-deck\nschema: 1\n---\n\n<slide layout=\"Title Slide\">\n<title>2026년 하반기 영업 전략</title>\n<body>영업기획팀 | 2026년 7월 3일</body>\n<notes>인사 후 30초 안에 핵심 요약</notes>\n</slide>\n\n<slide layout=\"Title and Content\">\n<title>목차</title>\n<body>\n- 상반기 실적 요약\n- 시장 환경\n- 하반기 목표\n- 실행 계획\n- 요청 사항\n</body>\n</slide>\n\n<slide layout=\"Section Header\">\n<title>상반기 실적 요약</title>\n<body>1월 ~ 6월 누계</body>\n</slide>\n\n<slide layout=\"Title and Content\">\n<title>상반기 핵심 지표</title>\n<body>\n- 매출 1조 2,480억 원 (전년 대비 +12%)\n- 영업이익 1,340억 원 (전년 대비 +9%)\n- 신규 고객 412곳\n- 고객 유지율 91%\n</body>\n<notes>전년 대비 수치는 재무팀 확정치</notes>\n<shape id=\"s4\" name=\"출처\">출처: 재무팀 결산 (2026. 7. 1.)</shape>\n</slide>\n\n<slide layout=\"Two Content\">\n<title>권역별 매출</title>\n<left>\n- 수도권 5,120억 원\n- 영남권 3,260억 원\n- 충청권 1,480억 원\n</left>\n<right>\n- 호남권 1,390억 원\n- 강원권 610억 원\n- 제주 620억 원\n</right>\n<notes>권역 구분은 2026년 조직 기준</notes>\n<shape id=\"s5\" name=\"단위\">단위: 억 원, 상반기 누계</shape>\n</slide>\n\n<slide layout=\"Title and Content\">\n<title>상반기 성과 요인</title>\n<body>\n- 수도권 대형 거래처 3곳 신규 계약\n- 온라인 채널 매출 +31%\n- 생활용품 매출 전년 대비 +12%\n</body>\n</slide>\n\n<slide layout=\"Two Content\">\n<title>상반기 채널별 매출</title>\n<left>\n- 오프라인 7,740억 원 (전년 대비 +5%)\n- 대형마트 3,900억 원\n- 대리점 3,840억 원\n</left>\n<right>\n- 온라인 4,740억 원 (전년 대비 +31%)\n- 자사몰 2,100억 원\n- 오픈마켓 2,640억 원\n</right>\n<notes>온라인 비중 38%로 확대</notes>\n</slide>\n\n<slide layout=\"Section Header\">\n<title>시장 환경</title>\n<body>하반기 전망</body>\n</slide>\n\n<slide layout=\"Title and Content\">\n<title>하반기 시장 전망</title>\n<body>\n- 소비 심리 완만한 회복 예상\n- 원자재 가격 안정세\n- 온라인 채널 경쟁 심화\n- 경쟁사 A 가격 인하 (평균 -5%)\n- 경쟁사 B 신제품 2종 출시 예정\n- 물류비 상승 지속 (+4%)\n- 환율 변동성 확대\n- 정부 소비 촉진 정책 (10월)\n</body>\n<notes>경쟁사 동향은 질문 시 설명</notes>\n</slide>\n\n<slide layout=\"Title and Content\">\n<title>경쟁사 동향</title>\n<body>\n- 경쟁사 A: 가격 인하 (평균 -5%), 대형마트 행사 확대\n- 경쟁사 B: 신제품 2종 출시 예정 (9월)\n- 경쟁사 C: 온라인 전용 브랜드 출시\n</body>\n<notes>경쟁사 동향은 질문 시 설명</notes>\n</slide>\n\n<slide layout=\"Section Header\">\n<title>하반기 계획</title>\n<body>목표와 실행</body>\n</slide>\n\n<slide layout=\"Title and Content\">\n<title>하반기 목표</title>\n<body>\n- 매출 1조 3,600억 원 (전년 대비 +12%)\n- 신규 고객 450곳\n- 고객 유지율 92%\n</body>\n<notes>목표는 이사회 승인 전 잠정치</notes>\n</slide>\n\n<slide layout=\"Title and Content\">\n<title>권역별 하반기 목표</title>\n<body>\n- 수도권 5,600억 원 (전년 대비 +12%)\n- 영남권 3,500억 원 (전년 대비 +9%)\n- 기타 권역 4,500억 원 (전년 대비 +14%)\n</body>\n<notes>목표는 이사회 승인 전 잠정치</notes>\n</slide>\n\n<slide layout=\"Two Content\">\n<title>채널별 전략</title>\n<left>\n- 오프라인: 대형마트 입점 확대\n- 오프라인: 지역 대리점 교육\n</left>\n<right>\n- 온라인: 자사몰 멤버십 개편\n- 온라인: 라이브 커머스 월 2회\n</right>\n<notes>질문 시 설명</notes>\n</slide>\n\n<slide layout=\"Title and Content\">\n<title>고객 유지 전략</title>\n<body>\n- 멤버십 등급 개편 (4단계 → 3단계)\n- 재구매 고객 쿠폰 자동 발송\n- 이탈 고객 전화 상담 (월 500곳)\n</body>\n<notes>질문 시 설명</notes>\n</slide>\n\n<slide layout=\"Title and Content\">\n<title>실행 계획</title>\n<body>\n- 7월: 조직 개편 및 목표 배분\n- 8월: 신규 거래처 제안\n- 9월: 추석 프로모션\n- 10월 ~ 12월: 연말 성수기 대응\n</body>\n<notes>질문 시 설명</notes>\n</slide>\n\n<slide layout=\"Title and Content\">\n<title>하반기 프로모션</title>\n<body>\n- 8월: 여름 정기 세일 (온라인 단독)\n- 9월: 추석 선물 세트 사전 예약\n- 11월: 블랙프라이데이 기획전\n- 12월: 연말 멤버십 감사 행사\n</body>\n<notes>질문 시 설명</notes>\n</slide>\n\n<slide layout=\"Title Only\">\n<title>요청 사항 요약</title>\n<shape id=\"s12\" name=\"요약표\">요청 사항 3건: 인력 2명, 예산 5억 원, 시스템 1건</shape>\n</slide>\n\n<slide layout=\"Title and Content\">\n<title>요청 사항</title>\n<body>\n- 영업 인력 2명 충원\n- 판촉 예산 5억 원 추가\n- CRM 시스템 고도화\n</body>\n<notes>질문 시 설명</notes>\n</slide>\n\n<slide layout=\"Two Content\">\n<title>기대 효과</title>\n<left>\n- 매출 전년 대비 +12%\n- 신규 고객 450곳\n</left>\n<right>\n- 고객 유지율 92%\n- 영업이익률 11%\n</right>\n<shape id=\"s16\" name=\"주석\">하반기 목표 기준 추정치</shape>\n</slide>\n\n<slide layout=\"Title Slide\">\n<title>감사합니다</title>\n<body>문의: 영업기획팀 (내선 2314)</body>\n</slide>\n",
+ "tasks": [
+  {
+   "task_id": "deck1-w",
+   "type": "write",
+   "instruction": "Write a new presentation with exactly these four slides, in this order:\n1. Layout Title Slide: title \"2026년 4분기 영업 계획\"; body \"영업기획팀 | 2026년 10월 2일\".\n2. Layout Title and Content: title \"4분기 목표\"; body bullets \"매출 3,900억 원\" and \"신규 고객 120곳\"; speaker notes \"목표는 10월 경영회의에서 확정\".\n3. Layout Two Content: title \"채널별 과제\"; left column bullets \"오프라인: 연말 매대 확보\" and \"오프라인: 대리점 판촉 지원\"; right column bullets \"온라인: 블랙프라이데이 기획전\" and \"온라인: 멤버십 전환 캠페인\".\n4. Layout Title Only: title \"질의응답\".",
+   "front_matter": "---\ntype: presentation\nformat: pptx\ntemplate: org/sales-deck\nschema: 1\n---",
+   "expect": {
+    "mode": "exact",
+    "items": [
+     {
+      "layout": "Title Slide",
+      "slots": {
+       "title": [
+        "2026년 4분기 영업 계획"
+       ],
+       "body": [
+        "영업기획팀 | 2026년 10월 2일"
+       ]
+      },
+      "shapes": []
+     },
+     {
+      "layout": "Title and Content",
+      "slots": {
+       "title": [
+        "4분기 목표"
+       ],
+       "body": [
+        "- 매출 3,900억 원",
+        "- 신규 고객 120곳"
+       ],
+       "notes": [
+        "목표는 10월 경영회의에서 확정"
+       ]
+      },
+      "shapes": []
+     },
+     {
+      "layout": "Two Content",
+      "slots": {
+       "title": [
+        "채널별 과제"
+       ],
+       "left": [
+        "- 오프라인: 연말 매대 확보",
+        "- 오프라인: 대리점 판촉 지원"
+       ],
+       "right": [
+        "- 온라인: 블랙프라이데이 기획전",
+        "- 온라인: 멤버십 전환 캠페인"
+       ]
+      },
+      "shapes": []
+     },
+     {
+      "layout": "Title Only",
+      "slots": {
+       "title": [
+        "질의응답"
+       ]
+      },
+      "shapes": []
+     }
+    ]
+   }
+  },
+  {
+   "task_id": "deck1-e1",
+   "type": "edit",
+   "instruction": "Split the slide \"하반기 시장 전망\" into two slides with the same layout. The first keeps the title and the first four bullets; the second, right after it, has the title \"하반기 시장 전망 (계속)\" and the other four bullets. The speaker notes stay with the first slide only."
+  },
+  {
+   "task_id": "deck1-e2",
+   "type": "edit",
+   "instruction": "On the slide \"권역별 매출\", the left column should list only 수도권 and 영남권. Move the bullet \"충청권 1,480억 원\" to the right column, as its last bullet. Change nothing else."
+  },
+  {
+   "task_id": "deck1-e3",
+   "type": "edit",
+   "instruction": "On the slide \"실행 계획\", replace the speaker notes with \"9월 추석 프로모션은 마케팅팀과 공동 진행\". Leave the notes of every other slide as they are."
+  },
+  {
+   "task_id": "deck1-e4",
+   "type": "edit",
+   "instruction": "Right after the slide \"하반기 목표\", add a slide with the two-column layout: title \"목표 대비 리스크\"; left column bullets \"경쟁사 가격 인하\" and \"물류비 상승\"; right column bullets \"대응: 번들 상품 확대\" and \"대응: 물류 거점 통합\"; speaker notes \"리스크 대응 방안은 8월 중 확정\"."
+  }
+ ]
+}

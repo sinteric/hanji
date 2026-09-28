@@ -1,0 +1,130 @@
+{
+ "unit_id": "r2-slides-B-2",
+ "decision": "slides",
+ "candidate": "B",
+ "replicate": 2,
+ "names": {
+  "layouts": {
+   "Title Slide": [
+    "title",
+    "body"
+   ],
+   "Title and Content": [
+    "title",
+    "body"
+   ],
+   "Two Content": [
+    "title",
+    "left",
+    "right"
+   ],
+   "Section Header": [
+    "title",
+    "body"
+   ],
+   "Title Only": [
+    "title"
+   ]
+  }
+ },
+ "fm": {
+  "type": "presentation",
+  "format": "pptx",
+  "template": "org/sales-deck",
+  "schema": "1"
+ },
+ "shape_ids": [
+  "s11",
+  "s14",
+  "s4"
+ ],
+ "seed": "---\ntype: presentation\nformat: pptx\ntemplate: org/sales-deck\nschema: 1\n---\n\nlayout: Title Slide\n::title::\n2026년 3분기 KPI 리뷰\n::body::\n경영기획실 | 2026. 10. 8.\n\n---\n\nlayout: Title and Content\n::title::\n리뷰 순서\n::body::\n- 전사 KPI 요약\n- 사업부별 실적\n- 고객 지표\n- 4분기 과제\n\n---\n\nlayout: Title and Content\n::title::\n리뷰 기준\n::body::\n- 기간: 2026년 7월 ~ 9월\n- 실적: 사업부 보고 잠정치\n- 목표: 2026년 사업계획 (1월 확정)\n\n---\n\nlayout: Section Header\n::title::\n전사 KPI 요약\n::body::\n3분기 누계 기준\n\n---\n\nlayout: Title and Content\n::title::\n전사 KPI\n::body::\n- 매출: 목표 대비 96%\n- 영업이익: 목표 대비 102%\n- 신규 수주: 목표 대비 88%\n- 고객 만족도: 4.3 / 5.0\n<shape id=\"s4\" name=\"기준\">기준: 3분기 누계, 잠정치</shape>\n\n---\n\nlayout: Two Content\n::title::\n목표 대비 실적\n::left::\n- 목표 달성: 영업이익, 고객 만족도\n::right::\n- 목표 미달: 매출, 신규 수주\n::notes::\n미달 항목은 사업부별 실적에서 설명\n\n---\n\nlayout: Title and Content\n::title::\n3분기 주요 이슈\n::body::\n- 원자재 가격 상승 (+7%)\n- 완성품 신제품 2종 조기 출시\n- 서비스 계약 갱신률 94% 유지\n- 부품 수주 2건 4분기로 이월\n::notes::\n이월 수주는 4분기 매출에 반영\n\n---\n\nlayout: Section Header\n::title::\n사업부별 실적\n::body::\n3분기 누계 기준\n\n---\n\nlayout: Title and Content\n::title::\n부품사업부\n::body::\n- 매출: 목표 대비 91%\n- 원가 상승 영향 (원자재 +7%)\n- 신규 수주: 목표 대비 80%\n::notes::\n원가 상승은 4분기까지 지속 전망\n\n---\n\nlayout: Title and Content\n::title::\n완성품사업부\n::body::\n- 매출: 목표 대비 101%\n- 신제품 2종 조기 출시\n- 신규 수주: 목표 대비 95%\n::notes::\n질문 시 상세 설명\n\n---\n\nlayout: Title and Content\n::title::\n서비스사업부\n::body::\n- 매출: 목표 대비 98%\n- 유지보수 계약 갱신률 94%\n- 신규 수주: 목표 대비 90%\n::notes::\n질문 시 상세 설명\n\n---\n\nlayout: Two Content\n::title::\n사업부별 영업이익\n::left::\n- 부품: 목표 대비 94%\n- 완성품: 목표 대비 108%\n::right::\n- 서비스: 목표 대비 103%\n- 전사: 목표 대비 102%\n::notes::\n영업이익은 원가 절감 효과 반영\n\n---\n\nlayout: Title and Content\n::title::\n사업부별 인력\n::body::\n- 부품사업부 412명 (전년 대비 -3%)\n- 완성품사업부 538명 (전년 대비 +2%)\n- 서비스사업부 297명 (전년 대비 +5%)\n::notes::\n질문 시 상세 설명\n\n---\n\nlayout: Title and Content\n::title::\n재고 지표\n::body::\n- 재고 회전율: 목표 6.0회, 실적 5.2회\n- 장기 재고: 전년 대비 +8%\n- 결품률: 1.2% (목표 1.0%)\n::notes::\n질문 시 상세 설명\n\n---\n\nlayout: Section Header\n::title::\n고객 지표\n::body::\n3분기 누계 기준\n\n---\n\nlayout: Two Content\n::title::\n고객 만족도\n::left::\n- 3분기: 4.3 / 5.0\n- 2분기: 4.1 / 5.0\n::right::\n- 불만 접수: 132건\n- 평균 처리: 2.4일\n::notes::\n질문 시 상세 설명\n<shape id=\"s11\" name=\"출처\">출처: 고객지원센터 월간 보고</shape>\n\n---\n\nlayout: Title and Content\n::title::\n불만 유형\n::body::\n- 배송 지연 49%\n- 제품 불량 22%\n- 환불 요청 21%\n- 기타 8%\n::notes::\n질문 시 상세 설명\n<shape id=\"s14\" name=\"출처\">출처: 고객지원센터 월간 보고</shape>\n\n---\n\nlayout: Two Content\n::title::\n채널별 불만 처리\n::left::\n- 오프라인: 평균 2.5일\n- 오프라인 목표: 2.0일\n::right::\n- 온라인: 평균 1.9일\n- 온라인 목표: 1.5일\n- 채팅 비중 28%\n::notes::\n질문 시 상세 설명\n\n---\n\nlayout: Section Header\n::title::\n4분기 계획\n::body::\n과제와 일정\n\n---\n\nlayout: Title and Content\n::title::\n4분기 과제\n::body::\n- 부품사업부 원가 절감 TF 운영\n- 신규 수주 파이프라인 점검 (주 1회)\n- 완성품 신제품 판촉 강화\n- 서비스 계약 갱신 캠페인\n- 고객 불만 처리 1.5일 이내\n- 재고 회전율 개선\n- 인력 재배치 검토\n::notes::\n과제별 담당 임원은 다음 주 확정\n\n---\n\nlayout: Title and Content\n::title::\n4분기 일정\n::body::\n- 10월: 원가 절감 TF 구성\n- 11월: 수주 파이프라인 중간 점검\n- 12월: 연간 실적 예비 집계\n::notes::\n일정은 경영회의 후 확정\n\n---\n\nlayout: Two Content\n::title::\n요청 사항\n::left::\n- 원가 절감 TF 인력 3명\n::right::\n- 재고 관리 시스템 개선 예산 2억 원\n::notes::\n질문 시 상세 설명\n\n---\n\nlayout: Title Only\n::title::\nQ&A\n",
+ "tasks": [
+  {
+   "task_id": "deck2-w",
+   "type": "write",
+   "instruction": "Write a new presentation with exactly these four slides, in this order:\n1. Layout Section Header: title \"4분기 과제 점검\"; body \"11월 경영회의\".\n2. Layout Two Content: title \"과제 진행 현황\"; left column bullets \"완료: 원가 절감 TF 구성\" and \"완료: 갱신 캠페인 착수\"; right column bullets \"진행 중: 파이프라인 점검\" and \"지연: 재고 회전율 개선\"; speaker notes \"지연 과제는 담당 임원이 설명\".\n3. Layout Title and Content: title \"다음 달 계획\"; body bullets \"재고 회전율 개선안 보고\", \"인력 재배치안 확정\" and \"12월 경영회의 준비\".\n4. Layout Title Only: title \"Q&A\".",
+   "front_matter": "---\ntype: presentation\nformat: pptx\ntemplate: org/sales-deck\nschema: 1\n---",
+   "expect": {
+    "mode": "exact",
+    "items": [
+     {
+      "layout": "Section Header",
+      "slots": {
+       "title": [
+        "4분기 과제 점검"
+       ],
+       "body": [
+        "11월 경영회의"
+       ]
+      },
+      "shapes": []
+     },
+     {
+      "layout": "Two Content",
+      "slots": {
+       "title": [
+        "과제 진행 현황"
+       ],
+       "left": [
+        "- 완료: 원가 절감 TF 구성",
+        "- 완료: 갱신 캠페인 착수"
+       ],
+       "right": [
+        "- 진행 중: 파이프라인 점검",
+        "- 지연: 재고 회전율 개선"
+       ],
+       "notes": [
+        "지연 과제는 담당 임원이 설명"
+       ]
+      },
+      "shapes": []
+     },
+     {
+      "layout": "Title and Content",
+      "slots": {
+       "title": [
+        "다음 달 계획"
+       ],
+       "body": [
+        "- 재고 회전율 개선안 보고",
+        "- 인력 재배치안 확정",
+        "- 12월 경영회의 준비"
+       ]
+      },
+      "shapes": []
+     },
+     {
+      "layout": "Title Only",
+      "slots": {
+       "title": [
+        "Q&A"
+       ]
+      },
+      "shapes": []
+     }
+    ]
+   }
+  },
+  {
+   "task_id": "deck2-e1",
+   "type": "edit",
+   "instruction": "Move the slide \"고객 만족도\" (with everything on it) so that it comes right after the slide \"전사 KPI\", before \"목표 대비 실적\". Change nothing else."
+  },
+  {
+   "task_id": "deck2-e2",
+   "type": "edit",
+   "instruction": "At the very end of the deck, after \"Q&A\", add a slide with the two-column layout: title \"부록: 사업부별 수주 현황\"; left column bullets \"부품: 목표 대비 80%\" and \"완성품: 목표 대비 95%\"; right column bullets \"서비스: 목표 대비 90%\" and \"전사: 목표 대비 88%\"."
+  },
+  {
+   "task_id": "deck2-e3",
+   "type": "edit",
+   "instruction": "Split the slide \"4분기 과제\" into two slides with the same layout. The first keeps the title and the first four bullets; the second, right after it, has the title \"4분기 과제 (계속)\" and the remaining three bullets. The speaker notes move to the second slide; the first has none."
+  },
+  {
+   "task_id": "deck2-e4",
+   "type": "edit",
+   "instruction": "Give the slide \"전사 KPI\" the speaker notes \"수치는 잠정치, 10월 20일 확정\". Change nothing else."
+  }
+ ]
+}

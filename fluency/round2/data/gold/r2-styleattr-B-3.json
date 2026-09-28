@@ -1,0 +1,40 @@
+{
+ "answers": [
+  {
+   "task_id": "memo3-w",
+   "text": "---\ntype: document\nformat: hwpx\ntemplate: org/gov-form\nschema: 1\n---\n\n# 2026년 하반기 전통시장 주차장 무료 개방 안내\n\n<div class=\"본문\">○○시는 전통시장 이용 편의를 위해 공영주차장을 무료로 개방합니다.</div>\n\n<div class=\"강조 문단\">개방 기간: 2026. 11. 1. ~ 12. 31.</div>\n\n<div class=\"본문\">대상 주차장은 다음과 같습니다.</div>\n\n<div class=\"본문 들여쓰기\">가. 중앙시장 공영주차장</div>\n\n<div class=\"본문 들여쓰기\">나. 동부시장 공영주차장</div>\n\n<div class=\"본문 들여쓰기 2\">1) 1일 최대 3시간</div>\n\n<table class=\"표 눈금\">\n| 주차장 | 주차면 |\n|---|---|\n| 중앙시장 | 120면 |\n| 동부시장 | 85면 |\n</table>\n\n<div class=\"붙임\">붙임  주차장 위치도 1부.  끝.</div>\n\n<div class=\"발신 명의\">○○시장</div>\n"
+  },
+  {
+   "task_id": "memo3-e1",
+   "edits": [
+    {
+     "old": "<div class=\"본문\">가. 키오스크·테이블 주문 기기 도입비 (최대 300만 원)</div>\n\n<div class=\"본문\">나. 온라인 쇼핑몰 입점 및 상세페이지 제작 (최대 200만 원)</div>\n",
+     "new": "<div class=\"본문 들여쓰기\">가. 키오스크·테이블 주문 기기 도입비 (최대 300만 원)</div>\n\n<div class=\"본문 들여쓰기\">나. 온라인 쇼핑몰 입점 및 상세페이지 제작 (최대 200만 원)</div>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "memo3-e2",
+   "text": "REFUSE: no style of this file draws a red box.",
+   "edits": []
+  },
+  {
+   "task_id": "memo3-e3",
+   "edits": [
+    {
+     "old": "\n<table class=\"눈금 표 4\">\n| 구분 | 서류 | 비고 |\n",
+     "new": "\n<table class=\"눈금 표 4 - 강조색 1\">\n| 구분 | 서류 | 비고 |\n"
+    }
+   ]
+  },
+  {
+   "task_id": "memo3-e4",
+   "edits": [
+    {
+     "old": "○○시장\n",
+     "new": "<div class=\"발신 명의\">○○시장</div>\n"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,40 @@
+{
+ "answers": [
+  {
+   "task_id": "memo2-w",
+   "text": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 용인 창고 반납 계획\n\n<div style=\"Key Message\">용인 창고는 2027년 6월 계약 만료와 함께 반납한다.</div>\n\n<div style=\"Body Text\">재고는 2027년 4월부터 이천 센터로 단계적으로 옮긴다.</div>\n\n<div style=\"Caption\">표 1. 반납 일정</div>\n\n<table style=\"Light List Accent 2\">\n| 단계 | 시기 |\n|---|---|\n| 재고 이전 | 2027년 4월 ~ 5월 |\n| 원상 복구 | 2027년 6월 |\n</table>\n\n<div style=\"Footnote Text\">자료: 물류혁신TF</div>\n\n<div style=\"Callout Warning\">원상 복구 비용이 보증금을 넘을 수 있다.</div>\n"
+  },
+  {
+   "task_id": "memo2-e1",
+   "edits": [
+    {
+     "old": "공사 기간 중 성수기 물량이 몰리면 출고 지연이 생길 수 있다.\n",
+     "new": "<div style=\"Callout Warning\">공사 기간 중 성수기 물량이 몰리면 출고 지연이 생길 수 있다.</div>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "memo2-e2",
+   "edits": [
+    {
+     "old": "\n<table style=\"Medium Shading 1\">\n| 항목 | 2027년 | 2028년 | 합계 |\n",
+     "new": "\n<table style=\"Medium Shading 1 Accent 2\">\n| 항목 | 2027년 | 2028년 | 합계 |\n"
+    }
+   ]
+  },
+  {
+   "task_id": "memo2-e3",
+   "text": "REFUSE: no style of this file highlights text.",
+   "edits": []
+  },
+  {
+   "task_id": "memo2-e4",
+   "edits": [
+    {
+     "old": "## 3. 기대 효과\n",
+     "new": "## 3. 기대 효과\n\n<div style=\"Key Message Small\">출고 리드타임을 2일에서 1일로 줄인다.</div>\n"
+    }
+   ]
+  }
+ ]
+}

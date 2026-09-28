@@ -1,0 +1,213 @@
+{
+ "unit_id": "r2-tablestyle-B-3",
+ "decision": "tablestyle",
+ "candidate": "B",
+ "replicate": 3,
+ "names": {
+  "paragraph_styles": [
+   "Body Text",
+   "Note",
+   "Caption"
+  ],
+  "table_styles": [
+   "Light Grid",
+   "Light Grid - Accent 1",
+   "Medium Grid 3",
+   "Medium Grid 3 - Accent 1"
+  ]
+ },
+ "fm": {
+  "type": "document",
+  "format": "docx",
+  "template": "org/report",
+  "schema": "1"
+ },
+ "shape_ids": [],
+ "seed": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 2026년 9월 고객 불만 처리 현황\n\n<div style=\"Body Text\">작성: 고객지원센터 / 집계 기간: 9월 1일 ~ 9월 30일 / 보고 대상: 고객경험본부장</div>\n\n## 1. 요약\n\n<div style=\"Body Text\">9월 접수 건수는 412건으로 전월 대비 6% 감소했고, 평균 처리 기간은 2.4일이었다.</div>\n\n<div style=\"Body Text\">처리 중인 건은 17건이며, 모두 10월 첫째 주 안에 종결할 예정이다.</div>\n\n- 배송 지연 불만이 전체의 49%\n- 채팅 접수 비중 확대 (24% → 28%)\n- 환불 요청 처리 기간 목표 미달 (목표 1.5일, 실적 1.8일)\n\n## 2. 유형별 접수 현황\n\n<div style=\"Caption\">표 1. 오프라인 채널 접수 (단위: 건)</div>\n\n{style=\"Light Grid - Accent 1\"}\n| 채널 | 유형 | 접수 | 처리 완료 | 처리 중 |\n|---|---|---|---|---|\n| 매장 | 배송 지연 | 42 | 40 | 2 |\n| ^^ | 제품 불량 | 35 | 35 | 0 |\n| ^^ | 환불 요청 | 28 | 26 | 2 |\n| 콜센터 | 배송 지연 | 61 | 58 | 3 |\n| ^^ | 제품 불량 | 30 | 29 | 1 |\n| ^^ | 환불 요청 | 22 | 22 | 0 |\n\n<div style=\"Body Text\">온라인 채널 접수는 다음과 같다.</div>\n\n<div style=\"Caption\">표 2. 온라인 채널 접수 (단위: 건)</div>\n\n{style=\"Light Grid - Accent 1\"}\n| 채널 | 유형 | 접수 | 처리 완료 | 처리 중 |\n|---|---|---|---|---|\n| 홈페이지 | 배송 지연 | 38 | 36 | 2 |\n| ^^ | 제품 불량 | 25 | 25 | 0 |\n| ^^ | 환불 요청 | 17 | 15 | 2 |\n| 채팅 | 배송 지연 | 60 | 57 | 3 |\n| ^^ | 제품 불량 | 32 | 32 | 0 |\n| ^^ | 환불 요청 | 22 | 20 | 2 |\n\n<div style=\"Note\">처리 중 건수는 9월 30일 18시 기준이다.</div>\n\n<div style=\"Body Text\">오프라인 접수는 218건, 온라인 접수는 194건이다.</div>\n\n<div style=\"Body Text\">채팅 접수는 114건으로, 처음으로 콜센터 접수(113건)를 넘었다.</div>\n\n## 3. 처리 기간\n\n<div style=\"Caption\">표 3. 유형별 평균 처리 기간 (단위: 일)</div>\n\n{style=\"Light Grid\"}\n| 유형 | 채널 구분 | 8월 | 9월 | 목표 |\n|---|---|---|---|---|\n| 배송 지연 | 오프라인 | 2.8 | 2.5 | 2.0 |\n| ^^ | 온라인 | 2.2 | 1.9 | ^^ |\n| 제품 불량 | 오프라인 | 3.1 | 2.9 | 2.5 |\n| ^^ | 온라인 | 2.7 | 2.6 | ^^ |\n| 환불 요청 | 오프라인 | 2.0 | 2.1 | 1.5 |\n| ^^ | 온라인 | 1.6 | 1.5 | ^^ |\n\n<div style=\"Note\">목표는 2026년 고객 서비스 기준에 따른 값이다.</div>\n\n<div style=\"Body Text\">환불 요청은 오프라인 처리 기간이 늘어 목표를 넘었다.</div>\n\n<div style=\"Body Text\">배송 지연과 제품 불량은 온라인 채널에서 목표 대비 0.1일 이내로 근접했다.</div>\n\n## 4. 재발 방지 대책\n\n<div style=\"Body Text\">배송 지연 대책은 물류팀과 고객지원센터가 함께 추진한다.</div>\n\n| 유형 | 대책 | 담당 | 기한 |\n|---|---|---|---|\n| 배송 지연 | 권역별 배송 협력사 추가 | 물류팀 | 10월 31일 |\n| ^^ | 지연 예상 시 사전 문자 안내 | 고객지원센터 | 10월 15일 |\n| 제품 불량 | 입고 검사 기준 강화 | 품질팀 | 11월 15일 |\n| 환불 요청 | 환불 처리 단계 축소 (5단계 → 3단계) | 고객지원센터 | 10월 31일 |\n| 공통 | 상담 품질 교육 (전 상담원) | ^^ | 11월 30일 |\n\n<div style=\"Note\">대책별 진행 상황은 매주 월요일 점검한다.</div>\n\n<div style=\"Body Text\">10월 말에 대책별 효과를 1차 점검해 11월 보고에 포함한다.</div>\n\n## 5. 채널별 고객 만족도\n\n<div style=\"Caption\">표 4. 채널별 만족도 (5점 만점)</div>\n\n{style=\"Medium Grid 3\"}\n| 채널 구분 | 채널 | 8월 | 9월 | 증감 |\n|---|---|---|---|---|\n| 오프라인 | 매장 | 4.1 | 4.2 | +0.1 |\n| ^^ | 콜센터 | 3.8 | 3.9 | +0.1 |\n| 온라인 | 홈페이지 | 3.9 | 3.9 | 0.0 |\n| ^^ | 채팅 | 4.0 | 4.3 | +0.3 |\n\n<div style=\"Note\">만족도는 처리 완료 고객 대상 문자 설문 결과이다.</div>\n\n<div style=\"Body Text\">채팅 만족도가 가장 크게 올랐으며, 콜센터 만족도는 여전히 가장 낮다.</div>\n\n## 6. 10월 중점 관리\n\n- 추석 연휴 전후 배송 지연 문의 대응 인력 20% 증원\n- 채팅 상담 응답 시간 1분 이내 유지\n- 환불 처리 단계 축소안 10월 31일 시행\n- 콜센터 상담원 대상 불만 고객 응대 교육 (10월 2주차)\n\n## 7. 우수 상담원\n\n{style=\"Light Grid\"}\n| 채널 | 상담원 | 처리 건수 | 만족도 |\n|---|---|---|---|\n| 콜센터 | 김하늘 | 312 | 4.8 |\n| ^^ | 이준서 | 298 | 4.7 |\n| 채팅 | 박서윤 | 405 | 4.9 |\n\n<div style=\"Note\">우수 상담원은 10월 월례 조회에서 시상한다.</div>\n\n<div style=\"Body Text\">다음 보고는 11월 첫째 주에 한다.</div>\n",
+ "tasks": [
+  {
+   "task_id": "form3-w",
+   "type": "write",
+   "instruction": "Write a new document, in this order: a heading level 1 \"2026년 10월 상담원 교육 일정\"; the label \"표 1. 교육 일정\" in the file's style for a label above a table; directly after it a table with thin gray lines and a bold header row, with the columns 주차, 과정, 대상, 시간 for these rows, in this order (주차 / 과정 / 대상 / 시간):\n- 1주차 / 응대 화법 / 신입 상담원 / 4시간\n- 1주차 / 불만 고객 응대 / 신입 상담원 / 4시간\n- 2주차 / 환불 규정 개정 안내 / 전 상담원 / 2시간\n- 2주차 / 채팅 상담 도구 / 전 상담원 / 2시간\n- 3주차 / 사례 발표회 (전 상담원 참석), written once across the 과정, 대상 and 시간 columns\nIn the table, each 주차 should appear once for its rows, and within a 주차 a 대상 or a 시간 that repeats should appear once (each column on its own). After the table, the side remark \"교육은 매주 수요일 14시에 시작한다.\" in small gray text.",
+   "front_matter": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---",
+   "expect": {
+    "mode": "subsequence",
+    "items": [
+     {
+      "k": "h",
+      "level": 1,
+      "text": "2026년 10월 상담원 교육 일정"
+     },
+     {
+      "k": "p",
+      "style": "Caption",
+      "text": "표 1. 교육 일정"
+     },
+     {
+      "k": "table",
+      "style": "Light Grid",
+      "grid": {
+       "rows": 6,
+       "cols": 4,
+       "cells": [
+        [
+         0,
+         0,
+         "주차",
+         1,
+         1,
+         true
+        ],
+        [
+         0,
+         1,
+         "과정",
+         1,
+         1,
+         true
+        ],
+        [
+         0,
+         2,
+         "대상",
+         1,
+         1,
+         true
+        ],
+        [
+         0,
+         3,
+         "시간",
+         1,
+         1,
+         true
+        ],
+        [
+         1,
+         0,
+         "1주차",
+         2,
+         1,
+         false
+        ],
+        [
+         1,
+         1,
+         "응대 화법",
+         1,
+         1,
+         false
+        ],
+        [
+         1,
+         2,
+         "신입 상담원",
+         2,
+         1,
+         false
+        ],
+        [
+         1,
+         3,
+         "4시간",
+         2,
+         1,
+         false
+        ],
+        [
+         2,
+         1,
+         "불만 고객 응대",
+         1,
+         1,
+         false
+        ],
+        [
+         3,
+         0,
+         "2주차",
+         2,
+         1,
+         false
+        ],
+        [
+         3,
+         1,
+         "환불 규정 개정 안내",
+         1,
+         1,
+         false
+        ],
+        [
+         3,
+         2,
+         "전 상담원",
+         2,
+         1,
+         false
+        ],
+        [
+         3,
+         3,
+         "2시간",
+         2,
+         1,
+         false
+        ],
+        [
+         4,
+         1,
+         "채팅 상담 도구",
+         1,
+         1,
+         false
+        ],
+        [
+         5,
+         0,
+         "3주차",
+         1,
+         1,
+         false
+        ],
+        [
+         5,
+         1,
+         "사례 발표회 (전 상담원 참석)",
+         1,
+         3,
+         false
+        ]
+       ]
+      }
+     },
+     {
+      "k": "p",
+      "style": "Note",
+      "text": "교육은 매주 수요일 14시에 시작한다."
+     }
+    ]
+   }
+  },
+  {
+   "task_id": "form3-e1",
+   "type": "edit",
+   "instruction": "In the table under \"3. 처리 기간\", add a row for the new 채널 구분 \"모바일 앱\" of 환불 요청, right after its 온라인 row, with 8월 \"-\" and 9월 1.2. It belongs to 환불 요청, and its 목표 is the same 1.5 as the other 환불 요청 rows, shown once for all of them."
+  },
+  {
+   "task_id": "form3-e2",
+   "type": "edit",
+   "instruction": "Give the table under \"4. 재발 방지 대책\" the table style with a dark blue header row. Change nothing else."
+  },
+  {
+   "task_id": "form3-e3",
+   "type": "edit",
+   "instruction": "Make the table under \"3. 처리 기간\" span the full page width, with equal column widths."
+  },
+  {
+   "task_id": "form3-e4",
+   "type": "edit",
+   "instruction": "Join the two tables under \"2. 유형별 접수 현황\" into one table in which the 온라인 rows directly follow the 오프라인 rows. Remove the paragraph \"온라인 채널 접수는 다음과 같다.\", the label \"표 2. 온라인 채널 접수 (단위: 건)\" and the header row of the second table. Change the first label to \"표 1. 채널별 접수 (단위: 건)\". The joined table keeps the style of the first table."
+  }
+ ]
+}
