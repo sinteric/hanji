@@ -227,7 +227,8 @@ pub fn unresolve(
             Block::Table(t) => fmt::Block::Table(fmt::Table { style: t.style.clone(), rows: t.rows.clone() }),
             Block::Para(p) => {
                 // Empty: `<p/>` / `<p style="Name"/>`. Spaces only: a `<div>`.
-                let empty = p.content.is_empty() || p.content.spaces_only();
+                // Spaces only: a `<div>` naming the style, so the spaces stay text.
+                let empty = p.content.is_empty();
                 let blank = p.content.units.iter().all(|u| u.atom.is_space());
                 let style = match styles.heading_level(&p.style) {
                     Some(n) if !blank => fmt::ParaStyle::Heading(n),

@@ -102,9 +102,9 @@ fn para_line(p: &Para) -> String {
                 format!("{hashes} {body}")
             }
         }
-        // Spaces alone are an empty paragraph (`Document::normalize`).
-        ParaStyle::Named(s) if body.is_empty() || p.content.spaces_only() => p_tag(Some(s)),
+        ParaStyle::Named(s) if body.is_empty() => p_tag(Some(s)),
         ParaStyle::Named(s) => format!("<div style=\"{}\">{body}</div>", attr(s)),
+        // Spaces alone have no plain line form (`Document::normalize`).
         ParaStyle::Plain if body.is_empty() || p.content.spaces_only() => p_tag(None),
         ParaStyle::Plain => escape_line_start(body),
     }

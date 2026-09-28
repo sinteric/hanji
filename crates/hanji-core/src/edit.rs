@@ -182,15 +182,25 @@ pub fn edit(rem: &Remainder, text: &str, old: &str, new: &str, caps: Capabilitie
 }
 
 /// Context the edit repeats unchanged is not part of the span: trim a
-/// common prefix and suffix, but only at whitespace, so a replaced word
-/// stays one replacement.
+/// common prefix and suffix, but only at word boundaries (whitespace), so a
+/// replaced word stays one replacement.
 fn trim_span<'a>(text: &str, s: usize, e: usize, new: &'a str) -> (usize, usize, &'a str) {
+    let ws_or_end = |t: &str| t.chars().next().is_none_or(char::is_whitespace);
+    let ws_or_start = |t: &str| t.chars().next_back().is_none_or(char::is_whitespace);
     let old = &text[s..e];
     let pre = common_prefix(old, new);
-    let pre = old[..pre].rfind(char::is_whitespace).map_or(0, |k| k + old[k..].chars().next().unwrap().len_utf8());
+    let pre = if ws_or_end(&old[pre..]) && ws_or_end(&new[pre..]) {
+        pre
+    } else {
+        old[..pre].rfind(char::is_whitespace).map_or(0, |k| k + old[k..].chars().next().unwrap().len_utf8())
+    };
     let (o2, n2) = (&old[pre..], &new[pre..]);
     let suf = common_suffix(o2, n2);
-    let suf = o2[o2.len() - suf..].find(char::is_whitespace).map_or(0, |k| suf - k);
+    let suf = if ws_or_start(&o2[..o2.len() - suf]) && ws_or_start(&n2[..n2.len() - suf]) {
+        suf
+    } else {
+        o2[o2.len() - suf..].find(char::is_whitespace).map_or(0, |k| suf - k)
+    };
     (s + pre, e - suf, &n2[..n2.len() - suf])
 }
 

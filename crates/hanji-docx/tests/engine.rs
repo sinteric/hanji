@@ -1,7 +1,7 @@
 //! Engine behaviour on small synthetic packages: exact edits, refusals,
 //! §8 neutralisation and the surface-before-export list.
 
-use hanji_core::{edit, rewrite, Capabilities, Engine, EngineError, ImportOptions, Part, Refusal};
+use hanji_core::{edit, rewrite, Capabilities, Engine, EngineError, ImportOptions, Kind, Part, Refusal};
 use hanji_docx::{package, DocxEngine};
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
@@ -324,28 +324,50 @@ fn a_zip_bomb_is_refused() {
 }
 
 #[test]
-fn a_spaces_only_paragraph_is_an_empty_one_and_keeps_its_spaces() {
-    let spaces = |style: &str| {
-        format!("<w:p>{style}<w:r><w:rPr><w:b/></w:rPr><w:t xml:space=\"preserve\">   </w:t></w:r></w:p>")
-    };
-    let body = format!("{}{}{}{}", p("a"), spaces(""), spaces("<w:pPr><w:pStyle w:val=\"Note\"/></w:pPr>"), p("b"));
-    let pkg = docx(&body, vec![]);
+fn spaces_only_paragraphs_keep_their_spaces_and_runs() {
+    // An original spaces-only paragraph is `<div style="Name">spaces</div>`,
+    // named by the file's own style (never a made-up "Normal").
+    let styles_de = STYLES.replace(
+        "w:styleId=\"Normal\"><w:name w:val=\"Normal\"/>",
+        "w:styleId=\"Normal\"><w:name w:val=\"Standard\"/>",
+    );
+    let body =
+        format!("{}<w:p><w:r><w:rPr><w:b/></w:rPr><w:t xml:space=\"preserve\">   </w:t></w:r></w:p>{}", p("a"), p("b"));
+    let mut pkg = package::read(&docx(&body, vec![])).unwrap();
+    pkg.iter_mut().find(|x| x.name == "word/styles.xml").unwrap().data = styles_de.into_bytes();
+    let pkg = package::write(&pkg).unwrap();
     let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
-    assert!(imp.text.ends_with("a\n\n<p/>\n<p style=\"Note\"/>\n\nb\n"), "{}", imp.text);
-    let doc = |pkg: &[u8]| {
-        String::from_utf8(package::get(&package::read(pkg).unwrap(), "word/document.xml").unwrap().to_vec()).unwrap()
-    };
-    let canon = |pkg: &[u8]| hanji_docx::xml::canon_part(doc(pkg).as_bytes()).unwrap();
+    assert!(imp.text.contains("\n<div style=\"Standard\">   </div>\n"), "{}", imp.text);
+    let doc = |pkg: &[u8]| package::get(&package::read(pkg).unwrap(), "word/document.xml").unwrap().to_vec();
+    let canon = |pkg: &[u8]| hanji_docx::xml::canon_part(&doc(pkg)).unwrap();
     let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
     assert_eq!(canon(&out), canon(&pkg));
-    // Text written into it replaces the spaces (and says its own marks).
-    let new = imp.text.replacen("<p/>\n", "new\n\n", 1);
-    let r = rewrite(&imp.remainder, &imp.text, &new, CAPS).unwrap();
-    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
-    let xml = doc(&out);
-    assert!(xml.contains("<w:t>new</w:t>"), "{xml}");
-    assert_eq!(xml.matches("   </w:t>").count(), 1, "{xml}");
-    assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, r.text);
+
+    // Survey E8 case: splitting a paragraph so that one piece is spaces only
+    // keeps the run of those spaces (with its bold) on them.
+    let body =
+        "<w:p><w:r><w:rPr><w:b/></w:rPr><w:t xml:space=\"preserve\">    </w:t></w:r><w:r><w:t>TEXT</w:t></w:r></w:p>";
+    let pkg = docx(body, vec![]);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(imp.text.ends_with("\n    TEXT\n"), "{}", imp.text);
+    let split = imp.text.replace("    TEXT", "<div style=\"Normal\">    </div>\n\nTEXT");
+    for r in [
+        rewrite(&imp.remainder, &imp.text, &split, CAPS).unwrap(),
+        edit(&imp.remainder, &imp.text, "    TEXT", "<div style=\"Normal\">    </div>\n\nTEXT", CAPS).unwrap(),
+    ] {
+        assert!(r.report.refused.is_empty() && r.report.removed.is_empty(), "{:?}", r.report);
+        let run = r
+            .remainder
+            .entries
+            .iter()
+            .find(|e| e.kind == Kind::Run && e.xml.iter().any(|x| x.contains("w:b")))
+            .unwrap();
+        assert_eq!((run.path.clone(), run.start, run.end), (vec![0], Some(0), Some(4)));
+        let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+        let xml = String::from_utf8(doc(&out)).unwrap();
+        assert!(xml.contains("<w:rPr><w:b/></w:rPr><w:t xml:space=\"preserve\">    </w:t>"), "{xml}");
+        assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, r.text, "PutGet");
+    }
 }
 
 #[test]

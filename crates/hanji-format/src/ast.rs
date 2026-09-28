@@ -203,8 +203,7 @@ impl Inline {
         self.units.is_empty() && self.spans.is_empty()
     }
 
-    /// Spaces only (no tab, break or atom): canonically an empty paragraph,
-    /// since no line form holds it.
+    /// Spaces only (no tab, break or atom): a plain line cannot hold it.
     pub fn spaces_only(&self) -> bool {
         !self.units.is_empty()
             && self.spans.is_empty()
@@ -296,13 +295,15 @@ impl Inline {
 impl Document {
     /// Canonical block shapes: a plain paragraph holding only an unmarked
     /// placeholder is a keep line, one holding only a page break is
-    /// `<pagebreak/>`, a paragraph of spaces only is empty (`<p/>`), and every
+    /// `<pagebreak/>`, a plain one of spaces only is empty (`<p/>`), and every
     /// inline is normalized.
     pub fn normalize(&mut self) {
         for b in &mut self.blocks {
             match b {
                 Block::Para(p) => {
-                    if p.content.spaces_only() {
+                    // A plain paragraph of spaces only has no line form (engines
+                    // write it as `<div style="Name">`, naming the file's style).
+                    if p.style == ParaStyle::Plain && p.content.spaces_only() {
                         p.content.units.clear();
                     }
                     p.content.normalize();
@@ -320,9 +321,6 @@ impl Document {
                         for c in row {
                             if let Cell::Text(ps) = c {
                                 for p in ps {
-                                    if p.content.spaces_only() {
-                                        p.content.units.clear();
-                                    }
                                     p.content.normalize();
                                 }
                             }

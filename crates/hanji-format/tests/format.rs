@@ -555,14 +555,18 @@ fn table_style_line_sits_on_the_header_row() {
 }
 
 #[test]
-fn spaces_only_paragraphs_are_empty_ones() {
-    // No line form holds a paragraph of spaces alone: it is canonically empty.
-    assert_eq!(roundtrip(&doc("<div style=\"Note\">   </div>\n")), doc("<p style=\"Note\"/>\n"));
-    assert_eq!(roundtrip(&doc("|    |\n|---|\n")), doc("|  |\n|---|\n"));
+fn spaces_only_paragraphs_name_their_style() {
+    // A plain line cannot hold spaces alone, so the style is named and the
+    // spaces stay text; the serializer never invents a style name for it.
+    let named = doc("<div style=\"Note\">   </div>\n");
+    assert_eq!(roundtrip(&named), named);
+    assert_eq!(roundtrip(&doc("|    |\n|---|\n")), doc("|    |\n|---|\n"));
     let mut d = parse(&doc("x\n")).unwrap();
     let Block::Para(p) = &mut d.blocks[0] else { panic!() };
     p.content = Inline::plain("   ");
-    assert_eq!(serialize(&d), doc("<p/>\n"));
-    // A tab is content: it stays in a named paragraph.
-    assert_eq!(roundtrip(&doc("<div style=\"Note\">\t</div>\n")), doc("<div style=\"Note\">\t</div>\n"));
+    let out = serialize(&d);
+    assert!(!out.contains("Normal"), "{out}");
+    assert_eq!(out, doc("<p/>\n"));
+    d.normalize();
+    assert_eq!(parse(&out).unwrap(), d, "canonical form and the serializer agree");
 }
