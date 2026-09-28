@@ -1,6 +1,6 @@
 [package]
-name = "hanji-format"
-description = "The hanji text format: parser, canonical serializer and validator"
+name = "hanji-core"
+description = "hanji core: engine interface, remainder store and re-anchoring"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -8,4 +8,6 @@ repository.workspace = true
 rust-version.workspace = true
 
 [dependencies]
+hanji-format.workspace = true
 serde = { version = "1", features = ["derive"] }
+serde_json = "1"
