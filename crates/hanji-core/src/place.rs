@@ -640,6 +640,13 @@ impl<'a> Placer<'a> {
                     Some((nr, _)) => self.put(e, vec![j, nr], None, None),
                 }
             }
+            // Markers after the row's last cell.
+            for e in self.entries_at(&vec![i, r, row.len()]) {
+                match nr {
+                    None => self.set(e, Status::Refused("table rows changed shape".into())),
+                    Some((nr, _)) => self.put(e, vec![j, nr, nt.rows[nr].len()], None, None),
+                }
+            }
             for (c, cell) in row.iter().enumerate() {
                 if *cell == Cell::Left {
                     continue;
@@ -658,7 +665,7 @@ impl<'a> Placer<'a> {
                 let (nr, nc) = tgt.unwrap();
                 let npath = vec![j, nr, nc];
                 for e in self.entries_at(&path) {
-                    if e.kind == Kind::Tc {
+                    if matches!(e.kind, Kind::Tc | Kind::Bmarker) {
                         self.put(e, npath.clone(), None, None);
                     }
                 }
@@ -666,6 +673,10 @@ impl<'a> Placer<'a> {
                 let news = self.cell_paras_new(ncell);
                 self.cell(&path, &olds, &npath, &news, matches!((cell, ncell), (Cell::Up, Cell::Up)));
             }
+        }
+        // Markers after the last row.
+        for e in self.entries_at(&vec![i, ot.rows.len()]) {
+            self.put(e, vec![j, nt.rows.len()], None, None);
         }
     }
 

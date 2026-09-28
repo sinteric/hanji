@@ -213,3 +213,71 @@ fn active_and_remote_content_is_neutralised_and_reported() {
     assert!(again.report.neutralised.is_empty(), "{:?}", again.report.neutralised);
     assert_eq!(again.text, imp.text);
 }
+
+#[test]
+fn markers_in_table_structure_keep_the_pipe_table() {
+    // Markers after tblGrid, between rows, between cells, after the last cell
+    // and after the last row (survey: 15.6% of docx tables have one).
+    let cell = |t: &str| format!("<w:tc><w:tcPr><w:tcW w:w=\"2000\" w:type=\"dxa\"/></w:tcPr>{}</w:tc>", p(t));
+    let body = format!(
+        "<w:tbl><w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/></w:tblPr><w:tblGrid><w:gridCol w:w=\"2000\"/><w:gridCol w:w=\"2000\"/></w:tblGrid>\
+         <w:bookmarkStart w:id=\"1\" w:name=\"t\"/>\
+         <w:tr>{}<w:proofErr w:type=\"spellStart\"/>{}<w:bookmarkEnd w:id=\"1\"/></w:tr>\
+         <w:bookmarkStart w:id=\"2\" w:name=\"r2\"/>\
+         <w:tr><w:trPr><w:cantSplit/></w:trPr>{}{}</w:tr>\
+         <w:bookmarkEnd w:id=\"2\"/></w:tbl>{}",
+        cell("a"),
+        cell("b"),
+        cell("c"),
+        cell("d"),
+        p("after")
+    );
+    let pkg = docx(&body, vec![]);
+    let (_, _, _, stats) = DocxEngine::split(&pkg, &ImportOptions::default()).unwrap();
+    assert_eq!((stats.tables_modelled, stats.tables_kept), (1, 0), "{:?}", stats.kept_reasons);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(imp.text.contains("| a | b |\n|---|---|\n| c | d |"), "{}", imp.text);
+    let doc = |pkg: &[u8]| package::get(&package::read(pkg).unwrap(), "word/document.xml").unwrap().to_vec();
+    let canon = |pkg: &[u8]| hanji_docx::xml::canon_part(&doc(pkg)).unwrap();
+    // GetPut: the document comes back canonically equal.
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon(&out), canon(&pkg));
+    // An edit in a cell keeps every marker where it was.
+    let r = edit(&imp.remainder, &imp.text, "| c |", "| see |", CAPS).unwrap();
+    assert!(r.report.refused.is_empty() && r.report.removed.is_empty(), "{:?}", r.report);
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(canon(&out), canon(&pkg).replace(">c</", ">see</"));
+    // A rewrite that adds a row keeps them too, and nothing is refused.
+    let new = r.text.replace("| see | d |", "| see | d |\n| e | f |");
+    let r2 = rewrite(&r.remainder, &r.text, &new, CAPS).unwrap();
+    let xml = String::from_utf8(doc(&DocxEngine.export(&r2.text, &r2.remainder).unwrap())).unwrap();
+    let order = [
+        "<w:tblGrid>",
+        "w:name=\"t\"",
+        ">a<",
+        "w:proofErr",
+        ">b<",
+        "w:id=\"1\"/></w:tr>",
+        "w:name=\"r2\"",
+        ">see<",
+        ">e<",
+        "w:id=\"2\"/></w:tbl>",
+    ];
+    let at: Vec<usize> = order.iter().map(|s| xml.find(s).unwrap_or_else(|| panic!("{s} missing: {xml}"))).collect();
+    assert!(at.windows(2).all(|w| w[0] < w[1]), "{order:?} out of order: {xml}");
+}
+
+#[test]
+fn a_marker_among_table_properties_keeps_the_table_whole() {
+    let body = "<w:tbl><w:tblPr/><w:bookmarkStart w:id=\"1\" w:name=\"t\"/><w:tblGrid><w:gridCol w:w=\"2000\"/></w:tblGrid><w:tr><w:tc><w:p/></w:tc></w:tr></w:tbl><w:bookmarkEnd w:id=\"1\"/>";
+    let pkg = docx(body, vec![]);
+    let (_, _, _, stats) = DocxEngine::split(&pkg, &ImportOptions::default()).unwrap();
+    assert_eq!(stats.tables_kept, 1);
+    assert!(stats.kept_reasons[0].contains("tblGrid after"), "{:?}", stats.kept_reasons);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    let canon = |pkg: &[u8]| {
+        hanji_docx::xml::canon_part(package::get(&package::read(pkg).unwrap(), "word/document.xml").unwrap()).unwrap()
+    };
+    assert_eq!(canon(&out), canon(&pkg));
+}

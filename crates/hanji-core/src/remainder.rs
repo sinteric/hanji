@@ -23,7 +23,9 @@ pub enum Kind {
     Rmarker,
     /// Inline wrapper whose text the model edits (hyperlink, smartTag, …). Anchor: `[start, end)`.
     Wrap,
-    /// Zero-width element between blocks. Anchor: before a block.
+    /// Zero-width element between blocks, table rows, cells or cell
+    /// paragraphs. Anchor: before the block, row, cell or paragraph at its
+    /// path (a path one past the last means after it).
     Bmarker,
     /// Table, row and cell properties. Anchor: the table / row / cell.
     Tbl,
