@@ -3,10 +3,10 @@
 
 use std::collections::{HashMap, HashSet};
 
-use hanji_format::{self as fmt, BlockMapKind, Diagnostic, Names, ParaMap, Parsed};
+use hanji_format::{self as fmt, Diagnostic, Names, ParaMap, Parsed};
 
 use crate::diff::{Op, Tag};
-use crate::model::{self, Block, Capabilities, Path, EMPTY};
+use crate::model::{self, Block, Capabilities, Path, SrcKind, EMPTY};
 use crate::place::{self, same_kind, Alignment, Global, Outcome, Status, Stream};
 use crate::remainder::{Kind, Remainder};
 
@@ -227,8 +227,8 @@ fn common_suffix(a: &str, b: &str) -> usize {
 fn para_maps<'a>(blocks: &'a [Block], parsed: &'a Parsed) -> Vec<(Path, Option<&'a fmt::Inline>, &'a ParaMap, usize)> {
     let mut out = vec![];
     for (j, (b, m)) in blocks.iter().zip(model::block_maps(parsed)).enumerate() {
-        match (b, &m.kind) {
-            (Block::Table(_), BlockMapKind::Table(cells)) => {
+        match (b, m.kind) {
+            (Block::Table(_), SrcKind::Table(cells)) => {
                 for (r, row) in cells.iter().enumerate() {
                     for (c, pms) in row.iter().enumerate() {
                         for (k, pm) in pms.iter().flatten().enumerate() {
@@ -237,7 +237,7 @@ fn para_maps<'a>(blocks: &'a [Block], parsed: &'a Parsed) -> Vec<(Path, Option<&
                     }
                 }
             }
-            (_, BlockMapKind::Para(pm)) => out.push((vec![j], model::content_at(blocks, &[j]), pm, j)),
+            (_, SrcKind::Para(pm)) => out.push((vec![j], model::content_at(blocks, &[j]), pm, j)),
             _ => {}
         }
     }

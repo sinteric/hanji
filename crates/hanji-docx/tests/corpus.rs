@@ -277,7 +277,8 @@ fn e2_insert_before_drawing(d: &Doc, rem: &Remainder) -> Option<Edit> {
     let i = d.blocks.iter().position(|b| has_drawing(d, rem, b))?;
     let mut blocks = d.blocks.clone();
     let text = "Inserted paragraph before the drawing.";
-    blocks.insert(i, Block::Para(Para { style: rem.styles.default_paragraph.clone(), content: Inline::plain(text) }));
+    let content = Inline::plain(text);
+    blocks.insert(i, Block::Para(Para { style: rem.styles.default_paragraph.clone(), content, item: None }));
     let bmap = (0..d.blocks.len()).map(|k| Some(if k < i { k } else { k + 1 })).collect();
     Some(Edit {
         name: "E2 insert before drawing",
@@ -576,7 +577,9 @@ fn e8_split(d: &Doc) -> Option<Edit> {
     let Block::Para(p) = &mut blocks[i] else { unreachable!() };
     let n = p.content.units.len();
     let tail = p.content.units.split_off(k);
-    let q = Block::Para(Para { style: p.style.clone(), content: Inline { units: tail, spans: vec![] } });
+    // A split list item gives two items of that list.
+    let item = p.item.map(|it| hanji_core::ListItem { first: false, ..it });
+    let q = Block::Para(Para { style: p.style.clone(), content: Inline { units: tail, spans: vec![] }, item });
     blocks.insert(i + 1, q);
     let bmap = (0..d.blocks.len()).map(|x| Some(if x <= i { x } else { x + 1 })).collect();
     let xmap = HashMap::from([(vec![i], vec![(0, k, vec![i], 0), (k, n, vec![i + 1], 0)])]);
@@ -975,7 +978,7 @@ fn export_and_check(
     let entries = place::placed_entries(&d.entries, got, &mut next);
     let r2 = Remainder { entries, next_id: next, ..rem.clone() };
     let docxml = export_document(new_blocks, &r2).unwrap_or_else(|e| panic!("{name} {out_name}: {e}"));
-    let well_formed = xml::parse(&docxml).is_ok();
+    let well_formed = xml::parse(&docxml.document).is_ok();
     let pkg = write_package(rem, docxml).unwrap();
     save(name, out_name, &pkg);
     let (rb, rr, _, _) = DocxEngine::split(&pkg, &ImportOptions { neutralise: false, template: None }).unwrap();
@@ -1004,9 +1007,9 @@ fn save(name: &str, what: &str, pkg: &[u8]) {
 fn text_span(old_text: &str, new_text: &str, rem: &Remainder, ed: &Edit) -> (usize, usize, String) {
     if let Some((path, s, e)) = &ed.unit_span {
         let parsed = hanji_format::parse_with(old_text, &hanji_core::edit::names(rem)).unwrap();
-        let pm = match &parsed.map.blocks[path[0]].kind {
-            hanji_format::BlockMapKind::Para(pm) => pm.clone(),
-            hanji_format::BlockMapKind::Table(cells) => cells[path[1]][path[2]].clone().unwrap()[path[3]].clone(),
+        let pm = match hanji_core::model::block_maps(&parsed).swap_remove(path[0]).kind {
+            hanji_core::model::SrcKind::Para(pm) => pm.clone(),
+            hanji_core::model::SrcKind::Table(cells) => cells[path[1]][path[2]].clone().unwrap()[path[3]].clone(),
         };
         let at = |k: usize| if k < pm.units.len() { pm.units[k] } else { pm.mark };
         let (a, b) = (at(*s), at(*e));

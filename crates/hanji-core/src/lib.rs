@@ -11,5 +11,5 @@ pub mod remainder;
 
 pub use edit::{edit, model_of, reanchor, reanchor_rewrite, reanchor_span, rewrite, Reanchored, Refusal, Report};
 pub use engine::{Engine, EngineError, ImportOptions, ImportReport, Imported, Notice};
-pub use model::{Block, Capabilities, Para, Path, StyleDef, StyleSet, Table};
+pub use model::{Block, Capabilities, ListItem, Para, Path, StyleDef, StyleSet, Table};
 pub use remainder::{Entry, Kind, Meta, Part, Remainder};

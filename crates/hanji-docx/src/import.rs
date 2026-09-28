@@ -4,9 +4,10 @@
 
 use std::collections::{HashMap, HashSet};
 
-use hanji_core::{Block, Entry, Kind, Meta, Para, StyleDef, StyleSet, Table};
+use hanji_core::{Block, Entry, Kind, ListItem, Meta, Para, StyleDef, StyleSet, Table};
 use hanji_format::{Atom, Cell, CellPara, Inline, Keep, Marks, Unit};
 
+use crate::numbering::{num_pr, Numbering};
 use crate::ooxml::*;
 use crate::xml::{Element, Node, Scope};
 
@@ -23,6 +24,8 @@ pub struct Stats {
     pub tables_modelled: usize,
     pub tables_kept: usize,
     pub kept_reasons: Vec<String>,
+    /// Paragraphs imported as list items.
+    pub list_items: usize,
 }
 
 pub struct Importer<'a> {
@@ -37,6 +40,10 @@ pub struct Importer<'a> {
     stats: Stats,
     /// Namespace declarations on ancestors below the root.
     inherited: Vec<(String, String)>,
+    numbering: &'a Numbering,
+    /// The list the previous block belonged to: its numId and the ilvl of
+    /// each open level.
+    list: Option<(u32, Vec<u32>)>,
 }
 
 /// Import-time checkpoint, so a table that turns out not to be a pipe
@@ -44,7 +51,12 @@ pub struct Importer<'a> {
 struct Mark(usize, u64, u64);
 
 impl<'a> Importer<'a> {
-    pub fn new(scope: &'a Scope, styles: StyleSet, notes: &'a HashMap<(String, String), String>) -> Self {
+    pub fn new(
+        scope: &'a Scope,
+        styles: StyleSet,
+        notes: &'a HashMap<(String, String), String>,
+        numbering: &'a Numbering,
+    ) -> Self {
         Importer {
             scope,
             styles,
@@ -56,6 +68,8 @@ impl<'a> Importer<'a> {
             buf: vec![],
             stats: Stats::default(),
             inherited: vec![],
+            numbering,
+            list: None,
         }
     }
 
@@ -236,6 +250,9 @@ impl<'a> Importer<'a> {
                 "w:tbl" => self.table(el, bi)?,
                 _ => self.block_keep(el, bi),
             };
+            if !matches!(b, Block::Para(Para { item: Some(_), .. })) {
+                self.list = None;
+            }
             blocks.push(b);
         }
         for m in pending {
@@ -456,14 +473,57 @@ impl<'a> Importer<'a> {
             self.fp(&[Some(&shell), rest.as_ref()])
         };
         let xml = std::iter::once(self.frag(&shell)).chain(ppr.map(|x| self.frag(x))).collect();
-        self.entry(Kind::Ppr, xml, f, path, None, None, Meta { style: Some(sid.clone()), ..Default::default() });
+        // A numbered top-level paragraph is a list item; a heading keeps its
+        // numbering in the remainder, and so does a cell paragraph.
+        let item = (path.len() == 1 && self.styles.heading_level(&style).is_none())
+            .then(|| self.list_item(ppr, &sid))
+            .flatten();
+        let meta = Meta {
+            style: Some(sid.clone()),
+            item: item.as_ref().map(|i| i.0),
+            aux: item.as_ref().map(|i| i.1.to_vec()).unwrap_or_default(),
+            ..Default::default()
+        };
+        self.entry(Kind::Ppr, xml, f, path, None, None, meta);
         self.buf.clear();
         let page_break_only = sid == default_id && is_page_break_para(p);
         self.walk(p, path, page_break_only)?;
         self.inherited.truncate(saved);
         let mut content = Inline { units: std::mem::take(&mut self.buf), spans: vec![] };
         content.normalize();
-        Ok(Para { style, content })
+        let item = item.map(|i| i.0);
+        self.stats.list_items += item.is_some() as usize;
+        // A list item's style is not in the text; it stays in the remainder.
+        let style = if item.is_some() { String::new() } else { style };
+        Ok(Para { style, content, item })
+    }
+
+    /// The list item a paragraph is, from its own `w:numPr` or its style's,
+    /// with the numbering to keep: `[numId, ilvl, "direct" | "style"]`.
+    fn list_item(&mut self, ppr: Option<&Element>, sid: &str) -> Option<(ListItem, [String; 3])> {
+        let (num, lvl) = num_pr(ppr);
+        let style = self.numbering.of_style(sid);
+        let num = num.or(style.map(|s| s.0)).filter(|&n| n != 0)?;
+        let direct = ppr.and_then(|p| p.child("w:numPr")).is_some();
+        let ilvl = lvl.or(style.filter(|_| !direct).map(|s| s.1)).unwrap_or(0);
+        let ordered = self.numbering.ordered(num, ilvl)?;
+        // Levels nest by ilvl within one list (numId); the text level counts
+        // the open levels, so a list starting at ilvl 2 is still at the margin.
+        let (first, level) = match &mut self.list {
+            Some((n, stack)) if *n == num => {
+                while stack.last().is_some_and(|&t| t >= ilvl) {
+                    stack.pop();
+                }
+                stack.push(ilvl);
+                (false, stack.len() - 1)
+            }
+            _ => {
+                self.list = Some((num, vec![ilvl]));
+                (true, 0)
+            }
+        };
+        let how = if direct { "direct" } else { "style" };
+        Some((ListItem { ordered, level, first }, [num.to_string(), ilvl.to_string(), how.to_string()]))
     }
 
     fn inherit(&mut self, e: &Element) {

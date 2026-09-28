@@ -10,7 +10,7 @@ native targets and on wasm32 (§10.4).
 |---|---|
 | `hanji-format` | The text format (§5.1, §5.2). A typed AST (flat inline units with marks, plus link and field spans), a parser that keeps a source map for exact-span edits, a canonical serializer, and validator errors written for the model (line, column, expected form, allowed names) |
 | `hanji-core` | The `Engine` trait (§7). The resolved model and style set. The remainder store (§10.3): a flat list of typed entries, with the namespace map stored once. Re-anchoring: a port of difflib, block alignment, design C's document-level diff, and the exact-span edit API. Entries are refused when they would land in two paragraphs or on one of several identical blocks |
-| `hanji-docx` | The docx engine. Splits `word/document.xml` at the XML level (a lossless tree over quick-xml) and copies every other part through byte for byte. §8: removes and reports active and remote content on import, and lists what to surface before export. `examples/dump.rs` prints a file's model text |
+| `hanji-docx` | The docx engine. Splits `word/document.xml` at the XML level (a lossless tree over quick-xml) and copies every other part through byte for byte. Numbered paragraphs are list items; `numbering.rs` reads their kind and gives new items and lists their numbering. §8: removes and reports active and remote content on import, and lists what to surface before export. `examples/dump.rs` prints a file's model text |
 
 rdocx is not on the import/export path. Its typed model (`CT_P`, `CT_RPr`,
 hyperlinks as run spans) does not expose the original `pPr`/`rPr` fragments,
@@ -46,4 +46,6 @@ The LibreOffice conversion runs natively only.
 - §4 rule 5: rendering and preview.
 - §9 validity in Word: exports are checked for well-formed XML and a
   LibreOffice PDF conversion only.
-- Lists (`- `, `1. `) are not in §5.2 yet; the parser rejects them with a hint.
+- Lists inside table cells and multi-paragraph list items (§5.2): a numbered
+  cell paragraph stays an ordinary cell paragraph, and a continuation paragraph
+  an ordinary paragraph; their numbering stays in the remainder.
