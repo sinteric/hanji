@@ -207,7 +207,10 @@ fn random_inline(r: &mut Rng, notes: &mut Vec<String>, allow_spans: bool) -> Inl
                 kind: "drawing".into(),
                 summary: "a \"b\" <c> & d".into(),
             }),
-            2 => Atom::Math(["x^2", "\\frac{a}{b}", "a|b", "y_1"][r.below(4)].into()),
+            // Bodies `$…$` cannot hold are written <math>…</math>.
+            2 => {
+                Atom::Math(["x^2", "\\frac{a}{b}", "a|b", "y_1", " a", "b ", "p$q", "c\\", "<p/>d"][r.below(9)].into())
+            }
             3 => {
                 let l = format!("n{}", r.below(3));
                 notes.push(l.clone());
@@ -216,12 +219,6 @@ fn random_inline(r: &mut Rng, notes: &mut Vec<String>, allow_spans: bool) -> Inl
             _ => Atom::Char(*r.pick(ALPHABET)),
         };
         units.push(Unit { atom, marks });
-    }
-    // `$x$1` cannot be written: a closing `$` followed by a digit does not close (pandoc's rule).
-    for k in 1..units.len() {
-        if matches!(units[k - 1].atom, Atom::Math(_)) && matches!(units[k].atom, Atom::Char(c) if c.is_ascii_digit()) {
-            units[k].atom = Atom::Char('x');
-        }
     }
     let mut spans = vec![];
     if allow_spans && units.len() > 2 && r.below(3) == 0 {
@@ -244,7 +241,7 @@ fn random_doc(seed: u64) -> Document {
     let mut notes = vec![];
     let mut blocks = vec![];
     for _ in 0..1 + r.below(6) {
-        let b = match r.below(7) {
+        let b = match r.below(8) {
             0 | 1 => {
                 let style = match r.below(3) {
                     0 => ParaStyle::Plain,
@@ -283,6 +280,15 @@ fn random_doc(seed: u64) -> Document {
             }
             3 => Block::Keep(Keep { id: "kb".into(), kind: "table".into(), summary: "x".into() }),
             4 => Block::PageBreak,
+            6 => Block::List(
+                (0..1 + r.below(4))
+                    .map(|_| Item {
+                        ordered: r.below(2) == 0,
+                        level: r.below(3),
+                        content: random_inline(&mut r, &mut notes, true),
+                    })
+                    .collect(),
+            ),
             5 => Block::Para(Para {
                 style: if r.below(2) == 0 { ParaStyle::Plain } else { ParaStyle::Named("좁은 간격".into()) },
                 content: Inline::default(),
@@ -314,6 +320,7 @@ fn random_documents_roundtrip() {
                         match b {
                             Block::Para(p) => vec![p.content.clone()],
                             Block::FootnoteDef(f) => vec![f.content.clone()],
+                            Block::List(items) => items.iter().map(|i| i.content.clone()).collect(),
                             Block::Table(t) => t
                                 .rows
                                 .iter()
@@ -383,8 +390,10 @@ fn errors_have_line_column_and_form() {
     assert!(e[0].starts_with("line 7, column 1: bold opened here is never closed"), "{e:?}");
     let e = errors("x <span>y</span>\n");
     assert!(e[0].starts_with("line 7, column 3: <span> is not a tag of this format. Inline tags are <u>"), "{e:?}");
-    let e = errors("- item\n");
-    assert!(e[0].contains("list items are not supported yet"), "{e:?}");
+    let e = errors("* item\n");
+    assert!(e[0].contains("a bullet item is written - text"), "{e:?}");
+    let e = errors("1) item\n");
+    assert!(e[0].contains("a numbered item is written 1. text"), "{e:?}");
     let e = errors("{style=\"Grid\"}\n\n| a |\n|---|\n");
     assert!(e[0].contains("must be directly followed by the header row"), "{e:?}");
     let e = errors("{style=\"Grid\" color=\"red\"}\n| a |\n|---|\n");
@@ -569,4 +578,113 @@ fn spaces_only_paragraphs_name_their_style() {
     assert_eq!(out, doc("<p/>\n"));
     d.normalize();
     assert_eq!(parse(&out).unwrap(), d, "canonical form and the serializer agree");
+}
+
+#[test]
+fn lists_nest_by_content_column_and_write_1_everywhere() {
+    let text = doc("- a\n  - b\n    1. c\n       - d\n  - e\n- f\n\n7. g\n10. h\n    1. i\n");
+    let d = parse(&text).unwrap();
+    let Block::List(items) = &d.blocks[0] else { panic!("{:?}", d.blocks) };
+    let got: Vec<(bool, usize, String)> = items.iter().map(|i| (i.ordered, i.level, i.content.text())).collect();
+    let want = [(false, 0, "a"), (false, 1, "b"), (true, 2, "c"), (false, 3, "d"), (false, 1, "e"), (false, 0, "f")];
+    assert_eq!(got, want.map(|(o, l, t)| (o, l, t.to_string())));
+    // A blank line ends a list; `10. ` has content column 4, canonical `1. ` has 3.
+    let Block::List(items) = &d.blocks[1] else { panic!() };
+    assert_eq!(items.iter().map(|i| i.level).collect::<Vec<_>>(), vec![0, 0, 1]);
+    assert_eq!(roundtrip(&text), doc("- a\n  - b\n    1. c\n       - d\n  - e\n- f\n\n1. g\n1. h\n   1. i\n"));
+    // Empty items, inline markup and <br/> inside items.
+    let t = doc("-\n- **bold** <br/>next\n1.\n");
+    assert_eq!(roundtrip(&t), t);
+}
+
+#[test]
+fn list_errors_say_where_to_indent() {
+    let e = errors("  - a\n");
+    assert!(e[0].starts_with("line 7, column 1: a list starts at the left margin"), "{e:?}");
+    let e = errors("- a\n   - b\n");
+    assert!(e[0].contains("indented 3 spaces") && e[0].contains("indented 0, 2 spaces"), "{e:?}");
+    let e = errors("1. a\n  - b\n");
+    assert!(e[0].contains("indented 0, 3 spaces"), "{e:?}");
+    let e = errors("- a\n\t- b\n");
+    assert!(e[0].contains("with spaces, not tabs"), "{e:?}");
+}
+
+#[test]
+fn text_that_looks_like_a_list_is_escaped() {
+    for line in ["- a", "-", "1. a", "1.", "2023. It was", "  - a", "  3. b", "+ a", "1) a"] {
+        let mut d = parse(&doc("x\n")).unwrap();
+        let Block::Para(p) = &mut d.blocks[0] else { panic!() };
+        p.content = Inline::plain(line);
+        let s = serialize(&d);
+        let back = parse(&s).unwrap_or_else(|e| panic!("{line:?}: {}\n{s}", diag::render(&e)));
+        assert_eq!(back, d, "{line:?} → {s}");
+    }
+}
+
+#[test]
+fn math_before_a_digit_uses_the_math_tag() {
+    // `$5 and $10` is text: a closing `$` needs a non-space before it.
+    let d = parse(&doc("costs $5 and $10\n")).unwrap();
+    let Block::Para(p) = &d.blocks[0] else { panic!() };
+    assert!(p.content.units.iter().all(|u| matches!(u.atom, Atom::Char(_))), "{:?}", p.content);
+    // Math followed by a digit cannot be `$x$5` (that is text): it is <math>.
+    let t = doc("<math>x</math>5 and $y$ and <math> padded </math> and <math>p$q</math>\n");
+    let d = parse(&t).unwrap();
+    let Block::Para(p) = &d.blocks[0] else { panic!() };
+    let math: Vec<&str> = p
+        .content
+        .units
+        .iter()
+        .filter_map(|u| if let Atom::Math(m) = &u.atom { Some(m.as_str()) } else { None })
+        .collect();
+    assert_eq!(math, ["x", "y", " padded ", "p$q"]);
+    assert_eq!(roundtrip(&t), t, "the tag is written only where $…$ would not read back");
+    assert_eq!(roundtrip(&doc("<math>z</math> w\n")), doc("$z$ w\n"));
+    let e = errors("<math>x\n");
+    assert!(e[0].contains("<math> is not closed by </math>"), "{e:?}");
+    let e = errors("<math></math>\n");
+    assert!(e[0].contains("is empty"), "{e:?}");
+}
+
+#[test]
+fn br_is_a_line_break_in_paragraphs_headings_cells_and_items() {
+    let t = doc("# a<br/>b\n\nc<br/>d\n\n| e<br/>f |\n|---|\n\n- g<br/>h\n");
+    let d = parse(&t).unwrap();
+    let breaks = |i: &Inline| i.units.iter().filter(|u| u.atom == Atom::Break).count();
+    let mut n = 0;
+    for b in &d.blocks {
+        n += match b {
+            Block::Para(p) => breaks(&p.content),
+            Block::Table(t) => {
+                t.rows[0].iter().map(|c| if let Cell::Text(ps) = c { breaks(&ps[0].content) } else { 0 }).sum()
+            }
+            Block::List(items) => breaks(&items[0].content),
+            _ => 0,
+        };
+    }
+    assert_eq!((d.blocks.len(), n), (4, 4));
+    assert_eq!(roundtrip(&t), t);
+    // A `<br/>` line is a paragraph holding a line break, never an empty paragraph.
+    let d = parse(&doc("<br/>\n")).unwrap();
+    assert!(
+        matches!(&d.blocks[0], Block::Para(p) if p.content.units.len() == 1 && p.content.units[0].atom == Atom::Break)
+    );
+}
+
+#[test]
+fn the_design_md_example_parses() {
+    // DESIGN.md §5.2's example, read from the spec itself so the two cannot drift.
+    let spec = include_str!("../../../DESIGN.md");
+    let start = spec.find("### 5.2 Document").unwrap();
+    let body = &spec[start..];
+    let a = body.find("```\n").unwrap() + 4;
+    let b = a + body[a..].find("```\n").unwrap();
+    let d = parse(&body[a..b]).unwrap_or_else(|e| panic!("{}", diag::render(&e)));
+    let lists: Vec<&Vec<Item>> =
+        d.blocks.iter().filter_map(|b| if let Block::List(l) = b { Some(l) } else { None }).collect();
+    assert_eq!(lists.len(), 1);
+    let got: Vec<(bool, usize)> = lists[0].iter().map(|i| (i.ordered, i.level)).collect();
+    assert_eq!(got, [(false, 0), (false, 1), (true, 0)]);
+    let again = serialize(&d);
+    assert_eq!(parse(&again).unwrap(), d);
 }

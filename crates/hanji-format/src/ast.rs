@@ -41,6 +41,28 @@ pub enum Block {
     Keep(Keep),
     PageBreak,
     FootnoteDef(FootnoteDef),
+    /// Consecutive list item lines (`- ` / `1. `); a blank line ends the list.
+    List(Vec<Item>),
+}
+
+/// A list item: one paragraph at a nesting level (0 = the margin).
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Item {
+    /// `1.` (ordered) or `-` (bullet).
+    pub ordered: bool,
+    pub level: usize,
+    pub content: Inline,
+}
+
+impl Item {
+    /// Canonical marker and the content column it gives nested items.
+    pub fn marker(&self) -> &'static str {
+        if self.ordered {
+            "1."
+        } else {
+            "-"
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -328,6 +350,15 @@ impl Document {
                     }
                 }
                 Block::FootnoteDef(f) => f.content.normalize(),
+                Block::List(items) => {
+                    // A list starts at the margin and nests one level at a time.
+                    let mut prev: Option<usize> = None;
+                    for it in items {
+                        it.level = it.level.min(prev.map_or(0, |p| p + 1));
+                        prev = Some(it.level);
+                        it.content.normalize();
+                    }
+                }
                 Block::Keep(_) | Block::PageBreak => {}
             }
         }

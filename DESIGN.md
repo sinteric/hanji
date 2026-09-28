@@ -162,9 +162,24 @@ package ─────────────────────► model
   from day one.
 
 **Shared inline core:** text, `**bold**`, `*italic*`, `~~strike~~`, `<u>`,
-links, footnote references `[^1]`, math `$…$` (→ OMML / HWP equation),
-line break, `<field name=…>value</field>` (Word content controls, HWP form
-fields), inline `<keep/>`.
+links, footnote references `[^1]`, math `$…$` or `<math>…</math>` (→ OMML /
+HWP equation), line break `<br/>`, `<field name=…>value</field>` (Word
+content controls, HWP form fields), inline `<keep/>`.
+
+- **Line break:** `<br/>` is a line break inside one paragraph (docx `w:br`,
+  the HWP line break). It is valid in paragraphs, headings, list items and
+  table cells, and it never starts a paragraph: a line holding only `<br/>`
+  is a paragraph holding one line break.
+- **Math:** `$…$` opens at a `$` followed by a non-space and closes at the
+  next `$` that follows a non-space and is not followed by a digit (pandoc's
+  rule), so `$5 and $10` is text. Math that `$…$` cannot hold is written
+  `<math>…</math>`, its body raw text up to `</math>` on the same line. That
+  covers math directly followed by a digit (`<math>x</math>5`, since `$x$5` is
+  text), math starting or ending with a space, and math containing `$`.
+  Canonical form writes `$…$` wherever it reads back and `<math>` only
+  otherwise. *Why:* it is the smallest rule that keeps `$5 and $10` as text.
+  It needs no new escape, the tag joins the existing tag set, and the common
+  `$x^2$` is unchanged.
 
 ### 5.2 Document
 
@@ -179,6 +194,10 @@ schema: 1
 매출은 전년 대비 **12%** 증가했다.[^1]
 
 <div style="Note">신규 고객 34곳 중 21곳이 수도권.</div>
+
+- 신규 고객 34곳
+  - 수도권 21곳
+1. 다음 분기 목표
 
 <p/>
 <p style="좁은 간격"/>
@@ -207,6 +226,29 @@ schema: 1
 - `style="Name"` holds exactly one style name, written as listed, spaces
   included (`style="Grid Table 4"`); never CSS. A styled paragraph is
   `<div style="Name">text</div>` on one line.
+- Lists: GFM `- ` (bullet) and `1. ` (numbered) items, one paragraph per line.
+  - A nested item is indented to its parent's text: 2 spaces under `- `, 3
+    under `1. `. That is the content column, so nothing is counted. A list
+    starts at the margin and nests one level at a time.
+  - Canonical form writes `1.` for every numbered item. Consecutive items are
+    consecutive lines. A blank line ends a list, so two lists are separated by
+    one, and an item written after one starts a new list.
+  - The text says only bullet or numbered, and the level. The item's paragraph
+    style, list definition and number format stay in the remainder.
+  - A new item takes the numbering of its nearest sibling: at its level, or the
+    same list one level off. A new list with no sibling takes the template's
+    default bullet or decimal list (a numbered one restarts at 1). It is
+    refused, with the reason, if the template has neither.
+  - An item is a single paragraph; `<br/>` breaks a line inside it. A paragraph
+    continuing an item without a number of its own is an ordinary paragraph
+    after the list, and its layout stays in the remainder.
+  - Inside a table cell, items are not written as list lines: a numbered cell
+    paragraph is an ordinary cell paragraph, and its numbering stays in the
+    remainder. A numbered heading stays a heading (`#`), with its numbering
+    in the remainder.
+  - *Why:* both cases keep the one-line forms (pipe rows, `#` lines) and lose
+    nothing. A list inside a cell would need its own syntax, which §6 has not
+    tested.
 - Every table is a GFM pipe table, merged or not. Every row has one cell per
   column; merged cells are written with local markers in the covered cells:
   - `^^` as the whole cell: merged into the cell above.
