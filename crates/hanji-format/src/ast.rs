@@ -117,7 +117,7 @@ impl Atom {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Keep {
     pub id: String,
     pub kind: String,
@@ -138,7 +138,7 @@ pub enum SpanKind {
 }
 
 /// Emphasis flags of one unit.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
 pub struct Marks(pub u8);
 
 impl Marks {

@@ -1,0 +1,170 @@
+//! WordprocessingML names and small helpers shared by import and export.
+
+use crate::xml::{canon, Element, Scope};
+
+pub const W_NS: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
+pub const W_NS_STRICT: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
+pub const R_NS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+pub const DOC_PART: &str = "word/document.xml";
+
+/// Inline wrappers whose text the model edits.
+pub const WRAPPERS: &[&str] = &["w:hyperlink", "w:smartTag", "w:customXml", "w:dir", "w:bdo"];
+
+/// Zero-width inline elements.
+pub const MARKERS: &[&str] = &[
+    "w:bookmarkStart",
+    "w:bookmarkEnd",
+    "w:commentRangeStart",
+    "w:commentRangeEnd",
+    "w:proofErr",
+    "w:permStart",
+    "w:permEnd",
+    "w:moveFromRangeStart",
+    "w:moveFromRangeEnd",
+    "w:moveToRangeStart",
+    "w:moveToRangeEnd",
+    "w:customXmlInsRangeStart",
+    "w:customXmlInsRangeEnd",
+    "w:customXmlDelRangeStart",
+    "w:customXmlDelRangeEnd",
+    "w:customXmlMoveFromRangeStart",
+    "w:customXmlMoveFromRangeEnd",
+    "w:customXmlMoveToRangeStart",
+    "w:customXmlMoveToRangeEnd",
+];
+
+/// Markers that mean something to a person: never dropped with nearby text.
+pub const DURABLE_MARKERS: &[&str] = &[
+    "w:bookmarkStart",
+    "w:bookmarkEnd",
+    "w:commentRangeStart",
+    "w:commentRangeEnd",
+    "w:permStart",
+    "w:permEnd",
+    "w:moveFromRangeStart",
+    "w:moveFromRangeEnd",
+    "w:moveToRangeStart",
+    "w:moveToRangeEnd",
+];
+
+pub const RUN_MARKERS: &[&str] = &["w:lastRenderedPageBreak"];
+
+/// Placeholder kind by element.
+pub fn keep_kind(name: &str) -> String {
+    let local = name.rsplit(':').next().unwrap_or(name);
+    match local {
+        "drawing" | "pict" | "AlternateContent" => "drawing",
+        "object" => "object",
+        "footnoteReference" => "footnote",
+        "endnoteReference" => "endnote",
+        "commentReference" => "comment",
+        "fldSimple" => "field",
+        "fldChar" | "instrText" => "field-part",
+        "ins" => "tracked-insert",
+        "del" => "tracked-delete",
+        "moveFrom" | "moveTo" => "tracked-move",
+        "sdt" => "content-control",
+        "oMath" | "oMathPara" => "math",
+        "sym" => "symbol",
+        "ptab" => "tab",
+        "noBreakHyphen" | "softHyphen" => "hyphen",
+        "cr" | "br" => "break",
+        "t" => "text",
+        other => other,
+    }
+    .to_string()
+}
+
+/// Order of `rPr` children (ECMA-376 §17.3.2), for inserting a flag.
+pub const RPR_ORDER: &[&str] = &[
+    "rStyle",
+    "rFonts",
+    "b",
+    "bCs",
+    "i",
+    "iCs",
+    "caps",
+    "smallCaps",
+    "strike",
+    "dstrike",
+    "outline",
+    "shadow",
+    "emboss",
+    "imprint",
+    "noProof",
+    "snapToGrid",
+    "vanish",
+    "webHidden",
+    "color",
+    "spacing",
+    "w",
+    "kern",
+    "position",
+    "sz",
+    "szCs",
+    "highlight",
+    "u",
+    "effect",
+    "bdr",
+    "shd",
+    "fitText",
+    "vertAlign",
+    "rtl",
+    "cs",
+    "em",
+    "lang",
+    "eastAsianLayout",
+    "specVanish",
+    "oMath",
+];
+
+pub const TCPR_ORDER: &[&str] = &[
+    "cnfStyle",
+    "tcW",
+    "gridSpan",
+    "hMerge",
+    "vMerge",
+    "tcBorders",
+    "shd",
+    "noWrap",
+    "tcMar",
+    "textDirection",
+    "tcFitText",
+    "vAlign",
+    "hideMark",
+];
+
+/// Insert `el` among `parent`'s children following `order` (by local name).
+pub fn insert_ordered(parent: &mut Element, el: Element, order: &[&str]) {
+    let rank = |e: &Element| order.iter().position(|x| *x == e.local());
+    let mine = rank(&el).unwrap_or(order.len());
+    let at =
+        parent.children.iter().position(|n| matches!(n, crate::xml::Node::El(c) if rank(c).is_some_and(|r| r > mine)));
+    match at {
+        Some(k) => parent.children.insert(k, crate::xml::Node::El(el)),
+        None => parent.children.push(crate::xml::Node::El(el)),
+    }
+}
+
+/// `w:b`-style toggle: present and not `0`/`false`/`off`.
+pub fn on(e: Option<&Element>) -> bool {
+    e.is_some_and(|e| !matches!(e.get("w:val").as_deref(), Some("0") | Some("false") | Some("off")))
+}
+
+/// Underline is on unless absent or `none`.
+pub fn underline_on(e: Option<&Element>) -> bool {
+    e.is_some_and(|e| e.get("w:val").as_deref() != Some("none"))
+}
+
+/// Fingerprint of fragments (canonical, joined; `-` for none).
+pub fn fp(scope: &Scope, els: &[Option<&Element>]) -> String {
+    els.iter().map(|e| e.map_or_else(|| "-".to_string(), |e| canon(e, scope))).collect::<Vec<_>>().join("|")
+}
+
+pub fn remove_child(e: &mut Element, qname: &str) -> Option<Element> {
+    let k = e.children.iter().position(|n| matches!(n, crate::xml::Node::El(c) if c.name == qname))?;
+    match e.children.remove(k) {
+        crate::xml::Node::El(x) => Some(x),
+        _ => None,
+    }
+}
