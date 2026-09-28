@@ -11,6 +11,8 @@ Round 3 keeps round 2's unit shape, answer format, refusal rule and scorer CLI. 
 changed. `score.py` imports round 2's scorer for the shared pieces (front matter, inline tags, style-name
 checks, the `{style="Name"}` line, edit application), and `build.py` is adapted from round 2's.
 
+2026-09-28: the scorer was aligned with DESIGN.md §5.2 (commit 6a3530b): under both A candidates `<p/>` only starts a paragraph, so an empty paragraph inside a cell (`a<p/><p/>b`, `a<p/>`) and a `<p/>` line in `cellpara` units are accepted; no published round 3 result changed.
+
 ## Decisions
 
 | decision | A | B |
@@ -221,9 +223,9 @@ Round 3 adds these flags to round 2's:
 | `list_parsed_as_list` | lines that look like a list table are read as an ordinary list (no `{list-table}` line, or a blank line inside) |
 | `list_table_form` | a malformed list table (row line with text, wrong indentation, stray line) |
 | `cell_para_form` | `<p>` … `</p>` or another non-self-closing form inside a cell |
-| `empty_cell_para` | a cell paragraph with no text |
+| `empty_cell_para` | a list-table cell paragraph `<div style="Name"></div>` with no text (cellpara B; under A an empty cell paragraph is valid, §5.2) |
 | `cell_div` | `<div>` inside a pipe-table cell |
-| `p_outside_cell` | `<p/>` outside a table cell (cellpara A) |
+| `p_outside_cell` | `<p/>` inside a line of text outside a table cell (cellpara A; a `<p/>` line is an empty paragraph, §5.2) |
 | `empty_para_form` | a malformed empty paragraph (`<p></p>`, `<p/>` inside text, `<div/>`, or the other tag pair) |
 
 `cell_para_lost`, `br_for_p` and `wrong_empty_para` are diagnoses of a valid but wrong result (added to
@@ -246,6 +248,11 @@ Round 3 adds these flags to round 2's:
   instead of an empty paragraph, `<br/>` lines for empty paragraphs, `<p style="height: 6pt"/>`, `<p></p>`, an
   invented `height` attribute, `<p/>` under B, `<div/>`, a `Spacer` line left in, one empty paragraph too many
   deleted, an existing style used where the answer is a refusal, a wrong refusal, and the other candidate's gold;
+  a cell ending in `<p/>` is now valid (§5.2) and caught as `wrong_empty_para`;
+- 9 §5.2 forms parse to the intended model under the A candidates: an empty paragraph mid-cell (plain and styled),
+  a trailing one, a cell of two, an empty first paragraph, a leading `<p style/>`, a dropped leading `<p/>`, `<p/>`
+  and `<p style/>` lines in a `cellpara` unit, and `<p/>` in a cell of an `emptypara` unit; two such answers score
+  valid with `wrong_empty_para`;
 - 12 correct answers written differently from the gold pass, 6 per decision: spaces around `<p style/>`, a merge
   done as two separate edits, a joined cell kept as a list table, a list-table conversion that also rewrites the
   style line, a move done as one wide edit, deleting a different one of identical empty paragraphs, a page break

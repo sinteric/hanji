@@ -15,6 +15,12 @@ Every candidate syntax is parsed into one common semantic model:
 
 Reuses round 2's scorer (../round2/score.py) by import for the shared pieces (front matter, inline tags, style
 names, the {style="Name"} line, edits); round 1 and round 2 files are not changed.
+
+Under both A candidates <p/> has the single meaning of DESIGN.md §5.2 (as of 6a3530b): it starts a paragraph, and
+<p style="Name"/> starts one in style Name. A line holding only the tag is an empty paragraph; inside a pipe cell
+each tag starts the next paragraph of the cell, which may be empty (a<p/><p/>b is a, an empty paragraph, b; a<p/>
+ends with one). A tag written first in a cell starts the first paragraph itself, so a leading plain <p/> changes
+nothing (canonical form drops it) and a leading <p style="Name"/> styles the first paragraph.
 """
 import importlib.util
 import json
@@ -56,9 +62,10 @@ class Ctx:
         self.names = unit.get('names', {})
         self.errors = []
         self.flags = set()
-        self.cell_p = d == 'cellpara' and c == 'A'        # <p/> / <p style/> inside pipe cells
+        self.p_tags = c == 'A'                            # §5.2 <p/>: cell paragraphs and empty-paragraph lines
+        self.cell_p = d == 'cellpara' and c == 'A'        # the candidate tested <p/> inside pipe cells
         self.list_tables = d == 'cellpara' and c == 'B'   # {list-table} blocks
-        self.empty_p = d == 'emptypara' and c == 'A'      # a line <p/> / <p style="Name"/>
+        self.empty_p = d == 'emptypara' and c == 'A'      # the candidate tested a line <p/> / <p style="Name"/>
         self.empty_div = d == 'emptypara' and c == 'B'    # a line <div></div> / <div style="Name"></div>
 
     def add(self, flag, line, col, msg):
@@ -69,13 +76,12 @@ class Ctx:
         base = ('Formatting is by style name only: <div style="Name">text</div> for a paragraph and a line '
                 '{style="Name"} before a table; colours, fonts, sizes, spacing, alignment and borders cannot be '
                 'written. <br/> is a line break inside a paragraph and a line <pagebreak/> is a page break.')
-        if self.cell_p:
-            return base + ' Inside a table cell, <p/> or <p style="Name"/> starts the next paragraph of the cell.'
+        if self.p_tags:
+            return base + (' Inside a table cell, <p/> or <p style="Name"/> starts the next paragraph of the cell; '
+                           'a line holding only <p/> or <p style="Name"/> is an empty paragraph.')
         if self.list_tables:
             return base + (' A table whose cells hold several paragraphs or a styled paragraph is a list table: a '
                            'line {list-table}, then for each row a line - and one line "  - " per cell.')
-        if self.empty_p:
-            return base + ' An empty paragraph is a line holding only <p/> or <p style="Name"/>.'
         return base + ' An empty paragraph is a line holding only <div></div> or <div style="Name"></div>.'
 
     def error_text(self):
@@ -92,19 +98,20 @@ def check_text(t, ln, col, ctx, in_cell=False):
     for m in P_TAG_RE.finditer(t):
         if ctx.cell_p:
             ctx.add('p_outside_cell', ln, col + m.start(),
-                    '<p/> and <p style="Name"/> start a new paragraph inside a table cell only. Outside a table, '
-                    'each paragraph is its own line.')
+                    '<p/> and <p style="Name"/> start a paragraph inside a table cell, or are an empty paragraph as '
+                    'a line of their own. Outside a table, a paragraph with text is its own line, and a styled one '
+                    'is <div style="Name">text</div>.')
         elif ctx.empty_p:
             ctx.add('empty_para_form', ln, col + m.start(),
                     'an empty paragraph is a line holding only <p/> or <p style="Name"/>; the tag is never inside '
-                    'a line of text or a table cell.')
-    if ctx.cell_p or ctx.empty_p:
+                    'a line of text (inside a table cell it starts the next paragraph of the cell).')
+    if ctx.p_tags:
         t = P_TAG_RE.sub(' ', t)
     if in_cell and re.search(r'<\s*/?\s*div\b', t):
         if ctx.list_tables:
             msg = ('a pipe table cell holds one paragraph with the default style. A table whose cells hold a styled '
                    'paragraph or several paragraphs is written as a list table.')
-        elif ctx.cell_p:
+        elif ctx.p_tags:
             msg = ('inside a table cell a paragraph never uses <div>; a cell paragraph with a style is written '
                    '<p style="Name"/> before its text.')
         else:
@@ -179,7 +186,9 @@ def build_grid(toks, pos, ctx):
 
 
 def cell_paras_A(raw, ln, col, ctx):
-    """A pipe cell under cellpara A: paragraphs separated by <p/> / <p style="Name"/>."""
+    """A pipe cell under the §5.2 rule (both A candidates): the cell's text starts its first paragraph and each
+    <p/> / <p style="Name"/> starts another, which may be empty. A tag written first starts the first paragraph
+    itself: <p style="Name"/>x styles it, and a leading plain <p/> changes nothing (<p/>x is x)."""
     ms = list(P_TAG_RE.finditer(raw))
     texts, styles, last = [], [None], 0
     for m in ms:
@@ -194,21 +203,17 @@ def cell_paras_A(raw, ln, col, ctx):
     if len(texts) == 1:
         check_text(raw, ln, col, ctx, in_cell=True)
         return [[None, ntext(raw)]]
+    if not texts[0].strip():
+        texts, styles = texts[1:], styles[1:]      # the cell begins with the tag of its first paragraph
     paras = []
-    for k, (t, s) in enumerate(zip(texts, styles)):
-        if k == 0 and not t.strip():
-            continue      # the cell begins with the tag of its first paragraph
-        if not t.strip():
-            ctx.add('empty_cell_para', ln, col, 'every paragraph in a cell has text: write the text after each <p/> '
-                    'or <p style="Name"/>, and do not end a cell with one.')
-            return None
+    for t, s in zip(texts, styles):
         check_text(t, ln, col, ctx, in_cell=True)
         paras.append([s, ntext(t)])
     return paras
 
 
 def pipe_cell(raw, ln, col, ctx):
-    if ctx.cell_p:
+    if ctx.p_tags:
         return cell_paras_A(raw, ln, col, ctx)
     check_text(raw, ln, col, ctx, in_cell=True)
     return [[None, ntext(raw)]]
@@ -456,14 +461,9 @@ def parse_document(text, ctx):
                 i += 1
                 continue
             em = EMPTY_P_LINE.match(s)
-            if em and ctx.empty_p:
+            if em and ctx.p_tags:
                 style = para_style(r2.parse_attrs(em.group(1)), ln, col0, ctx, 'p')
                 blocks.append({'k': 'p', 'style': style, 'text': ''})
-                i += 1
-                continue
-            if em and ctx.cell_p:
-                ctx.add('p_outside_cell', ln, col0, '<p/> and <p style="Name"/> start a new paragraph inside a table '
-                        'cell only. Outside a table, each paragraph is its own line.')
                 i += 1
                 continue
             if em is None and ctx.empty_p and re.match(r'^<\s*/?\s*p\b', s, re.I):
@@ -548,10 +548,24 @@ def is_empty_para(b):
     return b.get('k') == 'p' and b.get('text') == ''
 
 
+def without_empty_paras(blocks):
+    """The blocks with every empty paragraph left out, those inside table cells included."""
+    out = []
+    for b in blocks:
+        if is_empty_para(b):
+            continue
+        if b.get('k') == 'table':
+            g = b['grid']
+            cells = [c[:2] + [[p for p in c[2] if p[1] != '']] + c[3:] for c in g['cells']]
+            b = dict(b, grid=dict(g, cells=cells))
+        out.append(b)
+    return out
+
+
 def diagnose(got_blocks, want_blocks):
     """Flags that name what went wrong in a valid result that differs from the intended one."""
     flags = set()
-    if [b for b in got_blocks if not is_empty_para(b)] == [b for b in want_blocks if not is_empty_para(b)]:
+    if without_empty_paras(got_blocks) == without_empty_paras(want_blocks):
         flags.add('wrong_empty_para')
     if any(b.get('k') == 'p' and b.get('text', '').replace('<br/>', '').strip() == '' and b.get('text')
            for b in got_blocks):

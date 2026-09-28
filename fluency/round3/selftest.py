@@ -87,7 +87,8 @@ BROKEN = [
     (CA1, 'notice1-e4', lambda: mod(CA1, 'notice1-e4', '<p/>분야별 전문가 1:1 멘토링 (월 2회)<p/>투자 유치 설명회 참가', ''),
      'cell_para_lost'),
     (CA3, 'form3-e1', lambda: S(CA3, ('<p style="표 참고"/>※ 해당 시 작성', '')), 'edit_ambiguous'),
-    (CA2, 'minutes2-w', lambda: mod(CA2, 'minutes2-w', '| 10월 중 조치 |', '| 10월 중 조치<p/> |'), 'empty_cell_para'),
+    # a cell ending in <p/> ends with an empty paragraph (§5.2): valid, but not the brief
+    (CA2, 'minutes2-w', lambda: mod(CA2, 'minutes2-w', '| 10월 중 조치 |', '| 10월 중 조치<p/> |'), 'wrong_empty_para'),
     (CA3, 'form3-e3', lambda: S(CA3, ('<p/>② 허가받은', '<p style="6pt"/>② 허가받은')), 'css_in_attr'),
     (CA1, 'notice1-w', lambda: mod(CA1, 'notice1-w', '<div style="참고">교육 장소는',
                                    '<p style="참고"/>교육 장소는'), 'p_outside_cell'),
@@ -183,6 +184,54 @@ ALTERNATIVES = [
                                        '기명날인한다.\n\n<div></div>\n(첨부: 2027년 사업계획서 1부)\n<div></div>\n'))),
 ]
 
+# forms DESIGN.md §5.2 gives <p/> under both A candidates -- each must parse without errors to the given blocks.
+# (unit, body lines after the unit's front matter, expected blocks)
+T = lambda *cells: {'k': 'table', 'style': None, 'grid': {'rows': 2, 'cols': 2, 'cells': [
+    [0, 0, [[None, '구분']], 1, 1, True], [0, 1, [[None, '내용']], 1, 1, True],
+    [1, 0, [[None, '가']], 1, 1, False], [1, 1, [list(p) for p in cells], 1, 1, False]]}}
+TABLE = '| 구분 | 내용 |\n|---|---|\n| 가 | %s |'
+P = lambda text, style=None: {'k': 'p', 'style': style, 'text': text}
+ACCEPTED = [
+    ('empty paragraph mid-cell', CA1, TABLE % 'a<p/><p/>b', [T((None, 'a'), (None, ''), (None, 'b'))]),
+    ('styled empty paragraph mid-cell', CA1, TABLE % 'a<p style="표 참고"/><p/>b',
+     [T((None, 'a'), ('표 참고', ''), (None, 'b'))]),
+    ('trailing empty paragraph in a cell', CA1, TABLE % 'a<p/>', [T((None, 'a'), (None, ''))]),
+    ('cell of two empty paragraphs', CA1, TABLE % '<p/><p/>', [T((None, ''), (None, ''))]),
+    ('empty first paragraph, then text', CA1, TABLE % '<p/><p/>b', [T((None, ''), (None, 'b'))]),
+    ('leading <p style/> styles the first paragraph', CA1, TABLE % '<p style="표 참고"/>a<p/>b',
+     [T(('표 참고', 'a'), (None, 'b'))]),
+    ('leading plain <p/> is dropped', CA1, TABLE % '<p/>a<p/>b', [T((None, 'a'), (None, 'b'))]),
+    ('<p/> and <p style/> lines in a cellpara unit', CA1, '문단\n\n<p/>\n<p style="참고"/>\n\n' + TABLE % 'a',
+     [P('문단'), P(''), P('', '참고'), T((None, 'a'))]),
+    ('<p/> mid-cell in an emptypara unit', EA1, '<p style="좁은 간격"/>\n\n' + TABLE % 'a<p/><p/>b',
+     [P('', '좁은 간격'), T((None, 'a'), (None, ''), (None, 'b'))]),
+]
+
+
+def check_accepted():
+    fails = 0
+    for name, uid, body, want in ACCEPTED:
+        unit = score.load_unit(uid)
+        fm = unit['seed'].split('---\n')[1]
+        model, ctx = score.parse('---\n' + fm + '---\n\n' + body + '\n', unit)
+        if ctx.errors or model['blocks'] != want:
+            fails += 1
+            print('ACCEPTED FAIL', uid, name, ctx.error_text() or score.first_diff(model['blocks'], want))
+    # the same forms reach the scorer as valid answers: gold plus an empty paragraph added mid-cell, or plus a <p/>
+    # line, is valid and diagnosed as a wrong empty paragraph
+    for uid, tid, old, new in [(CA1, 'notice1-e2', '| 연령 | 공고일 기준 만 19세 이상 39세 이하<p/>',
+                                '| 연령 | 공고일 기준 만 19세 이상 39세 이하<p/><p/>'),
+                               (CA1, 'notice1-e2', '# 2027년 청년 창업 지원사업 참여자 모집 공고\n',
+                                '# 2027년 청년 창업 지원사업 참여자 모집 공고\n\n<p/>\n')]:
+        ans = G(uid, tid)
+        ans['edits'].append({'old': old, 'new': new})
+        r = one(uid, tid, ans)
+        if not r['valid'] or r['flags'] != ['not_landed', 'wrong_empty_para']:
+            fails += 1
+            print('ACCEPTED FAIL (scored)', uid, tid, r)
+    print('accepted: %d §5.2 forms parse, 2 scored answers valid' % len(ACCEPTED))
+    return fails
+
 
 def main():
     fails = 0
@@ -226,6 +275,7 @@ def main():
         print('alternatives %-10s %d/%d pass' % (d, sum(v), len(v)))
         if sum(v) < MIN_ALT:
             fails += 1
+    fails += check_accepted()
     # CLI round trip
     with tempfile.NamedTemporaryFile('w', suffix='.json', delete=False, encoding='utf-8') as f:
         json.dump(gold('r3-cellpara-B-2'), f, ensure_ascii=False)
