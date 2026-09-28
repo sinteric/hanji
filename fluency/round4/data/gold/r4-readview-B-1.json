@@ -1,0 +1,39 @@
+{
+ "answers": [
+  {
+   "task_id": "sales1-q1",
+   "text": "ANSWER: 12,390,000",
+   "accept": [
+    "12,390,000"
+   ]
+  },
+  {
+   "task_id": "sales1-q2",
+   "text": "ANSWER: 16",
+   "accept": [
+    "16"
+   ]
+  },
+  {
+   "task_id": "sales1-q3",
+   "text": "ANSWER: 64",
+   "accept": [
+    "64"
+   ]
+  },
+  {
+   "task_id": "sales1-q4",
+   "text": "ANSWER: 03609",
+   "accept": [
+    "03609"
+   ]
+  },
+  {
+   "task_id": "sales1-q5",
+   "text": "ANSWER: E36:E50",
+   "accept": [
+    "E36:E50"
+   ]
+  }
+ ]
+}

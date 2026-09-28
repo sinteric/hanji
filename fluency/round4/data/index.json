@@ -1,0 +1,185 @@
+[
+ {
+  "unit_id": "r4-readview-A-1",
+  "decision": "readview",
+  "candidate": "A",
+  "replicate": 1,
+  "prompt_file": "prompts/r4-readview-A-1.md",
+  "prompt_chars": 17042,
+  "view_chars": 12689,
+  "rows": 190,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r4-readview-A-2",
+  "decision": "readview",
+  "candidate": "A",
+  "replicate": 2,
+  "prompt_file": "prompts/r4-readview-A-2.md",
+  "prompt_chars": 15492,
+  "view_chars": 11102,
+  "rows": 155,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r4-readview-A-3",
+  "decision": "readview",
+  "candidate": "A",
+  "replicate": 3,
+  "prompt_file": "prompts/r4-readview-A-3.md",
+  "prompt_chars": 16534,
+  "view_chars": 12138,
+  "rows": 152,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r4-readview-B-1",
+  "decision": "readview",
+  "candidate": "B",
+  "replicate": 1,
+  "prompt_file": "prompts/r4-readview-B-1.md",
+  "prompt_chars": 14281,
+  "view_chars": 9902,
+  "rows": 190,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r4-readview-B-2",
+  "decision": "readview",
+  "candidate": "B",
+  "replicate": 2,
+  "prompt_file": "prompts/r4-readview-B-2.md",
+  "prompt_chars": 15190,
+  "view_chars": 10774,
+  "rows": 155,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r4-readview-B-3",
+  "decision": "readview",
+  "candidate": "B",
+  "replicate": 3,
+  "prompt_file": "prompts/r4-readview-B-3.md",
+  "prompt_chars": 14734,
+  "view_chars": 10312,
+  "rows": 152,
+  "refusal_tasks": []
+ },
+ {
+  "unit_id": "r4-writeshape-A-1",
+  "decision": "writeshape",
+  "candidate": "A",
+  "replicate": 1,
+  "prompt_file": "prompts/r4-writeshape-A-1.md",
+  "prompt_chars": 21666,
+  "view_chars": 12689,
+  "rows": 190,
+  "refusal_tasks": [
+   "sales1-e5"
+  ]
+ },
+ {
+  "unit_id": "r4-writeshape-A-2",
+  "decision": "writeshape",
+  "candidate": "A",
+  "replicate": 2,
+  "prompt_file": "prompts/r4-writeshape-A-2.md",
+  "prompt_chars": 20125,
+  "view_chars": 11102,
+  "rows": 155,
+  "refusal_tasks": [
+   "roster2-e5"
+  ]
+ },
+ {
+  "unit_id": "r4-writeshape-A-3",
+  "decision": "writeshape",
+  "candidate": "A",
+  "replicate": 3,
+  "prompt_file": "prompts/r4-writeshape-A-3.md",
+  "prompt_chars": 21036,
+  "view_chars": 12138,
+  "rows": 152,
+  "refusal_tasks": [
+   "budget3-e5"
+  ]
+ },
+ {
+  "unit_id": "r4-writeshape-B-1",
+  "decision": "writeshape",
+  "candidate": "B",
+  "replicate": 1,
+  "prompt_file": "prompts/r4-writeshape-B-1.md",
+  "prompt_chars": 21617,
+  "view_chars": 12689,
+  "rows": 190,
+  "refusal_tasks": [
+   "sales1-e5"
+  ]
+ },
+ {
+  "unit_id": "r4-writeshape-B-2",
+  "decision": "writeshape",
+  "candidate": "B",
+  "replicate": 2,
+  "prompt_file": "prompts/r4-writeshape-B-2.md",
+  "prompt_chars": 20076,
+  "view_chars": 11102,
+  "rows": 155,
+  "refusal_tasks": [
+   "roster2-e5"
+  ]
+ },
+ {
+  "unit_id": "r4-writeshape-B-3",
+  "decision": "writeshape",
+  "candidate": "B",
+  "replicate": 3,
+  "prompt_file": "prompts/r4-writeshape-B-3.md",
+  "prompt_chars": 20987,
+  "view_chars": 12138,
+  "rows": 152,
+  "refusal_tasks": [
+   "budget3-e5"
+  ]
+ },
+ {
+  "unit_id": "r4-writeshape-C-1",
+  "decision": "writeshape",
+  "candidate": "C",
+  "replicate": 1,
+  "prompt_file": "prompts/r4-writeshape-C-1.md",
+  "prompt_chars": 21538,
+  "view_chars": 12689,
+  "rows": 190,
+  "refusal_tasks": [
+   "sales1-e5"
+  ]
+ },
+ {
+  "unit_id": "r4-writeshape-C-2",
+  "decision": "writeshape",
+  "candidate": "C",
+  "replicate": 2,
+  "prompt_file": "prompts/r4-writeshape-C-2.md",
+  "prompt_chars": 19997,
+  "view_chars": 11102,
+  "rows": 155,
+  "refusal_tasks": [
+   "roster2-e5"
+  ]
+ },
+ {
+  "unit_id": "r4-writeshape-C-3",
+  "decision": "writeshape",
+  "candidate": "C",
+  "replicate": 3,
+  "prompt_file": "prompts/r4-writeshape-C-3.md",
+  "prompt_chars": 20908,
+  "view_chars": 12138,
+  "rows": 152,
+  "refusal_tasks": [
+   "budget3-e5"
+  ]
+ }
+]

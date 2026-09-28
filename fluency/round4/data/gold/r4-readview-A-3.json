@@ -1,0 +1,39 @@
+{
+ "answers": [
+  {
+   "task_id": "budget3-q1",
+   "text": "ANSWER: 12,510,000",
+   "accept": [
+    "12,510,000"
+   ]
+  },
+  {
+   "task_id": "budget3-q2",
+   "text": "ANSWER: 6",
+   "accept": [
+    "6"
+   ]
+  },
+  {
+   "task_id": "budget3-q3",
+   "text": "ANSWER: 66",
+   "accept": [
+    "66"
+   ]
+  },
+  {
+   "task_id": "budget3-q4",
+   "text": "ANSWER: 0431",
+   "accept": [
+    "0431"
+   ]
+  },
+  {
+   "task_id": "budget3-q5",
+   "text": "ANSWER: G20:G35",
+   "accept": [
+    "G20:G35"
+   ]
+  }
+ ]
+}

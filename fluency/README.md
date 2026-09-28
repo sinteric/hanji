@@ -10,7 +10,9 @@ subject model the same documents and tasks in candidate syntax A or candidate sy
 and the decisions are in [RESULTS.md](RESULTS.md). Round 2 (larger seeds, harder tasks, and the new table-style
 decision of §10.7) has its own kit in [round2/](round2/README.md); its results are in
 [round2/RESULTS.md](round2/RESULTS.md). Round 3 (multi-paragraph table cells and empty paragraphs, §10.8) has its
-own kit in [round3/](round3/README.md); its results are in [round3/RESULTS.md](round3/RESULTS.md).
+own kit in [round3/](round3/README.md); its results are in [round3/RESULTS.md](round3/RESULTS.md). Round 4
+(spreadsheet cell data: the read view and the write shape, §10.6) has its own kit in [round4/](round4/README.md);
+its results are in [round4/RESULTS.md](round4/RESULTS.md).
 
 | decision | A | B |
 |---|---|---|
