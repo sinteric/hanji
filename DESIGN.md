@@ -111,7 +111,8 @@ package ─────────────────────► model
   of related XML parts … rather than one editor tree"). Their reason is an
   interactive editor with collaboration over the whole package; ours is agent
   text editing plus a remainder. The remainder's anchoring (§5) is where that
-  choice will be tested hardest.
+  choice will be tested hardest. §10.3 gives the chosen anchoring and its
+  measured residual losses ([REMAINDER.md](prototype/remainder/REMAINDER.md)).
 - **Import** parses the package with a format engine, emits the model text,
   and moves everything unmodelled into the remainder, anchored to the model
   element it belongs to (block, run range, slide, shape, cell range).
@@ -212,6 +213,7 @@ schema: 1
     cell; covered cells hold only a marker. Nothing is counted.
   - An empty unmerged cell is `|  |`. `^^` in the header row and `||` at the
     start of a row are errors.
+- Multi-paragraph cells have no pipe-table form yet (open, §10.8).
 - Table style (proposal, open in §10.7): a `<table style="Name">` line and a
   `</table>` line around an unchanged pipe table.
 - Headers, footers and section setup come from the template or the remainder
@@ -405,8 +407,17 @@ v0.7.3; "lossless … regarding content", not formatting).
    (§5.2, §5.3, §6).
 2. Whether model edits reach the exported file as **tracked changes**
    (reviewable in Word/Hancom) or as direct changes.
-3. The remainder's storage shape and anchor granularity (block, run range,
-   shape, cell range) — the hardest part of §4.
+3. ~~The remainder's storage shape and anchor granularity (block, run range,
+   shape, cell range)~~ — decided by
+   [prototype/remainder/REMAINDER.md](prototype/remainder/REMAINDER.md): a flat
+   list of typed entries per revision, namespace map stored once per document;
+   anchors are a placeholder id, a block (paragraph/table/row/cell), or a
+   character range + seq in a paragraph. Re-anchor by the exact edit span, else
+   keep unchanged aligned blocks and run one document-level character diff over
+   the changed ones (design C): over 13 docx, 98.8% landed, 1.1% silently lost
+   (block + offset: 7.8%; never used). Refused: an entry whose ends land in
+   different paragraphs; an ambiguous alignment (identical or unrecognised
+   blocks).
 4. Where engines run: server, client (wasm), or both — rhwp, rdocx, rpptx and
    rust_xlsxwriter all build to wasm; rdocx-wasm is unpublished.
 5. Header/footer and section text: when to expose.
@@ -415,6 +426,13 @@ v0.7.3; "lossless … regarding content", not formatting).
    `<table style="Name">` line and a `</table>` line around an unchanged pipe
    table. Not tested — round 1's styled tables were HTML `<tr>`/`<td>` tables
    and its merged tables had no style — so the next fluency round decides.
+8. A syntax for **multi-paragraph table cells** and **empty paragraphs**. In
+   the remainder prototype 12 of 29 tables could not be pipe tables (9 for
+   multi-paragraph cells; the others use `gridBefore`/`gridAfter`, a nested
+   table, or a row-level content control) and fell back to an uneditable block
+   placeholder. Empty paragraphs have no Markdown form (the prototype wrote
+   `<div style="Normal"></div>`); they are common, and they are where
+   identity-by-diff fails. A fluency round decides.
 
 ## 11. Blind spots
 
