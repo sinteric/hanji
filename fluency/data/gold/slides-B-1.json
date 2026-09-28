@@ -1,0 +1,35 @@
+{
+ "answers": [
+  {
+   "task_id": "deck1-w",
+   "text": "---\ntype: presentation\nformat: pptx\ntemplate: org/sales-deck\nschema: 1\n---\n\nlayout: Title Slide\n::title::\n4분기 영업 회의\n::body::\n영업기획팀\n\n---\n\nlayout: Title and Content\n::title::\n4분기 중점 과제\n::body::\n- 연말 재고 소진\n- 대형 거래처 재계약\n- 신규 대리점 교육\n::notes::\n재고 소진이 최우선\n\n---\n\nlayout: Two Content\n::title::\n지역별 담당\n::left::\n- 수도권: 김민수\n- 영남권: 이서연\n::right::\n- 호남권: 박지훈\n- 제주: 최유진\n"
+  },
+  {
+   "task_id": "deck1-e1",
+   "edits": [
+    {
+     "old": "\nlayout: Title Only\n",
+     "new": "\nlayout: Two Content\n::title::\n실행 과제\n::left::\n- 수도권 대리점 3곳 추가\n- 온라인 견적 채널 오픈\n::right::\n- 재계약 고객 할인 5%\n- 분기별 고객 세미나\n\n---\n\nlayout: Title Only\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck1-e2",
+   "edits": [
+    {
+     "old": "- 재계약률 91%\n::notes::\n전년 대비 성장률을 먼저 강조\n",
+     "new": "::notes::\n전년 대비 성장률을 먼저 강조\n- 재계약률 91%\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck1-e3",
+   "edits": [
+    {
+     "old": "- 매출 530억 원, 전년 대비 +12%\n",
+     "new": "- 매출 530억 원, 전년 대비 +10%\n"
+    }
+   ]
+  }
+ ]
+}

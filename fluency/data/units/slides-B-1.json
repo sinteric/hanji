@@ -1,0 +1,108 @@
+{
+ "unit_id": "slides-B-1",
+ "decision": "slides",
+ "candidate": "B",
+ "replicate": 1,
+ "names": {
+  "layouts": {
+   "Title Slide": [
+    "title",
+    "body"
+   ],
+   "Title and Content": [
+    "title",
+    "body"
+   ],
+   "Two Content": [
+    "title",
+    "left",
+    "right"
+   ],
+   "Section Header": [
+    "title",
+    "body"
+   ],
+   "Title Only": [
+    "title"
+   ]
+  }
+ },
+ "fm": {
+  "type": "presentation",
+  "format": "pptx",
+  "template": "org/sales-deck",
+  "schema": "1"
+ },
+ "seed": "---\ntype: presentation\nformat: pptx\ntemplate: org/sales-deck\nschema: 1\n---\n\nlayout: Title Slide\n::title::\n2026 하반기 영업 전략\n::body::\n영업본부 / 2026년 7월\n\n---\n\nlayout: Title and Content\n::title::\n상반기 실적 요약\n::body::\n- 매출 482억 원, 전년 대비 +12%\n- 신규 고객 34곳 확보\n- 재계약률 91%\n::notes::\n전년 대비 성장률을 먼저 강조\n\n---\n\nlayout: Section Header\n::title::\n시장 환경\n::body::\n경쟁 심화와 가격 압박\n\n---\n\nlayout: Two Content\n::title::\n경쟁사 비교\n::left::\n- 당사: 전년 대비 +12%\n- 평균 납기 3일\n- 전담 CS 운영\n::right::\n- A사: 전년 대비 +8%\n- 평균 납기 5일\n- 가격 할인 공세\n\n---\n\nlayout: Title and Content\n::title::\n하반기 목표\n::body::\n- 매출 530억 원, 전년 대비 +12%\n- 신규 고객 40곳\n- 재계약률 93%\n::notes::\n목표치는 경영회의 승인 완료\n\n---\n\nlayout: Title Only\n::title::\n감사합니다\n",
+ "tasks": [
+  {
+   "task_id": "deck1-w",
+   "type": "write",
+   "instruction": "Write a new presentation with exactly three slides:\n1. Layout Title Slide; title \"4분기 영업 회의\"; body text \"영업기획팀\".\n2. Layout Title and Content; title \"4분기 중점 과제\"; body with the bullets \"연말 재고 소진\", \"대형 거래처 재계약\", \"신규 대리점 교육\"; speaker notes \"재고 소진이 최우선\".\n3. Layout Two Content; title \"지역별 담당\"; left column bullets \"수도권: 김민수\", \"영남권: 이서연\"; right column bullets \"호남권: 박지훈\", \"제주: 최유진\".",
+   "front_matter": "---\ntype: presentation\nformat: pptx\ntemplate: org/sales-deck\nschema: 1\n---",
+   "expect": {
+    "mode": "exact",
+    "items": [
+     {
+      "layout": "Title Slide",
+      "slots": {
+       "title": [
+        "4분기 영업 회의"
+       ],
+       "body": [
+        "영업기획팀"
+       ]
+      }
+     },
+     {
+      "layout": "Title and Content",
+      "slots": {
+       "title": [
+        "4분기 중점 과제"
+       ],
+       "body": [
+        "- 연말 재고 소진",
+        "- 대형 거래처 재계약",
+        "- 신규 대리점 교육"
+       ],
+       "notes": [
+        "재고 소진이 최우선"
+       ]
+      }
+     },
+     {
+      "layout": "Two Content",
+      "slots": {
+       "title": [
+        "지역별 담당"
+       ],
+       "left": [
+        "- 수도권: 김민수",
+        "- 영남권: 이서연"
+       ],
+       "right": [
+        "- 호남권: 박지훈",
+        "- 제주: 최유진"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "task_id": "deck1-e1",
+   "type": "edit",
+   "instruction": "After slide 5 (\"하반기 목표\") and before the last slide, add a slide with layout Two Content: title \"실행 과제\"; left column bullets \"수도권 대리점 3곳 추가\", \"온라인 견적 채널 오픈\"; right column bullets \"재계약 고객 할인 5%\", \"분기별 고객 세미나\"."
+  },
+  {
+   "task_id": "deck1-e2",
+   "type": "edit",
+   "instruction": "On slide 2 (\"상반기 실적 요약\"), move the bullet \"- 재계약률 91%\" out of the body and into the speaker notes, as a new last line of the notes (keep it as the bullet line \"- 재계약률 91%\")."
+  },
+  {
+   "task_id": "deck1-e3",
+   "type": "edit",
+   "instruction": "On slide 5 (\"하반기 목표\"), change \"전년 대비 +12%\" to \"전년 대비 +10%\". The same phrase on other slides stays as it is."
+  }
+ ]
+}

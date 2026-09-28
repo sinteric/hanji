@@ -1,0 +1,35 @@
+{
+ "answers": [
+  {
+   "task_id": "report2-w",
+   "text": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 10월 당직 근무표\n\n<table>\n<tr><th>주차</th><th>요일</th><th>주간 담당</th><th>야간 담당</th></tr>\n<tr><td rowspan=\"2\">1주차</td><td>월~수</td><td rowspan=\"2\">박지훈</td><td>최유진</td></tr>\n<tr><td>목~금</td><td>정하늘</td></tr>\n<tr><td>2주차</td><td>월~금</td><td colspan=\"2\">외부 위탁 (한결시큐리티)</td></tr>\n</table>\n\n비상 연락: 경영지원팀 내선 2020\n"
+  },
+  {
+   "task_id": "report2-e1",
+   "edits": [
+    {
+     "old": "<tr><td rowspan=\"2\">개발2팀</td><td>관리자 웹 개편</td><td>화면 개발</td><td>화면 개발</td><td>60%</td></tr>\n",
+     "new": "<tr><td rowspan=\"2\">개발2팀</td><td>관리자 웹 개편</td><td colspan=\"2\">화면 개발 (계속)</td><td>60%</td></tr>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "report2-e2",
+   "edits": [
+    {
+     "old": "<tr><th>팀</th><th>업무</th><th>금주 실적</th><th>차주 계획</th><th>진척률</th></tr>\n<tr><td rowspan=\"3\">개발1팀</td><td>모바일 앱 4.2</td><td>출시 완료</td><td>모니터링</td><td>100%</td></tr>\n<tr><td>푸시 알림 개선</td><td>설계 검토</td><td>개발 착수</td><td>20%</td></tr>\n<tr><td>결제 모듈 안정화</td><td>장애 원인 분석</td><td>재발 방지 패치</td><td>60%</td></tr>\n<tr><td rowspan=\"2\">개발2팀</td><td>관리자 웹 개편</td><td>화면 개발</td><td>화면 개발</td><td>60%</td></tr>\n<tr><td>API 문서화</td><td colspan=\"2\">휴가로 일정 순연 (9/29~10/2)</td><td>40%</td></tr>\n<tr><td rowspan=\"2\">QA팀</td><td>4.2 회귀 테스트</td><td>완료</td><td>없음</td><td>100%</td></tr>\n<tr><td>결제 모듈 검증</td><td>테스트 케이스 작성</td><td>검증 수행</td><td>20%</td></tr>\n",
+     "new": "<tr><th>팀</th><th>업무</th><th>금주 실적</th><th>차주 계획</th><th>비고</th><th>진척률</th></tr>\n<tr><td rowspan=\"3\">개발1팀</td><td>모바일 앱 4.2</td><td>출시 완료</td><td>모니터링</td><td>-</td><td>100%</td></tr>\n<tr><td>푸시 알림 개선</td><td>설계 검토</td><td>개발 착수</td><td>디자인팀 협업</td><td>20%</td></tr>\n<tr><td>결제 모듈 안정화</td><td>장애 원인 분석</td><td>재발 방지 패치</td><td>장애 보고서 첨부</td><td>60%</td></tr>\n<tr><td rowspan=\"2\">개발2팀</td><td>관리자 웹 개편</td><td>화면 개발</td><td>화면 개발</td><td>-</td><td>60%</td></tr>\n<tr><td>API 문서화</td><td colspan=\"2\">휴가로 일정 순연 (9/29~10/2)</td><td>-</td><td>40%</td></tr>\n<tr><td rowspan=\"2\">QA팀</td><td>4.2 회귀 테스트</td><td>완료</td><td>없음</td><td>-</td><td>100%</td></tr>\n<tr><td>결제 모듈 검증</td><td>테스트 케이스 작성</td><td>검증 수행</td><td>QA 인력 요청 중</td><td>20%</td></tr>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "report2-e3",
+   "edits": [
+    {
+     "old": "<tr><td>결제 모듈 안정화</td><td>장애 원인 분석</td><td>재발 방지 패치</td><td>60%</td></tr>\n",
+     "new": "<tr><td>결제 모듈 안정화</td><td>장애 원인 분석</td><td>재발 방지 패치</td><td>70%</td></tr>\n"
+    }
+   ]
+  }
+ ]
+}

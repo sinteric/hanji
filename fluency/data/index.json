@@ -1,0 +1,164 @@
+[
+ {
+  "unit_id": "merge-A-1",
+  "decision": "merge",
+  "candidate": "A",
+  "replicate": 1,
+  "prompt_file": "prompts/merge-A-1.md",
+  "prompt_chars": 5169,
+  "seed_chars": 1305
+ },
+ {
+  "unit_id": "merge-B-1",
+  "decision": "merge",
+  "candidate": "B",
+  "replicate": 1,
+  "prompt_file": "prompts/merge-B-1.md",
+  "prompt_chars": 4768,
+  "seed_chars": 917
+ },
+ {
+  "unit_id": "merge-A-2",
+  "decision": "merge",
+  "candidate": "A",
+  "replicate": 2,
+  "prompt_file": "prompts/merge-A-2.md",
+  "prompt_chars": 4997,
+  "seed_chars": 1153
+ },
+ {
+  "unit_id": "merge-B-2",
+  "decision": "merge",
+  "candidate": "B",
+  "replicate": 2,
+  "prompt_file": "prompts/merge-B-2.md",
+  "prompt_chars": 4688,
+  "seed_chars": 857
+ },
+ {
+  "unit_id": "merge-A-3",
+  "decision": "merge",
+  "candidate": "A",
+  "replicate": 3,
+  "prompt_file": "prompts/merge-A-3.md",
+  "prompt_chars": 4903,
+  "seed_chars": 1002
+ },
+ {
+  "unit_id": "merge-B-3",
+  "decision": "merge",
+  "candidate": "B",
+  "replicate": 3,
+  "prompt_file": "prompts/merge-B-3.md",
+  "prompt_chars": 4638,
+  "seed_chars": 750
+ },
+ {
+  "unit_id": "slides-A-1",
+  "decision": "slides",
+  "candidate": "A",
+  "replicate": 1,
+  "prompt_file": "prompts/slides-A-1.md",
+  "prompt_chars": 4792,
+  "seed_chars": 818
+ },
+ {
+  "unit_id": "slides-B-1",
+  "decision": "slides",
+  "candidate": "B",
+  "replicate": 1,
+  "prompt_file": "prompts/slides-B-1.md",
+  "prompt_chars": 4694,
+  "seed_chars": 662
+ },
+ {
+  "unit_id": "slides-A-2",
+  "decision": "slides",
+  "candidate": "A",
+  "replicate": 2,
+  "prompt_file": "prompts/slides-A-2.md",
+  "prompt_chars": 4663,
+  "seed_chars": 838
+ },
+ {
+  "unit_id": "slides-B-2",
+  "decision": "slides",
+  "candidate": "B",
+  "replicate": 2,
+  "prompt_file": "prompts/slides-B-2.md",
+  "prompt_chars": 4565,
+  "seed_chars": 682
+ },
+ {
+  "unit_id": "slides-A-3",
+  "decision": "slides",
+  "candidate": "A",
+  "replicate": 3,
+  "prompt_file": "prompts/slides-A-3.md",
+  "prompt_chars": 4648,
+  "seed_chars": 846
+ },
+ {
+  "unit_id": "slides-B-3",
+  "decision": "slides",
+  "candidate": "B",
+  "replicate": 3,
+  "prompt_file": "prompts/slides-B-3.md",
+  "prompt_chars": 4548,
+  "seed_chars": 688
+ },
+ {
+  "unit_id": "styleattr-A-1",
+  "decision": "styleattr",
+  "candidate": "A",
+  "replicate": 1,
+  "prompt_file": "prompts/styleattr-A-1.md",
+  "prompt_chars": 4876,
+  "seed_chars": 1025
+ },
+ {
+  "unit_id": "styleattr-B-1",
+  "decision": "styleattr",
+  "candidate": "B",
+  "replicate": 1,
+  "prompt_file": "prompts/styleattr-B-1.md",
+  "prompt_chars": 4876,
+  "seed_chars": 1025
+ },
+ {
+  "unit_id": "styleattr-A-2",
+  "decision": "styleattr",
+  "candidate": "A",
+  "replicate": 2,
+  "prompt_file": "prompts/styleattr-A-2.md",
+  "prompt_chars": 4718,
+  "seed_chars": 950
+ },
+ {
+  "unit_id": "styleattr-B-2",
+  "decision": "styleattr",
+  "candidate": "B",
+  "replicate": 2,
+  "prompt_file": "prompts/styleattr-B-2.md",
+  "prompt_chars": 4718,
+  "seed_chars": 950
+ },
+ {
+  "unit_id": "styleattr-A-3",
+  "decision": "styleattr",
+  "candidate": "A",
+  "replicate": 3,
+  "prompt_file": "prompts/styleattr-A-3.md",
+  "prompt_chars": 4315,
+  "seed_chars": 715
+ },
+ {
+  "unit_id": "styleattr-B-3",
+  "decision": "styleattr",
+  "candidate": "B",
+  "replicate": 3,
+  "prompt_file": "prompts/styleattr-B-3.md",
+  "prompt_chars": 4315,
+  "seed_chars": 715
+ }
+]

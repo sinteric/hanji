@@ -1,0 +1,106 @@
+{
+ "unit_id": "slides-B-2",
+ "decision": "slides",
+ "candidate": "B",
+ "replicate": 2,
+ "names": {
+  "layouts": {
+   "제목 슬라이드": [
+    "title",
+    "body"
+   ],
+   "제목 및 내용": [
+    "title",
+    "body"
+   ],
+   "콘텐츠 2개": [
+    "title",
+    "left",
+    "right"
+   ],
+   "구역 머리글": [
+    "title",
+    "body"
+   ],
+   "제목만": [
+    "title"
+   ]
+  }
+ },
+ "fm": {
+  "type": "presentation",
+  "format": "pptx",
+  "template": "org/sales-deck",
+  "schema": "1"
+ },
+ "seed": "---\ntype: presentation\nformat: pptx\ntemplate: org/sales-deck\nschema: 1\n---\n\nlayout: 제목 슬라이드\n::title::\n2026년 3분기 KPI 리뷰\n::body::\n경영기획실 / 2026-10-06\n\n---\n\nlayout: 제목 및 내용\n::title::\n전사 KPI 달성률\n::body::\n- 매출: 목표 대비 96%\n- 영업이익: 목표 대비 102%\n- 고객 만족도: 목표 대비 99%\n::notes::\n영업이익 초과 달성 강조\n\n---\n\nlayout: 콘텐츠 2개\n::title::\n사업부별 달성률\n::left::\n- 가전사업부: 목표 대비 104%\n- 부품사업부: 목표 대비 91%\n::right::\n- 서비스사업부: 목표 대비 96%\n- 해외사업부: 목표 대비 88%\n- 부품사업부 원가 상승 영향\n\n---\n\nlayout: 구역 머리글\n::title::\n4분기 계획\n::body::\n미달 KPI 집중 관리\n\n---\n\nlayout: 제목 및 내용\n::title::\n4분기 중점 관리 KPI\n::body::\n- 매출: 목표 대비 96% → 100%\n- 해외사업부: 목표 대비 88% → 95%\n- 고객 만족도: 목표 대비 99% → 100%\n::notes::\n해외사업부 담당 임원 별도 보고\n\n---\n\nlayout: 제목만\n::title::\nQ&A\n",
+ "tasks": [
+  {
+   "task_id": "deck2-w",
+   "type": "write",
+   "instruction": "Write a new presentation with exactly three slides:\n1. Layout 제목 슬라이드; title \"신입사원 온보딩\"; body text \"인사팀 / 2026년 10월\".\n2. Layout 구역 머리글; title \"첫 주 일정\"; body text \"적응 교육과 부서 배치\".\n3. Layout 콘텐츠 2개; title \"담당자 안내\"; left column bullets \"교육: 인사팀 한지민\", \"장비: IT지원팀 오세훈\"; right column bullets \"급여: 재무팀 윤가은\", \"복지: 총무팀 서준호\"; speaker notes \"연락처는 사내 메신저로 공유\".",
+   "front_matter": "---\ntype: presentation\nformat: pptx\ntemplate: org/sales-deck\nschema: 1\n---",
+   "expect": {
+    "mode": "exact",
+    "items": [
+     {
+      "layout": "제목 슬라이드",
+      "slots": {
+       "title": [
+        "신입사원 온보딩"
+       ],
+       "body": [
+        "인사팀 / 2026년 10월"
+       ]
+      }
+     },
+     {
+      "layout": "구역 머리글",
+      "slots": {
+       "title": [
+        "첫 주 일정"
+       ],
+       "body": [
+        "적응 교육과 부서 배치"
+       ]
+      }
+     },
+     {
+      "layout": "콘텐츠 2개",
+      "slots": {
+       "title": [
+        "담당자 안내"
+       ],
+       "left": [
+        "- 교육: 인사팀 한지민",
+        "- 장비: IT지원팀 오세훈"
+       ],
+       "right": [
+        "- 급여: 재무팀 윤가은",
+        "- 복지: 총무팀 서준호"
+       ],
+       "notes": [
+        "연락처는 사내 메신저로 공유"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "task_id": "deck2-e1",
+   "type": "edit",
+   "instruction": "After slide 2 (\"전사 KPI 달성률\"), add a slide with layout 제목 및 내용: title \"고객 만족도 세부\"; body bullets \"콜센터 응답률 92%\", \"불만 처리 기간 2.1일\"; speaker notes \"콜센터 인력 충원 효과\"."
+  },
+  {
+   "task_id": "deck2-e2",
+   "type": "edit",
+   "instruction": "On slide 3 (\"사업부별 달성률\"), the bullet \"부품사업부 원가 상승 영향\" is in the right column. Move it to the end of the left column."
+  },
+  {
+   "task_id": "deck2-e3",
+   "type": "edit",
+   "instruction": "On slide 2 (\"전사 KPI 달성률\"), change the 매출 bullet from \"목표 대비 96%\" to \"목표 대비 97%\". The same figure on slides 3 and 5 stays as it is."
+  }
+ ]
+}

@@ -1,0 +1,53 @@
+---
+type: presentation
+format: pptx
+template: org/sales-deck
+schema: 1
+---
+
+<slide layout="제목 슬라이드">
+<title>2026년 3분기 KPI 리뷰</title>
+<body>경영기획실 / 2026-10-06</body>
+</slide>
+
+<slide layout="제목 및 내용">
+<title>전사 KPI 달성률</title>
+<body>
+- 매출: 목표 대비 96%
+- 영업이익: 목표 대비 102%
+- 고객 만족도: 목표 대비 99%
+</body>
+<notes>영업이익 초과 달성 강조</notes>
+</slide>
+
+<slide layout="콘텐츠 2개">
+<title>사업부별 달성률</title>
+<left>
+- 가전사업부: 목표 대비 104%
+- 부품사업부: 목표 대비 91%
+</left>
+<right>
+- 서비스사업부: 목표 대비 96%
+- 해외사업부: 목표 대비 88%
+- 부품사업부 원가 상승 영향
+</right>
+</slide>
+
+<slide layout="구역 머리글">
+<title>4분기 계획</title>
+<body>미달 KPI 집중 관리</body>
+</slide>
+
+<slide layout="제목 및 내용">
+<title>4분기 중점 관리 KPI</title>
+<body>
+- 매출: 목표 대비 96% → 100%
+- 해외사업부: 목표 대비 88% → 95%
+- 고객 만족도: 목표 대비 99% → 100%
+</body>
+<notes>해외사업부 담당 임원 별도 보고</notes>
+</slide>
+
+<slide layout="제목만">
+<title>Q&A</title>
+</slide>

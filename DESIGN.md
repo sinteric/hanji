@@ -1,7 +1,7 @@
 ---
 status: draft
 date: 2026-09-29
-measured: library and project facts below were checked 2026-09-28/29 against crates.io, npm, PyPI, GitHub and project docs; nothing here has yet been opened in real Office by this project
+measured: library and project facts below were checked 2026-09-28/29 against crates.io, npm, PyPI, GitHub and project docs; the §5 syntax choices were measured by fluency round 1 (2026-09-28, two Claude models); nothing here has yet been opened in real Office by this project
 ---
 
 # hanji — office documents for LLM agents (design)
@@ -179,11 +179,17 @@ schema: 1
 
 <div style="Note">신규 고객 34곳 중 21곳이 수도권.</div>
 
+| 지역 | 지점 | 매출 |
+|---|---|---|
+| 서울 | 강남 | 120 |
+| ^^ | 종로 | 95 |
+| 합계 || 215 |
+
+<table style="Grid Table 4">   # proposal, §10.7
 | 지역 | 매출 | 증감 |
 |---|---|---|
 | 수도권 | 1,204 | +15% |
-
-<table style="Grid Table 4"> …cells with merges… </table>
+</table>
 
 <field name="작성자">홍길동</field>
 <keep id="k3" kind="drawing" summary="조직도, 상자 5개"/>
@@ -194,8 +200,20 @@ schema: 1
 
 - `#`–`######` map to the file's own Heading 1–6; `style` names come from the
   file's style set (names in any language).
-- Simple rectangular tables are GFM; anything with merged cells or a table
-  style is a `<table>`.
+- `style="Name"` holds exactly one style name, written as listed, spaces
+  included (`style="Grid Table 4"`); never CSS. A styled paragraph is
+  `<div style="Name">text</div>` on one line.
+- Every table is a GFM pipe table, merged or not. Every row has one cell per
+  column; merged cells are written with local markers in the covered cells:
+  - `^^` as the whole cell: merged into the cell above.
+  - `||` (two pipes, nothing between): the cell to the left extends into this
+    column.
+  - A merged area is a rectangle. Its text is written once, in its top-left
+    cell; covered cells hold only a marker. Nothing is counted.
+  - An empty unmerged cell is `|  |`. `^^` in the header row and `||` at the
+    start of a row are errors.
+- Table style (proposal, open in §10.7): a `<table style="Name">` line and a
+  `</table>` line around an unchanged pipe table.
 - Headers, footers and section setup come from the template or the remainder
   at first; exposing their text is a later extension.
 - Tracked changes and comments (`<ins>`, `<del>`, `<comment>`) are read-only
@@ -206,22 +224,50 @@ schema: 1
 Slides are built from the layout's placeholders — never geometry.
 
 ```
-<slide layout="Title and Content">
-<title>핵심 지표</title>
-<body>
+---
+type: presentation
+format: pptx
+template: org/deck
+schema: 1
+---
+
+layout: Title and Content
+::title::
+핵심 지표
+::body::
 - 매출 **12% 증가**
 - 신규 고객 34곳
-</body>
-<notes>전년 대비 강조</notes>
-</slide>
+::notes::
+전년 대비 강조
+
+---
+
+layout: Two Content
+::title::
+지역별 현황
+::left::
+- 수도권 21곳
+::right::
+- 지방 13곳
+<shape id="s4" name="출처">출처: 내부 집계</shape>
 ```
 
+- Slidev-style. The first slide begins right after the file's front matter;
+  later slides are separated by a line containing only `---`.
+- The first line of every slide is `layout: Name`, as listed, spaces included
+  (quotes allowed). No other `key: value` lines.
+- Each slot starts with a marker line — `::title::`, `::body::`, `::left::`,
+  `::right::`, `::notes::` — and its text is the lines after it, up to the next
+  marker or `---`. Only the layout's slots; an unfilled slot is left out; all
+  text is inside a slot.
+- Real Slidev closes the per-slide front matter with a second `---`. Here that
+  line starts an empty, layout-less slide and is an error.
 - Slot names are the layout's placeholder types (title, body, left/right,
   picture, chart, table, notes).
 - Shapes of an imported deck that are not placeholders appear as
   `<shape id=… name=…>text</shape>`: text editable, geometry in the remainder.
-- Candidate B (decided by §6): Slidev-style — `---` between slides, per-slide
-  `layout:`, `::left::`/`::right::` slot markers.
+  A shape is not a slot and sits in none: it is its own line after the slots,
+  and like a marker it ends the text of the slot before it.
 
 ### 5.4 Spreadsheet
 
@@ -281,6 +327,27 @@ a few HTML-like tags; small JSON. Where it fails:
   `color:red`, `class` splits "Heading 1" on the space); Presentation syntax A
   vs B.
 
+**Round 1 results (2026-09-28)** — kit and answers in [fluency/](fluency/),
+details in [fluency/RESULTS.md](fluency/RESULTS.md). Claude Opus and Sonnet,
+18 blind units each (3 choices × A/B × 3 Korean seeds × 4 tasks), no tools.
+
+| Choice | Opus chars A / B | Sonnet chars A / B | Decided |
+|---|---|---|---|
+| Merged cells | 3,435 / 2,893 | 6,689 / 3,383 | B: `^^` / `\|\|` markers |
+| Style attribute | 2,527 / 2,527 | 2,578 / 2,551 | A: `style` (tie, kept) |
+| Presentation | 2,410 / 1,887 | 2,837 / 2,256 | B: Slidev-style |
+
+- Both models: 72/72 valid and landed on the first try under every
+  candidate; the fix round was never needed. **Correctness tied; the choices
+  rest on size and design fit** (nothing counted, no closing tags), not on
+  errors avoided.
+- "Make it red, bold and large": both models chose the named Alert Box style
+  under both attributes; no CSS was written.
+- The tasks hit the ceiling: briefs spelled out the merges and the style list
+  offered a matching style. Next round: larger files, merges implied not
+  spelled out, no matching style to escape to, weaker models (Haiku), GPT and
+  Gemini (not run: no API keys).
+
 ## 7. Engines (surveyed 2026-09-28)
 
 Engines work only at import, export and preview. Every engine is behind this
@@ -333,7 +400,9 @@ v0.7.3; "lossless … regarding content", not formatting).
 
 ## 10. Open decisions
 
-1. Style attribute name, merged-cell syntax, Presentation syntax — by §6.
+1. ~~Style attribute name, merged-cell syntax, Presentation syntax~~ —
+   decided by §6 round 1: `style="Name"`, `^^`/`||` markers, Slidev-style
+   (§5.2, §5.3, §6).
 2. Whether model edits reach the exported file as **tracked changes**
    (reviewable in Word/Hancom) or as direct changes.
 3. The remainder's storage shape and anchor granularity (block, run range,
@@ -342,13 +411,20 @@ v0.7.3; "lossless … regarding content", not formatting).
    rust_xlsxwriter all build to wasm; rdocx-wasm is unpublished.
 5. Header/footer and section text: when to expose.
 6. Spreadsheet cell-data operations: API shape and the compressed read view.
+7. How a table style attaches to a pipe table. Proposed (§5.2): a
+   `<table style="Name">` line and a `</table>` line around an unchanged pipe
+   table. Not tested — round 1's styled tables were HTML `<tr>`/`<td>` tables
+   and its merged tables had no style — so the next fluency round decides.
 
 ## 11. Blind spots
 
 - No library above has been opened in real Office or Hancom by this project;
   every defect and fidelity statement comes from project docs and issue
   trackers.
-- The fluency list in §6 is a model's self-report until the test runs.
+- The fluency list in §6 is still mostly a model's self-report: round 1 ran
+  on two Claude models only and hit the ceiling (every answer valid and
+  landed), so it showed nothing about where models fail. GPT, Gemini, weaker
+  models and harder tasks are untested.
 - The 90% fidelity target is not yet a defined metric beyond "per-page SSIM
   against the native app's PDF"; the threshold per page and per corpus is
   unset.

@@ -1,0 +1,198 @@
+{
+ "unit_id": "merge-A-3",
+ "decision": "merge",
+ "candidate": "A",
+ "replicate": 3,
+ "names": {},
+ "fm": {
+  "type": "document",
+  "format": "docx",
+  "template": "org/report",
+  "schema": "1"
+ },
+ "seed": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 신제품 '하루견과' 출시 마케팅 제안서\n\n제안 부서: 마케팅전략팀 / 제안일: 2026-09-28\n\n## 1. 제안 배경\n\n간편 건강 간식 시장은 최근 3년간 연평균 11% 성장했다.\n\n당사 견과류 제품군은 대형마트 매출 비중이 높아 온라인 채널 보완이 필요하다.\n\n## 2. 소요 예산 (단위: 만 원)\n\n<table>\n<tr><th>항목</th><th>세부 내역</th><th>금액</th><th>집행 시기</th></tr>\n<tr><td rowspan=\"3\">마케팅</td><td>온라인 광고</td><td>1,500</td><td rowspan=\"2\">11월</td></tr>\n<tr><td>오프라인 시식 행사</td><td>800</td></tr>\n<tr><td>인플루언서 협업</td><td>500</td><td>12월</td></tr>\n<tr><td rowspan=\"2\">제작</td><td>패키지 디자인</td><td>300</td><td>10월</td></tr>\n<tr><td>초도 생산</td><td>2,400</td><td>10월</td></tr>\n<tr><td>운영</td><td>물류 대행</td><td>500</td><td>11월~12월</td></tr>\n<tr><td colspan=\"2\">합계</td><td>6,000</td><td>-</td></tr>\n</table>\n\n예산은 2026년 하반기 마케팅 예비비에서 집행한다.\n\n## 3. 추진 일정\n\n| 단계 | 기간 | 주요 내용 |\n|---|---|---|\n| 준비 | 10월 1일 ~ 10월 31일 | 패키지 확정, 초도 생산 |\n| 출시 | 11월 1일 ~ 11월 15일 | 온라인 광고, 시식 행사 |\n| 확산 | 11월 16일 ~ 12월 31일 | 인플루언서 협업, 재구매 쿠폰 |\n\n## 4. 기대 효과\n\n- 출시 3개월 매출 4억 원\n- 온라인 매출 비중 25%까지 확대\n",
+ "tasks": [
+  {
+   "task_id": "report3-w",
+   "type": "write",
+   "instruction": "Write a new document. Its content is a heading level 1 \"교육비 지원 기준\", a paragraph \"2027년 1월 1일부터 적용한다.\", and then one table with the columns 구분, 대상, 지원 한도, 비고 and these four rows (cells separated by \" / \"):\n1. 직무 교육 / 전 직원 / 연 200만 원 / 사전 승인 필요\n2. 직무 교육 / 팀장 이상 / 연 300만 원 / 사전 승인 필요\n3. 자격증 / 전 직원 / 응시료 전액 / 합격 시 지급\n4. 어학 / 전 직원 / 월 10만 원 / 합격 시 지급\nMerged cells: the two 직무 교육 cells are one cell; the two 사전 승인 필요 cells are one cell; the two 합격 시 지급 cells are one cell. The 전 직원 cells stay separate.",
+   "front_matter": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---",
+   "expect": {
+    "mode": "subsequence",
+    "items": [
+     {
+      "k": "h",
+      "level": 1,
+      "text": "교육비 지원 기준"
+     },
+     {
+      "k": "p",
+      "style": null,
+      "text": "2027년 1월 1일부터 적용한다."
+     },
+     {
+      "k": "table",
+      "style": null,
+      "grid": {
+       "rows": 5,
+       "cols": 4,
+       "cells": [
+        [
+         0,
+         0,
+         "구분",
+         1,
+         1,
+         true
+        ],
+        [
+         0,
+         1,
+         "대상",
+         1,
+         1,
+         true
+        ],
+        [
+         0,
+         2,
+         "지원 한도",
+         1,
+         1,
+         true
+        ],
+        [
+         0,
+         3,
+         "비고",
+         1,
+         1,
+         true
+        ],
+        [
+         1,
+         0,
+         "직무 교육",
+         2,
+         1,
+         false
+        ],
+        [
+         1,
+         1,
+         "전 직원",
+         1,
+         1,
+         false
+        ],
+        [
+         1,
+         2,
+         "연 200만 원",
+         1,
+         1,
+         false
+        ],
+        [
+         1,
+         3,
+         "사전 승인 필요",
+         2,
+         1,
+         false
+        ],
+        [
+         2,
+         1,
+         "팀장 이상",
+         1,
+         1,
+         false
+        ],
+        [
+         2,
+         2,
+         "연 300만 원",
+         1,
+         1,
+         false
+        ],
+        [
+         3,
+         0,
+         "자격증",
+         1,
+         1,
+         false
+        ],
+        [
+         3,
+         1,
+         "전 직원",
+         1,
+         1,
+         false
+        ],
+        [
+         3,
+         2,
+         "응시료 전액",
+         1,
+         1,
+         false
+        ],
+        [
+         3,
+         3,
+         "합격 시 지급",
+         2,
+         1,
+         false
+        ],
+        [
+         4,
+         0,
+         "어학",
+         1,
+         1,
+         false
+        ],
+        [
+         4,
+         1,
+         "전 직원",
+         1,
+         1,
+         false
+        ],
+        [
+         4,
+         2,
+         "월 10만 원",
+         1,
+         1,
+         false
+        ]
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "task_id": "report3-e1",
+   "type": "edit",
+   "instruction": "In the table under \"2. 소요 예산\", the 집행 시기 cells of 패키지 디자인 and 초도 생산 both read 10월. Merge these two cells into one cell reading 10월. Change nothing else."
+  },
+  {
+   "task_id": "report3-e2",
+   "type": "edit",
+   "instruction": "In the table under \"2. 소요 예산\", add a column 담당 부서 right after 세부 내역. For the three 마케팅 rows it is one merged cell reading 마케팅전략팀; 패키지 디자인: 디자인팀; 초도 생산: 생산관리팀; 물류 대행: SCM팀. The 합계 cell in the last row then covers the 항목, 세부 내역 and 담당 부서 columns."
+  },
+  {
+   "task_id": "report3-e3",
+   "type": "edit",
+   "instruction": "In the table under \"2. 소요 예산\", change the 금액 of 인플루언서 협업 from 500 to 650. Change nothing else."
+  }
+ ]
+}

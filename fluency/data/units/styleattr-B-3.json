@@ -1,0 +1,134 @@
+{
+ "unit_id": "styleattr-B-3",
+ "decision": "styleattr",
+ "candidate": "B",
+ "replicate": 3,
+ "names": {
+  "paragraph_styles": [
+   "본문",
+   "참고 문단",
+   "강조 문단",
+   "인용 문단",
+   "붙임 목록",
+   "발신 명의"
+  ],
+  "table_styles": [
+   "기본 표",
+   "격자 표 4",
+   "목록 표 강조 2"
+  ]
+ },
+ "fm": {
+  "type": "document",
+  "format": "docx",
+  "template": "org/report",
+  "schema": "1"
+ },
+ "seed": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 개인정보 처리방침 개정 안내\n\n수신: 전 부서장 / 참조: 정보보호위원회\n\n## 1. 개정 사유\n\n개인정보 보호법 시행령 개정(2026. 9. 15. 시행)에 따라 처리방침을 개정합니다.\n\n<div class=\"인용 문단\">개인정보처리자는 처리 목적이 달성된 개인정보를 지체 없이 파기하여야 한다.</div>\n\n## 2. 주요 개정 내용\n\n| 구분 | 현행 | 개정 |\n|---|---|---|\n| 보유 기간 | 회원 탈퇴 후 1년 | 회원 탈퇴 후 6개월 |\n| 파기 절차 | 분기별 일괄 파기 | 월별 일괄 파기 |\n| 위탁 업체 | 3곳 | 4곳 |\n\n<div class=\"참고 문단\">위탁 업체 추가: 한결고객센터(고객 상담)</div>\n\n<div class=\"참고 문단\">개정 방침은 2026년 10월 1일부터 적용합니다.</div>\n\n## 3. 부서별 조치 사항\n\n1. 보유 중인 탈퇴 회원 정보 점검 (9월 30일까지)\n1. 위탁 계약서 개인정보 조항 갱신 (10월 15일까지)\n1. 부서 내 교육 실시 후 결과 보고 (10월 31일까지)\n\n기한 내 미조치 부서는 정보보호위원회에 보고됩니다.\n\n<div class=\"붙임 목록\">붙임: 개정 처리방침 전문 1부. 끝.</div>\n\n<div class=\"발신 명의\">정보보호책임자</div>\n",
+ "tasks": [
+  {
+   "task_id": "document3-w",
+   "type": "write",
+   "instruction": "Write a new document with, in this order: a heading level 1 \"사내 동호회 지원 안내\"; a paragraph in style 본문 \"2027년 동호회 활동비 지원 신청을 받습니다.\"; a paragraph in style 강조 문단 \"신청 마감: 12월 5일(금) 18:00\"; a table in style 격자 표 4 with the header row 구분 / 지원 금액 and the rows 정기 활동 / 월 10만 원 and 대회 참가 / 회당 30만 원; and a paragraph in style 발신 명의 \"경영지원팀장\".",
+   "front_matter": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---",
+   "expect": {
+    "mode": "subsequence",
+    "items": [
+     {
+      "k": "h",
+      "level": 1,
+      "text": "사내 동호회 지원 안내"
+     },
+     {
+      "k": "p",
+      "style": "본문",
+      "text": "2027년 동호회 활동비 지원 신청을 받습니다."
+     },
+     {
+      "k": "p",
+      "style": "강조 문단",
+      "text": "신청 마감: 12월 5일(금) 18:00"
+     },
+     {
+      "k": "table",
+      "style": "격자 표 4",
+      "grid": {
+       "rows": 3,
+       "cols": 2,
+       "cells": [
+        [
+         0,
+         0,
+         "구분",
+         1,
+         1,
+         true
+        ],
+        [
+         0,
+         1,
+         "지원 금액",
+         1,
+         1,
+         true
+        ],
+        [
+         1,
+         0,
+         "정기 활동",
+         1,
+         1,
+         false
+        ],
+        [
+         1,
+         1,
+         "월 10만 원",
+         1,
+         1,
+         false
+        ],
+        [
+         2,
+         0,
+         "대회 참가",
+         1,
+         1,
+         false
+        ],
+        [
+         2,
+         1,
+         "회당 30만 원",
+         1,
+         1,
+         false
+        ]
+       ]
+      }
+     },
+     {
+      "k": "p",
+      "style": "발신 명의",
+      "text": "경영지원팀장"
+     }
+    ]
+   }
+  },
+  {
+   "task_id": "document3-e1",
+   "type": "edit",
+   "instruction": "Give the table under \"2. 주요 개정 내용\" the table style 목록 표 강조 2. Change nothing else."
+  },
+  {
+   "task_id": "document3-e2",
+   "type": "edit",
+   "instruction": "Make the sentence \"기한 내 미조치 부서는 정보보호위원회에 보고됩니다.\" red, bold and big. Change nothing else."
+  },
+  {
+   "task_id": "document3-e3",
+   "type": "edit",
+   "instruction": "Right after the quoted paragraph \"개인정보처리자는 처리 목적이 달성된 개인정보를 지체 없이 파기하여야 한다.\", add a new paragraph in style 참고 문단 reading \"관련 조항: 개인정보 보호법 제21조\"."
+  }
+ ]
+}

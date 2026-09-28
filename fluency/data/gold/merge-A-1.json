@@ -1,0 +1,35 @@
+{
+ "answers": [
+  {
+   "task_id": "report1-w",
+   "text": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 하반기 신입사원 교육 일정\n\n<table>\n<tr><th>구분</th><th>과정</th><th>일시</th><th>장소</th></tr>\n<tr><td rowspan=\"2\">공통 교육</td><td>회사 소개</td><td>10월 6일 오전</td><td rowspan=\"2\">본사 대강당</td></tr>\n<tr><td>정보보안</td><td>10월 6일 오후</td></tr>\n<tr><td rowspan=\"2\">직무 교육</td><td>영업 실무</td><td>10월 7일</td><td>영업본부 회의실</td></tr>\n<tr><td>품질 관리</td><td>10월 8일</td><td>생산본부 회의실</td></tr>\n<tr><td colspan=\"4\">비고: 교육 불참 시 팀장 승인 필요</td></tr>\n</table>\n"
+  },
+  {
+   "task_id": "report1-e1",
+   "edits": [
+    {
+     "old": "| 거래처 | 담당 | 계약 상태 | 비고 |\n|---|---|---|---|\n| 한빛유통 | 김민수 | 갱신 완료 | 3년 계약 |\n| 대성상사 | 김민수 | 갱신 협의 중 | 단가 조정 요청 |\n| 동해물산 | 이서연 | 신규 | 9월 첫 발주 |\n| 서해식품 | 이서연 | 갱신 협의 중 | 단가 조정 요청 |\n",
+     "new": "<table>\n<tr><th>거래처</th><th>담당</th><th>계약 상태</th><th>비고</th></tr>\n<tr><td>한빛유통</td><td rowspan=\"2\">김민수</td><td>갱신 완료</td><td>3년 계약</td></tr>\n<tr><td>대성상사</td><td>갱신 협의 중</td><td>단가 조정 요청</td></tr>\n<tr><td>동해물산</td><td>이서연</td><td>신규</td><td>9월 첫 발주</td></tr>\n<tr><td>서해식품</td><td>이서연</td><td>갱신 협의 중</td><td>단가 조정 요청</td></tr>\n</table>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "report1-e2",
+   "edits": [
+    {
+     "old": "<tr><th colspan=\"2\">구분</th><th>7월</th><th>8월</th><th>9월</th><th>합계</th></tr>\n<tr><td rowspan=\"3\">수도권</td><td>서울 본점</td><td>412</td><td>398</td><td>455</td><td>1,265</td></tr>\n<tr><td>경기 지점</td><td>287</td><td>301</td><td>296</td><td>884</td></tr>\n<tr><td>인천 지점</td><td>156</td><td>162</td><td>170</td><td>488</td></tr>\n<tr><td rowspan=\"2\">영남권</td><td>부산 지점</td><td>301</td><td>287</td><td>312</td><td>900</td></tr>\n<tr><td>대구 지점</td><td>198</td><td>205</td><td>211</td><td>614</td></tr>\n<tr><td>호남권</td><td>광주 지점</td><td>162</td><td>156</td><td>170</td><td>488</td></tr>\n<tr><td>제주</td><td>제주 지점</td><td>124</td><td>131</td><td>118</td><td>373</td></tr>\n<tr><td colspan=\"2\">전사 합계</td><td>1,640</td><td>1,640</td><td>1,732</td><td>5,012</td></tr>\n",
+     "new": "<tr><th colspan=\"2\">구분</th><th>7월</th><th>8월</th><th>9월</th><th>합계</th><th>전년 동기</th></tr>\n<tr><td rowspan=\"3\">수도권</td><td>서울 본점</td><td>412</td><td>398</td><td>455</td><td>1,265</td><td>1,180</td></tr>\n<tr><td>경기 지점</td><td>287</td><td>301</td><td>296</td><td>884</td><td>842</td></tr>\n<tr><td>인천 지점</td><td>156</td><td>162</td><td>170</td><td>488</td><td>455</td></tr>\n<tr><td rowspan=\"2\">영남권</td><td>부산 지점</td><td>301</td><td>287</td><td>312</td><td>900</td><td>861</td></tr>\n<tr><td>대구 지점</td><td>198</td><td>205</td><td>211</td><td>614</td><td>590</td></tr>\n<tr><td>호남권</td><td>광주 지점</td><td>162</td><td>156</td><td>170</td><td>488</td><td>502</td></tr>\n<tr><td>제주</td><td>제주 지점</td><td>124</td><td>131</td><td>118</td><td>373</td><td>351</td></tr>\n<tr><td colspan=\"2\">전사 합계</td><td>1,640</td><td>1,640</td><td>1,732</td><td>5,012</td><td>4,781</td></tr>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "report1-e3",
+   "edits": [
+    {
+     "old": "<tr><td rowspan=\"2\">영남권</td><td>부산 지점</td><td>301</td><td>287</td><td>312</td><td>900</td></tr>\n",
+     "new": "<tr><td rowspan=\"2\">영남권</td><td>부산 지점</td><td>301</td><td>293</td><td>312</td><td>900</td></tr>\n"
+    }
+   ]
+  }
+ ]
+}

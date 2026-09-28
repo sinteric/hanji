@@ -1,0 +1,150 @@
+{
+ "unit_id": "styleattr-A-1",
+ "decision": "styleattr",
+ "candidate": "A",
+ "replicate": 1,
+ "names": {
+  "paragraph_styles": [
+   "Note",
+   "Decision",
+   "Alert Box",
+   "Body Text Indent",
+   "Caption",
+   "Intense Quote"
+  ],
+  "table_styles": [
+   "Table Grid",
+   "Grid Table 4",
+   "List Table 3 Accent 1"
+  ]
+ },
+ "fm": {
+  "type": "document",
+  "format": "docx",
+  "template": "org/report",
+  "schema": "1"
+ },
+ "seed": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 제38차 주간 경영회의 회의록\n\n<div style=\"Caption\">일시: 2026-09-21(월) 09:00 / 장소: 본사 12층 대회의실</div>\n\n## 1. 참석자\n\n대표이사, 경영지원본부장, 영업본부장, 연구소장, 재무팀장\n\n## 2. 안건별 논의\n\n### 안건 1. 4분기 채용 계획\n\n<div style=\"Body Text Indent\">연구소 개발 인력 6명, 영업본부 2명 충원을 요청함.</div>\n\n<div style=\"Note\">인건비 증가분은 4분기 예산 범위 내에서 집행.</div>\n\n<div style=\"Decision\">결정: 연구소 6명 우선 채용, 영업본부는 11월 재검토.</div>\n\n### 안건 2. 판교 사무실 이전\n\n<div style=\"Body Text Indent\">판교 사무실 임대 계약이 2027년 2월 만료됨.</div>\n\n<div style=\"Note\">이전 비용은 4분기 예산 범위 내에서 집행.</div>\n\n<div style=\"Decision\">결정: 후보지 3곳 실사 후 10월 회의에서 확정.</div>\n\n### 안건 3. 보안 점검 결과\n\n정보보안 점검 결과 외부 반출 의심 건 1건이 확인됨.\n\n재발 방지를 위해 전 직원 보안 교육을 10월 중 실시한다.\n\n## 3. 후속 조치\n\n<table style=\"Grid Table 4\">\n<tr><th>조치 사항</th><th>담당</th><th>기한</th></tr>\n<tr><td>채용 공고 게시</td><td>경영지원본부</td><td>9월 25일</td></tr>\n<tr><td>후보지 실사</td><td>경영지원본부</td><td>10월 10일</td></tr>\n<tr><td>보안 교육 계획 수립</td><td>정보보안팀</td><td>9월 30일</td></tr>\n</table>\n\n<div style=\"Caption\">다음 회의: 2026-09-28(월) 09:00</div>\n",
+ "tasks": [
+  {
+   "task_id": "document1-w",
+   "type": "write",
+   "instruction": "Write a new document with, in this order: a heading level 1 \"10월 전사 워크숍 안내\"; a paragraph in the default style \"10월 17일(금) 전 직원 대상 워크숍을 진행합니다.\"; a paragraph in style Note \"장소: 가평 한빛연수원 / 버스 출발: 본사 정문 08:00\"; a paragraph in style Alert Box \"불참자는 10월 10일까지 팀장에게 사유를 제출해야 합니다.\"; and a table in style List Table 3 Accent 1 with the header row 시간 / 프로그램 and the rows 10:00 / 대표이사 인사말, 11:00 / 팀별 발표, 14:00 / 팀 빌딩.",
+   "front_matter": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---",
+   "expect": {
+    "mode": "subsequence",
+    "items": [
+     {
+      "k": "h",
+      "level": 1,
+      "text": "10월 전사 워크숍 안내"
+     },
+     {
+      "k": "p",
+      "style": null,
+      "text": "10월 17일(금) 전 직원 대상 워크숍을 진행합니다."
+     },
+     {
+      "k": "p",
+      "style": "Note",
+      "text": "장소: 가평 한빛연수원 / 버스 출발: 본사 정문 08:00"
+     },
+     {
+      "k": "p",
+      "style": "Alert Box",
+      "text": "불참자는 10월 10일까지 팀장에게 사유를 제출해야 합니다."
+     },
+     {
+      "k": "table",
+      "style": "List Table 3 Accent 1",
+      "grid": {
+       "rows": 4,
+       "cols": 2,
+       "cells": [
+        [
+         0,
+         0,
+         "시간",
+         1,
+         1,
+         true
+        ],
+        [
+         0,
+         1,
+         "프로그램",
+         1,
+         1,
+         true
+        ],
+        [
+         1,
+         0,
+         "10:00",
+         1,
+         1,
+         false
+        ],
+        [
+         1,
+         1,
+         "대표이사 인사말",
+         1,
+         1,
+         false
+        ],
+        [
+         2,
+         0,
+         "11:00",
+         1,
+         1,
+         false
+        ],
+        [
+         2,
+         1,
+         "팀별 발표",
+         1,
+         1,
+         false
+        ],
+        [
+         3,
+         0,
+         "14:00",
+         1,
+         1,
+         false
+        ],
+        [
+         3,
+         1,
+         "팀 빌딩",
+         1,
+         1,
+         false
+        ]
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "task_id": "document1-e1",
+   "type": "edit",
+   "instruction": "Under 안건 2, the paragraph \"이전 비용은 4분기 예산 범위 내에서 집행.\" should have the style Body Text Indent instead of its current style. Change nothing else."
+  },
+  {
+   "task_id": "document1-e2",
+   "type": "edit",
+   "instruction": "The CEO asked: make the sentence \"재발 방지를 위해 전 직원 보안 교육을 10월 중 실시한다.\" red, bold and large so that it stands out. Change nothing else."
+  },
+  {
+   "task_id": "document1-e3",
+   "type": "edit",
+   "instruction": "Right after the paragraph \"재발 방지를 위해 전 직원 보안 교육을 10월 중 실시한다.\", add a new paragraph in style Intense Quote reading \"보안 교육 미이수자는 사내 시스템 접속이 제한된다.\""
+  }
+ ]
+}

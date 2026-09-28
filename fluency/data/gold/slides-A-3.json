@@ -1,0 +1,35 @@
+{
+ "answers": [
+  {
+   "task_id": "deck3-w",
+   "text": "---\ntype: presentation\nformat: pptx\ntemplate: org/sales-deck\nschema: 1\n---\n\n<slide layout=\"Title Slide\">\n<title>고객 세미나 결과 보고</title>\n<body>마케팅팀</body>\n</slide>\n\n<slide layout=\"Title and Content\">\n<title>참석 현황</title>\n<body>\n- 참석 기업 42곳\n- 참석자 118명\n- 만족도 4.6점\n</body>\n</slide>\n\n<slide layout=\"Title and Content\">\n<title>후속 조치</title>\n<body>\n- 상담 요청 기업 12곳 방문\n- 발표 자료 공유\n</body>\n<notes>방문 일정은 영업팀과 조율</notes>\n</slide>\n"
+  },
+  {
+   "task_id": "deck3-e1",
+   "edits": [
+    {
+     "old": "\n<slide layout=\"Title Only\">\n",
+     "new": "\n<slide layout=\"Section Header\">\n<title>다음 단계</title>\n<body>현장 실사 일정 협의 (10월 넷째 주)</body>\n</slide>\n\n<slide layout=\"Title Only\">\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck3-e2",
+   "edits": [
+    {
+     "old": "</body>\n<notes>인력 재배치 방안은 질문 시 설명</notes>\n",
+     "new": "- 인력 재배치 방안은 질문 시 설명\n</body>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck3-e3",
+   "edits": [
+    {
+     "old": "- 도입 후\n- 출고 지연 2% 이하\n",
+     "new": "- 도입 후\n- 출고 지연 1.5% 이하\n"
+    }
+   ]
+  }
+ ]
+}

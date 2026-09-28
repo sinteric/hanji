@@ -1,0 +1,35 @@
+{
+ "answers": [
+  {
+   "task_id": "document3-w",
+   "text": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 사내 동호회 지원 안내\n\n<div style=\"본문\">2027년 동호회 활동비 지원 신청을 받습니다.</div>\n\n<div style=\"강조 문단\">신청 마감: 12월 5일(금) 18:00</div>\n\n<table style=\"격자 표 4\">\n<tr><th>구분</th><th>지원 금액</th></tr>\n<tr><td>정기 활동</td><td>월 10만 원</td></tr>\n<tr><td>대회 참가</td><td>회당 30만 원</td></tr>\n</table>\n\n<div style=\"발신 명의\">경영지원팀장</div>\n"
+  },
+  {
+   "task_id": "document3-e1",
+   "edits": [
+    {
+     "old": "| 구분 | 현행 | 개정 |\n|---|---|---|\n| 보유 기간 | 회원 탈퇴 후 1년 | 회원 탈퇴 후 6개월 |\n| 파기 절차 | 분기별 일괄 파기 | 월별 일괄 파기 |\n| 위탁 업체 | 3곳 | 4곳 |\n",
+     "new": "<table style=\"목록 표 강조 2\">\n<tr><th>구분</th><th>현행</th><th>개정</th></tr>\n<tr><td>보유 기간</td><td>회원 탈퇴 후 1년</td><td>회원 탈퇴 후 6개월</td></tr>\n<tr><td>파기 절차</td><td>분기별 일괄 파기</td><td>월별 일괄 파기</td></tr>\n<tr><td>위탁 업체</td><td>3곳</td><td>4곳</td></tr>\n</table>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "document3-e2",
+   "edits": [
+    {
+     "old": "기한 내 미조치 부서는 정보보호위원회에 보고됩니다.\n",
+     "new": "<div style=\"강조 문단\">기한 내 미조치 부서는 정보보호위원회에 보고됩니다.</div>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "document3-e3",
+   "edits": [
+    {
+     "old": "<div style=\"인용 문단\">개인정보처리자는 처리 목적이 달성된 개인정보를 지체 없이 파기하여야 한다.</div>\n",
+     "new": "<div style=\"인용 문단\">개인정보처리자는 처리 목적이 달성된 개인정보를 지체 없이 파기하여야 한다.</div>\n\n<div style=\"참고 문단\">관련 조항: 개인정보 보호법 제21조</div>\n"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,49 @@
+---
+type: document
+format: docx
+template: org/report
+schema: 1
+---
+
+# 제38차 주간 경영회의 회의록
+
+<div style="Caption">일시: 2026-09-21(월) 09:00 / 장소: 본사 12층 대회의실</div>
+
+## 1. 참석자
+
+대표이사, 경영지원본부장, 영업본부장, 연구소장, 재무팀장
+
+## 2. 안건별 논의
+
+### 안건 1. 4분기 채용 계획
+
+<div style="Body Text Indent">연구소 개발 인력 6명, 영업본부 2명 충원을 요청함.</div>
+
+<div style="Note">인건비 증가분은 4분기 예산 범위 내에서 집행.</div>
+
+<div style="Decision">결정: 연구소 6명 우선 채용, 영업본부는 11월 재검토.</div>
+
+### 안건 2. 판교 사무실 이전
+
+<div style="Body Text Indent">판교 사무실 임대 계약이 2027년 2월 만료됨.</div>
+
+<div style="Note">이전 비용은 4분기 예산 범위 내에서 집행.</div>
+
+<div style="Decision">결정: 후보지 3곳 실사 후 10월 회의에서 확정.</div>
+
+### 안건 3. 보안 점검 결과
+
+정보보안 점검 결과 외부 반출 의심 건 1건이 확인됨.
+
+재발 방지를 위해 전 직원 보안 교육을 10월 중 실시한다.
+
+## 3. 후속 조치
+
+<table style="Grid Table 4">
+<tr><th>조치 사항</th><th>담당</th><th>기한</th></tr>
+<tr><td>채용 공고 게시</td><td>경영지원본부</td><td>9월 25일</td></tr>
+<tr><td>후보지 실사</td><td>경영지원본부</td><td>10월 10일</td></tr>
+<tr><td>보안 교육 계획 수립</td><td>정보보안팀</td><td>9월 30일</td></tr>
+</table>
+
+<div style="Caption">다음 회의: 2026-09-28(월) 09:00</div>

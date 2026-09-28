@@ -1,0 +1,201 @@
+{
+ "unit_id": "merge-A-1",
+ "decision": "merge",
+ "candidate": "A",
+ "replicate": 1,
+ "names": {},
+ "fm": {
+  "type": "document",
+  "format": "docx",
+  "template": "org/report",
+  "schema": "1"
+ },
+ "seed": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 2026년 3분기 지역별 영업 실적 보고\n\n작성: 영업기획팀 / 보고일: 2026-10-05\n\n## 1. 요약\n\n3분기 전사 매출은 5,012백만 원으로 전년 동기 대비 4.8% 증가했다.\n\n수도권과 영남권이 성장을 이끌었고, 호남권과 제주는 전년 수준에 머물렀다.\n\n## 2. 지역별 실적 (단위: 백만 원)\n\n<table>\n<tr><th colspan=\"2\">구분</th><th>7월</th><th>8월</th><th>9월</th><th>합계</th></tr>\n<tr><td rowspan=\"3\">수도권</td><td>서울 본점</td><td>412</td><td>398</td><td>455</td><td>1,265</td></tr>\n<tr><td>경기 지점</td><td>287</td><td>301</td><td>296</td><td>884</td></tr>\n<tr><td>인천 지점</td><td>156</td><td>162</td><td>170</td><td>488</td></tr>\n<tr><td rowspan=\"2\">영남권</td><td>부산 지점</td><td>301</td><td>287</td><td>312</td><td>900</td></tr>\n<tr><td>대구 지점</td><td>198</td><td>205</td><td>211</td><td>614</td></tr>\n<tr><td>호남권</td><td>광주 지점</td><td>162</td><td>156</td><td>170</td><td>488</td></tr>\n<tr><td>제주</td><td>제주 지점</td><td>124</td><td>131</td><td>118</td><td>373</td></tr>\n<tr><td colspan=\"2\">전사 합계</td><td>1,640</td><td>1,640</td><td>1,732</td><td>5,012</td></tr>\n</table>\n\n8월 수치는 반품 정산 후 확정치이다.\n\n## 3. 주요 거래처 현황\n\n| 거래처 | 담당 | 계약 상태 | 비고 |\n|---|---|---|---|\n| 한빛유통 | 김민수 | 갱신 완료 | 3년 계약 |\n| 대성상사 | 김민수 | 갱신 협의 중 | 단가 조정 요청 |\n| 동해물산 | 이서연 | 신규 | 9월 첫 발주 |\n| 서해식품 | 이서연 | 갱신 협의 중 | 단가 조정 요청 |\n\n## 4. 향후 계획\n\n- 4분기 수도권 신규 거래처 5곳 확보\n- 호남권 판촉 행사 2회 진행\n- 단가 조정 요청 거래처 대응 방안 수립\n",
+ "tasks": [
+  {
+   "task_id": "report1-w",
+   "type": "write",
+   "instruction": "Write a new document. Its content is a heading level 1 \"하반기 신입사원 교육 일정\", followed by one table with the columns 구분, 과정, 일시, 장소 and these five rows (cells separated by \" / \"):\n1. 공통 교육 / 회사 소개 / 10월 6일 오전 / 본사 대강당\n2. 공통 교육 / 정보보안 / 10월 6일 오후 / 본사 대강당\n3. 직무 교육 / 영업 실무 / 10월 7일 / 영업본부 회의실\n4. 직무 교육 / 품질 관리 / 10월 8일 / 생산본부 회의실\n5. 비고: 교육 불참 시 팀장 승인 필요\nMerged cells: the two 공통 교육 cells are one cell; the two 본사 대강당 cells are one cell; the two 직무 교육 cells are one cell; row 5 is a single cell covering all four columns.",
+   "front_matter": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---",
+   "expect": {
+    "mode": "subsequence",
+    "items": [
+     {
+      "k": "h",
+      "level": 1,
+      "text": "하반기 신입사원 교육 일정"
+     },
+     {
+      "k": "table",
+      "style": null,
+      "grid": {
+       "rows": 6,
+       "cols": 4,
+       "cells": [
+        [
+         0,
+         0,
+         "구분",
+         1,
+         1,
+         true
+        ],
+        [
+         0,
+         1,
+         "과정",
+         1,
+         1,
+         true
+        ],
+        [
+         0,
+         2,
+         "일시",
+         1,
+         1,
+         true
+        ],
+        [
+         0,
+         3,
+         "장소",
+         1,
+         1,
+         true
+        ],
+        [
+         1,
+         0,
+         "공통 교육",
+         2,
+         1,
+         false
+        ],
+        [
+         1,
+         1,
+         "회사 소개",
+         1,
+         1,
+         false
+        ],
+        [
+         1,
+         2,
+         "10월 6일 오전",
+         1,
+         1,
+         false
+        ],
+        [
+         1,
+         3,
+         "본사 대강당",
+         2,
+         1,
+         false
+        ],
+        [
+         2,
+         1,
+         "정보보안",
+         1,
+         1,
+         false
+        ],
+        [
+         2,
+         2,
+         "10월 6일 오후",
+         1,
+         1,
+         false
+        ],
+        [
+         3,
+         0,
+         "직무 교육",
+         2,
+         1,
+         false
+        ],
+        [
+         3,
+         1,
+         "영업 실무",
+         1,
+         1,
+         false
+        ],
+        [
+         3,
+         2,
+         "10월 7일",
+         1,
+         1,
+         false
+        ],
+        [
+         3,
+         3,
+         "영업본부 회의실",
+         1,
+         1,
+         false
+        ],
+        [
+         4,
+         1,
+         "품질 관리",
+         1,
+         1,
+         false
+        ],
+        [
+         4,
+         2,
+         "10월 8일",
+         1,
+         1,
+         false
+        ],
+        [
+         4,
+         3,
+         "생산본부 회의실",
+         1,
+         1,
+         false
+        ],
+        [
+         5,
+         0,
+         "비고: 교육 불참 시 팀장 승인 필요",
+         1,
+         4,
+         false
+        ]
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "task_id": "report1-e1",
+   "type": "edit",
+   "instruction": "In the table under \"3. 주요 거래처 현황\", the 담당 cells of 한빛유통 and 대성상사 both read 김민수. Merge these two cells into one cell reading 김민수. Change nothing else."
+  },
+  {
+   "task_id": "report1-e2",
+   "type": "edit",
+   "instruction": "In the table under \"2. 지역별 실적\", add a new last column with the header 전년 동기 and these values: 서울 본점 1,180; 경기 지점 842; 인천 지점 455; 부산 지점 861; 대구 지점 590; 광주 지점 502; 제주 지점 351; 전사 합계 row 4,781."
+  },
+  {
+   "task_id": "report1-e3",
+   "type": "edit",
+   "instruction": "In the table under \"2. 지역별 실적\", correct the 8월 value of 부산 지점 from 287 to 293. Change nothing else."
+  }
+ ]
+}

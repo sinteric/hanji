@@ -1,0 +1,58 @@
+---
+type: presentation
+format: pptx
+template: org/sales-deck
+schema: 1
+---
+
+<slide layout="Title Slide">
+<title>한빛유통 물류 자동화 제안</title>
+<body>스마트로지스 영업1팀 / 2026-10-12</body>
+</slide>
+
+<slide layout="Title and Content">
+<title>고객 현황</title>
+<body>
+- 일 출고량 12,000박스
+- 피크 시즌 출고 지연 7%
+- 수작업 분류 인력 60명
+</body>
+</slide>
+
+<slide layout="Title and Content">
+<title>제안 개요</title>
+<body>
+- 자동 분류기 2기 도입
+- 출고 지연 2% 이하
+- 분류 인력 60명 → 25명
+</body>
+<notes>인력 재배치 방안은 질문 시 설명</notes>
+</slide>
+
+<slide layout="Two Content">
+<title>도입 전후 비교</title>
+<left>
+- 도입 전
+- 출고 지연 7%
+- 분류 인력 60명
+</left>
+<right>
+- 도입 후
+- 출고 지연 2% 이하
+- 분류 인력 25명
+</right>
+</slide>
+
+<slide layout="Title and Content">
+<title>투자 및 회수</title>
+<body>
+- 총 투자비 18억 원
+- 연간 절감액 5억 원
+- 회수 기간 3.6년
+</body>
+<notes>리스 조건 별도 안내 가능</notes>
+</slide>
+
+<slide layout="Title Only">
+<title>감사합니다</title>
+</slide>

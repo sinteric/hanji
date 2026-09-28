@@ -1,0 +1,104 @@
+{
+ "unit_id": "slides-B-3",
+ "decision": "slides",
+ "candidate": "B",
+ "replicate": 3,
+ "names": {
+  "layouts": {
+   "Title Slide": [
+    "title",
+    "body"
+   ],
+   "Title and Content": [
+    "title",
+    "body"
+   ],
+   "Two Content": [
+    "title",
+    "left",
+    "right"
+   ],
+   "Section Header": [
+    "title",
+    "body"
+   ],
+   "Title Only": [
+    "title"
+   ]
+  }
+ },
+ "fm": {
+  "type": "presentation",
+  "format": "pptx",
+  "template": "org/sales-deck",
+  "schema": "1"
+ },
+ "seed": "---\ntype: presentation\nformat: pptx\ntemplate: org/sales-deck\nschema: 1\n---\n\nlayout: Title Slide\n::title::\n한빛유통 물류 자동화 제안\n::body::\n스마트로지스 영업1팀 / 2026-10-12\n\n---\n\nlayout: Title and Content\n::title::\n고객 현황\n::body::\n- 일 출고량 12,000박스\n- 피크 시즌 출고 지연 7%\n- 수작업 분류 인력 60명\n\n---\n\nlayout: Title and Content\n::title::\n제안 개요\n::body::\n- 자동 분류기 2기 도입\n- 출고 지연 2% 이하\n- 분류 인력 60명 → 25명\n::notes::\n인력 재배치 방안은 질문 시 설명\n\n---\n\nlayout: Two Content\n::title::\n도입 전후 비교\n::left::\n- 도입 전\n- 출고 지연 7%\n- 분류 인력 60명\n::right::\n- 도입 후\n- 출고 지연 2% 이하\n- 분류 인력 25명\n\n---\n\nlayout: Title and Content\n::title::\n투자 및 회수\n::body::\n- 총 투자비 18억 원\n- 연간 절감액 5억 원\n- 회수 기간 3.6년\n::notes::\n리스 조건 별도 안내 가능\n\n---\n\nlayout: Title Only\n::title::\n감사합니다\n",
+ "tasks": [
+  {
+   "task_id": "deck3-w",
+   "type": "write",
+   "instruction": "Write a new presentation with exactly three slides:\n1. Layout Title Slide; title \"고객 세미나 결과 보고\"; body text \"마케팅팀\".\n2. Layout Title and Content; title \"참석 현황\"; body bullets \"참석 기업 42곳\", \"참석자 118명\", \"만족도 4.6점\".\n3. Layout Title and Content; title \"후속 조치\"; body bullets \"상담 요청 기업 12곳 방문\", \"발표 자료 공유\"; speaker notes \"방문 일정은 영업팀과 조율\".",
+   "front_matter": "---\ntype: presentation\nformat: pptx\ntemplate: org/sales-deck\nschema: 1\n---",
+   "expect": {
+    "mode": "exact",
+    "items": [
+     {
+      "layout": "Title Slide",
+      "slots": {
+       "title": [
+        "고객 세미나 결과 보고"
+       ],
+       "body": [
+        "마케팅팀"
+       ]
+      }
+     },
+     {
+      "layout": "Title and Content",
+      "slots": {
+       "title": [
+        "참석 현황"
+       ],
+       "body": [
+        "- 참석 기업 42곳",
+        "- 참석자 118명",
+        "- 만족도 4.6점"
+       ]
+      }
+     },
+     {
+      "layout": "Title and Content",
+      "slots": {
+       "title": [
+        "후속 조치"
+       ],
+       "body": [
+        "- 상담 요청 기업 12곳 방문",
+        "- 발표 자료 공유"
+       ],
+       "notes": [
+        "방문 일정은 영업팀과 조율"
+       ]
+      }
+     }
+    ]
+   }
+  },
+  {
+   "task_id": "deck3-e1",
+   "type": "edit",
+   "instruction": "Before the last slide (\"감사합니다\"), add a slide with layout Section Header: title \"다음 단계\"; body text \"현장 실사 일정 협의 (10월 넷째 주)\"."
+  },
+  {
+   "task_id": "deck3-e2",
+   "type": "edit",
+   "instruction": "On slide 3 (\"제안 개요\"), move the speaker note \"인력 재배치 방안은 질문 시 설명\" into the body as a new last bullet; the slide then has no notes."
+  },
+  {
+   "task_id": "deck3-e3",
+   "type": "edit",
+   "instruction": "On slide 4 (\"도입 전후 비교\"), change \"출고 지연 2% 이하\" in the right column to \"출고 지연 1.5% 이하\". Slide 3 keeps its figure."
+  }
+ ]
+}

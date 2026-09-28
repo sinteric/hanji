@@ -1,0 +1,35 @@
+{
+ "answers": [
+  {
+   "task_id": "deck3-w",
+   "text": "---\ntype: presentation\nformat: pptx\ntemplate: org/sales-deck\nschema: 1\n---\n\nlayout: Title Slide\n::title::\n고객 세미나 결과 보고\n::body::\n마케팅팀\n\n---\n\nlayout: Title and Content\n::title::\n참석 현황\n::body::\n- 참석 기업 42곳\n- 참석자 118명\n- 만족도 4.6점\n\n---\n\nlayout: Title and Content\n::title::\n후속 조치\n::body::\n- 상담 요청 기업 12곳 방문\n- 발표 자료 공유\n::notes::\n방문 일정은 영업팀과 조율\n"
+  },
+  {
+   "task_id": "deck3-e1",
+   "edits": [
+    {
+     "old": "\nlayout: Title Only\n",
+     "new": "\nlayout: Section Header\n::title::\n다음 단계\n::body::\n현장 실사 일정 협의 (10월 넷째 주)\n\n---\n\nlayout: Title Only\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck3-e2",
+   "edits": [
+    {
+     "old": "::notes::\n인력 재배치 방안은 질문 시 설명\n",
+     "new": "- 인력 재배치 방안은 질문 시 설명\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck3-e3",
+   "edits": [
+    {
+     "old": "- 도입 후\n- 출고 지연 2% 이하\n",
+     "new": "- 도입 후\n- 출고 지연 1.5% 이하\n"
+    }
+   ]
+  }
+ ]
+}

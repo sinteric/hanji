@@ -1,0 +1,39 @@
+{
+ "answers": [
+  {
+   "task_id": "deck2-w",
+   "text": "---\ntype: presentation\nformat: pptx\ntemplate: org/sales-deck\nschema: 1\n---\n\nlayout: 제목 슬라이드\n::title::\n신입사원 온보딩\n::body::\n인사팀 / 2026년 10월\n\n---\n\nlayout: 구역 머리글\n::title::\n첫 주 일정\n::body::\n적응 교육과 부서 배치\n\n---\n\nlayout: 콘텐츠 2개\n::title::\n담당자 안내\n::left::\n- 교육: 인사팀 한지민\n- 장비: IT지원팀 오세훈\n::right::\n- 급여: 재무팀 윤가은\n- 복지: 총무팀 서준호\n::notes::\n연락처는 사내 메신저로 공유\n"
+  },
+  {
+   "task_id": "deck2-e1",
+   "edits": [
+    {
+     "old": "영업이익 초과 달성 강조\n",
+     "new": "영업이익 초과 달성 강조\n\n---\n\nlayout: 제목 및 내용\n::title::\n고객 만족도 세부\n::body::\n- 콜센터 응답률 92%\n- 불만 처리 기간 2.1일\n::notes::\n콜센터 인력 충원 효과\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e2",
+   "edits": [
+    {
+     "old": "- 부품사업부: 목표 대비 91%\n",
+     "new": "- 부품사업부: 목표 대비 91%\n- 부품사업부 원가 상승 영향\n"
+    },
+    {
+     "old": "- 해외사업부: 목표 대비 88%\n- 부품사업부 원가 상승 영향\n",
+     "new": "- 해외사업부: 목표 대비 88%\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e3",
+   "edits": [
+    {
+     "old": "- 매출: 목표 대비 96%\n",
+     "new": "- 매출: 목표 대비 97%\n"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,64 @@
+---
+type: presentation
+format: pptx
+template: org/sales-deck
+schema: 1
+---
+
+layout: Title Slide
+::title::
+2026 하반기 영업 전략
+::body::
+영업본부 / 2026년 7월
+
+---
+
+layout: Title and Content
+::title::
+상반기 실적 요약
+::body::
+- 매출 482억 원, 전년 대비 +12%
+- 신규 고객 34곳 확보
+- 재계약률 91%
+::notes::
+전년 대비 성장률을 먼저 강조
+
+---
+
+layout: Section Header
+::title::
+시장 환경
+::body::
+경쟁 심화와 가격 압박
+
+---
+
+layout: Two Content
+::title::
+경쟁사 비교
+::left::
+- 당사: 전년 대비 +12%
+- 평균 납기 3일
+- 전담 CS 운영
+::right::
+- A사: 전년 대비 +8%
+- 평균 납기 5일
+- 가격 할인 공세
+
+---
+
+layout: Title and Content
+::title::
+하반기 목표
+::body::
+- 매출 530억 원, 전년 대비 +12%
+- 신규 고객 40곳
+- 재계약률 93%
+::notes::
+목표치는 경영회의 승인 완료
+
+---
+
+layout: Title Only
+::title::
+감사합니다
