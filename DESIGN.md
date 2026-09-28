@@ -403,6 +403,9 @@ project's own interface so it can be replaced.
 | xlsx (edit) | umya-spreadsheet / ooxmlsdk + **IronCalc** | umya reads+writes; ooxmlsdk is schema-typed and keeps untouched parts; IronCalc evaluates formulas | umya: 8 open repair issues incl. "charts corrupted after opening and saving" (#281); IronCalc drops charts and validation on export |
 | any OOXML | ooxmlsdk (Rust) | Port of .NET Open XML SDK; typed parts and elements generated from the schema; `create_from_template` | No helpers; pre-1.0, breaking releases |
 
+Each engine must build and pass the same tests on a native target and on
+wasm32 (§10 item 4).
+
 Not engines here: **pandoc** (GPL-2.0-or-later; md → docx/pptx only; no pptx
 charts; 6 open corruption issues), **Typst** (PDF/PNG/SVG; HTML behind a
 feature flag; no docx), **DocLang** (a read-oriented AI document format,
@@ -454,8 +457,11 @@ v0.7.3; "lossless … regarding content", not formatting).
    (block + offset: 7.8%; never used). Refused: an entry whose ends land in
    different paragraphs; an ambiguous alignment (identical or unrecognised
    blocks).
-4. Where engines run: server, client (wasm), or both — rhwp, rdocx, rpptx and
-   rust_xlsxwriter all build to wasm; rdocx-wasm is unpublished.
+4. ~~Where engines run: server, client (wasm), or both~~ — decided
+   2026-09-28: both. The core stays I/O-free so one build serves a server and
+   a wasm client; every engine is chosen and tested for both targets.
+   rhwp, rdocx, rpptx and rust_xlsxwriter all build to wasm; risk for the
+   client target: rdocx-wasm is unpublished.
 5. Header/footer and section text: when to expose.
 6. Spreadsheet cell-data operations: API shape and the compressed read view.
 7. ~~How a table style attaches to a pipe table~~ — decided by §6 round 2:
