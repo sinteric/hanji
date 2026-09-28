@@ -392,6 +392,7 @@ impl<'a> Exporter<'a> {
             }
         };
         for (ri, row) in t.rows.iter().enumerate() {
+            self.bmarkers(&mut tbl, &[bi, ri]);
             let mut tr = match self.at(&[bi, ri], Kind::Tr).first() {
                 Some(e) => {
                     let mut tr = fragment(&e.xml[0]);
@@ -413,6 +414,7 @@ impl<'a> Exporter<'a> {
                     span += 1;
                 }
                 let path = [bi, ri, ci];
+                self.bmarkers(&mut tr, &path);
                 let (mut tc, tcpr) = match self.at(&path, Kind::Tc).first() {
                     Some(e) => (fragment(&e.xml[0]), e.xml.get(1).map(|x| fragment(x))),
                     None => (el("w:tc"), None),
@@ -450,12 +452,14 @@ impl<'a> Exporter<'a> {
                 tr.children.push(node(tc));
                 ci += span;
             }
+            self.bmarkers(&mut tr, &[bi, ri, row.len()]);
             tbl.children.push(node(tr));
         }
+        self.bmarkers(&mut tbl, &[bi, t.rows.len()]);
         Ok(tbl)
     }
 
-    /// Markers stored before the block or cell paragraph at `path`.
+    /// Markers stored before the block, row, cell or cell paragraph at `path`.
     fn bmarkers(&self, parent: &mut Element, path: &[usize]) {
         let mut ms = self.at(path, Kind::Bmarker);
         ms.sort_by_key(|e| e.seq);

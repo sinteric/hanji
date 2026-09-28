@@ -40,7 +40,9 @@ The LibreOffice conversion runs natively only.
   `[^1]`, links, `<field>` and `$math$` parse but the docx engine refuses them
   on export.
 - §10.8 leftovers: `gridBefore`/`gridAfter`, nested tables and row-level
-  content controls stay block placeholders (4 of the corpus's 29 tables).
+  content controls stay block placeholders (4 of the corpus's 29 tables, 40
+  of the table survey's 506 docx tables). Zero-width markers between rows,
+  cells or cell paragraphs are remainder entries and do not block a table.
 - §4 rule 5: rendering and preview.
 - §9 validity in Word: exports are checked for well-formed XML and a
   LibreOffice PDF conversion only.

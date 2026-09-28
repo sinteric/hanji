@@ -230,8 +230,7 @@ impl<'a> Importer<'a> {
                 continue;
             }
             for m in std::mem::take(&mut pending) {
-                let (x, f) = (self.frag(m), self.fp(&[Some(m)]));
-                self.entry(Kind::Bmarker, vec![x], f, &[bi], None, None, Meta::default());
+                self.bmarker(m, &[bi]);
             }
             let b = match el.name.as_str() {
                 "w:p" => Block::Para(self.para(el, &[bi])?),
@@ -247,6 +246,13 @@ impl<'a> Importer<'a> {
         Ok(Split { blocks, entries: self.entries, styles: self.styles, next_id: self.next_id, stats: self.stats })
     }
 
+    /// A zero-width element between blocks, rows, cells or cell paragraphs:
+    /// before the one at `path`.
+    fn bmarker(&mut self, m: &Element, path: &[usize]) {
+        let (x, f) = (self.frag(m), self.fp(&[Some(m)]));
+        self.entry(Kind::Bmarker, vec![x], f, path, None, None, Meta::default());
+    }
+
     fn block_keep(&mut self, el: &Element, bi: usize) -> Block {
         let k = self.keep_entry(Kind::Bkeep, &[el], &[bi], None, None);
         Block::Keep(k.id)
@@ -255,24 +261,14 @@ impl<'a> Importer<'a> {
     // ------------------------------------------------------------ tables
 
     fn table_reason(&self, tbl: &Element) -> Option<String> {
-        for ch in &tbl.children {
-            match ch {
-                Node::El(e) if matches!(e.name.as_str(), "w:tblPr" | "w:tblGrid" | "w:tr") => {}
-                Node::El(e) => return Some(format!("table-level {}", e.local())),
-                n if is_blank(n) => {}
-                _ => return Some("text or comment in a table".into()),
-            }
+        if let Some(r) = structure_reason(tbl, &["w:tblPr", "w:tblGrid"], "w:tr", "table") {
+            return Some(r);
         }
         let mut grid: Vec<Vec<Cell>> = vec![];
         for (ri, tr) in tbl.elements().filter(|e| e.is("w:tr")).enumerate() {
             let mut row = vec![];
-            for ch in &tr.children {
-                match ch {
-                    Node::El(e) if matches!(e.name.as_str(), "w:trPr" | "w:tblPrEx" | "w:tc") => {}
-                    Node::El(e) => return Some(format!("row-level {}", e.local())),
-                    n if is_blank(n) => {}
-                    _ => return Some("text or comment in a table row".into()),
-                }
+            if let Some(r) = structure_reason(tr, &["w:tblPrEx", "w:trPr"], "w:tc", "row") {
+                return Some(r);
             }
             if let Some(trpr) = tr.child("w:trPr") {
                 if trpr.child("w:gridBefore").is_some() || trpr.child("w:gridAfter").is_some() {
@@ -380,7 +376,16 @@ impl<'a> Importer<'a> {
             .and_then(|id| self.styles.table_name(&id).map(str::to_string).or(Some(id)))
             .filter(|n| Some(n) != self.styles.default_table.as_ref());
         let mut rows = vec![];
-        for (ri, tr) in tbl.elements().filter(|e| e.is("w:tr")).enumerate() {
+        for el in tbl.elements() {
+            if MARKERS.contains(&el.name.as_str()) {
+                // A marker between rows (or after the last): before row `rows.len()`.
+                self.bmarker(el, &[bi, rows.len()]);
+                continue;
+            }
+            if !el.is("w:tr") {
+                continue;
+            }
+            let (ri, tr) = (rows.len(), el);
             let trs = tr.shell();
             let rhead: Vec<&Element> = tr.elements().filter(|e| e.is("w:tblPrEx") || e.is("w:trPr")).collect();
             let fpv =
@@ -388,7 +393,15 @@ impl<'a> Importer<'a> {
             let xml = std::iter::once(self.frag(&trs)).chain(rhead.iter().map(|e| self.frag(e))).collect();
             self.entry(Kind::Tr, xml, fpv, &[bi, ri], None, None, Meta::default());
             let mut row = vec![];
-            for tc in tr.elements().filter(|e| e.is("w:tc")) {
+            for tc in tr.elements() {
+                if MARKERS.contains(&tc.name.as_str()) {
+                    // A marker between cells (or after the last): before grid column `row.len()`.
+                    self.bmarker(tc, &[bi, ri, row.len()]);
+                    continue;
+                }
+                if !tc.is("w:tc") {
+                    continue;
+                }
                 let gc = row.len();
                 let tcpr = tc.child("w:tcPr");
                 let tcs = tc.shell();
@@ -404,8 +417,7 @@ impl<'a> Importer<'a> {
                         paras.push(CellPara { style, content: para.content });
                     } else {
                         // A marker between a cell's paragraphs: before paragraph k.
-                        let (x, f) = (self.frag(e), self.fp(&[Some(e)]));
-                        self.entry(Kind::Bmarker, vec![x], f, &[bi, ri, gc, k], None, None, Meta::default());
+                        self.bmarker(e, &[bi, ri, gc, k]);
                     }
                 }
                 let span = tcpr
@@ -621,6 +633,27 @@ impl<'a> Importer<'a> {
         e.meta.aux = aux;
         Ok(())
     }
+}
+
+/// Why a `w:tbl` or `w:tr` cannot be a pipe table: anything but its
+/// properties (`head`, first and in that order), its rows or cells (`item`),
+/// and zero-width markers after the properties.
+fn structure_reason(e: &Element, head: &[&str], item: &str, level: &str) -> Option<String> {
+    let mut past_head = false;
+    for ch in &e.children {
+        match ch {
+            Node::El(x) if head.contains(&x.name.as_str()) => {
+                if past_head {
+                    return Some(format!("{level}-level {} after a row, cell or marker", x.local()));
+                }
+            }
+            Node::El(x) if x.is(item) || MARKERS.contains(&x.name.as_str()) => past_head = true,
+            Node::El(x) => return Some(format!("{level}-level {}", x.local())),
+            n if is_blank(n) => {}
+            _ => return Some(format!("text or comment in a table{}", if level == "row" { " row" } else { "" })),
+        }
+    }
+    None
 }
 
 fn is_blank(n: &Node) -> bool {
