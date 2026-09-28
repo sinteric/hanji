@@ -186,11 +186,10 @@ schema: 1
 | ^^ | 종로 | 95 |
 | 합계 || 215 |
 
-<table style="Grid Table 4">   # proposal, §10.7
+{style="Grid Table 4"}
 | 지역 | 매출 | 증감 |
 |---|---|---|
 | 수도권 | 1,204 | +15% |
-</table>
 
 <field name="작성자">홍길동</field>
 <keep id="k3" kind="drawing" summary="조직도, 상자 5개"/>
@@ -209,13 +208,19 @@ schema: 1
   - `^^` as the whole cell: merged into the cell above.
   - `||` (two pipes, nothing between): the cell to the left extends into this
     column.
+  - A span over three columns is `|||`, adjacent pipes with no space between
+    them: `| 합계 ||| 215 |`. `|| ||` is two separate cells.
   - A merged area is a rectangle. Its text is written once, in its top-left
     cell; covered cells hold only a marker. Nothing is counted.
+  - A 2×2 merge is the text + `||` in the first row and `^^ ||` in the row
+    below: `| 합산 || 10 |` then `| ^^ || 20 |`.
   - An empty unmerged cell is `|  |`. `^^` in the header row and `||` at the
     start of a row are errors.
 - Multi-paragraph cells have no pipe-table form yet (open, §10.8).
-- Table style (proposal, open in §10.7): a `<table style="Name">` line and a
-  `</table>` line around an unchanged pipe table.
+- Table style (§6 round 2): a `{style="Name"}` line directly before the
+  header row, no blank line between; the braces hold only `style="Name"`;
+  nothing closes the table. A pipe table without the line has the default
+  table style.
 - Headers, footers and section setup come from the template or the remainder
   at first; exposing their text is a later extension.
 - Tracked changes and comments (`<ins>`, `<del>`, `<comment>`) are read-only
@@ -350,6 +355,37 @@ details in [fluency/RESULTS.md](fluency/RESULTS.md). Claude Opus and Sonnet,
   spelled out, no matching style to escape to, weaker models (Haiku), GPT and
   Gemini (not run: no API keys).
 
+**Round 2 results (2026-09-28)** — kit in [fluency/round2/](fluency/round2/),
+details in [fluency/round2/RESULTS.md](fluency/round2/RESULTS.md). Same two
+models, 24 blind units each (4 choices × A/B × 3 Korean seeds × 5 tasks), no
+tools, one fix round. What changed: seeds of 3,015–4,983 chars (round 1:
+662–1,305) with repeated text; merges described by meaning; structural edits
+(rows inside merged groups, splits, 2×2 merges, split/join/move styled tables
+and slides); 6 styling requests with no matching style (right answer:
+refuse); a fourth choice, table style (§10.7): A `<table style>` … `</table>`
+wrapper vs B `{style="Name"}` line.
+
+| Choice | Opus landed A / B | Sonnet landed A / B | Opus chars A / B | Sonnet chars A / B | Verdict |
+|---|---|---|---|---|---|
+| Merged cells | 15 / 15 | 15 / 13 | 5,147 / 3,827 | 8,453 / 4,438 | B holds |
+| Style attribute | 15 / 15 | 15 / 15 | 2,930 / 2,887 | 3,260 / 3,382 | A holds (tie) |
+| Table style | 14 / 15 | 14 / 14 | 4,060 / 3,641 | 7,437 / 8,511 | B, narrowly |
+| Presentation | 15 / 15 | 15 / 15 | 4,710 / 3,909 | 7,612 / 5,308 | B holds |
+
+- Landed is of 15 per cell, first try. Opus 120/120 valid, 119 landed;
+  Sonnet 117/120 valid, 116 landed. The 3 invalid answers (Sonnet: merge B,
+  table style A, table style B) were valid and landed after one validator
+  error. All 24 refusal answers refused; no over-refusal, no CSS, no invented
+  style name.
+- Failures: Sonnet wrote a span over three columns as spaced `|| ||` (each an
+  extra cell; 3 misses, all caught), and a 2×2 merge as two horizontal merges
+  (text + `||` in both rows; valid, so silent); §5.2 now shows both cases.
+  Opus once read "the ordinary body paragraph" as a plain line, not the listed
+  `본문` style.
+- Round 1's picks hold. Table style: correctness tied under A and B; B wins on
+  size only — −10% (Opus), −24% (Sonnet without one outlier edit that makes
+  its total +14%); unstyling a table is one line in B, two in A.
+
 ## 7. Engines (surveyed 2026-09-28)
 
 Engines work only at import, export and preview. Every engine is behind this
@@ -422,10 +458,9 @@ v0.7.3; "lossless … regarding content", not formatting).
    rust_xlsxwriter all build to wasm; rdocx-wasm is unpublished.
 5. Header/footer and section text: when to expose.
 6. Spreadsheet cell-data operations: API shape and the compressed read view.
-7. How a table style attaches to a pipe table. Proposed (§5.2): a
-   `<table style="Name">` line and a `</table>` line around an unchanged pipe
-   table. Not tested — round 1's styled tables were HTML `<tr>`/`<td>` tables
-   and its merged tables had no style — so the next fluency round decides.
+7. ~~How a table style attaches to a pipe table~~ — decided by §6 round 2:
+   `{style="Name"}` line before the pipe table (§5.2); a narrow, size-only
+   win.
 8. A syntax for **multi-paragraph table cells** and **empty paragraphs**. In
    the remainder prototype 12 of 29 tables could not be pipe tables (9 for
    multi-paragraph cells; the others use `gridBefore`/`gridAfter`, a nested
@@ -439,10 +474,11 @@ v0.7.3; "lossless … regarding content", not formatting).
 - No library above has been opened in real Office or Hancom by this project;
   every defect and fidelity statement comes from project docs and issue
   trackers.
-- The fluency list in §6 is still mostly a model's self-report: round 1 ran
-  on two Claude models only and hit the ceiling (every answer valid and
-  landed), so it showed nothing about where models fail. GPT, Gemini, weaker
-  models and harder tasks are untested.
+- The fluency list in §6 is still mostly a model's self-report: two rounds
+  ran on two Claude models only, 15 tasks per cell. Round 1 hit the ceiling;
+  round 2's harder tasks produced a few failures on Sonnet (the invalid ones
+  fixed in one round; the 2×2 merge was valid but wrong) and one on Opus.
+  GPT, Gemini and Haiku are still untested.
 - The 90% fidelity target is not yet a defined metric beyond "per-page SSIM
   against the native app's PDF"; the threshold per page and per corpus is
   unset.
