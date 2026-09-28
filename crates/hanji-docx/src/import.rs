@@ -41,7 +41,7 @@ pub struct Importer<'a> {
 
 /// Import-time checkpoint, so a table that turns out not to be a pipe
 /// table can be kept whole instead.
-struct Mark(usize, u64, u64, usize);
+struct Mark(usize, u64, u64);
 
 impl<'a> Importer<'a> {
     pub fn new(scope: &'a Scope, styles: StyleSet, notes: &'a HashMap<(String, String), String>) -> Self {
@@ -60,7 +60,7 @@ impl<'a> Importer<'a> {
     }
 
     fn checkpoint(&self) -> Mark {
-        Mark(self.entries.len(), self.next_id, self.next_seq, self.keep_ids.len())
+        Mark(self.entries.len(), self.next_id, self.next_seq)
     }
 
     fn rollback(&mut self, m: Mark) {
@@ -70,7 +70,6 @@ impl<'a> Importer<'a> {
             }
         }
         (self.next_id, self.next_seq) = (m.1, m.2);
-        let _ = m.3;
     }
 
     fn seq(&mut self) -> u64 {
@@ -185,12 +184,12 @@ impl<'a> Importer<'a> {
                 format!("{}{}", alias.map(|a| a + ": ").unwrap_or_default(), text(el, 40))
             }
             "fldSimple" => {
-                format!("field {} → {}", clip(&squash(&el.get("w:instr").unwrap_or_default()), 30), text(el, 25))
+                format!("field {} → {}", clip(&el.get("w:instr").unwrap_or_default(), 30), text(el, 25))
             }
             "r" if els.len() > 1 || !el.descendants("w:fldChar").is_empty() => {
                 let instr: String = els.iter().map(|e| e.text_of(&["w:instrText"])).collect();
                 let result = field_result(els);
-                format!("field {} → {}", clip(&squash(&instr), 30), clip(&result, 25)).trim().to_string()
+                format!("field {} → {}", clip(&instr, 30), clip(&result, 25)).trim().to_string()
             }
             "tbl" => format!("table: {}", text(el, 40)),
             _ => {
@@ -202,7 +201,7 @@ impl<'a> Importer<'a> {
                 }
             }
         };
-        clip(&squash(&s), 80)
+        clip(&s, 80)
     }
 
     // ------------------------------------------------------------ document
@@ -303,13 +302,7 @@ impl<'a> Importer<'a> {
                 let paras: Vec<&Element> =
                     ps.iter().filter_map(|n| if let Node::El(e) = n { Some(e) } else { None }).collect();
                 let tcpr = tc.child("w:tcPr");
-                let span = tcpr
-                    .and_then(|t| t.child("w:gridSpan"))
-                    .and_then(|g| g.get("w:val"))
-                    .and_then(|v| v.parse::<usize>().ok())
-                    .unwrap_or(1);
-                let vm = tcpr.and_then(|t| t.child("w:vMerge"));
-                let covered = vm.is_some_and(|v| v.get("w:val").as_deref() != Some("restart"));
+                let (span, covered) = (grid_span(tcpr), v_merged(tcpr));
                 if covered {
                     if ri == 0 {
                         return Some("vMerge continue in first row".into());
@@ -332,7 +325,7 @@ impl<'a> Importer<'a> {
         if grid.iter().any(|r| r.len() != grid[0].len()) {
             return Some("ragged rows".into());
         }
-        if !merges_are_rectangles(&grid) {
+        if hanji_format::merge_problem(&grid).is_some() {
             return Some("merged area is not a rectangle".into());
         }
         None
@@ -372,9 +365,7 @@ impl<'a> Importer<'a> {
         let fpv = fp(self.scope, &std::iter::once(Some(&shell)).chain(head_fp.iter().map(Some)).collect::<Vec<_>>());
         let xml = std::iter::once(self.frag(&shell)).chain(head.iter().map(|e| self.frag(e))).collect();
         self.entry(Kind::Tbl, xml, fpv, &[bi], None, None, Meta { style: style_id.clone(), ..Default::default() });
-        let style = style_id
-            .and_then(|id| self.styles.table_name(&id).map(str::to_string).or(Some(id)))
-            .filter(|n| Some(n) != self.styles.default_table.as_ref());
+        let style = style_id.and_then(|id| self.styles.table_style_name(&id));
         let mut rows = vec![];
         for el in tbl.elements() {
             if MARKERS.contains(&el.name.as_str()) {
@@ -420,15 +411,8 @@ impl<'a> Importer<'a> {
                         self.bmarker(e, &[bi, ri, gc, k]);
                     }
                 }
-                let span = tcpr
-                    .and_then(|t| t.child("w:gridSpan"))
-                    .and_then(|g| g.get("w:val"))
-                    .and_then(|v| v.parse::<usize>().ok())
-                    .unwrap_or(1);
-                let covered = tcpr
-                    .and_then(|t| t.child("w:vMerge"))
-                    .is_some_and(|v| v.get("w:val").as_deref() != Some("restart"));
-                if covered {
+                let span = grid_span(tcpr);
+                if v_merged(tcpr) {
                     row.push(Cell::Up);
                 } else {
                     if !paras.iter().all(|p| cell_writable(&p.content)) {
@@ -450,9 +434,8 @@ impl<'a> Importer<'a> {
         self.inherit(p);
         let ppr = p.child("w:pPr");
         let sid = ppr.and_then(|x| x.child("w:pStyle")).and_then(|s| s.get("w:val"));
-        let sid = sid.unwrap_or_else(|| {
-            self.styles.paragraph_id(&self.styles.default_paragraph).unwrap_or("Normal").to_string()
-        });
+        let default_id = self.styles.default_paragraph_id().to_string();
+        let sid = sid.unwrap_or_else(|| default_id.clone());
         let style = match self.styles.paragraph_name(&sid) {
             Some(n) => n.to_string(),
             None => {
@@ -475,8 +458,7 @@ impl<'a> Importer<'a> {
         let xml = std::iter::once(self.frag(&shell)).chain(ppr.map(|x| self.frag(x))).collect();
         self.entry(Kind::Ppr, xml, f, path, None, None, Meta { style: Some(sid.clone()), ..Default::default() });
         self.buf.clear();
-        let default_id = self.styles.paragraph_id(&self.styles.default_paragraph).map(str::to_string);
-        let page_break_only = Some(&sid) == default_id.as_ref() && is_page_break_para(p);
+        let page_break_only = sid == default_id && is_page_break_para(p);
         self.walk(p, path, page_break_only)?;
         self.inherited.truncate(saved);
         let mut content = Inline { units: std::mem::take(&mut self.buf), spans: vec![] };
@@ -486,7 +468,7 @@ impl<'a> Importer<'a> {
 
     fn inherit(&mut self, e: &Element) {
         for (k, v) in &e.attrs {
-            if k == "xmlns" || k.starts_with("xmlns:") {
+            if crate::xml::ns_prefix(k).is_some() {
                 self.inherited.push((k.clone(), v.clone()));
             }
         }
@@ -721,33 +703,6 @@ fn para_is_blank(p: &Element) -> bool {
 /// Text a pipe table cell can hold as it is.
 fn cell_writable(i: &Inline) -> bool {
     !i.units.iter().any(|u| matches!(u.atom, Atom::PageBreak))
-}
-
-fn merges_are_rectangles(grid: &[Vec<Cell>]) -> bool {
-    let (h, w) = (grid.len(), grid[0].len());
-    let mut origin = vec![vec![(0, 0); w]; h];
-    for r in 0..h {
-        for c in 0..w {
-            origin[r][c] = match grid[r][c] {
-                Cell::Left if c > 0 => origin[r][c - 1],
-                Cell::Up if r > 0 => origin[r - 1][c],
-                _ => (r, c),
-            };
-        }
-    }
-    let mut areas: HashMap<(usize, usize), Vec<(usize, usize)>> = HashMap::new();
-    for (r, row) in origin.iter().enumerate() {
-        for (c, o) in row.iter().enumerate() {
-            areas.entry(*o).or_default().push((r, c));
-        }
-    }
-    areas.iter().all(|(o, cells)| {
-        let r0 = cells.iter().map(|p| p.0).min().unwrap();
-        let r1 = cells.iter().map(|p| p.0).max().unwrap();
-        let c0 = cells.iter().map(|p| p.1).min().unwrap();
-        let c1 = cells.iter().map(|p| p.1).max().unwrap();
-        cells.len() == (r1 - r0 + 1) * (c1 - c0 + 1) && (r0, c0) == *o
-    })
 }
 
 /// Complex fields whose begin..end lie among these siblings: start → end.

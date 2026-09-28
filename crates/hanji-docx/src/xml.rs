@@ -156,8 +156,7 @@ pub fn parse(data: &[u8]) -> Result<Doc, XmlError> {
             Event::Eof => break,
             Event::DocType(_) => return Err(XmlError("a DOCTYPE is not allowed in a package part".into())),
             Event::Decl(_) => continue,
-            Event::Start(s) | Event::Empty(s) if stack.is_empty() && root.is_some() => {
-                let _ = s;
+            Event::Start(_) | Event::Empty(_) if stack.is_empty() && root.is_some() => {
                 return Err(XmlError("more than one root element".into()));
             }
             Event::Start(s) => {
@@ -240,29 +239,24 @@ pub fn write_element(e: &Element, out: &mut String) {
     }
     out.push('>');
     for c in &e.children {
-        match c {
-            Node::El(x) => write_element(x, out),
-            Node::Text(t) => out.push_str(t),
-            Node::Comment(t) => {
-                out.push_str("<!--");
-                out.push_str(t);
-                out.push_str("-->");
-            }
-            Node::Pi(t) => {
-                out.push_str("<?");
-                out.push_str(t);
-                out.push_str("?>");
-            }
-            Node::CData(t) => {
-                out.push_str("<![CDATA[");
-                out.push_str(t);
-                out.push_str("]]>");
-            }
-        }
+        write_node(c, out);
     }
     out.push_str("</");
     out.push_str(&e.name);
     out.push('>');
+}
+
+fn write_node(n: &Node, out: &mut String) {
+    let (open, t, close) = match n {
+        Node::El(x) => return write_element(x, out),
+        Node::Text(t) => return out.push_str(t),
+        Node::Comment(t) => ("<!--", t, "-->"),
+        Node::Pi(t) => ("<?", t, "?>"),
+        Node::CData(t) => ("<![CDATA[", t, "]]>"),
+    };
+    out.push_str(open);
+    out.push_str(t);
+    out.push_str(close);
 }
 
 pub fn write_doc(d: &Doc) -> Vec<u8> {
@@ -327,11 +321,18 @@ pub fn scope_of(root: &Element) -> Scope {
     s
 }
 
+/// The prefix an attribute declares (`""` for `xmlns`), if it is a namespace declaration.
+pub fn ns_prefix(attr: &str) -> Option<&str> {
+    if attr == "xmlns" {
+        Some("")
+    } else {
+        attr.strip_prefix("xmlns:")
+    }
+}
+
 fn push_scope(scope: &mut Scope, e: &Element) {
     for (k, v) in &e.attrs {
-        if k == "xmlns" {
-            scope.insert(String::new(), unescape(v));
-        } else if let Some(p) = k.strip_prefix("xmlns:") {
+        if let Some(p) = ns_prefix(k) {
             scope.insert(p.to_string(), unescape(v));
         }
     }
@@ -359,7 +360,7 @@ pub fn canon(e: &Element, scope: &Scope) -> String {
 }
 
 fn canon_into(e: &Element, scope: &Scope, out: &mut String) {
-    let own = e.attrs.iter().any(|a| a.0 == "xmlns" || a.0.starts_with("xmlns:"));
+    let own = e.attrs.iter().any(|a| ns_prefix(&a.0).is_some());
     let mut local_scope;
     let scope = if own {
         local_scope = scope.clone();
@@ -373,7 +374,7 @@ fn canon_into(e: &Element, scope: &Scope, out: &mut String) {
     let mut attrs: Vec<(String, String)> = e
         .attrs
         .iter()
-        .filter(|a| a.0 != "xmlns" && !a.0.starts_with("xmlns:"))
+        .filter(|a| ns_prefix(&a.0).is_none())
         .map(|(k, v)| (expand(scope, k, true), unescape(v).replace(['\t', '\n', '\r'], " ")))
         .collect();
     attrs.sort();
@@ -381,7 +382,7 @@ fn canon_into(e: &Element, scope: &Scope, out: &mut String) {
         out.push(' ');
         out.push_str(&k);
         out.push_str("=\"");
-        out.push_str(&v.replace('&', "&amp;").replace('<', "&lt;").replace('"', "&quot;"));
+        out.push_str(&escape_attr(&v));
         out.push('"');
     }
     out.push('>');
@@ -420,14 +421,11 @@ pub fn canon_part(data: &[u8]) -> Result<String, XmlError> {
 
 /// Serialize a sequence of nodes.
 pub fn write_nodes(nodes: &[Node]) -> String {
-    let mut e = Element::new("x");
-    e.children = nodes.to_vec();
-    let s = e.to_xml();
-    if nodes.is_empty() {
-        String::new()
-    } else {
-        s["<x>".len()..s.len() - "</x>".len()].to_string()
+    let mut s = String::new();
+    for n in nodes {
+        write_node(n, &mut s);
     }
+    s
 }
 
 #[cfg(test)]

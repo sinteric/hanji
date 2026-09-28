@@ -152,17 +152,10 @@ fn strip_refs(root: &mut Element, ids: &[&Removed], out: &mut Vec<Notice>, part:
     fn rec(e: &mut Element, ids: &[&Removed], out: &mut Vec<Notice>, part: &str) {
         e.children.retain(|n| {
             let Node::El(c) = n else { return true };
-            let hit = ids.iter().find(|r| c.attrs.iter().any(|a| a.0.starts_with("r:") && xml::unescape(&a.1) == r.id));
-            match hit {
-                // Whole elements that only exist to reach the target.
-                Some(r)
-                    if matches!(c.name.as_str(), "w:attachedTemplate" | "o:OLEObject" | "w:control" | "w:subDoc") =>
-                {
-                    let _ = r;
-                    false
-                }
-                _ => true,
-            }
+            // Whole elements that only exist to reach the target.
+            let reaches = matches!(c.name.as_str(), "w:attachedTemplate" | "o:OLEObject" | "w:control" | "w:subDoc");
+            !(reaches
+                && ids.iter().any(|r| c.attrs.iter().any(|a| a.0.starts_with("r:") && xml::unescape(&a.1) == r.id)))
         });
         for c in e.elements_mut() {
             let before = c.attrs.len();
@@ -170,11 +163,7 @@ fn strip_refs(root: &mut Element, ids: &[&Removed], out: &mut Vec<Notice>, part:
                 !(a.0.starts_with("r:") && ids.iter().any(|r| xml::unescape(&a.1) == r.id && r.kind != "ole-object"))
             });
             if c.attrs.len() != before {
-                out.push(Notice {
-                    kind: "reference-removed".into(),
-                    location: format!("{part} <{}>", c.name),
-                    detail: "points at a removed relationship".into(),
-                });
+                notice(out, "reference-removed", format!("{part} <{}>", c.name), "points at a removed relationship");
             }
             rec(c, ids, out, part);
         }
@@ -187,11 +176,8 @@ fn neutralise_objects(doc: &mut Element, out: &mut Vec<Notice>) {
         let n = e.children.len();
         e.children.retain(|c| !matches!(c, Node::El(x) if x.is("o:OLEObject") || x.is("w:control")));
         if e.children.len() != n {
-            out.push(Notice {
-                kind: "ole-object".into(),
-                location: format!("{} <{}>", DOC_PART, e.name),
-                detail: "embedded object or control removed; its preview picture stays".into(),
-            });
+            let detail = "embedded object or control removed; its preview picture stays";
+            notice(out, "ole-object", format!("{DOC_PART} <{}>", e.name), detail);
         }
         for c in e.elements_mut() {
             rec(c, out);
@@ -212,11 +198,7 @@ fn neutralise_fields(doc: &mut Element, out: &mut Vec<Notice>) {
         while k < e.children.len() {
             if let Node::El(c) = &e.children[k] {
                 if c.is("w:fldSimple") && fetches(&c.get("w:instr").unwrap_or_default()) {
-                    out.push(Notice {
-                        kind: "fetching-field".into(),
-                        location: DOC_PART.into(),
-                        detail: clip(&c.get("w:instr").unwrap_or_default(), 60),
-                    });
+                    notice(out, "fetching-field", DOC_PART, clip(&c.get("w:instr").unwrap_or_default(), 60));
                     let Node::El(c) = e.children.remove(k) else { unreachable!() };
                     for (j, x) in c.children.into_iter().enumerate() {
                         e.children.insert(k + j, x);
@@ -278,7 +260,7 @@ fn neutralise_fields(doc: &mut Element, out: &mut Vec<Notice>) {
         }
     }
     for (_, instr) in &bad_fields {
-        out.push(Notice { kind: "fetching-field".into(), location: DOC_PART.into(), detail: clip(instr, 60) });
+        notice(out, "fetching-field", DOC_PART, clip(instr, 60));
     }
     for path in drop.into_iter().rev() {
         remove_at(doc, &path);
@@ -337,33 +319,22 @@ pub fn surface(parts: &[Part], doc: &Element, report: &mut ImportReport) {
             let hidden = e.child("w:rPr").and_then(|p| p.child("w:vanish")).is_some_and(|v| crate::ooxml::on(Some(v)));
             let t = e.text_of(&["w:t"]);
             if hidden && !t.trim().is_empty() {
-                out.push(Notice {
-                    kind: "hidden-text".into(),
-                    location: format!("paragraph {para}"),
-                    detail: clip(&t, 60),
-                });
+                notice(out, "hidden-text", format!("paragraph {para}"), clip(&t, 60));
             }
         }
         if e.is("w:del") || e.is("w:moveFrom") {
             let t = e.text_of(&["w:delText", "w:t"]);
             if !t.trim().is_empty() {
                 let who = e.get("w:author").unwrap_or_else(|| "?".into());
-                out.push(Notice {
-                    kind: "tracked-deletion".into(),
-                    location: format!("paragraph {para}"),
-                    detail: format!("{who}: {}", clip(&t, 60)),
-                });
+                notice(out, "tracked-deletion", format!("paragraph {para}"), format!("{who}: {}", clip(&t, 60)));
             }
         }
     });
     if let Some(d) = crate::package::get(parts, "word/comments.xml").and_then(|d| xml::parse(d).ok()) {
         for c in d.root.elements().filter(|e| e.is("w:comment")) {
             let who = c.get("w:author").unwrap_or_else(|| "?".into());
-            out.push(Notice {
-                kind: "comment".into(),
-                location: format!("comment {}", c.get("w:id").unwrap_or_default()),
-                detail: format!("{who}: {}", clip(&c.text_of(&["w:t"]), 60)),
-            });
+            let location = format!("comment {}", c.get("w:id").unwrap_or_default());
+            notice(out, "comment", location, format!("{who}: {}", clip(&c.text_of(&["w:t"]), 60)));
         }
     }
     for (part, tags) in [
@@ -375,7 +346,7 @@ pub fn surface(parts: &[Part], doc: &Element, report: &mut ImportReport) {
             for e in d.root.elements().filter(|e| e.name == *tag) {
                 let v = e.text_of(&[tag]);
                 if !v.trim().is_empty() {
-                    out.push(Notice { kind: "metadata".into(), location: format!("{part} {tag}"), detail: v });
+                    notice(out, "metadata", format!("{part} {tag}"), v);
                 }
             }
         }

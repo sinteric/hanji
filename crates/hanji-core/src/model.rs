@@ -26,8 +26,8 @@ pub struct Table {
     pub rows: Vec<Vec<Cell>>,
 }
 
-/// Anchor path: `[block]`, `[block, row]` or `[block, row, col]`; empty for
-/// the document itself.
+/// Anchor path: `[block]`, `[block, row]`, `[block, row, col]` or
+/// `[block, row, col, paragraph]`; empty for the document itself.
 pub type Path = Vec<usize>;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -70,6 +70,16 @@ impl StyleSet {
     pub fn table_name(&self, id: &str) -> Option<&str> {
         self.table.iter().find(|s| s.id == id).map(|s| s.name.as_str())
     }
+    /// The id of the default paragraph style (`Normal` when the file names none).
+    pub fn default_paragraph_id(&self) -> &str {
+        self.paragraph_id(&self.default_paragraph).unwrap_or("Normal")
+    }
+    /// The text's name for table style `id`: `None` for the default table
+    /// style; an id missing from the style set stands for itself.
+    pub fn table_style_name(&self, id: &str) -> Option<String> {
+        let name = self.table_name(id).unwrap_or(id);
+        (Some(name) != self.default_table.as_deref()).then(|| name.to_string())
+    }
 }
 
 /// What an engine can export; the rest of the format is refused with a reason.
@@ -81,11 +91,12 @@ pub struct Capabilities {
     pub math: bool,
 }
 
-pub fn atom_is_keep(a: &Atom) -> Option<&fmt::Keep> {
-    match a {
-        Atom::Keep(k) => Some(k),
-        _ => None,
-    }
+/// An empty paragraph's content.
+pub(crate) static EMPTY: Inline = Inline { units: Vec::new(), spans: Vec::new() };
+
+/// Content of one unmarked atom.
+fn single(atom: Atom) -> Inline {
+    Inline { units: vec![fmt::Unit { atom, marks: fmt::Marks::NONE }], spans: vec![] }
 }
 
 /// Model text → resolved blocks. `is_block_keep(id)` says whether a
@@ -124,21 +135,12 @@ pub fn resolve(
             }
             fmt::Block::Keep(k) => match is_block_keep(&k.id) {
                 Some(true) => out.push(Block::Keep(k.id.clone())),
-                Some(false) => {
-                    let content = Inline {
-                        units: vec![fmt::Unit { atom: Atom::Keep(k.clone()), marks: fmt::Marks::NONE }],
-                        spans: vec![],
-                    };
-                    out.push(para(styles.default_paragraph.clone(), content));
-                }
+                Some(false) => out.push(para(styles.default_paragraph.clone(), single(Atom::Keep(k.clone())))),
                 None => {
                     err(format!("placeholder id=\"{}\" is not in this file; placeholders are never created.", k.id))
                 }
             },
-            fmt::Block::PageBreak => out.push(para(
-                styles.default_paragraph.clone(),
-                Inline { units: vec![fmt::Unit { atom: Atom::PageBreak, marks: fmt::Marks::NONE }], spans: vec![] },
-            )),
+            fmt::Block::PageBreak => out.push(para(styles.default_paragraph.clone(), single(Atom::PageBreak))),
             fmt::Block::Table(t) => {
                 let mut rows = t.rows.clone();
                 for c in rows.iter_mut().flatten() {
@@ -236,7 +238,6 @@ pub fn unresolve(
 /// cell has one empty one), `(path, None)` for block placeholders. `||`
 /// cells have no paragraph.
 pub fn paras(blocks: &[Block]) -> Vec<(Path, Option<&Inline>)> {
-    static EMPTY: Inline = Inline { units: Vec::new(), spans: Vec::new() };
     let mut out = vec![];
     for (j, b) in blocks.iter().enumerate() {
         match b {

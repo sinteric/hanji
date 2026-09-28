@@ -1,13 +1,13 @@
 //! Edits against a revision: a whole-file rewrite (aligned by diff, design
 //! C) or an exact span `old → new` (re-anchored from the span itself).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use hanji_format::{self as fmt, BlockMapKind, Diagnostic, Names, ParaMap, Parsed};
 
 use crate::diff::{Op, Tag};
-use crate::model::{self, Block, Capabilities, Path};
-use crate::place::{self, Alignment, Global, Outcome, Status, Stream};
+use crate::model::{self, Block, Capabilities, Path, EMPTY};
+use crate::place::{self, same_kind, Alignment, Global, Outcome, Status, Stream};
 use crate::remainder::{Kind, Remainder};
 
 /// What happened to the remainder: counts, and every entry that did not land.
@@ -253,11 +253,10 @@ fn exact_alignment(
             None => touched_old.push(i),
         }
     }
-    let claimed: std::collections::HashSet<usize> = bmap.iter().flatten().copied().collect();
-    let touched_new: Vec<usize> = (0..nb.len()).filter(|j| !claimed.contains(j)).collect();
+    let touched_old: HashSet<usize> = touched_old.into_iter().collect();
+    let claimed: HashSet<usize> = bmap.iter().flatten().copied().collect();
     let old_items: Vec<_> = para_maps(ob, op).into_iter().filter(|x| touched_old.contains(&x.3)).collect();
-    let new_items: Vec<_> = para_maps(nb, np).into_iter().filter(|x| touched_new.contains(&x.3)).collect();
-    static EMPTY: fmt::Inline = fmt::Inline { units: Vec::new(), spans: Vec::new() };
+    let new_items: Vec<_> = para_maps(nb, np).into_iter().filter(|x| !claimed.contains(&x.3)).collect();
     let old_stream = Stream::new(old_items.iter().map(|x| (x.0.clone(), x.1.unwrap_or(&EMPTY))));
     let new_stream = Stream::new(new_items.iter().map(|x| (x.0.clone(), x.1.unwrap_or(&EMPTY))));
     // Source offset of every stream position (units, then the mark).
@@ -308,10 +307,6 @@ fn exact_alignment(
     let global =
         (!old_stream.order.is_empty()).then_some(Global { old: old_stream, new: new_stream, ops, min_equal: 1 });
     Alignment { bmap, global, ..Default::default() }
-}
-
-fn same_kind(a: &Block, b: &Block) -> bool {
-    matches!((a, b), (Block::Para(_), Block::Para(_)) | (Block::Table(_), Block::Table(_)))
 }
 
 /// Matched pairs → opcodes; an unmatched stretch whose units are identical

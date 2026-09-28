@@ -24,6 +24,13 @@ fn node(e: Element) -> Node {
     Node::El(e)
 }
 
+/// An element stored as its shell followed by its leading children.
+fn assemble(xml: &[String]) -> Element {
+    let mut e = fragment(&xml[0]);
+    e.children.extend(xml[1..].iter().map(|x| node(fragment(x))));
+    e
+}
+
 impl<'a> Exporter<'a> {
     pub fn new(styles: &'a StyleSet, entries: &'a [Entry]) -> Self {
         let mut ex = Exporter { styles, by: HashMap::new(), keep: HashMap::new(), tail: vec![] };
@@ -84,12 +91,11 @@ impl<'a> Exporter<'a> {
             }
             None => None,
         };
-        let default_id = self.styles.paragraph_id(&self.styles.default_paragraph).unwrap_or("Normal").to_string();
+        let default_id = self.styles.default_paragraph_id().to_string();
         let (mut pel, mut ppr) = match pp.first() {
             Some(e) => {
-                let ppr = e.xml.get(1).map(|x| fragment(x));
+                let mut ppr = e.xml.get(1).map(|x| fragment(x));
                 let old = e.meta.style.clone().unwrap_or_else(|| default_id.clone());
-                let mut ppr = ppr;
                 if let Some(want) = want_id.filter(|w| *w != old) {
                     let mut x = ppr.take().unwrap_or_else(|| el("w:pPr"));
                     remove_child(&mut x, "w:pStyle");
@@ -242,10 +248,7 @@ impl<'a> Exporter<'a> {
                     }
                 }
                 It::Zrun(z) => {
-                    let mut r = fragment(&z.xml[0]);
-                    for x in &z.xml[1..] {
-                        r.children.push(node(fragment(x)));
-                    }
+                    let mut r = assemble(&z.xml);
                     for m in rm_at.get(&Target::Zrun(z.id)).into_iter().flatten() {
                         r.children.push(node(fragment(&m.xml[0])));
                     }
@@ -361,16 +364,8 @@ impl<'a> Exporter<'a> {
         let te = self.at(&[bi], Kind::Tbl);
         let mut tbl = match te.first() {
             Some(e) => {
-                let mut tbl = fragment(&e.xml[0]);
-                for x in &e.xml[1..] {
-                    tbl.children.push(node(fragment(x)));
-                }
-                let old = e
-                    .meta
-                    .style
-                    .as_deref()
-                    .and_then(|id| self.styles.table_name(id).map(str::to_string).or(Some(id.to_string())));
-                let old = old.filter(|n| Some(n) != self.styles.default_table.as_ref());
+                let mut tbl = assemble(&e.xml);
+                let old = e.meta.style.as_deref().and_then(|id| self.styles.table_style_name(id));
                 if old != t.style {
                     self.set_table_style(&mut tbl, t.style.as_deref())?;
                 }
@@ -378,10 +373,9 @@ impl<'a> Exporter<'a> {
             }
             None => {
                 let mut tbl = el("w:tbl");
-                tbl.children
-                    .push(node(el("w:tblPr").tap(|p| {
-                        p.children.push(node(el("w:tblW").with_attr("w:w", "0").with_attr("w:type", "auto")))
-                    })));
+                let mut pr = el("w:tblPr");
+                pr.children.push(node(el("w:tblW").with_attr("w:w", "0").with_attr("w:type", "auto")));
+                tbl.children.push(node(pr));
                 let mut grid = el("w:tblGrid");
                 for _ in &t.rows[0] {
                     grid.children.push(node(el("w:gridCol").with_attr("w:w", "2000")));
@@ -393,16 +387,7 @@ impl<'a> Exporter<'a> {
         };
         for (ri, row) in t.rows.iter().enumerate() {
             self.bmarkers(&mut tbl, &[bi, ri]);
-            let mut tr = match self.at(&[bi, ri], Kind::Tr).first() {
-                Some(e) => {
-                    let mut tr = fragment(&e.xml[0]);
-                    for x in &e.xml[1..] {
-                        tr.children.push(node(fragment(x)));
-                    }
-                    tr
-                }
-                None => el("w:tr"),
-            };
+            let mut tr = self.at(&[bi, ri], Kind::Tr).first().map_or_else(|| el("w:tr"), |e| assemble(&e.xml));
             let mut ci = 0;
             while ci < row.len() {
                 let cell = &row[ci];
@@ -491,16 +476,6 @@ enum Target {
     Zrun(u64),
 }
 
-trait Tap {
-    fn tap(self, f: impl FnOnce(&mut Self)) -> Self;
-}
-impl Tap for Element {
-    fn tap(mut self, f: impl FnOnce(&mut Self)) -> Self {
-        f(&mut self);
-        self
-    }
-}
-
 fn set_flag(rpr: &mut Element, name: &str, want: bool) {
     let cur = rpr.child(name);
     if on(cur) == want {
@@ -529,11 +504,9 @@ fn set_underline(rpr: &mut Element, want: bool) {
 
 /// `gridSpan` and `vMerge` regenerated from the `||` / `^^` markers.
 fn merge_props(tcpr: Option<Element>, span: usize, covered: bool, top: bool) -> Option<Element> {
-    let get = |t: &Option<Element>, n: &str| t.as_ref().and_then(|x| x.child(n)).cloned();
-    let gs = get(&tcpr, "w:gridSpan");
-    let cur_span = gs.as_ref().and_then(|g| g.get("w:val")).and_then(|v| v.parse::<usize>().ok()).unwrap_or(1);
-    let vm = get(&tcpr, "w:vMerge");
-    let cur_v = vm.as_ref().map(|v| if v.get("w:val").as_deref() == Some("restart") { "restart" } else { "continue" });
+    let cur_span = grid_span(tcpr.as_ref());
+    let has_vm = tcpr.as_ref().is_some_and(|t| t.child("w:vMerge").is_some());
+    let cur_v = has_vm.then(|| if v_merged(tcpr.as_ref()) { "continue" } else { "restart" });
     let want_v = if covered {
         Some("continue")
     } else if top {
