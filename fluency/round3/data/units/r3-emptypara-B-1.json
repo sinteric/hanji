@@ -1,0 +1,141 @@
+{
+ "unit_id": "r3-emptypara-B-1",
+ "decision": "emptypara",
+ "candidate": "B",
+ "replicate": 1,
+ "names": {
+  "paragraph_styles": [
+   "기관명",
+   "항목",
+   "붙임",
+   "발신 명의",
+   "결재란",
+   "좁은 간격",
+   "붙임 제목"
+  ],
+  "table_styles": [
+   "표 눈금",
+   "눈금 표 4"
+  ]
+ },
+ "fm": {
+  "type": "document",
+  "format": "hwpx",
+  "template": "org/gov-form",
+  "schema": "1"
+ },
+ "seed": "---\ntype: document\nformat: hwpx\ntemplate: org/gov-form\nschema: 1\n---\n\n<div style=\"기관명\">○○시교육청</div>\n\n<div></div>\n<div></div>\n\n수신: 수신자 참조\n\n(경유)\n\n제목: 2027학년도 교원 직무 연수 운영 계획 안내\n\n<div></div>\n\n<div style=\"항목\">1. 관련: ○○시교육청 교원인사과-4521(2026. 12. 3.)</div>\n\n<div style=\"항목\">2. 2027학년도 교원 직무 연수를 아래와 같이 운영하오니, 각 학교에서는 소속 교원이 기한 안에 신청하도록 안내하여 주시기 바랍니다.</div>\n\n가. 연수 기간: 2027. 3. 2. ~ 2027. 11. 30.\n\n나. 연수 대상: 관내 초·중·고 교원 (과정별 정원 있음)\n\n다. 연수 과정: 4개 과정 (과정별 세부 일정은 붙임 1 참고)\n\n<div style=\"좁은 간격\"></div>\n\n{style=\"표 눈금\"}\n| 과정명 | 대상 | 기간 | 정원 | 학점 |\n|---|---|---|---|---|\n| 디지털 수업 설계 | 초·중등 교원 | 3~5월 | 120명 | 2 |\n| 학생 상담 실무 | 담임 교원 | 4~6월 | 80명 | 2 |\n| 학교 안전 관리 | 전 교원 | 연중 | 200명 | 1 |\n| 교육과정 평가 | 중·고등 교원 | 9~11월 | 60명 | 2 |\n\n<div style=\"좁은 간격\"></div>\n\n라. 신청 방법: 교원연수 누리집에서 개인별로 신청 (2027. 2. 10.까지). 누리집 신청이 어려운 교원은 붙임 2의 신청서를 학교 연수 담당자에게 제출합니다.\n\n마. 이수 기준: 출석 80% 이상, 과정 평가 60점 이상\n\n바. 연수비: 전액 교육청 부담 (숙박이 필요한 과정은 숙박비 포함)\n\n사. 유의 사항: 같은 기간에 두 과정 이상을 신청할 수 없으며, 신청 후 취소는 개강 7일 전까지 누리집에서 합니다.\n\n<div style=\"항목\">3. 각 학교에서는 연수 대상 교원의 수업 결손이 생기지 않도록 시간표를 조정하고, 연수 기간 중 복무는 출장으로 처리하여 주시기 바랍니다.</div>\n\n<div style=\"항목\">4. 연수 결과는 개인별 연수 이력에 반영되며, 미이수자는 다음 연도에 같은 과정을 신청할 수 없습니다.</div>\n\n<div style=\"항목\">5. 올해부터 디지털 수업 설계 과정은 수업 나눔 발표를 이수 요건에 포함하며, 발표 자료는 연수 종료 후 누리집의 수업 나눔 게시판에 공개합니다. 학교에서는 발표 교원의 수업 공개 일정을 미리 협의하여 주시기 바랍니다.</div>\n\n<div style=\"항목\">6. 연수와 관련한 문의는 교원인사과 연수 담당 장학사(031-000-2345)에게 하여 주시기 바랍니다.</div>\n\n<div></div>\n<div></div>\n\n<div style=\"붙임\">붙임 1. 연수 과정별 세부 일정 1부.</div>\n\n<div style=\"붙임\">2. 연수 신청서 서식 1부. 끝.</div>\n\n<div></div>\n<div></div>\n<div></div>\n\n<div style=\"발신 명의\">○○시교육감</div>\n\n<div></div>\n<div></div>\n\n<div style=\"결재란\">장학사 김민지 / 장학관 박성훈 / 교원인사과장 최현우</div>\n\n<div style=\"결재란\">시행: 교원인사과-4602 (2026. 12. 15.) / 접수:</div>\n\n<div style=\"결재란\">우 12345 ○○시 ○○로 100 / 전화 031-000-2345 / 전송 031-000-2399 / 공개</div>\n\n<div></div>\n<div></div>\n<div></div>\n<div></div>\n<div></div>\n\n<div style=\"붙임 제목\">붙임 1. 연수 과정별 세부 일정</div>\n\n<div></div>\n\n{style=\"눈금 표 4\"}\n| 과정명 | 차시 | 일정 | 장소 |\n|---|---|---|---|\n| 디지털 수업 설계 | 1~4차시 | 3. 16. ~ 4. 6. (매주 월) | 교육연수원 301호 |\n| ^^ | 5~8차시 | 4. 13. ~ 5. 4. (매주 월) | ^^ |\n| 학생 상담 실무 | 1~6차시 | 4. 7. ~ 5. 12. (매주 화) | 교육연수원 205호 |\n| 학교 안전 관리 | 1~2차시 | 온라인 상시 | 원격연수 누리집 |\n| 교육과정 평가 | 1~6차시 | 9. 8. ~ 10. 13. (매주 화) | 교육연수원 302호 |\n| ^^ | 7~8차시 | 10. 20. ~ 10. 27. (매주 화) | ^^ |\n\n<div></div>\n\n※ 차시별 세부 내용은 연수 시작 2주 전에 누리집에 게시합니다.\n\n※ 연수 시간은 모두 16:30 ~ 18:30이며, 첫 차시에는 30분 일찍 와서 등록을 마쳐야 합니다.\n\n※ 천재지변 등으로 연수를 할 수 없으면 원격 연수로 바꾸고, 바뀐 내용은 누리집과 문자 메시지로 알립니다.\n\n※ 원격 연수는 개인 계정으로 접속하며, 대리 수강이 확인되면 이수를 취소합니다.\n\n<div></div>\n\n연수 장소 안내\n\n<div style=\"좁은 간격\"></div>\n\n{style=\"표 눈금\"}\n| 장소 | 주소 | 교통 |\n|---|---|---|\n| 교육연수원 | ○○시 ○○구 연수로 45 | 지하철 2호선 연수원역 3번 출구, 도보 5분 |\n| 원격연수 누리집 | 누리집 주소는 학교로 따로 안내 | 개인 인증서로 접속 |\n\n<div style=\"좁은 간격\"></div>\n\n※ 교육연수원에는 주차 공간이 부족하니 대중교통을 이용하여 주시기 바랍니다.\n\n※ 장애가 있는 교원은 신청서 비고란에 필요한 지원(수어 통역, 이동 지원 등)을 적어 주시면 준비하겠습니다.\n\n<div></div>\n<div></div>\n<div></div>\n<div></div>\n<div></div>\n\n<div style=\"붙임 제목\">붙임 2. 연수 신청서</div>\n\n<div></div>\n\n{style=\"표 눈금\"}\n| 항목 | 내용 |\n|---|---|\n| 성명 |  |\n| 소속 학교 |  |\n| 담당 교과 |  |\n| 신청 과정 |  |\n| 희망 차시 |  |\n| 연락처 |  |\n| 비고 |  |\n\n<div></div>\n\n개인정보 수집·이용 동의: 연수 운영을 위하여 성명, 소속 학교, 연락처를 수집하며, 연수 종료 후 5년 동안 보관합니다. 동의하지 않으면 연수를 신청할 수 없습니다.\n\n동의 여부: [ ] 동의함 [ ] 동의하지 않음\n\n<div></div>\n\n위와 같이 2027학년도 교원 직무 연수를 신청합니다.\n\n<div></div>\n\n2027년 __월 __일\n\n신청인: ________ (서명)\n\n<div></div>\n<div></div>\n\n○○학교장 확인: ________ (직인)\n\n※ 학교 연수 담당자는 제출받은 신청서를 모아 2027. 2. 12.까지 공문으로 보내 주시기 바랍니다.\n",
+ "tasks": [
+  {
+   "task_id": "letter1-w",
+   "type": "write",
+   "instruction": "Write a new document with exactly these blocks, in this order, and nothing else: the line \"○○시교육청\" in the style for the organisation name at the top; two empty paragraphs with the default style; the paragraphs \"수신: 관내 초·중·고등학교장\" and \"제목: 2027학년도 교원 연수 신청 기간 연장 안내\", both with the default style; one empty paragraph with the default style; the paragraphs \"1. 교원 연수 신청 기간을 2027. 2. 17.까지 연장합니다.\" and \"2. 연장 기간에도 과정별 정원을 넘으면 신청을 마감합니다.\", each in the style for numbered items of the letter, with one empty paragraph in the low spacing style between them; two empty paragraphs with the default style; the attachment-list line \"붙임 1. 변경된 연수 일정 1부. 끝.\"; three empty paragraphs with the default style; the head-of-organisation line \"○○시교육감\".",
+   "front_matter": "---\ntype: document\nformat: hwpx\ntemplate: org/gov-form\nschema: 1\n---",
+   "expect": {
+    "mode": "exact",
+    "items": [
+     {
+      "k": "p",
+      "style": "기관명",
+      "text": "○○시교육청"
+     },
+     {
+      "k": "p",
+      "style": null,
+      "text": ""
+     },
+     {
+      "k": "p",
+      "style": null,
+      "text": ""
+     },
+     {
+      "k": "p",
+      "style": null,
+      "text": "수신: 관내 초·중·고등학교장"
+     },
+     {
+      "k": "p",
+      "style": null,
+      "text": "제목: 2027학년도 교원 연수 신청 기간 연장 안내"
+     },
+     {
+      "k": "p",
+      "style": null,
+      "text": ""
+     },
+     {
+      "k": "p",
+      "style": "항목",
+      "text": "1. 교원 연수 신청 기간을 2027. 2. 17.까지 연장합니다."
+     },
+     {
+      "k": "p",
+      "style": "좁은 간격",
+      "text": ""
+     },
+     {
+      "k": "p",
+      "style": "항목",
+      "text": "2. 연장 기간에도 과정별 정원을 넘으면 신청을 마감합니다."
+     },
+     {
+      "k": "p",
+      "style": null,
+      "text": ""
+     },
+     {
+      "k": "p",
+      "style": null,
+      "text": ""
+     },
+     {
+      "k": "p",
+      "style": "붙임",
+      "text": "붙임 1. 변경된 연수 일정 1부. 끝."
+     },
+     {
+      "k": "p",
+      "style": null,
+      "text": ""
+     },
+     {
+      "k": "p",
+      "style": null,
+      "text": ""
+     },
+     {
+      "k": "p",
+      "style": null,
+      "text": ""
+     },
+     {
+      "k": "p",
+      "style": "발신 명의",
+      "text": "○○시교육감"
+     }
+    ]
+   }
+  },
+  {
+   "task_id": "letter1-e1",
+   "type": "edit",
+   "instruction": "There are three empty paragraphs directly before the line \"○○시교육감\". Keep two of them (delete one). Change nothing else."
+  },
+  {
+   "task_id": "letter1-e2",
+   "type": "edit",
+   "instruction": "In 붙임 1, the empty paragraph directly after the table should be in the low spacing style used around tables. Change nothing else."
+  },
+  {
+   "task_id": "letter1-e3",
+   "type": "edit",
+   "instruction": "Replace the empty paragraphs before \"○○시교육감\" with exactly 24pt of space above that line."
+  },
+  {
+   "task_id": "letter1-e4",
+   "type": "edit",
+   "instruction": "붙임 2 is pushed to a new page by the run of empty paragraphs directly before its title line \"붙임 2. 연수 신청서\". Replace that whole run with one page break. The run before \"붙임 1. 연수 과정별 세부 일정\" stays as it is. Change nothing else."
+  }
+ ]
+}

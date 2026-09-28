@@ -9,7 +9,8 @@ This kit decides the three format choices that were open in §5/§10.1. Each cho
 subject model the same documents and tasks in candidate syntax A or candidate syntax B. Round 1 results
 and the decisions are in [RESULTS.md](RESULTS.md). Round 2 (larger seeds, harder tasks, and the new table-style
 decision of §10.7) has its own kit in [round2/](round2/README.md); its results are in
-[round2/RESULTS.md](round2/RESULTS.md).
+[round2/RESULTS.md](round2/RESULTS.md). Round 3 (multi-paragraph table cells and empty paragraphs, §10.8) has its
+own kit in [round3/](round3/README.md); its results are in [round3/RESULTS.md](round3/RESULTS.md).
 
 | decision | A | B |
 |---|---|---|

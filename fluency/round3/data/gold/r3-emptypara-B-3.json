@@ -1,0 +1,40 @@
+{
+ "answers": [
+  {
+   "task_id": "report3-w",
+   "text": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n<div></div>\n<div></div>\n<div></div>\n<div></div>\n<div></div>\n<div></div>\n<div></div>\n\n<div style=\"표지 제목\">2027년 상반기 사업장 정기 안전 점검 계획</div>\n\n<div></div>\n<div></div>\n<div></div>\n<div></div>\n<div></div>\n\n<div style=\"표지 정보\">2027. 3.</div>\n\n<div style=\"표지 정보\">안전환경팀</div>\n\n<pagebreak/>\n\n# 1. 점검 개요\n\n상반기 점검은 4월 한 달 동안 실시한다.\n\n<div style=\"표 제목\">표 1. 점검 일정</div>\n\n{style=\"눈금 표 4 - 강조색 1\"}\n| 사업장 | 점검일 |\n|---|---|\n| 본사 | 4. 6. |\n| 평택 공장 | 4. 13. ~ 4. 15. |\n\n<div style=\"표 아래 간격\"></div>\n"
+  },
+  {
+   "task_id": "report3-e1",
+   "edits": [
+    {
+     "old": "<div style=\"표지 정보\">안전환경팀</div>\n\n<div></div>\n<div></div>\n<div></div>\n<div></div>\n<div></div>\n<div></div>\n\n",
+     "new": "<div style=\"표지 정보\">안전환경팀</div>\n\n<pagebreak/>\n\n"
+    }
+   ]
+  },
+  {
+   "task_id": "report3-e2",
+   "edits": [
+    {
+     "old": "\n<div style=\"참고\">조치 결과는 12월 안전보건위원회에 보고한다.</div>\n",
+     "new": "\n<div style=\"표 아래 간격\"></div>\n\n<div style=\"참고\">조치 결과는 12월 안전보건위원회에 보고한다.</div>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "report3-e3",
+   "edits": [
+    {
+     "old": "---\n\n<div></div>\n<div></div>\n<div></div>\n",
+     "new": "---\n\n<div></div>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "report3-e4",
+   "text": "REFUSE: a height in points cannot be written.",
+   "edits": []
+  }
+ ]
+}

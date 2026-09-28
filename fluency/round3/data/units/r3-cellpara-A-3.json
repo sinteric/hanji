@@ -1,0 +1,228 @@
+{
+ "unit_id": "r3-cellpara-A-3",
+ "decision": "cellpara",
+ "candidate": "A",
+ "replicate": 3,
+ "names": {
+  "paragraph_styles": [
+   "서식 번호",
+   "안내",
+   "표 참고",
+   "표 소제목",
+   "서명",
+   "수신"
+  ],
+  "table_styles": [
+   "서식 표",
+   "표 눈금",
+   "일반 표 1"
+  ]
+ },
+ "fm": {
+  "type": "document",
+  "format": "hwpx",
+  "template": "org/gov-form",
+  "schema": "1"
+ },
+ "seed": "---\ntype: document\nformat: hwpx\ntemplate: org/gov-form\nschema: 1\n---\n\n<div style=\"서식 번호\">[별지 제3호서식] (개정 2026. 7. 1.)</div>\n\n# 공공시설 대관 신청서\n\n<div style=\"안내\">※ 뒤쪽의 작성 방법을 읽고 작성하시기 바라며, [ ]에는 해당되는 곳에 √ 표시를 합니다.</div>\n\n{style=\"서식 표\"}\n| 구분 | 항목 | 내용 |\n|---|---|---|\n| 신청인 | 성명(단체명) | 한빛문화예술협회 |\n| ^^ | 대표자 | 이서연 |\n| ^^ | 주소 | 서울특별시 ○○구 ○○로 12<br/>한빛빌딩 3층 |\n| ^^ | 연락처 | 전화: 02-000-1234<p/>휴대전화: 010-0000-5678 |\n| 이용 계획 | 시설명 | [ ] 대공연장<p/>[√] 소공연장<p/>[ ] 전시실 |\n| ^^ | 이용 일시 | 2026. 11. 21.(토) 13:00 ~ 18:00<p style=\"표 참고\"/>리허설과 정리 시간 포함 |\n| ^^ | 행사명 | 제5회 시민 합창 발표회 |\n| ^^ | 행사 내용 | 시민 합창단 4개 팀 공연<p/>관람객 약 250명 예상<p style=\"표 참고\"/>입장료 없음 |\n| ^^ | 부대 설비 | [√] 음향 [√] 조명 [ ] 영상<p style=\"표 참고\"/>※ 해당 시 작성 |\n| 준수 사항 || <p style=\"표 소제목\"/>신청인은 다음 사항을 지킵니다.<p/>① 시설물을 훼손하거나 잃어버린 경우 원래대로 복구합니다.<p/>② 허가받은 용도 외에는 시설을 사용하지 않습니다.<p/>③ 행사가 끝난 뒤 1시간 안에 정리를 마칩니다. |\n\n위와 같이 공공시설 대관을 신청하며, 준수 사항을 지킬 것을 서약합니다.\n\n<div style=\"서명\">2026년 10월 20일</div>\n\n<div style=\"서명\">신청인 이서연 (서명 또는 인)</div>\n\n<div style=\"수신\">○○시 문화예술회관장 귀하</div>\n\n## 첨부 서류 및 수수료\n\n{style=\"표 눈금\"}\n| 구분 | 서류 | 수수료 |\n|---|---|---|\n| 신청인 제출 서류 | 가. 행사 계획서 1부<p/>나. 단체 소개서 1부 (단체인 경우만)<p style=\"표 참고\"/>※ 해당 시 작성 | 「○○시 문화예술회관 관리 조례」 별표 2에 따른 사용료 |\n| 담당 공무원 확인 사항 | 법인 등기사항증명서 (법인인 경우만) | ^^ |\n\n<div style=\"안내\">※ 담당 공무원 확인 사항은 신청인이 확인에 동의하지 않으면 해당 서류를 직접 제출해야 합니다.</div>\n\n## 개인정보 수집·이용 동의\n\n문화예술회관은 대관 신청을 처리하기 위하여 다음과 같이 개인정보를 수집·이용합니다.\n\n{style=\"서식 표\"}\n| 구분 | 내용 |\n|---|---|\n| 수집 항목 | 성명, 주소, 전화번호, 휴대전화번호<p style=\"표 참고\"/>단체는 대표자의 정보를 수집합니다. |\n| 이용 목적 | 대관 신청의 접수와 허가<p/>사용료 부과와 환불<p/>시설 이용 안내 |\n| 보유 기간 | 대관 종료 후 3년<p style=\"표 참고\"/>관계 법령에 따라 보존해야 하는 경우에는 그 기간 |\n| 제3자 제공 | 제공하지 않습니다.<p style=\"표 참고\"/>법령에 특별한 규정이 있는 경우는 예외로 합니다. |\n| 동의 거부 | 동의를 거부할 수 있습니다. 다만, 동의하지 않으면 대관 신청을 처리할 수 없습니다. |\n\n<div style=\"서명\">위 내용에 동의합니다. [√] 동의함 [ ] 동의하지 않음</div>\n\n## 사용료 감면\n\n다음에 해당하는 행사는 사용료를 감면합니다. 감면을 받으려면 신청서와 함께 증빙 서류를 내야 합니다.\n\n{style=\"표 눈금\"}\n| 감면 구분 | 대상 | 감면율 |\n|---|---|---|\n| 전액 면제 | 시가 주최하거나 주관하는 행사<p/>국가기관·공공기관이 공익 목적으로 여는 행사 | 100% |\n| 일부 감면 | 관내 등록 예술 단체의 정기 공연<p/>관내 학교의 교육 행사<p style=\"표 참고\"/>단체별로 연 2회까지 | 50% |\n| ^^ | 장애인·노인 단체가 회원을 위해 여는 행사 | 30% |\n\n<div style=\"안내\">※ 감면 대상이 둘 이상에 해당하면 감면율이 가장 높은 하나만 적용합니다.</div>\n\n<div style=\"안내\">※ 감면을 받은 뒤 입장료를 받거나 영리 목적으로 시설을 사용한 것이 확인되면 감면한 사용료를 다시 내야 합니다.</div>\n\n<div style=\"안내\">※ 부대 설비 사용료는 감면 대상에 포함되지 않습니다.</div>\n\n## 작성 방법\n\n- 성명(단체명)란에는 단체가 신청하는 경우 단체 이름을 적습니다.\n- 이용 일시에는 리허설과 정리 시간을 포함하여 적습니다.\n- 부대 설비는 사용할 설비에 √ 표시를 합니다.\n  - 영상 설비는 사용 7일 전까지 따로 협의해야 합니다.\n- 사용료는 허가 통지를 받은 날부터 5일 안에 냅니다.\n- 사용 허가를 받은 뒤 취소하면 사용일 10일 전까지는 사용료 전액을, 그 뒤에는 절반을 돌려받습니다.\n- 허가받은 사용자는 사용 권리를 다른 사람에게 넘길 수 없습니다.\n- 시설 안에서는 음식물을 먹을 수 없으며, 무대 장치를 설치하려면 미리 허가를 받아야 합니다.\n- 행사 계획서에는 행사 목적, 프로그램, 예상 관람 인원, 안전 관리 계획을 적습니다.\n- 관람객이 300명 이상이면 안전 관리 요원 배치 계획을 함께 냅니다.\n- 신청서는 사용일 60일 전부터 10일 전까지 문화예술회관 누리집이나 방문으로 냅니다.\n\n## 처리 절차\n\n{style=\"일반 표 1\"}\n| 신청서 작성 | 접수 | 검토 | 허가 | 사용료 납부 |\n|---|---|---|---|---|\n| 신청인 | 문화예술회관 | 문화예술회관 | 문화예술회관장 | 신청인 |\n\n<div style=\"안내\">※ 처리 기간은 접수일부터 7일입니다. 다만, 같은 날짜에 신청이 겹치면 추첨으로 정합니다.</div>\n\n<div style=\"안내\">※ 허가 결과는 신청서에 적은 휴대전화로 문자 메시지를 보내 알려 드립니다.</div>\n",
+ "tasks": [
+  {
+   "task_id": "form3-w",
+   "type": "write",
+   "instruction": "Write a new document with exactly these blocks, in this order, and nothing else: the line \"[별지 제5호서식]\" in the style for the small form number at the top of a form; a heading level 1 \"공공시설 사용 결과 보고서\"; a table with a thick outer border and thin inner lines, with the columns 구분, 항목, 내용 and these rows, in this order:\n- 사용자 / 단체명 / \"한빛문화예술협회\".\n- the same 구분 cell as the row above (사용자 covers both rows) / 사용 일시 / a 내용 cell with two paragraphs, \"2026. 11. 21.(토) 13:00 ~ 18:00\" and, in the style for small notes inside a table, \"실제 사용 시간 기준\".\n- 결과, written once across the 구분 and 항목 columns / a 내용 cell with three paragraphs: \"관람객 238명\", \"시설 훼손 없음\" and, in the style for small notes inside a table, \"사진 5매 첨부\".\nAfter the table, the line \"2026년 11월 24일\" in the style for right-aligned date and signature lines. Paragraphs in table cells have the default style unless a style is named above.",
+   "front_matter": "---\ntype: document\nformat: hwpx\ntemplate: org/gov-form\nschema: 1\n---",
+   "expect": {
+    "mode": "exact",
+    "items": [
+     {
+      "k": "p",
+      "style": "서식 번호",
+      "text": "[별지 제5호서식]"
+     },
+     {
+      "k": "h",
+      "level": 1,
+      "text": "공공시설 사용 결과 보고서"
+     },
+     {
+      "k": "table",
+      "style": "서식 표",
+      "grid": {
+       "rows": 4,
+       "cols": 3,
+       "cells": [
+        [
+         0,
+         0,
+         [
+          [
+           null,
+           "구분"
+          ]
+         ],
+         1,
+         1,
+         true
+        ],
+        [
+         0,
+         1,
+         [
+          [
+           null,
+           "항목"
+          ]
+         ],
+         1,
+         1,
+         true
+        ],
+        [
+         0,
+         2,
+         [
+          [
+           null,
+           "내용"
+          ]
+         ],
+         1,
+         1,
+         true
+        ],
+        [
+         1,
+         0,
+         [
+          [
+           null,
+           "사용자"
+          ]
+         ],
+         2,
+         1,
+         false
+        ],
+        [
+         1,
+         1,
+         [
+          [
+           null,
+           "단체명"
+          ]
+         ],
+         1,
+         1,
+         false
+        ],
+        [
+         1,
+         2,
+         [
+          [
+           null,
+           "한빛문화예술협회"
+          ]
+         ],
+         1,
+         1,
+         false
+        ],
+        [
+         2,
+         1,
+         [
+          [
+           null,
+           "사용 일시"
+          ]
+         ],
+         1,
+         1,
+         false
+        ],
+        [
+         2,
+         2,
+         [
+          [
+           null,
+           "2026. 11. 21.(토) 13:00 ~ 18:00"
+          ],
+          [
+           "표 참고",
+           "실제 사용 시간 기준"
+          ]
+         ],
+         1,
+         1,
+         false
+        ],
+        [
+         3,
+         0,
+         [
+          [
+           null,
+           "결과"
+          ]
+         ],
+         1,
+         2,
+         false
+        ],
+        [
+         3,
+         2,
+         [
+          [
+           null,
+           "관람객 238명"
+          ],
+          [
+           null,
+           "시설 훼손 없음"
+          ],
+          [
+           "표 참고",
+           "사진 5매 첨부"
+          ]
+         ],
+         1,
+         1,
+         false
+        ]
+       ]
+      }
+     },
+     {
+      "k": "p",
+      "style": "서명",
+      "text": "2026년 11월 24일"
+     }
+    ]
+   }
+  },
+  {
+   "task_id": "form3-e1",
+   "type": "edit",
+   "instruction": "Remove the note \"※ 해당 시 작성\" from the 부대 설비 cell of the application table. The same note elsewhere stays. Change nothing else."
+  },
+  {
+   "task_id": "form3-e2",
+   "type": "edit",
+   "instruction": "In the table under \"첨부 서류 및 수수료\", make the 서류 cell of 신청인 제출 서류 a single paragraph with the default style: \"가. 행사 계획서 1부, 나. 단체 소개서 1부 (단체인 경우만)\". The note in that cell goes away. Change nothing else."
+  },
+  {
+   "task_id": "form3-e3",
+   "type": "edit",
+   "instruction": "In the 준수 사항 cell of the application table, put 6pt of space between the pledges ①, ② and ③."
+  },
+  {
+   "task_id": "form3-e4",
+   "type": "edit",
+   "instruction": "In the application table, split the 준수 사항 row into three rows: the first keeps the cell's bold heading line and ①, the second holds ② and the third holds ③, each as the only paragraph of its cell. The 준수 사항 label stays one cell across the 구분 and 항목 columns and now covers all three rows. Change nothing else."
+  }
+ ]
+}

@@ -1,0 +1,40 @@
+{
+ "answers": [
+  {
+   "task_id": "letter1-w",
+   "text": "---\ntype: document\nformat: hwpx\ntemplate: org/gov-form\nschema: 1\n---\n\n<div style=\"기관명\">○○시교육청</div>\n\n<div></div>\n<div></div>\n\n수신: 관내 초·중·고등학교장\n\n제목: 2027학년도 교원 연수 신청 기간 연장 안내\n\n<div></div>\n\n<div style=\"항목\">1. 교원 연수 신청 기간을 2027. 2. 17.까지 연장합니다.</div>\n\n<div style=\"좁은 간격\"></div>\n\n<div style=\"항목\">2. 연장 기간에도 과정별 정원을 넘으면 신청을 마감합니다.</div>\n\n<div></div>\n<div></div>\n\n<div style=\"붙임\">붙임 1. 변경된 연수 일정 1부. 끝.</div>\n\n<div></div>\n<div></div>\n<div></div>\n\n<div style=\"발신 명의\">○○시교육감</div>\n"
+  },
+  {
+   "task_id": "letter1-e1",
+   "edits": [
+    {
+     "old": "<div style=\"붙임\">2. 연수 신청서 서식 1부. 끝.</div>\n\n<div></div>\n<div></div>\n",
+     "new": "<div style=\"붙임\">2. 연수 신청서 서식 1부. 끝.</div>\n\n<div></div>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "letter1-e2",
+   "edits": [
+    {
+     "old": "| ^^ | 7~8차시 | 10. 20. ~ 10. 27. (매주 화) | ^^ |\n\n<div></div>\n\n",
+     "new": "| ^^ | 7~8차시 | 10. 20. ~ 10. 27. (매주 화) | ^^ |\n\n<div style=\"좁은 간격\"></div>\n\n"
+    }
+   ]
+  },
+  {
+   "task_id": "letter1-e3",
+   "text": "REFUSE: spacing in points cannot be written.",
+   "edits": []
+  },
+  {
+   "task_id": "letter1-e4",
+   "edits": [
+    {
+     "old": "※ 장애가 있는 교원은 신청서 비고란에 필요한 지원(수어 통역, 이동 지원 등)을 적어 주시면 준비하겠습니다.\n\n<div></div>\n<div></div>\n<div></div>\n<div></div>\n<div></div>\n\n",
+     "new": "※ 장애가 있는 교원은 신청서 비고란에 필요한 지원(수어 통역, 이동 지원 등)을 적어 주시면 준비하겠습니다.\n\n<pagebreak/>\n\n"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,44 @@
+{
+ "answers": [
+  {
+   "task_id": "minutes2-w",
+   "text": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 품질팀 주간 회의록\n\n일시: 2026. 10. 13.(화) 14:00 / 장소: 본관 5층 소회의실\n\n<div style=\"Caption\">표 1. 논의 결과</div>\n\n{style=\"Grid Table 4\"}\n{list-table}\n-\n  - 안건\n  - 논의 내용\n  - 결정 사항\n-\n  - 보안 점검 결과\n  - 지적 사항 3건\n    모두 경미한 설정 오류\n  - 10월 중 조치\n-\n  - 서버 이전\n  - 11월 둘째 주 이전 예정\n    <div style=\"Table Note\">주말 작업</div>\n  - 이전 계획 승인\n    고객 공지는 1주 전\n-\n  - 장애 대응 훈련\n  - 분기 1회 실시\n  - ^^\n\n<div style=\"Note\">다음 회의는 10. 20.에 연다.</div>\n"
+  },
+  {
+   "task_id": "minutes2-e1",
+   "edits": [
+    {
+     "old": "  - 간편 로그인만 3.3에 포함\n",
+     "new": "  - <div style=\"Table Emphasis\">간편 로그인만 3.3에 포함</div>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "minutes2-e2",
+   "edits": [
+    {
+     "old": "    오프라인 모드는 개발 기간이 6주 이상 필요\n",
+     "new": ""
+    },
+    {
+     "old": "    오프라인 모드는 3.4로 연기\n",
+     "new": "    오프라인 모드는 3.4로 연기\n    오프라인 모드는 개발 기간이 6주 이상 필요\n"
+    }
+   ]
+  },
+  {
+   "task_id": "minutes2-e3",
+   "text": "REFUSE: no style of this file aligns the text of a table cell.",
+   "edits": []
+  },
+  {
+   "task_id": "minutes2-e4",
+   "edits": [
+    {
+     "old": "    품질팀\n",
+     "new": "    품질팀\n-\n  - 고객 문의 분류 기준\n  - 현행 12개 분류 중 4개가 겹침\n    품질팀 초안은 8개 분류\n  - 품질팀 초안 채택\n    <div style=\"Table Note\">11월 1일부터 시행</div>\n  - 품질팀\n"
+    }
+   ]
+  }
+ ]
+}

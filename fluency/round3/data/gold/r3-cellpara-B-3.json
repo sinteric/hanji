@@ -1,0 +1,40 @@
+{
+ "answers": [
+  {
+   "task_id": "form3-w",
+   "text": "---\ntype: document\nformat: hwpx\ntemplate: org/gov-form\nschema: 1\n---\n\n<div style=\"서식 번호\">[별지 제5호서식]</div>\n\n# 공공시설 사용 결과 보고서\n\n{style=\"서식 표\"}\n{list-table}\n-\n  - 구분\n  - 항목\n  - 내용\n-\n  - 사용자\n  - 단체명\n  - 한빛문화예술협회\n-\n  - ^^\n  - 사용 일시\n  - 2026. 11. 21.(토) 13:00 ~ 18:00\n    <div style=\"표 참고\">실제 사용 시간 기준</div>\n-\n  - 결과\n  - ||\n  - 관람객 238명\n    시설 훼손 없음\n    <div style=\"표 참고\">사진 5매 첨부</div>\n\n<div style=\"서명\">2026년 11월 24일</div>\n"
+  },
+  {
+   "task_id": "form3-e1",
+   "edits": [
+    {
+     "old": "  - [√] 음향 [√] 조명 [ ] 영상\n    <div style=\"표 참고\">※ 해당 시 작성</div>\n",
+     "new": "  - [√] 음향 [√] 조명 [ ] 영상\n"
+    }
+   ]
+  },
+  {
+   "task_id": "form3-e2",
+   "edits": [
+    {
+     "old": "{list-table}\n-\n  - 구분\n  - 서류\n  - 수수료\n-\n  - 신청인 제출 서류\n  - 가. 행사 계획서 1부\n    나. 단체 소개서 1부 (단체인 경우만)\n    <div style=\"표 참고\">※ 해당 시 작성</div>\n  - 「○○시 문화예술회관 관리 조례」 별표 2에 따른 사용료\n-\n  - 담당 공무원 확인 사항\n  - 법인 등기사항증명서 (법인인 경우만)\n  - ^^\n",
+     "new": "| 구분 | 서류 | 수수료 |\n|---|---|---|\n| 신청인 제출 서류 | 가. 행사 계획서 1부, 나. 단체 소개서 1부 (단체인 경우만) | 「○○시 문화예술회관 관리 조례」 별표 2에 따른 사용료 |\n| 담당 공무원 확인 사항 | 법인 등기사항증명서 (법인인 경우만) | ^^ |\n"
+    }
+   ]
+  },
+  {
+   "task_id": "form3-e3",
+   "text": "REFUSE: spacing in points cannot be written, and no style of this file adds space between paragraphs.",
+   "edits": []
+  },
+  {
+   "task_id": "form3-e4",
+   "edits": [
+    {
+     "old": "    ② 허가받은 용도 외에는 시설을 사용하지 않습니다.\n    ③ 행사가 끝난 뒤 1시간 안에 정리를 마칩니다.\n",
+     "new": "-\n  - ^^\n  - ||\n  - ② 허가받은 용도 외에는 시설을 사용하지 않습니다.\n-\n  - ^^\n  - ||\n  - ③ 행사가 끝난 뒤 1시간 안에 정리를 마칩니다.\n"
+    }
+   ]
+  }
+ ]
+}
