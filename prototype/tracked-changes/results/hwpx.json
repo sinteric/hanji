@@ -1,0 +1,89 @@
+{
+ "rhwp": "rhwp v0.8.6",
+ "rows": [
+  {
+   "file": "report",
+   "changes": 6,
+   "checks": {
+    "edits": "H1 '12%' -> '15%' inside '매출은 전년 대비 12% 증가했다. 신규 고객은 34곳이며 그중 21곳이 수도권이다.'; H2 insert a paragraph after '지방 매출은 부산과 대구를 중심으로 소폭 늘었다.'; H3 table cell '지역' -> '1,204'; H4 delete paragraph '다음 분기에는 온라인 채널을 강화한다.'",
+    "well-formed XML (all parts)": "yes",
+    "marks written": {
+     "section_marks": 12,
+     "header_trackChange": 6,
+     "header_trackChangeAuthor": 1
+    },
+    "rhwp info opens it": "yes",
+    "rhwp export-text (deleted text is shown as live text?)": {
+     "deleted figure '12%' still shown": true,
+     "inserted figure '15%' shown": true,
+     "inserted paragraph shown": true,
+     "deleted paragraph still shown": true
+    },
+    "rhwp export-svg renders": "yes, 1 page(s)",
+    "rhwp export-pdf renders": "yes",
+    "rhwp save (edit replace-text) keeps the marks": {
+     "section_marks": 0,
+     "header_trackChange": 0,
+     "header_trackChangeAuthor": 0
+    },
+    "after rhwp save, deleted text is ordinary text": true,
+    "rhwp save reports content loss": "no contentLoss field",
+    "rhwp hwpx-roundtrip (loss gate)": "exit 0: [          PASS] diff=  0 r2=  0      5ms  report.tracked.hwpx",
+    "rhwp hwpx-roundtrip output keeps the marks": {
+     "section_marks": 0,
+     "header_trackChange": 0,
+     "header_trackChangeAuthor": 0
+    },
+    "rhwp ir-diff base vs tracked": {
+     "identical": false,
+     "diffCount": 22
+    },
+    "rhwp convert to HWP5": "exit 0",
+    "HWP5 from convert: deleted text is ordinary text": true,
+    "LibreOffice 24.2 opens hwpx": "no: Warning: failed to launch javaldx - java may not function correctly\nError: source file could not be loaded"
+   }
+  },
+  {
+   "file": "mel-001",
+   "changes": 6,
+   "checks": {
+    "edits": "H1 '25.11.30.' -> '28.11.30.' inside '(’25.11.30. 기준)'; H2 insert a paragraph after '  * 별정직, 전문경력관, 행정전문관, 연구직, 관리운영 등   ** '; H3 table cell '고용노동부 업무보고' -> '1,204'; H4 delete paragraph '□ 이행계획(’26년)'",
+    "well-formed XML (all parts)": "yes",
+    "marks written": {
+     "section_marks": 12,
+     "header_trackChange": 6,
+     "header_trackChangeAuthor": 1
+    },
+    "rhwp info opens it": "yes",
+    "rhwp export-text (deleted text is shown as live text?)": {
+     "deleted figure '25.11.30.' still shown": true,
+     "inserted figure '28.11.30.' shown": true,
+     "inserted paragraph shown": true,
+     "deleted paragraph still shown": true
+    },
+    "rhwp export-svg renders": "yes, 20 page(s)",
+    "rhwp export-pdf renders": "yes",
+    "rhwp save (edit replace-text) keeps the marks": {
+     "section_marks": 0,
+     "header_trackChange": 0,
+     "header_trackChangeAuthor": 0
+    },
+    "after rhwp save, deleted text is ordinary text": true,
+    "rhwp save reports content loss": "no contentLoss field",
+    "rhwp hwpx-roundtrip (loss gate)": "exit 0: [          PASS] diff=  0 r2=  0    144ms  mel-001.tracked.hwpx",
+    "rhwp hwpx-roundtrip output keeps the marks": {
+     "section_marks": 0,
+     "header_trackChange": 0,
+     "header_trackChangeAuthor": 0
+    },
+    "rhwp ir-diff base vs tracked": {
+     "identical": false,
+     "diffCount": 2314
+    },
+    "rhwp convert to HWP5": "exit 0",
+    "HWP5 from convert: deleted text is ordinary text": true,
+    "LibreOffice 24.2 opens hwpx": "no: Warning: failed to launch javaldx - java may not function correctly\nError: source file could not be loaded"
+   }
+  }
+ ]
+}

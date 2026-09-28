@@ -1,0 +1,13 @@
+[package]
+name = "tcspike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Spike: can rdocx write tracked changes for hanji exports (DESIGN.md §10 item 2). Not part of the workspace."
+
+# Standalone: an empty [workspace] keeps this crate out of the hanji workspace build.
+[workspace]
+
+[dependencies]
+rdocx = { version = "=0.14.0", default-features = false }
+serde_json = "1"

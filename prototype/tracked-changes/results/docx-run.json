@@ -1,0 +1,5038 @@
+{
+ "route_a": [
+  {
+   "file": "Bug54849",
+   "edit": "E4",
+   "what": "no same-level headings: move blocks 9–12 before block 1",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison needs an adjacent paragraph for a final paragraph move"
+   }
+  },
+  {
+   "file": "Bug54849",
+   "edit": "E5",
+   "what": "block 1 → style 'endnote text'",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [
+     "body/paragraph[1]: formatting differs and the original formatting was retained"
+    ],
+    "ok": true,
+    "revisions": {
+     "authors": [],
+     "by_kind": {},
+     "count": 0,
+     "dates": []
+    }
+   }
+  },
+  {
+   "file": "Bug54849",
+   "edit": "E10",
+   "what": "E4 move section (no same-level headings: move blocks 9–12 before block 1); E5 restyle (block 1 → style 'endnote text')",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison needs an adjacent paragraph for a final paragraph move"
+   }
+  },
+  {
+   "file": "WordWithAttachments",
+   "edit": "E1",
+   "what": "change 'дастурлари' to 'дастурлари-2' in a paragraph with a comment",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 1,
+       "ins": 1
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 50943,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 2,
+     "by_type": {
+      "Delete": 1,
+      "Insert": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-WordWithAttachments-E1.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "WordWithAttachments",
+   "edit": "E2",
+   "what": "new paragraph before block 4",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "ins": 2
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "ins": 2
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "ins": 2
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 51145,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 1,
+     "by_type": {
+      "Insert": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-WordWithAttachments-E2.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "WordWithAttachments",
+   "edit": "E3",
+   "what": "delete block 0 ('\\U000f0001'…)",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 2
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 50360,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 1,
+     "by_type": {
+      "Delete": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-WordWithAttachments-E3.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "WordWithAttachments",
+   "edit": "E4",
+   "what": "no same-level headings: move blocks 30–34 before block 0",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "moveFrom": 2,
+      "moveTo": 2
+     },
+     "count": 4,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 14
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 14
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "moveFrom": 2,
+       "moveTo": 2
+      },
+      "count": 4,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "moveFrom": 2,
+      "moveTo": 2
+     },
+     "count": 4,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 50796,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "14/14"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 0,
+     "by_type": {},
+     "authors": []
+    },
+    "pdf": "out/lo/Ar-WordWithAttachments-E4.changes.pdf",
+    "accept_matches_edited": false,
+    "reject_matches_base": false,
+    "accept_matches_ignoring_field_digits": false,
+    "reject_matches_ignoring_field_digits": false,
+    "accept_diff_paras": 5,
+    "reject_diff_paras": 5,
+    "ok": true
+   }
+  },
+  {
+   "file": "WordWithAttachments",
+   "edit": "E5",
+   "what": "block 0 → style 'Balloon Text'",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "pPrChange": 1
+     },
+     "count": 1,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 1
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 1
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "pPrChange": 1
+      },
+      "count": 1,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "pPrChange": 1
+     },
+     "count": 1,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 50367,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "1/1"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 0,
+     "by_type": {},
+     "authors": []
+    },
+    "pdf": "out/lo/Ar-WordWithAttachments-E5.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "WordWithAttachments",
+   "edit": "E6",
+   "what": "no merged cell in any modelled table: append ' (rev.)' to cell (0, 0)",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 1,
+       "ins": 1
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 50790,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 2,
+     "by_type": {
+      "Delete": 1,
+      "Insert": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-WordWithAttachments-E6.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "WordWithAttachments",
+   "edit": "E7",
+   "what": "replace ', wh' (straddles two differently formatted runs) with 'EDITED'",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 2
+     },
+     "count": 4,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 4
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 4
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 2,
+       "ins": 2
+      },
+      "count": 4,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 2
+     },
+     "count": 4,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 51065,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "4/4"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 4,
+     "by_type": {
+      "Delete": 2,
+      "Insert": 2
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-WordWithAttachments-E7.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "WordWithAttachments",
+   "edit": "E8",
+   "what": "split block 18 at offset 15 of 31",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 3,
+      "ins": 5,
+      "pPrChange": 1
+     },
+     "count": 9,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 9
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 9
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 3,
+       "ins": 5,
+       "pPrChange": 1
+      },
+      "count": 9,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 3,
+      "ins": 5,
+      "pPrChange": 1
+     },
+     "count": 9,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 51152,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "9/9"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 5,
+     "by_type": {
+      "Delete": 2,
+      "ParagraphFormat": 1,
+      "Insert": 2
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-WordWithAttachments-E8.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "WordWithAttachments",
+   "edit": "E9",
+   "what": "join blocks 0 and 1",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison cannot revise paragraph boundary structures at body/paragraph[0]"
+   }
+  },
+  {
+   "file": "WordWithAttachments",
+   "edit": "E10",
+   "what": "E1 figure (change 'дастурлари' to 'дастурлари-2' in a paragraph with a comment); E2 insert before drawing (new paragraph before block 4); E3 delete formatted paragraph (delete block 0 ('\\U000f0001'…)); E4 move section (no same-level headings: move blocks 30–34 before block 0); E5 restyle (block 0 → style 'Balloon Text'); E6 table cell (no merged cell in any modelled table: append ' (rev.)' to cell (0, 0)); E7 edit across a run boundary (replace ', wh' (straddles two differently formatted runs) with 'EDITED'); E8 split paragraph (split block 23 at offset 15 of 31); E9 merge paragraphs (join blocks 19 and 20)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison cannot revise paragraph boundary structures at body/paragraph[21]"
+   }
+  },
+  {
+   "file": "delins",
+   "edit": "E3",
+   "what": "delete block 0 ('Tika can be:'…)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "delins",
+   "edit": "E4",
+   "what": "no same-level headings: move blocks 20–22 before block 0",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "delins",
+   "edit": "E5",
+   "what": "block 0 → style 'Balloon Text'",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "delins",
+   "edit": "E7",
+   "what": "replace 'f Pe' (straddles two differently formatted runs) with 'EDITED'",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "delins",
+   "edit": "E8",
+   "what": "split block 2 at offset 27 of 54",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "delins",
+   "edit": "E9",
+   "what": "join blocks 0 and 1",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "delins",
+   "edit": "E10",
+   "what": "E3 delete formatted paragraph (delete block 0 ('Tika can be:'…)); E4 move section (no same-level headings: move blocks 19–21 before block 0); E5 restyle (block 3 → style 'Balloon Text'); E7 edit across a run boundary (replace 'f Pe' (straddles two differently formatted runs) with 'EDITED'); E8 split paragraph (split block 9 at offset 23 of 47); E9 merge paragraphs (join blocks 5 and 6)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "docx4j-tables",
+   "edit": "E1",
+   "what": "change 'Merging' to 'Merging-2' in a paragraph with a bookmark",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 1,
+       "ins": 1
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 173951,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 2,
+     "by_type": {
+      "Delete": 1,
+      "Insert": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-docx4j-tables-E1.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "docx4j-tables",
+   "edit": "E2",
+   "what": "new paragraph before block 5",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "ins": 2
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "ins": 2
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "ins": 2
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 174238,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 1,
+     "by_type": {
+      "Insert": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-docx4j-tables-E2.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "docx4j-tables",
+   "edit": "E4",
+   "what": "no same-level headings: move blocks 28–34 before block 0",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison needs an adjacent paragraph for a final paragraph move"
+   }
+  },
+  {
+   "file": "docx4j-tables",
+   "edit": "E5",
+   "what": "block 4 → style 'Quote'",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "pPrChange": 1
+     },
+     "count": 1,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 1
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 1
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "pPrChange": 1
+      },
+      "count": 1,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "pPrChange": 1
+     },
+     "count": 1,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 181044,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "1/1"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 1,
+     "by_type": {
+      "ParagraphFormat": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-docx4j-tables-E5.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "docx4j-tables",
+   "edit": "E6",
+   "what": "cell next to a merged cell: append ' (rev.)' to cell (1, 0)",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 1,
+       "ins": 1
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 173845,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 2,
+     "by_type": {
+      "Delete": 1,
+      "Insert": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-docx4j-tables-E6.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "docx4j-tables",
+   "edit": "E7",
+   "what": "replace 'nt (' (straddles two differently formatted runs) with 'EDITED'",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 2
+     },
+     "count": 4,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 4
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 4
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 2,
+       "ins": 2
+      },
+      "count": 4,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 2
+     },
+     "count": 4,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 174275,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "4/4"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 4,
+     "by_type": {
+      "Delete": 2,
+      "Insert": 2
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-docx4j-tables-E7.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "docx4j-tables",
+   "edit": "E8",
+   "what": "split block 9 at offset 14 of 24",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison cannot revise paragraph boundary structures at body/paragraph[9]"
+   }
+  },
+  {
+   "file": "docx4j-tables",
+   "edit": "E10",
+   "what": "E1 figure (change 'Merging' to 'Merging-2' in a paragraph with a bookmark); E2 insert before drawing (new paragraph before block 5); E4 move section (no same-level headings: move blocks 29–35 before block 0); E5 restyle (block 0 → style 'Quote'); E6 table cell (cell next to a merged cell: append ' (rev.)' to cell (1, 0)); E7 edit across a run boundary (replace 'nt (' (straddles two differently formatted runs) with 'EDITED'); E8 split paragraph (split block 17 at offset 11 of 26); E9 merge paragraphs (join blocks 17 and 18)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison needs an adjacent paragraph for a final paragraph change"
+   }
+  },
+  {
+   "file": "fdo76098",
+   "edit": "E1",
+   "what": "change 'Hello' to 'Hello-2' in a paragraph with a bookmark",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 1,
+       "ins": 1
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 148877,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 2,
+     "by_type": {
+      "Delete": 1,
+      "Insert": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-fdo76098-E1.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "fdo76098",
+   "edit": "E2",
+   "what": "new paragraph before block 3",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "ins": 2
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "ins": 2
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "ins": 2
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 149209,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 1,
+     "by_type": {
+      "Insert": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-fdo76098-E2.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "fdo76098",
+   "edit": "E3",
+   "what": "delete block 0 ('This is some normal text in a '…)",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 3
+     },
+     "count": 3,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 3
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 3
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 3
+      },
+      "count": 3,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 3
+     },
+     "count": 3,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 147050,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "3/3"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 1,
+     "by_type": {
+      "Delete": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-fdo76098-E3.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "fdo76098",
+   "edit": "E4",
+   "what": "no same-level headings: move blocks 29–33 before block 0",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison acceptance does not reproduce the edited stories: ([\"p:None:[\\\"[]:[]:[]\\\"]:[]:[]:[]:[]:[]\", \"p:None:[\\\"[]:[]:[]\\\"]:[]:[]:[]:[]:[]\", \"p:None:[\\\"[\\\\\\\"Text(CT_Text { text: \\\\\\\\\\\\\\\"And also the date above!!\\\\\\\\\\\\\\\", preserve_space: false })\\\\\\\"]:[]:[]\\\"]:[]:[]:[]:[]:[]\", \"p:None:[\\\"[]:[]:[]\\\""
+   }
+  },
+  {
+   "file": "fdo76098",
+   "edit": "E5",
+   "what": "block 0 → style 'List Paragraph'",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "pPrChange": 1
+     },
+     "count": 1,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 1
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 1
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "pPrChange": 1
+      },
+      "count": 1,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "pPrChange": 1
+     },
+     "count": 1,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 146620,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "1/1"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 1,
+     "by_type": {
+      "ParagraphFormat": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-fdo76098-E5.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "fdo76098",
+   "edit": "E7",
+   "what": "replace 'h. I' (straddles two differently formatted runs) with 'EDITED'",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 3
+     },
+     "count": 5,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 5
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 5
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 2,
+       "ins": 3
+      },
+      "count": 5,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 3
+     },
+     "count": 5,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 151052,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "5/5"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 4,
+     "by_type": {
+      "Delete": 2,
+      "Insert": 2
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-fdo76098-E7.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "fdo76098",
+   "edit": "E8",
+   "what": "split block 34 at offset 91 of 182",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 3,
+      "ins": 5,
+      "pPrChange": 1
+     },
+     "count": 9,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 9
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 9
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 3,
+       "ins": 5,
+       "pPrChange": 1
+      },
+      "count": 9,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 3,
+      "ins": 5,
+      "pPrChange": 1
+     },
+     "count": 9,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 152514,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "9/9"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 5,
+     "by_type": {
+      "Delete": 2,
+      "ParagraphFormat": 1,
+      "Insert": 2
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-fdo76098-E8.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "fdo76098",
+   "edit": "E9",
+   "what": "join blocks 0 and 1",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 1
+     },
+     "count": 3,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 3
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 3
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 2,
+       "ins": 1
+      },
+      "count": 3,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 1
+     },
+     "count": 3,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 150363,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "3/3"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 3,
+     "by_type": {
+      "Insert": 1,
+      "Delete": 2
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-fdo76098-E9.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "fdo76098",
+   "edit": "E10",
+   "what": "E1 figure (change 'Hello' to 'Hello-2' in a paragraph with a bookmark); E2 insert before drawing (new paragraph before block 3); E3 delete formatted paragraph (delete block 0 ('This is some normal text in a '…)); E4 move section (no same-level headings: move blocks 29–33 before block 0); E5 restyle (block 2 → style 'List Paragraph'); E7 edit across a run boundary (replace 'y wh' (straddles two differently formatted runs) with 'EDITED'); E8 split paragraph (split block 34 at offset 91 of 184); E9 merge paragraphs (join blocks 34 and 35)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison cannot revise a modeled field at body/paragraph[0]"
+   }
+  },
+  {
+   "file": "form_footnotes",
+   "edit": "E2",
+   "what": "new paragraph before block 0",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison needs an adjacent paragraph for a final paragraph change"
+   }
+  },
+  {
+   "file": "form_footnotes",
+   "edit": "E3",
+   "what": "delete block 10 ('IMPORTANT: FORMS THAT ARE INCO'…)",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 3
+     },
+     "count": 3,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 3
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 3
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 3
+      },
+      "count": 3,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 3
+     },
+     "count": 3,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 172603,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "3/3"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 1,
+     "by_type": {
+      "Delete": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-form_footnotes-E3.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "form_footnotes",
+   "edit": "E7",
+   "what": "replace 'T: F' (straddles two differently formatted runs) with 'EDITED'",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 2
+     },
+     "count": 4,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 4
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 4
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 2,
+       "ins": 2
+      },
+      "count": 4,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 2
+     },
+     "count": 4,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 173756,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "4/4"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 4,
+     "by_type": {
+      "Delete": 2,
+      "Insert": 2
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-form_footnotes-E7.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "form_footnotes",
+   "edit": "E8",
+   "what": "split block 11 at offset 24 of 91",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 4,
+      "pPrChange": 1
+     },
+     "count": 7,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 7
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 7
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 2,
+       "ins": 4,
+       "pPrChange": 1
+      },
+      "count": 7,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 4,
+      "pPrChange": 1
+     },
+     "count": 7,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 173811,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "7/7"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 6,
+     "by_type": {
+      "Delete": 2,
+      "ParagraphFormat": 1,
+      "Insert": 3
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-form_footnotes-E8.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "form_footnotes",
+   "edit": "E9",
+   "what": "join blocks 10 and 11",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 3,
+      "ins": 2,
+      "pPrChange": 1
+     },
+     "count": 6,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 6
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 6
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 3,
+       "ins": 2,
+       "pPrChange": 1
+      },
+      "count": 6,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 3,
+      "ins": 2,
+      "pPrChange": 1
+     },
+     "count": 6,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 173715,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "6/6"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 4,
+     "by_type": {
+      "ParagraphFormat": 1,
+      "Insert": 1,
+      "Delete": 2
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-form_footnotes-E9.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "form_footnotes",
+   "edit": "E10",
+   "what": "E2 insert before drawing (new paragraph before block 0); E3 delete formatted paragraph (delete block 11 ('IMPORTANT: FORMS THAT ARE INCO'…)); E8 split paragraph (split block 11 at offset 24 of 91); E9 merge paragraphs (join blocks 11 and 12)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison needs an adjacent paragraph for a final paragraph change"
+   }
+  },
+  {
+   "file": "korean-report",
+   "edit": "E1",
+   "what": "change '1' to '15' in a paragraph with a comment",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "korean-report",
+   "edit": "E2",
+   "what": "new paragraph before block 6",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "korean-report",
+   "edit": "E3",
+   "what": "delete block 1 ('매출은 전년 대비 12% 증가했다.\\U000f0001 신규 고객은 34'…)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "korean-report",
+   "edit": "E4",
+   "what": "move the section at block 9 (5 blocks) before the one at block 4",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "korean-report",
+   "edit": "E5",
+   "what": "block 1 → style 'Body Text'",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "korean-report",
+   "edit": "E6",
+   "what": "cell next to a merged cell: append ' (rev.)' to cell (2, 1)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "korean-report",
+   "edit": "E7",
+   "what": "replace '중 21' (straddles two differently formatted runs) with 'EDITED'",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "korean-report",
+   "edit": "E8",
+   "what": "split block 1 at offset 24 of 49",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "korean-report",
+   "edit": "E9",
+   "what": "join blocks 0 and 1",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "korean-report",
+   "edit": "E10",
+   "what": "E1 figure (change '1' to '15' in a paragraph with a comment); E2 insert before drawing (new paragraph before block 6); E3 delete formatted paragraph (delete block 1 ('매출은 전년 대비 12% 증가했다.\\U000f0001 신규 고객은 34'…)); E4 move section (move the section at block 9 (5 blocks) before the one at block 3); E5 restyle (block 2 → style 'Body Text'); E6 table cell (cell next to a merged cell: append ' (rev.)' to cell (2, 1)); E7 edit across a run boundary (replace '로 15' (straddles two differently formatted runs) with 'EDITED'); E8 split paragraph (split block 4 at offset 10 of 21); E9 merge paragraphs (join blocks 4 and 5)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "loadAndSave",
+   "edit": "E1",
+   "what": "change 'Lorem' to 'Lorem-2' in a paragraph with a comment",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [
+    "word/styles.xml: Namespace prefix w14 for val on ligatures is not defined, line 9, column 109 (<string>, line 9)"
+   ],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 1,
+       "ins": 1
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 72781,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "ok": false,
+    "error": "AttributeError(\"'NoneType' object has no attribute 'close'\")"
+   }
+  },
+  {
+   "file": "loadAndSave",
+   "edit": "E2",
+   "what": "new paragraph before block 16",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "ins": 2
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [
+    "word/styles.xml: Namespace prefix w14 for val on ligatures is not defined, line 9, column 109 (<string>, line 9)"
+   ],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "ins": 2
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "ins": 2
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 73142,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "ok": false,
+    "error": "AttributeError(\"'NoneType' object has no attribute 'close'\")"
+   }
+  },
+  {
+   "file": "loadAndSave",
+   "edit": "E3",
+   "what": "delete block 6 ('Underline'…)",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [
+    "word/styles.xml: Namespace prefix w14 for val on ligatures is not defined, line 9, column 109 (<string>, line 9)"
+   ],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 2
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 72525,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "ok": false,
+    "error": "AttributeError(\"'NoneType' object has no attribute 'close'\")"
+   }
+  },
+  {
+   "file": "loadAndSave",
+   "edit": "E4",
+   "what": "move the section at block 29 (3 blocks) before the one at block 25",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "cannot scan identifiers in XML part /word/document.xml: duplicate drawing id 934288903 in imported or preserved XML"
+   }
+  },
+  {
+   "file": "loadAndSave",
+   "edit": "E5",
+   "what": "block 3 → style 'Quote'",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [
+     "body/paragraph[3]: formatting differs and the original formatting was retained"
+    ],
+    "ok": true,
+    "revisions": {
+     "authors": [],
+     "by_kind": {},
+     "count": 0,
+     "dates": []
+    }
+   }
+  },
+  {
+   "file": "loadAndSave",
+   "edit": "E6",
+   "what": "no merged cell in any modelled table: '1' → '15' in cell (0, 0)",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [
+    "word/styles.xml: Namespace prefix w14 for val on ligatures is not defined, line 9, column 109 (<string>, line 9)"
+   ],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 1,
+       "ins": 1
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 72609,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "ok": false,
+    "error": "AttributeError(\"'NoneType' object has no attribute 'close'\")"
+   }
+  },
+  {
+   "file": "loadAndSave",
+   "edit": "E7",
+   "what": "replace 'nt (' (straddles two differently formatted runs) with 'EDITED'",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 2
+     },
+     "count": 4,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [
+    "word/styles.xml: Namespace prefix w14 for val on ligatures is not defined, line 9, column 109 (<string>, line 9)"
+   ],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 4
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 4
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 2,
+       "ins": 2
+      },
+      "count": 4,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 2
+     },
+     "count": 4,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 73146,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "4/4"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "ok": false,
+    "error": "AttributeError(\"'NoneType' object has no attribute 'close'\")"
+   }
+  },
+  {
+   "file": "loadAndSave",
+   "edit": "E8",
+   "what": "split block 3 at offset 6 of 12",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison cannot revise paragraph boundary structures at body/paragraph[3]"
+   }
+  },
+  {
+   "file": "loadAndSave",
+   "edit": "E9",
+   "what": "join blocks 8 and 9",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 3,
+      "ins": 2,
+      "pPrChange": 1
+     },
+     "count": 6,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [
+    "word/styles.xml: Namespace prefix w14 for val on ligatures is not defined, line 9, column 109 (<string>, line 9)"
+   ],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 6
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 6
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 3,
+       "ins": 2,
+       "pPrChange": 1
+      },
+      "count": 6,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 3,
+      "ins": 2,
+      "pPrChange": 1
+     },
+     "count": 6,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 72984,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "6/6"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "ok": false,
+    "error": "AttributeError(\"'NoneType' object has no attribute 'close'\")"
+   }
+  },
+  {
+   "file": "loadAndSave",
+   "edit": "E10",
+   "what": "E1 figure (change 'Lorem' to 'Lorem-2' in a paragraph with a comment); E2 insert before drawing (new paragraph before block 16); E3 delete formatted paragraph (delete block 6 ('Underline'…)); E4 move section (move the section at block 29 (3 blocks) before the one at block 25); E5 restyle (block 3 → style 'Quote'); E6 table cell (no merged cell in any modelled table: '1' → '15' in cell (0, 0)); E7 edit across a run boundary (replace 'nt (' (straddles two differently formatted runs) with 'EDITED'); E8 split paragraph (split block 3 at offset 6 of 12); E9 merge paragraphs (join blocks 3 and 4)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "cannot scan identifiers in XML part /word/document.xml: duplicate drawing id 934288903 in imported or preserved XML"
+   }
+  },
+  {
+   "file": "sample-docx",
+   "edit": "E1",
+   "what": "change '10' to '105' in a paragraph with a bookmark",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "sample-docx",
+   "edit": "E2",
+   "what": "new paragraph before block 45",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "sample-docx",
+   "edit": "E3",
+   "what": "delete block 27 ('Font styles 18 point'…)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "sample-docx",
+   "edit": "E4",
+   "what": "move the section at block 42 (22 blocks) before the one at block 31",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "sample-docx",
+   "edit": "E5",
+   "what": "block 1 → style 'List Paragraph'",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "sample-docx",
+   "edit": "E6",
+   "what": "no merged cell in any modelled table: append ' (rev.)' to cell (0, 0)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "sample-docx",
+   "edit": "E7",
+   "what": "replace 's 18' (straddles two differently formatted runs) with 'EDITED'",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "sample-docx",
+   "edit": "E8",
+   "what": "split block 23 at offset 8 of 65",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "sample-docx",
+   "edit": "E9",
+   "what": "join blocks 22 and 23",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "sample-docx",
+   "edit": "E10",
+   "what": "E1 figure (change '10' to '105' in a paragraph with a bookmark); E2 insert before drawing (new paragraph before block 45); E3 delete formatted paragraph (delete block 27 ('Font styles 18 point'…)); E4 move section (move the section at block 41 (23 blocks) before the one at block 30); E5 restyle (block 1 → style 'List Paragraph'); E6 table cell (no merged cell in any modelled table: append ' (rev.)' to cell (0, 0)); E7 edit across a run boundary (replace 's un' (straddles two differently formatted runs) with 'EDITED'); E8 split paragraph (split block 23 at offset 8 of 66); E9 merge paragraphs (join blocks 22 and 23)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "tdf124637_sectionMargin",
+   "edit": "E1",
+   "what": "change '0' to '5' in a paragraph with a bookmark",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 1,
+       "ins": 1
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 50212,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 2,
+     "by_type": {
+      "Delete": 1,
+      "Insert": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-tdf124637_sectionMargin-E1.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "tdf124637_sectionMargin",
+   "edit": "E4",
+   "what": "move the section at block 29 (1 blocks) before the one at block 27",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison acceptance does not reproduce the edited stories: ([\"x:[60, 119, 58, 98, 111, 111, 107, 109, 97, 114, 107, 83, 116, 97, 114, 116, 32, 119, 58, 105, 100, 61, 34, 48, 34, 32, 119, 58, 110, 97, 109, 101, 61, 34, 95, 71, 111, 66, 97, 99, 107, 34, 32, 119, 58, 100, 105, 115, 112, 108, 97, 99, "
+   }
+  },
+  {
+   "file": "tdf124637_sectionMargin",
+   "edit": "E5",
+   "what": "block 19 → style 'List Paragraph'",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "pPrChange": 1
+     },
+     "count": 1,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 1
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 1
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "pPrChange": 1
+      },
+      "count": 1,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "pPrChange": 1
+     },
+     "count": 1,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 49729,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "1/1"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 1,
+     "by_type": {
+      "ParagraphFormat": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-tdf124637_sectionMargin-E5.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "tdf124637_sectionMargin",
+   "edit": "E8",
+   "what": "split block 19 at offset 160 of 323",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 9,
+      "ins": 11
+     },
+     "count": 20,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 20
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 20
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 9,
+       "ins": 11
+      },
+      "count": 20,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 9,
+      "ins": 11
+     },
+     "count": 20,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 52872,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "20/20"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 4,
+     "by_type": {
+      "Delete": 2,
+      "Insert": 2
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-tdf124637_sectionMargin-E8.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "tdf124637_sectionMargin",
+   "edit": "E9",
+   "what": "join blocks 10 and 11",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 3,
+      "ins": 2,
+      "pPrChange": 1
+     },
+     "count": 6,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 6
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 6
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 3,
+       "ins": 2,
+       "pPrChange": 1
+      },
+      "count": 6,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 3,
+      "ins": 2,
+      "pPrChange": 1
+     },
+     "count": 6,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 50002,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "6/6"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 4,
+     "by_type": {
+      "ParagraphFormat": 2,
+      "Insert": 1,
+      "Delete": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-tdf124637_sectionMargin-E9.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "tdf124637_sectionMargin",
+   "edit": "E10",
+   "what": "E1 figure (change '0' to '5' in a paragraph with a bookmark); E4 move section (move the section at block 29 (1 blocks) before the one at block 27); E5 restyle (block 19 → style 'List Paragraph'); E8 split paragraph (split block 19 at offset 160 of 323); E9 merge paragraphs (join blocks 28 and 29)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison cannot revise paragraph boundary structures at body/paragraph[30]"
+   }
+  },
+  {
+   "file": "tdf154481",
+   "edit": "E1",
+   "what": "change '2023' to '20235' in a paragraph with a comment",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "tdf154481",
+   "edit": "E2",
+   "what": "new paragraph before block 18",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "tdf154481",
+   "edit": "E3",
+   "what": "delete block 1 ('xxx\\U000f0001\\U000f0002'…)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "tdf154481",
+   "edit": "E4",
+   "what": "no same-level headings: move blocks 44–45 before block 1",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "tdf154481",
+   "edit": "E5",
+   "what": "block 1 → style 'List Paragraph'",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "tdf154481",
+   "edit": "E7",
+   "what": "replace 'e an' (straddles two differently formatted runs) with 'EDITED'",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "tdf154481",
+   "edit": "E8",
+   "what": "split block 16 at offset 9 of 17",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "tdf154481",
+   "edit": "E9",
+   "what": "join blocks 17 and 18",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "tdf154481",
+   "edit": "E10",
+   "what": "E1 figure (change '2023' to '20235' in a paragraph with a comment); E2 insert before drawing (new paragraph before block 18); E3 delete formatted paragraph (delete block 1 ('xxx\\U000f0001\\U000f0002'…)); E4 move section (no same-level headings: move blocks 44–45 before block 8); E5 restyle (block 8 → style 'List Paragraph'); E7 edit across a run boundary (replace 'e an' (straddles two differently formatted runs) with 'EDITED'); E8 split paragraph (split block 17 at offset 9 of 17); E9 merge paragraphs (join blocks 20 and 21)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "testWORD_2006ml",
+   "edit": "E1",
+   "what": "change '2' to '25' in a paragraph with a comment",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "testWORD_2006ml",
+   "edit": "E2",
+   "what": "new paragraph before block 13",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "testWORD_2006ml",
+   "edit": "E4",
+   "what": "move the section at block 65 (50 blocks) before the one at block 56",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "testWORD_2006ml",
+   "edit": "E5",
+   "what": "block 9 → style 'List Paragraph'",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "testWORD_2006ml",
+   "edit": "E6",
+   "what": "no merged cell in any modelled table: append ' (rev.)' to cell (0, 0)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "testWORD_2006ml",
+   "edit": "E7",
+   "what": "replace 'e qu' (straddles two differently formatted runs) with 'EDITED'",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "testWORD_2006ml",
+   "edit": "E8",
+   "what": "split block 2 at offset 12 of 28",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "testWORD_2006ml",
+   "edit": "E9",
+   "what": "join blocks 10 and 11",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "testWORD_2006ml",
+   "edit": "E10",
+   "what": "E1 figure (change '2' to '25' in a paragraph with a comment); E2 insert before drawing (new paragraph before block 13); E4 move section (move the section at block 66 (50 blocks) before the one at block 57); E5 restyle (block 9 → style 'List Paragraph'); E6 table cell (no merged cell in any modelled table: append ' (rev.)' to cell (0, 0)); E7 edit across a run boundary (replace 'e qu' (straddles two differently formatted runs) with 'EDITED'); E8 split paragraph (split block 2 at offset 12 of 28); E9 merge paragraphs (join blocks 11 and 12)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "document comparison requires inputs without existing modeled revisions"
+   }
+  },
+  {
+   "file": "testWORD_various",
+   "edit": "E1",
+   "what": "change 'Bold' to 'Bold-2' in a paragraph with a bookmark",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 1,
+       "ins": 1
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 72312,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 2,
+     "by_type": {
+      "Delete": 1,
+      "Insert": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-testWORD_various-E1.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "testWORD_various",
+   "edit": "E2",
+   "what": "new paragraph before block 0",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "ins": 2
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "ins": 2
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "ins": 2
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 72848,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 1,
+     "by_type": {
+      "Insert": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-testWORD_various-E2.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "testWORD_various",
+   "edit": "E3",
+   "what": "delete block 2 ('Bold italic underline superscr'…)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison cannot replace unlike body structures at body/raw[2]"
+   }
+  },
+  {
+   "file": "testWORD_various",
+   "edit": "E4",
+   "what": "no same-level headings: move blocks 37–38 before block 0",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "moveFrom": 2,
+      "moveTo": 2
+     },
+     "count": 4,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 8
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 8
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "moveFrom": 2,
+       "moveTo": 2
+      },
+      "count": 4,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "moveFrom": 2,
+      "moveTo": 2
+     },
+     "count": 4,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 73348,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "8/8"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 2,
+     "by_type": {
+      "Insert": 1,
+      "Delete": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-testWORD_various-E4.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "testWORD_various",
+   "edit": "E5",
+   "what": "block 0 → style 'List Paragraph'",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison correlated 3 of 5 physical paragraph runs"
+   }
+  },
+  {
+   "file": "testWORD_various",
+   "edit": "E6",
+   "what": "no merged cell in any modelled table: '1' → '15' in cell (0, 0)",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 2
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 1,
+       "ins": 1
+      },
+      "count": 2,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 1
+     },
+     "count": 2,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 72633,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "2/2"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 2,
+     "by_type": {
+      "Delete": 1,
+      "Insert": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-testWORD_various-E6.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "testWORD_various",
+   "edit": "E7",
+   "what": "replace 't st' (straddles two differently formatted runs) with 'EDITED'",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 2
+     },
+     "count": 4,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 4
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 4
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 2,
+       "ins": 2
+      },
+      "count": 4,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 2
+     },
+     "count": 4,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 72246,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "4/4"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 4,
+     "by_type": {
+      "Delete": 2,
+      "Insert": 2
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-testWORD_various-E7.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "testWORD_various",
+   "edit": "E8",
+   "what": "split block 2 at offset 22 of 57",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison cannot revise paragraph boundary structures at body/paragraph[2]"
+   }
+  },
+  {
+   "file": "testWORD_various",
+   "edit": "E9",
+   "what": "join blocks 4 and 5",
+   "granularity": "run",
+   "compare": {
+    "diagnostics": [],
+    "ok": true,
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 4,
+      "ins": 3
+     },
+     "count": 7,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    }
+   },
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 7
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 7
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 4,
+       "ins": 3
+      },
+      "count": 7,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 4,
+      "ins": 3
+     },
+     "count": 7,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 72054,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "7/7"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 2,
+     "by_type": {
+      "Insert": 1,
+      "Delete": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/Ar-testWORD_various-E9.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "testWORD_various",
+   "edit": "E10",
+   "what": "E1 figure (change 'Bold' to 'Bold-2' in a paragraph with a bookmark); E2 insert before drawing (new paragraph before block 0); E3 delete formatted paragraph (delete block 3 ('Bold-2 italic underline supers'…)); E4 move section (no same-level headings: move blocks 37–38 before block 0); E5 restyle (block 3 → style 'List Paragraph'); E6 table cell (no merged cell in any modelled table: '1' → '15' in cell (0, 0)); E7 edit across a run boundary (replace 'tali' (straddles two differently formatted runs) with 'EDITED'); E8 split paragraph (split block 2 at offset 19 of 38); E9 merge paragraphs (join blocks 7 and 8)",
+   "granularity": "run",
+   "compare": {
+    "ok": false,
+    "error": "comparison correlated 3 of 5 physical paragraph runs"
+   }
+  }
+ ],
+ "route_b": [
+  {
+   "file": "Bug54849",
+   "edits": [
+    {
+     "edit": "X1",
+     "what": "n/a"
+    },
+    {
+     "edit": "X2",
+     "what": "insert a paragraph after 'Rich_text_pre_table'"
+    },
+    {
+     "edit": "X3",
+     "what": "table cell run 'Rich_text_cell1' -> '1,204'"
+    },
+    {
+     "edit": "X4",
+     "what": "n/a"
+    },
+    {
+     "edit": "X5",
+     "what": "n/a"
+    }
+   ],
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 4
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 4
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 1,
+       "ins": 3
+      },
+      "count": 4,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 1,
+      "ins": 3
+     },
+     "count": 4,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 26812,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "4/4"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 3,
+     "by_type": {
+      "Insert": 2,
+      "Delete": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/B-Bug54849.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "docx4j-tables",
+   "edits": [
+    {
+     "edit": "X1",
+     "what": "delete ' alignment,' inside 'Shadings, alignment, row height'"
+    },
+    {
+     "edit": "X2",
+     "what": "insert a paragraph after 'Merging, empty cells'"
+    },
+    {
+     "edit": "X3",
+     "what": "table cell run 'A' -> '1,204'"
+    },
+    {
+     "edit": "X4",
+     "what": "n/a"
+    },
+    {
+     "edit": "X5",
+     "what": "restyle 'Merging, both directions': None -> Quote"
+    }
+   ],
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 6
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 6
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 2,
+       "ins": 3,
+       "pPrChange": 1
+      },
+      "count": 6,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 3,
+      "pPrChange": 1
+     },
+     "count": 6,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 181739,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "6/6"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 5,
+     "by_type": {
+      "Delete": 2,
+      "Insert": 2,
+      "ParagraphFormat": 1
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/B-docx4j-tables.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "korean-report",
+   "edits": [
+    {
+     "edit": "X1",
+     "what": "delete ' 표는' inside '아래 표는 지점별 매출을 정리한 것이다'"
+    },
+    {
+     "edit": "X2",
+     "what": "insert a paragraph after '신규 고객 34곳 중 21곳이 수도권.'"
+    },
+    {
+     "edit": "X3",
+     "what": "table cell run '지역' -> '1,204'"
+    },
+    {
+     "edit": "X4",
+     "what": "delete paragraph '4분기에는 부산과 대구에 지점을 연다.'"
+    },
+    {
+     "edit": "X5",
+     "what": "restyle '3분기 영업 보고': Heading1 -> Heading2"
+    }
+   ],
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 15
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 15
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)",
+       "김민지"
+      ],
+      "by_kind": {
+       "del": 10,
+       "ins": 4,
+       "pPrChange": 1
+      },
+      "count": 15,
+      "dates": [
+       "2026-09-20T10:00:00Z",
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)",
+      "김민지"
+     ],
+     "by_kind": {
+      "del": 10,
+      "ins": 4,
+      "pPrChange": 1
+     },
+     "count": 15,
+     "dates": [
+      "2026-09-20T10:00:00Z",
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 52263,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "15/15"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 7,
+     "by_type": {
+      "ParagraphFormat": 1,
+      "Insert": 3,
+      "Delete": 3
+     },
+     "authors": [
+      "hanji (model edit)",
+      "김민지"
+     ]
+    },
+    "pdf": "out/lo/B-korean-report.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "loadAndSave",
+   "edits": [
+    {
+     "edit": "X1",
+     "what": "delete ' of' inside 'Table of Contents'"
+    },
+    {
+     "edit": "X2",
+     "what": "insert a paragraph after 'Section 22'"
+    },
+    {
+     "edit": "X3",
+     "what": "table cell run '1' -> '1,204'"
+    },
+    {
+     "edit": "X4",
+     "what": "delete paragraph 'Font (Times New Roman)'"
+    },
+    {
+     "edit": "X5",
+     "what": "restyle 'Title': Title -> Quote"
+    }
+   ],
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 9
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 9
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 5,
+       "ins": 3,
+       "pPrChange": 1
+      },
+      "count": 9,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 5,
+      "ins": 3,
+      "pPrChange": 1
+     },
+     "count": 9,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 76490,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "9/9"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 6,
+     "by_type": {
+      "ParagraphFormat": 1,
+      "Delete": 3,
+      "Insert": 2
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/B-loadAndSave.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  },
+  {
+   "file": "tdf154481",
+   "edits": [
+    {
+     "edit": "X1",
+     "what": "delete ' further' inside 'and further '"
+    },
+    {
+     "edit": "X2",
+     "what": "insert a paragraph after ''"
+    },
+    {
+     "edit": "X3",
+     "what": "n/a"
+    },
+    {
+     "edit": "X4",
+     "what": "delete paragraph 'Xxxxxxxxxxxx Xxxxxxxxxxxxxxxxxxx / Xxxxxxxx XX'"
+    },
+    {
+     "edit": "X5",
+     "what": "restyle 'xxx': None -> Heading2"
+    }
+   ],
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 15
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 15
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "Author",
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 2,
+       "ins": 4,
+       "pPrChange": 1
+      },
+      "count": 7,
+      "dates": [
+       "",
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "Author",
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 2,
+      "ins": 4,
+      "pPrChange": 1
+     },
+     "count": 7,
+     "dates": [
+      "",
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 72723,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "15/15"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 4,
+     "by_type": {
+      "ParagraphFormat": 1,
+      "Insert": 2,
+      "Delete": 1
+     },
+     "authors": [
+      "Author",
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/B-tdf154481.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": false,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": false,
+    "reject_diff_paras": 5,
+    "ok": true
+   }
+  },
+  {
+   "file": "testWORD_various",
+   "edits": [
+    {
+     "edit": "X1",
+     "what": "delete ' appears' inside 'Footnote appears here'"
+    },
+    {
+     "edit": "X2",
+     "what": "insert a paragraph after ''"
+    },
+    {
+     "edit": "X3",
+     "what": "table cell run 'Row 1 Col 1' -> '1,204'"
+    },
+    {
+     "edit": "X4",
+     "what": "delete paragraph ' Keyword1 Keyword2'"
+    },
+    {
+     "edit": "X5",
+     "what": "n/a"
+    }
+   ],
+   "wf_errors": [],
+   "ws_unpreserved": 0,
+   "rdocx": {
+    "accept_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 8
+    },
+    "ok": true,
+    "reject_all": {
+     "left": 0,
+     "ok": true,
+     "resolved": 8
+    },
+    "resave": {
+     "ok": true,
+     "revisions": {
+      "authors": [
+       "hanji (model edit)"
+      ],
+      "by_kind": {
+       "del": 5,
+       "ins": 3
+      },
+      "count": 8,
+      "dates": [
+       "2026-09-28T00:00:00Z"
+      ]
+     }
+    },
+    "revisions": {
+     "authors": [
+      "hanji (model edit)"
+     ],
+     "by_kind": {
+      "del": 5,
+      "ins": 3
+     },
+     "count": 8,
+     "dates": [
+      "2026-09-28T00:00:00Z"
+     ]
+    },
+    "tracked_pdf": {
+     "bytes": 74786,
+     "ok": true
+    },
+    "revision_xml_kept_on_save": "8/8"
+   },
+   "text": {
+    "projection_accept_eq_edited": true,
+    "projection_reject_eq_base": true,
+    "rdocx_accept_eq_edited": true,
+    "rdocx_reject_eq_base": true
+   },
+   "lo": {
+    "redlines": {
+     "count": 5,
+     "by_type": {
+      "Delete": 3,
+      "Insert": 2
+     },
+     "authors": [
+      "hanji (model edit)"
+     ]
+    },
+    "pdf": "out/lo/B-testWORD_various.changes.pdf",
+    "accept_matches_edited": true,
+    "reject_matches_base": true,
+    "accept_matches_ignoring_field_digits": true,
+    "reject_matches_ignoring_field_digits": true,
+    "ok": true
+   }
+  }
+ ],
+ "granularity": "run"
+}
