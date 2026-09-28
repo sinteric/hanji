@@ -463,6 +463,11 @@ project's own interface so it can be replaced.
 Each engine must build and pass the same tests on a native target and on
 wasm32 (§10 item 4).
 
+Found by [prototype/tracked-changes/SPIKE.md](prototype/tracked-changes/SPIKE.md):
+rhwp 0.8.6 drops hwpx track-change marks on save without a loss report, and a
+plain rdocx 0.14 open/save of one corpus file wrote a `styles.xml` that is not
+well-formed (a dropped `xmlns:w14` declaration).
+
 Not engines here: **pandoc** (GPL-2.0-or-later; md → docx/pptx only; no pptx
 charts; 6 open corruption issues), **Typst** (PDF/PNG/SVG; HTML behind a
 feature flag; no docx), **DocLang** (a read-oriented AI document format,
@@ -501,10 +506,20 @@ v0.7.3; "lossless … regarding content", not formatting).
 1. ~~Style attribute name, merged-cell syntax, Presentation syntax~~ —
    decided by §6 round 1: `style="Name"`, `^^`/`||` markers, Slidev-style
    (§5.2, §5.3, §6).
-2. Whether model edits reach the exported file as **tracked changes**
-   (reviewable in Word/Hancom) or as direct changes. Next: a spike on whether
-   rdocx and rhwp write insertions/deletions that open cleanly, after the docx
-   GetPut tests pass (tracked changes stay read-only until then, §5.2).
+2. ~~Whether model edits reach the exported file as **tracked changes**
+   (reviewable in Word/Hancom) or as direct changes~~ — decided for now,
+   2026-09-28, by
+   [prototype/tracked-changes/SPIKE.md](prototype/tracked-changes/SPIKE.md):
+   direct changes only; tracked changes stay read-only (§5.2). Later, tracked
+   changes become a docx-only export option, off by default: hanji-docx writes
+   the revision XML itself from the exact edit spans, marking an inserted
+   paragraph on the mark of the paragraph before it, as Word does. rdocx has
+   no API to write revisions and its compare is unreliable (40 of 107 edits
+   tracked), so it only checks accept/reject all in tests; rhwp does not model
+   hwpx track changes and drops them on save without a loss report, so hwpx
+   stays on direct changes. Gate for the option: docx GetPut passes, the file
+   opens in Word with no repair prompt, and accept/reject give back the edited
+   and previous text across the corpus.
 3. ~~The remainder's storage shape and anchor granularity (block, run range,
    shape, cell range)~~ — decided by
    [prototype/remainder/REMAINDER.md](prototype/remainder/REMAINDER.md): a flat
@@ -533,12 +548,16 @@ v0.7.3; "lossless … regarding content", not formatting).
 8. ~~A syntax for multi-paragraph table cells and empty paragraphs~~ —
    decided by §6 round 3: `<p/>` paragraph starts in pipe cells and `<p/>`
    lines for empty paragraphs (§5.2). An empty paragraph inside a cell
-   (`<p/><p/>`) follows from the two, untested. Still open: the table shapes
-   round 3 did not cover — `gridBefore`/`gridAfter`, nested tables and
-   row-level content controls (3 of the prototype's 29 tables) still fall
-   back to an uneditable block placeholder. Next: a survey of real openly
-   licensed files to see how often these shapes occur, before a syntax is
-   designed.
+   (`<p/><p/>`) follows from the two, untested. The table shapes round 3 did
+   not cover are decided 2026-09-28 by
+   [prototype/tables-survey/SURVEY.md](prototype/tables-survey/SURVEY.md):
+   across 261 real documents (1,335 tables), nested tables are 2.6%,
+   `gridBefore`/`gridAfter` 1.0% and row-level content controls 0%, so they
+   stay an uneditable block placeholder for now. Import fixes it found: a
+   bookmark or marker before the first row goes to the remainder instead of
+   forcing a placeholder (15.6% of docx tables); side-by-side hwpx tables
+   import as separate blocks. Limit: the Korean side is press releases only,
+   and many source hosts were blocked.
 
 ## 11. Blind spots
 
