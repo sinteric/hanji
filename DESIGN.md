@@ -1,7 +1,7 @@
 ---
 status: draft
 date: 2026-09-29
-measured: library and project facts below were checked 2026-09-28/29 against crates.io, npm, PyPI, GitHub and project docs; the §5 syntax choices were measured by fluency round 1 (2026-09-28, two Claude models); nothing here has yet been opened in real Office by this project
+measured: library and project facts below were checked 2026-09-28/29 against crates.io, npm, PyPI, GitHub and project docs; the §5 syntax choices were measured by fluency rounds 1–3 (2026-09-28, two Claude models); the remainder anchoring (§10.3) by the remainder prototype (2026-09-28, 13 docx); nothing here has yet been opened in real Office by this project
 ---
 
 # hanji — office documents for LLM agents (design)
@@ -180,6 +180,9 @@ schema: 1
 
 <div style="Note">신규 고객 34곳 중 21곳이 수도권.</div>
 
+<p/>
+<p style="좁은 간격"/>
+
 | 지역 | 지점 | 매출 |
 |---|---|---|
 | 서울 | 강남 | 120 |
@@ -190,6 +193,7 @@ schema: 1
 | 지역 | 매출 | 증감 |
 |---|---|---|
 | 수도권 | 1,204 | +15% |
+| 지방 | 812 | +4%<p/>부산 신규 2곳<p style="표 참고"/>잠정치 |
 
 <field name="작성자">홍길동</field>
 <keep id="k3" kind="drawing" summary="조직도, 상자 5개"/>
@@ -216,7 +220,29 @@ schema: 1
     below: `| 합산 || 10 |` then `| ^^ || 20 |`.
   - An empty unmerged cell is `|  |`. `^^` in the header row and `||` at the
     start of a row are errors.
-- Multi-paragraph cells have no pipe-table form yet (open, §10.8).
+- Paragraphs without Markdown form (§6 round 3). `<p/>` has one meaning: it
+  starts a paragraph; `<p style="Name"/>` starts one in style Name. Single
+  tags: no `</p>`, no other attribute; no `<div>` in a cell or for an empty
+  paragraph.
+  - Empty paragraph: a line holding only `<p/>` or `<p style="Name"/>` is a
+    paragraph with no text. Each is its own line, identical ones included:
+    consecutive ones are consecutive lines, and canonical form keeps them so;
+    a blank line separates the group from other blocks. A blank line or a
+    `<br/>` line is not an empty paragraph.
+  - Multi-paragraph cell: tables stay pipe tables, one line per row. The
+    cell's text starts its first paragraph and each `<p/>` starts another:
+    `| 부산 | 해운대 1곳<p/>서면 1곳 |`. A tag written first in a cell starts
+    the first paragraph itself, so a cell that begins with
+    `<p style="Name"/>` has its first paragraph in that style (canonical form
+    drops a leading plain `<p/>`). `<br/>` is a line break inside one
+    paragraph, not a new paragraph. A merged cell's paragraphs are all in its
+    top-left cell; covered cells hold only `^^` or `||`.
+  - So `<p/><p/>` in a cell gives an empty paragraph there: `a<p/><p/>b` is
+    `a`, an empty paragraph, `b`; `a<p/>` ends with one. Not tested: round 3
+    tested the two rules apart and never an empty paragraph inside a cell,
+    and its kit's scorer still rejects one (`empty_cell_para`) and a `<p/>`
+    line in `cellpara` units (`p_outside_cell`); the kit must be aligned
+    before the next round.
 - Table style (§6 round 2): a `{style="Name"}` line directly before the
   header row, no blank line between; the braces hold only `style="Name"`;
   nothing closes the table. A pipe table without the line has the default
@@ -386,6 +412,37 @@ wrapper vs B `{style="Name"}` line.
   size only — −10% (Opus), −24% (Sonnet without one outlier edit that makes
   its total +14%); unstyling a table is one line in B, two in A.
 
+**Round 3 results (2026-09-28)** — kit in [fluency/round3/](fluency/round3/),
+details in [fluency/round3/RESULTS.md](fluency/round3/RESULTS.md). Same two
+models, 12 blind units each (2 decisions × A/B × 3 Korean seeds × 5 tasks), no
+tools, one fix round. It decides §10.8 on seeds of 3,023–3,408 chars with
+11–15 multi-paragraph cells or 25–33 empty paragraphs, identical runs of
+empty paragraphs where an edit must hit one, structural cell edits (split,
+join, move, restyle, merge cell paragraphs), exactly scored writes and one
+refusal per unit. Multi-paragraph cells: A `<p/>` / `<p style="Name"/>` inside
+pipe cells vs B a `{list-table}` with indented cell lines. Empty paragraphs:
+A a `<p/>` / `<p style="Name"/>` line vs B a `<div></div>` /
+`<div style="Name"></div>` line.
+
+| Decision | Opus valid A / B | Sonnet valid A / B | Opus chars A / B | Sonnet chars A / B | Verdict |
+|---|---|---|---|---|---|
+| Multi-paragraph cells | 15 / 10 | 14 / 15 | 2,875 / 3,574 | 3,402 / 3,920 | A: `<p/>` in pipe cells |
+| Empty paragraphs | 15 / 15 | 15 / 15 | 3,148 / 3,770 | 3,930 / 4,627 | A: `<p/>` lines (tie, size) |
+
+- Valid is of 15 per cell, first try; every valid answer landed. Cells: A
+  29/30, B 25/30; all 6 invalid answers were valid and landed after one
+  validator error. All 24 refusal answers refused; no CSS, invented attribute
+  or invented style.
+- Failures: Opus quoted list-table lines two spaces too deep in every B
+  `old` of two units (`edit_no_match`, 5 misses; its `new` text was right),
+  Sonnet once wrote a span to the last column as `|| |` (an extra cell), and
+  nothing failed on the identity tasks (no ambiguous `old` or wrong count in
+  runs of up to seven identical empty paragraphs).
+- Cells: A, on B's indentation misses and size (B +15–24%; one new cell
+  paragraph turns a pipe table into a list table, 4× the edit). Empty
+  paragraphs: A, on size alone (B +18–21%). The two A rules were tested apart;
+  §5.2 unifies them untested.
+
 ## 7. Engines (surveyed 2026-09-28)
 
 Engines work only at import, export and preview. Every engine is behind this
@@ -467,24 +524,25 @@ v0.7.3; "lossless … regarding content", not formatting).
 7. ~~How a table style attaches to a pipe table~~ — decided by §6 round 2:
    `{style="Name"}` line before the pipe table (§5.2); a narrow, size-only
    win.
-8. A syntax for **multi-paragraph table cells** and **empty paragraphs**. In
-   the remainder prototype 12 of 29 tables could not be pipe tables (9 for
-   multi-paragraph cells; the others use `gridBefore`/`gridAfter`, a nested
-   table, or a row-level content control) and fell back to an uneditable block
-   placeholder. Empty paragraphs have no Markdown form (the prototype wrote
-   `<div style="Normal"></div>`); they are common, and they are where
-   identity-by-diff fails. A fluency round decides.
+8. ~~A syntax for multi-paragraph table cells and empty paragraphs~~ —
+   decided by §6 round 3: `<p/>` paragraph starts in pipe cells and `<p/>`
+   lines for empty paragraphs (§5.2). An empty paragraph inside a cell
+   (`<p/><p/>`) follows from the two, untested. Still open: the table shapes
+   round 3 did not cover — `gridBefore`/`gridAfter`, nested tables and
+   row-level content controls (3 of the prototype's 29 tables) still fall
+   back to an uneditable block placeholder.
 
 ## 11. Blind spots
 
 - No library above has been opened in real Office or Hancom by this project;
   every defect and fidelity statement comes from project docs and issue
   trackers.
-- The fluency list in §6 is still mostly a model's self-report: two rounds
-  ran on two Claude models only, 15 tasks per cell. Round 1 hit the ceiling;
-  round 2's harder tasks produced a few failures on Sonnet (the invalid ones
-  fixed in one round; the 2×2 merge was valid but wrong) and one on Opus.
-  GPT, Gemini and Haiku are still untested.
+- The fluency list in §6 is still mostly a model's self-report: three rounds
+  ran on two Claude models only, 12–15 tasks per cell, one run per prompt.
+  Round 1 hit the ceiling; rounds 2 and 3 produced a few failures (Sonnet's
+  merge markers in both; Opus's list-table indentation in round 3), every
+  invalid one fixed in one round; one, round 2's 2×2 merge, was valid but
+  wrong. GPT, Gemini and Haiku are still untested.
 - The 90% fidelity target is not yet a defined metric beyond "per-page SSIM
   against the native app's PDF"; the threshold per page and per corpus is
   unset.
