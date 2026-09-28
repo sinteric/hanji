@@ -95,6 +95,13 @@ struct Line<'a> {
     next: usize,
 }
 
+impl Line<'_> {
+    /// Bytes of leading whitespace.
+    fn indent(&self) -> usize {
+        self.text.len() - self.text.trim_start().len()
+    }
+}
+
 fn split_lines(text: &str) -> Vec<Line<'_>> {
     let mut out = vec![];
     let mut at = 0;
@@ -256,8 +263,7 @@ impl<'a> Parser<'a> {
             Some((b, BlockMap { start: at, end: next, kind: BlockMapKind::Para(ParaMap { units, mark }) }, i + 1))
         };
         if trimmed == "<pagebreak/>" || trimmed == "<pagebreak />" {
-            let lead = text.len() - text.trim_start().len();
-            return para(Block::PageBreak, vec![at + lead]);
+            return para(Block::PageBreak, vec![at + line.indent()]);
         }
         if trimmed.starts_with("<p") && trimmed[2..].starts_with(['/', ' ', '>']) || trimmed.starts_with("</p") {
             return self.empty_para(i).and_then(|p| para(Block::Para(p), vec![]));
@@ -302,14 +308,13 @@ impl<'a> Parser<'a> {
     /// A line holding only `<p/>` or `<p style="Name"/>`: an empty paragraph.
     fn empty_para(&mut self, i: usize) -> Option<Para> {
         let line = &self.lines[i];
-        let lead = line.text.len() - line.text.trim_start().len();
+        let lead = line.indent();
         let src = chars_of(line, lead);
         let tag = parse_tag(&src, 0).filter(|t| src[t.1..].iter().all(|c| c.2.is_whitespace()));
         let tag = match tag {
             Some((t, _)) if t.name == "p" && t.self_closing && !t.closing => t,
             Some((t, _)) if t.name == "p" => {
                 self.err(i, lead + 1, P_FORM);
-                let _ = t;
                 return None;
             }
             _ => {
@@ -386,20 +391,20 @@ impl<'a> Parser<'a> {
         } else if looks_like_css(&v) {
             self.err(i, col, format!("style=\"{v}\" is direct formatting. Formatting is by style name only: style holds exactly one {kind} style name."));
         }
-        (tag.attrs.iter().filter(|a| a.0 != "style").count() == 0).then_some(v)
+        tag.attrs.iter().all(|a| a.0 == "style").then_some(v)
     }
 
     fn styled_table(&mut self, i: usize) -> Option<(Block, BlockMap, usize)> {
         let line = &self.lines[i];
         let (at, trimmed) = (line.at, line.text.trim());
         let form = "A table style line is exactly {style=\"Name\"}, directly before the header row of the table.";
-        let lead = line.text.len() - line.text.trim_start().len();
+        let lead = line.indent();
         if !trimmed.ends_with('}') {
             self.err(i, lead + 1, format!("{form} The braces hold only style=\"Name\"."));
             return Some((Block::PageBreak, dummy(at), i + 1));
         }
         // Reuse the tag attribute parser on `{…}` by treating the braces as a tag.
-        let src = chars_of(line, lead);
+        let src = chars_of(&Line { text: line.text.trim_end(), ..*line }, lead);
         let inner: Vec<Src> = src[1..src.len() - 1].to_vec();
         let attrs = parse_attrs(&inner);
         let style = match attrs {
@@ -545,7 +550,7 @@ impl<'a> Parser<'a> {
 
     fn split_row(&mut self, k: usize) -> Option<Vec<RawCell>> {
         let line = &self.lines[k];
-        let lead = line.text.len() - line.text.trim_start().len();
+        let lead = line.indent();
         let body = line.text.trim_end();
         let src = chars_of(&Line { text: body, at: line.at, end: line.end, next: line.next }, lead);
         let n = src.len();
@@ -766,7 +771,7 @@ impl<'a> Parser<'a> {
                                 fail!(x, "a <p/> cannot be inside a link or a field.");
                             }
                             if let Some(m) = Marks::ALL.into_iter().find(|&m| st.marks.has(m)) {
-                                let d = if m == Marks::UNDERLINE { "</u>" } else { delim(m) };
+                                let d = closer(m);
                                 fail!(x, "close {m} with {d} before <p/>: each paragraph of a cell carries its own emphasis.");
                             }
                             let style = if tag.attrs.is_empty() { None } else { Some(self.style_attr(line, &tag, "p", "paragraph")?) };
@@ -801,8 +806,7 @@ impl<'a> Parser<'a> {
         }
         for m in Marks::ALL {
             if st.marks.has(m) {
-                let d = delim(m);
-                let close = if m == Marks::UNDERLINE { "</u>".to_string() } else { d.to_string() };
+                let close = closer(m);
                 self.err(line, st.opened[mark_index(m)], format!("{m} opened here is never closed. Close it with {close} before the end of the line; a closing {close} follows text directly, not a space."));
                 return None;
             }
@@ -879,9 +883,9 @@ impl<'a> Parser<'a> {
     // ------------------------------------------------------------ cross-checks
 
     fn check_names_after(&mut self) {
+        let mut errs = vec![];
         if let Some(known) = &self.names.keeps {
             let mut seen: Vec<&str> = vec![];
-            let mut errs = vec![];
             for (line, col, k) in &self.keeps {
                 match known.iter().find(|x| x.id == k.id) {
                     None => errs.push((*line, *col, format!("placeholder id=\"{}\" is not in this file. Placeholders come from the file: keep, move or delete them, but never create one.", k.id))),
@@ -896,11 +900,7 @@ impl<'a> Parser<'a> {
                 }
                 seen.push(&k.id);
             }
-            for (l, c, m) in errs {
-                self.errors.push(Diagnostic { line: l + 1, col: c, message: m });
-            }
         }
-        let mut errs = vec![];
         for (line, col, label) in &self.refs {
             if !self.defs.iter().any(|d| &d.2 == label) {
                 errs.push((
@@ -999,6 +999,15 @@ impl InlineState {
 
 fn dummy(at: usize) -> BlockMap {
     BlockMap { start: at, end: at, kind: BlockMapKind::Para(ParaMap::default()) }
+}
+
+/// The text that closes mark `m`.
+pub(crate) fn closer(m: Marks) -> &'static str {
+    if m == Marks::UNDERLINE {
+        "</u>"
+    } else {
+        delim(m)
+    }
 }
 
 pub(crate) fn delim(m: Marks) -> &'static str {
@@ -1279,7 +1288,7 @@ fn covers_left(rows: &[Vec<Cell>], r: usize, c: usize) -> bool {
 
 /// First cell whose merged area is not a rectangle, as the fluency validator
 /// defines it: covered cells point at their origin through ^^ and ||.
-fn merge_problem(rows: &[Vec<Cell>]) -> Option<(usize, usize)> {
+pub fn merge_problem(rows: &[Vec<Cell>]) -> Option<(usize, usize)> {
     let h = rows.len();
     let w = rows.first().map_or(0, Vec::len);
     let mut origin = vec![vec![(0, 0); w]; h];

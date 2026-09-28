@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use hanji_core::diff::{span_ops, Op};
 use hanji_core::place::{self, Alignment, Outcome, Status};
 use hanji_core::{Block, Capabilities, Engine, Entry, ImportOptions, Kind, Para, Path, Remainder};
-use hanji_docx::{export_document, package, xml, DocxEngine};
+use hanji_docx::{export_document, package, write_package, xml, DocxEngine};
 use hanji_format::{Atom, Cell, Inline, Marks, Unit};
 
 const CAPS: Capabilities = Capabilities { links: false, fields: false, footnotes: false, math: false };
@@ -962,7 +962,6 @@ fn normalise_ids(s: &str) -> String {
 
 fn export_and_check(
     name: &str,
-    bytes: &[u8],
     d: &Doc,
     rem: &Remainder,
     new_text: &str,
@@ -977,17 +976,10 @@ fn export_and_check(
     let r2 = Remainder { entries, next_id: next, ..rem.clone() };
     let docxml = export_document(new_blocks, &r2).unwrap_or_else(|e| panic!("{name} {out_name}: {e}"));
     let well_formed = xml::parse(&docxml).is_ok();
-    let mut parts = rem.parts.clone();
-    for p in &mut parts {
-        if p.name == "word/document.xml" {
-            p.data = docxml.clone();
-        }
-    }
-    let pkg = package::write(&parts).unwrap();
+    let pkg = write_package(rem, docxml).unwrap();
     save(name, out_name, &pkg);
     let (rb, rr, _, _) = DocxEngine::split(&pkg, &ImportOptions { neutralise: false, template: None }).unwrap();
     let re_text = text_of(&rb, &rr);
-    let _ = bytes;
     let tally = score(d, expected, got, &rr.entries, touched);
     Run {
         tally,
@@ -1122,7 +1114,6 @@ fn corpus_getput_putget_remainder() {
             for (design, r) in designs {
                 let run = export_and_check(
                     name,
-                    bytes,
                     &d,
                     &rem,
                     &new_text,
@@ -1250,7 +1241,7 @@ fn neutralised_import_keeps_getput_for_the_rest() {
     for (name, bytes) in corpus() {
         let imp = DocxEngine.import(&bytes, &ImportOptions::default()).unwrap();
         let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
-        let (_, rem2, report2, _) = DocxEngine::split(&out, &ImportOptions::default()).unwrap();
+        let (_, _, report2, _) = DocxEngine::split(&out, &ImportOptions::default()).unwrap();
         assert!(
             report2.neutralised.is_empty(),
             "{name}: a second import still finds active content: {:?}",
@@ -1258,6 +1249,5 @@ fn neutralised_import_keeps_getput_for_the_rest() {
         );
         let again = DocxEngine.import(&out, &ImportOptions::default()).unwrap();
         assert_eq!(again.text, imp.text, "{name}");
-        let _ = rem2;
     }
 }

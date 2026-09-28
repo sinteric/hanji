@@ -550,4 +550,6 @@ fn table_style_line_sits_on_the_header_row() {
     assert_eq!(roundtrip(&ok), ok);
     let e = errors("{style=\"Grid Table 4\"}\n\n| a |\n|---|\n");
     assert!(e[0].contains("directly followed by the header row"), "{e:?}");
+    // Trailing whitespace on the style line is not part of it.
+    assert_eq!(roundtrip(&doc("{style=\"Grid Table 4\"}  \n| a |\n|---|\n")), ok);
 }

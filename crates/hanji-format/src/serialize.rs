@@ -3,7 +3,7 @@
 //! escapes only where the parser would otherwise misread a character.
 
 use crate::ast::*;
-use crate::parse::delim;
+use crate::parse::{closer, delim};
 
 pub fn serialize(doc: &Document) -> String {
     let f = &doc.front;
@@ -217,14 +217,6 @@ impl Out {
             self.bare_tilde = Some(self.s.len());
             self.s.push('~');
         }
-    }
-}
-
-fn closer(m: Marks) -> &'static str {
-    if m == Marks::UNDERLINE {
-        "</u>"
-    } else {
-        delim(m)
     }
 }
 

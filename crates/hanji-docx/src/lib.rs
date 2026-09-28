@@ -92,17 +92,8 @@ impl DocxEngine {
             body_open: open_tag(body),
             after_body: xml::write_nodes(&root.children[body_at + 1..]),
         };
-        let namespaces = root
-            .attrs
-            .iter()
-            .filter_map(|(k, v)| {
-                if k == "xmlns" {
-                    Some((String::new(), v.clone()))
-                } else {
-                    k.strip_prefix("xmlns:").map(|p| (p.to_string(), v.clone()))
-                }
-            })
-            .collect();
+        let namespaces =
+            root.attrs.iter().filter_map(|(k, v)| xml::ns_prefix(k).map(|p| (p.to_string(), v.clone()))).collect();
         for p in &mut parts {
             if p.name == DOC_PART {
                 p.data.clear();
@@ -156,15 +147,17 @@ impl Engine for DocxEngine {
 
     fn export(&self, text: &str, rem: &Remainder) -> Result<Vec<u8>, EngineError> {
         let (_, blocks) = hanji_core::model_of(text, rem, self.capabilities()).map_err(EngineError::Invalid)?;
-        let doc = export_document(&blocks, rem)?;
-        let mut parts = rem.parts.clone();
-        for p in &mut parts {
-            if p.name == DOC_PART {
-                p.data = doc.clone();
-            }
-        }
-        package::write(&parts).map_err(EngineError::Package)
+        write_package(rem, export_document(&blocks, rem)?)
     }
+}
+
+/// The package: `rem`'s parts, with `document` as `word/document.xml`.
+pub fn write_package(rem: &Remainder, document: Vec<u8>) -> Result<Vec<u8>, EngineError> {
+    let mut parts = rem.parts.clone();
+    if let Some(p) = parts.iter_mut().find(|p| p.name == DOC_PART) {
+        p.data = document;
+    }
+    package::write(&parts).map_err(EngineError::Package)
 }
 
 /// `document.xml` for resolved blocks placed against `rem`.

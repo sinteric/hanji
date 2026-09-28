@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use hanji_format::{Cell, Inline};
 
 use crate::diff::{self, Op, Tag};
-use crate::model::{content_at, keys, paras, Block, Path};
+use crate::model::{keys, paras, Block, Path};
 use crate::remainder::{Entry, Kind};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -26,6 +26,12 @@ pub struct Outcome {
     pub status: Status,
     /// Paragraph properties of a split or joined paragraph: no single right answer.
     pub lenient: bool,
+}
+
+impl From<Status> for Outcome {
+    fn from(status: Status) -> Outcome {
+        Outcome { status, lenient: false }
+    }
 }
 
 impl Outcome {
@@ -54,6 +60,15 @@ fn cell_keys(cell: &Cell, out: &mut Vec<u32>) {
     }
 }
 
+fn row_keys(row: &[Cell], out: &mut Vec<u32>) {
+    for (c, cell) in row.iter().enumerate() {
+        if c > 0 {
+            out.push(2);
+        }
+        cell_keys(cell, out);
+    }
+}
+
 fn content(b: &Block) -> Vec<u32> {
     match b {
         Block::Para(p) => keys(&p.content),
@@ -63,12 +78,7 @@ fn content(b: &Block) -> Vec<u32> {
                 if r > 0 {
                     out.push(1);
                 }
-                for (c, cell) in row.iter().enumerate() {
-                    if c > 0 {
-                        out.push(2);
-                    }
-                    cell_keys(cell, &mut out);
-                }
+                row_keys(row, &mut out);
             }
             out
         }
@@ -76,7 +86,7 @@ fn content(b: &Block) -> Vec<u32> {
     }
 }
 
-fn same_kind(a: &Block, b: &Block) -> bool {
+pub(crate) fn same_kind(a: &Block, b: &Block) -> bool {
     matches!((a, b), (Block::Para(_), Block::Para(_)) | (Block::Table(_), Block::Table(_)))
 }
 
@@ -240,12 +250,7 @@ fn cell_map(ot: &[Vec<Cell>], nt: &[Vec<Cell>]) -> CellMap {
     }
     let sig = |row: &Vec<Cell>| -> Vec<u32> {
         let mut out = vec![];
-        for (c, cell) in row.iter().enumerate() {
-            if c > 0 {
-                out.push(2);
-            }
-            cell_keys(cell, &mut out);
-        }
+        row_keys(row, &mut out);
         out
     };
     let os: Vec<Vec<u32>> = ot.iter().map(sig).collect();
@@ -432,7 +437,6 @@ pub struct Placer<'a> {
     owners: HashMap<(Path, Path), Vec<Option<u64>>>,
 }
 
-/// Place every entry of `entries` (anchored to `old`) against `new`.
 fn top_paras<'b>(blocks: &'b [Block], same: &HashSet<usize>) -> Vec<(Path, &'b Inline)> {
     blocks
         .iter()
@@ -444,6 +448,7 @@ fn top_paras<'b>(blocks: &'b [Block], same: &HashSet<usize>) -> Vec<(Path, &'b I
         .collect()
 }
 
+/// Place every entry of `entries` (anchored to `old`) against `new`.
 pub fn place(old: &[Block], new: &[Block], entries: &[Entry], al: &Alignment) -> HashMap<u64, Outcome> {
     let mut by_path: HashMap<Path, Vec<&Entry>> = HashMap::new();
     for e in entries {
@@ -460,15 +465,11 @@ impl<'a> Placer<'a> {
         if self.handled.contains(&e.id) && self.out.contains_key(&e.id) {
             return;
         }
-        self.out.insert(e.id, Outcome { status, lenient: false });
+        self.out.insert(e.id, status.into());
     }
 
     fn put(&mut self, e: &Entry, path: Path, start: Option<usize>, end: Option<usize>) {
-        let mut x = e.clone();
-        x.path = path;
-        x.start = start;
-        x.end = end;
-        self.set(e, Status::Placed { entry: x, pieces: vec![] });
+        self.set(e, Status::Placed { entry: moved(e, path, start, end), pieces: vec![] });
     }
 
     fn entries_at(&self, path: &Path) -> Vec<&'a Entry> {
@@ -481,18 +482,13 @@ impl<'a> Placer<'a> {
 
     /// A durable marker whose paragraph is gone moves to the next surviving block.
     fn relocate(&mut self, e: &Entry, i: usize) {
-        let mut x = e.clone();
-        x.start = None;
-        x.end = None;
+        let mut x = moved(e, vec![], None, None);
         match self.next_surviving(i) {
             Some(j) => {
                 x.kind = Kind::Bmarker;
                 x.path = vec![j];
             }
-            None => {
-                x.kind = Kind::Tail;
-                x.path = vec![];
-            }
+            None => x.kind = Kind::Tail,
         }
         self.set(e, Status::Placed { entry: x, pieces: vec![] });
     }
@@ -555,8 +551,9 @@ impl<'a> Placer<'a> {
                 _ => self.deleted_block(i),
             }
         }
-        for p in self.al.lenient.clone() {
-            for e in self.entries_at(&p) {
+        let al = self.al;
+        for p in &al.lenient {
+            for e in self.entries_at(p) {
                 if e.kind == Kind::Ppr {
                     if let Some(o) = self.out.get_mut(&e.id) {
                         o.lenient = true;
@@ -570,13 +567,15 @@ impl<'a> Placer<'a> {
     /// every identical block carries the same entries (then any pairing is right).
     fn refuse_ambiguous(&mut self) {
         type Sig = Vec<(Kind, String, Vec<usize>, Option<usize>, Option<usize>)>;
+        // Entries that make one of the identical blocks different from the others.
+        let carried = |e: &Entry, i: usize| {
+            e.path.first() == Some(&i) && !e.fp.is_empty() && !matches!(e.kind, Kind::Keep | Kind::Bkeep)
+        };
         let sig = |p: &Placer, i: usize| -> Sig {
             let mut v: Vec<_> = p
                 .entries
                 .iter()
-                .filter(|e| {
-                    e.path.first() == Some(&i) && !e.fp.is_empty() && !matches!(e.kind, Kind::Keep | Kind::Bkeep)
-                })
+                .filter(|e| carried(e, i))
                 .map(|e| (e.kind, e.fp.clone(), e.path[1..].to_vec(), e.start, e.end))
                 .collect();
             v.sort();
@@ -591,12 +590,10 @@ impl<'a> Placer<'a> {
                 continue;
             }
             let n = twins.len() + 1;
-            for e in self.entries.iter().filter(|e| {
-                e.path.first() == Some(&i) && !e.fp.is_empty() && !matches!(e.kind, Kind::Keep | Kind::Bkeep)
-            }) {
+            for e in self.entries.iter().filter(|e| carried(e, i)) {
                 self.handled.insert(e.id);
                 let why = format!("its block is one of {n} identical blocks, and the text does not say which one went where; use an exact edit");
-                self.out.insert(e.id, Outcome { status: Status::Refused(why), lenient: false });
+                self.out.insert(e.id, Status::Refused(why).into());
             }
         }
     }
@@ -894,10 +891,7 @@ impl<'a> Placer<'a> {
                     Kind::Wrap => {
                         let ((a, s2), (b, e2)) = (mp(s, true), mp(en, false));
                         let o = if a != b {
-                            Outcome {
-                                status: Status::Refused("a wrapper cannot span two paragraphs".into()),
-                                lenient: false,
-                            }
+                            Status::Refused("a wrapper cannot span two paragraphs".into()).into()
                         } else {
                             placed(e, a, s2, e2)
                         };
@@ -962,12 +956,12 @@ impl<'a> Placer<'a> {
                 }
             }
         }
-        for path in old.order.clone() {
-            let (b, n) = (old.base[&path], old.lens[&path]);
+        for path in &old.order {
+            let (b, n) = (old.base[path], old.lens[path]);
             if !survived[b..b + n].iter().any(|&x| x) {
                 continue; // wholly deleted (or moved unchanged): the per-block rules apply
             }
-            for e in self.offset_entries(&path) {
+            for e in self.offset_entries(path) {
                 if !self.handled.insert(e.id) {
                     continue; // already placed by a wider map
                 }
@@ -983,26 +977,19 @@ impl<'a> Placer<'a> {
                         match (a, z) {
                             (Some(a), Some(z)) if a.0 == z.0 => {
                                 if en > s && z.1 <= a.1 {
-                                    Outcome {
-                                        status: Status::Removed("all of its text was deleted".into()),
-                                        lenient: false,
-                                    }
+                                    Status::Removed("all of its text was deleted".into()).into()
                                 } else {
                                     placed(e, a.0, a.1, z.1)
                                 }
                             }
-                            _ => Outcome {
-                                status: Status::Refused("its two ends now fall in different paragraphs".into()),
-                                lenient: false,
-                            },
+                            _ => Status::Refused("its two ends now fall in different paragraphs".into()).into(),
                         }
                     }
                     _ => match new.locate(map_pos(ops, b + s, e.meta.opens)) {
                         Some((p, loc)) => placed(e, p, loc, loc),
                         None => {
-                            let mut x = e.clone();
-                            (x.kind, x.path, x.start, x.end) = (Kind::Tail, vec![], None, None);
-                            Outcome { status: Status::Placed { entry: x, pieces: vec![] }, lenient: false }
+                            let x = Entry { kind: Kind::Tail, ..moved(e, vec![], None, None) };
+                            Status::Placed { entry: x, pieces: vec![] }.into()
                         }
                     },
                 };
@@ -1012,10 +999,13 @@ impl<'a> Placer<'a> {
     }
 }
 
+/// `e` re-anchored at `path`.
+fn moved(e: &Entry, path: Path, start: Option<usize>, end: Option<usize>) -> Entry {
+    Entry { path, start, end, ..e.clone() }
+}
+
 fn placed(e: &Entry, path: Path, s: usize, en: usize) -> Outcome {
-    let mut x = e.clone();
-    (x.path, x.start, x.end) = (path, Some(s), Some(en));
-    Outcome { status: Status::Placed { entry: x, pieces: vec![] }, lenient: false }
+    Status::Placed { entry: moved(e, path, Some(s), Some(en)), pieces: vec![] }.into()
 }
 
 /// The new revision's entries: placed entries, runs split into pieces with
@@ -1029,8 +1019,7 @@ pub fn placed_entries(entries: &[Entry], outcomes: &HashMap<u64, Outcome>, next_
             continue;
         }
         for (k, (path, s, en)) in pieces.iter().enumerate() {
-            let mut x = entry.clone();
-            (x.path, x.start, x.end) = (path.clone(), Some(*s), Some(*en));
+            let mut x = moved(entry, path.clone(), Some(*s), Some(*en));
             if k > 0 {
                 x.id = *next_id;
                 *next_id += 1;
@@ -1040,9 +1029,4 @@ pub fn placed_entries(entries: &[Entry], outcomes: &HashMap<u64, Outcome>, next_
         }
     }
     out
-}
-
-/// Content at `path` in `blocks`, for engines.
-pub fn content_of<'b>(blocks: &'b [Block], path: &[usize]) -> Option<&'b Inline> {
-    content_at(blocks, path)
 }

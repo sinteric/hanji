@@ -134,6 +134,16 @@ pub const TCPR_ORDER: &[&str] = &[
     "hideMark",
 ];
 
+/// `w:gridSpan` of a cell (1 when absent).
+pub fn grid_span(tcpr: Option<&Element>) -> usize {
+    tcpr.and_then(|t| t.child("w:gridSpan")).and_then(|g| g.get("w:val")).and_then(|v| v.parse().ok()).unwrap_or(1)
+}
+
+/// A `w:vMerge` cell other than `restart`: covered by the cell above.
+pub fn v_merged(tcpr: Option<&Element>) -> bool {
+    tcpr.and_then(|t| t.child("w:vMerge")).is_some_and(|v| v.get("w:val").as_deref() != Some("restart"))
+}
+
 /// Insert `el` among `parent`'s children following `order` (by local name).
 pub fn insert_ordered(parent: &mut Element, el: Element, order: &[&str]) {
     let rank = |e: &Element| order.iter().position(|x| *x == e.local());
