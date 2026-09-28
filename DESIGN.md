@@ -62,7 +62,7 @@ Found while testing the rules, and adopted:
    text as a placeholder the model keeps; deleting one is an explicit act.
 9. **Preserved content can be unsafe.** Active and remote content is
    neutralised on import; hidden content is surfaced before export (§8).
-10. **Format scope is decided up front.** Proposed, not yet ruled — in: docx,
+10. **Format scope is decided up front.** Ruled 2026-09-28 — in: docx,
     pptx, xlsx, hwp/hwpx; later or out: odt/odp/ods, legacy binary
     doc/xls/ppt, Google formats (reachable by exporting them to OOXML).
 11. **Large files need partial views** — a 100-page Document or a 100k-row
@@ -502,7 +502,9 @@ v0.7.3; "lossless … regarding content", not formatting).
    decided by §6 round 1: `style="Name"`, `^^`/`||` markers, Slidev-style
    (§5.2, §5.3, §6).
 2. Whether model edits reach the exported file as **tracked changes**
-   (reviewable in Word/Hancom) or as direct changes.
+   (reviewable in Word/Hancom) or as direct changes. Next: a spike on whether
+   rdocx and rhwp write insertions/deletions that open cleanly, after the docx
+   GetPut tests pass (tracked changes stay read-only until then, §5.2).
 3. ~~The remainder's storage shape and anchor granularity (block, run range,
    shape, cell range)~~ — decided by
    [prototype/remainder/REMAINDER.md](prototype/remainder/REMAINDER.md): a flat
@@ -519,8 +521,12 @@ v0.7.3; "lossless … regarding content", not formatting).
    a wasm client; every engine is chosen and tested for both targets.
    rhwp, rdocx, rpptx and rust_xlsxwriter all build to wasm; risk for the
    client target: rdocx-wasm is unpublished.
-5. Header/footer and section text: when to expose.
+5. ~~Header/footer and section text: when to expose~~ — deferred
+   2026-09-28: header, footer and section text stay in the template or
+   remainder (§5.2) until a corpus shows edits need them.
 6. Spreadsheet cell-data operations: API shape and the compressed read view.
+   Next: a fluency round over two or three API shapes, after the Document
+   type works end to end.
 7. ~~How a table style attaches to a pipe table~~ — decided by §6 round 2:
    `{style="Name"}` line before the pipe table (§5.2); a narrow, size-only
    win.
@@ -530,13 +536,16 @@ v0.7.3; "lossless … regarding content", not formatting).
    (`<p/><p/>`) follows from the two, untested. Still open: the table shapes
    round 3 did not cover — `gridBefore`/`gridAfter`, nested tables and
    row-level content controls (3 of the prototype's 29 tables) still fall
-   back to an uneditable block placeholder.
+   back to an uneditable block placeholder. Next: a survey of real openly
+   licensed files to see how often these shapes occur, before a syntax is
+   designed.
 
 ## 11. Blind spots
 
 - No library above has been opened in real Office or Hancom by this project;
   every defect and fidelity statement comes from project docs and issue
-  trackers.
+  trackers. This check is deliberately deferred until the build produces
+  exports (2026-09-28).
 - The fluency list in §6 is still mostly a model's self-report: three rounds
   ran on two Claude models only, 12–15 tasks per cell, one run per prompt.
   Round 1 hit the ceiling; rounds 2 and 3 produced a few failures (Sonnet's
