@@ -1,7 +1,7 @@
 ---
 status: draft
 date: 2026-09-29
-measured: library and project facts below were checked 2026-09-28/29 against crates.io, npm, PyPI, GitHub and project docs; the §5 syntax choices were measured by fluency rounds 1–3 (2026-09-28, two Claude models); the remainder anchoring (§10.3) by the remainder prototype (2026-09-28, 13 docx); nothing here has yet been opened in real Office by this project
+measured: library and project facts below were checked 2026-09-28/29 against crates.io, npm, PyPI, GitHub and project docs; the §5 syntax choices were measured by fluency rounds 1–4 (2026-09-28, two Claude models); the remainder anchoring (§10.3) by the remainder prototype (2026-09-28, 13 docx); nothing here has yet been opened in real Office by this project
 ---
 
 # hanji — office documents for LLM agents (design)
@@ -322,9 +322,24 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
   </sheet>
   ```
 
-- **Cell data** is read through a compressed range view (SpreadsheetLLM-style
-  structural anchors) and written by range operations or code. The model never
-  types bulk rows.
+- **Cell data** is read through a row window of one table or range: a pipe
+  table whose first column is the read-only sheet row number, then one cell
+  per column with the value as displayed (`12,000,000`, `00417`), blank rows
+  included. A large sheet is read one window at a time (rule 11); the whole
+  sheet is never assumed to fit.
+- Cell data is written by **range operations**: a JSON list of ops from a
+  closed set, applied in order — `set`, `append_rows`, `insert_rows`,
+  `delete_rows`, `fill_formula`, `set_type`, `add_column`, `sort`,
+  `add_table`, `add_sheet`. The model never types bulk rows.
+
+  ```json
+  [{"op": "set", "range": "매출!B73", "values": [[18420000]]},
+   {"op": "append_rows", "table": "Sales", "rows": [{"월": "2026-08", "매출": 12400000}]}]
+  ```
+
+- The compressed view (SpreadsheetLLM-style anchors and a value index) is not
+  the default: it is retested on large sheets as a later option for overview
+  reads (§6 round 4).
 - Formulas use Excel structured references (`Table[Column]`, `[@Column]`) —
   the formula dialect models already know.
 - Formula results are computed by an engine before export (§7), so viewers
@@ -443,6 +458,43 @@ A a `<p/>` / `<p style="Name"/>` line vs B a `<div></div>` /
   paragraphs: A, on size alone (B +18–21%). The two A rules were tested apart;
   §5.2 unifies them untested.
 
+**Round 4 results (2026-09-28)** — kit in [fluency/round4/](fluency/round4/),
+details in [fluency/round4/RESULTS.md](fluency/round4/RESULTS.md). Same two
+models, 15 blind units each, no tools, one fix round. It decides §10.6 on three
+generated Korean workbooks (150–190 data rows over 3 sheets) with
+near-duplicate rows, leading-zero IDs in a number column, subtotal and blank
+rows, and one refusal per write unit. Read view (3 workbooks × 5 questions):
+A a plain window (pipe table, leading `row` column, values as displayed) vs
+B a compressed index (SheetCompressor-style anchors, per column an inverted
+index of values to rows). Write shape (3 workbooks × 6 tasks, cells read
+through view A): A range operations vs B editable range text (`{old, new}`
+edits on the window, row labels read-only) vs C Python against a small
+workbook API in a sandbox.
+
+| Decision | Opus landed A / B / C | Sonnet landed A / B / C | Opus chars A / B / C | Sonnet chars A / B / C | Verdict |
+|---|---|---|---|---|---|
+| Read view | 15 / 15 / – | 15 / 14 / – | 35,929 / 30,988 / – (input) | 35,929 / 30,988 / – (input) | A: plain window |
+| Write shape | 18 / 18 / 18 | 18 / 15 / 16 | 3,897 / 3,869 / 3,417 | 3,995 / 4,114 / 3,770 | A: range operations |
+
+- Landed is first try, of 15 per read cell and 18 per write cell. Opus
+  84/84; Sonnet 78/84, and 83/84 after one fix round: its five invalid
+  answers (write B 3, C 2) were fixed and landed. All 18 refusal answers
+  refused with the right rule. Sonnet's first write-shape run is void — its
+  nine prompts over 20,000 chars reached it as a file path, not text, so it
+  refused every task — and was rerun from the prompt files, as Opus had them.
+- Failures: in the compressed view Sonnet found the row and read its value
+  from the neighbouring column's line (15,710,000 for 12,510,000; valid, so
+  silent); in editable text it invented row labels on a new table
+  (`row_labels_edited`, all three new-table tasks); in code it wrote two
+  formulas without `=` (`bad_formula`, one conversation). Nothing failed on
+  near-duplicate rows, leading-zero IDs or A1 formulas.
+- Read view: A. 30/30 vs 29/30 is noise; A is chosen on the kind of error, as
+  B's miss is a plausible wrong figure no validator catches. B's −14% input
+  (−3% to −22% by workbook) is retested on large sheets. Write shape: A, the
+  only shape with no first-try error on either model (36/36 vs B 33/36, C
+  34/36; within noise). C is the runner-up and 6–12% smaller (Sonnet / Opus);
+  B is no smaller than A (−1% / +3%, Opus / Sonnet).
+
 ## 7. Engines (surveyed 2026-09-28)
 
 Engines work only at import, export and preview. Every engine is behind this
@@ -539,9 +591,9 @@ v0.7.3; "lossless … regarding content", not formatting).
 5. ~~Header/footer and section text: when to expose~~ — deferred
    2026-09-28: header, footer and section text stay in the template or
    remainder (§5.2) until a corpus shows edits need them.
-6. Spreadsheet cell-data operations: API shape and the compressed read view.
-   Next: a fluency round over two or three API shapes, after the Document
-   type works end to end.
+6. ~~Spreadsheet cell-data operations: API shape and the compressed read
+   view~~ — decided by §6 round 4: plain row-window read view and range
+   operations (§5.4); compressed view retested on large sheets later.
 7. ~~How a table style attaches to a pipe table~~ — decided by §6 round 2:
    `{style="Name"}` line before the pipe table (§5.2); a narrow, size-only
    win.
@@ -565,12 +617,16 @@ v0.7.3; "lossless … regarding content", not formatting).
   every defect and fidelity statement comes from project docs and issue
   trackers. This check is deliberately deferred until the build produces
   exports (2026-09-28).
-- The fluency list in §6 is still mostly a model's self-report: three rounds
-  ran on two Claude models only, 12–15 tasks per cell, one run per prompt.
-  Round 1 hit the ceiling; rounds 2 and 3 produced a few failures (Sonnet's
-  merge markers in both; Opus's list-table indentation in round 3), every
-  invalid one fixed in one round; one, round 2's 2×2 merge, was valid but
-  wrong. GPT, Gemini and Haiku are still untested.
+- The fluency list in §6 is still mostly a model's self-report: four rounds
+  ran on two Claude models only, 12–18 tasks per cell, one run per prompt.
+  Round 1 hit the ceiling; rounds 2–4 produced a few failures (Sonnet's merge
+  markers in rounds 2 and 3; Opus's list-table indentation in round 3;
+  Sonnet's new-table row labels and `=`-less formulas in round 4), every
+  invalid one fixed in one round; two, round 2's 2×2 merge and round 4's
+  compressed-view read, were valid but wrong. Round 4 used an in-memory
+  workbook model (`wb.py`), not a real xlsx engine, on workbooks of a few
+  hundred rows (150–190 data rows), not 100k. GPT, Gemini and Haiku are still
+  untested.
 - The 90% fidelity target is not yet a defined metric beyond "per-page SSIM
   against the native app's PDF"; the threshold per page and per corpus is
   unset.
