@@ -60,8 +60,9 @@ pub struct Importer<'a> {
     keep_ids: KeepIds,
     buf: Vec<Unit>,
     stats: Stats,
-    /// Levels of the open text list (a stack of `hh:heading` levels).
-    list: Option<Vec<u32>>,
+    /// The open text list: the list number (numbering or bullet) of its
+    /// items at the margin, and its levels (a stack of `hh:heading` levels).
+    list: Option<(u32, Vec<u32>)>,
     /// Tracked regions open at the end of the last paragraph (mark `Id`s).
     open_tracked: BTreeSet<String>,
     /// Group of the tracked paragraphs of the open region.
@@ -522,20 +523,20 @@ impl<'a> Importer<'a> {
     fn list_item(&mut self, ppr: u32) -> Option<(ListItem, u32, u32)> {
         let (num, lvl) = list_num(self.header.heading(ppr)?)?;
         let ordered = self.header.ordered(num, lvl)?;
-        let (first, level) = match &mut self.list {
-            Some(stack) => {
-                while stack.last().is_some_and(|&t| t >= lvl) {
-                    stack.pop();
-                }
+        // A list is one numbering or bullet at the margin (as a numId is in
+        // docx): an item back at the margin with another one starts a new
+        // list. A nested item may use another one (a bullet under a number).
+        if let Some((margin, stack)) = &mut self.list {
+            while stack.last().is_some_and(|&t| t >= lvl) {
+                stack.pop();
+            }
+            if !stack.is_empty() || *margin == num {
                 stack.push(lvl);
-                (false, stack.len() - 1)
+                return Some((ListItem { ordered, level: stack.len() - 1, first: false }, num, lvl));
             }
-            None => {
-                self.list = Some(vec![lvl]);
-                (true, 0)
-            }
-        };
-        Some((ListItem { ordered, level, first }, num, lvl))
+        }
+        self.list = Some((num, vec![lvl]));
+        Some((ListItem { ordered, level: 0, first: true }, num, lvl))
     }
 
     fn push(&mut self, atom: Atom, marks: Marks) {

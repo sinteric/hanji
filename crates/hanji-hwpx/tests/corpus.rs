@@ -84,3 +84,23 @@ fn neutralised_import_keeps_getput_for_the_rest() {
 fn a_serialized_remainder_exports_the_same_package() {
     hanji_testkit::a_serialized_remainder_exports_the_same_package(&Hwpx, &corpus());
 }
+
+/// A new table at the end of every corpus file exports, reads back as
+/// written, and goes next to the corpus exports for the rhwp check: in a
+/// file with a table it takes that table's layout, in one without, the
+/// default look.
+#[test]
+fn a_new_table_can_be_added_to_every_file() {
+    let out = Out { dir: PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("hwpx-corpus-out"), ext: "hwpx" };
+    let caps = HwpxEngine.capabilities();
+    for (name, pkg) in corpus() {
+        let imp = HwpxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+        let new = format!("{}\n| 새 표 | 값 |\n|---|---|\n| 가 | 1 |\n", imp.text);
+        let r = hanji_core::rewrite(&imp.remainder, &imp.text, &new, caps).unwrap_or_else(|e| panic!("{name}: {e:?}"));
+        let bytes = HwpxEngine.export(&r.text, &r.remainder).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let back = HwpxEngine.import(&bytes, &ImportOptions::default()).unwrap();
+        assert_eq!(back.text, r.text, "{name}: PutGet");
+        out.save(&name, "ORIGINAL", &pkg);
+        out.save(&name, "new-table", &bytes);
+    }
+}
