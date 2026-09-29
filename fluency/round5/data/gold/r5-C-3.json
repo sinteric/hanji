@@ -1,0 +1,70 @@
+{
+ "answers": [
+  {
+   "task_id": "deck3-q1",
+   "text": "ANSWER: title, body"
+  },
+  {
+   "task_id": "deck3-q2",
+   "text": "ANSWER: s9, s10"
+  },
+  {
+   "task_id": "deck3-e1",
+   "edits": [
+    {
+     "old": "::shape id=\"s11\" name=\"주석\" cells=\"B9:G9\"::\n",
+     "new": "::shape id=\"s11\" name=\"주석\" cells=\"B10:G10\"::\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck3-e2",
+   "edits": [
+    {
+     "old": "<keep id=\"k7hqa\" kind=\"picture\" summary=\"logo.png\" cells=\"L1\"/>\n",
+     "new": "<keep id=\"k7hqa\" kind=\"picture\" summary=\"logo.png\" cells=\"K1:L2\"/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck3-e3",
+   "edits": [
+    {
+     "old": "예상 매출\n",
+     "new": "예상 매출\n::shape cells=\"B4:K4\"::\n단위: 억 원 (2027년 계획)\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck3-e4",
+   "edits": []
+  },
+  {
+   "task_id": "deck3-e5",
+   "edits": [
+    {
+     "old": "  - 가격 29만 9천 원\n  - 음성 인식 지원\n",
+     "new": "  - 가격 29만 9천 원\n  - 음성 인식·제스처 지원\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck3-e6",
+   "edits": [
+    {
+     "old": "\n---\n\nlayout: Title Only\n::title cells=\"B2:K3\"::\n예상 매출\n",
+     "new": "\n---\n\nlayout: Comparison\n::title cells=\"B2:K3\"::\n출시 채널 비교\n::body cells=\"B4:F4\"::\n온라인\n::body2 cells=\"B5:F11\"::\n- 자사몰 단독 판매\n- 사전 예약 할인\n::body3 cells=\"G4:K4\"::\n오프라인\n::body4 cells=\"G5:K11\"::\n- 가전 매장 체험존\n- 통신사 대리점\n\n---\n\nlayout: Title Only\n::title cells=\"B2:K3\"::\n예상 매출\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck3-e7",
+   "text": "REFUSE: formatting and the content of kept objects cannot be changed here.",
+   "edits": []
+  },
+  {
+   "task_id": "deck3-w",
+   "text": "---\ntype: presentation\nformat: pptx\ntemplate: org/product-deck\nschema: 1\nsize: 960 x 540 pt\ngrid: 12 x 12 cells of 80 x 45 pt\n---\n\nlayout: Title Slide\n::title cells=\"C3:K6\"::\n2027 상반기 마케팅 계획\n::subtitle cells=\"C7:K9\"::\n마케팅본부 · 2026년 12월\n\n---\n\nlayout: Title and Content\n::title cells=\"B2:K3\"::\n핵심 목표\n::body cells=\"B4:K11\"::\n- 신규 고객 5만 명\n- 재구매율 40%\n::notes::\n목표치는 1월 확정\n\n---\n\nlayout: Section Header\n::title cells=\"B4:K8\"::\n세부 실행안\n::body cells=\"B9:K11\"::\n채널별 계획\n"
+  }
+ ]
+}

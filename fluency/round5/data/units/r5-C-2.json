@@ -1,0 +1,80 @@
+{
+ "unit_id": "r5-C-2",
+ "part": 1,
+ "candidate": "C",
+ "replicate": 2,
+ "stem": "deck2",
+ "file": "shapes.pptx",
+ "seed": "---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 720 x 540 pt\ngrid: 12 x 12 cells of 60 x 45 pt\n---\n\nlayout: Blank\n::shape id=\"s4\" name=\"TextBox 3\" cells=\"B3:D3\"::\nLearning PPTX\n<line id=\"s6\" name=\"Straight Connector 5\" from=\"B4\" to=\"E4\"/>\n::shape id=\"s7\" name=\"Freeform 6\" cells=\"B6:D8\"::\nCloud\n<keep id=\"kqld8\" kind=\"picture\" summary=\"Picture 1\" cells=\"H3:I5\"/>\n<keep id=\"kmtnf\" kind=\"table\" summary=\"Table 2: Column1 Column2 Column3 data1 data2 data3\" cells=\"F9:K10\"/>\n<line id=\"s8\" name=\"Straight Arrow Connector 7\" from=\"H9\" to=\"H5\"/>\n<line id=\"s10\" name=\"Elbow Connector 9\" from=\"D6\" to=\"G4\"/>\n\n---\n\nlayout: Title Slide\n::title cells=\"B5:K6\"::\nPPTX <u>Title</u>\n::subtitle cells=\"C8:J10\"::\n**Subtitle**\n<p/>\nAnd second line\n\n---\n\nlayout: Blank\n<group id=\"g5\" name=\"Group 4\" cells=\"C3:F6\">\n::shape id=\"s2\" name=\"Rectangle 1\" cells=\"C3:D4\"::\n::shape id=\"s3\" name=\"Oval 2\" cells=\"F4:F5\"::\n::shape id=\"s4\" name=\"Right Arrow 3\" cells=\"C6:D6\"::\n</group>\n\n---\n\nlayout: Blank\n<keep id=\"k5mk0\" kind=\"table\" summary=\"Table 1: header1 header2 header3 A1 B1 C1 A2 A3 B3 and C3 are merged A4 A5\" cells=\"C3:J6\"/>\n\n---\n\nlayout: Title Only\n<keep id=\"k4akl\" kind=\"table\" summary=\"Table 1: Link Type Target URI Web Page http://poi.apache.org/ Place in this docu…\" cells=\"B5:K7\"/>\n::title cells=\"B1:K2\"::\nHyperlinks\n\n---\n\nlayout: Blank\n::shape id=\"s2\" name=\"Rectangle 1\" cells=\"B3\"::\n::shape id=\"s9\" name=\"Rectangle 8\" cells=\"D3\"::\n::shape id=\"s10\" name=\"Rectangle 9\" cells=\"F3\"::\n::shape id=\"s11\" name=\"Rectangle 10\" cells=\"G3\"::\n::shape id=\"s12\" name=\"Rectangle 11\" cells=\"I3\"::\n::shape id=\"s13\" name=\"Rectangle 12\" cells=\"K3\"::\n",
+ "seed_chars": 1621,
+ "tasks": [
+  {
+   "task_id": "deck2-q1",
+   "type": "read",
+   "instruction": "On slide 1, which objects' boxes overlap the box of the shape \"Freeform 6\" (the one holding \"Cloud\")? A line's box is the rectangle its two ends span."
+  },
+  {
+   "task_id": "deck2-q2",
+   "type": "read",
+   "instruction": "On slide 1, which objects lie entirely inside the top-right quarter of the slide?"
+  },
+  {
+   "task_id": "deck2-e1",
+   "type": "edit",
+   "instruction": "On slide 1, move the text box \"TextBox 3\" 3 cm to the right. Keep its size and its vertical position."
+  },
+  {
+   "task_id": "deck2-e2",
+   "type": "edit",
+   "instruction": "On slide 1, make \"Picture 1\" half as wide, keeping its aspect ratio and its top-left corner."
+  },
+  {
+   "task_id": "deck2-e3",
+   "type": "edit",
+   "instruction": "On slide 5 (Hyperlinks), add a text box with the text \"Links checked in September 2026\" directly under the title: its top edge on the title's bottom edge, its left and right edges on the title's, and between 0.7 cm and 1.1 cm tall. It must not overlap any other object."
+  },
+  {
+   "task_id": "deck2-e4",
+   "type": "edit",
+   "instruction": "On slide 3, move \"Right Arrow 3\" (in the group) to the left so that its left edge lines up with the left edge of \"Rectangle 1\". Keep its size and its vertical position."
+  },
+  {
+   "task_id": "deck2-e5",
+   "type": "edit",
+   "instruction": "On slide 2, change the subtitle's last line \"And second line\" to \"And a second line\". Change nothing else: every position and size stays as it is."
+  },
+  {
+   "task_id": "deck2-e6",
+   "type": "edit",
+   "instruction": "Right after slide 2, add a slide with the Comparison layout: title \"Before and after\"; left heading \"Before\", with the bullets \"Positions in EMU\" and \"Hidden connectors\" under it; right heading \"After\", with the bullets \"Boxes in the text\" and \"Every object shown\" under it. Leave every placeholder where the layout puts it."
+  },
+  {
+   "task_id": "deck2-e7",
+   "type": "edit",
+   "instruction": "On slide 1, make the text \"Learning PPTX\" red and 24 pt."
+  },
+  {
+   "task_id": "deck2-w",
+   "type": "write",
+   "instruction": "Write a new presentation with exactly these three slides, in this order, using the layouts listed above:\n1. Layout Title Slide: title \"Quarterly Review\"; subtitle \"Operations team, October 2026\".\n2. Layout Title and Content: title \"Highlights\"; body bullets \"Costs down 4%\" and \"Two new sites\"; speaker notes \"Mention the audit\".\n3. Layout Two Content: title \"Next steps\"; left column bullets \"Hire two engineers\" and \"Close the old site\"; right column bullets \"Open the Busan office\" and \"Review in March\".\nEvery placeholder stays where its layout puts it."
+  }
+ ],
+ "unreachable": [
+  {
+   "task_id": "deck2-e1",
+   "detail": "TextBox 3: left is 192.0 pt, expected 157.0 pt"
+  },
+  {
+   "task_id": "deck2-e2",
+   "detail": "Picture 1: width is 84.0 pt, expected 72.0 pt"
+  },
+  {
+   "task_id": "deck2-e3",
+   "detail": "the new text box: left is 60.0 pt, expected 36.0 pt"
+  },
+  {
+   "task_id": "deck2-e4",
+   "detail": "Right Arrow 3: left is 144.0 pt, expected 120.0 pt"
+  }
+ ]
+}

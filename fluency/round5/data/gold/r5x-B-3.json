@@ -1,0 +1,57 @@
+{
+ "answers": [
+  {
+   "task_id": "deck3-x1",
+   "text": "ANSWER: k7hqa"
+  },
+  {
+   "task_id": "deck3-x2",
+   "edits": [
+    {
+     "old": "::right::\n",
+     "new": "::right box=\"486 144 446 343\"::\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck3-x3",
+   "edits": [
+    {
+     "old": "시장 현황\n",
+     "new": "시장 현황\n<shape id=\"s4\" name=\"NEW 배지\" box=\"744 126 90 36\" rot=\"15\">NEW</shape>\n"
+    },
+    {
+     "old": "- 1인 가구 비중 34%\n<shape id=\"s4\" name=\"NEW 배지\" box=\"744 126 90 36\" rot=\"15\">NEW</shape>\n",
+     "new": "- 1인 가구 비중 34%\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck3-x4",
+   "edits": [
+    {
+     "old": "<group id=\"g5\" name=\"타임라인\" box=\"96 180 720 72\">\n<shape id=\"s6\" name=\"기획 단계\" box=\"96 180 192 72\">기획</shape>\n<line id=\"s7\" name=\"화살표 1\" from=\"288 216\" to=\"360 216\"/>\n<shape id=\"s8\" name=\"개발 단계\" box=\"360 180 192 72\">개발</shape>\n<line id=\"s9\" name=\"화살표 2\" from=\"552 216\" to=\"624 216\"/>\n<shape id=\"s10\" name=\"출시 단계\" box=\"624 180 192 72\">출시</shape>\n",
+     "new": "<group id=\"g5\" name=\"타임라인\" box=\"120 180 720 72\">\n<shape id=\"s6\" name=\"기획 단계\" box=\"120 180 192 72\">기획</shape>\n<line id=\"s7\" name=\"화살표 1\" from=\"312 216\" to=\"384 216\"/>\n<shape id=\"s8\" name=\"개발 단계\" box=\"384 180 192 72\">개발</shape>\n<line id=\"s9\" name=\"화살표 2\" from=\"576 216\" to=\"648 216\"/>\n<shape id=\"s10\" name=\"출시 단계\" box=\"648 180 192 72\">출시</shape>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck3-x5",
+   "edits": [
+    {
+     "old": "<shape id=\"s13\" name=\"1분기 라벨\" box=\"630 180 180 29\">1분기 120억</shape>\n<shape id=\"s14\" name=\"2분기 라벨\" box=\"640 234 180 29\">2분기 180억</shape>\n",
+     "new": "<shape id=\"s13\" name=\"1분기 라벨\" box=\"120 482 180 29\">1분기 120억</shape>\n<shape id=\"s14\" name=\"2분기 라벨\" box=\"314 482 180 29\">2분기 180억</shape>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck3-x6",
+   "edits": [
+    {
+     "old": "<shape id=\"s4\" name=\"NEW 배지\" box=\"744 126 90 36\" rot=\"15\">NEW</shape>\n",
+     "new": "<shape id=\"s4\" name=\"NEW 배지\" box=\"804 144 90 36\">NEW</shape>\n"
+    }
+   ]
+  }
+ ]
+}

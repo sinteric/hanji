@@ -1,0 +1,75 @@
+{
+ "answers": [
+  {
+   "task_id": "deck1-q1",
+   "text": "ANSWER: left"
+  },
+  {
+   "task_id": "deck1-q2",
+   "text": "ANSWER: k04k9"
+  },
+  {
+   "task_id": "deck1-e1",
+   "edits": [
+    {
+     "old": "::shape id=\"s5\" name=\"출처\" box=\"5 88 40 5.3\"::\n",
+     "new": "::shape id=\"s5\" name=\"출처\" box=\"55 88 40 5.3\"::\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck1-e2",
+   "edits": [
+    {
+     "old": "<keep id=\"k04k9\" kind=\"picture\" summary=\"image.png\" box=\"80 73.3 10 6.7\"/>\n",
+     "new": "<keep id=\"k04k9\" kind=\"picture\" summary=\"image.png\" box=\"70 66.7 20 13.3\"/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck1-e3",
+   "edits": [
+    {
+     "old": "분기별 매출\n",
+     "new": "분기별 매출\n::shape box=\"5 20.7 90 4.7\"::\n단위: 억 원\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck1-e4",
+   "edits": [
+    {
+     "old": "<keep id=\"k04k9\" kind=\"picture\" summary=\"image.png\" box=\"80 73.3 10 6.7\"/>\n",
+     "new": "<keep id=\"k04k9\" kind=\"picture\" summary=\"image.png\" box=\"10 73.3 10 6.7\"/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck1-e5",
+   "edits": [
+    {
+     "old": "  - 지방 13곳\n",
+     "new": "  - 지방 14곳\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck1-e6",
+   "edits": [
+    {
+     "old": "\nlayout: Title Only\n",
+     "new": "\nlayout: Comparison\n::title box=\"5 4 90 16.7\"::\n권역별 전략\n::body box=\"5 22.4 44.2 9.3\"::\n수도권\n::body2 box=\"5 31.7 44.2 57.6\"::\n- 신규 지점 2곳\n- 온라인 판촉 강화\n::body3 box=\"50.8 22.4 44.2 9.3\"::\n지방\n::body4 box=\"50.8 31.7 44.2 57.6\"::\n- 부산 거점 확대\n- 대리점 교육\n\n---\n\nlayout: Title Only\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck1-e7",
+   "text": "REFUSE: formatting and the content of kept objects cannot be changed here.",
+   "edits": []
+  },
+  {
+   "task_id": "deck1-w",
+   "text": "---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 720 x 540 pt\n---\n\nlayout: Title Slide\n::title box=\"7.5 31.1 85 21.4\"::\n2026년 4분기 영업 계획\n::subtitle box=\"15 56.7 70 25.6\"::\n영업기획팀 · 2026년 10월\n\n---\n\nlayout: Title and Content\n::title box=\"5 4 90 16.7\"::\n4분기 목표\n::body box=\"5 23.3 90 66\"::\n- 매출 1,300억 원\n- 신규 고객 40곳\n::notes::\n목표는 10월 경영회의에서 확정\n\n---\n\nlayout: Two Content\n::title box=\"5 4 90 16.7\"::\n채널별 과제\n::left box=\"5 23.3 44.2 66\"::\n- 오프라인: 매장 판촉\n- 오프라인: 대리점 교육\n::right box=\"50.8 23.3 44.2 66\"::\n- 온라인: 기획전\n- 온라인: 멤버십 캠페인\n"
+  }
+ ]
+}

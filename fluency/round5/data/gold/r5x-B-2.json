@@ -1,0 +1,57 @@
+{
+ "answers": [
+  {
+   "task_id": "deck2-x1",
+   "text": "ANSWER: s11"
+  },
+  {
+   "task_id": "deck2-x2",
+   "edits": [
+    {
+     "old": "<shape id=\"s9\" name=\"Rectangle 8\" box=\"174 72 72 72\"/>\n<shape id=\"s10\" name=\"Rectangle 9\" box=\"270 72 72 72\"/>\n<shape id=\"s11\" name=\"Rectangle 10\" box=\"366 72 72 72\"/>\n<shape id=\"s12\" name=\"Rectangle 11\" box=\"468 72 72 72\"/>\n",
+     "new": "<shape id=\"s9\" name=\"Rectangle 8\" box=\"172 72 72 72\"/>\n<shape id=\"s10\" name=\"Rectangle 9\" box=\"277 72 72 72\"/>\n<shape id=\"s11\" name=\"Rectangle 10\" box=\"383 72 72 72\"/>\n<shape id=\"s12\" name=\"Rectangle 11\" box=\"488 72 72 72\"/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-x3",
+   "edits": [
+    {
+     "old": "<shape id=\"s4\" name=\"TextBox 3\" box=\"72 72 180 29\">Learning PPTX</shape>\n",
+     "new": ""
+    },
+    {
+     "old": "<line id=\"s10\" name=\"Elbow Connector 9\" from=\"186 252\" to=\"402 144\"/>\n",
+     "new": "<line id=\"s10\" name=\"Elbow Connector 9\" from=\"186 252\" to=\"402 144\"/>\n<shape id=\"s4\" name=\"TextBox 3\" box=\"72 72 180 29\">Learning PPTX</shape>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-x4",
+   "edits": [
+    {
+     "old": "<group id=\"g5\" name=\"Group 4\" box=\"120 108 258 152\">\n<shape id=\"s2\" name=\"Rectangle 1\" box=\"120 108 138 60\"/>\n<shape id=\"s3\" name=\"Oval 2\" box=\"306 150 72 72\"/>\n<shape id=\"s4\" name=\"Right Arrow 3\" box=\"144 222 77 38\"/>\n",
+     "new": "<group id=\"g5\" name=\"Group 4\" box=\"177 108 258 152\">\n<shape id=\"s2\" name=\"Rectangle 1\" box=\"177 108 138 60\"/>\n<shape id=\"s3\" name=\"Oval 2\" box=\"363 150 72 72\"/>\n<shape id=\"s4\" name=\"Right Arrow 3\" box=\"201 222 77 38\"/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-x5",
+   "edits": [
+    {
+     "old": "<keep id=\"kmtnf\" kind=\"table\" summary=\"Table 2: Column1 Column2 Column3 data1 data2 data3\" box=\"300 372 372 96\"/>\n",
+     "new": "<keep id=\"kmtnf\" kind=\"table\" summary=\"Table 2: Column1 Column2 Column3 data1 data2 data3\" box=\"337 372 298 96\"/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-x6",
+   "edits": [
+    {
+     "old": "<keep id=\"k4akl\" kind=\"table\" summary=\"Table 1: Link Type Target URI Web Page http://poi.apache.org/ Place in this docu…\" box=\"54 168 618 146\"/>\n::title::\n",
+     "new": "<keep id=\"k4akl\" kind=\"table\" summary=\"Table 1: Link Type Target URI Web Page http://poi.apache.org/ Place in this docu…\" box=\"54 168 618 146\"/>\n::title box=\"54 22 618 90\"::\n"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,43 @@
+{
+ "unit_id": "r5x-A-1",
+ "part": 2,
+ "candidate": "A",
+ "replicate": 1,
+ "stem": "deck1",
+ "file": "korean-deck.pptx",
+ "seed": "---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 720 x 540 pt\n---\n\nlayout: Title Slide\n::title box=\"54 168 612 116\"::\n3분기 영업 보고\n::subtitle box=\"108 306 504 138\"::\n영업본부 · 2026년 10월\n::notes::\n인사말 후 목차를 소개한다.\n\n---\n\nlayout: Title and Content\n::title box=\"36 22 648 90\"::\n핵심 지표\n::body box=\"36 126 648 356\"::\n- 매출 **12% 증가**\n- 신규 고객 34곳\n  - 수도권 21곳\n  - 지방 13곳\n- 영업이익률 8.4%\n::notes::\n전년 대비 증가폭을 강조한다.\n\n---\n\nlayout: Two Content\n::title box=\"36 22 648 90\"::\n지역별 현황\n::left box=\"36 126 318 356\"::\n- 수도권 21곳\n  - 서울 14곳\n::right box=\"366 126 318 356\"::\n- 지방 13곳\n  - 부산 5곳\n::shape id=\"s5\" name=\"출처\" box=\"36 475 288 29\"::\n출처: 내부 집계\n\n---\n\nlayout: Title Only\n::title box=\"36 22 648 90\"::\n분기별 매출\n<keep id=\"kb2br\" kind=\"table\" summary=\"Table 2: 분기 매출 증감 1분기 1,120 +3% 2분기 1,180 +5% 3분기 1,204 +12%\" box=\"72 144 576 144\"/>\n<keep id=\"k04k9\" kind=\"picture\" summary=\"image.png\" box=\"576 396 72 36\"/>\n::notes::\n표는 잠정치이며 10월 말 확정된다.\n\n---\n\nlayout: Title and Content\n::title box=\"36 22 648 90\"::\n다음 분기 계획\n::body box=\"36 126 648 356\"::\n1. 신규 지점 3곳 개설\n1. 온라인 채널 확대\n1. 고객 만족도 조사\n- 자세한 일정은 사내 게시판 참고 (긴급)\n\n---\n\nlayout: Section Header\n::title box=\"57 347 612 107\"::\n부록\n::body box=\"57 229 612 118\"::\n세부 자료\n\n---\n\nlayout: Title and Content\n::title box=\"36 22 648 90\"::\n감사합니다\n",
+ "seed_chars": 1241,
+ "tasks": [
+  {
+   "task_id": "deck1-x1",
+   "type": "read",
+   "instruction": "On slide 3 (지역별 현황), which objects reach lower than 16 cm from the top of the slide (their bottom edge is more than 16 cm from the top)?"
+  },
+  {
+   "task_id": "deck1-x2",
+   "type": "edit",
+   "instruction": "On slide 3 (지역별 현황), make the left column narrower: move its right edge 2 cm to the left, keeping its other three edges where they are."
+  },
+  {
+   "task_id": "deck1-x3",
+   "type": "edit",
+   "instruction": "On slide 4 (분기별 매출), put the picture behind the table, so that the table is drawn on top of it. Change nothing else."
+  },
+  {
+   "task_id": "deck1-x4",
+   "type": "edit",
+   "instruction": "On slide 4 (분기별 매출), centre the picture horizontally on the slide, keeping its size and its vertical position."
+  },
+  {
+   "task_id": "deck1-x5",
+   "type": "edit",
+   "instruction": "On slide 2 (핵심 지표), move the title 1 cm down, keeping its size; and move the body's top edge 1 cm down as well, keeping the body's bottom edge where it is."
+  },
+  {
+   "task_id": "deck1-x6",
+   "type": "edit",
+   "instruction": "On slide 3 (지역별 현황), move the 출처 text box down so that its top edge is 0.5 cm below the left column's bottom edge. Keep its size and its horizontal position."
+  }
+ ],
+ "unreachable": []
+}

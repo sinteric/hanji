@@ -1,0 +1,87 @@
+---
+type: presentation
+format: pptx
+template: org/product-deck
+schema: 1
+size: 960 x 540 pt
+---
+
+layout: Title Slide
+::title box="12.5 16.4 75 34.8"::
+2027 신제품 출시 계획
+::subtitle box="12.5 52.5 75 24.1"::
+마케팅본부 · 2026년 11월
+<keep id="k3ftw" kind="picture" summary="logo.png" box="90 3.3 8.1 7.2"/>
+::notes::
+일정과 수치는 내부 검토용
+
+---
+
+layout: Title and Content
+::title box="6.9 5.3 78.8 19.3"::
+시장 현황
+::body box="6.9 26.6 86.3 63.4"::
+- 국내 스마트홈 시장 4.2조 원 (전년 대비 +12%)
+- 주요 경쟁사 3곳 신제품 출시
+  - A사: 2027년 3월
+  - B사: 2027년 5월
+- 1인 가구 비중 34%
+::shape id="s4" name="NEW 배지" box="77.5 23.3 9.4 6.7" rot="15"::
+NEW
+<keep id="k7hqa" kind="picture" summary="logo.png" box="90 3.3 8.1 7.2"/>
+
+---
+
+layout: Title Only
+::title box="6.9 5.3 86.3 19.3"::
+출시 일정
+<group id="g5" name="타임라인" box="10 33.3 75 13.3">
+::shape id="s6" name="기획 단계" box="10 33.3 20 13.3"::
+기획
+<line id="s7" name="화살표 1" from="30 40" to="37.5 40"/>
+::shape id="s8" name="개발 단계" box="37.5 33.3 20 13.3"::
+개발
+<line id="s9" name="화살표 2" from="57.5 40" to="65 40"/>
+::shape id="s10" name="출시 단계" box="65 33.3 20 13.3"::
+출시
+</group>
+::shape id="s11" name="주석" box="10 66.7 50 5.4"::
+일정은 내부 검토 중이며 변동될 수 있음
+::notes::
+각 단계는 분기 단위
+
+---
+
+layout: Two Content
+::title box="6.9 5.3 86.3 19.3"::
+제품 비교
+::left box="6.9 26.6 42.5 63.4"::
+- 스마트 허브 S1
+  - 가격 19만 9천 원
+  - 음성 인식 지원
+::right box="50.6 26.6 42.5 63.4"::
+- 스마트 허브 S1 Pro
+  - 가격 29만 9천 원
+  - 음성 인식 지원
+  - 카메라 내장
+::notes::
+가격은 부가세 포함
+
+---
+
+layout: Title Only
+::title box="6.9 5.3 86.3 19.3"::
+예상 매출
+<keep id="k2m8c" kind="chart" summary="Chart 3: 분기별 예상 매출 (억 원)" box="12.5 31.1 50 55.6"/>
+::shape id="s13" name="1분기 라벨" box="65.6 33.3 18.8 5.4"::
+1분기 120억
+::shape id="s14" name="2분기 라벨" box="66.7 43.3 18.8 5.4"::
+2분기 180억
+
+---
+
+layout: Section Header
+::title box="6.8 24.9 86.3 41.6"::
+부록
+::body box="6.8 66.9 86.3 21.9"::
+세부 자료

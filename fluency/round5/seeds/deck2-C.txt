@@ -1,0 +1,59 @@
+---
+type: presentation
+format: pptx
+schema: 1
+size: 720 x 540 pt
+grid: 12 x 12 cells of 60 x 45 pt
+---
+
+layout: Blank
+::shape id="s4" name="TextBox 3" cells="B3:D3"::
+Learning PPTX
+<line id="s6" name="Straight Connector 5" from="B4" to="E4"/>
+::shape id="s7" name="Freeform 6" cells="B6:D8"::
+Cloud
+<keep id="kqld8" kind="picture" summary="Picture 1" cells="H3:I5"/>
+<keep id="kmtnf" kind="table" summary="Table 2: Column1 Column2 Column3 data1 data2 data3" cells="F9:K10"/>
+<line id="s8" name="Straight Arrow Connector 7" from="H9" to="H5"/>
+<line id="s10" name="Elbow Connector 9" from="D6" to="G4"/>
+
+---
+
+layout: Title Slide
+::title cells="B5:K6"::
+PPTX <u>Title</u>
+::subtitle cells="C8:J10"::
+**Subtitle**
+<p/>
+And second line
+
+---
+
+layout: Blank
+<group id="g5" name="Group 4" cells="C3:F6">
+::shape id="s2" name="Rectangle 1" cells="C3:D4"::
+::shape id="s3" name="Oval 2" cells="F4:F5"::
+::shape id="s4" name="Right Arrow 3" cells="C6:D6"::
+</group>
+
+---
+
+layout: Blank
+<keep id="k5mk0" kind="table" summary="Table 1: header1 header2 header3 A1 B1 C1 A2 A3 B3 and C3 are merged A4 A5" cells="C3:J6"/>
+
+---
+
+layout: Title Only
+<keep id="k4akl" kind="table" summary="Table 1: Link Type Target URI Web Page http://poi.apache.org/ Place in this docu…" cells="B5:K7"/>
+::title cells="B1:K2"::
+Hyperlinks
+
+---
+
+layout: Blank
+::shape id="s2" name="Rectangle 1" cells="B3"::
+::shape id="s9" name="Rectangle 8" cells="D3"::
+::shape id="s10" name="Rectangle 9" cells="F3"::
+::shape id="s11" name="Rectangle 10" cells="G3"::
+::shape id="s12" name="Rectangle 11" cells="I3"::
+::shape id="s13" name="Rectangle 12" cells="K3"::
