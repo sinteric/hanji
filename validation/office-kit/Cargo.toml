@@ -1,0 +1,25 @@
+[package]
+name = "office-kit"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Builds the kit of exports a person opens in Word, PowerPoint, Excel and Hancom Office (DESIGN.md §9 validity). Not part of the workspace."
+
+# Standalone: an empty [workspace] keeps this crate out of the hanji workspace build (and its wasm builds).
+[workspace]
+
+[dependencies]
+hanji-core = { path = "../../crates/hanji-core" }
+hanji-format = { path = "../../crates/hanji-format" }
+hanji-package = { path = "../../crates/hanji-package" }
+hanji-testkit = { path = "../../crates/hanji-testkit" }
+hanji-docx = { path = "../../crates/hanji-docx" }
+hanji-pptx = { path = "../../crates/hanji-pptx" }
+hanji-xlsx = { path = "../../crates/hanji-xlsx" }
+hanji-hwpx = { path = "../../crates/hanji-hwpx" }
+hanji-store = { path = "../../crates/hanji-store" }
+serde_json = "1"
+zip = { version = "8", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
+[profile.release]
+debug = false
