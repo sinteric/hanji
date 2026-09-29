@@ -553,3 +553,20 @@ fn table_style_line_sits_on_the_header_row() {
     // Trailing whitespace on the style line is not part of it.
     assert_eq!(roundtrip(&doc("{style=\"Grid Table 4\"}  \n| a |\n|---|\n")), ok);
 }
+
+#[test]
+fn spaces_only_paragraphs_name_their_style() {
+    // A plain line cannot hold spaces alone, so the style is named and the
+    // spaces stay text; the serializer never invents a style name for it.
+    let named = doc("<div style=\"Note\">   </div>\n");
+    assert_eq!(roundtrip(&named), named);
+    assert_eq!(roundtrip(&doc("|    |\n|---|\n")), doc("|    |\n|---|\n"));
+    let mut d = parse(&doc("x\n")).unwrap();
+    let Block::Para(p) = &mut d.blocks[0] else { panic!() };
+    p.content = Inline::plain("   ");
+    let out = serialize(&d);
+    assert!(!out.contains("Normal"), "{out}");
+    assert_eq!(out, doc("<p/>\n"));
+    d.normalize();
+    assert_eq!(parse(&out).unwrap(), d, "canonical form and the serializer agree");
+}

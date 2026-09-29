@@ -99,6 +99,13 @@ fn single(atom: Atom) -> Inline {
     Inline { units: vec![fmt::Unit { atom, marks: fmt::Marks::NONE }], spans: vec![] }
 }
 
+/// The source map of each block [`resolve`] returns, in the same order:
+/// footnote definitions are not blocks of the model.
+pub fn block_maps(parsed: &fmt::Parsed) -> Vec<&fmt::BlockMap> {
+    let blocks = parsed.doc.blocks.iter().zip(&parsed.map.blocks);
+    blocks.filter(|(b, _)| !matches!(b, fmt::Block::FootnoteDef(_))).map(|(_, m)| m).collect()
+}
+
 /// Model text → resolved blocks. `is_block_keep(id)` says whether a
 /// placeholder stands for a block (`Some(true)`), an inline object
 /// (`Some(false)`) or is unknown (`None`).
@@ -220,6 +227,7 @@ pub fn unresolve(
             Block::Table(t) => fmt::Block::Table(fmt::Table { style: t.style.clone(), rows: t.rows.clone() }),
             Block::Para(p) => {
                 // Empty: `<p/>` / `<p style="Name"/>`. Spaces only: a `<div>`.
+                // Spaces only: a `<div>` naming the style, so the spaces stay text.
                 let empty = p.content.is_empty();
                 let blank = p.content.units.iter().all(|u| u.atom.is_space());
                 let style = match styles.heading_level(&p.style) {

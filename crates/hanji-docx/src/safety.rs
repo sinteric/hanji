@@ -11,6 +11,20 @@ use crate::xml::{self, Element, Node};
 /// Field instructions that fetch or run something when the file opens or updates.
 const FETCHING_FIELDS: &[&str] = &["DDE", "DDEAUTO", "INCLUDEPICTURE", "INCLUDETEXT", "LINK", "IMPORT", "RD"];
 
+/// Extensions of macro-enabled Office packages.
+const MACRO_PACKAGES: &[&str] =
+    &[".docm", ".dotm", ".xlsm", ".xltm", ".xlam", ".xlsb", ".pptm", ".potm", ".ppsm", ".ppam", ".sldm"];
+
+/// An embedded package that can carry macros: a macro-enabled extension, or
+/// a zip holding a VBA project.
+fn is_macro_package(p: &Part) -> bool {
+    let lower = p.name.to_ascii_lowercase();
+    MACRO_PACKAGES.iter().any(|x| lower.ends_with(x))
+        || (p.data.starts_with(b"PK")
+            && crate::package::read(&p.data)
+                .is_ok_and(|inner| inner.iter().any(|q| q.name.to_ascii_lowercase().ends_with("vbaproject.bin"))))
+}
+
 fn notice(report: &mut Vec<Notice>, kind: &str, location: impl Into<String>, detail: impl Into<String>) {
     report.push(Notice { kind: kind.into(), location: location.into(), detail: detail.into() });
 }
@@ -50,7 +64,10 @@ pub fn neutralise(parts: &mut Vec<Part>, doc: &mut Element, report: &mut ImportR
     let out = &mut report.neutralised;
     let mut removed_rels: Vec<Removed> = vec![];
     let mut drop_parts: Vec<String> = vec![];
-    // Relationships that fetch (external, not a hyperlink) or run (OLE, ActiveX, macros).
+    let macro_parts: std::collections::BTreeSet<String> =
+        parts.iter().filter(|p| p.name != DOC_PART && is_macro_package(p)).map(|p| p.name.clone()).collect();
+    // Relationships that fetch (external, not a hyperlink) or run (OLE, ActiveX,
+    // macros, packages that carry macros).
     for part in parts.iter_mut() {
         if !part.name.ends_with(".rels") {
             continue;
@@ -73,6 +90,7 @@ pub fn neutralise(parts: &mut Vec<Part>, doc: &mut Element, report: &mut ImportR
                 "attachedTemplate" if external => Some("remote-template"),
                 "image" if external => Some("linked-image"),
                 "oleObject" if external => Some("linked-object"),
+                _ if !external && macro_parts.contains(&resolve_target(&source, &target)) => Some("macro-package"),
                 "oleObject" | "package" if source == DOC_PART => Some("ole-object"),
                 "control" | "activeXControl" => Some("activex-control"),
                 "vbaProject" | "wordVbaData" | "keyMapCustomizations" => Some("macros"),
@@ -111,6 +129,13 @@ pub fn neutralise(parts: &mut Vec<Part>, doc: &mut Element, report: &mut ImportR
     neutralise_objects(doc, out);
     // Fields that fetch: keep their shown result, drop the instruction.
     neutralise_fields(doc, out);
+    // Macro-carrying packages that no relationship reached go too.
+    for name in &macro_parts {
+        if !drop_parts.contains(name) {
+            notice(out, "macro-package", name.clone(), "embedded package that can carry macros");
+            drop_parts.push(name.clone());
+        }
+    }
     // Parts that only served removed content, and their content types.
     let mut gone = std::collections::BTreeSet::new();
     for name in drop_parts {
@@ -153,7 +178,10 @@ fn strip_refs(root: &mut Element, ids: &[&Removed], out: &mut Vec<Notice>, part:
         e.children.retain(|n| {
             let Node::El(c) = n else { return true };
             // Whole elements that only exist to reach the target.
-            let reaches = matches!(c.name.as_str(), "w:attachedTemplate" | "o:OLEObject" | "w:control" | "w:subDoc");
+            let reaches = matches!(
+                c.name.as_str(),
+                "w:attachedTemplate" | "o:OLEObject" | "w:control" | "w:subDoc" | "c:externalData"
+            );
             !(reaches
                 && ids.iter().any(|r| c.attrs.iter().any(|a| a.0.starts_with("r:") && xml::unescape(&a.1) == r.id)))
         });

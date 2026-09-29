@@ -203,6 +203,13 @@ impl Inline {
         self.units.is_empty() && self.spans.is_empty()
     }
 
+    /// Spaces only (no tab, break or atom): a plain line cannot hold it.
+    pub fn spaces_only(&self) -> bool {
+        !self.units.is_empty()
+            && self.spans.is_empty()
+            && self.units.iter().all(|u| matches!(u.atom, Atom::Char(c) if c.is_whitespace() && c != '\t'))
+    }
+
     /// The text with atoms shown as `\u{FFFC}` (for summaries and messages).
     pub fn text(&self) -> String {
         self.units
@@ -287,12 +294,18 @@ impl Inline {
 
 impl Document {
     /// Canonical block shapes: a plain paragraph holding only an unmarked
-    /// placeholder is a keep line, one holding only a page break is `<pagebreak/>`,
-    /// and every inline is normalized.
+    /// placeholder is a keep line, one holding only a page break is
+    /// `<pagebreak/>`, a plain one of spaces only is empty (`<p/>`), and every
+    /// inline is normalized.
     pub fn normalize(&mut self) {
         for b in &mut self.blocks {
             match b {
                 Block::Para(p) => {
+                    // A plain paragraph of spaces only has no line form (engines
+                    // write it as `<div style="Name">`, naming the file's style).
+                    if p.style == ParaStyle::Plain && p.content.spaces_only() {
+                        p.content.units.clear();
+                    }
                     p.content.normalize();
                     if p.style == ParaStyle::Plain && p.content.spans.is_empty() && p.content.units.len() == 1 {
                         let u = &p.content.units[0];

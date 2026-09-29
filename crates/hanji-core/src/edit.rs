@@ -182,15 +182,25 @@ pub fn edit(rem: &Remainder, text: &str, old: &str, new: &str, caps: Capabilitie
 }
 
 /// Context the edit repeats unchanged is not part of the span: trim a
-/// common prefix and suffix, but only at whitespace, so a replaced word
-/// stays one replacement.
+/// common prefix and suffix, but only at word boundaries (whitespace), so a
+/// replaced word stays one replacement.
 fn trim_span<'a>(text: &str, s: usize, e: usize, new: &'a str) -> (usize, usize, &'a str) {
+    let ws_or_end = |t: &str| t.chars().next().is_none_or(char::is_whitespace);
+    let ws_or_start = |t: &str| t.chars().next_back().is_none_or(char::is_whitespace);
     let old = &text[s..e];
     let pre = common_prefix(old, new);
-    let pre = old[..pre].rfind(char::is_whitespace).map_or(0, |k| k + old[k..].chars().next().unwrap().len_utf8());
+    let pre = if ws_or_end(&old[pre..]) && ws_or_end(&new[pre..]) {
+        pre
+    } else {
+        old[..pre].rfind(char::is_whitespace).map_or(0, |k| k + old[k..].chars().next().unwrap().len_utf8())
+    };
     let (o2, n2) = (&old[pre..], &new[pre..]);
     let suf = common_suffix(o2, n2);
-    let suf = o2[o2.len() - suf..].find(char::is_whitespace).map_or(0, |k| suf - k);
+    let suf = if ws_or_start(&o2[..o2.len() - suf]) && ws_or_start(&n2[..n2.len() - suf]) {
+        suf
+    } else {
+        o2[o2.len() - suf..].find(char::is_whitespace).map_or(0, |k| suf - k)
+    };
     (s + pre, e - suf, &n2[..n2.len() - suf])
 }
 
@@ -216,7 +226,7 @@ fn common_suffix(a: &str, b: &str) -> usize {
 /// Every paragraph position of a parsed text: path, content, source map.
 fn para_maps<'a>(blocks: &'a [Block], parsed: &'a Parsed) -> Vec<(Path, Option<&'a fmt::Inline>, &'a ParaMap, usize)> {
     let mut out = vec![];
-    for (j, (b, m)) in blocks.iter().zip(&parsed.map.blocks).enumerate() {
+    for (j, (b, m)) in blocks.iter().zip(model::block_maps(parsed)).enumerate() {
         match (b, &m.kind) {
             (Block::Table(_), BlockMapKind::Table(cells)) => {
                 for (r, row) in cells.iter().enumerate() {
@@ -255,10 +265,11 @@ fn exact_alignment(
             None
         }
     };
-    let new_start: HashMap<usize, usize> = np.map.blocks.iter().enumerate().map(|(j, m)| (m.start, j)).collect();
+    let (old_maps, new_maps) = (model::block_maps(op), model::block_maps(np));
+    let new_start: HashMap<usize, usize> = new_maps.iter().enumerate().map(|(j, m)| (m.start, j)).collect();
     let mut bmap = vec![None; ob.len()];
     let mut touched_old = vec![];
-    for (i, m) in op.map.blocks.iter().enumerate() {
+    for (i, m) in old_maps.iter().enumerate() {
         let untouched = m.end <= s || m.start >= e;
         match untouched.then(|| shift(m.start).and_then(|x| new_start.get(&x).copied())).flatten() {
             Some(j) => bmap[i] = Some(j),
@@ -360,4 +371,49 @@ fn pairs_to_ops(pairs: &[(usize, usize)], a: &[u32], b: &[u32]) -> Vec<Op> {
         (i, j) = (k + 1, n + 1);
     }
     ops
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::{StyleDef, StyleSet};
+    use crate::remainder::{Entry, Meta};
+
+    fn entry(id: u64, kind: Kind, path: Path, start: Option<usize>, end: Option<usize>) -> Entry {
+        Entry { id, kind, xml: vec![], fp: format!("fp{id}"), path, start, end, seq: id * 1000, meta: Meta::default() }
+    }
+
+    #[test]
+    fn footnote_definitions_do_not_shift_later_blocks() {
+        let styles = StyleSet {
+            paragraph: vec![StyleDef { id: "Normal".into(), name: "Normal".into() }],
+            default_paragraph: "Normal".into(),
+            ..Default::default()
+        };
+        // Resolved blocks: [a[^1], middle, last para]; the definition is not a block.
+        let entries = vec![
+            entry(1, Kind::Ppr, vec![0], None, None),
+            entry(2, Kind::Ppr, vec![2], None, None),
+            entry(3, Kind::Run, vec![2], Some(0), Some(9)),
+            entry(4, Kind::Ppr, vec![1], None, None),
+        ];
+        let rem = Remainder { format: "docx".into(), styles, entries, next_id: 5, ..Default::default() };
+        let text = "---\ntype: document\nformat: docx\nschema: 1\n---\na[^1]\n\n[^1]: note\n\nmiddle\n\nlast para\n";
+        let caps = Capabilities { footnotes: true, ..Default::default() };
+        let at = |r: &Reanchored, id| {
+            assert!(r.report.refused.is_empty() && r.report.removed.is_empty(), "{:?}", r.report);
+            r.remainder.entries.iter().find(|e| e.id == id).map(|e| (e.path.clone(), e.start, e.end))
+        };
+        // Edits after the definition, as an exact span and as a rewrite.
+        for r in [edit(&rem, text, "last", "final", caps), rewrite(&rem, text, &text.replace("last", "final"), caps)] {
+            let r = r.unwrap();
+            assert_eq!(at(&r, 2), Some((vec![2], None, None)));
+            assert_eq!(at(&r, 3), Some((vec![2], Some(0), Some(10))));
+            assert_eq!(at(&r, 4), Some((vec![1], None, None)));
+        }
+        // An edit before it: every block after the definition is untouched.
+        let r = edit(&rem, text, "a[^1]", "b[^1]", caps).unwrap();
+        assert_eq!(at(&r, 3), Some((vec![2], Some(0), Some(9))));
+        assert_eq!(at(&r, 4), Some((vec![1], None, None)));
+    }
 }

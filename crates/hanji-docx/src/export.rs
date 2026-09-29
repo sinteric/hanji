@@ -250,6 +250,12 @@ impl<'a> Exporter<'a> {
                     for m in rm_at.get(&Target::Zrun(z.id)).into_iter().flatten() {
                         r.children.push(node(fragment(&m.xml[0])));
                     }
+                    // Its own empty `w:t`s (a run with text is never zero-width).
+                    for t in z.meta.aux.iter().map(|x| fragment(x)) {
+                        if t.text_of(&["w:t"]).is_empty() {
+                            r.children.push(node(t));
+                        }
+                    }
                     stack.last_mut().unwrap().1.children.push(node(r));
                 }
                 It::Seg(si) => {
