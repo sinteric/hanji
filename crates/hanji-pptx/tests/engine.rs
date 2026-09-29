@@ -17,10 +17,17 @@ fn import(pkg: &[u8]) -> Imported {
     PptxEngine.import(pkg, &ImportOptions::default()).unwrap_or_else(|e| panic!("{e}"))
 }
 
-/// Exports `text`, checks that the export reads back as `text`, and returns its parts.
+/// The canonical text of `text` (§5.1): what a write returns, bare slot markers with their layout's box.
+fn canonical(text: &str, rem: &Remainder) -> String {
+    use hanji_core::TextModel;
+    let (blocks, _) = PptxModel.resolve(text, rem, CAPS).unwrap_or_else(|e| panic!("{e:?}"));
+    PptxEngine::text_of(&blocks, rem, None)
+}
+
+/// Exports `text`, checks that the export reads back as its canonical form, and returns its parts.
 fn export(text: &str, rem: &Remainder) -> Vec<Part> {
     let out = PptxEngine.export(text, rem).unwrap_or_else(|e| panic!("{e}"));
-    assert_eq!(import(&out).text, text, "PutGet");
+    assert_eq!(import(&out).text, canonical(text, rem), "PutGet");
     let parts = package::read(&out).unwrap();
     for p in &parts {
         if p.name.ends_with(".xml") || p.name.ends_with(".rels") {
@@ -204,7 +211,10 @@ fn invalid_texts_are_refused_with_what_is_allowed() {
         }
         other => panic!("{other:?}"),
     }
-    let bad = imp.text.replace("::title::\n분기별 매출", "::title::\n분기별 매출\n::body::\n표");
+    let bad = imp.text.replace(
+        "::title box=\"36 22 648 90\"::\n분기별 매출",
+        "::title box=\"36 22 648 90\"::\n분기별 매출\n::body::\n표",
+    );
     match PptxEngine.export(&bad, &imp.remainder) {
         Err(EngineError::Invalid(d)) => assert!(hanji_format::diag::render(&d).contains("body"), "{d:?}"),
         other => panic!("{other:?}"),
@@ -319,7 +329,11 @@ fn objects_are_shown_moved_and_deleted_never_changed() {
     let before = package::read(&pkg).unwrap();
     let imp = import(&pkg);
     let (pic, table) = (object_line(&imp.text, "picture"), object_line(&imp.text, "table"));
-    assert!(imp.text.contains(&format!("::title::\n분기별 매출\n{table}{pic}::notes::")), "{}", imp.text);
+    assert!(
+        imp.text.contains(&format!("::title box=\"36 22 648 90\"::\n분기별 매출\n{table}{pic}::notes::")),
+        "{}",
+        imp.text
+    );
     let s4 = slides(&before)[3].clone();
     // Moving one changes the z-order and nothing else.
     let moved = imp.text.replace(&format!("{table}{pic}"), &format!("{pic}{table}"));

@@ -6,11 +6,16 @@
 //!
 //! - The slide part and its notes page: a [`Kind::Slide`] entry each on the
 //!   slide head, holding the part as it is but for the modelled shapes, which
-//!   are stand-ins (`hanji-item`). Connectors, shapes without text,
-//!   transitions and animations stay there.
-//! - A picture, chart, table, group or other object that is not a layout
-//!   placeholder: an `object` head and its `<keep/>` line (rule 8; a `Bkeep`
-//!   entry tagged `object`), in z-order among the slots and shapes.
+//!   are stand-ins (`hanji-item`). Transitions and animations stay there.
+//! - A picture, chart, table or other object that is not a layout
+//!   placeholder, and a rotated or flipped group: an `object` head and its
+//!   `<keep/>` line (rule 8; a `Bkeep` entry tagged `object`), in z-order
+//!   among the slots and shapes.
+//! - A shape without text, a connector (`<line/>`) and a group (`<group>`,
+//!   its objects in its head's place): a head and a [`Kind::Shape`] entry
+//!   holding the element whole.
+//! - Every head but the slide's and the notes' carries its geometry (§5.3):
+//!   a slot its own box, else the one it inherits from its layout.
 //! - A placeholder with text: a slot (`::title::`); its element without its
 //!   paragraphs is a [`Kind::Shape`] entry on the slot's head. One without
 //!   text is left out of the text and kept in the slide entry (`hanji-latent`)
@@ -25,13 +30,14 @@
 
 use serde::{Deserialize, Serialize};
 
-use hanji_core::presentation::{object_head, shape_head, slide_head, slot_head};
+use hanji_core::presentation::{group_head, line_head, object_head, shape_head, slide_head, slot_head};
 use hanji_core::{Block, Entry, KeepIds, Kind, ListItem, Meta, Para};
-use hanji_format::{Atom, Inline, Keep, Marks, Unit};
+use hanji_format::{Atom, Geom, GroupItem, Inline, Keep, LineItem, Marks, ObjectItem, ShapeText, SlideItem, Unit};
 use hanji_package::clip;
 use hanji_package::xml::{canon, fp, is_blank, Element, Node, Scope};
 
 use crate::deck::{LayoutInfo, SlotInfo};
+use crate::geom::{self, Frame};
 use crate::pml::*;
 
 /// Where a slide came from, stored on its `Slide` entry.
@@ -70,8 +76,12 @@ pub struct Stats {
     pub notes: usize,
     /// Objects shown as `<keep/>` lines (pictures, charts, tables, groups, …).
     pub objects: usize,
-    /// Shape-tree children kept in the skeleton (connectors, shapes without text, …).
+    /// Shape-tree children kept in the skeleton (empty placeholders the layout does not have, …).
     pub kept: usize,
+    /// Shapes without text, lines and groups shown with their geometry.
+    pub bare: usize,
+    pub lines: usize,
+    pub groups: usize,
     pub list_items: usize,
 }
 
@@ -84,7 +94,7 @@ pub struct Importer<'a> {
     keep_ids: KeepIds,
     buf: Vec<Unit>,
     pub stats: Stats,
-    /// Shapes shown as `<shape>`: `(id, name)`.
+    /// Shapes shown as `<shape>`, `<line/>` or `<group>`: `(id, name)`.
     pub shapes: Vec<(String, String)>,
     /// The part being read.
     part: String,
@@ -99,6 +109,10 @@ enum What<'s> {
     KeepSlot(&'s SlotInfo),
     Latent(&'s SlotInfo),
     Shape(String, String),
+    /// A shape without text that is not a placeholder.
+    Bare(String, String),
+    Line(String, String),
+    Group(String, String),
     Object,
     Other,
 }
@@ -206,37 +220,64 @@ impl Importer<'_> {
                         &[("k", &k.to_string()), ("slot", &slot.name)],
                         Some(fallback),
                     )));
-                    self.blocks.push(slot_head(&slot.name));
-                    self.text_shape(&el, &slot.bullets, &k.to_string(), true)?;
+                    let g = geom::own(&el).or(slot.geom);
+                    self.blocks.push(slot_head(&slot.name, g));
+                    self.text_shape(&el, &slot.bullets, &k.to_string(), true, g)?;
                 }
                 What::KeepSlot(slot) => {
                     used.push(slot.name.clone());
                     k += 1;
                     self.stats.keep_slots += 1;
                     tree.children.push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
-                    self.blocks.push(slot_head(&slot.name));
+                    let g = object_geom(&el).or(slot.geom);
+                    self.blocks.push(slot_head(&slot.name, g));
                     let bj = self.blocks.len();
                     let keep = self.keep_entry(Kind::Bkeep, &el, &[bj], None, &k.to_string(), "");
+                    self.entries.last_mut().unwrap().meta.aux.push(shown(g));
                     self.blocks.push(Block::Keep(keep.id));
                 }
                 What::Object => {
                     k += 1;
                     self.stats.objects += 1;
                     tree.children.push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
-                    self.blocks.push(object_head());
+                    let g = object_geom(&el);
+                    self.blocks.push(object_head(g));
                     let bj = self.blocks.len();
                     let keep = self.keep_entry(Kind::Bkeep, &el, &[bj], None, &k.to_string(), OBJECT_TAG);
+                    self.entries.last_mut().unwrap().meta.aux.push(shown(g));
                     self.blocks.push(Block::Keep(keep.id));
                 }
                 What::Shape(id, name) => {
                     k += 1;
                     self.stats.shapes += 1;
                     tree.children.push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
-                    self.blocks.push(shape_head(&id, &name));
-                    if !self.shapes.iter().any(|s| s.0 == id && s.1 == name) {
-                        self.shapes.push((id, name));
-                    }
-                    self.text_shape(&el, &layout.other, &k.to_string(), false)?;
+                    let g = geom::own(&el);
+                    self.blocks.push(shape_head(&id, &name, g));
+                    self.name_shape(id, name);
+                    self.text_shape(&el, &layout.other, &k.to_string(), false, g)?;
+                }
+                What::Bare(ref id, ref name) | What::Line(ref id, ref name) | What::Group(ref id, ref name) => {
+                    let (id, name) = (id.clone(), name.clone());
+                    k += 1;
+                    tree.children.push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
+                    let head = match &what {
+                        What::Bare(..) => {
+                            self.stats.bare += 1;
+                            shape_head(&id, &name, geom::own(&el))
+                        }
+                        What::Line(..) => {
+                            self.stats.lines += 1;
+                            let g = geom::own(&el).unwrap_or_default();
+                            line_head(&id, &name, geom::ends_of(&g))
+                        }
+                        _ => {
+                            self.stats.groups += 1;
+                            group_head(&group_item(&el, &Frame::SLIDE).ok_or("a group that cannot be shown")?)
+                        }
+                    };
+                    self.blocks.push(head);
+                    self.name_shape(id, name);
+                    self.whole(&el, &k.to_string());
                 }
             }
         }
@@ -271,8 +312,8 @@ impl Importer<'_> {
             let shape = std::mem::take(el);
             if has_text(&shape) {
                 *el = wrap(ITEM, &[("k", "notes"), ("slot", "notes")], Some(emptied(&shape)));
-                self.blocks.push(slot_head("notes"));
-                self.text_shape(&shape, &bullets, "notes", true)?;
+                self.blocks.push(slot_head("notes", None));
+                self.text_shape(&shape, &bullets, "notes", true, None)?;
             } else {
                 *el = wrap(LATENT, &[("slot", "notes")], Some(shape));
             }
@@ -288,10 +329,37 @@ impl Importer<'_> {
         Ok(())
     }
 
+    fn name_shape(&mut self, id: String, name: String) {
+        if !self.shapes.iter().any(|s| s.0 == id && s.1 == name) {
+            self.shapes.push((id, name));
+        }
+    }
+
+    /// A shape without text, a line or a group: its element whole, a `Shape`
+    /// entry on the head just pushed.
+    fn whole(&mut self, el: &Element, k: &str) {
+        let hi = self.blocks.len() - 1;
+        let f = self.fp(&[Some(el)]);
+        let meta = Meta {
+            tag: el.name.clone(),
+            aux: vec![k.to_string(), self.part.clone(), shown(geom::own(el))],
+            ..Default::default()
+        };
+        self.entry(Kind::Shape, vec![el.to_xml()], f, &[hi], None, None, meta);
+    }
+
     /// A shape's element (a `Shape` entry on the head just pushed) and its
     /// paragraphs. Without `lists` (a `<shape>`, whose text has no list
-    /// items) a paragraph's bullet stays in the remainder.
-    fn text_shape(&mut self, el: &Element, inherited: &[Bu; 9], k: &str, lists: bool) -> Result<(), String> {
+    /// items) a paragraph's bullet stays in the remainder. `g` is the box
+    /// the text shows for it.
+    fn text_shape(
+        &mut self,
+        el: &Element,
+        inherited: &[Bu; 9],
+        k: &str,
+        lists: bool,
+        g: Option<Geom>,
+    ) -> Result<(), String> {
         let hi = self.blocks.len() - 1;
         let mut shell = el.clone();
         let tx = shell.child_mut("p:txBody").ok_or("a text shape without p:txBody")?;
@@ -305,7 +373,11 @@ impl Importer<'_> {
             }
         }
         let f = self.fp(&[Some(&fshell)]);
-        let meta = Meta { tag: shell.name.clone(), aux: vec![k.to_string(), self.part.clone()], ..Default::default() };
+        let meta = Meta {
+            tag: shell.name.clone(),
+            aux: vec![k.to_string(), self.part.clone(), shown(g)],
+            ..Default::default()
+        };
         self.entry(Kind::Shape, vec![shell.to_xml()], f, &[hi], None, None, meta);
         self.list = None;
         let bullets = if lists { bullets } else { [Bu::None; 9] };
@@ -321,7 +393,7 @@ impl Importer<'_> {
     /// A placeholder entry for `el`; `tag` marks a slide object's.
     fn keep_entry(&mut self, kind: Kind, el: &Element, path: &[usize], pos: Option<usize>, k: &str, tag: &str) -> Keep {
         let fpv = self.fp(&[Some(el)]);
-        let id = self.keep_ids.next(&fpv);
+        let id = self.keep_ids.next(&self.fp(&[Some(&geom::without_geometry(el))]));
         let keep = Keep { id, kind: keep_kind(el), summary: summary(el) };
         let aux = if kind == Kind::Bkeep { vec![k.to_string(), self.part.clone()] } else { vec![] };
         let meta = Meta { keep: Some(keep.clone()), aux, tag: tag.into(), ..Default::default() };
@@ -467,14 +539,113 @@ fn what<'s>(el: &Element, layout: &'s LayoutInfo, used: &[String]) -> What<'s> {
         }
     }
     let id = c_nv_pr(el).and_then(|c| c.get("id")).filter(|v| v.parse::<u32>().is_ok());
+    let name = || c_nv_pr(el).and_then(|c| c.get("name")).unwrap_or_default();
     match (text, id) {
-        (true, Some(id)) => {
-            let name = c_nv_pr(el).and_then(|c| c.get("name")).unwrap_or_default();
-            What::Shape(format!("s{id}"), name)
+        (true, Some(id)) => What::Shape(format!("s{id}"), name()),
+        (_, Some(id)) if el.is("p:grpSp") && group_item(el, &Frame::SLIDE).is_some() => {
+            What::Group(format!("g{id}"), name())
         }
         _ if is_object(el) => What::Object,
+        (false, Some(id)) if el.is("p:sp") && ph.is_none() => What::Bare(format!("s{id}"), name()),
+        (_, Some(id)) if el.is("p:cxnSp") && geom::own(el).is_some() => What::Line(format!("s{id}"), name()),
         _ => What::Other,
     }
+}
+
+/// The box stored with an entry: the one the text showed for it at import.
+pub fn shown(g: Option<Geom>) -> String {
+    serde_json::to_string(&g).unwrap()
+}
+
+/// The box an entry's `aux` says the text showed (see [`shown`]).
+pub fn shown_of(aux: &[String]) -> Option<Geom> {
+    aux.get(2).and_then(|a| serde_json::from_str(a).ok()).flatten()
+}
+
+/// An object's own box; an alternate-content object's is its first choice's.
+pub fn object_geom(el: &Element) -> Option<Geom> {
+    match chosen(el) {
+        Some(inner) => geom::own(inner),
+        None => geom::own(el),
+    }
+}
+
+/// A group as the text shows it (§5.3): its box and its objects in slide
+/// coordinates, through `parent` (the frame the group sits in). `None` for
+/// a rotated or flipped group, or one with an object the text cannot show:
+/// it is one `<keep/>`.
+pub fn group_item(el: &Element, parent: &Frame) -> Option<GroupItem> {
+    let id = geom::shape_id(el)?;
+    let name = c_nv_pr(el)?.get("name").unwrap_or_default();
+    let own = geom::own(el)?;
+    if own.rot != 0 || own.flip_h || own.flip_v {
+        return None;
+    }
+    let f = Frame::of(el)?.within(parent);
+    let mut items = vec![];
+    for c in el.elements() {
+        match c.name.as_str() {
+            "p:nvGrpSpPr" | "p:grpSpPr" | "p:extLst" => {}
+            _ => items.push(member(c, &f)?),
+        }
+    }
+    (!items.is_empty()).then(|| GroupItem { id: format!("g{id}"), name, geom: Some(parent.out(&own)), items })
+}
+
+/// One object of a group, in slide coordinates through `f`.
+fn member(c: &Element, f: &Frame) -> Option<SlideItem> {
+    let id = geom::shape_id(c)?;
+    let name = c_nv_pr(c).and_then(|x| x.get("name")).unwrap_or_default();
+    Some(match c.name.as_str() {
+        "p:sp" => SlideItem::Shape(ShapeText {
+            id: format!("s{id}"),
+            name,
+            geom: geom::own(c).map(|g| f.out(&g)),
+            paras: member_paras(c),
+        }),
+        "p:cxnSp" => {
+            let g = f.out(&geom::own(c)?);
+            SlideItem::Line(LineItem { id: format!("s{id}"), name, ends: geom::ends_of(&g) })
+        }
+        "p:grpSp" if group_item(c, f).is_some() => SlideItem::Group(group_item(c, f)?),
+        _ if is_object(c) => SlideItem::Object(ObjectItem {
+            keep: Keep { id: format!("s{id}"), kind: keep_kind(c), summary: summary(c) },
+            geom: object_geom(c).map(|g| f.out(&g)),
+        }),
+        _ => return None,
+    })
+}
+
+/// A group member's paragraphs as the text shows them (read only): runs
+/// and fields as their text with their marks, line breaks; none when it
+/// has no text.
+fn member_paras(sp: &Element) -> Vec<Inline> {
+    let Some(tx) = sp.child("p:txBody").filter(|_| has_text(sp)) else { return vec![] };
+    tx.elements()
+        .filter(|p| p.is("a:p"))
+        .map(|p| {
+            let mut units = vec![];
+            for c in p.elements() {
+                match c.name.as_str() {
+                    "a:r" | "a:fld" => {
+                        let m = marks_of(c.child("a:rPr"));
+                        let t = c.text_of(&["a:t"]);
+                        units.extend(
+                            t.chars().filter(|ch| *ch as u32 >= 0x20).map(|ch| Unit { atom: Atom::Char(ch), marks: m }),
+                        );
+                    }
+                    "a:br" => units.push(Unit { atom: Atom::Break, marks: Marks::NONE }),
+                    _ => {}
+                }
+            }
+            if units.iter().all(|u| matches!(u.atom, Atom::Char(c) if c.is_whitespace())) {
+                units.clear();
+            }
+            let mut i = Inline { units, spans: vec![] };
+            i.normalize();
+            i
+        })
+        .collect()
 }
 
 /// A picture, graphic frame (chart, table, SmartArt, OLE object), group,

@@ -213,11 +213,13 @@ fn a_new_presentation_written_whole() {
     let (rev, _) = s.read(&id);
     let text = "---\ntype: presentation\nformat: pptx\nschema: 1\n---\n\nlayout: Title Slide\n::title::\n3분기 보고\n\n---\n\nlayout: Title and Content\n::title::\n핵심 지표\n::body::\n- 매출 12% 증가\n::notes::\n강조\n";
     s.ok("hanji_write", json!({"doc_id": id, "revision": rev, "text": text}));
-    assert_eq!(s.read(&id).1, text);
+    // Stored in canonical form (§5.3): the slide size, and each slot's box from its layout.
+    let canonical = "---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 960 x 540 pt\n---\n\nlayout: Title Slide\n::title box=\"120 88 720 188\"::\n3분기 보고\n\n---\n\nlayout: Title and Content\n::title box=\"66 29 828 104\"::\n핵심 지표\n::body box=\"66 144 828 343\"::\n- 매출 12% 증가\n::notes::\n강조\n";
+    assert_eq!(s.read(&id).1, canonical);
     let out = s.path("deck.pptx");
     s.ok("hanji_export", json!({"doc_id": id, "path": out}));
     let back = s.ok("hanji_open", json!({"path": out})).json();
-    assert_eq!(s.read(back["doc_id"].as_str().unwrap()).1, text);
+    assert_eq!(s.read(back["doc_id"].as_str().unwrap()).1, canonical);
     let v = s.ok("hanji_validate", json!({"text": text.replace("Title Slide", "Title Slid"), "doc_id": id})).json();
     assert_eq!(v["valid"], false);
     assert!(v["diagnostics"][0]["message"].as_str().unwrap().contains("\"Title Slide\""), "{v}");

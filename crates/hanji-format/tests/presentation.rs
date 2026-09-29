@@ -60,6 +60,8 @@ fn design_example_is_canonical() {
             SlideItem::Slot(s) => s.name.as_str(),
             SlideItem::Shape(_) => "shape",
             SlideItem::Object(_) => "object",
+            SlideItem::Line(_) => "line",
+            SlideItem::Group(_) => "group",
         })
         .collect();
     assert_eq!(names, ["title", "body", "notes"]);
@@ -196,17 +198,15 @@ fn slot_text_has_no_styles_headings_or_tables() {
 #[test]
 fn shapes_come_from_the_file() {
     let e = errors("\nlayout: Blank\n<shape id=\"s9\" name=\"new\">x</shape>\n");
-    assert!(e[0].contains("is not a shape of this file") && e[0].contains("never create one"), "{e:?}");
+    assert!(e[0].contains("is not a shape of this file") && e[0].contains("written without them"), "{e:?}");
     let e = errors("\nlayout: Blank\n<shape id=\"s4\" name=\"renamed\">x</shape>\n");
     assert!(e[0].contains("is named \"출처\" in the file"), "{e:?}");
-    let e = errors("\nlayout: Blank\n<shape id=\"s4\" name=\"출처\"></shape>\n");
-    assert!(e[0].contains("a shape without text is not shown"), "{e:?}");
     let e = errors("\nlayout: Blank\n<shape id=\"s4\" name=\"출처\">x\n");
     assert!(e[0].contains("not closed by </shape>"), "{e:?}");
     let e = errors("\nlayout: Blank\n<shape id=\"s4\" name=\"출처\">x</shape> tail\n");
     assert!(e[0].contains("nothing may follow </shape>"), "{e:?}");
     let e = errors("\nlayout: Blank\n<shape id=\"s4\" name=\"출처\" x=\"1\">x</shape>\n");
-    assert!(e[0].contains("the attributes id and name only"), "{e:?}");
+    assert!(e[0].contains("<shape> has no attribute \"x\""), "{e:?}");
     let e =
         errors("\nlayout: Blank\n<shape id=\"s4\" name=\"출처\">x</shape>\n<shape id=\"s4\" name=\"출처\">y</shape>\n");
     assert!(e[0].contains("appears twice on this slide"), "{e:?}");
@@ -214,6 +214,93 @@ fn shapes_come_from_the_file() {
     let text =
         format!("{FM}\nlayout: Two Content\n::left::\n- a\n<shape id=\"s4\" name=\"출처\">x</shape>\n::right::\n- b\n");
     assert_eq!(roundtrip(&text), text);
+    // A shape without text is one tag; empty text reads as none.
+    let text = format!("{FM}\nlayout: Blank\n<shape id=\"s4\" name=\"출처\" box=\"36 475 288 29\"/>\n");
+    assert_eq!(roundtrip(&text), text);
+    let empty = format!("{FM}\nlayout: Blank\n<shape id=\"s4\" name=\"출처\" box=\"36 475 288 29\"></shape>\n");
+    assert_eq!(roundtrip(&empty), text);
+    // A new text box has no id or name, and needs its box and its text.
+    let text = format!("{FM}\nlayout: Blank\n<shape box=\"36 112 648 28\">단위: 억 원</shape>\n");
+    assert_eq!(roundtrip(&text), text);
+    let e = errors("\nlayout: Blank\n<shape>단위</shape>\n");
+    assert!(e[0].contains("a new text box needs its box"), "{e:?}");
+    let e = errors("\nlayout: Blank\n<shape box=\"1 2 3 4\"/>\n");
+    assert!(e[0].contains("a new text box holds its text"), "{e:?}");
+    let e = errors("\nlayout: Blank\n<shape id=\"s4\">x</shape>\n");
+    assert!(e[0].contains("needs both id and name"), "{e:?}");
+}
+
+#[test]
+fn boxes_are_points_and_numbers_are_checked() {
+    let text = format!(
+        "{FM}\nlayout: Two Content\n::title box=\"36 22 648 90\"::\n지역별 현황\n::left box=\"36 126 318 356\" rot=\"15\" flip=\"h\"::\n- a\n<keep id=\"k6\" kind=\"picture\" summary=\"map\" box=\"402 78 144 132\"/>\n<shape id=\"s4\" name=\"출처\" box=\"-3 475 288 29\">x</shape>\n"
+    );
+    assert_eq!(roundtrip(&text), text);
+    let p = parse(&text).unwrap();
+    let SlideItem::Slot(t) = &p.pres.slides[0].items[0] else { panic!() };
+    assert_eq!(t.geom, Some(Geom { x: 457_200, y: 279_400, w: 8_229_600, h: 1_143_000, ..Default::default() }));
+    let SlideItem::Slot(l) = &p.pres.slides[0].items[1] else { panic!() };
+    assert_eq!((l.geom.unwrap().rot, l.geom.unwrap().flip_h), (900_000, true));
+    // Decimals are read exactly and shown as whole points.
+    let dec = format!("{FM}\nlayout: Blank\n<shape box=\"36.4 22.5 0.01 90\">x</shape>\n");
+    let p = parse(&dec).unwrap();
+    let SlideItem::Shape(sh) = &p.pres.slides[0].items[0] else { panic!() };
+    assert_eq!(sh.geom.unwrap().x, 462_280);
+    assert_eq!(sh.geom.unwrap().w, 127);
+    assert!(serialize_presentation(&p.pres).contains("box=\"36 23 0 90\""));
+    for (bad, want) in [
+        ("::title box=\"1 2 3\"::\nx\n", "is not a box"),
+        ("::title box=\"1 2 -3 4\"::\nx\n", "negative width or height"),
+        ("::title box=\"a b c d\"::\nx\n", "is not a box"),
+        ("::title size=\"1\"::\nx\n", "a slot marker has no attribute \"size\""),
+        ("::title rot=\"5\"::\nx\n", "goes with a box"),
+        ("::notes box=\"1 2 3 4\"::\nx\n", "::notes:: has no box"),
+        ("<shape box=\"1 2 3 4\" flip=\"x\">t</shape>\n", "is not a flip"),
+    ] {
+        let e = errors(&format!("\nlayout: Title and Content\n{bad}"));
+        assert!(e.iter().any(|x| x.contains(want)), "{bad}: {e:?}");
+    }
+    // The slide size is front matter, in points.
+    let sized = "---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 720 x 540 pt\n---\n";
+    let p = parse_presentation(sized, &Names::default()).unwrap();
+    assert_eq!(p.pres.front.size, Some((9_144_000, 6_858_000)));
+    assert_eq!(serialize_presentation(&p.pres), sized);
+    let e = parse_presentation("---\ntype: presentation\nformat: pptx\nschema: 1\nsize: big\n---\n", &Names::default())
+        .unwrap_err();
+    assert!(e[0].to_string().contains("is not a slide size"), "{e:?}");
+}
+
+#[test]
+fn lines_and_groups() {
+    let text = format!(
+        "{FM}\nlayout: Blank\n<line id=\"s6\" name=\"Straight Connector 5\" from=\"84 144\" to=\"252 144\"/>\n<group id=\"g5\" name=\"Group 4\" box=\"120 108 258 152\">\n<shape id=\"s2\" name=\"Rectangle 1\" box=\"120 108 138 60\"/>\n<group id=\"g7\" name=\"Inner\" box=\"306 150 72 72\">\n<shape id=\"s3\" name=\"Oval 2\" box=\"306 150 72 72\">in</shape>\n</group>\n<keep id=\"s9\" kind=\"picture\" summary=\"x\" box=\"1 2 3 4\"/>\n</group>\n<line from=\"0 0\" to=\"10 10\"/>\n"
+    );
+    let names = Names::default();
+    let p = parse_presentation(&text, &names).unwrap_or_else(|e| panic!("{e:?}"));
+    assert_eq!(serialize_presentation(&p.pres), text);
+    let items = &p.pres.slides[0].items;
+    assert!(matches!(&items[0], SlideItem::Line(l) if l.ends.from == (84 * 12_700, 144 * 12_700)));
+    let SlideItem::Group(g) = &items[1] else { panic!() };
+    assert_eq!(g.items.len(), 3);
+    assert!(matches!(&g.items[1], SlideItem::Group(inner) if inner.items.len() == 1));
+    assert!(matches!(&items[2], SlideItem::Line(l) if l.id.is_empty()));
+    for (bad, want) in [
+        ("<group id=\"g5\" name=\"G\">\n<shape id=\"s2\" name=\"R\"/>\n", "is not closed"),
+        ("</group>\n", "without a <group"),
+        ("<group id=\"g5\" name=\"G\">\n</group>\n", "a group without objects"),
+        ("<group>\n<shape id=\"s2\" name=\"R\"/>\n</group>\n", "groups are never created"),
+        ("<group id=\"g5\" name=\"G\">\n<shape box=\"1 2 3 4\">new</shape>\n</group>\n", "never added"),
+        ("<group id=\"g5\" name=\"G\">\n::title::\nx\n</group>\n", "a slot is never in a group"),
+        ("<line from=\"1 2\"/>\n", "both its ends"),
+        ("<line from=\"1\" to=\"2 3\"/>\n", "is not a point"),
+        ("<line id=\"s6\" from=\"1 2\" to=\"2 3\"/>\n", "needs both id and name"),
+    ] {
+        let e: Vec<String> = match parse_presentation(&format!("{FM}\nlayout: Blank\n{bad}"), &names) {
+            Ok(_) => vec![],
+            Err(e) => e.iter().map(|d| d.to_string()).collect(),
+        };
+        assert!(e.iter().any(|x| x.contains(want)), "{bad}: {e:?}");
+    }
 }
 
 #[test]
@@ -247,8 +334,9 @@ fn objects_are_keep_lines_among_the_slots() {
         .iter()
         .map(|i| match i {
             SlideItem::Slot(s) => s.name.clone(),
-            SlideItem::Object(k) => k.id.clone(),
+            SlideItem::Object(o) => o.keep.id.clone(),
             SlideItem::Shape(_) => "shape".into(),
+            SlideItem::Line(_) | SlideItem::Group(_) => unreachable!(),
         })
         .collect();
     // k5 ends the title slot; k1, a slot's object, is the body's text.
@@ -266,7 +354,6 @@ fn objects_are_keep_lines_among_the_slots() {
 }
 
 #[test]
-#[ignore = "DESIGN.md §5.3 now writes geometry (size, box, <line>), which hanji-format reads once the geometry implementation lands; re-enable it then"]
 fn the_design_md_example_parses() {
     // DESIGN.md §5.3's example, read from the spec itself so the two cannot drift.
     let spec = include_str!("../../../DESIGN.md");
@@ -282,8 +369,11 @@ fn the_design_md_example_parses() {
         .map(|i| match i {
             SlideItem::Slot(s) => format!("::{}::", s.name),
             SlideItem::Shape(sh) => format!("shape {} ({} paragraphs)", sh.id, sh.paras.len()),
-            SlideItem::Object(k) => format!("object {}", k.kind),
+            SlideItem::Object(o) => format!("object {}", o.keep.kind),
+            SlideItem::Line(l) => format!("line {}", l.id),
+            SlideItem::Group(g) => format!("group {}", g.id),
         })
         .collect();
-    assert_eq!(items, ["object picture", "::title::", "::left::", "::right::", "shape s4 (2 paragraphs)"]);
+    assert_eq!(items, ["::title::", "::left::", "::right::", "object picture", "shape s4 (2 paragraphs)", "line s6"]);
+    assert_eq!(p.pres.front.size, Some((720 * 12_700, 540 * 12_700)));
 }

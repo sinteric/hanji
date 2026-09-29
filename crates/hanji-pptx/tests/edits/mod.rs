@@ -151,9 +151,15 @@ fn p3_add_slide(d: &Doc, cx: &Cx) -> Option<Edit> {
         .find(|l| has(l, "title") && has(l, "body"))
         .or_else(|| sh.deck.layouts.iter().find(|l| has(l, "title")))?;
     let mut blocks = d.blocks.clone();
-    blocks.extend([slide_head(&layout.name), slot_head("title"), para("새 슬라이드 제목", None)]);
+    // Written with bare markers, a new slide reads back with each slot's layout box (§5.3).
+    let at = |n: &str| layout.slot(n).and_then(|s| s.geom);
+    blocks.extend([slide_head(&layout.name), slot_head("title", at("title")), para("새 슬라이드 제목", None)]);
     if has(&layout, "body") {
-        blocks.extend([slot_head("body"), para("첫째 항목", item(true, 0)), para("둘째 항목 12", item(false, 1))]);
+        blocks.extend([
+            slot_head("body", at("body")),
+            para("첫째 항목", item(true, 0)),
+            para("둘째 항목 12", item(false, 1)),
+        ]);
     }
     let n = d.blocks.len();
     let count = slides(&d.blocks).len() + 1;
@@ -281,7 +287,7 @@ fn p6_notes(d: &Doc, cx: &Cx) -> Option<Edit> {
     let ss = slides(&d.blocks);
     let s = ss.iter().find(|s| !(s.head..s.end).any(|k| d.blocks[k].head().is_some_and(|h| h.key == "slot:notes")))?;
     let mut blocks = d.blocks.clone();
-    blocks.splice(s.end..s.end, [slot_head("notes"), para("발표자 메모 12", None)]);
+    blocks.splice(s.end..s.end, [slot_head("notes", None), para("발표자 메모 12", None)]);
     let bmap = (0..d.blocks.len()).map(|k| Some(if k < s.end { k } else { k + 2 })).collect();
     let touched = if s.end < d.blocks.len() { HashSet::from([s.end]) } else { HashSet::new() };
     let what = format!("notes for {}", slide_name(&d.blocks, s.head));

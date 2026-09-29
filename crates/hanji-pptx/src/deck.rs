@@ -25,6 +25,10 @@ pub struct SlotInfo {
     /// Per level, the bullet the slot's paragraphs inherit: the layout's list
     /// style over the master placeholder's over the master text style.
     pub bullets: [Bu; 9],
+    /// The box a slide placeholder of this slot inherits: the layout
+    /// placeholder's own, else its master placeholder's.
+    #[serde(default)]
+    pub geom: Option<hanji_format::Geom>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -48,6 +52,9 @@ pub struct NotesMaster {
 pub struct Deck {
     pub layouts: Vec<LayoutInfo>,
     pub notes: Option<NotesMaster>,
+    /// The slide size in EMU (`p:sldSz`).
+    #[serde(default)]
+    pub size: Option<(i64, i64)>,
 }
 
 impl LayoutInfo {
@@ -71,7 +78,8 @@ impl Deck {
     }
 
     pub fn read(parts: &[Part], pres_part: &str, pres: &Element) -> Result<Deck, String> {
-        let mut deck = Deck::default();
+        let size = pres.child("p:sldSz").and_then(|s| Some((s.get("cx")?.parse().ok()?, s.get("cy")?.parse().ok()?)));
+        let mut deck = Deck { size, ..Default::default() };
         let ids: Vec<String> = pres
             .child("p:sldMasterIdLst")
             .map(|l| l.elements().filter_map(|e| e.get("r:id")).collect())
@@ -128,6 +136,7 @@ impl Deck {
                         _ => body,
                     };
                     let bullets = over(ph.lst, over(master_ph.map_or([Bu::Unset; 9], |m| m.lst), base_bu));
+                    let geom = ph.geom.or(master_ph.and_then(|m| m.geom));
                     slots.push(SlotInfo {
                         name,
                         ty: ph.ty.clone(),
@@ -136,6 +145,7 @@ impl Deck {
                         shape_name: ph.name.clone(),
                         class,
                         bullets,
+                        geom,
                     });
                 }
                 deck.layouts.push(LayoutInfo { name, part: lpart, slots, other });
@@ -183,6 +193,7 @@ pub(crate) struct Ph {
     pub name: String,
     pub x: Option<i64>,
     pub lst: [Bu; 9],
+    pub geom: Option<hanji_format::Geom>,
 }
 
 /// The placeholders of a master's or layout's shape tree, in order.
@@ -199,7 +210,7 @@ pub(crate) fn placeholders(root: &Element) -> Vec<Ph> {
                 .and_then(|v| v.parse().ok());
             let lst = levels_of(sh.child("p:txBody").and_then(|t| t.child("a:lstStyle")));
             let name = c_nv_pr(sh).and_then(|c| c.get("name")).unwrap_or_default();
-            Some(Ph { ty, idx, ph: ph.to_xml(), name, x, lst })
+            Some(Ph { ty, idx, ph: ph.to_xml(), name, x, lst, geom: crate::geom::own(sh) })
         })
         .collect()
 }

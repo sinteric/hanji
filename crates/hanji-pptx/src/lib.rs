@@ -14,6 +14,7 @@
 
 pub mod deck;
 pub mod export;
+pub mod geom;
 pub mod import;
 pub mod pml;
 pub mod safety;
@@ -99,8 +100,33 @@ impl TextModel for PptxModel {
         caps: Capabilities,
     ) -> Result<(Vec<Block>, Vec<BlockSrc>), Vec<Diagnostic>> {
         let shell = DeckShell::of(rem).map_err(|m| vec![Diagnostic { line: 1, col: 1, message: m }])?;
+        check_size(text, shell.deck.size)?;
         let (mut blocks, maps) =
             hanji_core::presentation::model_of(text, &shell.names(rem), caps, &|id| rem.is_block_keep(id))?;
+        // A bare slot marker is the slot where its layout puts it (§5.3): its
+        // box is the layout's, which the canonical text shows.
+        let mut layout = None;
+        for b in &mut blocks {
+            let Block::Head(h) = b else { continue };
+            match hanji_core::presentation::kind(h) {
+                hanji_core::presentation::HeadKind::Slide { layout: l } => layout = shell.deck.layout(l),
+                hanji_core::presentation::HeadKind::Slot { name } if h.place.is_none() && name != "notes" => {
+                    let g = layout.and_then(|l| l.slot(name)).and_then(|s| s.geom);
+                    h.place = g.map(|g| hanji_core::Place::Box(g.shown()));
+                }
+                _ => {}
+            }
+        }
+        // A group written with a new box, or with objects moved, reads back
+        // with its objects and its box where the write puts them (§5.3).
+        for b in &mut blocks {
+            let Block::Head(h) = b else { continue };
+            if let Some(hanji_core::Place::Group(g)) = &h.place {
+                if let Some(c) = canonical_group(g, rem) {
+                    h.place = Some(hanji_core::Place::Group(c));
+                }
+            }
+        }
         // A slide paragraph has no list of its own: items in a row are one list.
         for k in 1..blocks.len() {
             let prev_item = matches!(&blocks[k - 1], Block::Para(p) if p.item.is_some());
@@ -114,10 +140,78 @@ impl TextModel for PptxModel {
     }
 }
 
+/// The group `g` as the write leaves it: its stored element (the one group
+/// of the file with its id, name and objects) with `g` applied, read back.
+/// `None` when no group or more than one matches, or the write refuses it.
+fn canonical_group(g: &fmt::GroupItem, rem: &Remainder) -> Option<fmt::GroupItem> {
+    let frame = geom::Frame::SLIDE;
+    let mut out: Option<fmt::GroupItem> = None;
+    for e in rem.entries.iter().filter(|e| e.kind == hanji_core::Kind::Shape && e.meta.tag == "p:grpSp") {
+        let el = xml::fragment(&e.xml[0]);
+        let Some(st) = import::group_item(&el, &frame) else { continue };
+        if st.id != g.id || st.name != g.name || export::sig(&st.items) != export::sig(&g.items) {
+            continue;
+        }
+        let mut after = el.clone();
+        export::apply_group(&mut after, g, &frame).ok()?;
+        let c = shown_group(import::group_item(&after, &frame)?);
+        if out.as_ref().is_some_and(|o| *o != c) {
+            return None;
+        }
+        out = Some(c);
+    }
+    out
+}
+
+/// A group as its text reads: every number rounded as shown.
+fn shown_group(mut g: fmt::GroupItem) -> fmt::GroupItem {
+    let r = |v: i64| fmt::shown_pt(v) * fmt::EMU_PER_PT;
+    g.geom = g.geom.map(|x| x.shown());
+    for it in &mut g.items {
+        match it {
+            fmt::SlideItem::Shape(sh) => sh.geom = sh.geom.map(|x| x.shown()),
+            fmt::SlideItem::Object(o) => o.geom = o.geom.map(|x| x.shown()),
+            fmt::SlideItem::Line(l) => {
+                l.ends = fmt::Ends { from: (r(l.ends.from.0), r(l.ends.from.1)), to: (r(l.ends.to.0), r(l.ends.to.1)) }
+            }
+            fmt::SlideItem::Group(inner) => *inner = shown_group(inner.clone()),
+            fmt::SlideItem::Slot(_) => {}
+        }
+    }
+    g
+}
+
+/// The front matter's `size:` line, when there is one, is the deck's slide
+/// size: it is shown, never changed here.
+fn check_size(text: &str, size: Option<(i64, i64)>) -> Result<(), Vec<Diagnostic>> {
+    let Some(end) = text.strip_prefix("---\n").and_then(|t| t.find("\n---")) else { return Ok(()) };
+    let Some((k, line)) = text[..end + 4].lines().enumerate().find(|(_, l)| l.trim_start().starts_with("size:")) else {
+        return Ok(());
+    };
+    let want = size.map(|(w, h)| format!("{} x {} pt", fmt::pres::pt(w), fmt::pres::pt(h)));
+    let got = line.trim_start().trim_start_matches("size:").split_whitespace().collect::<Vec<_>>().join(" ");
+    match want {
+        Some(w) if w == got => Ok(()),
+        Some(w) => Err(vec![Diagnostic {
+            line: k + 1,
+            col: 1,
+            message: format!(
+                "size is the deck's slide size, size: {w}, and it cannot be changed here; keep the line as it is."
+            ),
+        }]),
+        None => Err(vec![Diagnostic {
+            line: k + 1,
+            col: 1,
+            message: "this deck states no slide size, so the front matter has no size: line; delete it.".into(),
+        }]),
+    }
+}
+
 impl PptxEngine {
     /// Model text for resolved blocks and a remainder.
     pub fn text_of(blocks: &[Block], rem: &Remainder, template: Option<&str>) -> String {
-        let front = FrontMatter::presentation("pptx", template);
+        let mut front = FrontMatter::presentation("pptx", template);
+        front.size = DeckShell::of(rem).ok().and_then(|s| s.deck.size);
         let p =
             hanji_core::presentation::unresolve(blocks, front, &|id| rem.keep(id).cloned().expect("keep in remainder"));
         fmt::serialize_presentation(&p)

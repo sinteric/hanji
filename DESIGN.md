@@ -382,8 +382,10 @@ layout: Two Content
     inherited values. A marker without a box (`::title::`) removes the slot's
     own box: it sits where its layout puts it, and the text the write returns
     shows that box.
-  - Changing a slide's layout moves every slot whose box was left as shown
-    and inherited to the new layout's place; a slot with its own box keeps it.
+  - Changing a slide's layout keeps every slot where its box says: the text
+    is where the slide is, so a slot whose box was inherited gets it as its
+    own. To put a slot where the new layout puts it, write its marker without
+    a box (or with the new layout's box).
   - Slot names are the layout's placeholder types: `title` (centred or not),
     `subtitle`, `body`, `picture`, `chart`, `table`, `diagram`, `media`,
     `clipart`, `date`, `footer`, `number`. Two body placeholders are `left` and
@@ -412,9 +414,11 @@ layout: Two Content
   geometry stay in the remainder.
 - **Pictures, charts, tables** and other objects the format does not model are
   a `<keep id kind summary box/>` line each (§5.1). They may be moved, resized,
-  reordered or deleted, and their `id`, `kind` and `summary` never change.
-  Resizing a table scales its column widths and row heights; a picture keeps
-  its crop. Deleting one removes its parts; refused while an animation plays
+  reordered or deleted, and their `id`, `kind` and `summary` never change;
+  the id is made from the object without its geometry, so a moved or resized
+  object keeps it. Resizing a table scales its column widths and row heights;
+  a picture keeps its crop. An object stored in more than one form
+  (`mc:AlternateContent`) is shown with its box and not moved here. Deleting one removes its parts; refused while an animation plays
   on it.
 - **Lines and connectors** are `<line id="s6" name="…" from="x y" to="x y"/>`:
   the two ends, not a box. Writing them rewrites `a:off`, `a:ext` and the flips.
@@ -431,15 +435,20 @@ layout: Two Content
   offset and extent), and the group's box is the box around them. Changing the
   group's box moves or scales the whole group, and canonical form writes its
   objects' new boxes. Changing its objects moves the group's box with them. A
-  group box that disagrees with changed objects is refused. A rotated or
-  flipped group is one `<keep kind="group" … box/>`. Groups are never created or
-  ungrouped here.
-- **New objects** are written without `id`; the write gives ids and names, and
-  the text it returns shows them. They are:
+  group box that disagrees with changed objects is refused. An object in a
+  group is written as at the slide's level, a picture or other object as
+  `<keep id="s12" kind summary box/>` with its shape id. Only the boxes of a
+  group's objects change here: their text, names and number stay (refused
+  with the reason). A rotated or flipped group is one
+  `<keep kind="group" … box/>`. Groups are never created or ungrouped here.
+- **New objects** are written without `id`; the export gives ids and names
+  (`TextBox 4`, `Straight Connector 10`), and the file read back shows them.
+  They are:
   - a text box, `<shape box="…">text</shape>`;
   - a picture from a file, `<keep kind="picture" src="…" box="…"/>`, or, in a
     picture slot, the slot's marker holding `<keep kind="picture" src="…"/>`,
-    which takes the slot's box;
+    which takes the slot's box (not built yet: the host has to hand the
+    engine the image; refused until then);
   - a line, `<line from="…" to="…"/>`.
 
   Nothing else is created: a new `<keep/>` of another kind, a new group or an
@@ -857,14 +866,14 @@ v0.7.3; "lossless … regarding content", not formatting).
    Chosen over percent of the slide (one unit-conversion miss) and a 12 × 12
    grid (11 of 30 tasks unwritable, silent misreads). Shapes keep B's one-line
    `<shape>` form (round 5's A wrote them as `::shape::` blocks; B's form
-   landed as often, and is one line for a shape without text). It also fixes a rule 8 gap: the old
-   text left out connectors and textless shapes (9 of the 19 objects in
+   landed as often, and is one line for a shape without text). It also
+   fixes a rule 8 gap: the old text left out connectors and textless shapes (9 of the 19 objects in
    shapes.pptx). Across the 21 corpus decks, 36% of slide placeholders have
    their own box. A schema-1 text without boxes still reads unchanged.
    Deferred: rerouting attached connectors (an edit that moves an attached
    object without rewriting its connectors is refused, §5.3), editing inside
-   rotated groups (kept whole), and cm as a view or input over points (the
-   unit Korean PowerPoint shows; not measured).
+   rotated groups (kept whole), pictures from a file, and cm as a view or
+   input over points (the unit Korean PowerPoint shows; not measured).
 
 ## 11. Blind spots
 
