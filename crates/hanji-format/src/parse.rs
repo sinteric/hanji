@@ -26,6 +26,8 @@ pub enum BlockMapKind {
     Para(ParaMap),
     /// Per row and column, one map per cell paragraph; `None` for a `||` cell.
     Table(Vec<Vec<Option<Vec<ParaMap>>>>),
+    /// Per list item: its line's byte range and its map.
+    List(Vec<(usize, usize, ParaMap)>),
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -148,7 +150,7 @@ const FM_FORM: &str = "a line ---, the lines type: document, format: …, templa
 const P_FORM: &str =
     "<p/> and <p style=\"Name\"/> are single tags that start a paragraph: no </p>, and no attribute but style.";
 const INLINE_TAGS: &str =
-    "<u>…</u>, <br/>, <field name=\"…\">…</field>, <keep id=\"…\" kind=\"…\" summary=\"…\"/>, and <p/> in a table cell";
+    "<u>…</u>, <br/>, <math>…</math>, <field name=\"…\">…</field>, <keep id=\"…\" kind=\"…\" summary=\"…\"/>, and <p/> in a table cell";
 
 impl<'a> Parser<'a> {
     fn err(&mut self, line: usize, col: usize, msg: impl Into<String>) {
@@ -296,6 +298,9 @@ impl<'a> Parser<'a> {
                 }
             }
         }
+        if list_marker(text).is_some() {
+            return self.list(i);
+        }
         if let Some(msg) = unsupported_block(text) {
             self.err(i, 1, msg);
             return Some((Block::PageBreak, dummy(at), i + 1));
@@ -303,6 +308,51 @@ impl<'a> Parser<'a> {
         let src = chars_of(&self.lines[i], 0);
         let (content, units) = self.inline(i, &src, false)?.0;
         para(Block::Para(Para { style: ParaStyle::Plain, content }), units)
+    }
+
+    /// Consecutive list item lines from line `i`. An item nests under the one
+    /// before by indenting to its content column (2 spaces under `- `, 3 under
+    /// `1. `).
+    fn list(&mut self, i: usize) -> Option<(Block, BlockMap, usize)> {
+        let (mut items, mut maps) = (vec![], vec![]);
+        // Content column widths of the open ancestors, by level.
+        let mut widths: Vec<usize> = vec![];
+        let mut j = i;
+        let before = self.errors.len();
+        while let Some(m) = self.lines.get(j).and_then(|l| list_marker(l.text)) {
+            let line = &self.lines[j];
+            if line.text[..m.indent].contains('\t') {
+                self.err(j, 1, "list items are indented with spaces, not tabs: 2 spaces under - and 3 under 1.");
+                j += 1;
+                continue;
+            }
+            let columns: Vec<usize> = (0..=widths.len()).map(|k| widths[..k].iter().sum()).collect();
+            let Some(level) = columns.iter().position(|&c| c == m.indent) else {
+                let cols = columns.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(", ");
+                let msg = if widths.is_empty() {
+                    format!("a list starts at the left margin; this item is indented {} spaces.", m.indent)
+                } else {
+                    format!("this item is indented {} spaces. A nested item is indented to its parent's text: 2 spaces under - and 3 under 1. Here an item can be indented {cols} spaces.", m.indent)
+                };
+                self.err(j, 1, msg);
+                j += 1;
+                continue;
+            };
+            widths.truncate(level);
+            widths.push(m.width);
+            let (line_start, line_next, mark) = (line.at, line.next, line.end);
+            let src = chars_of(&self.lines[j], m.content);
+            if let Some(((content, units), _)) = self.inline(j, &src, false) {
+                items.push(Item { ordered: m.ordered, level, content });
+                maps.push((line_start, line_next, ParaMap { units, mark }));
+            }
+            j += 1;
+        }
+        let (start, end) = (self.lines[i].at, self.lines[j - 1].next);
+        if self.errors.len() > before {
+            return Some((Block::PageBreak, dummy(start), j));
+        }
+        Some((Block::List(items), BlockMap { start, end, kind: BlockMapKind::List(maps) }, j))
     }
 
     /// A line holding only `<p/>` or `<p style="Name"/>`: an empty paragraph.
@@ -726,6 +776,22 @@ impl<'a> Parser<'a> {
                         fail!(x, "a tag is not closed by >. Inline tags are {INLINE_TAGS}; write \\< for a literal <.");
                     };
                     match (tag.name.as_str(), tag.closing) {
+                        ("math", false) if !tag.self_closing => {
+                            if !tag.attrs.is_empty() {
+                                fail!(x, "<math> takes no attributes: <math>…</math>.");
+                            }
+                            let Some((body_end, resume)) = math_tag_end(src, after) else {
+                                fail!(x, "<math> is not closed by </math> on the same line.");
+                            };
+                            if body_end == after {
+                                fail!(x, "<math></math> is empty; math holds its formula: <math>x^2</math> or $x^2$.");
+                            }
+                            let body: String = src[after..body_end].iter().map(|s| s.2).collect();
+                            st.push(off, Atom::Math(body));
+                            x = resume;
+                            continue;
+                        }
+                        ("math", _) => fail!(x, "math is <math>…</math> (or $…$); </math> closes an open <math>."),
                         ("br", false) => {
                             if !tag.attrs.is_empty() {
                                 fail!(x, "<br/> takes no attributes.");
@@ -1030,6 +1096,33 @@ fn strip_comment(v: &str) -> &str {
     }
 }
 
+struct ListMarker {
+    /// Leading spaces.
+    indent: usize,
+    ordered: bool,
+    /// Marker plus its space: the content column nested items indent to.
+    width: usize,
+    /// Byte offset of the item's text.
+    content: usize,
+}
+
+/// `- text` or `1. text` (any digits), after leading spaces: a list item line.
+fn list_marker(text: &str) -> Option<ListMarker> {
+    let rest = text.trim_start_matches([' ', '\t']);
+    let indent = text.len() - rest.len();
+    let digits = rest.bytes().take_while(u8::is_ascii_digit).count();
+    let (ordered, len) = match rest.as_bytes() {
+        [b'-', ..] => (false, 1),
+        _ if (1..=9).contains(&digits) && rest[digits..].starts_with('.') => (true, digits + 1),
+        _ => return None,
+    };
+    match rest.as_bytes().get(len) {
+        None => Some(ListMarker { indent, ordered, width: len + 1, content: indent + len }),
+        Some(b' ') => Some(ListMarker { indent, ordered, width: len + 1, content: indent + len + 1 }),
+        _ => None,
+    }
+}
+
 fn heading_level(text: &str) -> Option<u8> {
     let n = text.bytes().take_while(|&b| b == b'#').count();
     let rest = &text[n..];
@@ -1049,15 +1142,12 @@ fn unsupported_block(text: &str) -> Option<&'static str> {
     if (first == '-' || first == '*' || first == '_') && t.len() >= 3 && t.chars().all(|c| c == first || c == ' ') {
         return Some("a line of --- is not allowed in a document body; a page break is <pagebreak/>. Write \\- for a literal dash.");
     }
-    if matches!(first, '-' | '+' | '*') && second == Some(' ') {
-        return Some("list items are not supported yet; write each item as a paragraph, e.g. <div style=\"List Paragraph\">text</div>, or write \\- for a literal dash.");
+    if matches!(first, '+' | '*') && second == Some(' ') {
+        return Some("a bullet item is written - text (a dash and a space); write \\* or \\+ for a literal character.");
     }
     let digits = t.chars().take_while(|c| c.is_ascii_digit()).count();
-    if digits > 0
-        && matches!(t.chars().nth(digits), Some('.') | Some(')'))
-        && matches!(t.chars().nth(digits + 1), Some(' ') | None)
-    {
-        return Some("numbered list items are not supported yet; write each item as a paragraph, or write 1\\. for a literal number.");
+    if digits > 0 && t.chars().nth(digits) == Some(')') && matches!(t.chars().nth(digits + 1), Some(' ') | None) {
+        return Some("a numbered item is written 1. text (canonically always 1.); write 1\\) for a literal number.");
     }
     if first == '>' {
         return Some("block quotes are not supported; use a quote style, <div style=\"Name\">text</div>, or write \\> for a literal >.");
@@ -1090,6 +1180,17 @@ fn math_close(src: &[Src], from: usize) -> Option<usize> {
     None
 }
 
+/// The `</math>` closing a `<math>` whose body starts at `from`: (body end,
+/// index after `</math>`). The body is raw text.
+fn math_tag_end(src: &[Src], from: usize) -> Option<(usize, usize)> {
+    let close: Vec<char> = "</math>".chars().collect();
+    (from..src.len())
+        .find(|&y| {
+            src.len() - y >= close.len() && src[y..y + close.len()].iter().map(|s| s.2).eq(close.iter().copied())
+        })
+        .map(|y| (y, y + close.len()))
+}
+
 /// A cell paragraph tag starts here: math and link text end at it.
 fn p_tag_at(src: &[Src], y: usize) -> bool {
     src[y].2 == '<'
@@ -1112,6 +1213,10 @@ fn link_at(src: &[Src], x: usize) -> Option<(usize, String, usize)> {
             '[' => return None,
             ']' => break,
             '<' if p_tag_at(src, y) => return None,
+            '<' if parse_tag(src, y).is_some_and(|t| t.0.name == "math" && !t.0.closing) => {
+                let after = parse_tag(src, y).unwrap().1;
+                y = math_tag_end(src, after).map_or(after, |m| m.1);
+            }
             '<' => y = parse_tag(src, y).map_or(y + 1, |t| t.1),
             '$' => {
                 let opens = src.get(y + 1).is_some_and(|s| !s.2.is_whitespace() && s.2 != '$');

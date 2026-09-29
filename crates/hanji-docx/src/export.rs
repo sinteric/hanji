@@ -3,9 +3,10 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use hanji_core::{Block, Entry, Kind, StyleSet};
+use hanji_core::{Block, Entry, Kind, ListItem, StyleSet};
 use hanji_format::{Atom, Cell, Inline, Marks};
 
+use crate::numbering::Numbering;
 use crate::ooxml::*;
 use crate::xml::{self, fragment, Element, Node};
 
@@ -14,6 +15,125 @@ pub struct Exporter<'a> {
     by: HashMap<(Vec<usize>, Kind), Vec<&'a Entry>>,
     keep: HashMap<&'a str, &'a Entry>,
     tail: Vec<&'a Entry>,
+    numbering: &'a Numbering,
+    lists: HashMap<usize, ListPlan>,
+}
+
+/// What a top-level paragraph's numbering becomes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ListPlan {
+    /// A list item as imported: its `w:pPr` stays as it is.
+    Keep,
+    /// A list item that takes this numbering (a new item, or a changed level
+    /// or kind).
+    Set { num: u32, ilvl: u32 },
+    /// A former list item, now a paragraph: its numbering goes.
+    Strip,
+}
+
+/// The numbering stored for the paragraph at `[bi]`: its item at import, numId and ilvl.
+fn stored_item(by: &HashMap<(Vec<usize>, Kind), Vec<&Entry>>, bi: usize) -> Option<(ListItem, u32, u32)> {
+    let e = by.get(&(vec![bi], Kind::Ppr))?.first()?;
+    let n = |k: usize| e.meta.aux.get(k).and_then(|v| v.parse().ok());
+    Some((e.meta.item?, n(0)?, n(1)?))
+}
+
+/// Numbering for every list item and former list item. An item keeps its
+/// own numbering (its level moved by the text's change of level); a new one
+/// takes its nearest sibling's, at its level or, one level off, the same
+/// list's; a new list takes the file's first bullet or decimal list, a
+/// decimal one restarting at 1.
+pub fn plan_lists(
+    blocks: &[Block],
+    entries: &[Entry],
+    numbering: &mut Numbering,
+) -> Result<HashMap<usize, ListPlan>, String> {
+    let mut by: HashMap<(Vec<usize>, Kind), Vec<&Entry>> = HashMap::new();
+    for e in entries.iter().filter(|e| e.kind == Kind::Ppr && e.path.len() == 1) {
+        by.entry((e.path.clone(), e.kind)).or_default().push(e);
+    }
+    let item = |bi: usize| match &blocks[bi] {
+        Block::Para(p) => p.item,
+        _ => None,
+    };
+    let mut plan = HashMap::new();
+    let mut assigned: HashMap<usize, (u32, u32)> = HashMap::new();
+    let mut pending = vec![];
+    for bi in 0..blocks.len() {
+        let stored = stored_item(&by, bi);
+        let Some(it) = item(bi) else {
+            if stored.is_some() {
+                plan.insert(bi, ListPlan::Strip);
+            }
+            continue;
+        };
+        let kept = stored.filter(|s| s.0.ordered == it.ordered).and_then(|(si, num, ilvl)| {
+            let nl = ilvl as i64 + it.level as i64 - si.level as i64;
+            let nl = u32::try_from(nl).ok().filter(|&l| l <= 8)?;
+            (numbering.ordered(num, nl) == Some(it.ordered)).then_some((num, nl, nl == ilvl))
+        });
+        match kept {
+            Some((num, ilvl, same)) => {
+                assigned.insert(bi, (num, ilvl));
+                plan.insert(bi, if same { ListPlan::Keep } else { ListPlan::Set { num, ilvl } });
+            }
+            None => pending.push(bi),
+        }
+    }
+    // The text list an item belongs to: from its first item to the next first.
+    let list_of = |bi: usize| {
+        let lo = (0..=bi).rev().find(|&k| item(k).is_none_or(|i| i.first)).map_or(0, |k| {
+            if item(k).is_some() {
+                k
+            } else {
+                k + 1
+            }
+        });
+        let hi = (bi + 1..blocks.len()).find(|&k| item(k).is_none_or(|i| i.first)).unwrap_or(blocks.len());
+        (lo, hi)
+    };
+    let mut new_lists: HashMap<usize, u32> = HashMap::new();
+    while !pending.is_empty() {
+        let mut progress = false;
+        pending.retain(|&bi| {
+            let it = item(bi).unwrap();
+            let (lo, hi) = list_of(bi);
+            let mut near: Vec<usize> = (lo..hi).filter(|k| assigned.contains_key(k)).collect();
+            near.sort_by_key(|&k| (k.abs_diff(bi), k));
+            let pick = near.iter().find_map(|&k| {
+                let (num, ilvl) = assigned[&k];
+                let sib = item(k).unwrap();
+                let nl = u32::try_from(ilvl as i64 + it.level as i64 - sib.level as i64).ok()?;
+                (sib.ordered == it.ordered && (sib.level == it.level || numbering.ordered(num, nl) == Some(it.ordered)))
+                    .then_some((num, nl))
+            });
+            match pick {
+                Some((num, ilvl)) => {
+                    assigned.insert(bi, (num, ilvl));
+                    plan.insert(bi, ListPlan::Set { num, ilvl });
+                    progress = true;
+                    false
+                }
+                None => true,
+            }
+        });
+        if progress || pending.is_empty() {
+            continue;
+        }
+        // No sibling anywhere: the first pending item starts from the file's default list.
+        let bi = pending.remove(0);
+        let it = item(bi).unwrap();
+        let what = if it.ordered { "numbered" } else { "bulleted" };
+        let (num, abs) = numbering.default_list(it.ordered).ok_or_else(|| {
+            format!("this file has no {what} list to take numbering from, so the new list item cannot be written; write it as a paragraph, or add it next to an existing {what} item")
+        })?;
+        let num =
+            if it.ordered { *new_lists.entry(list_of(bi).0).or_insert_with(|| numbering.new_list(abs)) } else { num };
+        let ilvl = it.level as u32;
+        assigned.insert(bi, (num, ilvl));
+        plan.insert(bi, ListPlan::Set { num, ilvl });
+    }
+    Ok(plan)
 }
 
 fn el(name: &str) -> Element {
@@ -32,8 +152,13 @@ fn assemble(xml: &[String]) -> Element {
 }
 
 impl<'a> Exporter<'a> {
-    pub fn new(styles: &'a StyleSet, entries: &'a [Entry]) -> Self {
-        let mut ex = Exporter { styles, by: HashMap::new(), keep: HashMap::new(), tail: vec![] };
+    pub fn new(
+        styles: &'a StyleSet,
+        entries: &'a [Entry],
+        numbering: &'a Numbering,
+        lists: HashMap<usize, ListPlan>,
+    ) -> Self {
+        let mut ex = Exporter { styles, by: HashMap::new(), keep: HashMap::new(), tail: vec![], numbering, lists };
         for e in entries {
             match e.kind {
                 Kind::Tail => ex.tail.push(e),
@@ -62,7 +187,15 @@ impl<'a> Exporter<'a> {
             self.bmarkers(&mut holder, &[bi]);
             out.extend(holder.children);
             match b {
-                Block::Para(p) => out.push(node(self.para(&p.content, Some(&p.style), &[bi])?)),
+                Block::Para(p) => {
+                    // A list item keeps the paragraph style the remainder has.
+                    let style = p.item.is_none().then_some(p.style.as_str());
+                    let mut pel = self.para(&p.content, style, &[bi])?;
+                    if let Some(plan) = self.lists.get(&bi) {
+                        self.apply_list(&mut pel, *plan, bi);
+                    }
+                    out.push(node(pel));
+                }
                 Block::Table(t) => out.push(node(self.table(t, bi)?)),
                 Block::Keep(id) => {
                     for x in &self.keep_entry(id)?.xml {
@@ -119,6 +252,46 @@ impl<'a> Exporter<'a> {
             pel.children.push(node(x));
         }
         Ok(pel)
+    }
+
+    /// Writes a paragraph's numbering (`w:numPr`) as planned.
+    fn apply_list(&self, pel: &mut Element, plan: ListPlan, bi: usize) {
+        if plan == ListPlan::Keep {
+            return;
+        }
+        if pel.child("w:pPr").is_none() {
+            let mut ppr = el("w:pPr");
+            // A new item: Word's own list paragraph style, where the file has it.
+            if let (Some(s), true) = (&self.numbering.list_paragraph, self.at(&[bi], Kind::Ppr).is_empty()) {
+                ppr.children.push(node(el("w:pStyle").with_attr("w:val", s)));
+            }
+            pel.children.insert(0, node(ppr));
+        }
+        let ppr = pel.child_mut("w:pPr").unwrap();
+        remove_child(ppr, "w:numPr");
+        let num_pr = |num: u32, ilvl: Option<u32>| {
+            let mut np = el("w:numPr");
+            if let Some(l) = ilvl {
+                np.children.push(node(el("w:ilvl").with_attr("w:val", &l.to_string())));
+            }
+            np.children.push(node(el("w:numId").with_attr("w:val", &num.to_string())));
+            np
+        };
+        match plan {
+            ListPlan::Set { num, ilvl } => insert_ordered(ppr, num_pr(num, Some(ilvl)), PPR_ORDER),
+            ListPlan::Strip => {
+                // Numbering the paragraph style still gives is switched off.
+                let sid = ppr.child("w:pStyle").and_then(|s| s.get("w:val"));
+                let sid = sid.unwrap_or_else(|| self.styles.default_paragraph_id().to_string());
+                if self.numbering.of_style(&sid).is_some() {
+                    insert_ordered(ppr, num_pr(0, None), PPR_ORDER);
+                }
+                if ppr.children.is_empty() && ppr.attrs.is_empty() {
+                    remove_child(pel, "w:pPr");
+                }
+            }
+            ListPlan::Keep => {}
+        }
     }
 
     fn para(&self, p: &Inline, style: Option<&str>, path: &[usize]) -> Result<Element, String> {

@@ -13,9 +13,22 @@ pub enum Block {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Para {
-    /// Paragraph style name.
+    /// Paragraph style name; empty for a list item, whose style is not in
+    /// the text (it stays in the remainder).
     pub style: String,
     pub content: Inline,
+    /// A list item (`- ` / `1. `).
+    pub item: Option<ListItem>,
+}
+
+/// A paragraph's place in a list.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct ListItem {
+    pub ordered: bool,
+    /// Nesting level, 0 at the margin.
+    pub level: usize,
+    /// First item of a list in the text (a blank line or another block before it).
+    pub first: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -99,11 +112,38 @@ fn single(atom: Atom) -> Inline {
     Inline { units: vec![fmt::Unit { atom, marks: fmt::Marks::NONE }], spans: vec![] }
 }
 
-/// The source map of each block [`resolve`] returns, in the same order:
-/// footnote definitions are not blocks of the model.
-pub fn block_maps(parsed: &fmt::Parsed) -> Vec<&fmt::BlockMap> {
-    let blocks = parsed.doc.blocks.iter().zip(&parsed.map.blocks);
-    blocks.filter(|(b, _)| !matches!(b, fmt::Block::FootnoteDef(_))).map(|(_, m)| m).collect()
+/// Where a resolved block is in the text.
+pub struct BlockSrc<'a> {
+    /// Byte range of its lines.
+    pub start: usize,
+    pub end: usize,
+    pub kind: SrcKind<'a>,
+}
+
+pub enum SrcKind<'a> {
+    Para(&'a fmt::ParaMap),
+    Table(&'a [Vec<Option<Vec<fmt::ParaMap>>>]),
+}
+
+/// The source of each block [`resolve`] returns, in the same order:
+/// footnote definitions are not blocks of the model, and each list item is one.
+pub fn block_maps(parsed: &fmt::Parsed) -> Vec<BlockSrc<'_>> {
+    let mut out = vec![];
+    for (b, m) in parsed.doc.blocks.iter().zip(&parsed.map.blocks) {
+        match (&m.kind, b) {
+            (_, fmt::Block::FootnoteDef(_)) => {}
+            (fmt::BlockMapKind::List(items), _) => {
+                out.extend(items.iter().map(|(s, e, pm)| BlockSrc { start: *s, end: *e, kind: SrcKind::Para(pm) }))
+            }
+            (fmt::BlockMapKind::Para(pm), _) => {
+                out.push(BlockSrc { start: m.start, end: m.end, kind: SrcKind::Para(pm) })
+            }
+            (fmt::BlockMapKind::Table(t), _) => {
+                out.push(BlockSrc { start: m.start, end: m.end, kind: SrcKind::Table(t) })
+            }
+        }
+    }
+    out
 }
 
 /// Model text → resolved blocks. `is_block_keep(id)` says whether a
@@ -124,7 +164,7 @@ pub fn resolve(
         line += text[counted..m.start].matches('\n').count();
         counted = m.start;
         let mut err = |msg: String| errs.push(Diagnostic { line, col: 1, message: msg });
-        let para = |style: String, content: Inline| Block::Para(Para { style, content });
+        let para = |style: String, content: Inline| Block::Para(Para { style, content, item: None });
         match b {
             fmt::Block::Para(p) => {
                 let style = match &p.style {
@@ -164,6 +204,13 @@ pub fn resolve(
                     }
                 }
                 out.push(Block::Table(Table { style: t.style.clone(), rows }));
+            }
+            fmt::Block::List(items) => {
+                for (k, it) in items.iter().enumerate() {
+                    check_inline(&it.content, caps, is_block_keep, &mut err);
+                    let item = ListItem { ordered: it.ordered, level: it.level, first: k == 0 };
+                    out.push(Block::Para(Para { style: String::new(), content: it.content.clone(), item: Some(item) }));
+                }
             }
             fmt::Block::FootnoteDef(f) => {
                 if !caps.footnotes {
@@ -222,6 +269,14 @@ pub fn unresolve(
 ) -> fmt::Document {
     let mut out = vec![];
     for b in blocks {
+        if let Block::Para(Para { content, item: Some(it), .. }) = b {
+            let fi = fmt::Item { ordered: it.ordered, level: it.level, content: content.clone() };
+            match out.last_mut() {
+                Some(fmt::Block::List(items)) if !it.first => items.push(fi),
+                _ => out.push(fmt::Block::List(vec![fi])),
+            }
+            continue;
+        }
         out.push(match b {
             Block::Keep(id) => fmt::Block::Keep(keep(id)),
             Block::Table(t) => fmt::Block::Table(fmt::Table { style: t.style.clone(), rows: t.rows.clone() }),

@@ -9,6 +9,7 @@
 
 pub mod export;
 pub mod import;
+pub mod numbering;
 pub mod ooxml;
 pub mod package;
 pub mod safety;
@@ -80,7 +81,8 @@ impl DocxEngine {
         let body_at = root.children.iter().position(|n| matches!(n, xml::Node::El(e) if e.is("w:body")));
         let Some(body_at) = body_at else { return Err(EngineError::Package("document.xml has no w:body".into())) };
         let xml::Node::El(body) = &root.children[body_at] else { unreachable!() };
-        let split = import::Importer::new(&scope, styles, &notes)
+        let numbering = numbering::Numbering::read(&parts);
+        let split = import::Importer::new(&scope, styles, &notes, &numbering)
             .body(body)
             .map_err(|e| EngineError::Package(format!("{DOC_PART}: {e}")))?;
         let shell = DocShell {
@@ -151,22 +153,37 @@ impl Engine for DocxEngine {
     }
 }
 
-/// The package: `rem`'s parts, with `document` as `word/document.xml`.
-pub fn write_package(rem: &Remainder, document: Vec<u8>) -> Result<Vec<u8>, EngineError> {
+/// What export writes: `word/document.xml`, and `word/numbering.xml` when a
+/// new list needed its own numbering.
+pub struct Exported {
+    pub document: Vec<u8>,
+    pub numbering: Option<Vec<u8>>,
+}
+
+/// The package: `rem`'s parts, with the exported ones in place.
+pub fn write_package(rem: &Remainder, out: Exported) -> Result<Vec<u8>, EngineError> {
     let mut parts = rem.parts.clone();
-    if let Some(p) = parts.iter_mut().find(|p| p.name == DOC_PART) {
-        p.data = document;
+    for p in &mut parts {
+        if p.name == DOC_PART {
+            p.data = out.document.clone();
+        } else if p.name == numbering::NUMBERING_PART {
+            if let Some(n) = &out.numbering {
+                p.data = n.clone();
+            }
+        }
     }
     package::write(&parts).map_err(EngineError::Package)
 }
 
-/// `document.xml` for resolved blocks placed against `rem`.
-pub fn export_document(blocks: &[hanji_core::Block], rem: &Remainder) -> Result<Vec<u8>, EngineError> {
+/// `document.xml` (and numbering) for resolved blocks placed against `rem`.
+pub fn export_document(blocks: &[hanji_core::Block], rem: &Remainder) -> Result<Exported, EngineError> {
     let shell: DocShell = serde_json::from_str(
         rem.shell.first().ok_or_else(|| EngineError::Package("remainder has no document shell".into()))?,
     )
     .map_err(|e| EngineError::Package(e.to_string()))?;
-    let ex = export::Exporter::new(&rem.styles, &rem.entries);
+    let mut numbering = numbering::Numbering::read(&rem.parts);
+    let lists = export::plan_lists(blocks, &rem.entries, &mut numbering).map_err(EngineError::Refused)?;
+    let ex = export::Exporter::new(&rem.styles, &rem.entries, &numbering, lists);
     let body = ex.body(blocks).map_err(EngineError::Refused)?;
     let mut s = shell.prolog.clone();
     s.push_str(&shell.root_open);
@@ -177,5 +194,5 @@ pub fn export_document(blocks: &[hanji_core::Block], rem: &Remainder) -> Result<
     s.push_str(&shell.after_body);
     s.push_str(&format!("</{}>", shell.root_name));
     s.push_str(&shell.epilog);
-    Ok(s.into_bytes())
+    Ok(Exported { document: s.into_bytes(), numbering: numbering.part() })
 }

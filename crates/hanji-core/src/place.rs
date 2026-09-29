@@ -711,7 +711,7 @@ impl<'a> Placer<'a> {
         } else {
             let as_blocks = |xs: &[Inline]| -> Vec<Block> {
                 xs.iter()
-                    .map(|x| Block::Para(crate::model::Para { style: String::new(), content: x.clone() }))
+                    .map(|x| Block::Para(crate::model::Para { style: String::new(), content: x.clone(), item: None }))
                     .collect()
             };
             align(&as_blocks(olds), &as_blocks(news))

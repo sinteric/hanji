@@ -2,7 +2,7 @@
 //! revision, the namespace map once per document, and the package parts the
 //! engine copies through.
 
-use crate::model::{Path, StyleSet};
+use crate::model::{ListItem, Path, StyleSet};
 use hanji_format::{Keep, Marks};
 use serde::{Deserialize, Serialize};
 
@@ -67,6 +67,9 @@ pub struct Meta {
     pub style: Option<String>,
     /// Marks the run had at import (`Run`).
     pub marks: Marks,
+    /// The list item the paragraph was at import (`Ppr`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub item: Option<ListItem>,
     /// Engine data (docx: the run's original `w:t` elements).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub aux: Vec<String>,

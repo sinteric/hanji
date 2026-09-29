@@ -427,3 +427,121 @@ fn embedded_macro_packages_are_neutralised() {
     assert!(text("word/charts/_rels/chart3.xml.rels").contains("Clean.xlsx"));
     assert!(!text("word/charts/_rels/chart1.xml.rels").contains("Book1"));
 }
+
+const NUMBERING: &str = r#"<?xml version="1.0" encoding="UTF-8"?><w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:numFmt w:val="bullet"/></w:lvl><w:lvl w:ilvl="1"><w:numFmt w:val="bullet"/></w:lvl></w:abstractNum><w:abstractNum w:abstractNumId="1"><w:lvl w:ilvl="0"><w:numFmt w:val="decimal"/></w:lvl><w:lvl w:ilvl="1"><w:numFmt w:val="lowerLetter"/></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num><w:num w:numId="2"><w:abstractNumId w:val="1"/></w:num></w:numbering>"#;
+
+fn li(num: u32, ilvl: u32, text: &str) -> String {
+    format!("<w:p><w:pPr><w:pStyle w:val=\"ListParagraph\"/><w:numPr><w:ilvl w:val=\"{ilvl}\"/><w:numId w:val=\"{num}\"/></w:numPr></w:pPr><w:r><w:t>{text}</w:t></w:r></w:p>")
+}
+
+fn list_docx(body: &str, numbering: bool) -> Vec<u8> {
+    let styles = STYLES.replace(
+        "</w:styles>",
+        "<w:style w:type=\"paragraph\" w:styleId=\"ListParagraph\"><w:name w:val=\"List Paragraph\"/></w:style><w:style w:type=\"paragraph\" w:styleId=\"ListBullet\"><w:name w:val=\"List Bullet\"/><w:pPr><w:numPr><w:numId w:val=\"1\"/></w:numPr></w:pPr></w:style></w:styles>",
+    );
+    let mut parts =
+        package::read(&docx(body, if numbering { vec![part("word/numbering.xml", NUMBERING)] } else { vec![] }))
+            .unwrap();
+    parts.iter_mut().find(|x| x.name == "word/styles.xml").unwrap().data = styles.into_bytes();
+    package::write(&parts).unwrap()
+}
+
+fn doc_xml(pkg: &[u8]) -> String {
+    String::from_utf8(package::get(&package::read(pkg).unwrap(), "word/document.xml").unwrap().to_vec()).unwrap()
+}
+
+#[test]
+fn numbered_paragraphs_are_list_items() {
+    let heading = "<w:p><w:pPr><w:pStyle w:val=\"Heading1\"/><w:numPr><w:ilvl w:val=\"0\"/><w:numId w:val=\"2\"/></w:numPr></w:pPr><w:r><w:t>Title</w:t></w:r></w:p>";
+    let cell = format!(
+        "<w:tbl><w:tblPr/><w:tblGrid><w:gridCol w:w=\"2000\"/></w:tblGrid><w:tr><w:tc>{}</w:tc></w:tr></w:tbl>",
+        li(1, 0, "in cell")
+    );
+    let style_item = "<w:p><w:pPr><w:pStyle w:val=\"ListBullet\"/></w:pPr><w:r><w:t>by style</w:t></w:r></w:p>";
+    let body = [
+        heading.to_string(),
+        li(1, 0, "a"),
+        li(1, 1, "b"),
+        li(1, 0, "c"),
+        p("plain"),
+        li(2, 0, "d"),
+        li(2, 1, "d1"),
+        li(2, 0, "e"),
+        li(1, 0, "other list"),
+        style_item.to_string(),
+        cell,
+    ]
+    .concat();
+    let pkg = list_docx(&body, true);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    let want = "# Title\n\n- a\n  - b\n- c\n\nplain\n\n1. d\n   1. d1\n1. e\n\n- other list\n- by style\n\n| <p style=\"List Paragraph\"/>in cell |\n|---|\n";
+    assert!(imp.text.ends_with(want), "{}", imp.text);
+    // GetPut.
+    let canon = |pkg: &[u8]| hanji_docx::xml::canon_part(doc_xml(pkg).as_bytes()).unwrap();
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon(&out), canon(&pkg));
+}
+
+#[test]
+fn list_edits_take_numbering_from_siblings_or_the_default_list() {
+    let body =
+        [li(1, 0, "a"), li(1, 1, "b"), li(1, 0, "c"), p("plain"), li(2, 0, "d"), li(2, 0, "e"), p("end")].concat();
+    let pkg = list_docx(&body, true);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    let new = imp
+        .text
+        .replace("- c\n", "- c\n- new sibling\n  - new child\n")
+        .replace("  - b\n", "- b promoted\n")
+        .replace("1. e\n", "\ne unlisted\n")
+        .replace("\nend\n", "\nend\n\n1. fresh\n   1. fresh child\n\n- fresh bullet\n");
+    let r = rewrite(&imp.remainder, &imp.text, &new, CAPS).unwrap();
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    let xml = doc_xml(&out);
+    let num_of = |t: &str| {
+        let at = xml.find(&format!(">{t}<")).unwrap_or_else(|| panic!("{t}: {xml}"));
+        let p = &xml[xml[..at].rfind("<w:p>").or_else(|| xml[..at].rfind("<w:p ")).unwrap()..at];
+        let v = |k: &str| {
+            let pat = format!("<w:{k} w:val=\"");
+            p.find(&pat).map(|i| p[i + pat.len()..].split('"').next().unwrap().to_string())
+        };
+        (v("numId"), v("ilvl"))
+    };
+    let s = |x: &str| Some(x.to_string());
+    assert_eq!(num_of("a"), (s("1"), s("0")));
+    assert_eq!(num_of("b promoted"), (s("1"), s("0")), "a promoted item moves its own ilvl");
+    assert_eq!(num_of("new sibling"), (s("1"), s("0")));
+    assert_eq!(num_of("new child"), (s("1"), s("1")));
+    assert_eq!(num_of("e unlisted"), (None, None), "a former item loses its numbering");
+    // A new numbered list restarts: a new w:num over the default decimal list.
+    assert_eq!(num_of("fresh"), (s("3"), s("0")));
+    assert_eq!(num_of("fresh child"), (s("3"), s("1")));
+    assert_eq!(num_of("fresh bullet"), (s("1"), s("0")));
+    let numbering =
+        String::from_utf8(package::get(&package::read(&out).unwrap(), "word/numbering.xml").unwrap().to_vec()).unwrap();
+    assert!(numbering.contains("<w:num w:numId=\"3\"><w:abstractNumId w:val=\"1\"/><w:lvlOverride w:ilvl=\"0\"><w:startOverride w:val=\"1\"/></w:lvlOverride></w:num></w:numbering>"), "{numbering}");
+    assert!(
+        xml.contains("<w:pStyle w:val=\"ListParagraph\"/><w:numPr><w:ilvl w:val=\"0\"/><w:numId w:val=\"3\"/>"),
+        "{xml}"
+    );
+    // PutGet.
+    assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, r.text);
+    if let Ok(dir) = std::env::var("HANJI_SAVE") {
+        std::fs::write(format!("{dir}/lists.docx"), &out).unwrap();
+    }
+    // An exact edit adds an item next to its sibling.
+    let r = edit(&imp.remainder, &imp.text, "- c\n", "- c\n- c2\n", CAPS).unwrap();
+    assert!(r.report.refused.is_empty() && r.report.removed.is_empty(), "{:?}", r.report);
+    let xml = doc_xml(&DocxEngine.export(&r.text, &r.remainder).unwrap());
+    assert!(xml.contains("<w:numId w:val=\"1\"/></w:numPr></w:pPr><w:r><w:t>c2</w:t>"), "{xml}");
+}
+
+#[test]
+fn a_new_list_without_numbering_in_the_file_is_refused() {
+    let pkg = list_docx(&p("a"), false);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    let new = imp.text.replace("\na\n", "\na\n\n- b\n");
+    match DocxEngine.export(&new, &imp.remainder) {
+        Err(EngineError::Refused(m)) => assert!(m.contains("no bulleted list to take numbering from"), "{m}"),
+        other => panic!("{other:?}"),
+    }
+}

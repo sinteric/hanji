@@ -56,6 +56,19 @@ fn block(out: &mut Vec<String>, b: &Block) {
             }
         }
         Block::Keep(k) => out.push(keep_tag(k)),
+        Block::List(items) => {
+            // Each item is indented to its parent's content column: the
+            // widths of its ancestors' markers plus one space each.
+            let mut widths: Vec<usize> = vec![];
+            for it in items {
+                widths.truncate(it.level);
+                let indent: usize = widths.iter().sum();
+                let body = serialize_inline(&it.content);
+                let line = if body.is_empty() { it.marker().to_string() } else { format!("{} {body}", it.marker()) };
+                out.push(format!("{}{line}", " ".repeat(indent)));
+                widths.push(it.marker().len() + 1);
+            }
+        }
         Block::PageBreak => out.push("<pagebreak/>".into()),
         Block::FootnoteDef(f) => {
             let body = serialize_inline(&f.content);
@@ -113,23 +126,28 @@ fn para_line(p: &Para) -> String {
 /// A plain line must not read as another block.
 fn escape_line_start(mut s: String) -> String {
     let lead = s.len() - s.trim_start().len();
-    if matches!(s[lead..].chars().next(), Some('|') | Some('{')) {
+    let t = &s[lead..];
+    let (first, second) = (t.chars().next(), t.chars().nth(1));
+    // A list marker, even indented: `-`, `+ `, `1.`, `1)` (the parser reads
+    // indented ones as nested items).
+    let digits = t.chars().take_while(|c| c.is_ascii_digit()).count();
+    let numbered = digits > 0
+        && matches!(t.chars().nth(digits), Some('.') | Some(')'))
+        && matches!(t.chars().nth(digits + 1), Some(' ') | None);
+    if numbered {
+        s.insert(lead + digits, '\\');
+        return s;
+    }
+    let bullet =
+        (first == Some('-') && matches!(second, Some(' ') | None)) || (first == Some('+') && second == Some(' '));
+    if matches!(first, Some('|') | Some('{')) || bullet {
         s.insert(lead, '\\');
         return s;
     }
     let first = s.chars().next().unwrap();
-    let second = s.chars().nth(1);
     let thematic = matches!(first, '-' | '_') && s.len() >= 3 && s.trim_end().chars().all(|c| c == first || c == ' ');
-    if first == '#' || first == '>' || thematic || (matches!(first, '-' | '+') && second == Some(' ')) {
+    if first == '#' || first == '>' || thematic {
         s.insert(0, '\\');
-        return s;
-    }
-    let digits = s.chars().take_while(|c| c.is_ascii_digit()).count();
-    if digits > 0
-        && matches!(s.chars().nth(digits), Some('.') | Some(')'))
-        && matches!(s.chars().nth(digits + 1), Some(' ') | None)
-    {
-        s.insert(digits, '\\');
     }
     s
 }
@@ -270,9 +288,25 @@ fn unit(out: &mut Out, units: &[Unit], i: usize, in_link: bool) {
         Atom::Break => out.text("<br/>"),
         Atom::Keep(k) => out.text(&keep_tag(k)),
         Atom::NoteRef(l) => out.text(&format!("[^{l}]")),
-        Atom::Math(m) => out.text(&format!("${m}$")),
+        Atom::Math(m) => {
+            let next_digit = next_char.is_some_and(|c| c.is_ascii_digit());
+            if dollar_math_ok(m) && !next_digit {
+                out.text(&format!("${m}$"))
+            } else {
+                out.text(&format!("<math>{m}</math>"))
+            }
+        }
         Atom::PageBreak => out.text("<pagebreak/>"),
     }
+}
+
+/// Whether `$m$` reads back as this math: `$` opens before a non-space and
+/// closes after one, a closing `$` followed by a digit is text (`$5 and
+/// $10`), and `$`, a trailing `\` or a `<p` inside would end or split it.
+/// Otherwise the math is written `<math>m</math>`.
+fn dollar_math_ok(m: &str) -> bool {
+    let (Some(first), Some(last)) = (m.chars().next(), m.chars().last()) else { return false };
+    !first.is_whitespace() && !last.is_whitespace() && last != '\\' && !m.contains('$') && !m.contains("<p")
 }
 
 pub(crate) fn keep_tag(k: &Keep) -> String {
