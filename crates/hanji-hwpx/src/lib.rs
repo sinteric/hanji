@@ -23,8 +23,6 @@ use serde::{Deserialize, Serialize};
 
 pub use hanji_package::{package, xml};
 
-use crate::xml::Element;
-
 use crate::header::Header;
 use crate::owpml::{section_number, HEADER_PART};
 
@@ -53,11 +51,6 @@ pub struct SectionShell {
 pub struct PackageShell {
     pub sections: Vec<SectionShell>,
     pub tracked: Vec<(String, String)>,
-}
-
-fn open_tag(e: &Element) -> String {
-    let s = e.shell().to_xml();
-    format!("{}>", &s[..s.len() - 2])
 }
 
 /// The package's section parts, in section order.
@@ -116,7 +109,7 @@ impl HwpxEngine {
             shells.push(SectionShell {
                 part: name.clone(),
                 prolog: d.prolog.clone(),
-                root_open: open_tag(&d.root),
+                root_open: d.root.open_tag(),
                 root_name: d.root.name.clone(),
                 epilog: d.epilog.clone(),
                 start_merged: start.as_ref().is_some_and(|s| s.1),
@@ -209,12 +202,8 @@ pub fn export_sections(blocks: &[Block], rem: &Remainder) -> Result<Exported, En
     let mut seen = BTreeSet::new();
     for (_, paras) in &body {
         for p in paras {
-            p.walk(&mut |x| {
-                for a in ["TcId", "charTcId", "paraTcId"] {
-                    if let Some(v) = x.get(a) {
-                        seen.insert(v);
-                    }
-                }
+            owpml::tracked_ids(p, &mut |v| {
+                seen.insert(v);
             });
         }
     }
@@ -244,7 +233,7 @@ pub fn export_sections(blocks: &[Block], rem: &Remainder) -> Result<Exported, En
 fn tracked_groups_intact(blocks: &[Block], rem: &Remainder) -> Result<(), String> {
     let mut last: HashMap<&str, (usize, u64)> = HashMap::new();
     // Page breaks are paragraph properties in hwpx: they do not part a change.
-    let is_break = |b: &Block| matches!(b, Block::Para(p) if p.content.units.len() == 1 && p.content.units[0].atom == fmt::Atom::PageBreak);
+    let is_break = |b: &Block| matches!(b, Block::Para(p) if export::is_page_break(&p.content));
     for (bi, b) in blocks.iter().filter(|b| !is_break(b)).enumerate() {
         let Block::Keep(id) = b else { continue };
         let Some(e) =

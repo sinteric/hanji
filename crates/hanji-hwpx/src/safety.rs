@@ -6,15 +6,11 @@
 
 use std::collections::BTreeSet;
 
-use hanji_core::{ImportReport, Notice, Part};
+use hanji_core::{notice, ImportReport, Part};
 use hanji_package::clip;
 use hanji_package::xml::{self, Doc, Element, Node};
 
 use crate::owpml::{CONTENT_PART, HEADER_PART};
-
-fn notice(report: &mut Vec<Notice>, kind: &str, location: impl Into<String>, detail: impl Into<String>) {
-    report.push(Notice { kind: kind.into(), location: location.into(), detail: detail.into() });
-}
 
 /// Remove every element (at any depth) that `drop` selects; returns what went.
 fn remove_where(e: &mut Element, drop: &dyn Fn(&Element) -> bool) -> Vec<Element> {

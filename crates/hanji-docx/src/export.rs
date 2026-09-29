@@ -8,7 +8,7 @@ use hanji_format::{Atom, Cell, Inline, Marks};
 
 use crate::numbering::Numbering;
 use crate::ooxml::*;
-use crate::xml::{self, fragment, Element, Node};
+use crate::xml::{self, assemble, fragment, Element, Node};
 
 pub struct Exporter<'a> {
     styles: &'a StyleSet,
@@ -25,13 +25,6 @@ fn el(name: &str) -> Element {
 
 fn node(e: Element) -> Node {
     Node::El(e)
-}
-
-/// An element stored as its shell followed by its leading children.
-fn assemble(xml: &[String]) -> Element {
-    let mut e = fragment(&xml[0]);
-    e.children.extend(xml[1..].iter().map(|x| node(fragment(x))));
-    e
 }
 
 impl<'a> Exporter<'a> {

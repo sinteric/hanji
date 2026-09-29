@@ -40,11 +40,6 @@ struct DocShell {
     after_body: String,
 }
 
-fn open_tag(e: &xml::Element) -> String {
-    let s = e.shell().to_xml();
-    format!("{}>", &s[..s.len() - 2])
-}
-
 impl DocxEngine {
     /// Model text for resolved blocks and a remainder.
     pub fn text_of(blocks: &[hanji_core::Block], rem: &Remainder, template: Option<&str>) -> String {
@@ -88,10 +83,10 @@ impl DocxEngine {
         let shell = DocShell {
             prolog: doc.prolog.clone(),
             epilog: doc.epilog.clone(),
-            root_open: open_tag(root),
+            root_open: root.open_tag(),
             root_name: root.name.clone(),
             before_body: xml::write_nodes(&root.children[..body_at]),
-            body_open: open_tag(body),
+            body_open: body.open_tag(),
             after_body: xml::write_nodes(&root.children[body_at + 1..]),
         };
         let namespaces =

@@ -98,6 +98,11 @@ impl Entry {
     }
 }
 
+/// 64-bit FNV-1a: a stable hash (the same in every build and on wasm).
+pub fn fnv1a(bytes: impl IntoIterator<Item = u8>) -> u64 {
+    bytes.into_iter().fold(0xcbf2_9ce4_8422_2325, |h, b| (h ^ b as u64).wrapping_mul(0x0100_0000_01b3))
+}
+
 /// Placeholder ids, stable across imports of the same file: `k` and four
 /// base-32 digits of a hash of the object's content; the same object again
 /// gets `-2`, `-3`, … in document order.
@@ -107,10 +112,7 @@ pub struct KeepIds(std::collections::HashSet<String>);
 impl KeepIds {
     /// A fresh id for the object with fingerprint `fp`.
     pub fn next(&mut self, fp: &str) -> String {
-        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-        for b in fp.bytes() {
-            h = (h ^ b as u64).wrapping_mul(0x0100_0000_01b3);
-        }
+        let h = fnv1a(fp.bytes());
         let base: String = std::iter::once('k')
             .chain((0..4).map(|k| char::from_digit(((h >> (k * 5)) & 31) as u32, 32).unwrap()))
             .collect();

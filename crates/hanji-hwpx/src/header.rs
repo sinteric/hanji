@@ -29,16 +29,26 @@ pub enum Heading {
     Bullet { id: u32, level: u32 },
 }
 
-/// A list number for [`ListDefs`]: a numbering or a bullet definition.
+/// List numbers for [`ListDefs`] name a numbering (odd) or a bullet (even).
+fn numbering_num(id: u32) -> u32 {
+    id * 2 + 1
+}
+
+fn bullet_num(id: u32) -> u32 {
+    id * 2
+}
+
+/// The list number and level of a list heading.
 pub fn list_num(h: Heading) -> Option<(u32, u32)> {
     match h {
-        Heading::Number { id, level } => Some((id * 2 + 1, level)),
-        Heading::Bullet { id, level } => Some((id * 2, level)),
+        Heading::Number { id, level } => Some((numbering_num(id), level)),
+        Heading::Bullet { id, level } => Some((bullet_num(id), level)),
         Heading::Outline(_) => None,
     }
 }
 
-fn heading_of_num(num: u32, level: u32) -> Heading {
+/// The heading a list number and level stand for.
+pub fn list_heading(num: u32, level: u32) -> Heading {
     if num % 2 == 1 {
         Heading::Number { id: num / 2, level }
     } else {
@@ -351,7 +361,7 @@ fn set_line(x: &mut Element, name: &str, attr: &str, value: &str, on: bool) {
 
 impl ListDefs for Header {
     fn ordered(&self, num: u32, ilvl: u32) -> Option<bool> {
-        match heading_of_num(num, ilvl) {
+        match list_heading(num, ilvl) {
             Heading::Number { id, level } => {
                 let n = self.numberings.get(&id)?;
                 // `hh:paraHead level` counts from 1.
@@ -375,22 +385,16 @@ impl ListDefs for Header {
                 })
             };
             let (id, _) = self.numberings.iter().find(|(_, n)| digit(n))?;
-            Some((id * 2 + 1, *id))
+            Some((numbering_num(*id), *id))
         } else {
             let id = self.bullets.iter().next()?;
-            Some((id * 2, *id))
+            Some((bullet_num(*id), *id))
         }
     }
 
     /// A copy of numbering `base` under a new id, so its count starts again.
     fn new_list(&mut self, base: u32) -> u32 {
         let x = self.numberings.get(&base).cloned().unwrap_or_else(|| Element::new("hh:numbering"));
-        let id = self.add(Container::Numberings, x);
-        id * 2 + 1
+        numbering_num(self.add(Container::Numberings, x))
     }
-}
-
-/// The heading a list plan asks for.
-pub fn list_heading(num: u32, ilvl: u32) -> Heading {
-    heading_of_num(num, ilvl)
 }

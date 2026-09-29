@@ -110,13 +110,24 @@ pub fn node_name(n: &Node) -> &str {
     }
 }
 
-/// Whether an element holds a tracked-change mark, or its run or paragraph a tracked shape change.
+/// Attributes that refer to a tracked change (`hh:trackChange id`): on the
+/// marks, on a run (a character shape change) and on a paragraph.
+const TC_ATTRS: [&str; 3] = ["TcId", "charTcId", "paraTcId"];
+
+/// Each tracked-change id `e` and its descendants refer to, in document order.
+pub fn tracked_ids(e: &Element, f: &mut dyn FnMut(String)) {
+    e.walk(&mut |x| {
+        for a in TC_ATTRS {
+            if let Some(v) = x.get(a) {
+                f(v);
+            }
+        }
+    });
+}
+
+/// Whether an element holds a tracked-change mark or a tracked shape change.
 pub fn has_tracked_change(e: &Element) -> bool {
     let mut found = false;
-    e.walk(&mut |x| {
-        found |= TRACK_MARKS.contains(&x.name.as_str())
-            || (x.is("hp:run") && x.attr("charTcId").is_some())
-            || (x.is("hp:p") && x.attr("paraTcId").is_some())
-    });
+    e.walk(&mut |x| found |= TRACK_MARKS.contains(&x.name.as_str()) || TC_ATTRS.iter().any(|a| x.attr(a).is_some()));
     found
 }

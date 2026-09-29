@@ -189,13 +189,8 @@ impl<'a> Importer<'a> {
             },
             "p" => {
                 let mut first = None;
-                el.walk(&mut |x| {
-                    if first.is_none() && TRACK_MARKS.contains(&x.name.as_str()) {
-                        first = x.get("TcId");
-                    }
-                    if first.is_none() && (x.is("hp:run") || x.is("hp:p")) {
-                        first = x.get("charTcId").or_else(|| x.get("paraTcId"));
-                    }
+                tracked_ids(el, &mut |id| {
+                    first.get_or_insert(id);
                 });
                 let what = first.and_then(|id| self.header.tracked.get(&id).cloned());
                 let what = what.unwrap_or_else(|| {
@@ -312,11 +307,9 @@ impl<'a> Importer<'a> {
                 }
                 _ => {}
             }
-            for a in ["TcId", "charTcId", "paraTcId"] {
-                if let Some(t) = x.get(a) {
-                    self.tracked_ids.insert(t);
-                }
-            }
+        });
+        tracked_ids(p, &mut |t| {
+            self.tracked_ids.insert(t);
         });
         self.stats.tracked_paragraphs += 1;
         let k = self.keep_entry(Kind::Bkeep, p, &[bi], None, None, "tracked-change");
@@ -442,8 +435,7 @@ impl<'a> Importer<'a> {
         }
         let rows: Vec<Vec<Cell>> =
             rows.into_iter().map(|r| r.into_iter().map(|c| c.expect("covered")).collect()).collect();
-        let style = None;
-        Ok(Some(Table { style, rows }))
+        Ok(Some(Table { style: None, rows }))
     }
 
     // ------------------------------------------------------------ paragraphs
@@ -554,9 +546,10 @@ impl<'a> Importer<'a> {
             format!("{}|{}", canon(&rest, &self.scope), self.header.char_rest(cp))
         };
         let start = self.buf.len();
+        let run_xml = shell.to_xml();
         let idx = self.entry(
             Kind::Run,
-            vec![shell.to_xml()],
+            vec![run_xml.clone()],
             f,
             path,
             Some(start),
@@ -564,7 +557,6 @@ impl<'a> Importer<'a> {
             Meta { marks, ..Default::default() },
         );
         let run_id = self.entries[idx].id;
-        let run_xml = shell.to_xml();
         let mut tabs = vec![];
         let mut prev_t = false;
         for n in &r.children {
@@ -577,10 +569,11 @@ impl<'a> Importer<'a> {
             if is_t {
                 // A new `hp:t` where the export would not start one by itself.
                 if prev_t || !c.attrs.is_empty() || c.children.is_empty() {
-                    let f = if c.attrs.is_empty() { String::new() } else { self.fp(&[Some(&c.shell())]) };
+                    let ts = c.shell();
+                    let f = if c.attrs.is_empty() { String::new() } else { self.fp(&[Some(&ts)]) };
                     let meta = Meta { run: Some(run_id), tag: "hp:t".into(), ..Default::default() };
                     let at = self.buf.len();
-                    self.entry(Kind::Rmarker, vec![c.shell().to_xml()], f, path, Some(at), Some(at), meta);
+                    self.entry(Kind::Rmarker, vec![ts.to_xml()], f, path, Some(at), Some(at), meta);
                 }
                 for n in &c.children {
                     match n {
@@ -802,19 +795,9 @@ pub fn table_reason(tbl: &Element) -> Option<String> {
 /// for: its style, paragraph shape, text and marks. Export drops the cache
 /// when any of them changed.
 pub fn layout_key(style: u32, para_pr: u32, content: &Inline) -> String {
-    let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-    let mut mix = |v: u64| {
-        for b in v.to_le_bytes() {
-            h = (h ^ b as u64).wrapping_mul(0x0100_0000_01b3);
-        }
-    };
-    mix(style as u64);
-    mix(para_pr as u64);
-    for u in &content.units {
-        mix(hanji_core::model::key(&u.atom) as u64);
-        mix(u.marks.0 as u64);
-    }
-    format!("{h:016x}")
+    let units = content.units.iter().flat_map(|u| [hanji_core::model::key(&u.atom) as u64, u.marks.0 as u64]);
+    let values = [style as u64, para_pr as u64].into_iter().chain(units);
+    format!("{:016x}", hanji_core::remainder::fnv1a(values.flat_map(u64::to_le_bytes)))
 }
 
 #[cfg(test)]

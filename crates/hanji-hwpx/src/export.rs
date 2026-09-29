@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use hanji_core::{Block, Entry, Kind, ListPlan, StyleSet};
 use hanji_format::{Atom, Cell, Inline, Marks};
-use hanji_package::xml::{escape_text, fragment, Element, Node};
+use hanji_package::xml::{assemble, escape_text, fragment, Element, Node};
 
 use crate::header::{list_heading, Header, Style};
 use crate::import::{dims, layout_key};
@@ -32,11 +32,9 @@ fn node(e: Element) -> Node {
     Node::El(e)
 }
 
-/// An element stored as its shell followed by its leading children.
-fn assemble(xml: &[String]) -> Element {
-    let mut e = fragment(&xml[0]);
-    e.children.extend(xml[1..].iter().map(|x| node(fragment(x))));
-    e
+/// An empty run in character shape `char_pr`.
+fn empty_run(char_pr: u32) -> Element {
+    Element::new("hp:run").with_attr("charPrIDRef", &char_pr.to_string())
 }
 
 fn num_attr(e: &Element, k: &str) -> Option<u32> {
@@ -190,10 +188,7 @@ impl<'a> Exporter<'a> {
         let mut tail = self.tail.clone();
         tail.sort_by_key(|e| e.seq);
         if !tail.is_empty() {
-            if out.sections.last().is_some_and(|s| s.paras.is_empty()) {
-                let p = self.new_para(&self.default_style()?);
-                self.emit(&mut out, p);
-            }
+            self.close_section(&mut out)?;
             let last = out.sections.last_mut().unwrap().paras.last_mut().unwrap();
             let at = last.children.iter().position(|n| matches!(n, Node::El(e) if e.is("hp:linesegarray")));
             let at = at.unwrap_or(last.children.len());
@@ -267,7 +262,7 @@ impl<'a> Exporter<'a> {
             .with_attr("pageBreak", "0")
             .with_attr("columnBreak", "0")
             .with_attr("merged", "0");
-        p.children.push(node(Element::new("hp:run").with_attr("charPrIDRef", &style.char_pr.to_string())));
+        p.children.push(node(empty_run(style.char_pr)));
         p
     }
 
@@ -344,7 +339,7 @@ impl<'a> Exporter<'a> {
         self.runs(&mut p, content, path, &now, old_style.as_ref())?;
         if pp.is_none() && p.child("hp:run").is_none() {
             // A paragraph holds at least one run.
-            p.children.push(node(Element::new("hp:run").with_attr("charPrIDRef", &now.char_pr.to_string())));
+            p.children.push(node(empty_run(now.char_pr)));
         }
         if let (Some(l), Some((k, at))) = (lines, layout) {
             if layout_key(now.id, ppr, content) == k {
@@ -465,9 +460,7 @@ impl<'a> Exporter<'a> {
                 It::New(s) => {
                     let ms = &at[&Target::New(s)];
                     let mut r =
-                        ms.iter().find_map(|m| m.xml.get(1)).map(|x| fragment(x)).unwrap_or_else(|| {
-                            Element::new("hp:run").with_attr("charPrIDRef", &style.char_pr.to_string())
-                        });
+                        ms.iter().find_map(|m| m.xml.get(1)).map_or_else(|| empty_run(style.char_pr), |x| fragment(x));
                     r.children.clear();
                     self.fill_run(&mut r, p, s, s, ms, None, &mut tabs)?;
                     out.push(node(r));
@@ -476,7 +469,7 @@ impl<'a> Exporter<'a> {
                     let (a, b, own) = segs[si];
                     let mut r = match own {
                         Some(o) => fragment(&o.xml[0]),
-                        None => Element::new("hp:run").with_attr("charPrIDRef", &style.char_pr.to_string()),
+                        None => empty_run(style.char_pr),
                     };
                     let base = self.base_char_pr(&r, style, old_style);
                     let sflags = self.header.flags(style.char_pr);
@@ -662,8 +655,7 @@ impl<'a> Exporter<'a> {
             None => (self.new_para(&default), None),
         };
         p.children.clear();
-        let mut run =
-            run.unwrap_or_else(|| Element::new("hp:run").with_attr("charPrIDRef", &default.char_pr.to_string()));
+        let mut run = run.unwrap_or_else(|| empty_run(default.char_pr));
         run.children = vec![node(Element::new("hp:tbl")), node(Element::new("hp:t"))];
         p.children.push(node(run));
         Ok(p)
@@ -716,37 +708,28 @@ impl<'a> Exporter<'a> {
                 let xml = te.ok_or("this file has no table cell to take a new cell's properties from")?.xml.clone();
                 let mut tc = fragment(&xml[0]);
                 let mut sub = fragment(&xml[1]);
+                let styles = self.styles;
                 for (k, p) in ps.iter().enumerate() {
-                    let style = p.style.as_deref().unwrap_or(&self.styles.default_paragraph);
-                    let style = style.to_string();
-                    sub.children.push(node(self.para(&p.content, Some(&style), &[bi, ri, ci, k], None)?));
+                    let style = p.style.as_deref().unwrap_or(&styles.default_paragraph);
+                    sub.children.push(node(self.para(&p.content, Some(style), &[bi, ri, ci, k], None)?));
                 }
                 if !self.at(&[bi, ri, ci, ps.len()], Kind::Bmarker).is_empty() {
                     return Err("a marker between cell paragraphs cannot be written to hwpx".into());
                 }
                 tc.children.push(node(sub));
-                let addr = Element::new("hp:cellAddr")
-                    .with_attr("colAddr", &ci.to_string())
-                    .with_attr("rowAddr", &ri.to_string());
-                let spans = Element::new("hp:cellSpan")
-                    .with_attr("colSpan", &span.to_string())
-                    .with_attr("rowSpan", &down.to_string());
                 let mut rest: Vec<Element> = xml[2..].iter().map(|x| fragment(x)).collect();
-                for (name, el) in [("hp:cellAddr", addr), ("hp:cellSpan", spans)] {
-                    match rest.iter_mut().find(|x| x.is(name)) {
-                        Some(x) => {
-                            for (k, v) in &el.attrs {
-                                x.set(k, &hanji_package::xml::unescape(v));
-                            }
-                        }
-                        None => {
-                            let at = if name == "hp:cellAddr" {
-                                0
-                            } else {
-                                rest.iter().position(|x| x.is("hp:cellAddr")).map_or(0, |k| k + 1)
-                            };
-                            rest.insert(at, el);
-                        }
+                // The cell's place, written after its address (which goes first).
+                for (name, attrs, after) in [
+                    ("hp:cellAddr", [("colAddr", ci), ("rowAddr", ri)], None),
+                    ("hp:cellSpan", [("colSpan", span), ("rowSpan", down)], Some("hp:cellAddr")),
+                ] {
+                    let k = rest.iter().position(|x| x.is(name)).unwrap_or_else(|| {
+                        let at = after.and_then(|a| rest.iter().position(|x| x.is(a))).map_or(0, |k| k + 1);
+                        rest.insert(at, Element::new(name));
+                        at
+                    });
+                    for (a, v) in attrs {
+                        rest[k].set(a, &v.to_string());
                     }
                 }
                 tc.children.extend(rest.into_iter().map(node));
@@ -778,20 +761,18 @@ fn wrap_run(m: &Entry) -> Element {
     if el.is("hp:run") {
         return el.shell();
     }
-    let mut r =
-        m.xml.get(1).map(|x| fragment(x)).unwrap_or_else(|| Element::new("hp:run").with_attr("charPrIDRef", "0"));
-    r.children = match (m.meta.tag.as_str(), m.meta.aux.first().map(String::as_str)) {
-        ("hp:t", _) => vec![node(el)],
-        (_, Some("in-t")) => {
-            let mut t = Element::new("hp:t");
-            t.children.push(node(el));
-            vec![node(t)]
-        }
-        _ => vec![node(el)],
+    let mut r = m.xml.get(1).map_or_else(|| empty_run(0), |x| fragment(x));
+    let el = if m.meta.aux.first().is_some_and(|a| a == "in-t") {
+        let mut t = Element::new("hp:t");
+        t.children.push(node(el));
+        t
+    } else {
+        el
     };
+    r.children = vec![node(el)];
     r
 }
 
-fn is_page_break(i: &Inline) -> bool {
+pub(crate) fn is_page_break(i: &Inline) -> bool {
     i.units.len() == 1 && i.units[0].atom == Atom::PageBreak
 }

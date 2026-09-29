@@ -103,6 +103,11 @@ impl Element {
     pub fn shell(&self) -> Element {
         Element { name: self.name.clone(), attrs: self.attrs.clone(), children: vec![] }
     }
+    /// The start tag, `<name attrs…>`.
+    pub fn open_tag(&self) -> String {
+        let s = self.shell().to_xml();
+        format!("{}>", &s[..s.len() - 2])
+    }
     /// Pre-order walk over all descendant elements (self included).
     pub fn walk<'a>(&'a self, f: &mut dyn FnMut(&'a Element)) {
         f(self);
@@ -206,6 +211,13 @@ pub fn parse(data: &[u8]) -> Result<Doc, XmlError> {
 /// Parse one element written by [`Element::to_xml`].
 pub fn fragment(s: &str) -> Element {
     parse(s.as_bytes()).expect("stored fragment is well-formed").root
+}
+
+/// An element stored as its shell followed by its leading children.
+pub fn assemble(xml: &[String]) -> Element {
+    let mut e = fragment(&xml[0]);
+    e.children.extend(xml[1..].iter().map(|x| Node::El(fragment(x))));
+    e
 }
 
 fn push_merged(children: &mut Vec<Node>, node: Node) {
