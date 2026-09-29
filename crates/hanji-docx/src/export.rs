@@ -521,8 +521,10 @@ impl<'a> Exporter<'a> {
         }
     }
 
+    /// Sets the table style the text names; no name is the default table
+    /// style, written out so that every application draws it.
     fn set_table_style(&self, tbl: &mut Element, style: Option<&str>) -> Result<(), String> {
-        let id = match style {
+        let id = match style.or(self.styles.default_table.as_deref()) {
             Some(s) => Some(self.styles.table_id(s).ok_or_else(|| format!("unknown table style {s:?}"))?.to_string()),
             None => None,
         };
