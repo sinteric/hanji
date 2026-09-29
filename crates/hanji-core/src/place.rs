@@ -279,8 +279,23 @@ fn follow_heads(
     let end = |xs: &[Block], i: usize, lv: u8| {
         (i + 1..xs.len()).find(|&k| level(&xs[k]).is_some_and(|l| l <= lv)).unwrap_or(xs.len())
     };
-    // The new head of level `lv` or above that new block `j` sits under.
-    let under = |j: usize, lv: u8| (0..j).rev().find(|&x| level(&new[x]).is_some_and(|l| l <= lv));
+    // `unders[lv][j]`: the new head of level `lv` or above that new block `j` sits under.
+    let top = old.iter().chain(new).filter_map(level).max().unwrap_or(0);
+    let unders: Vec<Vec<Option<usize>>> = (0..=top)
+        .map(|lv| {
+            let mut last = None;
+            (0..new.len())
+                .map(|j| {
+                    let u = last;
+                    if level(&new[j]).is_some_and(|l| l <= lv) {
+                        last = Some(j);
+                    }
+                    u
+                })
+                .collect()
+        })
+        .collect();
+    let under = |j: usize, lv: u8| unders[lv as usize][j];
     let pair = |bmap: &mut [Option<usize>], used: &mut HashSet<usize>, i: usize, j: usize| -> bool {
         let fits = j < new.len() && !used.contains(&j) && same_kind(&old[i], &new[j]);
         if fits {

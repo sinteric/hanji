@@ -111,7 +111,7 @@ fn para(text: &str, item: Option<ListItem>) -> Block {
 /// A new slide at the end, from a layout with a title and a body.
 fn p3_add_slide(d: &Doc, cx: &Cx) -> Option<Edit> {
     let sh = shell(cx);
-    let has = |l: &&hanji_pptx::deck::LayoutInfo, n: &str| l.slots.iter().any(|s| s.name == n);
+    let has = |l: &&hanji_pptx::deck::LayoutInfo, n: &str| l.slot(n).is_some();
     let layout = sh
         .deck
         .layouts
@@ -277,7 +277,7 @@ fn p8_layout(d: &Doc, cx: &Cx) -> Option<Edit> {
             continue;
         }
         let cur = sh.deck.layout(layout)?;
-        let slot = |l: &hanji_pptx::deck::LayoutInfo, n: &str| l.slots.iter().find(|x| x.name == n).cloned();
+        let slot = |l: &hanji_pptx::deck::LayoutInfo, n: &str| l.slot(n).cloned();
         let fits = |l: &&hanji_pptx::deck::LayoutInfo| l.name != layout && used.iter().all(|u| slot(l, u).is_some());
         // Prefer a layout whose slots give the text the same bullets, then the fewest slots.
         let same_bullets = |l: &hanji_pptx::deck::LayoutInfo| {

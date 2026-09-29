@@ -50,6 +50,17 @@ pub struct Deck {
     pub notes: Option<NotesMaster>,
 }
 
+impl LayoutInfo {
+    pub fn slot(&self, name: &str) -> Option<&SlotInfo> {
+        self.slots.iter().find(|s| s.name == name)
+    }
+
+    /// [`slot`](Self::slot), or the error the export gives for a slot the layout lacks.
+    pub fn need_slot(&self, name: &str) -> Result<&SlotInfo, String> {
+        self.slot(name).ok_or_else(|| format!("::{name}:: is not a slot of layout {:?}", self.name))
+    }
+}
+
 impl Deck {
     pub fn layout(&self, name: &str) -> Option<&LayoutInfo> {
         self.layouts.iter().find(|l| l.name == name)

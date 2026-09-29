@@ -8,15 +8,11 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use hanji_core::{notice, ImportReport, Notice, Part};
-use hanji_package::opc::{self, rels_part};
+use hanji_package::opc::{self, is_macro_package, rels_part};
 use hanji_package::xml::{self, Element, Node};
 use hanji_package::{clip, package};
 
 use crate::pml::CT_MAIN;
-
-/// Extensions of macro-enabled Office packages.
-const MACRO_PACKAGES: &[&str] =
-    &[".docm", ".dotm", ".xlsm", ".xltm", ".xlam", ".xlsb", ".pptm", ".potm", ".ppsm", ".ppam", ".sldm"];
 
 /// Macro-enabled main parts and what they become.
 const MACRO_MAINS: &[(&str, &str)] = &[
@@ -33,15 +29,6 @@ const MACRO_MAINS: &[(&str, &str)] = &[
 
 /// Elements that exist only to reach what a removed relationship pointed at.
 const REACHES: &[&str] = &["p:control", "a:videoFile", "a:audioFile", "a:quickTimeFile", "p14:media", "c:externalData"];
-
-/// An embedded package that can carry macros: a macro-enabled extension, or a zip holding a VBA project.
-fn is_macro_package(p: &Part) -> bool {
-    let lower = p.name.to_ascii_lowercase();
-    MACRO_PACKAGES.iter().any(|x| lower.ends_with(x))
-        || (p.data.starts_with(b"PK")
-            && package::read(&p.data)
-                .is_ok_and(|inner| inner.iter().any(|q| q.name.to_ascii_lowercase().ends_with("vbaproject.bin"))))
-}
 
 struct Removed {
     source: String,

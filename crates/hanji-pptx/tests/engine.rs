@@ -274,3 +274,35 @@ fn linked_media_and_external_objects_are_cut() {
     assert!(x.contains("github.com"), "hyperlinks stay: {x}");
     assert!(!xml(&out, &s1).contains("r:link"));
 }
+
+#[test]
+fn a_deleted_slide_leaves_the_outline_view_settings() {
+    let mut parts = package::read(&deck("korean-deck.pptx")).unwrap();
+    let second = slides(&parts)[1].clone();
+    let v = parts.iter_mut().find(|p| p.name == "ppt/viewProps.xml").unwrap();
+    let x = String::from_utf8(v.data.clone()).unwrap().replace(
+        "<p:notesTextViewPr>",
+        "<p:outlineViewPr><p:cViewPr><p:scale><a:sx n=\"33\" d=\"100\"/><a:sy n=\"33\" d=\"100\"/></p:scale><p:origin x=\"0\" y=\"0\"/></p:cViewPr><p:sldLst><p:sld r:id=\"rId1\" collapse=\"1\"/><p:sld r:id=\"rId2\" collapse=\"1\"/></p:sldLst></p:outlineViewPr><p:notesTextViewPr>",
+    );
+    v.data = x.into_bytes();
+    let rel = |id: &str, t: &str| {
+        format!("<Relationship Id=\"{id}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide\" Target=\"{t}\"/>")
+    };
+    let first = slides(&parts)[0].clone();
+    let rels = format!(
+        "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<Relationships xmlns=\"http://schemas.openxmlformats.org/package/2006/relationships\">{}{}</Relationships>",
+        rel("rId1", &opc::relative_target("ppt/viewProps.xml", &second)),
+        rel("rId2", &opc::relative_target("ppt/viewProps.xml", &first)),
+    );
+    let template = parts[0].clone();
+    parts.push(Part { name: "ppt/_rels/viewProps.xml.rels".into(), data: rels.into_bytes(), ..template });
+    let imp = import(&package::write(&parts).unwrap());
+    let (a, b) = slide_span(&imp.text, 1);
+    let (text, rem) = span_edit(&imp, a, b + 5, "");
+    let out = export(&text, &rem);
+    let v = xml(&out, "ppt/viewProps.xml");
+    assert!(!v.contains("r:id=\"rId1\"") && v.contains("<p:sld r:id=\"rId2\" collapse=\"1\"/>"), "{v}");
+    let r = xml(&out, "ppt/_rels/viewProps.xml.rels");
+    assert!(!r.contains("rId1") && r.contains("rId2"), "{r}");
+    assert!(package::get(&out, &second).is_none());
+}

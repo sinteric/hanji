@@ -29,6 +29,20 @@ impl Rel {
     }
 }
 
+/// Extensions of macro-enabled Office packages.
+const MACRO_PACKAGES: &[&str] =
+    &[".docm", ".dotm", ".xlsm", ".xltm", ".xlam", ".xlsb", ".pptm", ".potm", ".ppsm", ".ppam", ".sldm"];
+
+/// An embedded package that can carry macros (§8): a macro-enabled
+/// extension, or a zip holding a VBA project.
+pub fn is_macro_package(p: &Part) -> bool {
+    let lower = p.name.to_ascii_lowercase();
+    MACRO_PACKAGES.iter().any(|x| lower.ends_with(x))
+        || (p.data.starts_with(b"PK")
+            && package::read(&p.data)
+                .is_ok_and(|inner| inner.iter().any(|q| q.name.to_ascii_lowercase().ends_with("vbaproject.bin"))))
+}
+
 /// `ppt/slides/slide1.xml` → `ppt/slides/_rels/slide1.xml.rels`.
 pub fn rels_part(part: &str) -> String {
     match part.rsplit_once('/') {

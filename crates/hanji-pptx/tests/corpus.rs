@@ -104,8 +104,8 @@ fn corpus_getput_putget_remainder() {
     assert_eq!(sum.touched.get("exact").map_or(0, |t| t[2]), 0, "exact spans lost entries");
 }
 
-/// Every export converts to PDF with LibreOffice, and each GetPut export has
-/// the original's slide count.
+/// Every export converts to PDF with LibreOffice, one page per slide it
+/// shows (its slides not hidden).
 #[cfg(not(target_os = "wasi"))]
 fn soffice() {
     use std::process::Command;
@@ -134,7 +134,22 @@ fn soffice() {
         let parts = hanji_pptx::package::read(&std::fs::read(p).ok()?).ok()?;
         let pres = parts.iter().find(|x| x.name == "ppt/presentation.xml")?;
         let d = xml::parse(&pres.data).ok()?;
-        Some(d.root.child("p:sldIdLst").map_or(0, |l| l.elements().count()))
+        let ids: Vec<String> = d
+            .root
+            .child("p:sldIdLst")
+            .map(|l| l.elements().filter_map(|e| e.get("r:id")).collect())
+            .unwrap_or_default();
+        // LibreOffice leaves hidden slides (`show="0"`) out of the PDF.
+        let shown = |id: &String| {
+            let part = hanji_package::opc::target_of(&parts, &pres.name, id)?;
+            let d = xml::parse(hanji_pptx::package::get(&parts, &part)?).ok()?;
+            Some(d.root.get("show").as_deref() != Some("0"))
+        };
+        let mut n = 0;
+        for id in &ids {
+            n += usize::from(shown(id)?);
+        }
+        Some(n)
     };
     let (mut ok, mut total, mut differ) = (0, 0, vec![]);
     for dir in std::fs::read_dir(out_dir()).unwrap() {
@@ -167,6 +182,8 @@ fn soffice() {
     }
     println!("soffice: exports whose page count differs from their slide count: {differ:?}");
     println!("soffice ({}): {ok}/{total} exports converted to PDF", String::from_utf8_lossy(&v.stdout).trim());
+    assert_eq!(ok, total, "LibreOffice (with Impress) converts every export");
+    assert!(differ.is_empty(), "{differ:?}");
 }
 
 #[test]

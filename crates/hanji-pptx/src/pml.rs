@@ -185,8 +185,3 @@ pub fn marks_of(rpr: Option<&Element>) -> hanji_format::Marks {
 
 /// The `a:rPr` attributes the marks are written in.
 pub const MARK_ATTRS: &[&str] = &["b", "i", "u", "strike"];
-
-/// A fragment with an `r:` attribute somewhere: it refers to its part's relationships.
-pub fn refers_to_rels(xml: &str) -> bool {
-    xml.contains(" r:")
-}

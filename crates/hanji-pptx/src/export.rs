@@ -158,7 +158,7 @@ impl<'a> Exporter<'a> {
         // Slides the text no longer has go, with what only they used.
         let kept: BTreeSet<&str> = outs.iter().map(|o| o.info.part.as_str()).collect();
         let deleted: Vec<&String> = self.shell.slides.iter().filter(|p| !kept.contains(p.as_str())).collect();
-        let gone = self.delete(&parts, &deleted)?;
+        let gone = self.delete(&mut parts, &deleted)?;
         parts.retain(|p| !gone.contains(&p.name));
         if let Some(ct) = opc::content_types(&parts, &gone, &added) {
             put(&mut parts, &template, opc::CT_PART, ct);
@@ -193,9 +193,7 @@ impl<'a> Exporter<'a> {
         let bullets_of = |it: &ItemG, el: &Element| -> [Bu; 9] {
             let own = levels_of(el.child("p:txBody").and_then(|t| t.child("a:lstStyle")));
             match it.kind {
-                HeadKind::Slot { name } => {
-                    over(own, layout.slots.iter().find(|x| x.name == name).map_or(layout.other, |x| x.bullets))
-                }
+                HeadKind::Slot { name } => over(own, layout.slot(name).map_or(layout.other, |x| x.bullets)),
                 _ => over(own, layout.other),
             }
         };
@@ -249,11 +247,7 @@ impl<'a> Exporter<'a> {
                             if occupied(&stands, layout, name) {
                                 return Err(format!("::{name}:: is filled by a placeholder the text does not show (in a group, or holding an object): the slot cannot be written twice"));
                             }
-                            let slot = layout
-                                .slots
-                                .iter()
-                                .find(|x| x.name == name)
-                                .ok_or_else(|| format!("::{name}:: is not a slot of layout {:?}", layout.name))?;
+                            let slot = layout.need_slot(name)?;
                             els[n] = Some(new_placeholder(slot));
                             fresh[n] = true;
                         }
@@ -268,11 +262,7 @@ impl<'a> Exporter<'a> {
             let mut e = els[n].take().unwrap();
             if let HeadKind::Slot { name } = it.kind {
                 if relayout && placeholder(&e).is_some() {
-                    let slot = layout
-                        .slots
-                        .iter()
-                        .find(|x| x.name == name)
-                        .ok_or_else(|| format!("::{name}:: is not a slot of layout {:?}", layout.name))?;
+                    let slot = layout.need_slot(name)?;
                     set_ph(&mut e, slot);
                 }
             }
@@ -294,9 +284,8 @@ impl<'a> Exporter<'a> {
             out_items.push(e);
         }
         assign_ids(&stands, &mut out_items, &fresh);
-        let tree_children = assemble(std::mem::take(&mut stands), &claims, out_items, &|slot: &str| {
-            layout.slots.iter().any(|x| x.name == slot)
-        })?;
+        let tree_children =
+            assemble(std::mem::take(&mut stands), &claims, out_items, &|slot: &str| layout.slot(slot).is_some())?;
         let tree = xml_root.child_mut("p:cSld").and_then(|c| c.child_mut("p:spTree")).unwrap();
         tree.children = tree_children;
         check_timing(&xml_root, &info)?;
@@ -786,7 +775,7 @@ impl<'a> Exporter<'a> {
             None => {}
         }
         if order_changed {
-            sections(&mut root, &sh.order, &ids)?;
+            sections(&mut root, &ids)?;
         }
         let data = format!("{}{}{}", sh.prolog, root.to_xml(), sh.epilog).into_bytes();
         for p in parts.iter_mut() {
@@ -807,8 +796,9 @@ impl<'a> Exporter<'a> {
     }
 
     /// Parts that go with deleted slides: the slides, their notes, and what
-    /// only they reached. Refused when a part that stays points at one.
-    fn delete(&self, parts: &[Part], deleted: &[&String]) -> Result<BTreeSet<String>, String> {
+    /// only they reached. Refused when a part that stays points at one,
+    /// except the view settings' outline state, which loses the slide.
+    fn delete(&self, parts: &mut [Part], deleted: &[&String]) -> Result<BTreeSet<String>, String> {
         let mut gone: BTreeSet<String> = BTreeSet::new();
         if deleted.is_empty() {
             return Ok(gone);
@@ -826,17 +816,44 @@ impl<'a> Exporter<'a> {
             }
         }
         // Nothing that stays may point at a deleted slide.
+        let mut view = None;
         for p in parts.iter().filter(|p| p.name.ends_with(".rels")) {
             let Some(src) = opc::source_of_rels(&p.name) else { continue };
             if gone.contains(&src) || src == self.shell.pres_part {
                 continue;
             }
-            for r in opc::parse_rels(&p.data).iter().filter(|r| !r.external) {
-                let t = opc::resolve_target(&src, &r.target);
-                if dset.contains(t.as_str()) {
-                    return Err(format!(
-                        "{src} links to {t}, a slide the edit deletes: remove the link in PowerPoint first, or keep the slide"
-                    ));
+            let rels = opc::parse_rels(&p.data);
+            let to_deleted = |r: &Rel| !r.external && dset.contains(opc::resolve_target(&src, &r.target).as_str());
+            if src.ends_with("/viewProps.xml") && rels.iter().any(|r| to_deleted(r) && r.ty == REL_SLIDE) {
+                let ids: BTreeSet<String> = rels.iter().filter(|r| to_deleted(r)).map(|r| r.id.clone()).collect();
+                let kept: Vec<Rel> = rels.iter().filter(|r| !ids.contains(&r.id)).cloned().collect();
+                view = Some((src.clone(), ids, kept));
+                continue;
+            }
+            if let Some(r) = rels.iter().find(|r| to_deleted(r)) {
+                return Err(format!(
+                    "{src} links to {}, a slide the edit deletes: remove the link in PowerPoint first, or keep the slide",
+                    opc::resolve_target(&src, &r.target)
+                ));
+            }
+        }
+        // The outline view's `p:sld` entries name slides by relationship.
+        if let Some((src, ids, kept)) = view {
+            let rels = rewrite_rels(parts, &src, &kept)?;
+            let v = package::get(parts, &src).ok_or_else(|| format!("no {src}"))?;
+            let mut d = xml::parse(v).map_err(|e| format!("{src}: {e}"))?;
+            d.root.walk_mut(&mut |e| {
+                e.children.retain(
+                    |n| !matches!(n, Node::El(x) if x.is("p:sld") && x.get("r:id").is_some_and(|r| ids.contains(&r))),
+                )
+            });
+            let data = xml::write_doc(&d);
+            let rp = opc::rels_part(&src);
+            for p in parts.iter_mut() {
+                if p.name == src {
+                    p.data = data.clone();
+                } else if p.name == rp {
+                    p.data = rels.clone();
                 }
             }
         }
@@ -1082,7 +1099,7 @@ fn check_timing(root: &Element, info: &SlideInfo) -> Result<(), String> {
 /// Sections (`p14:sectionLst`) after the slide order changed: each slide keeps
 /// its section, a new one joins the section of the slide before it, and the
 /// sections must stay contiguous and in order.
-fn sections(root: &mut Element, old: &[u32], new: &[u32]) -> Result<(), String> {
+fn sections(root: &mut Element, new: &[u32]) -> Result<(), String> {
     let mut lst = None;
     root.walk_mut(&mut |e| {
         if e.local() == "sectionLst" && lst.is_none() {
@@ -1101,7 +1118,6 @@ fn sections(root: &mut Element, old: &[u32], new: &[u32]) -> Result<(), String> 
             }
         });
     }
-    let _ = old;
     let mut assigned: Vec<(u32, usize)> = vec![];
     for &id in new {
         let s = of.get(&id).copied().or_else(|| assigned.last().map(|a| a.1)).unwrap_or(0);
