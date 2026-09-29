@@ -39,6 +39,10 @@ pub enum Kind {
     Slide,
     /// A slot's or shape's own element, without its paragraphs. Anchor: its head.
     Shape,
+    /// A spreadsheet feature anchored to cells of one sheet (merged cells,
+    /// a conditional format, a data validation, a hyperlink). Anchor: `path`
+    /// `[sheet]` and `meta.range`, a range list (`cells.rs`).
+    Range,
 }
 
 impl Kind {
@@ -83,6 +87,10 @@ pub struct Meta {
     /// (`r:` attributes): the entry cannot be placed in another part.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub part: Option<String>,
+    /// The cells a `Range` entry is anchored to: a space-separated range
+    /// list (`A1:B2 D4`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub range: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
