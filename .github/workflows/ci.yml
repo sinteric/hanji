@@ -19,9 +19,9 @@ jobs:
       - run: cargo test --workspace
       # The CLI and the MCP server are native only (files, processes, stdio).
       - name: build for wasm32-unknown-unknown
-        run: cargo build --target wasm32-unknown-unknown --workspace --exclude hanji-cli
+        run: cargo build --target wasm32-unknown-unknown --workspace --exclude hanji-cli --exclude hanji-mcp
       - uses: bytecodealliance/actions/wasmtime/setup@v1
       - name: test on wasm32-wasip1 (wasmtime)
-        run: cargo test --target wasm32-wasip1 --workspace --exclude hanji-cli
+        run: cargo test --target wasm32-wasip1 --workspace --exclude hanji-cli --exclude hanji-mcp
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: wasmtime run --dir=${{ github.workspace }}
