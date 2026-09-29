@@ -52,6 +52,8 @@ HANJI_SOFFICE=1 cargo test --release -p hanji-docx --test corpus -- --nocapture 
 # tracked changes (§10.2): the corpus test above also writes target/tmp/docx-tracked-out; cross-check it outside the workspace:
 cargo run --release --manifest-path crates/hanji-docx/validate/Cargo.toml       # rdocx's accept / reject by author
 python3 crates/hanji-docx/validate/lo_review.py                                 # LibreOffice's Accept All / Reject All (UNO)
+# §9 validity by hand: the Office check kit (target/office-kit/ and target/office-kit.zip, with CHECKLIST.md):
+cargo run --release --manifest-path validation/office-kit/Cargo.toml
 HANJI_SOFFICE=1 cargo test --release -p hanji-pptx --test corpus -- --nocapture  # the same, checking PDF page count against the slide count
 HANJI_REPORT=1 cargo test --release -p hanji-xlsx -- --nocapture                 # xlsx: corpus, op set, round 4, the 100k-row sheet
 HANJI_SOFFICE=1 cargo test --release -p hanji-xlsx -- --nocapture                # also compare LibreOffice's values with the windows
