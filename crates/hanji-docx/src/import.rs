@@ -2,14 +2,15 @@
 //! of the prototype's importer; entry kinds are documented in
 //! `hanji_core::remainder::Kind`).
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
-use hanji_core::{Block, Entry, Kind, ListItem, Meta, Para, StyleDef, StyleSet, Table};
+use hanji_core::{Block, Entry, KeepIds, Kind, ListItem, Meta, Para, StyleDef, StyleSet, Table};
 use hanji_format::{Atom, Cell, CellPara, Inline, Keep, Marks, Unit};
 
 use crate::numbering::{num_pr, Numbering};
 use crate::ooxml::*;
-use crate::xml::{Element, Node, Scope};
+use crate::xml::{is_blank, Element, Node, Scope};
+use hanji_package::clip;
 
 pub struct Split {
     pub blocks: Vec<Block>,
@@ -34,7 +35,7 @@ pub struct Importer<'a> {
     entries: Vec<Entry>,
     next_id: u64,
     next_seq: u64,
-    keep_ids: HashSet<String>,
+    keep_ids: KeepIds,
     notes: &'a HashMap<(String, String), String>,
     buf: Vec<Unit>,
     stats: Stats,
@@ -63,7 +64,7 @@ impl<'a> Importer<'a> {
             entries: vec![],
             next_id: 1,
             next_seq: 1000,
-            keep_ids: HashSet::new(),
+            keep_ids: KeepIds::default(),
             notes,
             buf: vec![],
             stats: Stats::default(),
@@ -80,7 +81,7 @@ impl<'a> Importer<'a> {
     fn rollback(&mut self, m: Mark) {
         for e in self.entries.drain(m.0..) {
             if let Some(k) = e.meta.keep {
-                self.keep_ids.remove(&k.id);
+                self.keep_ids.release(&k.id);
             }
         }
         (self.next_id, self.next_seq) = (m.1, m.2);
@@ -128,22 +129,6 @@ impl<'a> Importer<'a> {
         self.entries.len() - 1
     }
 
-    /// A stable placeholder id derived from the object's content.
-    fn keep_id(&mut self, fp: &str) -> String {
-        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
-        for b in fp.bytes() {
-            h = (h ^ b as u64).wrapping_mul(0x0100_0000_01b3);
-        }
-        // Four base-32 digits; the same object again gets `-2`, `-3`, … in document order.
-        let base: String = std::iter::once('k')
-            .chain((0..4).map(|k| char::from_digit(((h >> (k * 5)) & 31) as u32, 32).unwrap()))
-            .collect();
-        if self.keep_ids.insert(base.clone()) {
-            return base;
-        }
-        (2..).map(|k| format!("{base}-{k}")).find(|id| self.keep_ids.insert(id.clone())).unwrap()
-    }
-
     fn keep_entry(
         &mut self,
         kind: Kind,
@@ -153,7 +138,7 @@ impl<'a> Importer<'a> {
         run: Option<u64>,
     ) -> Keep {
         let fpv = self.fp(&els.iter().map(|e| Some(*e)).collect::<Vec<_>>());
-        let id = self.keep_id(&fpv);
+        let id = self.keep_ids.next(&fpv);
         let kind_name = if kind == Kind::Bkeep && els[0].is("w:tbl") {
             "table".to_string()
         } else if els.len() > 1 || (els[0].is("w:r") && kind == Kind::Keep) {
@@ -698,10 +683,6 @@ fn structure_reason(e: &Element, head: &[&str], item: &str, level: &str) -> Opti
     None
 }
 
-fn is_blank(n: &Node) -> bool {
-    matches!(n, Node::Text(t) if crate::xml::unescape(t).trim().is_empty())
-}
-
 /// A `w:t` whose text the model can hold: no control characters (a tab or
 /// newline inside `w:t` would come back as `w:tab` / `w:br`).
 fn text_modellable(t: &Element) -> bool {
@@ -820,17 +801,4 @@ pub fn field_result(els: &[&Element]) -> String {
         });
     }
     out
-}
-
-pub fn squash(s: &str) -> String {
-    s.split_whitespace().collect::<Vec<_>>().join(" ")
-}
-
-pub fn clip(s: &str, n: usize) -> String {
-    let s = squash(s);
-    if s.chars().count() > n {
-        s.chars().take(n).collect::<String>() + "…"
-    } else {
-        s
-    }
 }

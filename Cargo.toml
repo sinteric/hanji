@@ -12,3 +12,5 @@ rust-version = "1.85"
 [workspace.dependencies]
 hanji-format = { path = "crates/hanji-format" }
 hanji-core = { path = "crates/hanji-core" }
+hanji-package = { path = "crates/hanji-package" }
+hanji-testkit = { path = "crates/hanji-testkit" }

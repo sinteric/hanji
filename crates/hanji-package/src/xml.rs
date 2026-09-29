@@ -103,11 +103,23 @@ impl Element {
     pub fn shell(&self) -> Element {
         Element { name: self.name.clone(), attrs: self.attrs.clone(), children: vec![] }
     }
+    /// The start tag, `<name attrs…>`.
+    pub fn open_tag(&self) -> String {
+        let s = self.shell().to_xml();
+        format!("{}>", &s[..s.len() - 2])
+    }
     /// Pre-order walk over all descendant elements (self included).
     pub fn walk<'a>(&'a self, f: &mut dyn FnMut(&'a Element)) {
         f(self);
         for c in self.elements() {
             c.walk(f);
+        }
+    }
+    /// [`Element::walk`] with mutable access.
+    pub fn walk_mut(&mut self, f: &mut dyn FnMut(&mut Element)) {
+        f(self);
+        for c in self.elements_mut() {
+            c.walk_mut(f);
         }
     }
     pub fn descendants(&self, qname: &str) -> Vec<&Element> {
@@ -199,6 +211,13 @@ pub fn parse(data: &[u8]) -> Result<Doc, XmlError> {
 /// Parse one element written by [`Element::to_xml`].
 pub fn fragment(s: &str) -> Element {
     parse(s.as_bytes()).expect("stored fragment is well-formed").root
+}
+
+/// An element stored as its shell followed by its leading children.
+pub fn assemble(xml: &[String]) -> Element {
+    let mut e = fragment(&xml[0]);
+    e.children.extend(xml[1..].iter().map(|x| Node::El(fragment(x))));
+    e
 }
 
 fn push_merged(children: &mut Vec<Node>, node: Node) {
@@ -426,6 +445,38 @@ pub fn write_nodes(nodes: &[Node]) -> String {
         write_node(n, &mut s);
     }
     s
+}
+
+// ---------------------------------------------------------------- tree edits and fingerprints
+
+/// Insert `el` among `parent`'s children following `order` (by local name).
+pub fn insert_ordered(parent: &mut Element, el: Element, order: &[&str]) {
+    let rank = |e: &Element| order.iter().position(|x| *x == e.local());
+    let mine = rank(&el).unwrap_or(order.len());
+    let at = parent.children.iter().position(|n| matches!(n, Node::El(c) if rank(c).is_some_and(|r| r > mine)));
+    match at {
+        Some(k) => parent.children.insert(k, Node::El(el)),
+        None => parent.children.push(Node::El(el)),
+    }
+}
+
+/// Remove the first child element named `qname`.
+pub fn remove_child(e: &mut Element, qname: &str) -> Option<Element> {
+    let k = e.children.iter().position(|n| matches!(n, Node::El(c) if c.name == qname))?;
+    match e.children.remove(k) {
+        Node::El(x) => Some(x),
+        _ => None,
+    }
+}
+
+/// Fingerprint of fragments (canonical, joined; `-` for none).
+pub fn fp(scope: &Scope, els: &[Option<&Element>]) -> String {
+    els.iter().map(|e| e.map_or_else(|| "-".to_string(), |e| canon(e, scope))).collect::<Vec<_>>().join("|")
+}
+
+/// Whitespace-only character data (between elements).
+pub fn is_blank(n: &Node) -> bool {
+    matches!(n, Node::Text(t) if unescape(t).trim().is_empty())
 }
 
 #[cfg(test)]

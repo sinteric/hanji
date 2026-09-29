@@ -2,11 +2,11 @@
 //! reported, never preserved); hidden text, comments, tracked deletions and
 //! author metadata are listed to surface before export.
 
-use hanji_core::{ImportReport, Notice, Part};
+use hanji_core::{notice, ImportReport, Notice, Part};
 
-use crate::import::clip;
 use crate::ooxml::DOC_PART;
 use crate::xml::{self, Element, Node};
+use hanji_package::clip;
 
 /// Field instructions that fetch or run something when the file opens or updates.
 const FETCHING_FIELDS: &[&str] = &["DDE", "DDEAUTO", "INCLUDEPICTURE", "INCLUDETEXT", "LINK", "IMPORT", "RD"];
@@ -23,10 +23,6 @@ fn is_macro_package(p: &Part) -> bool {
         || (p.data.starts_with(b"PK")
             && crate::package::read(&p.data)
                 .is_ok_and(|inner| inner.iter().any(|q| q.name.to_ascii_lowercase().ends_with("vbaproject.bin"))))
-}
-
-fn notice(report: &mut Vec<Notice>, kind: &str, location: impl Into<String>, detail: impl Into<String>) {
-    report.push(Notice { kind: kind.into(), location: location.into(), detail: detail.into() });
 }
 
 /// `word/_rels/document.xml.rels` → `word/document.xml`.

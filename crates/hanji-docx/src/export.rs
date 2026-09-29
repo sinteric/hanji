@@ -3,12 +3,12 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use hanji_core::{Block, Entry, Kind, ListItem, StyleSet};
+use hanji_core::{Block, Entry, Kind, ListPlan, StyleSet};
 use hanji_format::{Atom, Cell, Inline, Marks};
 
 use crate::numbering::Numbering;
 use crate::ooxml::*;
-use crate::xml::{self, fragment, Element, Node};
+use crate::xml::{self, assemble, fragment, Element, Node};
 
 pub struct Exporter<'a> {
     styles: &'a StyleSet,
@@ -19,136 +19,12 @@ pub struct Exporter<'a> {
     lists: HashMap<usize, ListPlan>,
 }
 
-/// What a top-level paragraph's numbering becomes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ListPlan {
-    /// A list item as imported: its `w:pPr` stays as it is.
-    Keep,
-    /// A list item that takes this numbering (a new item, or a changed level
-    /// or kind).
-    Set { num: u32, ilvl: u32 },
-    /// A former list item, now a paragraph: its numbering goes.
-    Strip,
-}
-
-/// The numbering stored for the paragraph at `[bi]`: its item at import, numId and ilvl.
-fn stored_item(by: &HashMap<(Vec<usize>, Kind), Vec<&Entry>>, bi: usize) -> Option<(ListItem, u32, u32)> {
-    let e = by.get(&(vec![bi], Kind::Ppr))?.first()?;
-    let n = |k: usize| e.meta.aux.get(k).and_then(|v| v.parse().ok());
-    Some((e.meta.item?, n(0)?, n(1)?))
-}
-
-/// Numbering for every list item and former list item. An item keeps its
-/// own numbering (its level moved by the text's change of level); a new one
-/// takes its nearest sibling's, at its level or, one level off, the same
-/// list's; a new list takes the file's first bullet or decimal list, a
-/// decimal one restarting at 1.
-pub fn plan_lists(
-    blocks: &[Block],
-    entries: &[Entry],
-    numbering: &mut Numbering,
-) -> Result<HashMap<usize, ListPlan>, String> {
-    let mut by: HashMap<(Vec<usize>, Kind), Vec<&Entry>> = HashMap::new();
-    for e in entries.iter().filter(|e| e.kind == Kind::Ppr && e.path.len() == 1) {
-        by.entry((e.path.clone(), e.kind)).or_default().push(e);
-    }
-    let item = |bi: usize| match &blocks[bi] {
-        Block::Para(p) => p.item,
-        _ => None,
-    };
-    let mut plan = HashMap::new();
-    let mut assigned: HashMap<usize, (u32, u32)> = HashMap::new();
-    let mut pending = vec![];
-    for bi in 0..blocks.len() {
-        let stored = stored_item(&by, bi);
-        let Some(it) = item(bi) else {
-            if stored.is_some() {
-                plan.insert(bi, ListPlan::Strip);
-            }
-            continue;
-        };
-        let kept = stored.filter(|s| s.0.ordered == it.ordered).and_then(|(si, num, ilvl)| {
-            let nl = ilvl as i64 + it.level as i64 - si.level as i64;
-            let nl = u32::try_from(nl).ok().filter(|&l| l <= 8)?;
-            (numbering.ordered(num, nl) == Some(it.ordered)).then_some((num, nl, nl == ilvl))
-        });
-        match kept {
-            Some((num, ilvl, same)) => {
-                assigned.insert(bi, (num, ilvl));
-                plan.insert(bi, if same { ListPlan::Keep } else { ListPlan::Set { num, ilvl } });
-            }
-            None => pending.push(bi),
-        }
-    }
-    // The text list an item belongs to: from its first item to the next first.
-    let list_of = |bi: usize| {
-        let lo = (0..=bi).rev().find(|&k| item(k).is_none_or(|i| i.first)).map_or(0, |k| {
-            if item(k).is_some() {
-                k
-            } else {
-                k + 1
-            }
-        });
-        let hi = (bi + 1..blocks.len()).find(|&k| item(k).is_none_or(|i| i.first)).unwrap_or(blocks.len());
-        (lo, hi)
-    };
-    let mut new_lists: HashMap<usize, u32> = HashMap::new();
-    while !pending.is_empty() {
-        let mut progress = false;
-        pending.retain(|&bi| {
-            let it = item(bi).unwrap();
-            let (lo, hi) = list_of(bi);
-            let mut near: Vec<usize> = (lo..hi).filter(|k| assigned.contains_key(k)).collect();
-            near.sort_by_key(|&k| (k.abs_diff(bi), k));
-            let pick = near.iter().find_map(|&k| {
-                let (num, ilvl) = assigned[&k];
-                let sib = item(k).unwrap();
-                let nl = u32::try_from(ilvl as i64 + it.level as i64 - sib.level as i64).ok()?;
-                (sib.ordered == it.ordered && (sib.level == it.level || numbering.ordered(num, nl) == Some(it.ordered)))
-                    .then_some((num, nl))
-            });
-            match pick {
-                Some((num, ilvl)) => {
-                    assigned.insert(bi, (num, ilvl));
-                    plan.insert(bi, ListPlan::Set { num, ilvl });
-                    progress = true;
-                    false
-                }
-                None => true,
-            }
-        });
-        if progress || pending.is_empty() {
-            continue;
-        }
-        // No sibling anywhere: the first pending item starts from the file's default list.
-        let bi = pending.remove(0);
-        let it = item(bi).unwrap();
-        let what = if it.ordered { "numbered" } else { "bulleted" };
-        let (num, abs) = numbering.default_list(it.ordered).ok_or_else(|| {
-            format!("this file has no {what} list to take numbering from, so the new list item cannot be written; write it as a paragraph, or add it next to an existing {what} item")
-        })?;
-        let num =
-            if it.ordered { *new_lists.entry(list_of(bi).0).or_insert_with(|| numbering.new_list(abs)) } else { num };
-        let ilvl = it.level as u32;
-        assigned.insert(bi, (num, ilvl));
-        plan.insert(bi, ListPlan::Set { num, ilvl });
-    }
-    Ok(plan)
-}
-
 fn el(name: &str) -> Element {
     Element::new(name)
 }
 
 fn node(e: Element) -> Node {
     Node::El(e)
-}
-
-/// An element stored as its shell followed by its leading children.
-fn assemble(xml: &[String]) -> Element {
-    let mut e = fragment(&xml[0]);
-    e.children.extend(xml[1..].iter().map(|x| node(fragment(x))));
-    e
 }
 
 impl<'a> Exporter<'a> {
@@ -311,17 +187,7 @@ impl<'a> Exporter<'a> {
         }
         // Marks as exported: a unit the text cannot state a mark on (a space
         // at a mark's edge, a page break) keeps what its run had.
-        let eff: Vec<Marks> = (0..n)
-            .map(|c| {
-                let mut m = p.units[c].marks;
-                for x in Marks::ALL {
-                    if !m.has(x) && !p.mark_expressible(c, x) {
-                        m = m.with(x, owner[c].is_some_and(|o| o.meta.marks.has(x)));
-                    }
-                }
-                m
-            })
-            .collect();
+        let eff = p.written_marks(&|c| owner[c].map_or(Marks::NONE, |o| o.meta.marks));
         let mut pkeep: BTreeMap<usize, &Entry> = BTreeMap::new();
         for (c, u) in p.units.iter().enumerate() {
             if let Atom::Keep(k) = &u.atom {

@@ -1,0 +1,13 @@
+[package]
+name = "hanji-package"
+description = "hanji package plumbing shared by the engines: zip parts and a lossless XML tree"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+hanji-core.workspace = true
+quick-xml = "0.42"
+zip = { version = "8", default-features = false, features = ["deflate-flate2-zlib-rs"] }

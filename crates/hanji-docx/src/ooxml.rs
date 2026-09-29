@@ -1,6 +1,7 @@
 //! WordprocessingML names and small helpers shared by import and export.
 
-use crate::xml::{canon, Element, Scope};
+use crate::xml::Element;
+pub use crate::xml::{fp, insert_ordered, remove_child};
 
 pub const W_NS: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 pub const W_NS_STRICT: &str = "http://purl.oclc.org/ooxml/wordprocessingml/main";
@@ -184,18 +185,6 @@ pub fn v_merged(tcpr: Option<&Element>) -> bool {
     tcpr.and_then(|t| t.child("w:vMerge")).is_some_and(|v| v.get("w:val").as_deref() != Some("restart"))
 }
 
-/// Insert `el` among `parent`'s children following `order` (by local name).
-pub fn insert_ordered(parent: &mut Element, el: Element, order: &[&str]) {
-    let rank = |e: &Element| order.iter().position(|x| *x == e.local());
-    let mine = rank(&el).unwrap_or(order.len());
-    let at =
-        parent.children.iter().position(|n| matches!(n, crate::xml::Node::El(c) if rank(c).is_some_and(|r| r > mine)));
-    match at {
-        Some(k) => parent.children.insert(k, crate::xml::Node::El(el)),
-        None => parent.children.push(crate::xml::Node::El(el)),
-    }
-}
-
 /// `w:b`-style toggle: present and not `0`/`false`/`off`.
 pub fn on(e: Option<&Element>) -> bool {
     e.is_some_and(|e| !matches!(e.get("w:val").as_deref(), Some("0") | Some("false") | Some("off")))
@@ -204,17 +193,4 @@ pub fn on(e: Option<&Element>) -> bool {
 /// Underline is on unless absent or `none`.
 pub fn underline_on(e: Option<&Element>) -> bool {
     e.is_some_and(|e| e.get("w:val").as_deref() != Some("none"))
-}
-
-/// Fingerprint of fragments (canonical, joined; `-` for none).
-pub fn fp(scope: &Scope, els: &[Option<&Element>]) -> String {
-    els.iter().map(|e| e.map_or_else(|| "-".to_string(), |e| canon(e, scope))).collect::<Vec<_>>().join("|")
-}
-
-pub fn remove_child(e: &mut Element, qname: &str) -> Option<Element> {
-    let k = e.children.iter().position(|n| matches!(n, crate::xml::Node::El(c) if c.name == qname))?;
-    match e.children.remove(k) {
-        crate::xml::Node::El(x) => Some(x),
-        _ => None,
-    }
 }

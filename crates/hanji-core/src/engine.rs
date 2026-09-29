@@ -14,6 +14,11 @@ pub struct Notice {
     pub detail: String,
 }
 
+/// Add a notice to a report list.
+pub fn notice(report: &mut Vec<Notice>, kind: &str, location: impl Into<String>, detail: impl Into<String>) {
+    report.push(Notice { kind: kind.into(), location: location.into(), detail: detail.into() });
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ImportReport {
     /// Active or remote content removed on import; it is not preserved.
