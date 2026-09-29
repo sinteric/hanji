@@ -855,6 +855,24 @@ pub fn holds(hay: &[u8], needle: &[u8]) -> bool {
     memchr::memmem::find(hay, needle).is_some()
 }
 
+/// Whether `hay` holds `needle` (ASCII upper case), ignoring ASCII case.
+pub fn holds_any_case(hay: &[u8], needle: &[u8]) -> bool {
+    holds(&hay.to_ascii_uppercase(), needle)
+}
+
+/// What a row's bytes must hold to mention sheet `name` in a formula: the
+/// longest part of the name that XML escaping and formula quoting leave as
+/// it is (`R&D` is written `'R&amp;D'!`, `Bob's` as `'Bob''s'!`), in ASCII
+/// upper case (sheet names ignore case); `!` when no part is left.
+pub fn sheet_needle(name: &str) -> Vec<u8> {
+    let part = name.split(['&', '<', '>', '"', '\'']).max_by_key(|p| p.len()).unwrap_or("");
+    if part.is_empty() {
+        b"!".to_vec()
+    } else {
+        part.to_ascii_uppercase().into_bytes()
+    }
+}
+
 /// A row pre-check: the row holds a formula (`<f>` or `<f …`, any prefix).
 pub fn has_formula(row: &[u8]) -> bool {
     holds(row, b"f>") || holds(row, b"f ")

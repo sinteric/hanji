@@ -272,7 +272,7 @@ fn cases() -> Vec<Case> {
             name: "set under a validation that cannot be checked",
             file: "@dv",
             ops: r##"[{"op": "set", "range": "S!B2", "values": [[5]]}]"##,
-            expect: Err("the data validation of B2:B3 cannot be checked (it is a custom rule)"),
+            expect: Err("the data validation of B2 cannot be checked (it is a custom rule)"),
             shows: &[],
         },
         Case {
@@ -281,6 +281,34 @@ fn cases() -> Vec<Case> {
             ops: r##"[{"op": "set", "range": "S!B4", "values": [[5]]}]"##,
             expect: Ok(Cells("S", &["B4"])),
             shows: &[("T", "| 4 | 3 | 5 |"), ("notice", "unchecked-validation")],
+        },
+        Case {
+            name: "set under an unchecked validation that shows no error",
+            file: "@dv",
+            ops: r##"[{"op": "set", "range": "S!B3", "values": [[5]]}]"##,
+            expect: Ok(Cells("S", &["B3"])),
+            shows: &[("T", "| 3 | 2 | 5 |"), ("notice", "unchecked-validation")],
+        },
+        Case {
+            name: "set within a date validation",
+            file: "@dv",
+            ops: r##"[{"op": "set", "range": "S!B5", "values": [[45700]]}]"##,
+            expect: Ok(Cells("S", &["B5"])),
+            shows: &[("T", "| 5 | 4 | 45700 |")],
+        },
+        Case {
+            name: "set breaking a date validation",
+            file: "@dv",
+            ops: r##"[{"op": "set", "range": "S!B5", "values": [[1]]}]"##,
+            expect: Err("breaks the data validation of B5 (a date between 45658 and 46022)"),
+            shows: &[],
+        },
+        Case {
+            name: "set into an array formula's cells",
+            file: "@array",
+            ops: r##"[{"op": "set", "range": "S!C8", "values": [[1]]}]"##,
+            expect: Err("S!C8 is part of the array formula or data table at B8:C8"),
+            shows: &[],
         },
         Case {
             name: "a table under a merge that reaches out",
@@ -375,7 +403,7 @@ fn fixture(which: &str) -> Vec<u8> {
     let mut s = String::from_utf8(sheet.data.clone()).unwrap();
     match which {
         "@gone" => s = s.replace("</sheetData>", "</sheetData><conditionalFormatting sqref=\"A3:B3\"><cfRule type=\"cellIs\" priority=\"1\" operator=\"greaterThan\"><formula>5</formula></cfRule></conditionalFormatting><dataValidations count=\"1\"><dataValidation type=\"whole\" sqref=\"A3\"><formula1>0</formula1></dataValidation></dataValidations>"),
-        "@dv" => s = s.replace("</sheetData>", "<row r=\"10\"><c r=\"D10\"><v>1</v></c></row><row r=\"11\"><c r=\"D11\"><v>2</v></c></row><row r=\"12\"><c r=\"D12\"><v>3</v></c></row></sheetData><dataValidations count=\"3\"><dataValidation type=\"list\" allowBlank=\"1\" sqref=\"A2:A5\"><formula1>$D$10:$D$12</formula1></dataValidation><dataValidation type=\"custom\" sqref=\"B2:B3\"><formula1>ISNUMBER(B2)</formula1></dataValidation><dataValidation type=\"custom\" errorStyle=\"warning\" sqref=\"B4:B5\"><formula1>ISNUMBER(B4)</formula1></dataValidation></dataValidations>"),
+        "@dv" => s = s.replace("</sheetData>", "<row r=\"10\"><c r=\"D10\"><v>1</v></c></row><row r=\"11\"><c r=\"D11\"><v>2</v></c></row><row r=\"12\"><c r=\"D12\"><v>3</v></c></row></sheetData><dataValidations count=\"5\"><dataValidation type=\"list\" allowBlank=\"1\" sqref=\"A2:A5\"><formula1>$D$10:$D$12</formula1></dataValidation><dataValidation type=\"custom\" showErrorMessage=\"1\" sqref=\"B2\"><formula1>ISNUMBER(B2)</formula1></dataValidation><dataValidation type=\"custom\" sqref=\"B3\"><formula1>ISNUMBER(B3)</formula1></dataValidation><dataValidation type=\"custom\" showErrorMessage=\"1\" errorStyle=\"warning\" sqref=\"B4\"><formula1>ISNUMBER(B4)</formula1></dataValidation><dataValidation type=\"date\" operator=\"between\" sqref=\"B5\"><formula1>45658</formula1><formula2>46022</formula2></dataValidation></dataValidations>"),
         "@merge" => s = s.replace("</sheetData>", "<row r=\"8\"><c r=\"B8\"><v>1</v></c></row></sheetData><mergeCells count=\"1\"><mergeCell ref=\"B8:D8\"/></mergeCells>"),
         _ => s = s.replace("</sheetData>", "<row r=\"8\"><c r=\"B8\"><f t=\"array\" ref=\"B8:C8\">A2:B2*2</f><v>2</v></c><c r=\"C8\"><v>20</v></c></row></sheetData>"),
     }
@@ -675,4 +703,75 @@ fn dependents_get_new_cached_values() {
             assert_eq!(&row1[3..5], ["105", "105"], "{row1:?}");
         }
     }
+}
+
+/// A formula on another sheet follows rows moved on a sheet whose name XML
+/// escapes and formulas quote (`R&D`, written `'R&amp;D'!B5`).
+#[test]
+fn formulas_follow_rows_on_a_sheet_with_an_escaped_name() {
+    use common::fixture::{build, Col, SheetSpec, TableSpec, V};
+    let col = |n: &str| Col { name: n.into(), format: "0".into(), formula: None };
+    let t = |name: &str| TableSpec {
+        name: name.into(),
+        col: 0,
+        row: 1,
+        cols: vec![col("a"), col("b")],
+        rows: (1..=4).map(|k| vec![V::Num(k as f64), V::Num(10.0 * k as f64)]).collect(),
+    };
+    let sheets = [
+        SheetSpec { name: "R&D".into(), tables: vec![t("T")] },
+        SheetSpec { name: "Sum".into(), tables: vec![t("U")] },
+    ];
+    let mut parts = package::read(&build(&sheets)).unwrap();
+    let p = parts.iter_mut().find(|p| p.name == "xl/worksheets/sheet2.xml").unwrap();
+    let mut s = String::from_utf8(p.data.clone()).unwrap();
+    let at = s.find("</row>").unwrap();
+    s.insert_str(at, "<c r=\"D1\"><f>'R&amp;D'!B5</f><v>40</v></c>");
+    p.data = s.into_bytes();
+    let imp = XlsxEngine.import(&package::write(&parts).unwrap(), &ImportOptions::default()).unwrap();
+    let ops = r##"[{"op": "insert_rows", "table": "T", "before": 3, "rows": [{"a": 9, "b": 90}]}]"##;
+    let a = XlsxEngine::apply(&imp.text, &imp.remainder, ops).unwrap();
+    let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
+    let sheet = package::read(&out).unwrap().into_iter().find(|p| p.name == "xl/worksheets/sheet2.xml").unwrap();
+    let xml = String::from_utf8(sheet.data).unwrap();
+    assert!(xml.contains("<f>'R&amp;D'!B6</f><v>40</v>"), "{xml}");
+}
+
+/// Writing a formula over the first cell of a shared formula turns the
+/// sheet's shared formulas into plain ones first: the shared formula's
+/// other cells, here one below the table, keep their formulas.
+#[test]
+fn a_formula_written_over_a_shared_one_keeps_the_others() {
+    use common::fixture::{build, Col, SheetSpec, TableSpec, V};
+    let col = |n: &str, f: Option<&str>| Col { name: n.into(), format: "0".into(), formula: f.map(Into::into) };
+    let t = TableSpec {
+        name: "T".into(),
+        col: 0,
+        row: 1,
+        cols: vec![col("a", None), col("b", Some("T[[#This Row],[a]]*2"))],
+        rows: (1..=4).map(|k| vec![V::Num(k as f64)]).collect(),
+    };
+    let mut parts = package::read(&build(&[SheetSpec { name: "S".into(), tables: vec![t] }])).unwrap();
+    let p = parts.iter_mut().find(|p| p.name == "xl/worksheets/sheet1.xml").unwrap();
+    let mut s = String::from_utf8(p.data.clone()).unwrap();
+    s = s.replace("<f>T[[#This Row],[a]]*2</f>", "<f/>");
+    s = s.replacen("<f/>", "<f t=\"shared\" ref=\"B2:B6\" si=\"0\">A2*2</f><v>2</v>", 1);
+    s = s.replace("<f/>", "<f t=\"shared\" si=\"0\"/>");
+    s = s.replace(
+        "</sheetData>",
+        "<row r=\"6\"><c r=\"A6\"><v>5</v></c><c r=\"B6\"><f t=\"shared\" si=\"0\"/><v>10</v></c></row></sheetData>",
+    );
+    p.data = s.into_bytes();
+    let imp = XlsxEngine.import(&package::write(&parts).unwrap(), &ImportOptions::default()).unwrap();
+    let ops = r##"[{"op": "fill_formula", "table": "T", "column": "b", "formula": "=[@a]*3"}]"##;
+    let a = XlsxEngine::apply(&imp.text, &imp.remainder, ops).unwrap();
+    let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
+    let xml = String::from_utf8(
+        package::read(&out).unwrap().into_iter().find(|p| p.name == "xl/worksheets/sheet1.xml").unwrap().data,
+    )
+    .unwrap();
+    assert!(!xml.contains("t=\"shared\""), "{xml}");
+    assert!(xml.contains("<c r=\"B6\"><f>A6*2</f><v>10</v></c>"), "{xml}");
+    let w = XlsxEngine::window(&a.remainder, &WindowOf::Table { name: "T".into(), rows: None }).unwrap();
+    assert!(w.contains("| 5 | 4 | 12 |"), "{w}");
 }

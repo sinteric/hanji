@@ -333,6 +333,25 @@ pub fn uncached_formulas(book: &mut Book) -> Result<Changed, String> {
     Ok(ch)
 }
 
+/// The error values Excel has; any other comes from the calculator.
+const EXCEL_ERRORS: &[&str] = &[
+    "#NULL!",
+    "#DIV/0!",
+    "#VALUE!",
+    "#REF!",
+    "#NAME?",
+    "#NUM!",
+    "#N/A",
+    "#GETTING_DATA",
+    "#SPILL!",
+    "#CALC!",
+    "#FIELD!",
+    "#BLOCKED!",
+    "#CONNECT!",
+    "#BUSY!",
+    "#UNKNOWN!",
+];
+
 /// Functions whose result depends on the date system (IronCalc knows 1900 only).
 const EPOCH_FUNCTIONS: &[&str] = &[
     "DATE",
@@ -427,8 +446,11 @@ pub fn recompute(book: &mut Book, ch: &Changed) -> Result<Recalc, String> {
         let v = if why.is_some() { None } else { values.get(&(f.sheet, f.row, f.col)).cloned().flatten() };
         match v {
             None => rc.left.push(format!("{} ({})", at(), why.unwrap_or("not computed"))),
+            // The calculator's own errors (`#N/IMPL`, `#ERROR!` for a formula it cannot
+            // parse), and `#NAME?` where the file had a value: a function or name it lacks.
             Some(CellValue::Error(e))
-                if e == "#N/IMPL" || (e == "#NAME?" && f.cached != CellValue::Error("#NAME?".into())) =>
+                if !EXCEL_ERRORS.contains(&e.as_str())
+                    || (e == "#NAME?" && f.cached != CellValue::Error("#NAME?".into())) =>
             {
                 rc.left.push(format!("{} ({e} in the calculator)", at()))
             }

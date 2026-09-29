@@ -49,6 +49,9 @@ pub fn getput(a: &[u8], b: &[u8]) -> Result<(), String> {
 #[cfg(not(target_os = "wasi"))]
 pub fn soffice_csv(xlsx: &[u8], dir: &std::path::Path) -> Option<Vec<(String, Vec<Vec<String>>)>> {
     use std::process::Command;
+    // One LibreOffice at a time: a second one hands its conversion to the first.
+    static ONE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    let _one = ONE.lock().unwrap_or_else(|e| e.into_inner());
     let _ = std::fs::remove_dir_all(dir);
     std::fs::create_dir_all(dir).ok()?;
     let src = dir.join("book.xlsx");

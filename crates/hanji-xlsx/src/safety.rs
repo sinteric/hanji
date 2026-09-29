@@ -323,9 +323,7 @@ pub fn surface(book: &mut Book, report: &mut ImportReport) -> Result<(), String>
         let mut links = vec![];
         let hidden_or_link = |b: &[u8]| {
             let tag_end = b.iter().position(|&x| x == b'>').unwrap_or(b.len());
-            crate::store::holds(&b[..tag_end], b"hidden")
-                || crate::store::holds(b, b"HYPERLINK")
-                || crate::store::holds(b, b"hyperlink")
+            crate::store::holds(&b[..tag_end], b"hidden") || crate::store::holds_any_case(b, b"HYPERLINK")
         };
         st.for_each_cell_if(&hidden_or_link, &mut |r, c| {
             if let Some(f) = c.formula() {

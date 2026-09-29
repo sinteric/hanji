@@ -17,7 +17,7 @@ use hanji_package::xml::{self, Element, Node};
 
 use crate::book::{Book, SheetKind};
 use crate::drawing;
-use crate::store::{has_formula, holds, Cell, Row};
+use crate::store::{has_formula, holds_any_case, sheet_needle, Cell, Row};
 
 /// What a formula reference points at: its sheet and area (whole rows or
 /// columns are not areas here).
@@ -170,7 +170,7 @@ type Rewrite = (usize, u32, u32, Option<String>, Option<String>);
 
 fn formulas_to_rewrite(book: &mut Book, target: &str, i: usize, sh: &RowShift) -> Result<Vec<Rewrite>, String> {
     let mut out = vec![];
-    let needle = target.as_bytes();
+    let needle = sheet_needle(target);
     for k in 0..book.sheets.len() {
         if book.sheets[k].kind != SheetKind::Work {
             continue;
@@ -178,7 +178,7 @@ fn formulas_to_rewrite(book: &mut Book, target: &str, i: usize, sh: &RowShift) -
         book.load_store(k)?;
         let own_name = book.sheets[k].name.clone();
         let own = own_name.eq_ignore_ascii_case(target);
-        let pre = |b: &[u8]| has_formula(b) && (own || holds(b, needle));
+        let pre = |b: &[u8]| has_formula(b) && (own || holds_any_case(b, &needle));
         book.store(k).for_each_cell_if(&pre, &mut |r, c| {
             let Some(f) = &c.f else { return };
             let text = c.formula().and_then(|t| shift_formula(&t, &own_name, target, sh));
@@ -329,8 +329,8 @@ pub fn apply(
             let reads = k == i || {
                 book.load_store(k)?;
                 let mut hit = false;
-                let needle = name.as_bytes().to_vec();
-                book.store(k).for_each_cell_if(&|b| has_formula(b) && holds(b, &needle), &mut |_, c| {
+                let needle = sheet_needle(&name);
+                book.store(k).for_each_cell_if(&|b| has_formula(b) && holds_any_case(b, &needle), &mut |_, c| {
                     hit |= c.f.as_ref().and_then(shared_attr).is_some();
                 });
                 hit
@@ -460,7 +460,8 @@ pub fn apply(
 }
 
 /// Whether a row holds nothing worth keeping once its cells are gone.
-fn is_plain(row: &Row) -> bool {
+/// A row with nothing of its own: no cells, and no attributes but its number and hints.
+pub(crate) fn is_plain(row: &Row) -> bool {
     row.cells.is_empty()
         && row.extra.is_empty()
         && row.attrs.iter().all(|a| matches!(a.0.as_str(), "r" | "spans" | "x14ac:dyDescent"))

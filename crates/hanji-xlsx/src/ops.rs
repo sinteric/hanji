@@ -26,7 +26,7 @@ use crate::book::{Book, SheetInfo, SheetKind, TableCol, TableInfo, CT_SHEET, MAI
 use crate::calc::{self, Changed, Recalc};
 use crate::numfmt;
 use crate::shift::{self, f_element};
-use crate::store::{Cell, SHEET_ORDER};
+use crate::store::{has_formula, holds, Cell, SHEET_ORDER};
 use crate::value::CellValue;
 use crate::{book_of, model, remainder_of, structure, Applied, XlsxEngine};
 
@@ -66,6 +66,8 @@ struct Ctx {
     notices: Vec<Notice>,
     /// Column declarations per table (lower-case name), kept current as operations change them.
     cols: HashMap<String, Cols>,
+    /// Multi-cell array formulas per sheet, as found (cleared when rows move).
+    arrays: HashMap<usize, Vec<CellRange>>,
 }
 
 fn refused(m: String) -> EngineError {
@@ -118,7 +120,7 @@ pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, Eng
         .filter(|e| e.kind == Kind::Range)
         .map(|e| (e.id, e.meta.tag.clone(), e.path[0], e.meta.range.clone().unwrap_or_default()))
         .collect();
-    let mut cx = Ctx { changed: Changed::default(), notices: vec![], cols: HashMap::new() };
+    let mut cx = Ctx { changed: Changed::default(), notices: vec![], cols: HashMap::new(), arrays: HashMap::new() };
     for (_, t) in current.tables() {
         cx.cols.insert(
             t.name.to_lowercase(),
@@ -317,20 +319,9 @@ fn write_cell(
         }
         _ => None,
     };
+    prepare_cell(book, i, row, col, &at, cx)?;
     let st = book.store_mut(i)?;
     let cell = st.row_mut(row).cell_mut(col);
-    if let Some(f) = &cell.f {
-        match f.get("t").as_deref() {
-            Some("array") | Some("dataTable") => {
-                return Err(format!("{at} is part of an array formula, which the engine does not model"))
-            }
-            Some("shared") => {
-                shift::unshare(book, i)?;
-                return write_cell(book, i, row, col, w, style, cx);
-            }
-            _ => {}
-        }
-    }
     let was_string = cell.ty() == "s";
     cell.clear_value();
     if let Some(s) = style {
@@ -370,6 +361,7 @@ fn write_formula(
     style: Option<u32>,
     cx: &mut Ctx,
 ) -> Result<(), String> {
+    prepare_cell(book, i, row, col, &format!("{}!{}{row}", book.sheets[i].name, col_letters(col)), cx)?;
     let st = book.store_mut(i)?;
     let prefix = st.prefix.clone();
     let cell = st.row_mut(row).cell_mut(col);
@@ -383,6 +375,42 @@ fn write_formula(
         book.sst_mut().refs_delta -= 1;
     }
     cx.changed.formulas.insert((i, row, col));
+    Ok(())
+}
+
+/// Before a cell is written: refused when it is part of an array formula or
+/// a data table (the engine does not model them); the sheet's shared
+/// formulas become plain ones when the cell holds one (a shared formula's
+/// other cells read their text from its first cell).
+fn prepare_cell(book: &mut Book, i: usize, row: u32, col: u32, at: &str, cx: &mut Ctx) -> Result<(), String> {
+    if let std::collections::hash_map::Entry::Vacant(slot) = cx.arrays.entry(i) {
+        let mut found = vec![];
+        book.store(i).for_each_cell_if(
+            &|b| has_formula(b) && (holds(b, b"array") || holds(b, b"dataTable")),
+            &mut |r, c| {
+                if let Some(f) =
+                    c.f.as_ref().filter(|f| matches!(f.get("t").as_deref(), Some("array") | Some("dataTable")))
+                {
+                    found.push(
+                        f.get("ref")
+                            .and_then(|x| CellRange::parse(&x))
+                            .unwrap_or(CellRange::cell(CellRef::new(c.col, r))),
+                    );
+                }
+            },
+        );
+        slot.insert(found);
+    }
+    if let Some(a) = cx.arrays[&i].iter().find(|a| a.contains(CellRef::new(col, row))) {
+        return Err(format!("{at} is part of the array formula or data table at {a}, which the engine does not model"));
+    }
+    let shared = book
+        .store(i)
+        .row(row)
+        .and_then(|r| r.cell(col).and_then(|c| c.f.as_ref()).map(|f| f.get("t").as_deref() == Some("shared")));
+    if shared == Some(true) {
+        shift::unshare(book, i)?;
+    }
     Ok(())
 }
 
@@ -456,10 +484,10 @@ fn check_merge(book: &Book, i: usize, col: u32, row: u32, at: &str) -> Result<()
 }
 
 /// A value checked against the data validation of its cell. List rules (a
-/// constant list or a range of cells), number and text-length rules with
-/// constant bounds are checked. Any other rule cannot be: under the default
-/// error style (`stop`, Excel refuses a value that breaks it) the write is
-/// refused; under `warning` or `information` it is reported unchecked.
+/// constant list or a range of cells), number, date and text-length rules
+/// with constant bounds are checked. Any other rule cannot be: when Excel
+/// would refuse a value that breaks it (it shows its error, in the `stop`
+/// style) the write is refused; otherwise it is reported unchecked.
 fn check_validation(
     book: &mut Book,
     i: usize,
@@ -554,6 +582,20 @@ fn check_validation(
                     None => Some("its bounds are formulas".into()),
                 }
             }
+            "date" => {
+                let serial = match v {
+                    Value::Number(n) => Some(*n),
+                    Value::Text(t) => date_of(t).map(|(y, m, d)| numfmt::serial_of(y as i64, m, d, book.date1904)),
+                    _ => None,
+                };
+                let Some(n) = serial else { return fail("a date".into()) };
+                let (a, b) = bounds();
+                match within(n, a, b) {
+                    Some(true) => None,
+                    Some(false) => return fail(format!("a date {}", rule(a, b))),
+                    None => Some("its bounds are formulas".into()),
+                }
+            }
             "textLength" => {
                 let (a, b) = bounds();
                 match within(text.chars().count() as f64, a, b) {
@@ -565,14 +607,17 @@ fn check_validation(
             other => Some(format!("it is a {other} rule")),
         };
         if let Some(why) = unchecked {
-            match x.get("errorStyle").as_deref() {
-                Some("warning") | Some("information") => notice(
+            // Excel refuses a value only when the rule shows its error, in the `stop` style.
+            let refuses = x.get("showErrorMessage").is_some_and(|v| v == "1" || v == "true")
+                && x.get("errorStyle").is_none_or(|v| v == "stop");
+            match refuses {
+                false => notice(
                     &mut cx.notices,
                     "unchecked-validation",
                     at.to_string(),
                     format!("the data validation of {range} is not checked: {why}"),
                 ),
-                _ => {
+                true => {
                     return Err(format!(
                         "{at}: the data validation of {range} cannot be checked ({why}), and it refuses values that break it"
                     ))
@@ -605,10 +650,14 @@ fn list_cells(book: &mut Book, i: usize, formula: &str) -> Option<Vec<String>> {
     let mut out = vec![];
     for row in book.store(sheet).rows_in(area.first.row, area.last.row) {
         for c in row.cells.iter().filter(|c| (area.first.col..=area.last.col).contains(&c.col)) {
+            // As shown, and as the value is written (`1` for a `1.00`).
             let shown = book.display(c);
-            if !shown.is_empty() {
-                out.push(shown.trim().to_string());
-            }
+            let value = match book.value(c) {
+                CellValue::Number(n) => numfmt::general(n),
+                CellValue::Text(t) => t,
+                _ => String::new(),
+            };
+            out.extend([shown, value].into_iter().map(|x| x.trim().to_string()).filter(|x| !x.is_empty()));
         }
     }
     Some(out)
@@ -649,6 +698,7 @@ fn insert_rows(book: &mut Book, k: usize, at: u32, rows: &[Row], cx: &mut Ctx) -
     shift::check(book, i, &sh, Some(k))?;
     let old_last = book.tables[k].range.last.row;
     let rewritten = shift::apply(book, i, &sh, &mut cx.notices)?;
+    cx.arrays.remove(&i);
     cx.changed.follow(i, &sh);
     cx.changed.formulas.extend(rewritten);
     let t = &mut book.tables[k];
@@ -710,6 +760,7 @@ fn delete_rows(book: &mut Book, k: usize, first: u32, last: u32, cx: &mut Ctx) -
         let sh = RowShift::Delete { cols: (c0, c1), first: from, last };
         shift::check(book, i, &sh, Some(k))?;
         let rewritten = shift::apply(book, i, &sh, &mut cx.notices)?;
+        cx.arrays.remove(&i);
         cx.changed.follow(i, &sh);
         cx.changed.formulas.extend(rewritten);
     }
@@ -1029,7 +1080,7 @@ fn sort(book: &mut Book, k: usize, keys: &[SortKey], cx: &mut Ctx) -> Result<(),
             row.cells.push(c);
         }
         row.cells.sort_by_key(|c| c.col);
-        if !(row.cells.is_empty() && row.extra.is_empty() && row.attrs.len() <= 2) {
+        if !shift::is_plain(&row) {
             row.fix_spans();
             back.push(row);
         }
