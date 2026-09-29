@@ -1,0 +1,12 @@
+[package]
+name = "docx-validate"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Cross-checks the tracked-change exports of the docx corpus test with rdocx's own Accept All / Reject All (§10.2). Not part of the workspace."
+
+# Standalone: an empty [workspace] keeps this crate out of the hanji workspace build.
+[workspace]
+
+[dependencies]
+rdocx = { version = "=0.14.0", default-features = false }

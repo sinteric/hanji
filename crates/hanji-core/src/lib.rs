@@ -13,6 +13,7 @@ pub mod model;
 pub mod place;
 pub mod presentation;
 pub mod remainder;
+pub mod revision;
 
 pub use edit::{
     edit, edit_in, model_of, reanchor, reanchor_rewrite, reanchor_rewrite_in, reanchor_span, reanchor_span_in, rewrite,
@@ -22,3 +23,4 @@ pub use engine::{notice, Engine, EngineError, ImportOptions, ImportReport, Impor
 pub use lists::{plan_lists, ListDefs, ListPlan};
 pub use model::{Block, BlockSrc, Capabilities, Head, ListItem, Para, Path, SrcKind, StyleDef, StyleSet, Table};
 pub use remainder::{Entry, KeepIds, Kind, Meta, Part, Remainder};
+pub use revision::{Kept, Pos};

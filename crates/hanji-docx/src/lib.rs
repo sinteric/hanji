@@ -13,8 +13,10 @@ pub mod numbering;
 pub mod ooxml;
 pub mod safety;
 pub mod styles;
+pub mod track;
 
 pub use hanji_package::{package, xml};
+pub use track::{ExportOptions, History, Reviewer};
 
 use std::collections::HashMap;
 
@@ -28,7 +30,7 @@ pub struct DocxEngine;
 
 /// The parts of `document.xml` around the body, stored once.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
-struct DocShell {
+pub(crate) struct DocShell {
     prolog: String,
     epilog: String,
     /// `<w:document …>` start tag.
@@ -38,6 +40,22 @@ struct DocShell {
     /// `<w:body …>` start tag.
     body_open: String,
     after_body: String,
+}
+
+impl DocShell {
+    /// `document.xml` around the body's children.
+    pub(crate) fn document(&self, body: &[xml::Node]) -> String {
+        let mut s = self.prolog.clone();
+        s.push_str(&self.root_open);
+        s.push_str(&self.before_body);
+        s.push_str(&self.body_open);
+        s.push_str(&xml::write_nodes(body));
+        s.push_str("</w:body>");
+        s.push_str(&self.after_body);
+        s.push_str(&format!("</{}>", self.root_name));
+        s.push_str(&self.epilog);
+        s
+    }
 }
 
 impl DocxEngine {
@@ -180,14 +198,5 @@ pub fn export_document(blocks: &[hanji_core::Block], rem: &Remainder) -> Result<
     let lists = hanji_core::plan_lists(blocks, &rem.entries, &mut numbering).map_err(EngineError::Refused)?;
     let ex = export::Exporter::new(&rem.styles, &rem.entries, &numbering, lists);
     let body = ex.body(blocks).map_err(EngineError::Refused)?;
-    let mut s = shell.prolog.clone();
-    s.push_str(&shell.root_open);
-    s.push_str(&shell.before_body);
-    s.push_str(&shell.body_open);
-    s.push_str(&xml::write_nodes(&body));
-    s.push_str("</w:body>");
-    s.push_str(&shell.after_body);
-    s.push_str(&format!("</{}>", shell.root_name));
-    s.push_str(&shell.epilog);
-    Ok(Exported { document: s.into_bytes(), numbering: numbering.part() })
+    Ok(Exported { document: shell.document(&body).into_bytes(), numbering: numbering.part() })
 }

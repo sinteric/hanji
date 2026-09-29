@@ -8,6 +8,7 @@ use hanji_format::{Atom, Cell, Inline, Marks};
 
 use crate::numbering::Numbering;
 use crate::ooxml::*;
+use crate::track::Track;
 use crate::xml::{self, assemble, fragment, Element, Node};
 
 pub struct Exporter<'a> {
@@ -17,6 +18,9 @@ pub struct Exporter<'a> {
     tail: Vec<&'a Entry>,
     numbering: &'a Numbering,
     lists: HashMap<usize, ListPlan>,
+    /// A tracked-change export (§10.2): what each unit, paragraph mark and
+    /// row is against the imported revision.
+    track: Option<&'a Track>,
 }
 
 fn el(name: &str) -> Element {
@@ -34,7 +38,8 @@ impl<'a> Exporter<'a> {
         numbering: &'a Numbering,
         lists: HashMap<usize, ListPlan>,
     ) -> Self {
-        let mut ex = Exporter { styles, by: HashMap::new(), keep: HashMap::new(), tail: vec![], numbering, lists };
+        let mut ex =
+            Exporter { styles, by: HashMap::new(), keep: HashMap::new(), tail: vec![], numbering, lists, track: None };
         for e in entries {
             match e.kind {
                 Kind::Tail => ex.tail.push(e),
@@ -45,6 +50,13 @@ impl<'a> Exporter<'a> {
             }
         }
         ex
+    }
+
+    /// Write revisions as `track` says (a merged model of the imported and
+    /// the current revision: see `track.rs`).
+    pub(crate) fn tracked(mut self, track: &'a Track) -> Self {
+        self.track = Some(track);
+        self
     }
 
     fn at(&self, path: &[usize], kind: Kind) -> Vec<&'a Entry> {
@@ -69,6 +81,9 @@ impl<'a> Exporter<'a> {
                     let mut pel = self.para(&p.content, style, &[bi])?;
                     if let Some(plan) = self.lists.get(&bi) {
                         self.apply_list(&mut pel, *plan, bi);
+                    }
+                    if let Some(t) = self.track {
+                        t.mark(&mut pel, &[bi])?;
                     }
                     out.push(node(pel));
                 }
@@ -188,7 +203,11 @@ impl<'a> Exporter<'a> {
         }
         // Marks as exported: a unit the text cannot state a mark on (a space
         // at a mark's edge, a page break) keeps what its run had.
-        let eff = p.written_marks(&|c| owner[c].map_or(Marks::NONE, |o| o.meta.marks));
+        let revs = self.track.and_then(|t| t.units.get(path)).filter(|r| r.len() == n);
+        let eff = match revs {
+            Some(r) => r.iter().map(|u| u.eff).collect(),
+            None => p.written_marks(&|c| owner[c].map_or(Marks::NONE, |o| o.meta.marks)),
+        };
         let mut pkeep: BTreeMap<usize, &Entry> = BTreeMap::new();
         for (c, u) in p.units.iter().enumerate() {
             if let Atom::Keep(k) = &u.atom {
@@ -206,7 +225,7 @@ impl<'a> Exporter<'a> {
             bounds.insert(w.start.unwrap());
             bounds.insert(w.end.unwrap());
         }
-        let key = |c: usize| (owner[c].map(|o| o.id), eff[c]);
+        let key = |c: usize| (owner[c].map(|o| o.id), eff[c], revs.map(|r| (r[c].st, &r[c].old_rpr)));
         let mut segs: Vec<(usize, usize, Option<&Entry>)> = vec![];
         let mut c = 0;
         while c < n {
@@ -299,8 +318,11 @@ impl<'a> Exporter<'a> {
                     stack.last_mut().unwrap().1.children.push(node(r));
                 }
                 It::Seg(si) => {
-                    let r =
+                    let mut r =
                         self.run_el(p, &eff, segs[si], rm_at.get(&Target::Seg(si)).map(Vec::as_slice).unwrap_or(&[]))?;
+                    if let (Some(t), Some(revs)) = (self.track, revs) {
+                        r = t.run(r, &revs[segs[si].0]);
+                    }
                     stack.last_mut().unwrap().1.children.push(node(r));
                 }
             }
@@ -327,16 +349,8 @@ impl<'a> Exporter<'a> {
             ),
             None => (el("w:r"), None, vec![]),
         };
-        let want = eff[a];
-        if rpr.is_none() && !want.is_empty() {
-            rpr = Some(el("w:rPr"));
-        }
-        if let Some(x) = &mut rpr {
-            set_flag(x, "w:b", want.has(Marks::BOLD));
-            set_flag(x, "w:i", want.has(Marks::ITALIC));
-            set_flag(x, "w:strike", want.has(Marks::STRIKE));
-            set_underline(x, want.has(Marks::UNDERLINE));
-            r.children.push(node(rpr.take().unwrap()));
+        if let Some(x) = with_marks(rpr.take(), eff[a]) {
+            r.children.push(node(x));
         }
         let mut rm: BTreeMap<usize, Vec<&Entry>> = BTreeMap::new();
         for m in rmarkers {
@@ -457,7 +471,11 @@ impl<'a> Exporter<'a> {
                         for (k, p) in ps.iter().enumerate() {
                             self.bmarkers(&mut tc, &[bi, ri, ci, k]);
                             let style = p.style.as_deref().unwrap_or(&self.styles.default_paragraph);
-                            tc.children.push(node(self.para(&p.content, Some(style), &[bi, ri, ci, k])?));
+                            let mut pel = self.para(&p.content, Some(style), &[bi, ri, ci, k])?;
+                            if let Some(t) = self.track {
+                                t.mark(&mut pel, &[bi, ri, ci, k])?;
+                            }
+                            tc.children.push(node(pel));
                         }
                         ps.len()
                     }
@@ -482,6 +500,9 @@ impl<'a> Exporter<'a> {
                 ci += span;
             }
             self.bmarkers(&mut tr, &[bi, ri, row.len()]);
+            if let Some(st) = self.track.and_then(|t| t.rows.get(&[bi, ri][..]).map(|st| (t, *st))) {
+                st.0.row(&mut tr, st.1);
+            }
             tbl.children.push(node(tr));
         }
         self.bmarkers(&mut tbl, &[bi, t.rows.len()]);
@@ -518,6 +539,17 @@ impl<'a> Exporter<'a> {
 enum Target {
     Seg(usize),
     Zrun(u64),
+}
+
+/// A run's properties with the marks the text states: `rpr` as stored, or
+/// a new `w:rPr` when a mark needs one.
+pub(crate) fn with_marks(rpr: Option<Element>, want: Marks) -> Option<Element> {
+    let mut rpr = rpr.or_else(|| (!want.is_empty()).then(|| el("w:rPr")))?;
+    set_flag(&mut rpr, "w:b", want.has(Marks::BOLD));
+    set_flag(&mut rpr, "w:i", want.has(Marks::ITALIC));
+    set_flag(&mut rpr, "w:strike", want.has(Marks::STRIKE));
+    set_underline(&mut rpr, want.has(Marks::UNDERLINE));
+    Some(rpr)
 }
 
 fn set_flag(rpr: &mut Element, name: &str, want: bool) {
