@@ -1,0 +1,43 @@
+{
+ "unit_id": "r5x-Ap-2",
+ "part": 2,
+ "candidate": "Ap",
+ "replicate": 2,
+ "stem": "deck2",
+ "file": "shapes.pptx",
+ "seed": "---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 720 x 540 pt\n---\n\nlayout: Blank\n::shape id=\"s4\" name=\"TextBox 3\" box=\"10 13.3 25 5.4\"::\nLearning PPTX\n<line id=\"s6\" name=\"Straight Connector 5\" from=\"11.7 26.7\" to=\"35 26.7\"/>\n::shape id=\"s7\" name=\"Freeform 6\" box=\"6.5 39 25.7 25.3\"::\nCloud\n<keep id=\"kqld8\" kind=\"picture\" summary=\"Picture 1\" box=\"55.8 14.4 20 24.4\"/>\n<keep id=\"kmtnf\" kind=\"table\" summary=\"Table 2: Column1 Column2 Column3 data1 data2 data3\" box=\"41.7 68.9 51.7 17.8\"/>\n<line id=\"s8\" name=\"Straight Arrow Connector 7\" from=\"65 67.8\" to=\"65 40\"/>\n<line id=\"s10\" name=\"Elbow Connector 9\" from=\"25.8 46.7\" to=\"55.8 26.7\"/>\n\n---\n\nlayout: Title Slide\n::title box=\"7.5 31.1 85 21.4\"::\nPPTX <u>Title</u>\n::subtitle box=\"15 56.7 70 25.6\"::\n**Subtitle**\n<p/>\nAnd second line\n\n---\n\nlayout: Blank\n<group id=\"g5\" name=\"Group 4\" box=\"16.7 20 35.8 28.2\">\n::shape id=\"s2\" name=\"Rectangle 1\" box=\"16.7 20 19.2 11.1\"::\n::shape id=\"s3\" name=\"Oval 2\" box=\"42.5 27.8 10 13.3\"::\n::shape id=\"s4\" name=\"Right Arrow 3\" box=\"20 41.1 10.7 7.1\"::\n</group>\n\n---\n\nlayout: Blank\n<keep id=\"k5mk0\" kind=\"table\" summary=\"Table 1: header1 header2 header3 A1 B1 C1 A2 A3 B3 and C3 are merged A4 A5\" box=\"16.7 20.4 66.7 32.4\"/>\n\n---\n\nlayout: Title Only\n<keep id=\"k4akl\" kind=\"table\" summary=\"Table 1: Link Type Target URI Web Page http://poi.apache.org/ Place in this docu…\" box=\"7.5 31.1 85.8 27\"/>\n::title box=\"5 4 90 16.7\"::\nHyperlinks\n\n---\n\nlayout: Blank\n::shape id=\"s2\" name=\"Rectangle 1\" box=\"9.2 13.3 10 13.3\"::\n::shape id=\"s9\" name=\"Rectangle 8\" box=\"24.2 13.3 10 13.3\"::\n::shape id=\"s10\" name=\"Rectangle 9\" box=\"37.5 13.3 10 13.3\"::\n::shape id=\"s11\" name=\"Rectangle 10\" box=\"50.8 13.3 10 13.3\"::\n::shape id=\"s12\" name=\"Rectangle 11\" box=\"65 13.3 10 13.3\"::\n::shape id=\"s13\" name=\"Rectangle 12\" box=\"82.5 13.3 10 13.3\"::\n",
+ "seed_chars": 1813,
+ "tasks": [
+  {
+   "task_id": "deck2-x1",
+   "type": "read",
+   "instruction": "On slide 6, which rectangle's centre is closest to the slide's horizontal centre?"
+  },
+  {
+   "task_id": "deck2-x2",
+   "type": "edit",
+   "instruction": "On slide 6, space the six rectangles evenly: keep the first and the last where they are, and move the four between them so that the gaps between neighbours are all equal. Keep every size and vertical position."
+  },
+  {
+   "task_id": "deck2-x3",
+   "type": "edit",
+   "instruction": "On slide 1, bring the text box \"TextBox 3\" to the front, so that it is drawn on top of every other object. Change nothing else."
+  },
+  {
+   "task_id": "deck2-x4",
+   "type": "edit",
+   "instruction": "On slide 3, move the whole group 2 cm to the right. Keep every size and vertical position."
+  },
+  {
+   "task_id": "deck2-x5",
+   "type": "edit",
+   "instruction": "On slide 1, make the table 20% narrower, keeping its centre and its height."
+  },
+  {
+   "task_id": "deck2-x6",
+   "type": "edit",
+   "instruction": "On slide 5 (Hyperlinks), make the title exactly as wide as the table, with its left edge on the table's left edge. Keep the title's top and height."
+  }
+ ],
+ "unreachable": []
+}

@@ -1,0 +1,1 @@
+{"answers": [{"task_id": "deck2-e4", "text": "REFUSE: Both left edges show as column C, so any offset between them is smaller than a grid cell and cannot be read or set exactly from the cells in this file.", "edits": []}]}

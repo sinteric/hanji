@@ -1,0 +1,1 @@
+{"sent": "The validator did not accept these answers:\n- deck2-e4: an edit task is answered with \"edits\" (a non-empty list of {\"old\", \"new\"} pairs), or refused with \"text\": \"REFUSE: <reason>\" and \"edits\": [].\nReply with one JSON object and nothing else, {\"answers\": [...]}, holding a corrected answer for each of these tasks only, in the same answer format."}

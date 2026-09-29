@@ -1,0 +1,43 @@
+{
+ "unit_id": "r5x-A-3",
+ "part": 2,
+ "candidate": "A",
+ "replicate": 3,
+ "stem": "deck3",
+ "file": "product-deck (synthetic)",
+ "seed": "---\ntype: presentation\nformat: pptx\ntemplate: org/product-deck\nschema: 1\nsize: 960 x 540 pt\n---\n\nlayout: Title Slide\n::title box=\"120 88 720 188\"::\n2027 신제품 출시 계획\n::subtitle box=\"120 284 720 130\"::\n마케팅본부 · 2026년 11월\n<keep id=\"k3ftw\" kind=\"picture\" summary=\"logo.png\" box=\"864 18 78 39\"/>\n::notes::\n일정과 수치는 내부 검토용\n\n---\n\nlayout: Title and Content\n::title box=\"66 29 756 104\"::\n시장 현황\n::body box=\"66 144 828 343\"::\n- 국내 스마트홈 시장 4.2조 원 (전년 대비 +12%)\n- 주요 경쟁사 3곳 신제품 출시\n  - A사: 2027년 3월\n  - B사: 2027년 5월\n- 1인 가구 비중 34%\n::shape id=\"s4\" name=\"NEW 배지\" box=\"744 126 90 36\" rot=\"15\"::\nNEW\n<keep id=\"k7hqa\" kind=\"picture\" summary=\"logo.png\" box=\"864 18 78 39\"/>\n\n---\n\nlayout: Title Only\n::title box=\"66 29 828 104\"::\n출시 일정\n<group id=\"g5\" name=\"타임라인\" box=\"96 180 720 72\">\n::shape id=\"s6\" name=\"기획 단계\" box=\"96 180 192 72\"::\n기획\n<line id=\"s7\" name=\"화살표 1\" from=\"288 216\" to=\"360 216\"/>\n::shape id=\"s8\" name=\"개발 단계\" box=\"360 180 192 72\"::\n개발\n<line id=\"s9\" name=\"화살표 2\" from=\"552 216\" to=\"624 216\"/>\n::shape id=\"s10\" name=\"출시 단계\" box=\"624 180 192 72\"::\n출시\n</group>\n::shape id=\"s11\" name=\"주석\" box=\"96 360 480 29\"::\n일정은 내부 검토 중이며 변동될 수 있음\n::notes::\n각 단계는 분기 단위\n\n---\n\nlayout: Two Content\n::title box=\"66 29 828 104\"::\n제품 비교\n::left box=\"66 144 408 343\"::\n- 스마트 허브 S1\n  - 가격 19만 9천 원\n  - 음성 인식 지원\n::right box=\"486 144 408 343\"::\n- 스마트 허브 S1 Pro\n  - 가격 29만 9천 원\n  - 음성 인식 지원\n  - 카메라 내장\n::notes::\n가격은 부가세 포함\n\n---\n\nlayout: Title Only\n::title box=\"66 29 828 104\"::\n예상 매출\n<keep id=\"k2m8c\" kind=\"chart\" summary=\"Chart 3: 분기별 예상 매출 (억 원)\" box=\"120 168 480 300\"/>\n::shape id=\"s13\" name=\"1분기 라벨\" box=\"630 180 180 29\"::\n1분기 120억\n::shape id=\"s14\" name=\"2분기 라벨\" box=\"640 234 180 29\"::\n2분기 180억\n\n---\n\nlayout: Section Header\n::title box=\"66 135 828 225\"::\n부록\n::body box=\"66 361 828 118\"::\n세부 자료\n",
+ "seed_chars": 1757,
+ "tasks": [
+  {
+   "task_id": "deck3-x1",
+   "type": "read",
+   "instruction": "On slide 2 (시장 현황), which objects are partly or wholly within 2 cm of the slide's right edge?"
+  },
+  {
+   "task_id": "deck3-x2",
+   "type": "edit",
+   "instruction": "On slide 4 (제품 비교), widen the right column so that its right edge is 1 cm from the slide's right edge, keeping its other three edges where they are."
+  },
+  {
+   "task_id": "deck3-x3",
+   "type": "edit",
+   "instruction": "On slide 2 (시장 현황), send the shape \"NEW 배지\" behind the body, so that the body is drawn on top of it. Change nothing else."
+  },
+  {
+   "task_id": "deck3-x4",
+   "type": "edit",
+   "instruction": "On slide 3 (출시 일정), centre the timeline group horizontally on the slide. Keep every size and vertical position."
+  },
+  {
+   "task_id": "deck3-x5",
+   "type": "edit",
+   "instruction": "On slide 5 (예상 매출), put the two label text boxes side by side below the chart: \"1분기 라벨\" with its left edge on the chart's left edge and its top edge 0.5 cm below the chart's bottom edge; \"2분기 라벨\" to its right, with a gap of 0.5 cm between them and the same top edge. Keep both sizes."
+  },
+  {
+   "task_id": "deck3-x6",
+   "type": "edit",
+   "instruction": "On slide 2 (시장 현황), turn the shape \"NEW 배지\" upright (no rotation) and move it so that its top-right corner is on the body's top-right corner. Keep its size."
+  }
+ ],
+ "unreachable": []
+}

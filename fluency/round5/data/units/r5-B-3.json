@@ -1,0 +1,63 @@
+{
+ "unit_id": "r5-B-3",
+ "part": 1,
+ "candidate": "B",
+ "replicate": 3,
+ "stem": "deck3",
+ "file": "product-deck (synthetic)",
+ "seed": "---\ntype: presentation\nformat: pptx\ntemplate: org/product-deck\nschema: 1\nsize: 960 x 540 pt\n---\n\nlayout: Title Slide\n::title::\n2027 신제품 출시 계획\n::subtitle::\n마케팅본부 · 2026년 11월\n<keep id=\"k3ftw\" kind=\"picture\" summary=\"logo.png\" box=\"864 18 78 39\"/>\n::notes::\n일정과 수치는 내부 검토용\n\n---\n\nlayout: Title and Content\n::title box=\"66 29 756 104\"::\n시장 현황\n::body::\n- 국내 스마트홈 시장 4.2조 원 (전년 대비 +12%)\n- 주요 경쟁사 3곳 신제품 출시\n  - A사: 2027년 3월\n  - B사: 2027년 5월\n- 1인 가구 비중 34%\n<shape id=\"s4\" name=\"NEW 배지\" box=\"744 126 90 36\" rot=\"15\">NEW</shape>\n<keep id=\"k7hqa\" kind=\"picture\" summary=\"logo.png\" box=\"864 18 78 39\"/>\n\n---\n\nlayout: Title Only\n::title::\n출시 일정\n<group id=\"g5\" name=\"타임라인\" box=\"96 180 720 72\">\n<shape id=\"s6\" name=\"기획 단계\" box=\"96 180 192 72\">기획</shape>\n<line id=\"s7\" name=\"화살표 1\" from=\"288 216\" to=\"360 216\"/>\n<shape id=\"s8\" name=\"개발 단계\" box=\"360 180 192 72\">개발</shape>\n<line id=\"s9\" name=\"화살표 2\" from=\"552 216\" to=\"624 216\"/>\n<shape id=\"s10\" name=\"출시 단계\" box=\"624 180 192 72\">출시</shape>\n</group>\n<shape id=\"s11\" name=\"주석\" box=\"96 360 480 29\">일정은 내부 검토 중이며 변동될 수 있음</shape>\n::notes::\n각 단계는 분기 단위\n\n---\n\nlayout: Two Content\n::title::\n제품 비교\n::left::\n- 스마트 허브 S1\n  - 가격 19만 9천 원\n  - 음성 인식 지원\n::right::\n- 스마트 허브 S1 Pro\n  - 가격 29만 9천 원\n  - 음성 인식 지원\n  - 카메라 내장\n::notes::\n가격은 부가세 포함\n\n---\n\nlayout: Title Only\n::title::\n예상 매출\n<keep id=\"k2m8c\" kind=\"chart\" summary=\"Chart 3: 분기별 예상 매출 (억 원)\" box=\"120 168 480 300\"/>\n<shape id=\"s13\" name=\"1분기 라벨\" box=\"630 180 180 29\">1분기 120억</shape>\n<shape id=\"s14\" name=\"2분기 라벨\" box=\"640 234 180 29\">2분기 180억</shape>\n\n---\n\nlayout: Section Header\n::title::\n부록\n::body::\n세부 자료\n",
+ "seed_chars": 1583,
+ "tasks": [
+  {
+   "task_id": "deck3-q1",
+   "type": "read",
+   "instruction": "On slide 2 (시장 현황), which objects' boxes overlap the box of the shape \"NEW 배지\"? Use the boxes as written, ignoring rotation."
+  },
+  {
+   "task_id": "deck3-q2",
+   "type": "read",
+   "instruction": "On slide 3 (출시 일정), which objects of the group 타임라인 lie entirely in the right half of the slide?"
+  },
+  {
+   "task_id": "deck3-e1",
+   "type": "edit",
+   "instruction": "On slide 3 (출시 일정), move the text box 주석 2 cm down. Keep its size and its horizontal position."
+  },
+  {
+   "task_id": "deck3-e2",
+   "type": "edit",
+   "instruction": "On slide 2 (시장 현황), make the logo picture 1.5 times as wide and 1.5 times as tall, keeping its top-right corner where it is."
+  },
+  {
+   "task_id": "deck3-e3",
+   "type": "edit",
+   "instruction": "On slide 5 (예상 매출), add a text box with the text \"단위: 억 원 (2027년 계획)\" directly under the title: its top edge on the title's bottom edge, its left and right edges on the title's, and between 0.7 cm and 1.1 cm tall. It must not overlap any other object."
+  },
+  {
+   "task_id": "deck3-e4",
+   "type": "edit",
+   "instruction": "On slide 5 (예상 매출), move the text box \"2분기 라벨\" so that its left edge lines up with the left edge of \"1분기 라벨\". Keep its size and its vertical position."
+  },
+  {
+   "task_id": "deck3-e5",
+   "type": "edit",
+   "instruction": "On slide 4 (제품 비교), in the right column, change \"음성 인식 지원\" to \"음성 인식·제스처 지원\". Change nothing else: every position and size stays as it is."
+  },
+  {
+   "task_id": "deck3-e6",
+   "type": "edit",
+   "instruction": "Right after slide 4 (제품 비교), add a slide with the Comparison layout: title \"출시 채널 비교\"; left heading \"온라인\", with the bullets \"자사몰 단독 판매\" and \"사전 예약 할인\" under it; right heading \"오프라인\", with the bullets \"가전 매장 체험존\" and \"통신사 대리점\" under it. Leave every placeholder where the layout puts it."
+  },
+  {
+   "task_id": "deck3-e7",
+   "type": "edit",
+   "instruction": "On slide 3 (출시 일정), fill the three boxes of the timeline with the brand blue #1E5AA8."
+  },
+  {
+   "task_id": "deck3-w",
+   "type": "write",
+   "instruction": "Write a new presentation with exactly these three slides, in this order, using the layouts listed above:\n1. Layout Title Slide: title \"2027 상반기 마케팅 계획\"; subtitle \"마케팅본부 · 2026년 12월\".\n2. Layout Title and Content: title \"핵심 목표\"; body bullets \"신규 고객 5만 명\" and \"재구매율 40%\"; speaker notes \"목표치는 1월 확정\".\n3. Layout Section Header: title \"세부 실행안\"; body \"채널별 계획\".\nEvery placeholder stays where its layout puts it."
+  }
+ ],
+ "unreachable": []
+}

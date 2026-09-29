@@ -1,0 +1,75 @@
+{
+ "answers": [
+  {
+   "task_id": "deck1-q1",
+   "text": "ANSWER: left"
+  },
+  {
+   "task_id": "deck1-q2",
+   "text": "ANSWER: k04k9"
+  },
+  {
+   "task_id": "deck1-e1",
+   "edits": [
+    {
+     "old": "::shape id=\"s5\" name=\"출처\" cells=\"B12:E12\"::\n",
+     "new": "::shape id=\"s5\" name=\"출처\" cells=\"H12:K12\"::\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck1-e2",
+   "edits": [
+    {
+     "old": "<keep id=\"k04k9\" kind=\"picture\" summary=\"image.png\" cells=\"K10\"/>\n",
+     "new": "<keep id=\"k04k9\" kind=\"picture\" summary=\"image.png\" cells=\"I9:K10\"/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck1-e3",
+   "edits": [
+    {
+     "old": "분기별 매출\n",
+     "new": "분기별 매출\n::shape cells=\"B3:K3\"::\n단위: 억 원\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck1-e4",
+   "edits": [
+    {
+     "old": "<keep id=\"k04k9\" kind=\"picture\" summary=\"image.png\" cells=\"K10\"/>\n",
+     "new": "<keep id=\"k04k9\" kind=\"picture\" summary=\"image.png\" cells=\"B10\"/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck1-e5",
+   "edits": [
+    {
+     "old": "  - 지방 13곳\n",
+     "new": "  - 지방 14곳\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck1-e6",
+   "edits": [
+    {
+     "old": "\nlayout: Title Only\n",
+     "new": "\nlayout: Comparison\n::title cells=\"B1:K2\"::\n권역별 전략\n::body cells=\"B4:F4\"::\n수도권\n::body2 cells=\"B5:F11\"::\n- 신규 지점 2곳\n- 온라인 판촉 강화\n::body3 cells=\"G4:K4\"::\n지방\n::body4 cells=\"G5:K11\"::\n- 부산 거점 확대\n- 대리점 교육\n\n---\n\nlayout: Title Only\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck1-e7",
+   "text": "REFUSE: formatting and the content of kept objects cannot be changed here.",
+   "edits": []
+  },
+  {
+   "task_id": "deck1-w",
+   "text": "---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 720 x 540 pt\ngrid: 12 x 12 cells of 60 x 45 pt\n---\n\nlayout: Title Slide\n::title cells=\"B5:K6\"::\n2026년 4분기 영업 계획\n::subtitle cells=\"C8:J10\"::\n영업기획팀 · 2026년 10월\n\n---\n\nlayout: Title and Content\n::title cells=\"B1:K2\"::\n4분기 목표\n::body cells=\"B4:K11\"::\n- 매출 1,300억 원\n- 신규 고객 40곳\n::notes::\n목표는 10월 경영회의에서 확정\n\n---\n\nlayout: Two Content\n::title cells=\"B1:K2\"::\n채널별 과제\n::left cells=\"B4:F11\"::\n- 오프라인: 매장 판촉\n- 오프라인: 대리점 교육\n::right cells=\"G4:K11\"::\n- 온라인: 기획전\n- 온라인: 멤버십 캠페인\n"
+  }
+ ]
+}

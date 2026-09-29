@@ -1,0 +1,63 @@
+{
+ "unit_id": "r5-Ap-1",
+ "part": 1,
+ "candidate": "Ap",
+ "replicate": 1,
+ "stem": "deck1",
+ "file": "korean-deck.pptx",
+ "seed": "---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 720 x 540 pt\n---\n\nlayout: Title Slide\n::title box=\"7.5 31.1 85 21.4\"::\n3분기 영업 보고\n::subtitle box=\"15 56.7 70 25.6\"::\n영업본부 · 2026년 10월\n::notes::\n인사말 후 목차를 소개한다.\n\n---\n\nlayout: Title and Content\n::title box=\"5 4 90 16.7\"::\n핵심 지표\n::body box=\"5 23.3 90 66\"::\n- 매출 **12% 증가**\n- 신규 고객 34곳\n  - 수도권 21곳\n  - 지방 13곳\n- 영업이익률 8.4%\n::notes::\n전년 대비 증가폭을 강조한다.\n\n---\n\nlayout: Two Content\n::title box=\"5 4 90 16.7\"::\n지역별 현황\n::left box=\"5 23.3 44.2 66\"::\n- 수도권 21곳\n  - 서울 14곳\n::right box=\"50.8 23.3 44.2 66\"::\n- 지방 13곳\n  - 부산 5곳\n::shape id=\"s5\" name=\"출처\" box=\"5 88 40 5.3\"::\n출처: 내부 집계\n\n---\n\nlayout: Title Only\n::title box=\"5 4 90 16.7\"::\n분기별 매출\n<keep id=\"kb2br\" kind=\"table\" summary=\"Table 2: 분기 매출 증감 1분기 1,120 +3% 2분기 1,180 +5% 3분기 1,204 +12%\" box=\"10 26.7 80 26.7\"/>\n<keep id=\"k04k9\" kind=\"picture\" summary=\"image.png\" box=\"80 73.3 10 6.7\"/>\n::notes::\n표는 잠정치이며 10월 말 확정된다.\n\n---\n\nlayout: Title and Content\n::title box=\"5 4 90 16.7\"::\n다음 분기 계획\n::body box=\"5 23.3 90 66\"::\n1. 신규 지점 3곳 개설\n1. 온라인 채널 확대\n1. 고객 만족도 조사\n- 자세한 일정은 사내 게시판 참고 (긴급)\n\n---\n\nlayout: Section Header\n::title box=\"7.9 64.3 85 19.9\"::\n부록\n::body box=\"7.9 42.4 85 21.9\"::\n세부 자료\n\n---\n\nlayout: Title and Content\n::title box=\"5 4 90 16.7\"::\n감사합니다\n",
+ "seed_chars": 1240,
+ "tasks": [
+  {
+   "task_id": "deck1-q1",
+   "type": "read",
+   "instruction": "On slide 3 (지역별 현황), which objects' boxes overlap the box of the text box 출처?"
+  },
+  {
+   "task_id": "deck1-q2",
+   "type": "read",
+   "instruction": "On slide 4 (분기별 매출), which objects lie entirely inside the bottom-right quarter of the slide?"
+  },
+  {
+   "task_id": "deck1-e1",
+   "type": "edit",
+   "instruction": "On slide 3 (지역별 현황), move the text box 출처 to the right so that its right edge lines up with the right edge of the right column. Keep its size and its vertical position."
+  },
+  {
+   "task_id": "deck1-e2",
+   "type": "edit",
+   "instruction": "On slide 4 (분기별 매출), make the picture twice as wide and twice as tall, keeping its bottom-right corner where it is."
+  },
+  {
+   "task_id": "deck1-e3",
+   "type": "edit",
+   "instruction": "On slide 4 (분기별 매출), add a text box with the text \"단위: 억 원\" directly under the title: its top edge on the title's bottom edge, its left and right edges on the title's, and between 0.7 cm and 1.1 cm tall. It must not overlap any other object."
+  },
+  {
+   "task_id": "deck1-e4",
+   "type": "edit",
+   "instruction": "On slide 4 (분기별 매출), move the picture to the left so that its left edge lines up with the table's left edge. Keep its size and its vertical position."
+  },
+  {
+   "task_id": "deck1-e5",
+   "type": "edit",
+   "instruction": "On slide 2 (핵심 지표), change the bullet \"지방 13곳\" to \"지방 14곳\". Change nothing else: every position and size stays as it is."
+  },
+  {
+   "task_id": "deck1-e6",
+   "type": "edit",
+   "instruction": "Right after slide 3 (지역별 현황), add a slide with the Comparison layout: title \"권역별 전략\"; left heading \"수도권\", with the bullets \"신규 지점 2곳\" and \"온라인 판촉 강화\" under it; right heading \"지방\", with the bullets \"부산 거점 확대\" and \"대리점 교육\" under it. Leave every placeholder where the layout puts it."
+  },
+  {
+   "task_id": "deck1-e7",
+   "type": "edit",
+   "instruction": "On slide 4 (분기별 매출), change the 3분기 figure in the table from 1,204 to 1,210."
+  },
+  {
+   "task_id": "deck1-w",
+   "type": "write",
+   "instruction": "Write a new presentation with exactly these three slides, in this order, using the layouts listed above:\n1. Layout Title Slide: title \"2026년 4분기 영업 계획\"; subtitle \"영업기획팀 · 2026년 10월\".\n2. Layout Title and Content: title \"4분기 목표\"; body bullets \"매출 1,300억 원\" and \"신규 고객 40곳\"; speaker notes \"목표는 10월 경영회의에서 확정\".\n3. Layout Two Content: title \"채널별 과제\"; left column bullets \"오프라인: 매장 판촉\" and \"오프라인: 대리점 교육\"; right column bullets \"온라인: 기획전\" and \"온라인: 멤버십 캠페인\".\nEvery placeholder stays where its layout puts it."
+  }
+ ],
+ "unreachable": []
+}

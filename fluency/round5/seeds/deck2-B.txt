@@ -1,0 +1,56 @@
+---
+type: presentation
+format: pptx
+schema: 1
+size: 720 x 540 pt
+---
+
+layout: Blank
+<shape id="s4" name="TextBox 3" box="72 72 180 29">Learning PPTX</shape>
+<line id="s6" name="Straight Connector 5" from="84 144" to="252 144"/>
+<shape id="s7" name="Freeform 6" box="47 211 185 136">Cloud</shape>
+<keep id="kqld8" kind="picture" summary="Picture 1" box="402 78 144 132"/>
+<keep id="kmtnf" kind="table" summary="Table 2: Column1 Column2 Column3 data1 data2 data3" box="300 372 372 96"/>
+<line id="s8" name="Straight Arrow Connector 7" from="468 366" to="468 216"/>
+<line id="s10" name="Elbow Connector 9" from="186 252" to="402 144"/>
+
+---
+
+layout: Title Slide
+::title::
+PPTX <u>Title</u>
+::subtitle::
+**Subtitle**
+<p/>
+And second line
+
+---
+
+layout: Blank
+<group id="g5" name="Group 4" box="120 108 258 152">
+<shape id="s2" name="Rectangle 1" box="120 108 138 60"/>
+<shape id="s3" name="Oval 2" box="306 150 72 72"/>
+<shape id="s4" name="Right Arrow 3" box="144 222 77 38"/>
+</group>
+
+---
+
+layout: Blank
+<keep id="k5mk0" kind="table" summary="Table 1: header1 header2 header3 A1 B1 C1 A2 A3 B3 and C3 are merged A4 A5" box="120 110 480 175"/>
+
+---
+
+layout: Title Only
+<keep id="k4akl" kind="table" summary="Table 1: Link Type Target URI Web Page http://poi.apache.org/ Place in this docu…" box="54 168 618 146"/>
+::title::
+Hyperlinks
+
+---
+
+layout: Blank
+<shape id="s2" name="Rectangle 1" box="66 72 72 72"/>
+<shape id="s9" name="Rectangle 8" box="174 72 72 72"/>
+<shape id="s10" name="Rectangle 9" box="270 72 72 72"/>
+<shape id="s11" name="Rectangle 10" box="366 72 72 72"/>
+<shape id="s12" name="Rectangle 11" box="468 72 72 72"/>
+<shape id="s13" name="Rectangle 12" box="594 72 72 72"/>

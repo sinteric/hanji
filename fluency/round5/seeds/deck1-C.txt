@@ -1,0 +1,78 @@
+---
+type: presentation
+format: pptx
+schema: 1
+size: 720 x 540 pt
+grid: 12 x 12 cells of 60 x 45 pt
+---
+
+layout: Title Slide
+::title cells="B5:K6"::
+3분기 영업 보고
+::subtitle cells="C8:J10"::
+영업본부 · 2026년 10월
+::notes::
+인사말 후 목차를 소개한다.
+
+---
+
+layout: Title and Content
+::title cells="B1:K2"::
+핵심 지표
+::body cells="B4:K11"::
+- 매출 **12% 증가**
+- 신규 고객 34곳
+  - 수도권 21곳
+  - 지방 13곳
+- 영업이익률 8.4%
+::notes::
+전년 대비 증가폭을 강조한다.
+
+---
+
+layout: Two Content
+::title cells="B1:K2"::
+지역별 현황
+::left cells="B4:F11"::
+- 수도권 21곳
+  - 서울 14곳
+::right cells="G4:K11"::
+- 지방 13곳
+  - 부산 5곳
+::shape id="s5" name="출처" cells="B12:E12"::
+출처: 내부 집계
+
+---
+
+layout: Title Only
+::title cells="B1:K2"::
+분기별 매출
+<keep id="kb2br" kind="table" summary="Table 2: 분기 매출 증감 1분기 1,120 +3% 2분기 1,180 +5% 3분기 1,204 +12%" cells="B4:K6"/>
+<keep id="k04k9" kind="picture" summary="image.png" cells="K10"/>
+::notes::
+표는 잠정치이며 10월 말 확정된다.
+
+---
+
+layout: Title and Content
+::title cells="B1:K2"::
+다음 분기 계획
+::body cells="B4:K11"::
+1. 신규 지점 3곳 개설
+1. 온라인 채널 확대
+1. 고객 만족도 조사
+- 자세한 일정은 사내 게시판 참고 (긴급)
+
+---
+
+layout: Section Header
+::title cells="B9:K10"::
+부록
+::body cells="B6:K8"::
+세부 자료
+
+---
+
+layout: Title and Content
+::title cells="B1:K2"::
+감사합니다

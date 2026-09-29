@@ -1,0 +1,75 @@
+{
+ "answers": [
+  {
+   "task_id": "deck2-q1",
+   "text": "ANSWER: s10"
+  },
+  {
+   "task_id": "deck2-q2",
+   "text": "ANSWER: kqld8"
+  },
+  {
+   "task_id": "deck2-e1",
+   "edits": [
+    {
+     "old": "<shape id=\"s4\" name=\"TextBox 3\" box=\"72 72 180 29\">Learning PPTX</shape>\n",
+     "new": "<shape id=\"s4\" name=\"TextBox 3\" box=\"157 72 180 29\">Learning PPTX</shape>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e2",
+   "edits": [
+    {
+     "old": "<keep id=\"kqld8\" kind=\"picture\" summary=\"Picture 1\" box=\"402 78 144 132\"/>\n",
+     "new": "<keep id=\"kqld8\" kind=\"picture\" summary=\"Picture 1\" box=\"402 78 72 66\"/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e3",
+   "edits": [
+    {
+     "old": "Hyperlinks\n",
+     "new": "Hyperlinks\n<shape box=\"36 112 648 26\">Links checked in September 2026</shape>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e4",
+   "edits": [
+    {
+     "old": "<shape id=\"s4\" name=\"Right Arrow 3\" box=\"144 222 77 38\"/>\n",
+     "new": "<shape id=\"s4\" name=\"Right Arrow 3\" box=\"120 222 77 38\"/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e5",
+   "edits": [
+    {
+     "old": "And second line\n",
+     "new": "And a second line\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e6",
+   "edits": [
+    {
+     "old": "And second line\n",
+     "new": "And second line\n\n---\n\nlayout: Comparison\n::title::\nBefore and after\n::body::\nBefore\n::body2::\n- Positions in EMU\n- Hidden connectors\n::body3::\nAfter\n::body4::\n- Boxes in the text\n- Every object shown\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e7",
+   "text": "REFUSE: formatting and the content of kept objects cannot be changed here.",
+   "edits": []
+  },
+  {
+   "task_id": "deck2-w",
+   "text": "---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 720 x 540 pt\n---\n\nlayout: Title Slide\n::title::\nQuarterly Review\n::subtitle::\nOperations team, October 2026\n\n---\n\nlayout: Title and Content\n::title::\nHighlights\n::body::\n- Costs down 4%\n- Two new sites\n::notes::\nMention the audit\n\n---\n\nlayout: Two Content\n::title::\nNext steps\n::left::\n- Hire two engineers\n- Close the old site\n::right::\n- Open the Busan office\n- Review in March\n"
+  }
+ ]
+}

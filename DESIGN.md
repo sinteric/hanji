@@ -1,7 +1,7 @@
 ---
 status: draft
 date: 2026-09-29
-measured: library and project facts below were checked 2026-09-28/29 against crates.io, npm, PyPI, GitHub and project docs; the §5 syntax choices were measured by fluency rounds 1–4 (2026-09-28, two Claude models); the remainder anchoring (§10.3) by the remainder prototype (2026-09-28, 13 docx); nothing here has yet been opened in real Office by this project
+measured: library and project facts below were checked 2026-09-28/29 against crates.io, npm, PyPI, GitHub and project docs; the §5 syntax choices were measured by fluency rounds 1–4 (2026-09-28, two Claude models) and the Presentation geometry by round 5 (2026-09-29, the same models); the remainder anchoring (§10.3) by the remainder prototype (2026-09-28, 13 docx); nothing here has yet been opened in real Office by this project
 ---
 
 # hanji — office documents for LLM agents (design)
@@ -130,9 +130,13 @@ package ─────────────────────► model
 - **Laws (from bidirectional transformations / lenses), as tests:**
   - *GetPut:* import then export with no edit returns the original —
     XML-equivalent per part (canonicalised), since byte identity does not
-    survive a split and recombine.
+    survive a split and recombine. Geometry is exact too: a Presentation shows
+    each box rounded, and a number left as shown keeps the stored EMU, so an
+    unchanged `a:xfrm` is not touched (§5.3).
   - *PutGet:* after any edit, importing the exported file shows exactly the
-    text that was written.
+    text that was written, in canonical form (§5.1). The write returns that
+    text, so the model sees, for example, rounded numbers, ids on new objects,
+    and a group's objects after the group was moved.
 
 ## 5. The format
 
@@ -143,7 +147,7 @@ package ─────────────────────► model
   by a host through a registered schema (e.g. a citation tag).
 - **Canonical form, re-applied on every write:** no hard wrapping (one
   paragraph = one line), no table padding, `1.` for every ordered item, fixed
-  attribute order. *Why:* a formatter that re-pads a table or renumbers a list
+  attribute order, numbers as shown (whole points, §5.3). *Why:* a formatter that re-pads a table or renumbers a list
   turns a one-cell edit into a whole-table rewrite, and the model's next exact
   `old → new` edit stops matching.
 - **Local, never counted.** Nothing requires the author to count columns,
@@ -153,8 +157,9 @@ package ─────────────────────► model
   (a colour, a font size) is remainder: preserved for people, not edited by
   the model.
 - **Placeholders:** `<keep id="k3" kind="drawing" summary="org chart, 5 boxes"/>`
-  (block or inline). The model may move or delete one explicitly; it never
-  creates or alters one.
+  (block or inline). The model may move or delete one explicitly, and in a
+  Presentation resize it by its box (§5.3); it never alters its content, and
+  never creates one except a picture from a file (§5.3).
 - **Validator errors are written for the model:** line and column, the
   expected form, and the allowed names (styles, layouts, fields).
 - **Front matter** names the type, home format, template and schema version.
@@ -301,7 +306,8 @@ schema: 1
 
 ### 5.3 Presentation
 
-Slides are built from the layout's placeholders — never geometry.
+A slide is a canvas: its objects in z-order, each where it is. Every object shows
+its box, slots included, so a slide reads on its own (§6 round 5, candidate A).
 
 ```
 ---
@@ -309,12 +315,13 @@ type: presentation
 format: pptx
 template: org/deck
 schema: 1
+size: 720 x 540 pt
 ---
 
 layout: Title and Content
-::title::
+::title box="36 22 648 90"::
 핵심 지표
-::body::
+::body box="36 126 648 356"::
 - 매출 **12% 증가**
 - 신규 고객 34곳
 ::notes::
@@ -323,51 +330,125 @@ layout: Title and Content
 ---
 
 layout: Two Content
-<keep id="k7" kind="picture" summary="지도"/>
-::title::
+::title box="36 22 504 90"::
 지역별 현황
-::left::
+::left box="36 126 318 356"::
 - 수도권 21곳
-::right::
+::right box="366 126 318 356"::
 - 지방 13곳
-<shape id="s4" name="출처">출처: 내부 집계<p/>2026년 9월</shape>
+<keep id="k7" kind="picture" summary="지도" box="560 20 124 80"/>
+<shape id="s4" name="출처" box="36 490 288 29">출처: 내부 집계<p/>2026년 9월</shape>
+<line id="s6" name="화살표" from="330 504" to="366 504"/>
 ```
 
 - Slidev-style. The first slide begins right after the file's front matter;
-  later slides are separated by a line containing only `---`.
+  later slides are separated by a line containing only `---`. `size` in the
+  front matter is the slide's width and height in points.
 - The first line of every slide is `layout: Name`, as listed, spaces included
   (quotes allowed). No other `key: value` lines.
-- Each slot starts with a marker line — `::title::`, `::body::`, `::left::`,
-  `::right::`, `::notes::` — and its text is the lines after it, up to the next
-  marker or `---`. Only the layout's slots; an unfilled slot is left out; all
-  text is inside a slot.
 - Real Slidev closes the per-slide front matter with a second `---`. Here that
   line starts an empty, layout-less slide and is an error.
-- Slot names are the layout's placeholder types: `title` (centred or not),
-  `subtitle`, `body`, `picture`, `chart`, `table`, `diagram`, `media`,
-  `clipart`, `date`, `footer`, `number`, `notes`. Two body placeholders are
-  `left` and `right`, by position; three or more are `body`, `body2`, `body3`.
-  A second placeholder of one name is `picture2`. A layout name the file uses
-  twice is written `Name (2)`.
-- A slot holds paragraphs, list items, `<p/>` and placeholders. Its list items
-  form one list. No headings, styles, tables, page breaks or footnotes: those
-  come from the layout. An empty marker is an error. Deleting a slot's text
-  leaves the layout's empty placeholder; a placeholder holding only spaces
-  counts as empty and is left out.
-- A placeholder filled with a picture, chart or table is its slot's text: the
-  slot holds that `<keep/>` alone.
-- Shapes of an imported deck that are not placeholders appear as
-  `<shape id=… name=…>text</shape>`: text editable, geometry in the remainder.
-  One line per shape; `<p/>` starts its next paragraph. Its paragraphs are
-  never list items (bullets stay in the remainder). A shape is never created,
-  and a shape line without text is an error: delete the line to delete the
-  shape.
-- Objects that are not placeholders (pictures, charts, tables, groups) are a
-  `<keep/>` line each (§5.1): moved or deleted, never created or altered.
-  Deleting one removes its parts; refused while an animation plays on it.
-- Slots, shapes and objects are written in the slide's z-order, `::notes::`
-  last. A shape or object line is in no slot: like a marker it ends the text
-  of the slot before it.
+- **Objects and z-order.** A slide is its objects written back to front, slots
+  included: an object written later is drawn on top. Moving a line is the
+  z-order edit. `::notes::` comes last and is not an object. Every object on
+  the slide is shown, shapes without text and connectors included (rule 8).
+- **Geometry.** `box="x y w h"` is the left edge, top edge, width and height in
+  points from the slide's top-left corner (72 pt = 1 inch = 2.54 cm; x grows to
+  the right, y downwards). Points are the unit, decided 2026-09-29; a cm view
+  or cm input can be added later as a conversion on top of them. Numbers are
+  shown as whole points; a written number may have decimals. `rot="15"` turns an object 15° clockwise about its centre,
+  and its box is the unturned one, as `a:xfrm` stores it. `flip="h"`, `"v"` or
+  `"hv"` mirrors it. Both are left out when there is no rotation or flip.
+  - A number left as it is shown keeps the exact stored value; a changed number
+    is used as written (1 pt = 12,700 EMU). A box whose four numbers are
+    unchanged leaves its `a:xfrm` untouched (GetPut, §4).
+  - *Why points:* round 5 measured points, percent of the slide and a 12 × 12
+    grid. Every request given in cm landed in points. Percent's one miss was a
+    cm-to-percent conversion on a 16:9 slide, where x and y have different
+    scales. The grid could not write 11 of 30 tasks, and it hid overlaps and
+    misalignments smaller than a cell.
+- **Slots.** Each slot starts with a marker line — `::title::`, `::body::`,
+  `::left::`, `::right::` — and its text is the lines after it, up to the next
+  object or `---`. Only the layout's slots appear; an unfilled slot is left out.
+  - Every slot shows its box on its marker, `::title box="36 22 648 90"::`:
+    its own when the slide stores one (`a:xfrm` in its `p:spPr`), else the one
+    it inherits from the layout (or the master). The text does not say which;
+    the remainder does. A slide therefore reads on its own, without the
+    layout list.
+  - A box left as shown keeps what the slide stores: an inherited box writes
+    nothing back (the placeholder stays without `a:xfrm`, so GetPut is
+    byte-exact), and an own box keeps its exact EMU. A changed box gives the
+    slot an `a:xfrm` of its own, the unchanged numbers keeping their exact
+    inherited values. A marker without a box (`::title::`) removes the slot's
+    own box: it sits where its layout puts it, and the text the write returns
+    shows that box.
+  - Changing a slide's layout moves every slot whose box was left as shown
+    and inherited to the new layout's place; a slot with its own box keeps it.
+  - Slot names are the layout's placeholder types: `title` (centred or not),
+    `subtitle`, `body`, `picture`, `chart`, `table`, `diagram`, `media`,
+    `clipart`, `date`, `footer`, `number`. Two body placeholders are `left` and
+    `right`, by position; three or more are `body`, `body2`, `body3`. A second
+    placeholder of one name is `picture2`. A layout name the file uses twice is
+    written `Name (2)`.
+  - A slot holds paragraphs, list items, `<p/>` and placeholders. Its list items
+    form one list. No headings, styles, tables, page breaks or footnotes: those
+    come from the layout. An empty marker is an error. Deleting a slot's text
+    leaves the layout's empty placeholder; a placeholder holding only spaces
+    counts as empty and is left out.
+  - A placeholder filled with a picture, chart or table is its slot's text: the
+    slot holds that `<keep/>` alone, and its box is on the marker.
+  - *Why every slot shows its box (A over B):* round 5 tied A (every slot's
+    box shown) and B (a slot's box shown only when the slide moved it) at the
+    ceiling, with B 11% smaller in answers and 10% in input. Round 5's decks
+    were small. In a large deck, an agent under B must look each slot up in
+    the layout list to know where it is, and can misjudge how the slide looks;
+    A makes each slide self-contained, and the owner chose it for that
+    (2026-09-29) at the cost of the 11%.
+- **Shapes.** A shape that is not a placeholder is one line,
+  `<shape id="s4" name="출처" box="…">text</shape>`, with its text editable;
+  `<p/>` starts its next paragraph. Its paragraphs are never list items
+  (bullets stay in the remainder). A shape without text is
+  `<shape id="s9" name="Oval 8" box="…"/>`. Its outline, fill and preset
+  geometry stay in the remainder.
+- **Pictures, charts, tables** and other objects the format does not model are
+  a `<keep id kind summary box/>` line each (§5.1). They may be moved, resized,
+  reordered or deleted, and their `id`, `kind` and `summary` never change.
+  Resizing a table scales its column widths and row heights; a picture keeps
+  its crop. Deleting one removes its parts; refused while an animation plays
+  on it.
+- **Lines and connectors** are `<line id="s6" name="…" from="x y" to="x y"/>`:
+  the two ends, not a box. Writing them rewrites `a:off`, `a:ext` and the flips.
+  Arrowheads, the connector's path and its connection ids stay in the
+  remainder.
+  - *Attached connectors.* Moving or resizing an object that a connector is
+    attached to (its `stCxn` or `endCxn` names the object) is refused, with the
+    connector and the reason named, unless the same edit also rewrites every
+    attached `<line>`. The write does not reroute connectors: rerouting is
+    deferred (§10.9), and a refusal is better than a connector left detached
+    in PowerPoint (rule 1).
+- **Groups** are a `<group id name box>` line, the group's objects, then
+  `</group>`. Its objects show slide coordinates (through the group's child
+  offset and extent), and the group's box is the box around them. Changing the
+  group's box moves or scales the whole group, and canonical form writes its
+  objects' new boxes. Changing its objects moves the group's box with them. A
+  group box that disagrees with changed objects is refused. A rotated or
+  flipped group is one `<keep kind="group" … box/>`. Groups are never created or
+  ungrouped here.
+- **New objects** are written without `id`; the write gives ids and names, and
+  the text it returns shows them. They are:
+  - a text box, `<shape box="…">text</shape>`;
+  - a picture from a file, `<keep kind="picture" src="…" box="…"/>`, or, in a
+    picture slot, the slot's marker holding `<keep kind="picture" src="…"/>`,
+    which takes the slot's box;
+  - a line, `<line from="…" to="…"/>`.
+
+  Nothing else is created: a new `<keep/>` of another kind, a new group or an
+  invented id is an error.
+- **New slides and decks from a template** are written with `layout:` and bare
+  slot markers, with no geometry: every slot sits where its layout puts it,
+  and the text the write returns shows each slot's box. The old, geometry-free
+  form still reads (a shape written without its box keeps its box); its bare
+  markers put an existing slot back in its layout's place.
 
 ### 5.4 Spreadsheet
 
@@ -459,7 +540,8 @@ a few HTML-like tags; small JSON. Where it fails:
 - **Syntax against habit** — e.g. Djot's `*strong*` (models write `**bold**`);
   Typst function names that changed across versions.
 - **Prose inside JSON strings** (`\n`, `\"`).
-- **Coordinates** (slide EMUs) — hopeless.
+- **Coordinates** (slide EMUs) — hopeless. Points are not: round 5 below
+  measured boxes in points, percent and grid cells.
 - **Undocumented attributes** — models invent plausible ones.
 - **Exact-match editing breaks** on padded tables, repeated text, and
   auto-renumbered lists.
@@ -599,6 +681,51 @@ workbook API in a sandbox.
   34/36; within noise). C is the runner-up and 6–12% smaller (Sonnet / Opus);
   B is no smaller than A (−1% / +3%, Opus / Sonnet).
 
+**Round 5 results (2026-09-29)** — kit in [fluency/round5/](fluency/round5/),
+candidates in [fluency/round5/CANDIDATES.md](fluency/round5/CANDIDATES.md),
+details in [fluency/round5/RESULTS.md](fluency/round5/RESULTS.md). Same two
+models, 21 blind units each, no tools, one fix round. It decides §10.9, geometry
+in Presentations, on korean-deck.pptx and shapes.pptx (the office-kit decks,
+with every object the files hold) and a 16:9 Korean deck written for the round.
+The candidates are A, every object and slot with its `box` in points; Ap, A in
+percent of the slide; B, slots from the layout (a box only when moved) and
+every other object with its box in points; and C, A on a 12 × 12 grid of
+cells. Part 1 (4 candidates × 3 decks × 10 tasks) asks for reads (overlap,
+region), a move, a picture resize, a text box under the title, left alignment,
+a bullet edit that must not touch geometry, a comparison slide, a new
+three-slide deck and one refusal. Part 2 (A, Ap and B × 3 decks × 6 tasks) is
+harder: slot geometry, z-order, centring, even spacing, a group move and a
+rotation.
+
+| Decision | Opus landed A / Ap / B / C | Sonnet landed A / Ap / B / C | Opus chars A / Ap / B | Sonnet chars A / Ap / B | Verdict |
+|---|---|---|---|---|---|
+| Format and unit | 48 / 47 / 48 / 17 | 48 / 48 / 48 / 17 | 6,325 / 6,261 / 5,650 | 5,868 / 5,886 / 5,236 | A and B tie; A chosen (§10.9), in points |
+
+- Landed is first try, of 48 per A/Ap/B cell (both parts) and 30 per C cell
+  (part 1). All 288 A/Ap/B answers were valid, and every A and B answer
+  landed on both models. Ap's one miss (Opus) wrote 0.5 cm as 1.0 cm in
+  percent of each axis on the 16:9 deck (valid, so silent). All 24 refusals
+  refused; no box was written on any of the 48 new slides and decks; every cm
+  request landed in points.
+- C cannot write 11 of its 30 tasks (3 cm moves, a 0.7–1.1 cm text box, 1.5×
+  scaling, aligning to an off-grid edge). Opus refused 9 of them and Sonnet 5,
+  and the rest missed. C also misread two 7 pt overlaps that round to one grid
+  line (4 of 4 answers wrong), and Sonnet called two misaligned pairs "already
+  aligned". Sonnet's two invalid C answers were valid after one round and still
+  missed.
+- Format: A and B tie at the ceiling. On size and fit alone, as in round 1,
+  B wins: it is 11% smaller in answers on both models and 10% smaller in
+  input (21% on a deck of inherited placeholders), and a box on a slot says
+  the slide stores its own, as the file does. A's self-contained read did not
+  matter here: no inherited slot was misread in 14 tasks that needed the
+  layout list. The owner chose A
+  (§10.9): the decks were small, and in a large deck B's lookups in the layout
+  list are where an agent would misjudge a slide. Unit: points (A and B
+  192/192; percent 191/192, its miss a unit conversion). Grid: rejected.
+- Limits: the ceiling (a harder or longer round could still separate A and B),
+  one run per prompt, and geometry checked in the kit's model, not yet in
+  hanji-pptx or PowerPoint.
+
 ## 7. Engines (surveyed 2026-09-28)
 
 Engines work only at import, export and preview. Every engine is behind this
@@ -655,6 +782,8 @@ v0.7.3; "lossless … regarding content", not formatting).
 | PutGet | After each fluency-test edit, re-import shows exactly the written text |
 | Validity | Every export opens in Word / PowerPoint / Excel / Hancom with no repair prompt; schema validation alone is not enough (a schema-valid file Word rejected: office_oxide #208) |
 | Rule 5 (fidelity) | Per-page SSIM of our preview against the native application's own PDF export — Word, PowerPoint, Excel, Hancom — not against LibreOffice |
+| Presentation geometry | GetPut per object on the pptx corpus: every `a:xfrm` (and every absent one) unchanged after import → export; PutGet after box, z-order, group and new-object edits; the office-kit shows moved, resized and added objects where the text puts them, in PowerPoint |
+| Rule 8 (the model sees it) | Per corpus deck, every object on a slide appears in the text: slots, shapes with or without text, lines, groups and their objects, `<keep/>` lines |
 | Rule 2 (fluency) | §6 |
 
 ## 10. Open decisions
@@ -714,6 +843,28 @@ v0.7.3; "lossless … regarding content", not formatting).
    forcing a placeholder (15.6% of docx tables); side-by-side hwpx tables
    import as separate blocks. Limit: the Korean side is press releases only,
    and many source hosts were blocked.
+9. ~~Geometry in Presentations~~ — decided 2026-09-29 by §6 round 5 and the
+   owner: candidate A, in points, with the attached-connector refusal. Real
+   decks checked in PowerPoint showed a canvas without positions and sizes to
+   be too limited, so the old §5.3 ("never geometry") is replaced. Every
+   object shows its box in points, slots included (their inherited box when
+   the slide stores none), groups show their objects, and lines show their
+   ends. Text boxes, pictures from a file and lines can be added (§5.3). A
+   tied B (a slot's box shown only when moved) at the ceiling of round 5, and
+   B is 11% smaller; the owner chose A because round 5's decks were small,
+   and in a large deck an agent under B must look each slot up in the layout
+   list and may misjudge how a slide looks. A slide under A reads on its own.
+   Chosen over percent of the slide (one unit-conversion miss) and a 12 × 12
+   grid (11 of 30 tasks unwritable, silent misreads). Shapes keep B's one-line
+   `<shape>` form (round 5's A wrote them as `::shape::` blocks; B's form
+   landed as often, and is one line for a shape without text). It also fixes a rule 8 gap: the old
+   text left out connectors and textless shapes (9 of the 19 objects in
+   shapes.pptx). Across the 21 corpus decks, 36% of slide placeholders have
+   their own box. A schema-1 text without boxes still reads unchanged.
+   Deferred: rerouting attached connectors (an edit that moves an attached
+   object without rewriting its connectors is refused, §5.3), editing inside
+   rotated groups (kept whole), and cm as a view or input over points (the
+   unit Korean PowerPoint shows; not measured).
 
 ## 11. Blind spots
 
@@ -721,8 +872,13 @@ v0.7.3; "lossless … regarding content", not formatting).
   every defect and fidelity statement comes from project docs and issue
   trackers. This check is deliberately deferred until the build produces
   exports (2026-09-28).
-- The fluency list in §6 is still mostly a model's self-report: four rounds
-  ran on two Claude models only, 12–18 tasks per cell, one run per prompt.
+- The fluency list in §6 is still mostly a model's self-report: five rounds
+  ran on two Claude models only, 12–48 tasks per cell, one run per prompt.
+  Round 5 put three of its four candidates at the ceiling on small decks, so
+  the §5.3 geometry rests on design (a slide that reads on its own), and its geometry was checked in the
+  kit's model (`deck.py`), not in hanji-pptx or PowerPoint. No round asked
+  for a connector edit, so how often the attached-connector refusal (§5.3)
+  blocks a real move is unmeasured.
   Round 1 hit the ceiling; rounds 2–4 produced a few failures (Sonnet's merge
   markers in rounds 2 and 3; Opus's list-table indentation in round 3;
   Sonnet's new-table row labels and `=`-less formulas in round 4), every

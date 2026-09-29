@@ -1,0 +1,75 @@
+{
+ "answers": [
+  {
+   "task_id": "deck2-q1",
+   "text": "ANSWER: s10"
+  },
+  {
+   "task_id": "deck2-q2",
+   "text": "ANSWER: kqld8"
+  },
+  {
+   "task_id": "deck2-e1",
+   "edits": [
+    {
+     "old": "::shape id=\"s4\" name=\"TextBox 3\" box=\"10 13.3 25 5.4\"::\n",
+     "new": "::shape id=\"s4\" name=\"TextBox 3\" box=\"21.8 13.3 25 5.4\"::\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e2",
+   "edits": [
+    {
+     "old": "<keep id=\"kqld8\" kind=\"picture\" summary=\"Picture 1\" box=\"55.8 14.4 20 24.4\"/>\n",
+     "new": "<keep id=\"kqld8\" kind=\"picture\" summary=\"Picture 1\" box=\"55.8 14.4 10 12.2\"/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e3",
+   "edits": [
+    {
+     "old": "Hyperlinks\n",
+     "new": "Hyperlinks\n::shape box=\"5 20.7 90 4.7\"::\nLinks checked in September 2026\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e4",
+   "edits": [
+    {
+     "old": "::shape id=\"s4\" name=\"Right Arrow 3\" box=\"20 41.1 10.7 7.1\"::\n",
+     "new": "::shape id=\"s4\" name=\"Right Arrow 3\" box=\"16.7 41.1 10.7 7.1\"::\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e5",
+   "edits": [
+    {
+     "old": "And second line\n",
+     "new": "And a second line\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e6",
+   "edits": [
+    {
+     "old": "And second line\n",
+     "new": "And second line\n\n---\n\nlayout: Comparison\n::title box=\"5 4 90 16.7\"::\nBefore and after\n::body box=\"5 22.4 44.2 9.3\"::\nBefore\n::body2 box=\"5 31.7 44.2 57.6\"::\n- Positions in EMU\n- Hidden connectors\n::body3 box=\"50.8 22.4 44.2 9.3\"::\nAfter\n::body4 box=\"50.8 31.7 44.2 57.6\"::\n- Boxes in the text\n- Every object shown\n"
+    }
+   ]
+  },
+  {
+   "task_id": "deck2-e7",
+   "text": "REFUSE: formatting and the content of kept objects cannot be changed here.",
+   "edits": []
+  },
+  {
+   "task_id": "deck2-w",
+   "text": "---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 720 x 540 pt\n---\n\nlayout: Title Slide\n::title box=\"7.5 31.1 85 21.4\"::\nQuarterly Review\n::subtitle box=\"15 56.7 70 25.6\"::\nOperations team, October 2026\n\n---\n\nlayout: Title and Content\n::title box=\"5 4 90 16.7\"::\nHighlights\n::body box=\"5 23.3 90 66\"::\n- Costs down 4%\n- Two new sites\n::notes::\nMention the audit\n\n---\n\nlayout: Two Content\n::title box=\"5 4 90 16.7\"::\nNext steps\n::left box=\"5 23.3 44.2 66\"::\n- Hire two engineers\n- Close the old site\n::right box=\"50.8 23.3 44.2 66\"::\n- Open the Busan office\n- Review in March\n"
+  }
+ ]
+}

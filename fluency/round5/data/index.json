@@ -1,0 +1,247 @@
+[
+ {
+  "unit_id": "r5-A-1",
+  "part": 1,
+  "candidate": "A",
+  "replicate": 1,
+  "prompt_file": "prompts/r5-A-1.md",
+  "prompt_chars": 10075,
+  "seed_chars": 1241,
+  "gold_chars": 1361,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5-A-2",
+  "part": 1,
+  "candidate": "A",
+  "replicate": 2,
+  "prompt_file": "prompts/r5-A-2.md",
+  "prompt_chars": 10702,
+  "seed_chars": 1749,
+  "gold_chars": 1487,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5-A-3",
+  "part": 1,
+  "candidate": "A",
+  "replicate": 3,
+  "prompt_file": "prompts/r5-A-3.md",
+  "prompt_chars": 10406,
+  "seed_chars": 1757,
+  "gold_chars": 1409,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5-Ap-1",
+  "part": 1,
+  "candidate": "Ap",
+  "replicate": 1,
+  "prompt_file": "prompts/r5-Ap-1.md",
+  "prompt_chars": 10167,
+  "seed_chars": 1240,
+  "gold_chars": 1373,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5-Ap-2",
+  "part": 1,
+  "candidate": "Ap",
+  "replicate": 2,
+  "prompt_file": "prompts/r5-Ap-2.md",
+  "prompt_chars": 10859,
+  "seed_chars": 1813,
+  "gold_chars": 1519,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5-Ap-3",
+  "part": 1,
+  "candidate": "Ap",
+  "replicate": 3,
+  "prompt_file": "prompts/r5-Ap-3.md",
+  "prompt_chars": 10619,
+  "seed_chars": 1821,
+  "gold_chars": 1477,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5-B-1",
+  "part": 1,
+  "candidate": "B",
+  "replicate": 1,
+  "prompt_file": "prompts/r5-B-1.md",
+  "prompt_chars": 9817,
+  "seed_chars": 981,
+  "gold_chars": 1148,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5-B-2",
+  "part": 1,
+  "candidate": "B",
+  "replicate": 2,
+  "prompt_file": "prompts/r5-B-2.md",
+  "prompt_chars": 10643,
+  "seed_chars": 1688,
+  "gold_chars": 1280,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5-B-3",
+  "part": 1,
+  "candidate": "B",
+  "replicate": 3,
+  "prompt_file": "prompts/r5-B-3.md",
+  "prompt_chars": 10234,
+  "seed_chars": 1583,
+  "gold_chars": 1228,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5-C-1",
+  "part": 1,
+  "candidate": "C",
+  "replicate": 1,
+  "prompt_file": "prompts/r5-C-1.md",
+  "prompt_chars": 10078,
+  "seed_chars": 1179,
+  "gold_chars": 1277,
+  "unreachable": [
+   "deck1-e2",
+   "deck1-e3",
+   "deck1-e4"
+  ]
+ },
+ {
+  "unit_id": "r5-C-2",
+  "part": 1,
+  "candidate": "C",
+  "replicate": 2,
+  "prompt_file": "prompts/r5-C-2.md",
+  "prompt_chars": 10639,
+  "seed_chars": 1621,
+  "gold_chars": 1496,
+  "unreachable": [
+   "deck2-e1",
+   "deck2-e2",
+   "deck2-e3",
+   "deck2-e4"
+  ]
+ },
+ {
+  "unit_id": "r5-C-3",
+  "part": 1,
+  "candidate": "C",
+  "replicate": 3,
+  "prompt_file": "prompts/r5-C-3.md",
+  "prompt_chars": 10361,
+  "seed_chars": 1622,
+  "gold_chars": 1221,
+  "unreachable": [
+   "deck3-e1",
+   "deck3-e2",
+   "deck3-e3",
+   "deck3-e4"
+  ]
+ },
+ {
+  "unit_id": "r5x-A-1",
+  "part": 2,
+  "candidate": "A",
+  "replicate": 1,
+  "prompt_file": "prompts/r5x-A-1.md",
+  "prompt_chars": 8848,
+  "seed_chars": 1241,
+  "gold_chars": 853,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5x-A-2",
+  "part": 2,
+  "candidate": "A",
+  "replicate": 2,
+  "prompt_file": "prompts/r5x-A-2.md",
+  "prompt_chars": 9271,
+  "seed_chars": 1749,
+  "gold_chars": 1475,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5x-A-3",
+  "part": 2,
+  "candidate": "A",
+  "replicate": 3,
+  "prompt_file": "prompts/r5x-A-3.md",
+  "prompt_chars": 9325,
+  "seed_chars": 1757,
+  "gold_chars": 1246,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5x-Ap-1",
+  "part": 2,
+  "candidate": "Ap",
+  "replicate": 1,
+  "prompt_file": "prompts/r5x-Ap-1.md",
+  "prompt_chars": 8940,
+  "seed_chars": 1240,
+  "gold_chars": 853,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5x-Ap-2",
+  "part": 2,
+  "candidate": "Ap",
+  "replicate": 2,
+  "prompt_file": "prompts/r5x-Ap-2.md",
+  "prompt_chars": 9428,
+  "seed_chars": 1813,
+  "gold_chars": 1563,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5x-Ap-3",
+  "part": 2,
+  "candidate": "Ap",
+  "replicate": 3,
+  "prompt_file": "prompts/r5x-Ap-3.md",
+  "prompt_chars": 9538,
+  "seed_chars": 1821,
+  "gold_chars": 1296,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5x-B-1",
+  "part": 2,
+  "candidate": "B",
+  "replicate": 1,
+  "prompt_file": "prompts/r5x-B-1.md",
+  "prompt_chars": 8590,
+  "seed_chars": 981,
+  "gold_chars": 822,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5x-B-2",
+  "part": 2,
+  "candidate": "B",
+  "replicate": 2,
+  "prompt_file": "prompts/r5x-B-2.md",
+  "prompt_chars": 9212,
+  "seed_chars": 1688,
+  "gold_chars": 1742,
+  "unreachable": []
+ },
+ {
+  "unit_id": "r5x-B-3",
+  "part": 2,
+  "candidate": "B",
+  "replicate": 3,
+  "prompt_file": "prompts/r5x-B-3.md",
+  "prompt_chars": 9153,
+  "seed_chars": 1583,
+  "gold_chars": 1326,
+  "unreachable": []
+ }
+]
