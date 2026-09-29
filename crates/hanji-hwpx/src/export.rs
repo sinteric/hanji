@@ -699,8 +699,13 @@ impl<'a> Exporter<'a> {
                     Cell::Left if ci == 0 => return Err(format!("row {}: || with no cell to its left", ri + 1)),
                     Cell::Text(ps) => ps,
                     _ => {
-                        if !self.at(&[bi, ri, ci, 0], Kind::Marker).is_empty() {
-                            return Err(format!("the cell at row {}, column {} is now merged, and hwpx keeps nothing in a merged cell: move its bookmark or field out first", ri + 1, ci + 1));
+                        // hwpx has no cell where a merge covers one: what the old cell held would go.
+                        let held = self
+                            .by
+                            .iter()
+                            .any(|((p, _), es)| p.len() >= 3 && p[..3] == path && es.iter().any(|e| !e.is_trivial()));
+                        if held {
+                            return Err(format!("the cell at row {}, column {} is now covered by a merge, and hwpx keeps no cell there, so its properties and content would be lost; merge cells in Hancom, or write the merged table as a new one", ri + 1, ci + 1));
                         }
                         continue;
                     }
