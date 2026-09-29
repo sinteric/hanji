@@ -178,4 +178,3 @@ impl Format for Hwpx {
             .any(|t| xml.contains(t))
     }
 }
-
