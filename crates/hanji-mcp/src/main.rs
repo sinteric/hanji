@@ -5,7 +5,7 @@
 //! `isError` and the reason, never a silent success (DESIGN.md §2 rule 1).
 //!
 //! `hanji-mcp [--store DIR]`: documents are kept in DIR (default
-//! `$HANJI_STORE`, else `.hanji` in the working directory). Paths in tool
+//! `$HANJI_STORE`, else `~/.hanji`). Paths in tool
 //! arguments are absolute, or relative to the server's working directory.
 
 use std::path::{Path, PathBuf};
@@ -216,31 +216,41 @@ impl Hanji {
         Hanji { ws: Arc::new(Mutex::new(Workspace::new(FsStorage::new(store)))), tool_router: Self::tool_router() }
     }
 
-    fn with<T>(&self, f: impl FnOnce(&mut Workspace<FsStorage>) -> T) -> T {
-        let mut ws = self.ws.lock().unwrap_or_else(|p| p.into_inner());
-        f(&mut ws)
+    /// Run an operation on the blocking pool, so the server keeps reading
+    /// its input (pings, cancellations) while a large export runs.
+    async fn with<T: Send + 'static>(
+        &self,
+        f: impl FnOnce(&mut Workspace<FsStorage>) -> hanji_store::Result<T> + Send + 'static,
+    ) -> hanji_store::Result<T> {
+        let ws = self.ws.clone();
+        tokio::task::spawn_blocking(move || f(&mut ws.lock().unwrap_or_else(|p| p.into_inner())))
+            .await
+            .unwrap_or_else(|e| Err(Error::io(format!("the operation stopped: {e}"))))
     }
 
     #[tool(
         description = "Open an office file (.docx, .hwpx, .pptx, .xlsx) as a hanji document. Returns its doc_id, revision 1 and the safety report: `neutralised` lists active or remote content that was removed (macros, remote templates, external links, embedded objects; not kept), `surfaced` lists content that would leave with the file unreviewed (comments, hidden text, tracked deletions, author metadata). Tell the person about both. Then call hanji_read: never edit a document you have not read."
     )]
-    fn hanji_open(&self, Parameters(a): Parameters<OpenArgs>) -> Result<CallToolResult, ErrorData> {
-        answer(self.with(|ws| ws.open(Path::new(&a.path))))
+    async fn hanji_open(&self, Parameters(a): Parameters<OpenArgs>) -> Result<CallToolResult, ErrorData> {
+        answer(self.with(move |ws| ws.open(Path::new(&a.path))).await)
     }
 
     #[tool(
         description = "Make a new document from a blank file, or from a template file (its styles, layouts and content are kept). type: document (docx or hwpx), presentation (pptx) or spreadsheet (xlsx). Returns its doc_id and revision 1. Read it before writing, to see its front matter and what it holds; then hanji_write the whole text (documents, presentations) or use hanji_ops (spreadsheets)."
     )]
-    fn hanji_new(&self, Parameters(a): Parameters<NewArgs>) -> Result<CallToolResult, ErrorData> {
+    async fn hanji_new(&self, Parameters(a): Parameters<NewArgs>) -> Result<CallToolResult, ErrorData> {
         answer(
-            self.with(|ws| ws.create_from(a.ty.into(), a.format.map(Into::into), a.template.as_deref().map(Path::new))),
+            self.with(move |ws| {
+                ws.create_from(a.ty.into(), a.format.map(Into::into), a.template.as_deref().map(Path::new))
+            })
+            .await,
         )
     }
 
     #[tool(
         description = "Read a revision's text (the current one by default). Read before every edit: the result's `revision` is what hanji_edit, hanji_write and hanji_ops need, and `old` must be copied from this text exactly. The text is the second content block, exactly as stored. A large file comes in parts (`partial`, `outline`, `next`): read on with `lines` (\"120:180\"), `section` (a heading's text) or `slides` (\"3:5\"). For a spreadsheet the text is the workbook's structure, and the third block is a read-only row window (first column: sheet row; values as displayed): ask for `table` with `rows` (\"2:101\"), or `sheet` with `range` (\"A1:F50\")."
     )]
-    fn hanji_read(&self, Parameters(a): Parameters<ReadArgs>) -> Result<CallToolResult, ErrorData> {
+    async fn hanji_read(&self, Parameters(a): Parameters<ReadArgs>) -> Result<CallToolResult, ErrorData> {
         let w = Window {
             lines: a.lines,
             section: a.section,
@@ -250,7 +260,7 @@ impl Hanji {
             sheet: a.sheet,
             range: a.range,
         };
-        let r = match self.with(|ws| ws.read(&a.doc_id, a.revision, &w)) {
+        let r = match self.with(move |ws| ws.read(&a.doc_id, a.revision, &w)).await {
             Ok(r) => r,
             Err(e) => return Ok(refused(e)),
         };
@@ -269,62 +279,62 @@ impl Hanji {
     #[tool(
         description = "Edit a document by exact spans. Each `old` is copied exactly from a hanji_read of `revision` (spaces, line breaks, markers and <keep/> placeholders included) and must occur exactly once in the whole text: add neighbouring text to make it unique. Give `old` and `new`, or `edits`, a list applied in order, all or nothing. `new` is written in the format (see the instructions); keep placeholders unless the person asked to delete that object. `revision` must be the current revision: an edit against an older one is refused as stale, except over a person's re-imported edits, where it is merged if it changes other lines. A refusal changes nothing and says why (no_match, ambiguous_match with the count and lines, invalid with line, column and the allowed names, refused, unplaceable); fix the edit and retry. Returns the new revision; if it says `canonicalized`, read again before editing near the change."
     )]
-    fn hanji_edit(&self, Parameters(a): Parameters<EditArgs>) -> Result<CallToolResult, ErrorData> {
+    async fn hanji_edit(&self, Parameters(a): Parameters<EditArgs>) -> Result<CallToolResult, ErrorData> {
         let edits = match (a.old, a.new, a.edits) {
             (Some(old), Some(new), None) => vec![TextEdit { old, new }],
             (None, None, Some(list)) => list.into_iter().map(|e| TextEdit { old: e.old, new: e.new }).collect(),
             _ => return Ok(refused(Error::bad("give old and new, or edits (a list of {old, new}), not both."))),
         };
-        answer(self.with(|ws| ws.edit(&a.doc_id, a.revision, &edits)))
+        answer(self.with(move |ws| ws.edit(&a.doc_id, a.revision, &edits)).await)
     }
 
     #[tool(
         description = "Replace a document's whole text: for large changes, or to fill a new document. Send the complete text, front matter included, in canonical form (one paragraph per line, a blank line between blocks). What the text does not show (formatting, pictures, comments) is kept by aligning the old and new text; anything whose place cannot be found is refused, not dropped. Same revision rules as hanji_edit. For small changes prefer hanji_edit."
     )]
-    fn hanji_write(&self, Parameters(a): Parameters<WriteArgs>) -> Result<CallToolResult, ErrorData> {
-        answer(self.with(|ws| ws.write(&a.doc_id, a.revision, &a.text)))
+    async fn hanji_write(&self, Parameters(a): Parameters<WriteArgs>) -> Result<CallToolResult, ErrorData> {
+        answer(self.with(move |ws| ws.write(&a.doc_id, a.revision, &a.text)).await)
     }
 
     #[tool(
         description = "Write spreadsheet cells with range operations: `ops` is a JSON array applied in order, all or nothing, from set, append_rows, insert_rows, delete_rows, fill_formula, set_type, add_column, sort, add_table, add_sheet (keys in the instructions). Read the structure and a row window first. Numbers are JSON numbers, dates \"YYYY-MM-DD\" text; a value starting with = is stored as text: formulas go only in a column's formula or fill_formula, with structured references ([@매출]). At most 50 new rows per call. `revision` must be the current one. Returns the new revision, ranges that moved, notices and recalculated formulas."
     )]
-    fn hanji_ops(&self, Parameters(a): Parameters<OpsArgs>) -> Result<CallToolResult, ErrorData> {
+    async fn hanji_ops(&self, Parameters(a): Parameters<OpsArgs>) -> Result<CallToolResult, ErrorData> {
         let ops = match a.ops {
             serde_json::Value::String(s) => s,
             v => v.to_string(),
         };
-        answer(self.with(|ws| ws.ops(&a.doc_id, a.revision, &ops)))
+        answer(self.with(move |ws| ws.ops(&a.doc_id, a.revision, &ops)).await)
     }
 
     #[tool(
         description = "Check a text without changing anything: the grammar of its type and, with doc_id, the document's style names, layouts, slots and placeholders. Returns `valid` and `diagnostics` (line, column, and a message with the expected form and the allowed names)."
     )]
-    fn hanji_validate(&self, Parameters(a): Parameters<ValidateArgs>) -> Result<CallToolResult, ErrorData> {
-        answer(self.with(|ws| ws.validate(&a.text, a.ty.map(Into::into), a.doc_id.as_deref())))
+    async fn hanji_validate(&self, Parameters(a): Parameters<ValidateArgs>) -> Result<CallToolResult, ErrorData> {
+        answer(self.with(move |ws| ws.validate(&a.text, a.ty.map(Into::into), a.doc_id.as_deref())).await)
     }
 
     #[tool(
         description = "Write a revision (the current one by default) to a file in the document's format. If the file would carry content nobody may have reviewed (comments, hidden text, tracked deletions, author metadata), the export is refused with that list in `surfaced`: show it to the person, and export again with acknowledge_surfaced=true only once they agree. Returns the path, size and a digest (the same revision gives the same bytes)."
     )]
-    fn hanji_export(&self, Parameters(a): Parameters<ExportArgs>) -> Result<CallToolResult, ErrorData> {
+    async fn hanji_export(&self, Parameters(a): Parameters<ExportArgs>) -> Result<CallToolResult, ErrorData> {
         let opts = ExportOptions { acknowledge_surfaced: a.acknowledge_surfaced, tracked_changes: a.tracked_changes };
-        answer(self.with(|ws| ws.export(&a.doc_id, a.revision, Path::new(&a.path), &opts)))
+        answer(self.with(move |ws| ws.export(&a.doc_id, a.revision, Path::new(&a.path), &opts)).await)
     }
 
     #[tool(
         description = "Bring back a file the person edited in Word, PowerPoint, Excel or Hancom (usually one hanji_export wrote): it becomes the new current revision, and `diff` shows their changes to the text. Read again before editing. An edit sent against the revision before it is merged if it changes other lines, and refused if it changes the same ones."
     )]
-    fn hanji_reimport(&self, Parameters(a): Parameters<ReimportArgs>) -> Result<CallToolResult, ErrorData> {
-        answer(self.with(|ws| ws.reimport(&a.doc_id, Path::new(&a.path))))
+    async fn hanji_reimport(&self, Parameters(a): Parameters<ReimportArgs>) -> Result<CallToolResult, ErrorData> {
+        answer(self.with(move |ws| ws.reimport(&a.doc_id, Path::new(&a.path))).await)
     }
 
     #[tool(
         description = "List a document's revisions: id, parent, and what made each (open, new, edit, write, ops, reimport), and the current one (`head`). With `from` and `to`: the text diff between those two revisions instead."
     )]
-    fn hanji_history(&self, Parameters(a): Parameters<HistoryArgs>) -> Result<CallToolResult, ErrorData> {
+    async fn hanji_history(&self, Parameters(a): Parameters<HistoryArgs>) -> Result<CallToolResult, ErrorData> {
         match (a.from, a.to) {
-            (None, None) => answer(self.with(|ws| ws.history(&a.doc_id))),
-            (Some(from), Some(to)) => answer(self.with(|ws| ws.diff(&a.doc_id, from, to))),
+            (None, None) => answer(self.with(move |ws| ws.history(&a.doc_id)).await),
+            (Some(from), Some(to)) => answer(self.with(move |ws| ws.diff(&a.doc_id, from, to)).await),
             _ => Ok(refused(Error::bad("give both from and to for a diff, or neither for the history."))),
         }
     }
@@ -346,12 +356,14 @@ fn store_dir() -> Result<PathBuf, String> {
         match a.as_str() {
             "--store" => store = Some(args.next().ok_or("--store needs a directory")?.into()),
             "--help" | "-h" => {
-                return Err("hanji-mcp [--store DIR]: the hanji MCP server over stdio. Documents are kept in DIR (default $HANJI_STORE, else .hanji).".into())
+                return Err("hanji-mcp [--store DIR]: the hanji MCP server over stdio. Documents are kept in DIR (default $HANJI_STORE, else ~/.hanji).".into())
             }
             other => return Err(format!("unknown argument {other:?}; hanji-mcp [--store DIR]")),
         }
     }
-    Ok(store.unwrap_or_else(|| PathBuf::from(".hanji")))
+    // Clients start servers in any directory (often `/`): the default is in the home directory.
+    let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(PathBuf::from);
+    Ok(store.unwrap_or_else(|| home.map_or_else(|| PathBuf::from(".hanji"), |h| h.join(".hanji"))))
 }
 
 #[tokio::main(flavor = "current_thread")]

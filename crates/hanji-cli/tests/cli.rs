@@ -185,6 +185,8 @@ fn refusals_are_exit_status_1_with_the_reason() {
     assert!(!env.dir.join("x.docx").exists(), "nothing is written");
     let e = env.err(&["export", "korean-report", &env.path("x.docx"), "--acknowledge-surfaced", "--tracked-changes"]);
     assert_eq!(e["code"], "unsupported");
+    let e = env.err(&["export", "korean-report", &env.path("x.docm"), "--acknowledge-surfaced"]);
+    assert_eq!(e["code"], "bad_request", "an export carries no macros: not a .docm");
     assert_eq!(env.err(&["read", "nope"])["code"], "not_found");
     // People get the message on stderr.
     let out = env.cmd().args(["edit", "korean-report", "--rev", "1", "--old", "a", "--new", "b"]).output().unwrap();

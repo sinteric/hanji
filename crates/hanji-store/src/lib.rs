@@ -343,7 +343,7 @@ fn locate(text: &str, old: &str, rev: u32) -> Result<usize> {
             } else {
                 occurrences(text, first).iter().map(|&k| line_of(text, k)).collect()
             };
-            if squash(text).contains(&squash(old)) {
+            if !old.trim().is_empty() && squash(text).contains(&squash(old)) {
                 msg.push_str(" It matches if spaces and line breaks are ignored: copy them exactly as the revision has them (no padding, one paragraph per line).");
             } else if !at.is_empty() {
                 let shown: Vec<String> = at.iter().take(10).map(|l| l.to_string()).collect();
@@ -407,7 +407,8 @@ impl<S: Storage> Workspace<S> {
     pub fn doc(&self, id: &str) -> Result<DocRecord> {
         let found = if valid_id(id) { self.get(&doc_key(id))? } else { None };
         let Some(data) = found else {
-            let ids: Vec<String> = self.list()?.into_iter().map(|d| d.doc_id).take(20).collect();
+            let ids = self.ids()?;
+            let ids: Vec<&str> = ids.iter().map(String::as_str).take(20).collect();
             return Err(Error::not_found(format!(
                 "there is no document {id:?}. Documents: {}.",
                 if ids.is_empty() { "none (open or create one first)".into() } else { ids.join(", ") }
@@ -510,14 +511,21 @@ impl<S: Storage> Workspace<S> {
     // ------------------------------------------------------------ operations
 
     /// The documents in the store.
+    /// The ids of the documents in the store.
+    fn ids(&self) -> Result<Vec<String>> {
+        let keys = self.storage.keys("docs/").map_err(Error::io)?;
+        Ok(keys
+            .iter()
+            .filter_map(|k| k.strip_prefix("docs/")?.strip_suffix("/doc.json"))
+            .filter(|id| valid_id(id))
+            .map(str::to_string)
+            .collect())
+    }
+
     pub fn list(&self) -> Result<Vec<DocSummary>> {
         let mut out = vec![];
-        for k in self.storage.keys("docs/").map_err(Error::io)? {
-            let Some(id) = k.strip_prefix("docs/").and_then(|k| k.strip_suffix("/doc.json")) else { continue };
-            if !valid_id(id) {
-                continue;
-            }
-            let d = self.doc(id)?;
+        for id in self.ids()? {
+            let d = self.doc(&id)?;
             out.push(DocSummary {
                 doc_id: d.id,
                 doc_type: d.doc_type,
@@ -851,7 +859,12 @@ impl<S: Storage> Workspace<S> {
         let report = (&imp.report).into();
         // Nothing changed when the two revisions make the same package.
         let engine = doc.format.engine();
-        if text == imp.text && engine.export(&text, &rem).ok() == engine.export(&imp.text, &imp.remainder).ok() {
+        let same = |a: &str, ra: &Remainder, b: &str, rb: &Remainder| match (engine.export(a, ra), engine.export(b, rb))
+        {
+            (Ok(x), Ok(y)) => x == y,
+            _ => false,
+        };
+        if text == imp.text && same(&text, &rem, &imp.text, &imp.remainder) {
             return Ok(Reimported { doc_id: doc.id, revision: parent, parent, unchanged: true, report, diff });
         }
         let summary = format!("re-imported {name}");
@@ -1072,12 +1085,13 @@ mod native {
         /// Export a revision to `path` (see [`Workspace::export_bytes`]).
         pub fn export(&self, id: &str, revision: Option<u32>, path: &Path, opts: &ExportOptions) -> Result<Exported> {
             let (mut out, bytes) = self.export_bytes(id, revision, opts)?;
-            if let Some(f) = Format::of_name(&name_of(path)).filter(|f| *f != out.format) {
+            // The extension must be the format's own: an export carries no macros.
+            let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase());
+            if ext.as_deref().is_some_and(|e| e != out.format.name() && Format::of_name(&format!("x.{e}")).is_some()) {
                 return Err(Error::bad(format!(
-                    "{id} exports as .{}; {} names a .{} file.",
+                    "{id} exports as .{}; {} names another kind of file.",
                     out.format.name(),
-                    path.display(),
-                    f.name()
+                    path.display()
                 )));
             }
             std::fs::write(path, &bytes).map_err(|e| Error::io(format!("cannot write {}: {e}", path.display())))?;
