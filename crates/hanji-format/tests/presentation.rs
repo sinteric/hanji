@@ -264,3 +264,25 @@ fn objects_are_keep_lines_among_the_slots() {
     let bad = errors("\nlayout: Blank\n<keep id=\"k9\" kind=\"chart\" summary=\"x\"/>\n");
     assert!(bad.iter().any(|e| e.contains("not in this file")), "{bad:?}");
 }
+
+#[test]
+fn the_design_md_example_parses() {
+    // DESIGN.md §5.3's example, read from the spec itself so the two cannot drift.
+    let spec = include_str!("../../../DESIGN.md");
+    let body = &spec[spec.find("### 5.3 Presentation").unwrap()..];
+    let a = body.find("```\n").unwrap() + 4;
+    let b = a + body[a..].find("```\n").unwrap();
+    let text = &body[a..b];
+    let p = parse_presentation(text, &Names::default()).unwrap_or_else(|e| panic!("{}", diag::render(&e)));
+    assert_eq!(serialize_presentation(&p.pres), text, "the example is in canonical form");
+    let items: Vec<String> = p.pres.slides[1]
+        .items
+        .iter()
+        .map(|i| match i {
+            SlideItem::Slot(s) => format!("::{}::", s.name),
+            SlideItem::Shape(sh) => format!("shape {} ({} paragraphs)", sh.id, sh.paras.len()),
+            SlideItem::Object(k) => format!("object {}", k.kind),
+        })
+        .collect();
+    assert_eq!(items, ["object picture", "::title::", "::left::", "::right::", "shape s4 (2 paragraphs)"]);
+}

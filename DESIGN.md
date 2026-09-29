@@ -318,13 +318,14 @@ layout: Title and Content
 ---
 
 layout: Two Content
+<keep id="k7" kind="picture" summary="지도"/>
 ::title::
 지역별 현황
 ::left::
 - 수도권 21곳
 ::right::
 - 지방 13곳
-<shape id="s4" name="출처">출처: 내부 집계</shape>
+<shape id="s4" name="출처">출처: 내부 집계<p/>2026년 9월</shape>
 ```
 
 - Slidev-style. The first slide begins right after the file's front matter;
@@ -337,12 +338,31 @@ layout: Two Content
   text is inside a slot.
 - Real Slidev closes the per-slide front matter with a second `---`. Here that
   line starts an empty, layout-less slide and is an error.
-- Slot names are the layout's placeholder types (title, body, left/right,
-  picture, chart, table, notes).
+- Slot names are the layout's placeholder types: `title` (centred or not),
+  `subtitle`, `body`, `picture`, `chart`, `table`, `diagram`, `media`,
+  `clipart`, `date`, `footer`, `number`, `notes`. Two body placeholders are
+  `left` and `right`, by position; three or more are `body`, `body2`, `body3`.
+  A second placeholder of one name is `picture2`. A layout name the file uses
+  twice is written `Name (2)`.
+- A slot holds paragraphs, list items, `<p/>` and placeholders. Its list items
+  form one list. No headings, styles, tables, page breaks or footnotes: those
+  come from the layout. An empty marker is an error. Deleting a slot's text
+  leaves the layout's empty placeholder; a placeholder holding only spaces
+  counts as empty and is left out.
+- A placeholder filled with a picture, chart or table is its slot's text: the
+  slot holds that `<keep/>` alone.
 - Shapes of an imported deck that are not placeholders appear as
   `<shape id=… name=…>text</shape>`: text editable, geometry in the remainder.
-  A shape is not a slot and sits in none: it is its own line after the slots,
-  and like a marker it ends the text of the slot before it.
+  One line per shape; `<p/>` starts its next paragraph. Its paragraphs are
+  never list items (bullets stay in the remainder). A shape is never created,
+  and a shape line without text is an error: delete the line to delete the
+  shape.
+- Objects that are not placeholders (pictures, charts, tables, groups) are a
+  `<keep/>` line each (§5.1): moved or deleted, never created or altered.
+  Deleting one removes its parts; refused while an animation plays on it.
+- Slots, shapes and objects are written in the slide's z-order, `::notes::`
+  last. A shape or object line is in no slot: like a marker it ends the text
+  of the slot before it.
 
 ### 5.4 Spreadsheet
 
