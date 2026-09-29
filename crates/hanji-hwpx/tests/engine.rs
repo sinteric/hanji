@@ -217,6 +217,27 @@ fn exact_edits_keep_formatting_and_new_marks_get_a_shape() {
 }
 
 #[test]
+fn joining_paragraphs_keeps_the_runs_the_join_rewrites_around() {
+    // "2." at the start of a line is escaped (`2\.`, not a list item); after
+    // the join it is not. The exact span then covers the paragraph mark, the
+    // escape and the units between them, which are the same on both sides.
+    let pkg = hwpx(&[p("1부."), p_in(0, 0, &[(2, "  "), (2, " 2."), (0, " 나")])]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("1부.\n\n   2\\. 나"), "{}", imp.text);
+    let r = edit(&imp.remainder, &imp.text, "1부.\n\n   2\\.", "1부.   2.", CAPS).unwrap();
+    // Only the second paragraph's own properties go with it.
+    let removed: Vec<_> = r.report.removed.iter().map(|x| x.1).collect();
+    assert_eq!(removed, [hanji_core::Kind::Ppr], "{:?}", r.report);
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(
+        sec.contains(
+            r#"<hp:run charPrIDRef="2"><hp:t>  </hp:t></hp:run><hp:run charPrIDRef="2"><hp:t> 2.</hp:t></hp:run>"#
+        ),
+        "{sec}"
+    );
+}
+
+#[test]
 fn side_by_side_tables_are_separate_blocks_in_one_paragraph() {
     let a = tbl(&[&[("담당 부서", 1, 1), ("기획과", 1, 1)]], 2);
     let b = tbl(&[&[("담당자", 1, 1), ("홍길동", 1, 1)]], 2);

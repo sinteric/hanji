@@ -333,7 +333,10 @@ fn exact_alignment(
 }
 
 /// Matched pairs → opcodes; an unmatched stretch whose units are identical
-/// on both sides (a restyle, an emphasis change) counts as equal.
+/// on both sides (a restyle, an emphasis change) counts as equal, and so do
+/// its units when the two sides differ only in paragraph marks (a join or a
+/// split: the span then also covers syntax the text rewrites around the mark,
+/// such as an escape at the start of a line or a `<div>` wrapper).
 fn pairs_to_ops(pairs: &[(usize, usize)], a: &[u32], b: &[u32]) -> Vec<Op> {
     let mut ops: Vec<Op> = vec![];
     let push = |ops: &mut Vec<Op>, tag: Tag, i1, i2, j1, j2| {
@@ -359,8 +362,23 @@ fn pairs_to_ops(pairs: &[(usize, usize)], a: &[u32], b: &[u32]) -> Vec<Op> {
             } else {
                 Tag::Insert
             };
+            let no_marks = |x: &[u32]| x.iter().copied().filter(|&u| u != place::SEP).collect::<Vec<_>>();
             if tag == Tag::Equal && k > i {
                 push(&mut ops, tag, i, k, j, n);
+            } else if tag == Tag::Replace && no_marks(&a[i..k]) == no_marks(&b[j..n]) {
+                let (mut x, mut y) = (i, j);
+                while x < k || y < n {
+                    if x < k && a[x] == place::SEP && (y == n || b[y] != place::SEP) {
+                        push(&mut ops, Tag::Delete, x, x + 1, y, y);
+                        x += 1;
+                    } else if y < n && b[y] == place::SEP && (x == k || a[x] != place::SEP) {
+                        push(&mut ops, Tag::Insert, x, x, y, y + 1);
+                        y += 1;
+                    } else {
+                        push(&mut ops, Tag::Equal, x, x + 1, y, y + 1);
+                        (x, y) = (x + 1, y + 1);
+                    }
+                }
             } else if tag != Tag::Equal {
                 ops.push(Op { tag, i1: i, i2: k, j1: j, j2: n });
             }
