@@ -5,7 +5,7 @@ How to work
 2. Read before every edit. A read returns the current revision; edits name it. A large file comes in parts: use its outline and read by lines, section (heading text) or slides.
 3. Edit with exact spans: `old` is copied exactly from what you read (spaces, line breaks and markers included) and must occur exactly once in the whole revision, so add surrounding text when it repeats. Several edits go in one list, applied in order. For large changes, write the whole text instead. Spreadsheet cells change only through range operations.
 4. A refused edit changes nothing and says why: the line and column, the expected form, the allowed names, or how often `old` occurs. Fix that and retry; never resend the same edit unchanged. If the revision is stale, read again.
-5. Export to a path. If it lists surfaced items, show them to the person and export again with acknowledge_surfaced only once they agree.
+5. Export to a path. If it lists surfaced items, show them to the person and export again with acknowledge_surfaced only once they agree. For a docx a person will review, export with tracked_changes: your edits since the file was opened come out as Word's tracked changes by "hanji (model edit)"; what cannot be tracked (moving a placeholder, deleting a field or another author's change, adding or removing a section break) is refused with the reason: export without tracked_changes instead.
 6. If the person changed the exported file in Office or Hancom, re-import it, then read again: their changes are the new revision.
 
 The format (schema 1)

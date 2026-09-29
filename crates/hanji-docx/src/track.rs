@@ -63,8 +63,8 @@ pub struct History {
     blocks: Vec<Block>,
     text: String,
     kept: Kept,
-    /// The current revision's remainder, as far as export can tell it apart (entries, next id).
-    rem_key: (usize, u64),
+    /// The current revision's remainder.
+    rem: Remainder,
 }
 
 fn refused(m: impl Into<String>) -> EngineError {
@@ -82,7 +82,7 @@ impl History {
             base: rem.clone(),
             blocks,
             text: text.to_string(),
-            rem_key: (rem.entries.len(), rem.next_id),
+            rem: rem.clone(),
         })
     }
 
@@ -114,7 +114,40 @@ impl History {
         self.kept = self.kept.then(&Kept::of(&r.old, &r.new, &r.alignment));
         self.blocks = r.new.clone();
         self.text = r.text.clone();
-        self.rem_key = (r.remainder.entries.len(), r.remainder.next_id);
+        self.rem = r.remainder.clone();
+        Ok(())
+    }
+
+    /// The current revision's remainder.
+    pub fn remainder(&self) -> &Remainder {
+        &self.rem
+    }
+
+    /// The next revision given as its whole text (a stored revision, with
+    /// no record of the edits that made it): each run of changed lines
+    /// becomes an exact edit, the last first so earlier offsets hold.
+    pub fn push_text(&mut self, new_text: &str) -> Result<(), EngineError> {
+        let lines = |t: &str| -> Vec<String> { t.split_inclusive('\n').map(String::from).collect() };
+        let (old, new) = (lines(&self.text), lines(new_text));
+        let at: Vec<usize> = std::iter::once(0)
+            .chain(old.iter().scan(0, |n, l| {
+                *n += l.len();
+                Some(*n)
+            }))
+            .collect();
+        let caps = hanji_core::Engine::capabilities(&DocxEngine);
+        for op in hanji_core::diff::opcodes(&old, &new).into_iter().rev() {
+            if op.tag == hanji_core::diff::Tag::Equal {
+                continue;
+            }
+            let repl = new[op.j1..op.j2].concat();
+            let r = hanji_core::reanchor_span(&self.rem, &self.text, at[op.i1], at[op.i2], &repl, caps)
+                .map_err(|e| refused(e.to_string()))?;
+            self.push(&r)?;
+        }
+        if self.text != new_text {
+            return Err(refused("the revision's text could not be rebuilt from exact edits"));
+        }
         Ok(())
     }
 }
@@ -137,7 +170,7 @@ impl DocxEngine {
         let h = history.ok_or_else(|| {
             refused("tracked changes are written from the edits made since import: pass their History")
         })?;
-        if text != h.text || (rem.entries.len(), rem.next_id) != h.rem_key {
+        if text != h.text || rem.entries != h.rem.entries || rem.next_id != h.rem.next_id {
             return Err(refused("the text and remainder are not the current revision of the history"));
         }
         export_tracked(h, rem, reviewer)

@@ -301,7 +301,14 @@ fn export_shows_what_it_would_surface_and_needs_an_acknowledgement() {
     assert!(e.message.contains("acknowledge_surfaced"), "{}", e.message);
     let (out, _) = ws.export_bytes(&o.doc_id, None, &ACK).unwrap();
     assert_eq!(out.surfaced, e.detail.surfaced);
-    let e = ws.export_bytes(&o.doc_id, None, &ExportOptions { tracked_changes: true, ..ACK }).unwrap_err();
+    // Tracked changes (§10.2): with no edit since the file was opened, the same bytes.
+    let tracked = ExportOptions { tracked_changes: true, ..ACK };
+    let (_, a) = ws.export_bytes(&o.doc_id, None, &ACK).unwrap();
+    let (_, b) = ws.export_bytes(&o.doc_id, None, &tracked).unwrap();
+    assert_eq!(a, b);
+    // docx only.
+    let h = open(&mut ws, "crates/hanji-hwpx/corpus/basic-table-01.hwpx");
+    let e = ws.export_bytes(&h.doc_id, None, &tracked).unwrap_err();
     assert_eq!(e.code, Code::Unsupported);
 }
 

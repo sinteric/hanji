@@ -166,7 +166,7 @@ struct ExportArgs {
     /// Export although the file would carry surfaced content; only after the person has seen the list.
     #[serde(default)]
     acknowledge_surfaced: bool,
-    /// docx: write the edits as tracked changes (not available yet).
+    /// docx: write the edits since the file was opened or re-imported as tracked changes by "hanji (model edit)", for a person to review in Word.
     #[serde(default)]
     tracked_changes: bool,
 }

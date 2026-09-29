@@ -42,6 +42,9 @@ pub use view::{OutlineEntry, Window};
 use error::{diags, items};
 use merge::{line_of, Hunk, Merged};
 
+/// The date tracked changes carry: fixed, so the same revision exports the same bytes (§8).
+const TRACKED_DATE: &str = "2026-01-01T00:00:00Z";
+
 /// How to work with hanji and the format, written for a model (the MCP
 /// server's instructions, `hanji guide`).
 pub const GUIDE: &str = include_str!("guide.md");
@@ -802,15 +805,8 @@ impl<S: Storage> Workspace<S> {
         let doc = self.doc(id)?;
         let rev = revision.unwrap_or(doc.head);
         let (text, rem) = self.revision(&doc, rev)?;
-        if opts.tracked_changes {
-            // TODO(§10.2): pass the option to hanji-docx once its tracked-changes export is on main.
-            return Err(Error::new(
-                Code::Unsupported,
-                "not supported yet: tracked-changes export (§10.2); export without it for direct changes.",
-            ));
-        }
         let engine = doc.format.engine();
-        let bytes = engine.export(&text, &rem)?;
+        let bytes = if opts.tracked_changes { self.tracked_bytes(&doc, rev)? } else { engine.export(&text, &rem)? };
         // What leaves with the file is what the exported package holds.
         let back = engine.import(&bytes, &ImportOptions::default())?;
         let surfaced = items(&back.report.surface);
@@ -837,6 +833,47 @@ impl<S: Storage> Workspace<S> {
             surfaced,
         };
         Ok((out, bytes))
+    }
+
+    /// A docx export with the model's edits since the file was last
+    /// imported (opened or re-imported) as tracked changes (§10.2). The
+    /// store keeps each revision's text, so every revision after that import
+    /// is replayed as exact edits (each run of changed lines one edit).
+    fn tracked_bytes(&self, doc: &DocRecord, rev: u32) -> Result<Vec<u8>> {
+        if doc.format != Format::Docx {
+            return Err(Error::new(
+                Code::Unsupported,
+                format!(
+                    "tracked changes are written to docx only (§10.2); {} is {}: export without them.",
+                    doc.id,
+                    doc.format.name()
+                ),
+            ));
+        }
+        // The revisions from the last import to `rev`.
+        let mut path = vec![];
+        let mut at = Some(rev);
+        while let Some(r) = at {
+            let revision = doc
+                .revisions
+                .iter()
+                .find(|x| x.id == r)
+                .ok_or_else(|| Error::bad(format!("{} has no revision {r}", doc.id)))?;
+            path.push(r);
+            if matches!(revision.op, RevOp::Open | RevOp::New | RevOp::Reimport) {
+                break;
+            }
+            at = revision.parent;
+        }
+        path.reverse();
+        let (text, rem) = self.revision(doc, path[0])?;
+        let mut h = hanji_docx::History::new(&text, &rem)?;
+        for r in &path[1..] {
+            h.push_text(&self.text(doc, *r)?)?;
+        }
+        let reviewer = hanji_docx::Reviewer { author: "hanji (model edit)".into(), date: TRACKED_DATE.into() };
+        let opts = hanji_docx::ExportOptions { tracked_changes: Some(reviewer) };
+        Ok(hanji_docx::DocxEngine.export_with(h.text(), h.remainder(), &opts, Some(&h))?)
     }
 
     /// A person's edits come back in (rule 7): the file, polished in the
