@@ -25,6 +25,17 @@ pub struct Head {
     pub level: u8,
     pub key: String,
     pub label: String,
+    /// Where a slot, shape, object, line or group is on its slide (§5.3).
+    /// Like the label, not what the head is: a moved shape is the same shape.
+    pub place: Option<Place>,
+}
+
+/// A head's geometry: a box, a line's ends, or a group with its objects.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum Place {
+    Box(fmt::Geom),
+    Line(fmt::Ends),
+    Group(fmt::GroupItem),
 }
 
 impl Block {

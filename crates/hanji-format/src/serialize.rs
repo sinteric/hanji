@@ -18,6 +18,9 @@ pub(crate) fn front_lines(f: &FrontMatter) -> Vec<String> {
         out.push(format!("template: {t}"));
     }
     out.push(format!("schema: {}", f.schema));
+    if let Some((w, h)) = f.size {
+        out.push(format!("size: {} x {} pt", crate::pres::pt(w), crate::pres::pt(h)));
+    }
     out.push("---".into());
     out
 }

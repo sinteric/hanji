@@ -319,6 +319,19 @@ fn follow_heads(
         }
         fits
     };
+    // A head that holds nothing (a line, a group, a shape without text) has
+    // no contents to follow: it pairs with the new head identical to it,
+    // place and name included, when each is the only one of its kind on
+    // its side. It then votes for its slide like any content.
+    for &i in &heads {
+        if level(&old[i]) != Some(1) || end(old, i, 1) != i + 1 {
+            continue;
+        }
+        let twins = |xs: &[Block]| (0..xs.len()).filter(|&k| xs[k] == old[i]).collect::<Vec<_>>();
+        if let ([_], [j]) = (twins(old).as_slice(), twins(new).as_slice()) {
+            pair(bmap, used, i, *j);
+        }
+    }
     for lv in [1, 0] {
         // Every head's votes: (old head, new head, count, every voter ambiguous).
         let mut votes: Vec<(usize, usize, usize, bool)> = vec![];

@@ -10,15 +10,16 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
-use hanji_core::presentation::{kind, HeadKind};
-use hanji_core::{Block, Entry, Kind, Para, Part, Remainder};
-use hanji_format::{Atom, Inline, Marks};
+use hanji_core::presentation::{geom_of, kind, HeadKind};
+use hanji_core::{Block, Entry, Head, Kind, Para, Part, Place, Remainder};
+use hanji_format::{Atom, Geom, GroupItem, Inline, Marks, SlideItem};
 use hanji_package::opc::{self, Rel};
 use hanji_package::package;
 use hanji_package::xml::{self, fragment, insert_ordered, Element, Node};
 
 use crate::deck::{LayoutInfo, SlotInfo};
-use crate::import::{NotesInfo, SlideInfo, OBJECT_TAG};
+use crate::geom::{self, Frame};
+use crate::import::{group_item, shown_of, NotesInfo, SlideInfo, OBJECT_TAG};
 use crate::pml::*;
 use crate::DeckShell;
 
@@ -115,6 +116,13 @@ impl<'a> Exporter<'a> {
             ex.by.entry((at, e.kind)).or_default().push(e);
         }
         ex
+    }
+
+    fn head(&self, it: &ItemG) -> &'a Head {
+        match &self.blocks[it.head] {
+            Block::Head(h) => h,
+            _ => unreachable!("an item starts at its head"),
+        }
     }
 
     fn at(&self, bi: usize, kind: Kind) -> Vec<&'a Entry> {
@@ -214,6 +222,9 @@ impl<'a> Exporter<'a> {
         let mut claims: Vec<Option<usize>> = vec![None; items.len()];
         // Items new to this slide need a shape id of their own.
         let mut fresh = vec![false; items.len()];
+        // The box the text showed for each item's element (§5.3), and which elements are new objects.
+        let mut shown: Vec<Option<Geom>> = vec![None; items.len()];
+        let mut created = vec![false; items.len()];
         for (n, it) in items.iter().enumerate() {
             let (e, k) = match self.keep_slot(it)? {
                 Some(bk) => (Some(bk), bk.meta.aux.first()),
@@ -231,21 +242,45 @@ impl<'a> Exporter<'a> {
                 fresh[n] = true;
             }
             els[n] = Some(fragment(&e.xml[0]));
+            shown[n] = shown_of(&e.meta.aux);
         }
         for (n, it) in items.iter().enumerate() {
             if els[n].is_some() {
                 continue;
             }
+            let head = self.head(it);
             match it.kind {
+                HeadKind::Shape { id: "", .. } => {
+                    let g = geom_of(head).ok_or("a new text box needs its box")?;
+                    els[n] = Some(new_text_box(&g));
+                    (fresh[n], created[n]) = (true, true);
+                }
+                HeadKind::Line { id: "", .. } => {
+                    let Some(Place::Line(ends)) = &head.place else { return Err("a line without its ends".into()) };
+                    els[n] = Some(new_line(ends));
+                    (fresh[n], created[n]) = (true, true);
+                }
                 HeadKind::Shape { id, .. } => {
-                    return Err(format!("<shape id=\"{id}\"> has no shape in the file to take its text: shapes come from the file and are never created. Write new text in a slot"));
+                    return Err(format!("<shape id=\"{id}\"> is not a shape of this slide's file: keep a shape's id and name as they are, and write a new text box without them"));
+                }
+                HeadKind::Line { id, .. } => {
+                    return Err(format!(
+                        "<line id=\"{id}\"> is not a line of this file: write a new line without an id"
+                    ));
+                }
+                HeadKind::Group { id, .. } => {
+                    return Err(format!(
+                        "<group id=\"{id}\"> is not a group of this file: groups are never created here"
+                    ));
                 }
                 HeadKind::Slot { name } => {
                     let taken: Vec<usize> = claims.iter().flatten().copied().collect();
                     let found = stands.iter().enumerate().find(|(x, st)| !taken.contains(x) && st.slot() == Some(name));
                     match found {
                         Some((x, st)) => {
-                            els[n] = Some(st.element().ok_or("a stand-in without its placeholder")?);
+                            let el = st.element().ok_or("a stand-in without its placeholder")?;
+                            shown[n] = geom::own(&el).or(layout.slot(name).and_then(|s| s.geom));
+                            els[n] = Some(el);
                             claims[n] = Some(x);
                         }
                         None => {
@@ -260,6 +295,7 @@ impl<'a> Exporter<'a> {
                             }
                             let slot = layout.need_slot(name)?;
                             els[n] = Some(new_placeholder(slot));
+                            shown[n] = slot.geom;
                             fresh[n] = true;
                         }
                     }
@@ -285,17 +321,78 @@ impl<'a> Exporter<'a> {
                     }
                 }
             }
-            if self.keep_slot(it)?.is_none() {
+            let text = matches!(it.kind, HeadKind::Slot { .. } | HeadKind::Shape { .. });
+            if text && self.keep_slot(it)?.is_none() {
                 let bullets = bullets_of(it, &e);
                 let lists = matches!(it.kind, HeadKind::Slot { .. });
                 let paras = self.paras(it, &bullets, &part, lists)?;
-                let tx = e.child_mut("p:txBody").ok_or("a placeholder without p:txBody cannot hold text")?;
-                tx.children.retain(|x| !matches!(x, Node::El(p) if p.is("a:p")));
-                tx.children.extend(paras.into_iter().map(Node::El));
+                if e.child("p:txBody").is_none() && !paras.is_empty() {
+                    if !e.is("p:sp") {
+                        return Err("only a shape can hold text".into());
+                    }
+                    e.children.push(Node::El(fragment("<p:txBody><a:bodyPr/><a:lstStyle/></p:txBody>")));
+                }
+                if let Some(tx) = e.child_mut("p:txBody") {
+                    let had = tx.elements().any(|p| p.is("a:p"));
+                    // A shape without text keeps its empty paragraphs; a text body has at least one.
+                    if !paras.is_empty() || !had || !it.body.is_empty() {
+                        tx.children.retain(|x| !matches!(x, Node::El(p) if p.is("a:p")));
+                        if paras.is_empty() {
+                            tx.children.push(Node::El(Element::new("a:p")));
+                        }
+                        tx.children.extend(paras.into_iter().map(Node::El));
+                    }
+                } else if matches!(it.kind, HeadKind::Slot { .. }) {
+                    return Err("a placeholder without p:txBody cannot hold text".into());
+                }
             }
             out_items.push(e);
         }
+        // Geometry (§5.3): each written box against the one the text showed.
+        let mut moved: Vec<(u32, String)> = vec![];
+        let mut lines_written: HashSet<u32> = HashSet::new();
+        for (n, it) in items.iter().enumerate() {
+            let e = &mut out_items[n];
+            let head = self.head(it);
+            let what = match (&it.kind, self.blocks.get(it.body.start)) {
+                (HeadKind::Object, Some(Block::Keep(id))) => format!("<keep id=\"{id}\">"),
+                _ => item_label(it),
+            };
+            let mut changed = vec![];
+            match (&it.kind, &head.place) {
+                (HeadKind::Line { .. }, Some(Place::Line(w))) => {
+                    let st = geom::own(e).unwrap_or_default();
+                    let ends = geom::ends_of(&st);
+                    if !created[n] && !w.shows_as(&ends) {
+                        geom::write(e, &geom::box_of(&ends.merged(w), st.rot)).map_err(|m| format!("{what}: {m}"))?;
+                        lines_written.extend(geom::shape_id(e));
+                    }
+                }
+                (HeadKind::Group { .. }, Some(Place::Group(w))) => {
+                    changed = apply_group(e, w, &geom::Frame::SLIDE).map_err(|m| format!("{what}: {m}"))?;
+                    lines_written.extend(changed.iter().filter(|x| x.1).map(|x| x.0));
+                }
+                (kind, place) => {
+                    let written = match place {
+                        Some(Place::Box(g)) => Some(*g),
+                        _ => None,
+                    };
+                    let slot = match kind {
+                        HeadKind::Slot { name } => Some(layout.slot(name).and_then(|s| s.geom)),
+                        _ => None,
+                    };
+                    if !created[n] && place_box(e, shown[n], written, slot).map_err(|m| format!("{what}: {m}"))? {
+                        changed.push((geom::shape_id(e).unwrap_or(0), false));
+                    }
+                }
+            }
+            for (id, _) in changed {
+                moved.push((id, what.clone()));
+            }
+        }
         assign_ids(&stands, &mut out_items, &fresh);
+        name_new(&mut out_items, &created);
+        check_connectors(&stands, &out_items, &moved, &lines_written)?;
         let tree_children =
             assemble(std::mem::take(&mut stands), &claims, out_items, &|slot: &str| layout.slot(slot).is_some())?;
         let tree = xml_root.child_mut("p:cSld").and_then(|c| c.child_mut("p:spTree")).unwrap();
@@ -1092,6 +1189,351 @@ fn assign_ids(stands: &[Stand], items: &mut [Element], fresh: &[bool]) {
             }
         });
     }
+}
+
+/// How an error names an item: `<shape id="s4" name="출처">`, `::title::`.
+fn item_label(it: &ItemG) -> String {
+    match it.kind {
+        HeadKind::Slot { name } => format!("::{name}::"),
+        HeadKind::Shape { id: "", .. } => "the new text box".into(),
+        HeadKind::Shape { id, name } => format!("<shape id=\"{id}\" name=\"{name}\">"),
+        HeadKind::Line { id: "", .. } => "the new line".into(),
+        HeadKind::Line { id, name } => format!("<line id=\"{id}\" name=\"{name}\">"),
+        HeadKind::Group { id, name } => format!("<group id=\"{id}\" name=\"{name}\">"),
+        HeadKind::Object => "an object's <keep/>".into(),
+        HeadKind::Slide { .. } => "the slide".into(),
+    }
+}
+
+/// Write a box (§5.3). `shown` is the box the text showed for the element,
+/// `layout` (for a slot) the box its layout gives it now. Nothing is written
+/// when the element already sits where `written` says (its own box, or the
+/// one it inherits); a slot written at its layout's box goes back to it;
+/// else the box is written, the numbers left as shown keeping their exact
+/// value. Without a box, a slot goes back to its layout's place and anything
+/// else stays. Whether the element moved or was resized.
+fn place_box(
+    e: &mut Element,
+    shown: Option<Geom>,
+    written: Option<Geom>,
+    layout: Option<Option<Geom>>,
+) -> Result<bool, String> {
+    let slot = layout.is_some();
+    let own = geom::own(e);
+    let now = own.or(layout.flatten());
+    let g = match written {
+        Some(w) if now.is_some_and(|n| w.shows_as(&n)) => return Ok(false),
+        Some(w) if slot && layout.flatten().is_some_and(|l| w.shows_as(&l)) => {
+            geom::remove(e);
+            return Ok(true);
+        }
+        Some(w) => shown.or(now).map_or(w, |s| s.merged(&w)),
+        None if slot && geom::xfrm(e).is_some() => {
+            geom::remove(e);
+            return Ok(true);
+        }
+        None => return Ok(false),
+    };
+    if e.is("mc:AlternateContent") {
+        return Err("this object is stored in more than one form, for different applications, and cannot be moved or resized here; move it in PowerPoint".into());
+    }
+    if g.w < 0 || g.h < 0 {
+        return Err("a box's width and height are 0 or more".into());
+    }
+    geom::write(e, &g)?;
+    if let Some(b) = now.filter(|b| (b.w, b.h) != (g.w, g.h)) {
+        if e.is("p:graphicFrame") {
+            geom::scale_table(e, (b.w, b.h), (g.w, g.h));
+        }
+    }
+    Ok(true)
+}
+
+/// A group's objects as a signature without their geometry: what must not
+/// change when a group is moved or its objects are.
+pub fn sig(items: &[SlideItem]) -> Vec<String> {
+    items
+        .iter()
+        .map(|it| match it {
+            SlideItem::Shape(sh) => {
+                hanji_format::pres::shape_line(&hanji_format::ShapeText { geom: None, ..sh.clone() })
+            }
+            SlideItem::Object(o) => {
+                hanji_format::pres::object_line(&hanji_format::ObjectItem { geom: None, ..o.clone() })
+            }
+            SlideItem::Line(l) => format!("<line id=\"{}\" name=\"{}\"/>", l.id, l.name),
+            SlideItem::Group(g) => {
+                format!("<group id=\"{}\" name=\"{}\">{}</group>", g.id, g.name, sig(&g.items).join(""))
+            }
+            SlideItem::Slot(_) => "::slot::".into(),
+        })
+        .collect()
+}
+
+/// The box of a group's object as the text shows it.
+fn member_box(it: &SlideItem) -> Option<Geom> {
+    match it {
+        SlideItem::Shape(sh) => sh.geom,
+        SlideItem::Object(o) => o.geom,
+        SlideItem::Line(l) => Some(geom::box_of(&l.ends, 0)),
+        SlideItem::Group(g) => g.geom,
+        SlideItem::Slot(_) => None,
+    }
+}
+
+/// Whether a member was written other than the text showed it.
+fn member_changed(st: &SlideItem, w: &SlideItem) -> bool {
+    match (st, w) {
+        (SlideItem::Line(a), SlideItem::Line(b)) => !b.ends.shows_as(&a.ends),
+        (SlideItem::Group(a), SlideItem::Group(b)) => {
+            b.geom.zip(a.geom).is_some_and(|(x, y)| !x.shows_as(&y))
+                || a.items.iter().zip(&b.items).any(|(x, y)| member_changed(x, y))
+        }
+        _ => match (member_box(st), member_box(w)) {
+            (Some(a), Some(b)) => !b.shows_as(&a),
+            _ => false,
+        },
+    }
+}
+
+/// Every shape id in a group (itself included), each marked when it is a connector.
+fn ids_in(el: &Element) -> Vec<(u32, bool)> {
+    let mut out = vec![];
+    el.walk(&mut |x| {
+        if x.is("p:cNvPr") {
+            out.extend(x.get("id").and_then(|v| v.parse().ok()).map(|id| (id, false)));
+        }
+    });
+    let mut cxn = vec![];
+    el.walk(&mut |x| {
+        if x.is("p:cxnSp") {
+            cxn.extend(geom::shape_id(x));
+        }
+    });
+    for o in &mut out {
+        o.1 = cxn.contains(&o.0);
+    }
+    out
+}
+
+/// The group's written geometry onto its element `el`, which sits in
+/// `parent` (§5.3). Its box alone moves or scales it; its objects' boxes
+/// move them, and the group's box follows them; both at once must agree.
+/// Anything else about its objects is refused. The shape ids that moved
+/// (marked when a connector).
+pub fn apply_group(el: &mut Element, w: &GroupItem, parent: &Frame) -> Result<Vec<(u32, bool)>, String> {
+    let st = group_item(el, parent).ok_or("the group's objects are not as they were read")?;
+    if sig(&st.items) != sig(&w.items) {
+        return Err("a group's objects can be moved and resized here, never added, deleted, reordered, renamed or edited: keep each object's line as it is but for its box, or change the group in PowerPoint".into());
+    }
+    let (Some(sg), wg) = (st.geom, w.geom) else { return Err("the group has no box".into()) };
+    let box_changed = wg.is_some_and(|g| !g.shows_as(&sg));
+    let members: Vec<usize> = (0..st.items.len()).filter(|&k| member_changed(&st.items[k], &w.items[k])).collect();
+    if !box_changed && members.is_empty() {
+        return Ok(vec![]);
+    }
+    let local = Frame::of(el).ok_or("the group has no child offset and extent")?;
+    // The group's box alone, its objects where that puts them (as the
+    // canonical text shows them after a box edit): its objects follow.
+    if box_changed && !members.is_empty() {
+        let mut alone = el.clone();
+        let only = GroupItem { items: st.items.clone(), ..w.clone() };
+        if let Ok(ids) = apply_group(&mut alone, &only, parent) {
+            let after = group_item(&alone, parent);
+            if after.is_some_and(|a| a.items.iter().zip(&w.items).all(|(x, y)| !member_changed(x, y))) {
+                *el = alone;
+                return Ok(ids);
+            }
+        }
+    }
+    if members.is_empty() {
+        // The group's box alone: its objects follow in its child coordinates.
+        let g = sg.merged(&wg.unwrap());
+        if g.rot != 0 || g.flip_h || g.flip_v {
+            return Err("a group is not rotated or flipped here".into());
+        }
+        let own = geom::own(el).unwrap_or_default();
+        let at = parent.back(&g);
+        let keep = |a: i64, b: i64, s: i64, x: i64| {
+            if hanji_format::shown_pt(s) * hanji_format::EMU_PER_PT == x {
+                a
+            } else {
+                b
+            }
+        };
+        let wv = wg.unwrap();
+        let next = Geom {
+            x: keep(own.x, at.x, sg.x, wv.x),
+            y: keep(own.y, at.y, sg.y, wv.y),
+            w: keep(own.w, at.w, sg.w, wv.w),
+            h: keep(own.h, at.h, sg.h, wv.h),
+            ..own
+        };
+        geom::write(el, &next)?;
+        return Ok(ids_in(el));
+    }
+    if let Some(g) = wg.filter(|_| box_changed) {
+        let boxes: Vec<Geom> = w.items.iter().filter_map(member_box).collect();
+        let u = geom::union(&boxes).unwrap_or_default();
+        let near = |a: i64, b: i64| (a - b).abs() <= 2 * hanji_format::EMU_PER_PT;
+        if !(near(u.x, g.x) && near(u.y, g.y) && near(u.w, g.w) && near(u.h, g.h)) {
+            return Err(format!(
+                "the group's box and its objects' boxes both changed and disagree (the objects' box is {} {} {} {}): change the group's box to move the whole group, or its objects, not both",
+                hanji_format::pres::pt(u.x), hanji_format::pres::pt(u.y), hanji_format::pres::pt(u.w), hanji_format::pres::pt(u.h)
+            ));
+        }
+    }
+    let f = local.within(parent);
+    let mut moved = vec![];
+    let kids: Vec<usize> = el
+        .children
+        .iter()
+        .enumerate()
+        .filter(
+            |(_, n)| matches!(n, Node::El(e) if !matches!(e.name.as_str(), "p:nvGrpSpPr" | "p:grpSpPr" | "p:extLst")),
+        )
+        .map(|(k, _)| k)
+        .collect();
+    for &m in &members {
+        let Node::El(c) = &mut el.children[kids[m]] else { unreachable!() };
+        match (&st.items[m], &w.items[m]) {
+            (SlideItem::Group(_), SlideItem::Group(wg)) => moved.extend(apply_group(c, wg, &f)?),
+            (SlideItem::Line(a), SlideItem::Line(b)) => {
+                let own = geom::own(c).unwrap_or_default();
+                let ends = a.ends.merged(&b.ends);
+                let g = f.back(&geom::box_of(&ends, own.rot));
+                geom::write(c, &Geom { rot: own.rot, ..g })?;
+                moved.extend(geom::shape_id(c).map(|id| (id, true)));
+            }
+            (a, b) => {
+                let (Some(sa), Some(sb)) = (member_box(a), member_box(b)) else { continue };
+                let own = geom::own(c).ok_or("an object in the group has no box")?;
+                let merged = sa.merged(&sb);
+                let at = f.back(&merged);
+                let keep = |o: i64, n: i64, s: i64, x: i64| {
+                    if hanji_format::shown_pt(s) * hanji_format::EMU_PER_PT == x {
+                        o
+                    } else {
+                        n
+                    }
+                };
+                let next = Geom {
+                    x: keep(own.x, at.x, sa.x, sb.x),
+                    y: keep(own.y, at.y, sa.y, sb.y),
+                    w: keep(own.w, at.w, sa.w, sb.w),
+                    h: keep(own.h, at.h, sa.h, sb.h),
+                    rot: merged.rot,
+                    flip_h: merged.flip_h,
+                    flip_v: merged.flip_v,
+                };
+                if c.is("mc:AlternateContent") {
+                    return Err(
+                        "an object in the group is stored in more than one form and cannot be moved here".into()
+                    );
+                }
+                geom::write(c, &next)?;
+                moved.extend(geom::shape_id(c).map(|id| (id, false)));
+            }
+        }
+    }
+    // The group's child box is the box around its objects; its box follows.
+    let boxes: Vec<Geom> = kids
+        .iter()
+        .filter_map(|&k| match &el.children[k] {
+            Node::El(c) => geom::own(c).map(|g| Geom { rot: 0, flip_h: false, flip_v: false, ..g }),
+            _ => None,
+        })
+        .collect();
+    let u = geom::union(&boxes).ok_or("a group without objects")?;
+    if (u.x, u.y, u.w, u.h) != (local.ch_off.0, local.ch_off.1, local.ch_ext.0, local.ch_ext.1) && u.w > 0 && u.h > 0 {
+        let out = local.out(&u);
+        let own = geom::own(el).unwrap_or_default();
+        geom::write(el, &Geom { x: out.x, y: out.y, w: out.w, h: out.h, ..own })?;
+        let x = el.child_mut("p:grpSpPr").and_then(|p| p.child_mut("a:xfrm")).ok_or("the group has no a:xfrm")?;
+        for (name, a, b, va, vb) in [("a:chOff", "x", "y", u.x, u.y), ("a:chExt", "cx", "cy", u.w, u.h)] {
+            let c = x.child_mut(name).ok_or("the group has no child offset and extent")?;
+            c.set(a, &va.to_string());
+            c.set(b, &vb.to_string());
+        }
+    }
+    Ok(moved)
+}
+
+/// Names for new objects, once they have ids: `TextBox 7`, `Straight Connector 8`.
+fn name_new(items: &mut [Element], created: &[bool]) {
+    for (e, _) in items.iter_mut().zip(created).filter(|(_, c)| **c) {
+        let base = if e.is("p:cxnSp") { "Straight Connector" } else { "TextBox" };
+        let id = geom::shape_id(e).unwrap_or(1);
+        if let Some(c) = c_nv_pr_mut(e) {
+            c.set("name", &format!("{base} {}", id.saturating_sub(1)));
+        }
+    }
+}
+
+/// Connectors are not rerouted (§5.3): moving or resizing an object a
+/// connector is attached to is refused, unless the same edit moves that
+/// connector too.
+fn check_connectors(
+    stands: &[Stand],
+    items: &[Element],
+    moved: &[(u32, String)],
+    written: &HashSet<u32>,
+) -> Result<(), String> {
+    if moved.is_empty() {
+        return Ok(());
+    }
+    let mut all: Vec<&Element> = items.iter().collect();
+    for st in stands {
+        if let Stand::Raw(Node::El(e)) = st {
+            all.push(e);
+        }
+    }
+    for e in all {
+        let mut found: Vec<&Element> = vec![];
+        e.walk(&mut |x| {
+            if x.is("p:cxnSp") {
+                found.push(x);
+            }
+        });
+        for c in found {
+            let cid = geom::shape_id(c).unwrap_or(0);
+            if written.contains(&cid) {
+                continue;
+            }
+            for (end, target) in geom::connections(c) {
+                if let Some((_, what)) = moved.iter().find(|m| m.0 == target && m.0 != cid) {
+                    let name = c_nv_pr(c).and_then(|x| x.get("name")).unwrap_or_default();
+                    return Err(format!(
+                        "{what} is moved or resized, and connector <line id=\"s{cid}\" name=\"{name}\"> has its {end} attached to it. Connectors are not rerouted here, so the connector would come loose in PowerPoint: move that end of the <line> in the same edit, or leave {what} where it is"
+                    ));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// A new text box (§5.3): `txBox`, no fill, the master's `otherStyle`; its
+/// id, name and paragraphs are written after.
+fn new_text_box(g: &Geom) -> Element {
+    let mut e = fragment(concat!(
+        "<p:sp><p:nvSpPr><p:cNvPr id=\"0\" name=\"TextBox\"/><p:cNvSpPr txBox=\"1\"/><p:nvPr/></p:nvSpPr>",
+        "<p:spPr><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom><a:noFill/></p:spPr>",
+        "<p:txBody><a:bodyPr wrap=\"square\" rtlCol=\"0\"/><a:lstStyle/></p:txBody></p:sp>"
+    ));
+    geom::write(&mut e, g).expect("a new text box has p:spPr");
+    e
+}
+
+/// A new straight line from `ends`, drawn in the text colour.
+fn new_line(ends: &hanji_format::Ends) -> Element {
+    let mut e = fragment(concat!(
+        "<p:cxnSp><p:nvCxnSpPr><p:cNvPr id=\"0\" name=\"Straight Connector\"/><p:cNvCxnSpPr/><p:nvPr/></p:nvCxnSpPr>",
+        "<p:spPr><a:prstGeom prst=\"line\"><a:avLst/></a:prstGeom>",
+        "<a:ln w=\"12700\"><a:solidFill><a:schemeClr val=\"tx1\"/></a:solidFill></a:ln></p:spPr></p:cxnSp>"
+    ));
+    geom::write(&mut e, &geom::box_of(ends, 0)).expect("a new line has p:spPr");
+    e
 }
 
 /// Animations may not lose their shape: an animated shape that was on the

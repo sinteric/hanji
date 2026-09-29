@@ -21,6 +21,6 @@ pub use edit::{
 };
 pub use engine::{notice, Engine, EngineError, ImportOptions, ImportReport, Imported, Notice};
 pub use lists::{plan_lists, ListDefs, ListPlan};
-pub use model::{Block, BlockSrc, Capabilities, Head, ListItem, Para, Path, SrcKind, StyleDef, StyleSet, Table};
+pub use model::{Block, BlockSrc, Capabilities, Head, ListItem, Para, Path, Place, SrcKind, StyleDef, StyleSet, Table};
 pub use remainder::{Entry, KeepIds, Kind, Meta, Part, Remainder};
 pub use revision::{Kept, Pos};

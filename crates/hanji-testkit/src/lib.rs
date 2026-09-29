@@ -1091,6 +1091,26 @@ fn normalise_ids(s: &str) -> String {
         out.push('?');
         rest = &rest[e..];
     }
+    // A presentation's new text boxes get their id and name at export (§5.3).
+    new_text_boxes(&(out + rest))
+}
+
+/// `<shape id="…" name="TextBox N"` → `<shape`: a new text box as it was written.
+fn new_text_boxes(s: &str) -> String {
+    let mut out = String::new();
+    let mut rest = s;
+    while let Some(k) = rest.find("<shape id=\"") {
+        out.push_str(&rest[..k + 6]);
+        rest = &rest[k + 6..];
+        let tail = rest.find(" name=\"TextBox ").filter(|&n| !rest[..n].contains('>')).and_then(|n| {
+            let after = &rest[n + 15..];
+            let digits = after.find('"')?;
+            after[..digits].chars().all(|c| c.is_ascii_digit()).then_some(n + 15 + digits + 1)
+        });
+        if let Some(t) = tail {
+            rest = &rest[t..];
+        }
+    }
     out + rest
 }
 

@@ -139,6 +139,17 @@ pub(crate) struct Parser<'a> {
     /// Lines from here on are not part of the block being parsed (the end
     /// of a presentation slot).
     pub(crate) stop: usize,
+    /// Parsing a slide object's `<keep/>` line: its tag may carry a box
+    /// (§5.3), which lands in `object_geom`.
+    pub(crate) object_line: bool,
+    pub(crate) object_geom: Option<crate::ast::Geom>,
+}
+
+/// `720 x 540 pt` → width and height in EMU.
+fn parse_size(v: &str) -> Option<(i64, i64)> {
+    let v = v.strip_suffix("pt")?.trim_end();
+    let (w, h) = v.split_once('x')?;
+    Some((crate::pres::parse_pt(w.trim())?, crate::pres::parse_pt(h.trim())?)).filter(|(w, h)| *w > 0 && *h > 0)
 }
 
 fn fm_form(doc_type: &str) -> String {
@@ -153,7 +164,18 @@ impl<'a> Parser<'a> {
     pub(crate) fn new(text: &'a str, names: &'a Names) -> Parser<'a> {
         let lines = split_lines(text);
         let stop = lines.len();
-        Parser { names, errors: vec![], lines, keeps: vec![], refs: vec![], defs: vec![], in_cell: false, stop }
+        Parser {
+            names,
+            errors: vec![],
+            lines,
+            keeps: vec![],
+            refs: vec![],
+            defs: vec![],
+            in_cell: false,
+            stop,
+            object_line: false,
+            object_geom: None,
+        }
     }
 
     pub(crate) fn err(&mut self, line: usize, col: usize, msg: impl Into<String>) {
@@ -171,6 +193,7 @@ impl<'a> Parser<'a> {
             return (None, 0);
         }
         let (mut ty, mut format, mut template, mut schema) = (None, None, None, None);
+        let mut size: Option<(String, usize)> = None;
         for i in 1..self.lines.len() {
             let s = self.lines[i].text.trim();
             if s == "---" {
@@ -216,6 +239,21 @@ impl<'a> Parser<'a> {
                     format: format.unwrap_or_default(),
                     template,
                     schema: schema_n,
+                    size: None,
+                };
+                let fm = match size {
+                    Some((v, line)) => match (doc_type, parse_size(&v)) {
+                        ("presentation", Some(wh)) => FrontMatter { size: Some(wh), ..fm },
+                        ("presentation", None) => {
+                            self.err(line, 1, format!("size: {v} is not a slide size; it is size: W x H pt, the slide's width and height in points, as the file has it."));
+                            fm
+                        }
+                        _ => {
+                            self.err(line, 1, "\"size\" is a Presentation's front matter key (its slide size); a Document or Spreadsheet has none.");
+                            fm
+                        }
+                    },
+                    None => fm,
                 };
                 return (Some(fm), i + 1);
             }
@@ -231,11 +269,22 @@ impl<'a> Parser<'a> {
                 "format" => &mut format,
                 "template" => &mut template,
                 "schema" => &mut schema,
+                "size" if size.is_none() => {
+                    size = Some((v, i));
+                    continue;
+                }
+                "size" => {
+                    self.err(i, 1, "\"size\" appears twice in the front matter.");
+                    continue;
+                }
                 other => {
                     self.err(
                         i,
                         1,
-                        format!("\"{other}\" is not a front matter key. The keys are type, format, template, schema."),
+                        format!(
+                            "\"{other}\" is not a front matter key. The keys are type, format, template, schema{}.",
+                            if doc_type == "presentation" { ", size" } else { "" }
+                        ),
                     );
                     continue;
                 }
@@ -904,11 +953,17 @@ impl<'a> Parser<'a> {
     fn keep_tag(&mut self, line: usize, tag: &Tag) -> Option<Keep> {
         let form = "<keep id=\"…\" kind=\"…\" summary=\"…\"/>";
         let (mut id, mut kind, mut summary) = (None, None, None);
+        let mut geo = vec![];
         for (k, v, col) in &tag.attrs {
             match k.as_str() {
                 "id" => id = Some(v.clone()),
                 "kind" => kind = Some(v.clone()),
                 "summary" => summary = Some(v.clone()),
+                "box" | "rot" | "flip" if self.object_line => geo.push((k.clone(), v.clone(), *col)),
+                "src" => {
+                    self.err(line, *col, "a picture from a file cannot be added yet (DESIGN.md §5.3): add it in PowerPoint, or leave a text box where it goes.");
+                    return None;
+                }
                 other => {
                     self.err(
                         line,
@@ -917,6 +972,15 @@ impl<'a> Parser<'a> {
                             "<keep> has no attribute \"{other}\"; it is {form}, kept exactly as it is in the file."
                         ),
                     );
+                    return None;
+                }
+            }
+        }
+        if self.object_line {
+            match crate::pres::geom_of(&geo, tag.col) {
+                Ok(g) => self.object_geom = g,
+                Err((col, msg)) => {
+                    self.err(line, col, msg);
                     return None;
                 }
             }

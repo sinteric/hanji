@@ -115,13 +115,14 @@ fn pptx_open_read_edit_export_reopen() {
         &o.doc_id,
         2,
         &one(
-            "::title::\n감사합니다\n",
-            "::title::\n감사합니다\n\n---\n\nlayout: Title and Content\n::title::\n질의응답\n::body::\n- 질문 받기\n",
+            "::title box=\"36 22 648 90\"::\n감사합니다\n",
+            "::title box=\"36 22 648 90\"::\n감사합니다\n\n---\n\nlayout: Title and Content\n::title::\n질의응답\n::body::\n- 질문 받기\n",
         ),
     )
     .unwrap();
     let (_, t) = text(&ws, &o.doc_id);
-    assert!(t.contains("핵심 성과 지표") && t.ends_with("::body::\n- 질문 받기\n"), "{t}");
+    // Stored in canonical form: the new slide's slots with their layout's boxes (§5.3).
+    assert!(t.contains("핵심 성과 지표") && t.ends_with("::body box=\"36 126 648 356\"::\n- 질문 받기\n"), "{t}");
     // This deck has no notes master: a new slide cannot get notes (refused, with the reason).
     let e = ws.edit(&o.doc_id, 3, &one("- 질문 받기\n", "- 질문 받기\n::notes::\n5분\n")).unwrap_err();
     assert!(e.code == Code::Refused && e.message.contains("notes master"), "{e:?}");
@@ -183,8 +184,23 @@ fn new_files_from_the_blank_packages() {
             assert!(r.data.as_deref().unwrap().contains("| 2 | 강남 | 1,200 | 800 | 400 |"), "{:?}", r.data);
         } else {
             let c = ws.write(&o.doc_id, 1, body).unwrap_or_else(|e| panic!("{f:?}: {e}"));
-            assert!(!c.canonicalized, "{f:?}: the text was written canonical:\n{}", text(&ws, &o.doc_id).1);
-            assert_eq!(text(&ws, &o.doc_id).1, body);
+            if f == Format::Pptx {
+                // A deck's canonical text adds its slide size and each slot's box (§5.3).
+                let t = text(&ws, &o.doc_id).1;
+                assert!(c.canonicalized && t.contains("size: 960 x 540 pt\n") && t.contains("::title box=\""), "{t}");
+                let bare = t.replace("size: 960 x 540 pt\n", "");
+                let bare: String = bare
+                    .split_inclusive('\n')
+                    .map(|l| match (l.starts_with("::"), l.find(" box=\"")) {
+                        (true, Some(k)) => format!("{}::\n", &l[..k]),
+                        _ => l.to_string(),
+                    })
+                    .collect();
+                assert_eq!(bare, body);
+            } else {
+                assert!(!c.canonicalized, "{f:?}: the text was written canonical:\n{}", text(&ws, &o.doc_id).1);
+                assert_eq!(text(&ws, &o.doc_id).1, body);
+            }
         }
         // Nothing to surface: exports without acknowledging.
         ws.export_bytes(&o.doc_id, None, &ExportOptions::default()).unwrap_or_else(|e| panic!("{f:?}: {e}"));
@@ -400,7 +416,7 @@ fn a_deck_is_read_by_slides() {
     let mut ws = ws();
     let o = open(&mut ws, "crates/hanji-pptx/corpus/korean-deck.pptx");
     let r = ws.read(&o.doc_id, None, &Window { slides: Some("2:3".into()), ..Default::default() }).unwrap();
-    assert!(r.partial && r.text.starts_with("layout: Title and Content\n::title::\n핵심 지표\n"));
+    assert!(r.partial && r.text.starts_with("layout: Title and Content\n::title box=\"36 22 648 90\"::\n핵심 지표\n"));
     assert!(r.text.contains("layout: Two Content") && !r.text.contains("분기별 매출"));
     assert_eq!(r.outline[3].text, "slide 4: layout: Title Only · 분기별 매출");
     let e = ws.read(&o.doc_id, None, &Window { section: Some("x".into()), ..Default::default() }).unwrap_err();

@@ -115,7 +115,10 @@ pub fn outline(ty: DocType, text: &str) -> Vec<OutlineEntry> {
                 let end = ls[k..].iter().position(|l| l.trim_end() == "---").map_or(ls.len(), |e| k + e);
                 let title = ls[k..end]
                     .iter()
-                    .position(|l| l.trim() == "::title::")
+                    .position(|l| {
+                        let t = l.trim();
+                        t == "::title::" || (t.starts_with("::title ") && t.ends_with("::"))
+                    })
                     .and_then(|t| ls.get(k + t + 1))
                     .map(|t| format!(" · {}", t.trim()))
                     .unwrap_or_default();

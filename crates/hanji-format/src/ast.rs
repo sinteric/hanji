@@ -18,6 +18,8 @@ pub struct FrontMatter {
     pub format: String,
     pub template: Option<String>,
     pub schema: u32,
+    /// A Presentation's slide size, width and height in EMU (`size: 720 x 540 pt`).
+    pub size: Option<(i64, i64)>,
 }
 
 impl FrontMatter {
@@ -39,11 +41,12 @@ impl FrontMatter {
             format: format.into(),
             template: template.map(str::to_string),
             schema: crate::SCHEMA_VERSION,
+            size: None,
         }
     }
 }
 
-/// A Presentation file (§5.3): slides built from their layouts' placeholders.
+/// A Presentation file (§5.3): slides, each a canvas of objects in z-order.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Presentation {
     pub front: FrontMatter,
@@ -60,42 +63,170 @@ pub struct Slide {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum SlideItem {
-    /// `::name::` and the lines after it: paragraphs, list items, empty
-    /// paragraphs and placeholders.
+    /// `::name box="…"::` and the lines after it: paragraphs, list items,
+    /// empty paragraphs and placeholders.
     Slot(Slot),
-    /// `<shape id="…" name="…">text</shape>`: a shape that is not a layout
-    /// placeholder, its text only; `<p/>` starts another paragraph.
+    /// `<shape id="…" name="…" box="…">text</shape>`: a shape that is not a
+    /// layout placeholder; `<p/>` starts another paragraph. Without text it
+    /// is `<shape … />`; a new text box has no id or name.
     Shape(ShapeText),
-    /// A `<keep/>` line outside a slot: a picture, chart, table, group or
+    /// A `<keep … box="…"/>` line outside a slot: a picture, chart, table or
     /// other object of the slide the text does not model (rule 8). It can be
-    /// moved or deleted, never created or changed.
-    Object(Keep),
+    /// moved, resized or deleted, never created or changed.
+    Object(ObjectItem),
+    /// `<line id="…" name="…" from="x y" to="x y"/>`: a line or connector.
+    Line(LineItem),
+    /// `<group id="…" name="…" box="…">`, its objects, `</group>`.
+    Group(GroupItem),
+}
+
+/// Where an object is (§5.3): its box in EMU as written (the text shows
+/// whole points, 1 pt = 12,700 EMU), its rotation in 60,000ths of a degree
+/// clockwise, and its flips.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Geom {
+    pub x: i64,
+    pub y: i64,
+    pub w: i64,
+    pub h: i64,
+    pub rot: i64,
+    pub flip_h: bool,
+    pub flip_v: bool,
+}
+
+/// A line's two ends in EMU, as written.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Ends {
+    pub from: (i64, i64),
+    pub to: (i64, i64),
+}
+
+/// EMU per point.
+pub const EMU_PER_PT: i64 = 12_700;
+
+/// A length in EMU as the text shows it: whole points.
+pub fn shown_pt(emu: i64) -> i64 {
+    (emu as f64 / EMU_PER_PT as f64).round() as i64
+}
+
+/// A rotation in 60,000ths of a degree as the text shows it: whole degrees.
+pub fn shown_deg(rot: i64) -> i64 {
+    (rot as f64 / 60_000.0).round() as i64
+}
+
+/// `written` where it differs from how `stored` is shown, else `stored`:
+/// a number left as shown keeps its exact value (§5.3).
+pub fn keep_or(stored: i64, written: i64) -> i64 {
+    if shown_pt(stored) * EMU_PER_PT == written {
+        stored
+    } else {
+        written
+    }
+}
+
+impl Geom {
+    /// The same box as `other` as the text shows them (whole points and degrees, same flips).
+    pub fn shows_as(&self, other: &Geom) -> bool {
+        let p = |a: i64, b: i64| shown_pt(a) == shown_pt(b);
+        p(self.x, other.x)
+            && p(self.y, other.y)
+            && p(self.w, other.w)
+            && p(self.h, other.h)
+            && shown_deg(self.rot) == shown_deg(other.rot)
+            && self.flip_h == other.flip_h
+            && self.flip_v == other.flip_v
+    }
+
+    /// `written`, with each number left as `self` shows it kept exact.
+    pub fn merged(&self, written: &Geom) -> Geom {
+        let rot = if shown_deg(self.rot) * 60_000 == written.rot { self.rot } else { written.rot };
+        Geom {
+            x: keep_or(self.x, written.x),
+            y: keep_or(self.y, written.y),
+            w: keep_or(self.w, written.w),
+            h: keep_or(self.h, written.h),
+            rot,
+            flip_h: written.flip_h,
+            flip_v: written.flip_v,
+        }
+    }
+
+    /// As the text shows it: every number rounded.
+    pub fn shown(&self) -> Geom {
+        let r = |v: i64| shown_pt(v) * EMU_PER_PT;
+        Geom { x: r(self.x), y: r(self.y), w: r(self.w), h: r(self.h), rot: shown_deg(self.rot) * 60_000, ..*self }
+    }
+}
+
+impl Ends {
+    pub fn shows_as(&self, other: &Ends) -> bool {
+        let p = |a: (i64, i64), b: (i64, i64)| shown_pt(a.0) == shown_pt(b.0) && shown_pt(a.1) == shown_pt(b.1);
+        p(self.from, other.from) && p(self.to, other.to)
+    }
+
+    pub fn merged(&self, written: &Ends) -> Ends {
+        let k = |a: (i64, i64), b: (i64, i64)| (keep_or(a.0, b.0), keep_or(a.1, b.1));
+        Ends { from: k(self.from, written.from), to: k(self.to, written.to) }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Slot {
     pub name: String,
+    /// Where the slot is; `None` (a bare marker) is where its layout puts it.
+    pub geom: Option<Geom>,
     pub blocks: Vec<Block>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct ShapeText {
+    /// Empty for a new text box (the write gives it an id and a name).
     pub id: String,
     pub name: String,
+    pub geom: Option<Geom>,
     pub paras: Vec<Inline>,
+}
+
+/// A slide object's `<keep/>` line and its box.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ObjectItem {
+    pub keep: Keep,
+    pub geom: Option<Geom>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct LineItem {
+    /// Empty for a new line.
+    pub id: String,
+    pub name: String,
+    pub ends: Ends,
+}
+
+/// A group: its box (the box around its objects) and its objects, in slide
+/// coordinates. A member `<keep/>` stands for the member by its shape id.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct GroupItem {
+    pub id: String,
+    pub name: String,
+    pub geom: Option<Geom>,
+    pub items: Vec<SlideItem>,
 }
 
 impl Presentation {
     /// Canonical shapes, as [`Document::normalize`] gives a document's blocks.
     pub fn normalize(&mut self) {
-        for s in &mut self.slides {
-            for it in &mut s.items {
+        fn items(its: &mut [SlideItem]) {
+            for it in its {
                 match it {
                     SlideItem::Slot(slot) => normalize_blocks(&mut slot.blocks),
                     SlideItem::Shape(sh) => sh.paras.iter_mut().for_each(Inline::normalize),
-                    SlideItem::Object(_) => {}
+                    SlideItem::Group(g) => items(&mut g.items),
+                    SlideItem::Object(_) | SlideItem::Line(_) => {}
                 }
             }
+        }
+        for s in &mut self.slides {
+            items(&mut s.items);
         }
     }
 }
