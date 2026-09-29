@@ -52,16 +52,8 @@ pub fn parse(text: &str) -> Result<Document, Vec<Diagnostic>> {
 
 /// Parse and check names (styles, fields, placeholders) against `names`.
 pub fn parse_with(text: &str, names: &Names) -> Result<Parsed, Vec<Diagnostic>> {
-    let mut p = Parser {
-        names,
-        errors: vec![],
-        lines: split_lines(text),
-        keeps: vec![],
-        refs: vec![],
-        defs: vec![],
-        in_cell: false,
-    };
-    let (front, first) = p.front_matter();
+    let mut p = Parser::new(text, names);
+    let (front, first) = p.front_matter("document");
     let mut blocks = vec![];
     let mut map = SourceMap::default();
     let mut i = first;
@@ -87,19 +79,19 @@ pub fn parse_with(text: &str, names: &Names) -> Result<Parsed, Vec<Diagnostic>> 
     Ok(Parsed { doc, map })
 }
 
-struct Line<'a> {
-    text: &'a str,
+pub(crate) struct Line<'a> {
+    pub(crate) text: &'a str,
     /// Byte offset of the line start.
-    at: usize,
+    pub(crate) at: usize,
     /// Byte offset of the line terminator (or end of text).
-    end: usize,
+    pub(crate) end: usize,
     /// Byte offset just past the terminator.
-    next: usize,
+    pub(crate) next: usize,
 }
 
 impl Line<'_> {
     /// Bytes of leading whitespace.
-    fn indent(&self) -> usize {
+    pub(crate) fn indent(&self) -> usize {
         self.text.len() - self.text.trim_start().len()
     }
 }
@@ -121,9 +113,9 @@ fn split_lines(text: &str) -> Vec<Line<'_>> {
 }
 
 /// One source character: absolute byte offset, 1-based column, char.
-type Src = (usize, usize, char);
+pub(crate) type Src = (usize, usize, char);
 
-fn chars_of(line: &Line<'_>, from_byte: usize) -> Vec<Src> {
+pub(crate) fn chars_of(line: &Line<'_>, from_byte: usize) -> Vec<Src> {
     let mut col = line.text[..from_byte].chars().count();
     line.text[from_byte..]
         .char_indices()
@@ -134,34 +126,48 @@ fn chars_of(line: &Line<'_>, from_byte: usize) -> Vec<Src> {
         .collect()
 }
 
-struct Parser<'a> {
-    names: &'a Names,
-    errors: Vec<Diagnostic>,
-    lines: Vec<Line<'a>>,
+pub(crate) struct Parser<'a> {
+    pub(crate) names: &'a Names,
+    pub(crate) errors: Vec<Diagnostic>,
+    pub(crate) lines: Vec<Line<'a>>,
     /// (line, col, keep) of every placeholder written.
     keeps: Vec<(usize, usize, Keep)>,
     refs: Vec<(usize, usize, String)>,
     defs: Vec<(usize, usize, String)>,
-    /// Parsing a table cell: `<p/>` starts another paragraph.
-    in_cell: bool,
+    /// Parsing a table cell (or a presentation shape): `<p/>` starts another paragraph.
+    pub(crate) in_cell: bool,
+    /// Lines from here on are not part of the block being parsed (the end
+    /// of a presentation slot).
+    pub(crate) stop: usize,
 }
 
-const FM_FORM: &str = "a line ---, the lines type: document, format: …, template: …, schema: 1, and a closing line ---";
+fn fm_form(doc_type: &str) -> String {
+    format!("a line ---, the lines type: {doc_type}, format: …, template: …, schema: 1, and a closing line ---")
+}
 const P_FORM: &str =
     "<p/> and <p style=\"Name\"/> are single tags that start a paragraph: no </p>, and no attribute but style.";
 const INLINE_TAGS: &str =
     "<u>…</u>, <br/>, <math>…</math>, <field name=\"…\">…</field>, <keep id=\"…\" kind=\"…\" summary=\"…\"/>, and <p/> in a table cell";
 
 impl<'a> Parser<'a> {
-    fn err(&mut self, line: usize, col: usize, msg: impl Into<String>) {
+    pub(crate) fn new(text: &'a str, names: &'a Names) -> Parser<'a> {
+        let lines = split_lines(text);
+        let stop = lines.len();
+        Parser { names, errors: vec![], lines, keeps: vec![], refs: vec![], defs: vec![], in_cell: false, stop }
+    }
+
+    pub(crate) fn err(&mut self, line: usize, col: usize, msg: impl Into<String>) {
         self.errors.push(Diagnostic { line: line + 1, col, message: msg.into() });
     }
 
     // ------------------------------------------------------------ front matter
 
-    fn front_matter(&mut self) -> (Option<FrontMatter>, usize) {
+    /// The front matter of a file of `doc_type` (`document`, `presentation`):
+    /// it and the first line after it.
+    pub(crate) fn front_matter(&mut self, doc_type: &str) -> (Option<FrontMatter>, usize) {
+        let fm = fm_form(doc_type);
         if self.lines.first().map(|l| l.text.trim()) != Some("---") {
-            self.err(0, 1, format!("the file must begin with its front matter: {FM_FORM}."));
+            self.err(0, 1, format!("the file must begin with its front matter: {fm}."));
             return (None, 0);
         }
         let (mut ty, mut format, mut template, mut schema) = (None, None, None, None);
@@ -170,7 +176,7 @@ impl<'a> Parser<'a> {
             if s == "---" {
                 for (key, v) in [("type", &ty), ("format", &format), ("schema", &schema)] {
                     if v.is_none() {
-                        self.err(i, 1, format!("the front matter has no \"{key}:\" line. It is {FM_FORM}."));
+                        self.err(i, 1, format!("the front matter has no \"{key}:\" line. It is {fm}."));
                     }
                 }
                 let schema_n = match schema.as_deref().map(str::parse::<u32>) {
@@ -188,10 +194,9 @@ impl<'a> Parser<'a> {
                     }
                     None => SCHEMA_VERSION,
                 };
-                if let Some(t) = &ty {
-                    if t != "document" {
-                        self.err(1, 1, format!("type: {t} is not a Document; this parser reads type: document."));
-                    }
+                if let Some(t) = ty.as_deref().filter(|t| *t != doc_type) {
+                    let what = if doc_type == "document" { "Document" } else { "Presentation" };
+                    self.err(1, 1, format!("type: {t} is not a {what}; this parser reads type: {doc_type}."));
                 }
                 if let (Some(f), Some(allowed)) = (&format, &self.names.formats) {
                     if !allowed.contains(f) {
@@ -212,7 +217,7 @@ impl<'a> Parser<'a> {
             }
             let Some((k, v)) = s.split_once(':') else {
                 if !s.is_empty() {
-                    self.err(i, 1, format!("front matter lines are \"key: value\". It is {FM_FORM}."));
+                    self.err(i, 1, format!("front matter lines are \"key: value\". It is {fm}."));
                 }
                 continue;
             };
@@ -244,7 +249,7 @@ impl<'a> Parser<'a> {
 
     /// Parse the block starting at line `i`: (block, map, next line). `None`
     /// for a blank line.
-    fn block(&mut self, i: usize) -> Option<(Block, BlockMap, usize)> {
+    pub(crate) fn block(&mut self, i: usize) -> Option<(Block, BlockMap, usize)> {
         let line = &self.lines[i];
         let text = line.text;
         let trimmed = text.trim();
@@ -280,7 +285,7 @@ impl<'a> Parser<'a> {
         if let Some(level) = heading_level(text) {
             let from = (level as usize + 1).min(text.len());
             let src = chars_of(&self.lines[i], from);
-            let (content, units) = self.inline(i, &src, false)?.0;
+            let (content, units) = self.inline(i, &src, None)?.0;
             return para(Block::Para(Para { style: ParaStyle::Heading(level), content }), units);
         }
         if text.starts_with("[^") {
@@ -293,7 +298,7 @@ impl<'a> Parser<'a> {
                     }
                     self.defs.push((i, 1, label.to_string()));
                     let src = chars_of(&self.lines[i], from);
-                    let (content, units) = self.inline(i, &src, false)?.0;
+                    let (content, units) = self.inline(i, &src, None)?.0;
                     return para(Block::FootnoteDef(FootnoteDef { label: label.into(), content }), units);
                 }
             }
@@ -306,7 +311,7 @@ impl<'a> Parser<'a> {
             return Some((Block::PageBreak, dummy(at), i + 1));
         }
         let src = chars_of(&self.lines[i], 0);
-        let (content, units) = self.inline(i, &src, false)?.0;
+        let (content, units) = self.inline(i, &src, None)?.0;
         para(Block::Para(Para { style: ParaStyle::Plain, content }), units)
     }
 
@@ -319,7 +324,7 @@ impl<'a> Parser<'a> {
         let mut widths: Vec<usize> = vec![];
         let mut j = i;
         let before = self.errors.len();
-        while let Some(m) = self.lines.get(j).and_then(|l| list_marker(l.text)) {
+        while let Some(m) = self.lines.get(j).filter(|_| j < self.stop).and_then(|l| list_marker(l.text)) {
             let line = &self.lines[j];
             if line.text[..m.indent].contains('\t') {
                 self.err(j, 1, "list items are indented with spaces, not tabs: 2 spaces under - and 3 under 1.");
@@ -342,7 +347,7 @@ impl<'a> Parser<'a> {
             widths.push(m.width);
             let (line_start, line_next, mark) = (line.at, line.next, line.end);
             let src = chars_of(&self.lines[j], m.content);
-            if let Some(((content, units), _)) = self.inline(j, &src, false) {
+            if let Some(((content, units), _)) = self.inline(j, &src, None) {
                 items.push(Item { ordered: m.ordered, level, content });
                 maps.push((line_start, line_next, ParaMap { units, mark }));
             }
@@ -395,7 +400,7 @@ impl<'a> Parser<'a> {
             return None;
         }
         let style = self.style_attr(i, &tag, "div", "paragraph")?;
-        let ((content, units), end) = self.inline(i, &src[after..], true)?;
+        let ((content, units), end) = self.inline(i, &src[after..], Some("div"))?;
         let Some(end) = end else {
             self.err(
                 i,
@@ -467,7 +472,8 @@ impl<'a> Parser<'a> {
                 None
             }
         };
-        let next_is_table = self.lines.get(i + 1).is_some_and(|l| l.text.trim_start().starts_with('|'));
+        let next_is_table =
+            i + 1 < self.stop && self.lines.get(i + 1).is_some_and(|l| l.text.trim_start().starts_with('|'));
         if !next_is_table {
             self.err(i, lead + 1, "a {style=\"Name\"} line must be directly followed by the header row of its table, with no blank line or other text between.");
             return Some((Block::PageBreak, dummy(at), i + 1));
@@ -480,7 +486,7 @@ impl<'a> Parser<'a> {
     #[allow(clippy::type_complexity)]
     fn table(&mut self, i: usize, style: Option<String>) -> Option<(Table, Vec<Vec<Option<Vec<ParaMap>>>>, usize)> {
         let mut j = i;
-        while j < self.lines.len() && self.lines[j].text.trim_start().starts_with('|') {
+        while j < self.stop && self.lines[j].text.trim_start().starts_with('|') {
             j += 1;
         }
         let before = self.errors.len();
@@ -563,7 +569,7 @@ impl<'a> Parser<'a> {
                         src = &src[..src.len() - 1];
                     }
                     self.in_cell = true;
-                    let out = self.inline_full(*ln, src, false);
+                    let out = self.inline_full(*ln, src, None);
                     self.in_cell = false;
                     let (paras, pmaps) = out.map(|o| o.cell_paras(cell.close)).unwrap_or_default();
                     row.push(Cell::Text(paras));
@@ -636,14 +642,19 @@ impl<'a> Parser<'a> {
 
     // ------------------------------------------------------------ inline
 
-    /// Parse inline content. With `stop_at_div`, stops at `</div>` and
-    /// returns its index in `src`.
+    /// Parse inline content. With `stop_at` (`div`), stops at that closing
+    /// tag and returns the index after it in `src`.
     #[allow(clippy::type_complexity)]
-    fn inline(&mut self, line: usize, src: &[Src], stop_at_div: bool) -> Option<((Inline, Vec<usize>), Option<usize>)> {
-        self.inline_full(line, src, stop_at_div).map(|o| ((o.inline, o.offsets), o.stop))
+    fn inline(
+        &mut self,
+        line: usize,
+        src: &[Src],
+        stop_at: Option<&str>,
+    ) -> Option<((Inline, Vec<usize>), Option<usize>)> {
+        self.inline_full(line, src, stop_at).map(|o| ((o.inline, o.offsets), o.stop))
     }
 
-    fn inline_full(&mut self, line: usize, src: &[Src], stop_at_div: bool) -> Option<InlineOut> {
+    pub(crate) fn inline_full(&mut self, line: usize, src: &[Src], stop_at: Option<&str>) -> Option<InlineOut> {
         let mut st = InlineState::default();
         let n = src.len();
         let mut x = 0;
@@ -776,6 +787,10 @@ impl<'a> Parser<'a> {
                         fail!(x, "a tag is not closed by >. Inline tags are {INLINE_TAGS}; write \\< for a literal <.");
                     };
                     match (tag.name.as_str(), tag.closing) {
+                        (name, true) if stop_at == Some(name) => {
+                            stop = Some(after);
+                            break;
+                        }
                         ("math", false) if !tag.self_closing => {
                             if !tag.attrs.is_empty() {
                                 fail!(x, "<math> takes no attributes: <math>…</math>.");
@@ -845,10 +860,6 @@ impl<'a> Parser<'a> {
                         }
                         ("p", false) if tag.self_closing => fail!(x, "<p/> inside a line starts a paragraph only in a table cell; elsewhere a paragraph is its own line, and an empty paragraph is a line holding only <p/>."),
                         ("p", _) => fail!(x, "{P_FORM}"),
-                        ("div", true) if stop_at_div => {
-                            stop = Some(after);
-                            break;
-                        }
                         ("div", _) => fail!(x, "a <div> is a whole line, <div style=\"Name\">text</div>, and cannot contain another <div>."),
                         ("pagebreak", _) => fail!(x, "a page break is its own line: write <pagebreak/> alone on a line."),
                         ("table", _) => fail!(x, "a table style is a line {{style=\"Name\"}} directly before the header row; there is no <table> tag."),
@@ -948,7 +959,7 @@ impl<'a> Parser<'a> {
 
     // ------------------------------------------------------------ cross-checks
 
-    fn check_names_after(&mut self) {
+    pub(crate) fn check_names_after(&mut self) {
         let mut errs = vec![];
         if let Some(known) = &self.names.keeps {
             let mut seen: Vec<&str> = vec![];
@@ -1013,17 +1024,17 @@ struct InlineState {
     splits: Vec<(usize, Option<String>, usize)>,
 }
 
-struct InlineOut {
-    inline: Inline,
-    offsets: Vec<usize>,
-    stop: Option<usize>,
-    splits: Vec<(usize, Option<String>, usize)>,
+pub(crate) struct InlineOut {
+    pub(crate) inline: Inline,
+    pub(crate) offsets: Vec<usize>,
+    pub(crate) stop: Option<usize>,
+    pub(crate) splits: Vec<(usize, Option<String>, usize)>,
 }
 
 impl InlineOut {
     /// A cell's paragraphs: the text starts the first, each `<p/>` another;
     /// a tag written first starts the first paragraph itself.
-    fn cell_paras(self, close: usize) -> (Vec<CellPara>, Vec<ParaMap>) {
+    pub(crate) fn cell_paras(self, close: usize) -> (Vec<CellPara>, Vec<ParaMap>) {
         let (mut paras, mut maps) = (vec![], vec![]);
         let (mut style, mut from) = (None, 0);
         for (k, (at, st, off)) in self.splits.into_iter().enumerate() {
@@ -1063,7 +1074,7 @@ impl InlineState {
     }
 }
 
-fn dummy(at: usize) -> BlockMap {
+pub(crate) fn dummy(at: usize) -> BlockMap {
     BlockMap { start: at, end: at, kind: BlockMapKind::Para(ParaMap::default()) }
 }
 

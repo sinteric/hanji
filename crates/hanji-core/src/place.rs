@@ -83,11 +83,16 @@ fn content(b: &Block) -> Vec<u32> {
             out
         }
         Block::Keep(id) => std::iter::once(3).chain(id.chars().map(|c| c as u32)).collect(),
+        // What a head is, not its label: a slide whose layout changed has the same content.
+        Block::Head(h) => [5, h.level as u32].into_iter().chain(h.key.chars().map(|c| c as u32)).collect(),
     }
 }
 
 pub(crate) fn same_kind(a: &Block, b: &Block) -> bool {
-    matches!((a, b), (Block::Para(_), Block::Para(_)) | (Block::Table(_), Block::Table(_)))
+    match (a, b) {
+        (Block::Head(x), Block::Head(y)) => x.level == y.level && x.key == y.key,
+        _ => matches!((a, b), (Block::Para(_), Block::Para(_)) | (Block::Table(_), Block::Table(_))),
+    }
 }
 
 /// Old block index → new block index. Diff on whole blocks, then pair moved
@@ -101,6 +106,10 @@ pub fn align(old: &[Block], new: &[Block]) -> Vec<Option<usize>> {
 /// identical blocks: matched only through a run of repeated blocks, or
 /// moved while an identical block exists.
 pub fn align_ambiguous(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, HashSet<usize>) {
+    // Nothing changed: every block is where it was, identical ones included.
+    if old == new {
+        return ((0..old.len()).map(Some).collect(), HashSet::new());
+    }
     let mut bmap: Vec<Option<usize>> = vec![None; old.len()];
     let mut used: HashSet<usize> = HashSet::new();
     let mut stretches: Vec<(Vec<usize>, Vec<usize>)> = vec![];
@@ -161,7 +170,8 @@ pub fn align_ambiguous(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, Has
         }
     }
     for &i in &moved {
-        if bmap[i].is_none() {
+        // A head is not paired by chance among identical heads: it follows what it holds (below).
+        if bmap[i].is_none() && old[i].head().is_none() {
             if let Some(&j) = free_new.iter().find(|&&j| !used.contains(&j) && new[j] == old[i]) {
                 pair(&mut bmap, &mut used, i, j);
             }
@@ -172,7 +182,7 @@ pub fn align_ambiguous(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, Has
     }
     let contents_old: Vec<Vec<u32>> = old.iter().map(content).collect();
     let contents_new: Vec<Vec<u32>> = new.iter().map(content).collect();
-    let pairable = |i: usize, j: usize| same_kind(&old[i], &new[j]);
+    let pairable = |i: usize, j: usize| same_kind(&old[i], &new[j]) && old[i].head().is_none();
     let ratio = |i: usize, j: usize| diff::ratio(&contents_old[i], &contents_new[j]);
     for (olds, _) in &stretches {
         for &i in olds {
@@ -216,6 +226,7 @@ pub fn align_ambiguous(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, Has
             pair(&mut bmap, &mut used, i, j);
         }
     }
+    follow_heads(old, new, &mut bmap, &mut used, &mut ambiguous);
     // Block placeholders are found by id wherever they went.
     for (i, b) in old.iter().enumerate() {
         if let Block::Keep(id) = b {
@@ -239,6 +250,107 @@ pub fn align_ambiguous(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, Has
         k = e;
     }
     (bmap, ambiguous)
+}
+
+/// Heads follow what they hold. Each head pairs with the new head its
+/// contents mostly went under (slots and shapes first, then slides, whose
+/// contents include their slots). A slide none of whose contents survived
+/// keeps the pairing the diff gave it, else takes the place after where the
+/// block before it went; a slot or shape none of whose
+/// contents survived pairs with the head of its key on the slide its slide
+/// went to. A head is ambiguous when every block that placed it is.
+fn follow_heads(
+    old: &[Block],
+    new: &[Block],
+    bmap: &mut [Option<usize>],
+    used: &mut HashSet<usize>,
+    ambiguous: &mut HashSet<usize>,
+) {
+    let heads: Vec<usize> = (0..old.len()).filter(|&i| old[i].head().is_some()).collect();
+    let diff: HashMap<usize, usize> = heads.iter().filter_map(|&i| bmap[i].map(|j| (i, j))).collect();
+    let diff_ambiguous: HashSet<usize> = heads.iter().copied().filter(|i| ambiguous.contains(i)).collect();
+    for &i in &heads {
+        if let Some(j) = bmap[i].take() {
+            used.remove(&j);
+        }
+        ambiguous.remove(&i);
+    }
+    let level = |b: &Block| b.head().map(|h| h.level);
+    let end = |xs: &[Block], i: usize, lv: u8| {
+        (i + 1..xs.len()).find(|&k| level(&xs[k]).is_some_and(|l| l <= lv)).unwrap_or(xs.len())
+    };
+    // `unders[lv][j]`: the new head of level `lv` or above that new block `j` sits under.
+    let top = old.iter().chain(new).filter_map(level).max().unwrap_or(0);
+    let unders: Vec<Vec<Option<usize>>> = (0..=top)
+        .map(|lv| {
+            let mut last = None;
+            (0..new.len())
+                .map(|j| {
+                    let u = last;
+                    if level(&new[j]).is_some_and(|l| l <= lv) {
+                        last = Some(j);
+                    }
+                    u
+                })
+                .collect()
+        })
+        .collect();
+    let under = |j: usize, lv: u8| unders[lv as usize][j];
+    let pair = |bmap: &mut [Option<usize>], used: &mut HashSet<usize>, i: usize, j: usize| -> bool {
+        let fits = j < new.len() && !used.contains(&j) && same_kind(&old[i], &new[j]);
+        if fits {
+            bmap[i] = Some(j);
+            used.insert(j);
+        }
+        fits
+    };
+    for lv in [1, 0] {
+        for &i in heads.iter().filter(|&&i| level(&old[i]) == Some(lv)) {
+            let mut votes: Vec<(usize, usize, bool)> = vec![]; // (new head, count, every voter ambiguous)
+            let contents = i + 1..end(old, i, lv);
+            for (k, to) in contents.clone().zip(&bmap[contents]) {
+                let Some(x) = to.and_then(|jk| under(jk, lv)) else { continue };
+                match votes.iter_mut().find(|v| v.0 == x) {
+                    Some(v) => {
+                        v.1 += 1;
+                        v.2 &= ambiguous.contains(&k);
+                    }
+                    None => votes.push((x, 1, ambiguous.contains(&k))),
+                }
+            }
+            // Most votes; the earliest content breaks a tie.
+            let best = votes.iter().enumerate().max_by_key(|(n, v)| (v.1, std::cmp::Reverse(*n))).map(|(_, v)| *v);
+            if let Some((x, _, amb)) = best {
+                if pair(bmap, used, i, x) && amb {
+                    ambiguous.insert(i);
+                }
+            }
+        }
+        if lv == 0 {
+            for &i in &heads {
+                if level(&old[i]) != Some(0) || bmap[i].is_some() {
+                    continue;
+                }
+                let by_diff = diff.get(&i).is_some_and(|&j| pair(bmap, used, i, j));
+                if by_diff {
+                    if diff_ambiguous.contains(&i) {
+                        ambiguous.insert(i);
+                    }
+                } else if let Some(j) = i.checked_sub(1).and_then(|p| bmap[p]).map(|j| j + 1) {
+                    pair(bmap, used, i, j);
+                }
+            }
+        }
+    }
+    for &i in &heads {
+        if level(&old[i]) != Some(1) || bmap[i].is_some() {
+            continue;
+        }
+        let Some(js) = (0..i).rev().find(|&s| level(&old[s]) == Some(0)).and_then(|s| bmap[s]) else { continue };
+        if let Some(x) = (js + 1..end(new, js, 0)).find(|&x| !used.contains(&x) && same_kind(&old[i], &new[x])) {
+            pair(bmap, used, i, x);
+        }
+    }
 }
 
 type CellMap = Box<dyn Fn(usize, usize) -> Option<(usize, usize)>>;
@@ -548,6 +660,13 @@ impl<'a> Placer<'a> {
             match (&old[i], &new[j]) {
                 (Block::Para(op), Block::Para(np)) => self.para(&op.content, vec![i], &np.content, vec![j], &[]),
                 (Block::Table(ot), Block::Table(nt)) => self.table(ot, i, nt, j),
+                (Block::Head(_), Block::Head(_)) => {
+                    for e in self.entries_at(&vec![i]) {
+                        if !matches!(e.kind, Kind::Keep | Kind::Bkeep | Kind::Bmarker) {
+                            self.put(e, vec![j], None, None);
+                        }
+                    }
+                }
                 _ => self.deleted_block(i),
             }
         }

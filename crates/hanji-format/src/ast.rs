@@ -22,11 +22,71 @@ pub struct FrontMatter {
 
 impl FrontMatter {
     pub fn document(format: &str, template: Option<&str>) -> Self {
+        Self::of("document", format, template)
+    }
+
+    pub fn presentation(format: &str, template: Option<&str>) -> Self {
+        Self::of("presentation", format, template)
+    }
+
+    fn of(doc_type: &str, format: &str, template: Option<&str>) -> Self {
         FrontMatter {
-            doc_type: "document".into(),
+            doc_type: doc_type.into(),
             format: format.into(),
             template: template.map(str::to_string),
             schema: crate::SCHEMA_VERSION,
+        }
+    }
+}
+
+/// A Presentation file (§5.3): slides built from their layouts' placeholders.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Presentation {
+    pub front: FrontMatter,
+    pub slides: Vec<Slide>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Slide {
+    /// `layout: Name`, as the file lists it.
+    pub layout: String,
+    /// Slots and shapes in the order written (the slide's z-order); notes last.
+    pub items: Vec<SlideItem>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub enum SlideItem {
+    /// `::name::` and the lines after it: paragraphs, list items, empty
+    /// paragraphs and placeholders.
+    Slot(Slot),
+    /// `<shape id="…" name="…">text</shape>`: a shape that is not a layout
+    /// placeholder, its text only; `<p/>` starts another paragraph.
+    Shape(ShapeText),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Slot {
+    pub name: String,
+    pub blocks: Vec<Block>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ShapeText {
+    pub id: String,
+    pub name: String,
+    pub paras: Vec<Inline>,
+}
+
+impl Presentation {
+    /// Canonical shapes, as [`Document::normalize`] gives a document's blocks.
+    pub fn normalize(&mut self) {
+        for s in &mut self.slides {
+            for it in &mut s.items {
+                match it {
+                    SlideItem::Slot(slot) => normalize_blocks(&mut slot.blocks),
+                    SlideItem::Shape(sh) => sh.paras.iter_mut().for_each(Inline::normalize),
+                }
+            }
         }
     }
 }
@@ -345,47 +405,52 @@ impl Document {
     /// `<pagebreak/>`, a plain one of spaces only is empty (`<p/>`), and every
     /// inline is normalized.
     pub fn normalize(&mut self) {
-        for b in &mut self.blocks {
-            match b {
-                Block::Para(p) => {
-                    // A plain paragraph of spaces only has no line form (engines
-                    // write it as `<div style="Name">`, naming the file's style).
-                    if p.style == ParaStyle::Plain && p.content.spaces_only() {
-                        p.content.units.clear();
-                    }
-                    p.content.normalize();
-                    if p.style == ParaStyle::Plain && p.content.spans.is_empty() && p.content.units.len() == 1 {
-                        let u = &p.content.units[0];
-                        match &u.atom {
-                            Atom::Keep(k) if u.marks.is_empty() => *b = Block::Keep(k.clone()),
-                            Atom::PageBreak => *b = Block::PageBreak,
-                            _ => {}
-                        }
+        normalize_blocks(&mut self.blocks);
+    }
+}
+
+/// [`Document::normalize`] over a list of blocks (a document body, a presentation slot).
+pub(crate) fn normalize_blocks(blocks: &mut [Block]) {
+    for b in blocks {
+        match b {
+            Block::Para(p) => {
+                // A plain paragraph of spaces only has no line form (engines
+                // write it as `<div style="Name">`, naming the file's style).
+                if p.style == ParaStyle::Plain && p.content.spaces_only() {
+                    p.content.units.clear();
+                }
+                p.content.normalize();
+                if p.style == ParaStyle::Plain && p.content.spans.is_empty() && p.content.units.len() == 1 {
+                    let u = &p.content.units[0];
+                    match &u.atom {
+                        Atom::Keep(k) if u.marks.is_empty() => *b = Block::Keep(k.clone()),
+                        Atom::PageBreak => *b = Block::PageBreak,
+                        _ => {}
                     }
                 }
-                Block::Table(t) => {
-                    for row in &mut t.rows {
-                        for c in row {
-                            if let Cell::Text(ps) = c {
-                                for p in ps {
-                                    p.content.normalize();
-                                }
+            }
+            Block::Table(t) => {
+                for row in &mut t.rows {
+                    for c in row {
+                        if let Cell::Text(ps) = c {
+                            for p in ps {
+                                p.content.normalize();
                             }
                         }
                     }
                 }
-                Block::FootnoteDef(f) => f.content.normalize(),
-                Block::List(items) => {
-                    // A list starts at the margin and nests one level at a time.
-                    let mut prev: Option<usize> = None;
-                    for it in items {
-                        it.level = it.level.min(prev.map_or(0, |p| p + 1));
-                        prev = Some(it.level);
-                        it.content.normalize();
-                    }
-                }
-                Block::Keep(_) | Block::PageBreak => {}
             }
+            Block::FootnoteDef(f) => f.content.normalize(),
+            Block::List(items) => {
+                // A list starts at the margin and nests one level at a time.
+                let mut prev: Option<usize> = None;
+                for it in items {
+                    it.level = it.level.min(prev.map_or(0, |p| p + 1));
+                    prev = Some(it.level);
+                    it.content.normalize();
+                }
+            }
+            Block::Keep(_) | Block::PageBreak => {}
         }
     }
 }

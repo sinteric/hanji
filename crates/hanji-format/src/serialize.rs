@@ -6,22 +6,32 @@ use crate::ast::*;
 use crate::parse::{closer, delim};
 
 pub fn serialize(doc: &Document) -> String {
-    let f = &doc.front;
+    let mut out = front_lines(&doc.front);
+    blocks(&mut out, &doc.blocks);
+    out.join("\n") + "\n"
+}
+
+/// The front matter's lines.
+pub(crate) fn front_lines(f: &FrontMatter) -> Vec<String> {
     let mut out = vec!["---".to_string(), format!("type: {}", f.doc_type), format!("format: {}", f.format)];
     if let Some(t) = &f.template {
         out.push(format!("template: {t}"));
     }
     out.push(format!("schema: {}", f.schema));
     out.push("---".into());
-    for (k, b) in doc.blocks.iter().enumerate() {
+    out
+}
+
+/// Blocks, a blank line between them.
+pub(crate) fn blocks(out: &mut Vec<String>, blocks: &[Block]) {
+    for (k, b) in blocks.iter().enumerate() {
         // Consecutive empty paragraphs are consecutive lines; a blank line
         // separates the group from other blocks.
-        if k > 0 && !(is_empty_para(b) && is_empty_para(&doc.blocks[k - 1])) {
+        if k > 0 && !(is_empty_para(b) && is_empty_para(&blocks[k - 1])) {
             out.push(String::new());
         }
-        block(&mut out, b);
+        block(out, b);
     }
-    out.join("\n") + "\n"
 }
 
 fn block(out: &mut Vec<String>, b: &Block) {
@@ -92,7 +102,7 @@ fn p_tag(style: Option<&str>) -> String {
 /// A cell's paragraphs: the first one's text, then `<p/>` before each other
 /// one. A leading plain `<p/>` is written only where it is needed (an empty
 /// first paragraph followed by others).
-fn cell_text(ps: &[CellPara]) -> String {
+pub(crate) fn cell_text(ps: &[CellPara]) -> String {
     let mut s = String::new();
     for (k, p) in ps.iter().enumerate() {
         let lead_needed = k > 0 || p.style.is_some() || (p.content.is_empty() && ps.len() > 1);
@@ -104,7 +114,7 @@ fn cell_text(ps: &[CellPara]) -> String {
     s
 }
 
-fn para_line(p: &Para) -> String {
+pub(crate) fn para_line(p: &Para) -> String {
     let body = serialize_inline(&p.content);
     match &p.style {
         ParaStyle::Heading(n) => {
@@ -313,7 +323,7 @@ pub(crate) fn keep_tag(k: &Keep) -> String {
     format!("<keep id=\"{}\" kind=\"{}\" summary=\"{}\"/>", attr(&k.id), attr(&k.kind), attr(&k.summary))
 }
 
-fn attr(s: &str) -> String {
+pub(crate) fn attr(s: &str) -> String {
     s.replace('&', "&amp;").replace('"', "&quot;").replace('<', "&lt;")
 }
 

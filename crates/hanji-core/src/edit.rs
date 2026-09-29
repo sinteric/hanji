@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 use hanji_format::{self as fmt, Diagnostic, Names, ParaMap, Parsed};
 
 use crate::diff::{Op, Tag};
-use crate::model::{self, Block, Capabilities, Path, SrcKind, EMPTY};
+use crate::model::{self, Block, BlockSrc, Capabilities, Path, SrcKind, EMPTY};
 use crate::place::{self, same_kind, Alignment, Global, Outcome, Status, Stream};
 use crate::remainder::{Kind, Remainder};
 
@@ -54,6 +54,7 @@ pub fn names(rem: &Remainder) -> Names {
         fields: None,
         keeps: Some(rem.keep_list()),
         formats: Some(vec![rem.format.clone()]),
+        ..Default::default()
     }
 }
 
@@ -62,6 +63,35 @@ pub fn model_of(text: &str, rem: &Remainder, caps: Capabilities) -> Result<(Pars
     let parsed = fmt::parse_with(text, &names(rem))?;
     let blocks = model::resolve(&parsed, text, &rem.styles, caps, &|id| rem.is_block_keep(id))?;
     Ok((parsed, blocks))
+}
+
+/// A text grammar resolved against a remainder: the Document grammar
+/// (§5.2, [`DocumentModel`]) or a Presentation's (§5.3). Re-anchoring works
+/// on what it gives, whatever the grammar.
+pub trait TextModel {
+    /// Parse and check `text` against `rem`: its model blocks, and where
+    /// each is in the text.
+    fn resolve(
+        &self,
+        text: &str,
+        rem: &Remainder,
+        caps: Capabilities,
+    ) -> Result<(Vec<Block>, Vec<BlockSrc>), Vec<Diagnostic>>;
+}
+
+/// The Document grammar (§5.2).
+pub struct DocumentModel;
+
+impl TextModel for DocumentModel {
+    fn resolve(
+        &self,
+        text: &str,
+        rem: &Remainder,
+        caps: Capabilities,
+    ) -> Result<(Vec<Block>, Vec<BlockSrc>), Vec<Diagnostic>> {
+        let (parsed, blocks) = model_of(text, rem, caps)?;
+        Ok((blocks, model::block_maps(&parsed)))
+    }
 }
 
 /// Place the remainder of `old` against `new` under `al`: the new
@@ -114,8 +144,19 @@ pub fn reanchor_rewrite(
     new_text: &str,
     caps: Capabilities,
 ) -> Result<Reanchored, Refusal> {
-    let (_, old) = model_of(old_text, rem, caps).map_err(Refusal::Invalid)?;
-    let (_, new) = model_of(new_text, rem, caps).map_err(Refusal::Invalid)?;
+    reanchor_rewrite_in(&DocumentModel, rem, old_text, new_text, caps)
+}
+
+/// [`reanchor_rewrite`] for a text of grammar `m`.
+pub fn reanchor_rewrite_in(
+    m: &dyn TextModel,
+    rem: &Remainder,
+    old_text: &str,
+    new_text: &str,
+    caps: Capabilities,
+) -> Result<Reanchored, Refusal> {
+    let (old, _) = m.resolve(old_text, rem, caps).map_err(Refusal::Invalid)?;
+    let (new, _) = m.resolve(new_text, rem, caps).map_err(Refusal::Invalid)?;
     let al = Alignment::design_c(&old, &new);
     let (remainder, report, outcomes) = reanchor(rem, &old, &new, &al);
     Ok(Reanchored { text: new_text.to_string(), old, new, remainder, report, outcomes })
@@ -123,6 +164,19 @@ pub fn reanchor_rewrite(
 
 /// Re-anchor the edit `text[start..end] → new`; refusals are in the report.
 pub fn reanchor_span(
+    rem: &Remainder,
+    text: &str,
+    start: usize,
+    end: usize,
+    new: &str,
+    caps: Capabilities,
+) -> Result<Reanchored, Refusal> {
+    reanchor_span_in(&DocumentModel, rem, text, start, end, new, caps)
+}
+
+/// [`reanchor_span`] for a text of grammar `m`.
+pub fn reanchor_span_in(
+    m: &dyn TextModel,
     rem: &Remainder,
     text: &str,
     start: usize,
@@ -138,9 +192,9 @@ pub fn reanchor_span(
     }
     let (s, e, repl) = trim_span(text, start, end, new);
     let new_text = format!("{}{}{}", &text[..s], repl, &text[e..]);
-    let (op, old) = model_of(text, rem, caps).map_err(Refusal::Invalid)?;
-    let (np, nb) = model_of(&new_text, rem, caps).map_err(Refusal::Invalid)?;
-    let al = exact_alignment(&op, &old, &np, &nb, s, e, repl.len());
+    let (old, om) = m.resolve(text, rem, caps).map_err(Refusal::Invalid)?;
+    let (nb, nm) = m.resolve(&new_text, rem, caps).map_err(Refusal::Invalid)?;
+    let al = exact_alignment(&om, &old, &nm, &nb, s, e, repl.len());
     let (remainder, report, outcomes) = reanchor(rem, &old, &nb, &al);
     Ok(Reanchored { text: new_text, old, new: nb, remainder, report, outcomes })
 }
@@ -149,13 +203,36 @@ pub fn reanchor_span(
 /// `new_text`. Blocks are aligned by diff (design C). Refused when an entry
 /// cannot be placed.
 pub fn rewrite(rem: &Remainder, old_text: &str, new_text: &str, caps: Capabilities) -> Result<Reanchored, Refusal> {
-    refuse_unplaceable(reanchor_rewrite(rem, old_text, new_text, caps)?)
+    rewrite_in(&DocumentModel, rem, old_text, new_text, caps)
+}
+
+/// [`rewrite`] for a text of grammar `m`.
+pub fn rewrite_in(
+    m: &dyn TextModel,
+    rem: &Remainder,
+    old_text: &str,
+    new_text: &str,
+    caps: Capabilities,
+) -> Result<Reanchored, Refusal> {
+    refuse_unplaceable(reanchor_rewrite_in(m, rem, old_text, new_text, caps)?)
 }
 
 /// An exact edit: the one occurrence of `old` in `text` becomes `new`, and
 /// the remainder is re-anchored from that span. Refused when an entry
 /// cannot be placed.
 pub fn edit(rem: &Remainder, text: &str, old: &str, new: &str, caps: Capabilities) -> Result<Reanchored, Refusal> {
+    edit_in(&DocumentModel, rem, text, old, new, caps)
+}
+
+/// [`edit`] for a text of grammar `m`.
+pub fn edit_in(
+    m: &dyn TextModel,
+    rem: &Remainder,
+    text: &str,
+    old: &str,
+    new: &str,
+    caps: Capabilities,
+) -> Result<Reanchored, Refusal> {
     if old.is_empty() {
         return Err(Refusal::Edit("the old text is empty; include the text around the place to edit.".into()));
     }
@@ -178,7 +255,7 @@ pub fn edit(rem: &Remainder, text: &str, old: &str, new: &str, caps: Capabilitie
             )))
         }
     };
-    refuse_unplaceable(reanchor_span(rem, text, s, s + old.len(), new, caps)?)
+    refuse_unplaceable(reanchor_span_in(m, rem, text, s, s + old.len(), new, caps)?)
 }
 
 /// Context the edit repeats unchanged is not part of the span: trim a
@@ -223,11 +300,14 @@ fn common_suffix(a: &str, b: &str) -> usize {
     n.min(a.len()).min(b.len())
 }
 
-/// Every paragraph position of a parsed text: path, content, source map.
-fn para_maps<'a>(blocks: &'a [Block], parsed: &'a Parsed) -> Vec<(Path, Option<&'a fmt::Inline>, &'a ParaMap, usize)> {
+/// Every paragraph position of a resolved text: path, content, source map.
+fn para_maps<'a>(
+    blocks: &'a [Block],
+    maps: &'a [BlockSrc],
+) -> Vec<(Path, Option<&'a fmt::Inline>, &'a ParaMap, usize)> {
     let mut out = vec![];
-    for (j, (b, m)) in blocks.iter().zip(model::block_maps(parsed)).enumerate() {
-        match (b, m.kind) {
+    for (j, (b, m)) in blocks.iter().zip(maps).enumerate() {
+        match (b, &m.kind) {
             (Block::Table(_), SrcKind::Table(cells)) => {
                 for (r, row) in cells.iter().enumerate() {
                     for (c, pms) in row.iter().enumerate() {
@@ -248,9 +328,9 @@ fn para_maps<'a>(blocks: &'a [Block], parsed: &'a Parsed) -> Vec<(Path, Option<&
 /// units inside the touched blocks map through their source offsets; a
 /// paragraph follows its paragraph mark.
 fn exact_alignment(
-    op: &Parsed,
+    old_maps: &[BlockSrc],
     ob: &[Block],
-    np: &Parsed,
+    new_maps: &[BlockSrc],
     nb: &[Block],
     s: usize,
     e: usize,
@@ -265,7 +345,6 @@ fn exact_alignment(
             None
         }
     };
-    let (old_maps, new_maps) = (model::block_maps(op), model::block_maps(np));
     let new_start: HashMap<usize, usize> = new_maps.iter().enumerate().map(|(j, m)| (m.start, j)).collect();
     let mut bmap = vec![None; ob.len()];
     let mut touched_old = vec![];
@@ -278,8 +357,8 @@ fn exact_alignment(
     }
     let touched_old: HashSet<usize> = touched_old.into_iter().collect();
     let claimed: HashSet<usize> = bmap.iter().flatten().copied().collect();
-    let old_items: Vec<_> = para_maps(ob, op).into_iter().filter(|x| touched_old.contains(&x.3)).collect();
-    let new_items: Vec<_> = para_maps(nb, np).into_iter().filter(|x| !claimed.contains(&x.3)).collect();
+    let old_items: Vec<_> = para_maps(ob, old_maps).into_iter().filter(|x| touched_old.contains(&x.3)).collect();
+    let new_items: Vec<_> = para_maps(nb, new_maps).into_iter().filter(|x| !claimed.contains(&x.3)).collect();
     let old_stream = Stream::new(old_items.iter().map(|x| (x.0.clone(), x.1.unwrap_or(&EMPTY))));
     let new_stream = Stream::new(new_items.iter().map(|x| (x.0.clone(), x.1.unwrap_or(&EMPTY))));
     // Source offset of every stream position (units, then the mark).

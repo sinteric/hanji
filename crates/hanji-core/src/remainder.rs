@@ -33,6 +33,12 @@ pub enum Kind {
     Tc,
     /// After the last block (the body's final section properties). Anchor: the document.
     Tail,
+    /// Everything of a slide but its slots' and shapes' text: its part, the
+    /// objects on it the text does not show, its notes page. Anchor: the
+    /// slide's head.
+    Slide,
+    /// A slot's or shape's own element, without its paragraphs. Anchor: its head.
+    Shape,
 }
 
 impl Kind {
@@ -73,6 +79,10 @@ pub struct Meta {
     /// Engine data (docx: the run's original `w:t` elements).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub aux: Vec<String>,
+    /// The package part whose relationships the entry's XML refers to
+    /// (`r:` attributes): the entry cannot be placed in another part.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub part: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

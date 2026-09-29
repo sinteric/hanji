@@ -11,7 +11,8 @@ use std::path::{Path as FsPath, PathBuf};
 use hanji_core::diff::{span_ops, Op};
 use hanji_core::place::{self, Alignment, Outcome, Status};
 use hanji_core::{
-    Block, Capabilities, Engine, EngineError, Entry, ImportOptions, ImportReport, Kind, Para, Path, Remainder,
+    Block, Capabilities, DocumentModel, Engine, EngineError, Entry, ImportOptions, ImportReport, Kind, Para, Path,
+    Remainder, TextModel,
 };
 use hanji_format::{Atom, Cell, Inline, Marks, Unit};
 use hanji_package::{package, xml};
@@ -43,6 +44,10 @@ pub trait Format {
     fn preferred_styles(&self) -> &'static [&'static str];
     /// Whether a block placeholder's XML draws something (E2).
     fn is_drawing(&self, xml: &str) -> bool;
+    /// The text grammar (a Document's unless the engine says otherwise).
+    fn model(&self) -> &dyn TextModel {
+        &DocumentModel
+    }
 }
 
 /// The files with extension `ext` in `dir`, by name.
@@ -68,22 +73,23 @@ pub fn getput_equal(fmt: &dyn Format, original: &[u8], out: &[u8]) -> (bool, boo
 
 // ---------------------------------------------------------------- the model as the edits see it
 
+/// A revision as the edits see it: its blocks and their entries.
 #[derive(Clone)]
-struct Doc {
-    blocks: Vec<Block>,
-    entries: Vec<Entry>,
+pub struct Doc {
+    pub blocks: Vec<Block>,
+    pub entries: Vec<Entry>,
 }
 
 /// What the edits read besides the document: the engine and the remainder.
-struct Cx<'a> {
-    fmt: &'a dyn Format,
-    rem: &'a Remainder,
+pub struct Cx<'a> {
+    pub fmt: &'a dyn Format,
+    pub rem: &'a Remainder,
 }
 
 const KEEP_CH: char = '\u{F0000}';
 
 /// A paragraph's anchor string: text, placeholders as one private character.
-fn chars(i: &Inline) -> Vec<char> {
+pub fn chars(i: &Inline) -> Vec<char> {
     i.units
         .iter()
         .map(|u| match &u.atom {
@@ -110,7 +116,7 @@ fn paras(blocks: &[Block]) -> Vec<(Path, &Inline)> {
                     }
                 }
             }
-            Block::Keep(_) => {}
+            Block::Keep(_) | Block::Head(_) => {}
         }
     }
     out
@@ -127,7 +133,7 @@ fn get_para<'a>(blocks: &'a mut [Block], path: &[usize]) -> &'a mut Inline {
     }
 }
 
-fn entries_at<'a>(d: &'a Doc, path: &[usize]) -> Vec<&'a Entry> {
+pub fn entries_at<'a>(d: &'a Doc, path: &[usize]) -> Vec<&'a Entry> {
     d.entries.iter().filter(|e| e.path == path).collect()
 }
 
@@ -136,32 +142,64 @@ fn is_page_break(i: &Inline) -> bool {
     i.units.len() == 1 && i.units[0].atom == Atom::PageBreak
 }
 
-fn clean(p: &[char], s: usize, e: usize) -> bool {
+/// Characters `s..e` hold no placeholder, atom, tab or line break.
+pub fn clean(p: &[char], s: usize, e: usize) -> bool {
     p[s..e].iter().all(|&c| c != KEEP_CH && c != '\u{F0001}' && c != '\t' && c != '\n')
 }
 
-type Xmap = HashMap<Path, Vec<(usize, usize, Path, usize)>>;
+pub type Xmap = HashMap<Path, Vec<(usize, usize, Path, usize)>>;
 
-struct Edit {
-    name: &'static str,
-    what: String,
-    blocks: Vec<Block>,
-    bmap: Vec<Option<usize>>,
-    true_ops: HashMap<Path, Vec<Op>>,
-    touched: HashSet<usize>,
-    xmap: Xmap,
-    lenient: HashSet<Path>,
+/// A scripted edit: the new blocks, and the true alignment the oracle places by.
+pub struct Edit {
+    pub name: &'static str,
+    pub what: String,
+    pub blocks: Vec<Block>,
+    pub bmap: Vec<Option<usize>>,
+    pub true_ops: HashMap<Path, Vec<Op>>,
+    pub touched: HashSet<usize>,
+    pub xmap: Xmap,
+    pub lenient: HashSet<Path>,
     /// For the exact-span run: the edited units (path, start, end), if one paragraph span.
-    unit_span: Option<(Path, usize, usize)>,
+    pub unit_span: Option<(Path, usize, usize)>,
     /// Whether the edit is one contiguous text change (not a move).
-    local: bool,
+    pub local: bool,
+    /// The exact text edit `(start, end, new)`, when the edit knows it
+    /// (a whole slide deleted spans whole lines).
+    pub span: Option<(usize, usize, String)>,
 }
 
-fn ident(n: usize) -> Vec<Option<usize>> {
+impl Edit {
+    /// An edit that changes `blocks` as `bmap` says, with no paragraph-level ops.
+    pub fn blocks(
+        name: &'static str,
+        what: String,
+        blocks: Vec<Block>,
+        bmap: Vec<Option<usize>>,
+        touched: HashSet<usize>,
+        local: bool,
+    ) -> Edit {
+        Edit {
+            name,
+            what,
+            blocks,
+            bmap,
+            true_ops: HashMap::new(),
+            touched,
+            xmap: HashMap::new(),
+            lenient: HashSet::new(),
+            unit_span: None,
+            local,
+            span: None,
+        }
+    }
+}
+
+pub fn ident(n: usize) -> Vec<Option<usize>> {
     (0..n).map(Some).collect()
 }
 
-fn replace_span(d: &Doc, path: &[usize], s: usize, e: usize, new: &str, name: &'static str, what: String) -> Edit {
+/// Units `s..e` of the paragraph at `path` become `new` (with the marks of the first replaced unit).
+pub fn replace_span(d: &Doc, path: &[usize], s: usize, e: usize, new: &str, name: &'static str, what: String) -> Edit {
     let mut blocks = d.blocks.clone();
     let p = get_para(&mut blocks, path);
     let n = p.units.len();
@@ -182,16 +220,17 @@ fn replace_span(d: &Doc, path: &[usize], s: usize, e: usize, new: &str, name: &'
         lenient: HashSet::new(),
         unit_span: Some((path.to_vec(), s, e)),
         local: true,
+        span: None,
     }
 }
 
 /// `str(int(digits) * 10 + 5)` without overflow.
-fn times_ten_plus_five(digits: &str) -> String {
+pub fn times_ten_plus_five(digits: &str) -> String {
     let t = digits.trim_start_matches('0');
     format!("{t}5")
 }
 
-fn runs_of(p: &[char], pred: impl Fn(char) -> bool, min: usize) -> Vec<(usize, usize)> {
+pub fn runs_of(p: &[char], pred: impl Fn(char) -> bool, min: usize) -> Vec<(usize, usize)> {
     let mut out = vec![];
     let mut k = 0;
     while k < p.len() {
@@ -214,7 +253,8 @@ fn is_word(c: char) -> bool {
     c.is_alphanumeric() || c == '_'
 }
 
-fn figure_or_word(p: &[char]) -> Option<(usize, usize, String)> {
+/// A figure to change (`12` → `125`) or a word (`word` → `word-2`) in a paragraph.
+pub fn figure_or_word(p: &[char]) -> Option<(usize, usize, String)> {
     for (s, e) in runs_of(p, |c| c.is_ascii_digit(), 1) {
         if clean(p, s, e) {
             return Some((s, e, times_ten_plus_five(&p[s..e].iter().collect::<String>())));
@@ -315,6 +355,7 @@ fn e2_insert_before_drawing(d: &Doc, cx: &Cx) -> Option<Edit> {
         lenient: HashSet::new(),
         unit_span: None,
         local: true,
+        span: None,
     })
 }
 
@@ -350,6 +391,7 @@ fn e3_delete_formatted(d: &Doc, cx: &Cx) -> Option<Edit> {
                 lenient: HashSet::new(),
                 unit_span: None,
                 local: true,
+                span: None,
             });
         }
     }
@@ -417,6 +459,7 @@ fn e4_move_section(d: &Doc, cx: &Cx) -> Option<Edit> {
         lenient: HashSet::new(),
         unit_span: None,
         local: false,
+        span: None,
     })
 }
 
@@ -461,6 +504,7 @@ fn e5_restyle(d: &Doc, cx: &Cx) -> Option<Edit> {
                 lenient: HashSet::new(),
                 unit_span: None,
                 local: true,
+                span: None,
             });
         }
     }
@@ -621,6 +665,7 @@ fn e8_split(d: &Doc, _: &Cx) -> Option<Edit> {
         lenient: HashSet::from([vec![i]]),
         unit_span: None,
         local: true,
+        span: None,
     })
 }
 
@@ -677,12 +722,14 @@ fn e9_merge(d: &Doc, cx: &Cx) -> Option<Edit> {
         lenient: HashSet::from([vec![i], vec![i + 1]]),
         unit_span: None,
         local: true,
+        span: None,
     })
 }
 
-type EditFn = fn(&Doc, &Cx) -> Option<Edit>;
+pub type EditFn = fn(&Doc, &Cx) -> Option<Edit>;
 
-const EDITS: [(&str, EditFn); 9] = [
+/// The Document edits E1–E9 (E10 combines them).
+pub const EDITS: [(&str, EditFn); 9] = [
     ("e1_figure", e1_figure),
     ("e2_insert_before_drawing", e2_insert_before_drawing),
     ("e3_delete_formatted", e3_delete_formatted),
@@ -696,8 +743,9 @@ const EDITS: [(&str, EditFn); 9] = [
 
 // ---------------------------------------------------------------- oracle, E10
 
-pub fn written(text: &str, rem: &Remainder) -> Vec<Block> {
-    hanji_core::model_of(text, rem, CAPS).unwrap_or_else(|e| panic!("{}\n{text}", hanji_format::diag::render(&e))).1
+/// The blocks of a text, as the engine's grammar reads it.
+pub fn written(fmt: &dyn Format, text: &str, rem: &Remainder) -> Vec<Block> {
+    fmt.model().resolve(text, rem, CAPS).unwrap_or_else(|e| panic!("{}\n{text}", hanji_format::diag::render(&e))).0
 }
 
 fn oracle(d: &Doc, new: &[Block], ed: &Edit) -> HashMap<u64, Outcome> {
@@ -713,15 +761,15 @@ fn oracle(d: &Doc, new: &[Block], ed: &Edit) -> HashMap<u64, Outcome> {
 }
 
 /// E10: every edit in one revision; the oracle composed step by step.
-fn combined(d0: &Doc, cx: &Cx) -> (Vec<Block>, HashMap<u64, Outcome>, Vec<String>) {
+fn combined(d0: &Doc, cx: &Cx, edits: &[(&str, EditFn)]) -> (Vec<Block>, HashMap<u64, Outcome>, Vec<String>) {
     let mut cur = d0.clone();
     let mut origin: HashMap<u64, u64> = d0.entries.iter().map(|e| (e.id, e.id)).collect();
     let mut next_id = 1_000_000;
     let mut gone: HashMap<u64, &'static str> = HashMap::new();
     let mut steps = vec![];
-    for (_, f) in EDITS {
+    for (_, f) in edits {
         let Some(ed) = f(&cur, cx) else { continue };
-        let new = written(&cx.fmt.text_of(&ed.blocks, cx.rem), cx.rem);
+        let new = written(cx.fmt, &cx.fmt.text_of(&ed.blocks, cx.rem), cx.rem);
         let outs = oracle(&cur, &new, &ed);
         let mut nxt = vec![];
         for e in &cur.entries {
@@ -875,6 +923,8 @@ impl Tally {
 }
 
 const COUNTED: &[Kind] = &[
+    Kind::Slide,
+    Kind::Shape,
     Kind::Ppr,
     Kind::Run,
     Kind::Marker,
@@ -1028,11 +1078,14 @@ impl Out {
 
 /// The exact text span of an edit: from its unit span when it has one,
 /// else the minimal differing region.
-fn text_span(old_text: &str, new_text: &str, rem: &Remainder, ed: &Edit) -> (usize, usize, String) {
+fn text_span(fmt: &dyn Format, old_text: &str, new_text: &str, rem: &Remainder, ed: &Edit) -> (usize, usize, String) {
+    if let Some(span) = &ed.span {
+        return span.clone();
+    }
     if let Some((path, s, e)) = &ed.unit_span {
-        let parsed = hanji_format::parse_with(old_text, &hanji_core::edit::names(rem)).unwrap();
-        let pm = match hanji_core::model::block_maps(&parsed).swap_remove(path[0]).kind {
-            hanji_core::model::SrcKind::Para(pm) => pm.clone(),
+        let (_, mut maps) = fmt.model().resolve(old_text, rem, CAPS).unwrap();
+        let pm = match maps.swap_remove(path[0]).kind {
+            hanji_core::model::SrcKind::Para(pm) => pm,
             hanji_core::model::SrcKind::Table(cells) => cells[path[1]][path[2]].clone().unwrap()[path[3]].clone(),
         };
         let at = |k: usize| if k < pm.units.len() { pm.units[k] } else { pm.mark };
@@ -1080,6 +1133,18 @@ pub struct Summary {
 /// exports over `files`; prints the numbers (per file with HANJI_REPORT=1)
 /// and saves every export under `out`.
 pub fn run_corpus(fmt: &dyn Format, files: &[(String, Vec<u8>)], out: &Out) -> Summary {
+    run_corpus_with(fmt, files, out, &EDITS, "E10")
+}
+
+/// [`run_corpus`] with the engine's own edit set; `all` names the run that
+/// makes every edit in one revision (E10).
+pub fn run_corpus_with(
+    fmt: &dyn Format,
+    files: &[(String, Vec<u8>)],
+    out: &Out,
+    edits: &[(&str, EditFn)],
+    all: &str,
+) -> Summary {
     let report = std::env::var("HANJI_REPORT").is_ok();
     let mut totals = Totals::default();
     let mut sum = Summary { files: files.len(), ..Default::default() };
@@ -1089,9 +1154,13 @@ pub fn run_corpus(fmt: &dyn Format, files: &[(String, Vec<u8>)], out: &Out) -> S
         let d = Doc { blocks, entries: rem.entries.clone() };
         let text = fmt.text_of(&d.blocks, &rem);
         // The model text round-trips through the format crate.
-        assert_eq!(fmt.text_of(&written(&text, &rem), &rem), text, "{name}: model text does not reparse to itself");
+        assert_eq!(
+            fmt.text_of(&written(fmt, &text, &rem), &rem),
+            text,
+            "{name}: model text does not reparse to itself"
+        );
         // GetPut through the whole path: text → parse → place → export.
-        let re = hanji_core::reanchor_rewrite(&rem, &text, &text, CAPS).unwrap();
+        let re = hanji_core::reanchor_rewrite_in(fmt.model(), &rem, &text, &text, CAPS).unwrap();
         assert!(
             re.report.refused.is_empty() && re.report.removed.is_empty(),
             "{name}: GetPut moved entries: {:?}",
@@ -1115,7 +1184,7 @@ pub fn run_corpus(fmt: &dyn Format, files: &[(String, Vec<u8>)], out: &Out) -> S
             HashSet<usize>,
             Option<(usize, usize, String)>,
         )> = vec![];
-        for (fname, f) in EDITS {
+        for (fname, f) in edits {
             let Some(ed) = f(&d, &cx) else {
                 if report {
                     println!("  {name} {fname}: n/a");
@@ -1123,14 +1192,14 @@ pub fn run_corpus(fmt: &dyn Format, files: &[(String, Vec<u8>)], out: &Out) -> S
                 continue;
             };
             let new_text = fmt.text_of(&ed.blocks, &rem);
-            let new_blocks = written(&new_text, &rem);
+            let new_blocks = written(fmt, &new_text, &rem);
             let expected = oracle(&d, &new_blocks, &ed);
-            let span = ed.local.then(|| text_span(&text, &new_text, &rem, &ed));
+            let span = ed.local.then(|| text_span(fmt, &text, &new_text, &rem, &ed));
             jobs.push((ed.name.to_string(), ed.what.clone(), new_text, expected, ed.touched.clone(), span));
         }
-        let (fb, fexp, steps) = combined(&d, &cx);
+        let (fb, fexp, steps) = combined(&d, &cx, edits);
         jobs.push((
-            "E10 all edits in one revision".into(),
+            format!("{all} all edits in one revision"),
             steps.join("; "),
             fmt.text_of(&fb, &rem),
             fexp,
@@ -1140,9 +1209,9 @@ pub fn run_corpus(fmt: &dyn Format, files: &[(String, Vec<u8>)], out: &Out) -> S
         for (ename, what, new_text, expected, touched, span) in jobs {
             let short = ename.split_whitespace().next().unwrap().to_string();
             let mut designs: Vec<(&'static str, hanji_core::Reanchored)> =
-                vec![("C", hanji_core::reanchor_rewrite(&rem, &text, &new_text, CAPS).unwrap())];
+                vec![("C", hanji_core::reanchor_rewrite_in(fmt.model(), &rem, &text, &new_text, CAPS).unwrap())];
             if let Some((s, e, ref new)) = span {
-                let r = hanji_core::reanchor_span(&rem, &text, s, e, new, CAPS)
+                let r = hanji_core::reanchor_span_in(fmt.model(), &rem, &text, s, e, new, CAPS)
                     .unwrap_or_else(|e| panic!("{name} {ename}: {e}"));
                 assert_eq!(r.text, new_text, "{name} {ename}: the exact span does not give the edited text");
                 designs.push(("exact", r));

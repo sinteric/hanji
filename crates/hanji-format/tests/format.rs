@@ -418,6 +418,7 @@ fn name_errors_list_allowed_names() {
         fields: Some(vec!["작성자".into()]),
         keeps: Some(vec![Keep { id: "k1".into(), kind: "drawing".into(), summary: "logo".into() }]),
         formats: Some(vec!["docx".into()]),
+        ..Default::default()
     };
     let e = errors_with("<div style=\"note\">x</div>\n", &names);
     assert_eq!(e, vec!["line 7, column 6: style=\"note\" is not a paragraph style of this file; names are case-sensitive: \"Note\". The value is exactly one style name, spaces included. Allowed paragraph styles: \"Normal\", \"Note\", \"Body Text\"."]);

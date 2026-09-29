@@ -7,48 +7,10 @@ use hanji_core::{notice, ImportReport, Notice, Part};
 use crate::ooxml::DOC_PART;
 use crate::xml::{self, Element, Node};
 use hanji_package::clip;
+use hanji_package::opc::{is_macro_package, rels_part, resolve_target, source_of_rels};
 
 /// Field instructions that fetch or run something when the file opens or updates.
 const FETCHING_FIELDS: &[&str] = &["DDE", "DDEAUTO", "INCLUDEPICTURE", "INCLUDETEXT", "LINK", "IMPORT", "RD"];
-
-/// Extensions of macro-enabled Office packages.
-const MACRO_PACKAGES: &[&str] =
-    &[".docm", ".dotm", ".xlsm", ".xltm", ".xlam", ".xlsb", ".pptm", ".potm", ".ppsm", ".ppam", ".sldm"];
-
-/// An embedded package that can carry macros: a macro-enabled extension, or
-/// a zip holding a VBA project.
-fn is_macro_package(p: &Part) -> bool {
-    let lower = p.name.to_ascii_lowercase();
-    MACRO_PACKAGES.iter().any(|x| lower.ends_with(x))
-        || (p.data.starts_with(b"PK")
-            && crate::package::read(&p.data)
-                .is_ok_and(|inner| inner.iter().any(|q| q.name.to_ascii_lowercase().ends_with("vbaproject.bin"))))
-}
-
-/// `word/_rels/document.xml.rels` → `word/document.xml`.
-fn source_of_rels(rels: &str) -> Option<String> {
-    let (dir, file) = rels.rsplit_once("_rels/")?;
-    Some(format!("{dir}{}", file.strip_suffix(".rels")?))
-}
-
-/// A relationship target resolved against its source part.
-fn resolve_target(source: &str, target: &str) -> String {
-    if let Some(abs) = target.strip_prefix('/') {
-        return abs.to_string();
-    }
-    let mut segs: Vec<&str> = source.split('/').collect();
-    segs.pop();
-    for t in target.split('/') {
-        match t {
-            ".." => {
-                segs.pop();
-            }
-            "." | "" => {}
-            t => segs.push(t),
-        }
-    }
-    segs.join("/")
-}
 
 struct Removed {
     source: String,
@@ -135,10 +97,7 @@ pub fn neutralise(parts: &mut Vec<Part>, doc: &mut Element, report: &mut ImportR
     // Parts that only served removed content, and their content types.
     let mut gone = std::collections::BTreeSet::new();
     for name in drop_parts {
-        let rels = match name.rsplit_once('/') {
-            Some((d, f)) => format!("{d}/_rels/{f}.rels"),
-            None => format!("_rels/{name}.rels"),
-        };
+        let rels = rels_part(&name);
         gone.insert(name);
         gone.insert(rels);
     }

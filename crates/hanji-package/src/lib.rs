@@ -1,7 +1,8 @@
-//! Package plumbing shared by the XML engines (docx, hwpx): zip parts copied
+//! Package plumbing shared by the XML engines (docx, hwpx, pptx): zip parts copied
 //! through byte for byte, a lossless XML tree over quick-xml with a canonical
 //! form for GetPut and fingerprints, and small helpers. No I/O.
 
+pub mod opc;
 pub mod package;
 pub mod xml;
 

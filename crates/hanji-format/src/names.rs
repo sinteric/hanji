@@ -9,4 +9,15 @@ pub struct Names {
     /// The file's placeholders; the text may keep, move or delete them only.
     pub keeps: Option<Vec<Keep>>,
     pub formats: Option<Vec<String>>,
+    /// A presentation's layouts and the slots each has (§5.3).
+    pub layouts: Option<Vec<Layout>>,
+    /// A presentation's shapes that are not placeholders: `(id, name)`.
+    pub shapes: Option<Vec<(String, String)>>,
+}
+
+/// A slide layout: its name and the slots its placeholders give, in order.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Layout {
+    pub name: String,
+    pub slots: Vec<String>,
 }

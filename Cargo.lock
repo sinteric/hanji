@@ -83,6 +83,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "hanji-pptx"
+version = "0.1.0"
+dependencies = [
+ "hanji-core",
+ "hanji-format",
+ "hanji-package",
+ "hanji-testkit",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "hanji-testkit"
 version = "0.1.0"
 dependencies = [
