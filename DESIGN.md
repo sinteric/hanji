@@ -369,30 +369,67 @@ layout: Two Content
 A grid does not fit a text view, so the Spreadsheet splits in two:
 
 - **Workbook structure as text** — sheets, tables, column types and formats,
-  formulas, charts, validation:
+  formulas, charts, placeholders:
 
   ```
-  <sheet name="매출">
-  <table name="Sales" range="A1:E1201">
+  ---
+  type: spreadsheet
+  format: xlsx
+  schema: 1
+  ---
+
+  <sheet name="매출" range="A1:G1201">
+
+  <table name="Sales" range="A1:D1201">
   | column | type | format | formula |
   |---|---|---|---|
-  | 월 | date | yyyy-mm | |
-  | 매출 | number | #,##0 | |
+  | 월 | date | yyyy-mm |  |
+  | 매출 | number | #,##0 |  |
+  | 원가 | number | #,##0 |  |
   | 이익 | number | #,##0 | =[@매출]-[@원가] |
   </table>
+
   <chart type="bar" data="Sales[월],Sales[이익]" title="월별 이익"/>
+
+  <keep id="k1" kind="data-validation" summary="B2:B1201"/>
   </sheet>
   ```
+
+  `range` on `<sheet>` is the used range, tables included. A column's type
+  is `text`, `number`, `date` or `mixed` (cells of more than one kind, or
+  empty cells in General format). Merges, validations, conditional formats,
+  notes, pictures and pivot tables are `<keep/>` placeholders (rule 8). A
+  syntax for validations is still open; until then they are
+  placeholders, and a value that breaks one is refused.
 
 - **Cell data** is read through a row window of one table or range: a pipe
   table whose first column is the read-only sheet row number, then one cell
   per column with the value as displayed (`12,000,000`, `00417`), blank rows
   included. A large sheet is read one window at a time (rule 11); the whole
-  sheet is never assumed to fit.
+  sheet is never assumed to fit. `rows` picks the sheet rows of a table's
+  window; cells outside tables are read by range, one column per letter:
+
+  ```
+  <data table="Sales" rows="2:3">
+  | row | 월 | 매출 | 원가 | 이익 |
+  |---|---|---|---|---|
+  | 2 | 2026-01 | 12,000,000 | 8,400,000 | 3,600,000 |
+  | 3 | 2026-02 | 11,200,000 | 7,900,000 | 3,300,000 |
+  </data>
+  <data sheet="매출" range="F1:G2">
+  | row | F | G |
+  |---|---|---|
+  | 1 | 목표 | 150,000,000 |
+  | 2 |  |  |
+  </data>
+  ```
+
 - Cell data is written by **range operations**: a JSON list of ops from a
   closed set, applied in order — `set`, `append_rows`, `insert_rows`,
   `delete_rows`, `fill_formula`, `set_type`, `add_column`, `sort`,
-  `add_table`, `add_sheet`. The model never types bulk rows.
+  `add_table`, `add_sheet`. The model never types bulk rows. A value that
+  starts with `=` is stored as text, with a notice (§8); formulas are written
+  only as a column's `formula` or by `fill_formula`.
 
   ```json
   [{"op": "set", "range": "매출!B73", "values": [[18420000]]},
