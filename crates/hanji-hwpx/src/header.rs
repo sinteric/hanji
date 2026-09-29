@@ -170,6 +170,12 @@ impl Header {
         self.styles.iter().find(|s| s.id == id)
     }
 
+    /// Style `id`, or, when header.xml has no such style, a stand-in named
+    /// by its id with the first shapes, so the reference is kept as it is.
+    pub fn style_or_missing(&self, id: u32) -> Style {
+        self.style(id).cloned().unwrap_or_else(|| Style { id, name: id.to_string(), para_pr: 0, char_pr: 0 })
+    }
+
     pub fn style_named(&self, name: &str) -> Option<&Style> {
         self.styles.iter().find(|s| s.name == name)
     }

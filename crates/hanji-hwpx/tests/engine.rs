@@ -238,6 +238,22 @@ fn joining_paragraphs_keeps_the_runs_the_join_rewrites_around() {
 }
 
 #[test]
+fn a_style_missing_from_the_header_keeps_its_reference() {
+    let pkg = hwpx(&[p_in(9, 0, &[(1, "유령 스타일")]), p("끝")]);
+    let imp = import(&pkg);
+    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg), "GetPut\n{}", imp.text);
+    let r = edit(&imp.remainder, &imp.text, "유령 스타일", "유령 문단", CAPS).unwrap();
+    let out = export(&r.text, &r.remainder);
+    assert!(section(&out).contains(r#"paraPrIDRef="0" styleIDRef="9""#), "{}", section(&out));
+    assert_eq!(import(&out).text, r.text, "PutGet");
+    // A new paragraph in that style takes the same reference.
+    let block = imp.text.lines().find(|b| b.contains("유령")).unwrap().to_string();
+    let added = imp.text.replace("끝", &block.replace("유령 스타일", "새 문단"));
+    let out = export(&added, &imp.remainder);
+    assert_eq!(section(&out).matches(r#"styleIDRef="9""#).count(), 2, "{}", section(&out));
+}
+
+#[test]
 fn side_by_side_tables_are_separate_blocks_in_one_paragraph() {
     let a = tbl(&[&[("담당 부서", 1, 1), ("기획과", 1, 1)]], 2);
     let b = tbl(&[&[("담당자", 1, 1), ("홍길동", 1, 1)]], 2);
