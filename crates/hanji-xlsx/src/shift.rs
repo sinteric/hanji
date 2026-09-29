@@ -170,6 +170,7 @@ type Rewrite = (usize, u32, u32, Option<String>, Option<String>);
 
 fn formulas_to_rewrite(book: &mut Book, target: &str, i: usize, sh: &RowShift) -> Result<Vec<Rewrite>, String> {
     let mut out = vec![];
+    let needle = target.as_bytes();
     for k in 0..book.sheets.len() {
         if book.sheets[k].kind != SheetKind::Work {
             continue;
@@ -177,8 +178,7 @@ fn formulas_to_rewrite(book: &mut Book, target: &str, i: usize, sh: &RowShift) -
         book.load_store(k)?;
         let own_name = book.sheets[k].name.clone();
         let own = own_name.eq_ignore_ascii_case(target);
-        let needle = target.as_bytes().to_vec();
-        let pre = |b: &[u8]| has_formula(b) && (own || holds(b, &needle));
+        let pre = |b: &[u8]| has_formula(b) && (own || holds(b, needle));
         book.store(k).for_each_cell_if(&pre, &mut |r, c| {
             let Some(f) = &c.f else { return };
             let text = c.formula().and_then(|t| shift_formula(&t, &own_name, target, sh));

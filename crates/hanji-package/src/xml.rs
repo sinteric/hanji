@@ -53,7 +53,7 @@ impl Element {
         self
     }
     pub fn local(&self) -> &str {
-        self.name.rsplit(':').next().unwrap()
+        local_name(&self.name)
     }
     pub fn is(&self, qname: &str) -> bool {
         self.name == qname
@@ -335,6 +335,11 @@ pub fn unescape(s: &str) -> String {
     }
     out.push_str(rest);
     out
+}
+
+/// A qualified name without its prefix.
+pub fn local_name(name: &str) -> &str {
+    name.rsplit(':').next().unwrap_or(name)
 }
 
 pub fn escape_text(s: &str) -> String {

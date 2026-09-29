@@ -122,6 +122,17 @@ impl Cell {
         set_attr(&mut self.attrs, "r", &format!("{}{row}", col_letters(self.col)), true);
     }
     /// Whether the cell holds nothing but its address and style.
+    /// A formula cell without a cached value (openpyxl writes `<v></v>`; an
+    /// empty `<v>` is a value only for a text result).
+    pub fn lacks_cached_value(&self) -> bool {
+        self.f.is_some()
+            && match self.v.as_deref() {
+                None => true,
+                Some("") => self.ty() != "str",
+                Some(_) => false,
+            }
+    }
+
     pub fn is_blank(&self) -> bool {
         self.f.is_none() && self.v.is_none() && self.is.is_none()
     }
@@ -308,7 +319,7 @@ impl Row {
             };
             let r = row.r;
             let name = s.name();
-            if local(name.as_ref()) != "c" {
+            if xml::local_name(name.as_ref()) != "c" {
                 row.extra.push(Node::El(element(&mut rd, before, empty)?));
                 continue;
             }
@@ -336,7 +347,7 @@ impl Row {
                         _ => continue,
                     };
                     let xn = x.name();
-                    let xl = local(xn.as_ref()).to_string();
+                    let xl = xml::local_name(xn.as_ref()).to_string();
                     if xl == "v" && x.attributes().next().is_none() {
                         let from = rd.buffer_position() as usize;
                         let mut to = from;
@@ -379,7 +390,8 @@ impl Row {
         row.ok_or_else(|| bad(&"no row element"))
     }
 
-    /// A row read from its element.
+    /// A row read from its element: what [`Row::from_bytes`] must agree with.
+    #[cfg(test)]
     pub fn from_element(e: &Element, implied: u32) -> Result<Row, String> {
         let r = e.get("r").and_then(|v| v.parse().ok()).unwrap_or(implied);
         let mut attrs = e.attrs.clone();
@@ -425,13 +437,6 @@ impl Row {
     }
 }
 
-fn local(name: &str) -> &str {
-    match name.rfind(':') {
-        Some(k) => &name[k + 1..],
-        None => name,
-    }
-}
-
 impl Store {
     /// Index a worksheet part: find its rows and build the skeleton.
     pub fn load(data: Vec<u8>) -> Result<Store, String> {
@@ -453,7 +458,7 @@ impl Store {
                 Event::Eof => break,
                 Event::Start(s) => {
                     let name = s.name();
-                    let l = local(name.as_ref());
+                    let l = xml::local_name(name.as_ref());
                     if data_depth.is_none() && l == "sheetData" && depth == 1 {
                         sd_start = Some(before);
                         sd_inner = r.buffer_position() as usize;
@@ -479,7 +484,7 @@ impl Store {
                 }
                 Event::Empty(s) => {
                     let name = s.name();
-                    let l = local(name.as_ref());
+                    let l = xml::local_name(name.as_ref());
                     if data_depth.is_none() && l == "sheetData" && depth == 1 {
                         sd_start = Some(before);
                         sd_inner = r.buffer_position() as usize;

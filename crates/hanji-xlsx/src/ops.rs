@@ -586,15 +586,11 @@ fn check_validation(
 /// The values of a list validation's range (`$A$1:$A$9`, `Sheet!$A$1:$A$9`), as shown.
 fn list_cells(book: &mut Book, i: usize, formula: &str) -> Option<Vec<String>> {
     let toks = formula::tokenize(formula.trim_start_matches('='));
-    let refs: Vec<&formula::Reference> = toks
-        .iter()
-        .filter_map(|t| match &t.kind {
-            formula::Tok::Ref(r) => Some(r),
-            formula::Tok::Space => None,
-            _ => Some(&EMPTY_REF),
-        })
-        .collect();
-    let [r] = refs.as_slice() else { return None };
+    // One reference and nothing else.
+    let mut toks = toks.iter().filter(|t| !matches!(t.kind, formula::Tok::Space));
+    let (Some(formula::Token { kind: formula::Tok::Ref(r), .. }), None) = (toks.next(), toks.next()) else {
+        return None;
+    };
     let (a, b) = (r.first?, r.last.or(r.first)?);
     let sheet = match &r.sheet {
         Some(p) if p.external || p.to.is_some() => return None,
@@ -617,9 +613,6 @@ fn list_cells(book: &mut Book, i: usize, formula: &str) -> Option<Vec<String>> {
     }
     Some(out)
 }
-
-/// Stands for any token other than one reference in [`list_cells`].
-static EMPTY_REF: formula::Reference = formula::Reference { sheet: None, first: None, last: None };
 
 /// The style a new cell of table `k`'s column `ci` takes: its neighbour's in
 /// the column (the row above, else below), with the column's format.

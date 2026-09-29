@@ -354,7 +354,9 @@ fn cells(rem: &Remainder) -> HashMap<(String, u32, u32), (bool, String, u32)> {
     out
 }
 
-/// The fixtures that must be refused: a table under a merge, or above an array formula, reaching outside its columns.
+/// Small workbooks for what the corpus lacks: a table under a merge or above
+/// an array formula reaching outside its columns (refused), a format and a
+/// validation on one row (removed with it), validations of each kind.
 fn fixture(which: &str) -> Vec<u8> {
     use common::fixture::{build, Col, SheetSpec, TableSpec, V};
     let t = TableSpec {

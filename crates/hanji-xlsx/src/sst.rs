@@ -116,7 +116,7 @@ impl Sst {
         loop {
             match r.read_event().map_err(|e| format!("{part}: {e}"))? {
                 Event::Eof => break,
-                Event::Start(s) => match local(s.name().as_ref()) {
+                Event::Start(s) => match xml::local_name(s.name().as_ref()) {
                     "si" => {
                         in_si = true;
                         cur.clear();
@@ -125,8 +125,8 @@ impl Sst {
                     "t" if in_si && rph == 0 => in_t = true,
                     _ => {}
                 },
-                Event::Empty(s) if local(s.name().as_ref()) == "si" => strings.push(String::new()),
-                Event::End(e) => match local(e.name().as_ref()) {
+                Event::Empty(s) if xml::local_name(s.name().as_ref()) == "si" => strings.push(String::new()),
+                Event::End(e) => match xml::local_name(e.name().as_ref()) {
                     "si" => {
                         in_si = false;
                         strings.push(decode_xstring(&std::mem::take(&mut cur)));
@@ -227,13 +227,6 @@ impl Sst {
         out.push_str(&close);
         out.push_str(after);
         out.into_bytes()
-    }
-}
-
-fn local(name: &str) -> &str {
-    match name.rfind(':') {
-        Some(k) => &name[k + 1..],
-        None => name,
     }
 }
 

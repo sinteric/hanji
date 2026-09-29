@@ -244,8 +244,8 @@ fn may_need_neutralising(row: &[u8]) -> bool {
     let has = |b: u8| memchr::memchr(b, row).is_some();
     crate::store::has_formula(row)
         && (has(b'|') || (has(b']') && has(b'!')) || {
-            let lower = row.to_ascii_lowercase();
-            formula::FETCH_FUNCTIONS.iter().any(|n| crate::store::holds(&lower, n.to_ascii_lowercase().as_bytes()))
+            let upper = row.to_ascii_uppercase();
+            formula::FETCH_FUNCTIONS.iter().any(|n| crate::store::holds(&upper, n.as_bytes()))
         })
 }
 
