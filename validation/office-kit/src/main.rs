@@ -6,6 +6,10 @@
 //! cargo run --release --manifest-path validation/office-kit/Cargo.toml [OUT_DIR]
 //! ```
 //!
+//! Per source: the untouched original (`NN-…-original.ext`), then its exports,
+//! each edited one with `NN-…-edits.md` beside it (the edits in plain words
+//! and the before/after model text diff).
+//!
 //! Writes `target/office-kit/` (the files, `CHECKLIST.md`, `checklist.csv`)
 //! and `target/office-kit.zip` at the workspace root. Every file is an export
 //! of a corpus file whose licence allows redistribution (the corpora's
@@ -53,6 +57,8 @@ struct Item {
     checks: Vec<String>,
     /// What was edited, and what to look for.
     notes: Vec<String>,
+    /// `NN-…-edits.md`: the edits in plain words and the model text diff.
+    md: Option<String>,
 }
 
 struct Kit {
@@ -87,9 +93,21 @@ impl Kit {
             Some((_, "pptm")) => "pptx",
             _ => format,
         };
+        let ext = if variant == "original" { source.rsplit_once('.').map_or(ext, |x| x.1) } else { ext };
         let file = format!("{:02}-{format}-{}-{variant}.{ext}", self.items.len() + 1, slug(source));
         std::fs::write(self.dir.join(&file), bytes).unwrap();
         println!("  {file} ({} KB)", bytes.len() / 1024);
+        let mut checks = checks;
+        if variant != "original" {
+            if let Some(o) = self.items.iter().find(|i| i.source == source && i.variant == "original") {
+                let c = if variant == "getput" {
+                    format!("Compare with {}: should look identical", o.file)
+                } else {
+                    format!("Compare with {}: only the changes in the -edits.md file beside this one differ", o.file)
+                };
+                checks.insert(1.min(checks.len()), c);
+            }
+        }
         self.items.push(Item {
             file,
             format,
@@ -99,13 +117,100 @@ impl Kit {
             about: about.to_string(),
             checks,
             notes,
+            md: None,
         });
+    }
+
+    /// The source file as it came, to compare the exports with.
+    fn original(&mut self, format: &'static str, source: &str, licence: &str, bytes: &[u8]) {
+        self.add(
+            format,
+            source,
+            licence,
+            "original",
+            "the source file, untouched, for comparison",
+            bytes,
+            vec![],
+            vec![],
+        );
+    }
+
+    /// `NN-…-edits.md` for the file just added: what changed in plain
+    /// words and the model text diff (`diff`, unified; empty when the text
+    /// did not change).
+    fn edits(&mut self, diff: &str, diff_what: &str) {
+        let it = self.items.last().unwrap();
+        let md_name = format!("{}-edits.md", it.file.rsplit_once('.').unwrap().0);
+        let mut md = format!("# What {} changed\n\n", it.file);
+        let orig = self.items.iter().find(|i| i.source == it.source && i.variant == "original").map(|i| i.file.clone());
+        let it = self.items.last_mut().unwrap();
+        let _ = write!(md, "{}. Source: `{}`", cap(&it.about), it.source);
+        match &orig {
+            Some(o) => {
+                let _ = writeln!(md, "; compare with `{o}`.\n");
+            }
+            None => md.push_str(".\n\n"),
+        }
+        md.push_str("## The edits\n\n");
+        for n in &it.notes {
+            if n.starts_with("```") {
+                let _ = writeln!(md, "\n{n}\n");
+            } else {
+                let _ = writeln!(md, "- {}", placeholders(n));
+            }
+        }
+        let _ = writeln!(md, "\n## {diff_what}\n");
+        if diff.is_empty() {
+            md.push_str("(no change)\n");
+        } else {
+            const MAX: usize = 1500;
+            let lines: Vec<&str> = diff.lines().collect();
+            let _ = writeln!(md, "```diff\n{}\n```", lines[..lines.len().min(MAX)].join("\n"));
+            if lines.len() > MAX {
+                let _ = writeln!(md, "\n({} more lines of diff left out)", lines.len() - MAX);
+            }
+        }
+        std::fs::write(self.dir.join(&md_name), md).unwrap();
+        it.md = Some(md_name);
     }
 
     fn file_of(&self, source: &str, variant: &str) -> String {
         self.items.iter().find(|i| i.source == source && i.variant == variant).map_or("?".into(), |i| i.file.clone())
     }
 }
+
+/// An edit description quotes text with Rust escapes for the placeholder characters (`\u{f0000}`): shown as `◆`.
+fn placeholders(s: &str) -> String {
+    let mut out = String::new();
+    let mut rest = s;
+    while let Some(k) = rest.find("\\u{") {
+        out.push_str(&rest[..k]);
+        match rest[k..].find('}') {
+            Some(e) => {
+                out.push('◆');
+                rest = &rest[k + e + 1..];
+            }
+            None => {
+                out.push_str(&rest[k..]);
+                rest = "";
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
+fn cap(s: &str) -> String {
+    let mut c = s.chars();
+    c.next().map_or(String::new(), |f| f.to_uppercase().chain(c).collect())
+}
+
+/// The model text diff, before (the original's text) and after (the edited revision's).
+fn text_diff(before: &str, after: &str) -> String {
+    hanji_store::merge::unified(before, after, "original (model text)", "edited (model text)")
+}
+
+const TEXT_DIFF: &str = "Model text, before and after (unified diff; `-` original, `+` edited)";
 
 fn root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().unwrap()
@@ -133,7 +238,13 @@ const DOCX: &[(&str, &str)] = &[
 ];
 
 /// An exact edit for a local change (the span the texts differ in), a design C rewrite for a move.
-fn step(model: &dyn TextModel, rem: &Remainder, text: &str, new_text: &str, local: bool) -> Option<hanji_core::Reanchored> {
+fn step(
+    model: &dyn TextModel,
+    rem: &Remainder,
+    text: &str,
+    new_text: &str,
+    local: bool,
+) -> Option<hanji_core::Reanchored> {
     let r = if local {
         let (a, b, repl) = hanji_testkit::differing_span(text, new_text);
         hanji_core::reanchor_span_in(model, rem, text, a, b, &repl, CAPS).ok()?
@@ -154,7 +265,17 @@ fn docx(kit: &mut Kit) {
         let imp = DocxEngine.import(&bytes, &opts).unwrap();
         let (text, rem) = (imp.text, imp.remainder);
         let getput = DocxEngine.export(&text, &rem).unwrap();
-        kit.add("docx", name, licence, "getput", "imported and exported with no edit", &getput, vec![word.clone()], vec![]);
+        kit.original("docx", name, licence, &bytes);
+        kit.add(
+            "docx",
+            name,
+            licence,
+            "getput",
+            "imported and exported with no edit",
+            &getput,
+            vec![word.clone()],
+            vec![],
+        );
         let (blocks, _, _, _) = DocxEngine::split(&bytes, &opts).unwrap();
         let d = Doc { blocks, entries: rem.entries.clone() };
         let cx = Cx { fmt: &Docx, rem: &rem };
@@ -174,6 +295,7 @@ fn docx(kit: &mut Kit) {
                     vec![word.clone(), "Shows the edits listed below".into()],
                     notes,
                 );
+                kit.edits(&text_diff(&text, &r.text), TEXT_DIFF);
             }
             Err(e) => println!("  {name} E10: refused: {}", e.to_string().lines().next().unwrap_or("")),
         }
@@ -199,7 +321,7 @@ fn docx(kit: &mut Kit) {
             }
         }
         if let Some(pkg) = last {
-            let getput_file = kit.file_of(name, "getput");
+            let getput_file = kit.file_of(name, "original");
             kit.add(
                 "docx",
                 name,
@@ -215,6 +337,7 @@ fn docx(kit: &mut Kit) {
                 ],
                 kept,
             );
+            kit.edits(&text_diff(&text, &cur_text), TEXT_DIFF);
         }
     }
     // Two new documents from a blank template.
@@ -222,7 +345,11 @@ fn docx(kit: &mut Kit) {
     let imp = DocxEngine.import(&template, &ImportOptions::default()).unwrap();
     let front = &imp.text[..imp.text.find("\n---\n").unwrap() + 5];
     for (source, body, about) in [
-        ("blank-report-en.docx", NEW_EN, "a new report from hanji's blank docx: headings, lists, emphasis, a merged table"),
+        (
+            "blank-report-en.docx",
+            NEW_EN,
+            "a new report from hanji's blank docx: headings, lists, emphasis, a merged table",
+        ),
         ("blank-report-ko.docx", NEW_KO, "a new Korean report from hanji's blank docx (DESIGN.md §5.2's example)"),
     ] {
         // In canonical form, so the export reads back as the same text (PutGet).
@@ -244,6 +371,7 @@ fn docx(kit: &mut Kit) {
             ],
             vec!["Model text written:".into(), format!("```\n{}```", body)],
         );
+        kit.edits(&text_diff(&imp.text, &r.text), "Model text, blank package to new document (unified diff)");
     }
 }
 
@@ -316,7 +444,17 @@ fn pptx(kit: &mut Kit) {
         let imp = PptxEngine.import(&bytes, &ImportOptions::default()).unwrap();
         let (text, rem) = (imp.text, imp.remainder);
         let getput = PptxEngine.export(&text, &rem).unwrap();
-        kit.add("pptx", name, licence, "getput", "imported and exported with no edit", &getput, vec![ppt.clone()], vec![]);
+        kit.original("pptx", name, licence, &bytes);
+        kit.add(
+            "pptx",
+            name,
+            licence,
+            "getput",
+            "imported and exported with no edit",
+            &getput,
+            vec![ppt.clone()],
+            vec![],
+        );
         // The edit set one edit at a time (an exact span where it is local), each kept when it places everything.
         let model: &dyn TextModel = &hanji_pptx::PptxModel;
         let (mut cur_text, mut cur_rem) = (text.clone(), rem.clone());
@@ -340,12 +478,13 @@ fn pptx(kit: &mut Kit) {
                 "pptx",
                 name,
                 licence,
-                "edits",
+                "pset",
                 "the pptx edit set, one edit after another: text edits, a slide added from a layout, one deleted, one moved",
                 &out,
                 vec![ppt.clone(), "Shows the edits listed below (slides added, deleted and moved; text changed)".into()],
                 done,
             );
+            kit.edits(&text_diff(&text, &cur_text), TEXT_DIFF);
         }
     }
 }
@@ -355,7 +494,10 @@ fn pptx(kit: &mut Kit) {
 const XLSX_DIR: &str = "crates/hanji-xlsx/corpus";
 
 /// Workbook, licence, operations, and the windows that show their results.
-const XLSX: &[(&str, &str, &str, &[(&str, &str)])] = &[
+/// Workbook, licence, operations (JSON), windows to show as (sheet, range).
+type XlsxCase = (&'static str, &'static str, &'static str, &'static [(&'static str, &'static str)]);
+
+const XLSX: &[XlsxCase] = &[
     (
         "korean-sales.xlsx",
         "CC0-1.0, synthetic (written for this project with openpyxl)",
@@ -402,7 +544,17 @@ fn xlsx(kit: &mut Kit) {
         let bytes = read(XLSX_DIR, name);
         let imp = XlsxEngine.import(&bytes, &ImportOptions::default()).unwrap();
         let getput = XlsxEngine.export(&imp.text, &imp.remainder).unwrap();
-        kit.add("xlsx", name, licence, "getput", "imported and exported with no edit", &getput, vec![excel.clone()], vec![]);
+        kit.original("xlsx", name, licence, &bytes);
+        kit.add(
+            "xlsx",
+            name,
+            licence,
+            "getput",
+            "imported and exported with no edit",
+            &getput,
+            vec![excel.clone()],
+            vec![],
+        );
         let a = match XlsxEngine::apply(&imp.text, &imp.remainder, ops) {
             Ok(a) => a,
             Err(e) => {
@@ -417,13 +569,21 @@ fn xlsx(kit: &mut Kit) {
              no cached value in the source; Excel computes it when it opens the file."
                 .into(),
         );
+        // The values before and after, window by window, and the structure text.
+        let (mut before, mut after) = (String::new(), String::new());
         for (sheet, range) in *shows {
             let of = WindowOf::Range { sheet: sheet.to_string(), range: range.to_string() };
             match XlsxEngine::window(&a.remainder, &of) {
                 Ok(w) => notes.push(format!("```\n{}\n```", w.trim_end())),
                 Err(e) => notes.push(format!("({sheet}!{range}: {e})")),
             }
+            for (rem, out) in [(&imp.remainder, &mut before), (&a.remainder, &mut after)] {
+                out.push_str(&XlsxEngine::window(rem, &of).unwrap_or_default());
+                out.push('\n');
+            }
         }
+        before.push_str(&imp.text);
+        after.push_str(&a.text);
         kit.add(
             "xlsx",
             name,
@@ -436,6 +596,10 @@ fn xlsx(kit: &mut Kit) {
                 "Formula results show the new values without pressing F9 (compare the values listed below)".into(),
             ],
             notes,
+        );
+        kit.edits(
+            &text_diff(&before, &after),
+            "Cell values and model text, before and after (unified diff; the row windows above, then the structure)",
         );
     }
 }
@@ -460,7 +624,17 @@ fn hwpx(kit: &mut Kit) {
         let imp = HwpxEngine.import(&bytes, &ImportOptions::default()).unwrap();
         let (text, rem) = (imp.text, imp.remainder);
         let getput = HwpxEngine.export(&text, &rem).unwrap();
-        kit.add("hwpx", name, licence, "getput", "imported and exported with no edit", &getput, vec![hancom.clone()], vec![]);
+        kit.original("hwpx", name, licence, &bytes);
+        kit.add(
+            "hwpx",
+            name,
+            licence,
+            "getput",
+            "imported and exported with no edit",
+            &getput,
+            vec![hancom.clone()],
+            vec![],
+        );
         let (blocks, _, _, _) = HwpxEngine::split(&bytes, &ImportOptions::default()).unwrap();
         let d = Doc { blocks, entries: rem.entries.clone() };
         let cx = Cx { fmt: &Hwpx, rem: &rem };
@@ -479,6 +653,7 @@ fn hwpx(kit: &mut Kit) {
                     vec![hancom.clone(), "Shows the edits listed below".into()],
                     e10.what.split("; ").map(String::from).collect(),
                 );
+                kit.edits(&text_diff(&text, &r.text), TEXT_DIFF);
             }
             Err(e) => println!("  {name} E10: refused: {}", e.to_string().lines().next().unwrap_or("")),
         }
@@ -491,20 +666,31 @@ fn checklist(kit: &Kit, commit: &str) -> (String, String) {
     let mut md = String::new();
     let _ = writeln!(
         md,
-        "# hanji Office check kit\n\nBuilt from commit `{commit}` by `validation/office-kit`. DESIGN.md §9: every export must open in Word, PowerPoint, Excel or Hancom Office with no repair prompt. This environment cannot run them, so these files are checked by hand.\n\nFor each file: open it, tick pass or fail for each line, and write anything odd under Notes (a screenshot helps). `checklist.csv` has the same lines for a spreadsheet. Files are named `NN-format-source-variant`: `getput` is imported and exported with no edit, `e10` / `edits` / `ops` hold edits, `tracked` holds tracked changes, `new` was written from hanji's blank docx.\n"
+        "# hanji Office check kit\n\nBuilt from commit `{commit}` by `validation/office-kit`. DESIGN.md §9: every export must open in Word, PowerPoint, Excel or Hancom Office with no repair prompt. This environment cannot run them, so these files are checked by hand.\n\nFor each file: open it, tick pass or fail for each line, and write anything odd under Notes (a screenshot helps). `checklist.csv` has the same lines for a spreadsheet. Files are named `NN-format-source-variant`: `getput` is imported and exported with no edit, `original` is the source file, untouched, `e10` / `pset` / `ops` hold edits (each with an `-edits.md` beside it: the edits in plain words and the before/after diff), `tracked` holds tracked changes, `new` was written from hanji's blank docx.\n"
     );
     let mut csv = String::from("file,format,source,variant,check,pass,fail,notes\n");
     let q = |s: &str| format!("\"{}\"", s.replace('"', "\"\""));
     for it in &kit.items {
         let _ = writeln!(md, "## {}\n", it.file);
-        let mut about = it.about.clone();
-        if let Some(c) = about.get(..1) {
-            about.replace_range(..1, &c.to_uppercase());
+        if it.variant == "original" {
+            let _ = writeln!(
+                md,
+                "Source: `{}`, {}. The file as it came, for comparing the exports below with; nothing to check.\n",
+                it.source, it.licence
+            );
+            continue;
         }
-        let _ = writeln!(md, "Source: `{}`, {}. {about}.\n", it.source, it.licence);
-        for c in &it.checks {
+        let _ = writeln!(md, "Source: `{}`, {}. {}.\n", it.source, it.licence, cap(&it.about));
+        let named = |c: &String| match &it.md {
+            Some(e) => c.replace("the -edits.md file beside this one", e),
+            None => c.clone(),
+        };
+        for c in it.checks.iter().map(named) {
             let _ = writeln!(md, "- Pass [ ] Fail [ ] {c}");
-            let _ = writeln!(csv, "{},{},{},{},{},,,", q(&it.file), it.format, q(&it.source), it.variant, q(c));
+            let _ = writeln!(csv, "{},{},{},{},{},,,", q(&it.file), it.format, q(&it.source), it.variant, q(&c));
+        }
+        if let Some(e) = &it.md {
+            let _ = writeln!(md, "\nWhat changed, and the before/after diff: `{e}`.");
         }
         if !it.notes.is_empty() {
             let _ = writeln!(md, "\n<details><summary>What changed</summary>\n");
@@ -558,14 +744,17 @@ fn main() {
     let (md, csv) = checklist(&kit, &commit);
     std::fs::write(dir.join("CHECKLIST.md"), md).unwrap();
     std::fs::write(dir.join("checklist.csv"), csv).unwrap();
-    let mut names: Vec<String> = kit.items.iter().map(|i| i.file.clone()).collect();
+    let mut names: Vec<String> =
+        kit.items.iter().flat_map(|i| std::iter::once(i.file.clone()).chain(i.md.clone())).collect();
+    names.sort();
     names.extend(["CHECKLIST.md".to_string(), "checklist.csv".to_string()]);
     let zip = dir.with_extension("zip");
     zip_dir(&dir, &names, &zip);
     let per = |f: &str| kit.items.iter().filter(|i| i.format == f).count();
     println!(
-        "{}: {} files (docx {}, pptx {}, xlsx {}, hwpx {}), {} KB",
+        "{}: {} files ({} exports and originals: docx {}, pptx {}, xlsx {}, hwpx {}), {} KB",
         zip.display(),
+        names.len(),
         kit.items.len(),
         per("docx"),
         per("pptx"),
