@@ -168,7 +168,8 @@ impl<'a> Exporter<'a> {
                     1
                 }
                 Block::Table(_) => {
-                    let (pel, n) = self.table_group(blocks, bi)?;
+                    let section = out.sections.last().map_or(0, |s| s.shell);
+                    let (pel, n) = self.table_group(blocks, bi, section)?;
                     self.emit(&mut out, pel);
                     n
                 }
@@ -616,7 +617,7 @@ impl<'a> Exporter<'a> {
 
     /// The paragraph holding the table at `bi` and the side-by-side tables
     /// after it that shared its paragraph; how many blocks it took.
-    fn table_group(&mut self, blocks: &[Block], bi: usize) -> Result<(Element, usize), String> {
+    fn table_group(&mut self, blocks: &[Block], bi: usize, section: usize) -> Result<(Element, usize), String> {
         let tag = |k: usize, t: &str| self.at(&[k], Kind::Tbl).into_iter().find(|e| e.meta.tag == t);
         let (mut anchor, group) = match tag(bi, "hwpx:anchor") {
             Some(a) => (fragment(&a.xml[0]), Some(a.meta.aux[0].clone())),
@@ -637,7 +638,7 @@ impl<'a> Exporter<'a> {
         let mut tables = vec![];
         for &k in &members {
             let Block::Table(t) = &blocks[k] else { unreachable!() };
-            tables.push(self.table(t, k)?);
+            tables.push(self.table(t, k, section)?);
         }
         // Fill the `hp:tbl` slots in order; slots of tables that went are dropped.
         let mut tables = tables.into_iter();
@@ -677,20 +678,29 @@ impl<'a> Exporter<'a> {
         Ok(p)
     }
 
-    fn table(&mut self, t: &hanji_core::Table, bi: usize) -> Result<Element, String> {
+    /// The table at `bi`, in section `section`.
+    fn table(&mut self, t: &hanji_core::Table, bi: usize, section: usize) -> Result<Element, String> {
         if t.style.is_some() {
             return Err("hwpx has no table styles; remove the {style=…} line".into());
         }
+        let (rows_n, cols_n) = (t.rows.len(), t.rows.first().map_or(0, Vec::len));
         let own = self.at(&[bi], Kind::Tbl).into_iter().find(|e| e.meta.tag.is_empty());
-        let Some(e) = own.or(self.table_template) else {
-            return Err("this file has no table to take a new table's layout from, so the table cannot be written; tables can be added to hwpx files that already have one".into());
+        // A new table takes the first table's layout, not its caption; in a
+        // file with no table, Hancom's default layout across the text width.
+        let mut fresh = None;
+        let mut tbl = match own.or(self.table_template) {
+            Some(e) => assemble(&e.xml),
+            None => {
+                let border = self.header.table_border_fill()?;
+                let width = text_width(&self.shell.sections[section]);
+                let col = (width - 2 * OUT_MARGIN) / cols_n.max(1) as u32;
+                fresh = Some((border, col));
+                new_table(bi, border, col * cols_n as u32, rows_n as u32)
+            }
         };
-        let mut tbl = assemble(&e.xml);
         if own.is_none() {
-            // A new table takes the first table's layout, not its caption.
             tbl.children.retain(|n| !matches!(n, Node::El(x) if x.is("hp:caption")));
         }
-        let (rows_n, cols_n) = (t.rows.len(), t.rows.first().map_or(0, Vec::len));
         let (r0, c0) = dims(&tbl);
         tbl.set("rowCnt", &rows_n.to_string());
         tbl.set("colCnt", &cols_n.to_string());
@@ -721,7 +731,13 @@ impl<'a> Exporter<'a> {
                 let span = 1 + row[ci + 1..].iter().take_while(|c| **c == Cell::Left).count();
                 let down = 1 + t.rows[ri + 1..].iter().take_while(|r| r.get(ci) == Some(&Cell::Up)).count();
                 let te = self.at(&path, Kind::Tc).first().copied().or_else(|| self.cell_neighbour(t, bi, ri, ci));
-                let xml = te.ok_or("this file has no table cell to take a new cell's properties from")?.xml.clone();
+                let xml = match (te, fresh) {
+                    (Some(e), _) => e.xml.clone(),
+                    (None, Some((border, col))) => new_cell(border, col * span as u32),
+                    (None, None) => {
+                        return Err("this file has no table cell to take a new cell's properties from".into())
+                    }
+                };
                 let mut tc = fragment(&xml[0]);
                 let mut sub = fragment(&xml[1]);
                 let styles = self.styles;
@@ -767,6 +783,58 @@ impl<'a> Exporter<'a> {
             .or_else(|| (0..t.rows.len()).find_map(|r| (0..t.rows[r].len()).find_map(|c| find(r, c))))
             .or(self.cell_template)
     }
+}
+
+/// A new table's outer margin (each side), in HWPUNIT, as Hancom inserts one.
+const OUT_MARGIN: u32 = 283;
+
+/// The text width of a section's columns (page width less the left and
+/// right margins and the gutter, less the gaps, over the columns), in
+/// HWPUNIT; A4 with 30 mm margins when the section does not say.
+fn text_width(s: &SectionShell) -> u32 {
+    let run = s.start_run.as_deref().map(fragment);
+    let n = |e: &Element, k: &str| num_attr(e, k).unwrap_or(0);
+    let width = run.as_ref().and_then(|r| r.descendants("hp:pagePr").first().copied()).map_or(0, |p| {
+        // A landscape page (`NARROWLY`) keeps its portrait sizes.
+        let w = if p.get("landscape").as_deref() == Some("NARROWLY") { n(p, "height") } else { n(p, "width") };
+        let m = p.child("hp:margin");
+        w.saturating_sub(m.map_or(0, |m| n(m, "left") + n(m, "right") + n(m, "gutter")))
+    });
+    let cols = run.as_ref().and_then(|r| r.descendants("hp:colPr").first().copied());
+    let (count, gap) = cols.map_or((1, 0), |c| (n(c, "colCount").max(1), n(c, "sameGap")));
+    let width = width.saturating_sub(gap * (count - 1)) / count;
+    if width > 2 * OUT_MARGIN + 1000 {
+        width
+    } else {
+        42520
+    }
+}
+
+/// A new table at block `bi`: its shell and head, Hancom's defaults:
+/// `width` wide, a line of 10 pt text per row, its border fill `border`.
+/// Its id is made from `bi`, so new tables do not share one.
+fn new_table(bi: usize, border: u32, width: u32, rows: u32) -> Element {
+    let m = OUT_MARGIN;
+    let id = 1_900_000_000 + bi as u64;
+    assemble(&[
+        format!(r#"<hp:tbl id="{id}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="1" rowCnt="0" colCnt="0" cellSpacing="0" borderFillIDRef="{border}" noAdjust="0"/>"#),
+        format!(r#"<hp:sz width="{width}" widthRelTo="ABSOLUTE" height="{}" heightRelTo="ABSOLUTE" protect="0"/>"#, rows * 1282),
+        r#"<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>"#.into(),
+        format!(r#"<hp:outMargin left="{m}" right="{m}" top="{m}" bottom="{m}"/>"#),
+        r#"<hp:inMargin left="510" right="510" top="141" bottom="141"/>"#.into(),
+    ])
+}
+
+/// A new cell's properties as a `Tc` entry stores them (cell shell, list
+/// shell, the elements after the list; its address and span are set where
+/// it goes): Hancom's defaults, `width` wide.
+fn new_cell(border: u32, width: u32) -> Vec<String> {
+    vec![
+        format!(r#"<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="{border}"/>"#),
+        r#"<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0"/>"#.into(),
+        format!(r#"<hp:cellSz width="{width}" height="282"/>"#),
+        r#"<hp:cellMargin left="510" right="510" top="141" bottom="141"/>"#.into(),
+    ]
 }
 
 /// A zero-width item whose paragraph went, as a run of its own: a marker

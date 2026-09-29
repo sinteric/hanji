@@ -342,6 +342,85 @@ fn bullets_and_numbers_are_list_items() {
 }
 
 #[test]
+fn adjacent_lists_of_another_kind_or_definition_stay_separate() {
+    // A bullet list right before a numbered one: two lists, as in docx (§5.2).
+    let body =
+        [p_in(0, 2, &[(0, "가")]), p_in(0, 2, &[(0, "나")]), p_in(0, 3, &[(0, "하나")]), p_in(0, 3, &[(0, "둘")])];
+    let pkg = hwpx(&body);
+    let imp = import(&pkg);
+    assert!(imp.text.ends_with("\n- 가\n- 나\n\n1. 하나\n1. 둘\n"), "{}", imp.text);
+    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg), "GetPut");
+    // Written as new text, each reads back as it was written.
+    let base = import(&hwpx(&[p("끝")]));
+    for lists in [
+        "- 가\n- 나\n\n1. 하나\n1. 둘\n",
+        "1. 하나\n1. 둘\n\n- 가\n- 나\n",
+        // Two numbered lists: the second restarts, on a numbering of its own.
+        "1. 하나\n1. 둘\n\n1. 새 하나\n",
+        // A list nests another kind, and the outer list goes on after it.
+        "- 가\n  1. 하나\n  1. 둘\n- 나\n\n1. 셋\n",
+    ] {
+        let r =
+            rewrite(&base.remainder, &base.text, &base.text.replace("끝\n", &format!("{lists}\n끝\n")), CAPS).unwrap();
+        let out = export(&r.text, &r.remainder);
+        assert_eq!(import(&out).text, r.text, "PutGet\n{}", section(&out));
+    }
+}
+
+/// A border fill with no lines (a page border), as a file with no table has.
+const NO_LINES: &str = r##"<hh:borderFills itemCnt="1"><hh:borderFill id="1" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0"><hh:slash type="NONE" Crooked="0" isCounter="0"/><hh:backSlash type="NONE" Crooked="0" isCounter="0"/><hh:leftBorder type="NONE" width="0.1 mm" color="#000000"/><hh:rightBorder type="NONE" width="0.1 mm" color="#000000"/><hh:topBorder type="NONE" width="0.1 mm" color="#000000"/><hh:bottomBorder type="NONE" width="0.1 mm" color="#000000"/><hh:diagonal type="SOLID" width="0.1 mm" color="#000000"/></hh:borderFill></hh:borderFills>"##;
+
+const ONE_COLUMN: &str = r#"colCount="1""#;
+
+#[test]
+fn a_new_table_in_a_file_without_one_takes_the_default_look() {
+    let table = "| 지역 | 매출 |\n|---|---|\n| 서울 | 120 |\n| 합계 ||\n";
+    let with_table = |header_extra: &str, columns: &str| {
+        let pkg = hwpx_with(&[p("앞"), p("뒤")], header_extra, vec![], "");
+        let mut parts = package::read(&pkg).unwrap();
+        let sec = parts.iter_mut().find(|p| p.name == "Contents/section0.xml").unwrap();
+        sec.data = String::from_utf8(sec.data.clone()).unwrap().replace(r#"colCount="1""#, columns).into_bytes();
+        let pkg = package::write(&parts).unwrap();
+        let imp = import(&pkg);
+        let r =
+            rewrite(&imp.remainder, &imp.text, &imp.text.replace("\n뒤\n", &format!("\n{table}\n뒤\n")), CAPS).unwrap();
+        let out = export(&r.text, &r.remainder);
+        assert_eq!(import(&out).text, r.text, "PutGet");
+        save("engine-new-table", "ORIGINAL", &pkg);
+        let hdr = |p: &[u8]| package::get(&package::read(p).unwrap(), "Contents/header.xml").unwrap().to_vec();
+        (String::from_utf8(hdr(&out)).unwrap(), hdr(&pkg) == hdr(&out), out)
+    };
+    // The file has no border fill with lines: a solid one is added for the table and its cells.
+    let (hdr, same, out) = with_table(NO_LINES, ONE_COLUMN);
+    assert!(!same && hdr.contains(r#"<hh:borderFills itemCnt="2">"#), "{hdr}");
+    assert!(hdr.contains(r##"<hh:borderFill id="2" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0"><hh:slash type="NONE" Crooked="0" isCounter="0"/><hh:backSlash type="NONE" Crooked="0" isCounter="0"/><hh:leftBorder type="SOLID" width="0.12 mm" color="#000000"/>"##), "{hdr}");
+    let sec = section(&out);
+    assert!(sec.contains(r#"rowCnt="3" colCnt="2" cellSpacing="0" borderFillIDRef="2""#), "{sec}");
+    assert_eq!(
+        sec.matches(
+            r#"<hp:tc name="" header="0" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="2">"#
+        )
+        .count(),
+        5,
+        "{sec}"
+    );
+    // Across the text width (the page here has no margins), less the outer margins.
+    assert!(sec.contains(r#"<hp:sz width="58962" widthRelTo="ABSOLUTE" height="3846""#), "{sec}");
+    assert!(sec.contains(r#"<hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="29481" height="282"/>"#), "{sec}");
+    assert!(sec.contains(r#"<hp:cellSpan colSpan="2" rowSpan="1"/><hp:cellSz width="58962" height="282"/>"#), "{sec}");
+    save("engine-new-table", "added-border-fill", &out);
+    // In two columns 1134 apart, across one column.
+    let (_, _, out) = with_table(NO_LINES, r#"colCount="2" sameSz="1" sameGap="1134""#);
+    assert!(section(&out).contains(r#"<hp:sz width="28630""#), "{}", section(&out));
+    save("engine-new-table", "two-columns", &out);
+    // One that draws a table already is reused: the header is unchanged.
+    let (_, same, out) =
+        with_table(&NO_LINES.replace(r#"NONE" width="0.1 mm""#, r#"SOLID" width="0.12 mm""#), ONE_COLUMN);
+    assert!(same && section(&out).contains(r#"colCnt="2" cellSpacing="0" borderFillIDRef="1""#), "{}", section(&out));
+    save("engine-new-table", "reused-border-fill", &out);
+}
+
+#[test]
 fn deleting_the_first_paragraph_keeps_the_section_settings() {
     let pkg = hwpx(&[p("첫째"), p("둘째")]);
     let imp = import(&pkg);

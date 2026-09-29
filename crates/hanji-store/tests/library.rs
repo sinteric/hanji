@@ -169,8 +169,7 @@ fn new_files_from_the_blank_packages() {
     let mut ws = ws();
     let cases: [(DocType, Format, &str); 4] = [
         (DocType::Document, Format::Docx, "---\ntype: document\nformat: docx\nschema: 1\n---\n# 3분기 보고\n\n매출은 **12%** 늘었다.\n\n- 신규 고객 34곳\n  - 수도권 21곳\n\n1. 다음 분기 목표\n1. 채용\n\n| 지역 | 매출 |\n|---|---|\n| 서울 | 120 |\n| 합계 | 215 |\n\n<div style=\"Quote\">고객이 있는 곳에 지점이 있다.</div>\n\n<p/>\n"),
-        // A paragraph between the lists: in hwpx a bullet list right before a numbered one reads back as one list.
-        (DocType::Document, Format::Hwpx, "---\ntype: document\nformat: hwpx\nschema: 1\n---\n# 3분기 보고\n\n매출은 **12%** 늘었다.\n\n- 신규 고객 34곳\n- 수도권 21곳\n\n목표:\n\n1. 다음 분기 목표\n1. 채용\n\n<div style=\"본문\">본문 스타일 문단.</div>\n"),
+        (DocType::Document, Format::Hwpx, "---\ntype: document\nformat: hwpx\nschema: 1\n---\n# 3분기 보고\n\n매출은 **12%** 늘었다.\n\n- 신규 고객 34곳\n- 수도권 21곳\n\n1. 다음 분기 목표\n1. 채용\n\n| 지역 | 매출 |\n|---|---|\n| 서울 | 120 |\n| 합계 | 215 |\n\n<div style=\"본문\">본문 스타일 문단.</div>\n"),
         (DocType::Presentation, Format::Pptx, "---\ntype: presentation\nformat: pptx\nschema: 1\n---\n\nlayout: Title Slide\n::title::\n3분기 보고\n::subtitle::\n영업본부\n\n---\n\nlayout: Title and Content\n::title::\n핵심 지표\n::body::\n- 매출 **12%** 증가\n  - 수도권 21곳\n::notes::\n강조할 것\n\n---\n\nlayout: Two Content\n::title::\n지역\n::left::\n- 수도권\n::right::\n- 지방\n"),
         (DocType::Spreadsheet, Format::Xlsx, ""),
     ];
@@ -189,7 +188,14 @@ fn new_files_from_the_blank_packages() {
         }
         // Nothing to surface: exports without acknowledging.
         ws.export_bytes(&o.doc_id, None, &ExportOptions::default()).unwrap_or_else(|e| panic!("{f:?}: {e}"));
-        putget(&mut ws, &o.doc_id, &format!("new.{}", f.name()));
+        let bytes = putget(&mut ws, &o.doc_id, &format!("new.{}", f.name()));
+        if f == Format::Hwpx {
+            // Next to the hwpx corpus exports, so the rhwp check (hanji-hwpx/validate) re-opens it too.
+            let d = std::path::Path::new(env!("CARGO_TARGET_TMPDIR")).join("hwpx-corpus-out/store-blank");
+            std::fs::create_dir_all(&d).unwrap();
+            std::fs::write(d.join("ORIGINAL.hwpx"), blank::package(Format::Hwpx)).unwrap();
+            std::fs::write(d.join("new.hwpx"), &bytes).unwrap();
+        }
     }
 }
 
@@ -398,13 +404,8 @@ fn a_deck_is_read_by_slides() {
 fn an_edit_that_would_lose_content_is_refused_with_the_reason() {
     let mut ws = ws();
     let o = open(&mut ws, "crates/hanji-hwpx/corpus/basic-table-01.hwpx");
-    // A new table in a file whose only table was deleted has no layout to take (refused on export).
-    let (_, t) = text(&ws, &o.doc_id);
-    let table: String = t.lines().filter(|l| l.starts_with('|')).map(|l| format!("{l}\n")).collect();
-    let e = ws.edit(&o.doc_id, 1, &one(&table, "")).map(|_| ()).and_then(|_| {
-        ws.write(&o.doc_id, 2, &format!("{}| x | y |\n|---|---|\n| 1 | 2 |\n", text(&ws, &o.doc_id).1)).map(|_| ())
-    });
-    let e = e.unwrap_err();
+    // A merge over an existing cell: hwpx keeps no cell there, so what it held would go (refused on export).
+    let e = ws.edit(&o.doc_id, 1, &one("| 9 | 10 |", "| 9 | ^^ |")).unwrap_err();
     assert_eq!(e.code, Code::Refused, "{e:?}");
-    assert!(e.message.contains("table"), "{}", e.message);
+    assert!(e.message.contains("row 3, column 2 is now covered by a merge"), "{}", e.message);
 }

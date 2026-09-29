@@ -1,8 +1,9 @@
 //! `Contents/header.xml`: the file's paragraph styles, the character
 //! shapes (`hh:charPr`) that carry bold, italic, underline and strikeout,
 //! the paragraph shapes (`hh:paraPr`) that carry outline and list headings,
-//! and the numbering and bullet definitions. Export adds a shape or a
-//! numbering only when the text asks for one no existing shape gives.
+//! the numbering and bullet definitions, and the border fills a new table
+//! is drawn with. Export adds a shape, a numbering or a border fill only
+//! when the text asks for one the file does not have.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
@@ -59,6 +60,7 @@ pub fn list_heading(num: u32, level: u32) -> Heading {
 /// Which list of `header.xml` an added element goes to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 enum Container {
+    BorderFills,
     CharProperties,
     ParaProperties,
     Numberings,
@@ -67,6 +69,7 @@ enum Container {
 impl Container {
     fn name(self) -> &'static str {
         match self {
+            Container::BorderFills => "hh:borderFills",
             Container::CharProperties => "hh:charProperties",
             Container::ParaProperties => "hh:paraProperties",
             Container::Numberings => "hh:numberings",
@@ -82,6 +85,7 @@ pub struct Header {
     char_prs: BTreeMap<u32, Element>,
     para_prs: BTreeMap<u32, Element>,
     numberings: BTreeMap<u32, Element>,
+    border_fills: BTreeMap<u32, Element>,
     bullets: BTreeSet<u32>,
     /// Canonical form (without id) → id, for reuse.
     char_index: HashMap<String, u32>,
@@ -127,6 +131,11 @@ impl Header {
         for e in items(&doc.root, "hh:numberings", "hh:numbering") {
             if let Some(id) = id_of(e) {
                 h.numberings.insert(id, e.clone());
+            }
+        }
+        for e in items(&doc.root, "hh:borderFills", "hh:borderFill") {
+            if let Some(id) = id_of(e) {
+                h.border_fills.insert(id, e.clone());
             }
         }
         h.bullets = items(&doc.root, "hh:bullets", "hh:bullet").into_iter().filter_map(id_of).collect();
@@ -298,11 +307,13 @@ impl Header {
             Container::CharProperties => (&mut self.char_prs, Some(&mut self.char_index)),
             Container::ParaProperties => (&mut self.para_prs, Some(&mut self.para_index)),
             Container::Numberings => (&mut self.numberings, None),
+            Container::BorderFills => (&mut self.border_fills, None),
         };
         if let Some(&id) = index.as_ref().and_then(|i| i.get(&key)) {
             return id;
         }
-        let id = map.keys().next_back().map_or(0, |m| m + 1);
+        // Border fill ids count from 1.
+        let id = map.keys().next_back().map_or((c == Container::BorderFills) as u32, |m| m + 1);
         x.set("id", &id.to_string());
         map.insert(id, x.clone());
         if let Some(i) = index {
@@ -310,6 +321,30 @@ impl Header {
         }
         self.added.push((c, x));
         id
+    }
+
+    // ------------------------------------------------------------ border fills
+
+    /// The border fill of a new table and its cells, the look of a table
+    /// Hancom inserts: solid 0.12 mm black lines on all four sides, no
+    /// diagonal, no fill. The file's first such border fill, or a new one.
+    pub fn table_border_fill(&mut self) -> Result<u32, String> {
+        if let Some((&id, _)) = self.border_fills.iter().find(|(_, e)| is_table_look(e)) {
+            return Ok(id);
+        }
+        let has_list = self.doc.as_ref().is_some_and(|d| !items(&d.root, "hh:refList", "hh:borderFills").is_empty());
+        if !has_list {
+            return Err("header.xml has no border fills (hh:borderFills) to draw a new table with".into());
+        }
+        let line = |side: &str| format!(r##"<hh:{side} type="SOLID" width="0.12 mm" color="#000000"/>"##);
+        let x = xml::fragment(&format!(
+            r##"<hh:borderFill id="0" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0"><hh:slash type="NONE" Crooked="0" isCounter="0"/><hh:backSlash type="NONE" Crooked="0" isCounter="0"/>{}{}{}{}<hh:diagonal type="SOLID" width="0.1 mm" color="#000000"/></hh:borderFill>"##,
+            line("leftBorder"),
+            line("rightBorder"),
+            line("topBorder"),
+            line("bottomBorder"),
+        ));
+        Ok(self.add(Container::BorderFills, x))
     }
 
     /// `header.xml` with the added shapes and numberings, if any were added.
@@ -335,6 +370,19 @@ impl Header {
         rec(&mut d.root, &self.added);
         Some(xml::write_doc(&d))
     }
+}
+
+/// A border fill that draws a table as Hancom does by default.
+fn is_table_look(e: &Element) -> bool {
+    let is = |x: &Element, k: &str, v: &str| x.get(k).is_some_and(|a| a.eq_ignore_ascii_case(v));
+    let solid = |n: &str| {
+        e.child(n).is_some_and(|b| is(b, "type", "SOLID") && is(b, "width", "0.12 mm") && is(b, "color", "#000000"))
+    };
+    ["hh:leftBorder", "hh:rightBorder", "hh:topBorder", "hh:bottomBorder"].into_iter().all(solid)
+        && ["hh:slash", "hh:backSlash"].into_iter().all(|n| e.child(n).is_none_or(|x| is(x, "type", "NONE")))
+        && e.child("hc:fillBrush").is_none()
+        && !is(e, "threeD", "1")
+        && !is(e, "shadow", "1")
 }
 
 fn set_present(x: &mut Element, name: &str, on: bool) {
