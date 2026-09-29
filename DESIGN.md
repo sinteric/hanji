@@ -355,7 +355,8 @@ layout: Two Content
   the slide is shown, shapes without text and connectors included (rule 8).
 - **Geometry.** `box="x y w h"` is the left edge, top edge, width and height in
   points from the slide's top-left corner (72 pt = 1 inch = 2.54 cm; x grows to
-  the right, y downwards). Numbers are shown as whole points; a written number
+  the right, y downwards). Points are the unit, decided 2026-09-29; a cm view
+  or cm input can be added later as a conversion on top of them. Numbers are shown as whole points; a written number
   may have decimals. `rot="15"` turns an object 15° clockwise about its centre,
   and its box is the unturned one, as `a:xfrm` stores it. `flip="h"`, `"v"` or
   `"hv"` mirrors it. Both are left out when there is no rotation or flip.
@@ -405,9 +406,13 @@ layout: Two Content
 - **Lines and connectors** are `<line id="s6" name="…" from="x y" to="x y"/>`:
   the two ends, not a box. Writing them rewrites `a:off`, `a:ext` and the flips.
   Arrowheads, the connector's path and its connection ids stay in the
-  remainder. An edit that moves an object a connector is attached to, without
-  moving that end of the connector, is refused with the connector named:
-  connectors are not rerouted here.
+  remainder.
+  - *Attached connectors.* Moving or resizing an object that a connector is
+    attached to (its `stCxn` or `endCxn` names the object) is refused, with the
+    connector and the reason named, unless the same edit also rewrites every
+    attached `<line>`. The write does not reroute connectors: rerouting is
+    deferred (§10.9), and a refusal is better than a connector left detached
+    in PowerPoint (rule 1).
 - **Groups** are a `<group id name box>` line, the group's objects, then
   `</group>`. Its objects show slide coordinates (through the group's child
   offset and extent), and the group's box is the box around them. Changing the
@@ -821,7 +826,8 @@ v0.7.3; "lossless … regarding content", not formatting).
    forcing a placeholder (15.6% of docx tables); side-by-side hwpx tables
    import as separate blocks. Limit: the Korean side is press releases only,
    and many source hosts were blocked.
-9. ~~Geometry in Presentations~~ — decided 2026-09-29 by §6 round 5, after
+9. ~~Geometry in Presentations~~ — decided 2026-09-29 by §6 round 5 and the
+   owner (candidate B, in points, with the attached-connector refusal), after
    real decks checked in PowerPoint showed a canvas without positions and
    sizes to be too limited. The old §5.3 ("never geometry") is replaced. Slots
    come from the layout and show a `box` only when the slide moved them.
@@ -832,9 +838,11 @@ v0.7.3; "lossless … regarding content", not formatting).
    30 tasks unwritable, silent misreads). It also fixes a rule 8 gap: the old
    text left out connectors and textless shapes (9 of the 19 objects in
    shapes.pptx). Across the 21 corpus decks, 36% of slide placeholders have
-   their own box. A schema-1 text without boxes still reads unchanged. Not
-   yet measured: rerouting attached connectors (refused for now), rotated
-   groups (kept whole), and cm as the unit Korean PowerPoint shows.
+   their own box. A schema-1 text without boxes still reads unchanged.
+   Deferred: rerouting attached connectors (an edit that moves an attached
+   object without rewriting its connectors is refused, §5.3), editing inside
+   rotated groups (kept whole), and cm as a view or input over points (the
+   unit Korean PowerPoint shows; not measured).
 
 ## 11. Blind spots
 
@@ -846,7 +854,9 @@ v0.7.3; "lossless … regarding content", not formatting).
   ran on two Claude models only, 12–48 tasks per cell, one run per prompt.
   Round 5 put three of its four candidates at the ceiling, so the §5.3
   geometry rests on size and design, and its geometry was checked in the
-  kit's model (`deck.py`), not in hanji-pptx or PowerPoint.
+  kit's model (`deck.py`), not in hanji-pptx or PowerPoint. No round asked
+  for a connector edit, so how often the attached-connector refusal (§5.3)
+  blocks a real move is unmeasured.
   Round 1 hit the ceiling; rounds 2–4 produced a few failures (Sonnet's merge
   markers in rounds 2 and 3; Opus's list-table indentation in round 3;
   Sonnet's new-table row labels and `=`-less formulas in round 4), every
