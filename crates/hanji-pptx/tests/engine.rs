@@ -400,3 +400,58 @@ fn a_rewrite_that_deletes_a_slide_and_adds_one_is_refused_not_guessed() {
     let (text, rem) = span_edit(&imp2, n, n, "\n---\n\nlayout: Title and Content\n::title::\n완전히 새로운 제목\n");
     assert_eq!(slides(&export(&text, &rem)).len(), 7);
 }
+
+/// shapes.pptx's fifth slide (Hyperlinks: a table and a title) as the text
+/// shows it, with the separator before it; the sixth slide after it holds
+/// six squares and no text.
+fn hyperlinks_slide(text: &str) -> (usize, usize) {
+    let (a, b) = slide_span(text, 4);
+    assert!(text[a..b].contains("Hyperlinks") && text[b..].starts_with("---\n\nlayout: Blank"), "{}", &text[a..]);
+    (text[..a].rfind("\n\n---\n\n").unwrap(), text[..b].trim_end().len())
+}
+
+#[test]
+fn deleting_the_slide_before_a_slide_without_text_keeps_that_slide() {
+    let imp = import(&deck("shapes.pptx"));
+    let (a, b) = hyperlinks_slide(&imp.text);
+    let r = edit_in(&PptxModel, &imp.remainder, &imp.text, &imp.text[a..b], "", CAPS).unwrap_or_else(|e| panic!("{e}"));
+    let parts = export(&r.text, &r.remainder);
+    assert_eq!(slides(&parts).last().unwrap(), "ppt/slides/slide6.xml");
+    assert_eq!(xml(&parts, "ppt/slides/slide6.xml").matches("<p:sp>").count(), 6);
+}
+
+#[test]
+fn an_exact_edit_that_cuts_a_slide_line_is_read_by_whole_lines_or_refused() {
+    let imp = import(&deck("shapes.pptx"));
+    let (a, b) = hyperlinks_slide(&imp.text);
+    let sep = "\n\n---\n\nlayout: ";
+    let (s, e) = (a + sep.len(), b + sep.len());
+    assert_eq!(&imp.text[e..e + 5], "Blank");
+    let kept = |text: &str, rem: &Remainder| {
+        assert_eq!(text, format!("{}{}", &imp.text[..a], &imp.text[b..]));
+        let parts = export(text, rem);
+        assert_eq!(slides(&parts).last().unwrap(), "ppt/slides/slide6.xml");
+        assert_eq!(xml(&parts, "ppt/slides/slide6.xml").matches("<p:sp>").count(), 6);
+    };
+    // The smallest span that deletes the Hyperlinks slide starts after its
+    // `layout: ` and ends before the next slide's layout name, cutting both
+    // slide lines: read by whole lines, it deletes that slide, and the next
+    // one stays, six squares and all.
+    let (text, rem) = span_edit(&imp, s, e, "");
+    kept(&text, &rem);
+    // The same with the separator before it, as an edit of old → new text.
+    let r = edit_in(&PptxModel, &imp.remainder, &imp.text, &imp.text[a..e + 5], &sep.replace(": ", ": Blank"), CAPS);
+    let r = r.unwrap_or_else(|e| panic!("{e}"));
+    kept(&r.text, &r.remainder);
+    // A layout name changed and the slide's table deleted in one span that
+    // cuts the slide line: the slide would be made anew, so it is refused.
+    let k = imp.text[s..].find('\n').unwrap() + s + 1;
+    let obj = imp.text[k..].find('\n').unwrap() + k;
+    let r = reanchor_span_in(&PptxModel, &imp.remainder, &imp.text, s, obj, "Title and Content", CAPS).unwrap();
+    assert!(
+        !r.report.refused.is_empty()
+            && r.report.refused.iter().all(|x| x.2.contains("cuts through the line \"layout: Title Only\"")),
+        "{:?}",
+        r.report
+    );
+}

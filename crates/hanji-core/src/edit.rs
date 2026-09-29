@@ -196,9 +196,90 @@ pub fn reanchor_span_in(
     let new_text = format!("{}{}{}", &text[..s], repl, &text[e..]);
     let (old, om) = m.resolve(text, rem, caps).map_err(Refusal::Invalid)?;
     let (nb, nm) = m.resolve(&new_text, rem, caps).map_err(Refusal::Invalid)?;
-    let alignment = exact_alignment(&om, &old, &nm, &nb, s, e, repl.len());
-    let (remainder, report, outcomes) = reanchor(rem, &old, &nb, &alignment);
+    let (mut s, mut e) = (s, e);
+    let mut alignment = exact_alignment(&om, &old, &nm, &nb, s, e, repl.len());
+    // A span that cuts a head's line and leaves it unpaired is read by
+    // whole lines: the same text change, with the lines it repeats left out
+    // (deleting a slide whose neighbour begins alike cuts both slide lines).
+    let cut = cut_heads(&old, &om, &alignment, s, e);
+    if !cut.is_empty() {
+        let (s2, e2, r2) = whole_lines(text, s, e, repl);
+        debug_assert_eq!(format!("{}{r2}{}", &text[..s2], &text[e2..]), new_text);
+        let al2 = exact_alignment(&om, &old, &nm, &nb, s2, e2, r2.len());
+        let gone_whole = |i: usize| {
+            let level = old[i].head().map_or(0, |h| h.level);
+            let end =
+                (i + 1..old.len()).find(|&k| old[k].head().is_some_and(|h| h.level <= level)).unwrap_or(old.len());
+            s2 <= om[i].start && om[end - 1].end <= e2
+        };
+        if cut.iter().all(|&i| al2.bmap[i].is_some() || gone_whole(i)) && cut_heads(&old, &om, &al2, s2, e2).is_empty()
+        {
+            (s, e, alignment) = (s2, e2, al2);
+        }
+    }
+    let (remainder, mut report, mut outcomes) = reanchor(rem, &old, &nb, &alignment);
+    refuse_cut_heads(rem, text, &om, &cut_heads(&old, &om, &alignment, s, e), &mut report, &mut outcomes);
     Ok(Reanchored { text: new_text, old, new: nb, remainder, report, outcomes, alignment })
+}
+
+/// Heads (a slide's `layout:` line, a slot's or shape's) the span `s..e`
+/// cuts through, part in and part out, that found no new head.
+fn cut_heads(old: &[Block], om: &[BlockSrc], al: &Alignment, s: usize, e: usize) -> Vec<usize> {
+    (0..old.len())
+        .filter(|&i| {
+            let m = &om[i];
+            matches!(old[i], Block::Head(_))
+                && al.bmap[i].is_none()
+                && m.start < e
+                && s < m.end
+                && !(s <= m.start && m.end <= e)
+        })
+        .collect()
+}
+
+/// The edit `text[s..e] → repl` as a span of whole lines, less the lines
+/// it starts or ends with unchanged.
+fn whole_lines(text: &str, s: usize, e: usize, repl: &str) -> (usize, usize, String) {
+    let s0 = text[..s].rfind('\n').map_or(0, |k| k + 1);
+    let e0 =
+        if e == 0 || text[..e].ends_with('\n') { e } else { text[e..].find('\n').map_or(text.len(), |k| e + k + 1) };
+    let old = &text[s0..e0];
+    let new = format!("{}{repl}{}", &text[s0..s], &text[e..e0]);
+    let (ol, nl): (Vec<&str>, Vec<&str>) = (old.split_inclusive('\n').collect(), new.split_inclusive('\n').collect());
+    let pre = ol.iter().zip(&nl).take_while(|(a, b)| a == b).count();
+    let suf = ol[pre..].iter().rev().zip(nl[pre..].iter().rev()).take_while(|(a, b)| a == b).count();
+    let bytes = |ls: &[&str]| ls.iter().map(|l| l.len()).sum::<usize>();
+    let (a, b) = (bytes(&ol[..pre]), bytes(&ol[ol.len() - suf..]));
+    let nb = bytes(&nl[nl.len() - suf..]);
+    (s0 + a, e0 - b, new[a..new.len() - nb].to_string())
+}
+
+/// What the entries of a head in `cut` hold (a slide's shapes without
+/// text, its geometry) would go with it, though the text keeps the part of
+/// its line the edit left: that is not the edit the text states, so they
+/// are refused, not removed.
+fn refuse_cut_heads(
+    rem: &Remainder,
+    text: &str,
+    om: &[BlockSrc],
+    cut: &[usize],
+    report: &mut Report,
+    outcomes: &mut HashMap<u64, Outcome>,
+) {
+    for en in &rem.entries {
+        let Some(&i) = en.path.first().filter(|i| cut.contains(i)) else { continue };
+        let Some(o) = outcomes.get_mut(&en.id) else { continue };
+        if matches!(o.status, Status::Removed(_)) {
+            let line = text[om[i].start..om[i].end].trim_end();
+            let why = format!(
+                "the edit cuts through the line {line:?}: include the whole line in the edit (from the line \
+                 before), or leave it out"
+            );
+            o.status = Status::Refused(why.clone());
+            report.removed.retain(|x| x.0 != en.id);
+            report.refused.push((en.id, en.kind, why));
+        }
+    }
 }
 
 /// A whole-file rewrite: `old_text` (the revision `rem` belongs to) becomes
@@ -363,16 +444,26 @@ fn exact_alignment(
     let new_items: Vec<_> = para_maps(nb, new_maps).into_iter().filter(|x| !claimed.contains(&x.3)).collect();
     let old_stream = Stream::new(old_items.iter().map(|x| (x.0.clone(), x.1.unwrap_or(&EMPTY))));
     let new_stream = Stream::new(new_items.iter().map(|x| (x.0.clone(), x.1.unwrap_or(&EMPTY))));
-    // Source offset of every stream position (units, then the mark).
+    // Source offset of every stream position (units, then the mark). A
+    // block placeholder's line is a unit in its source map but no content
+    // in the stream: only its mark counts, so the offsets stay in step.
     let offsets = |items: &[(Path, Option<&fmt::Inline>, &ParaMap, usize)]| -> Vec<usize> {
-        items.iter().flat_map(|x| x.2.units.iter().copied().chain([x.2.mark])).collect()
+        items
+            .iter()
+            .flat_map(|x| {
+                let n = x.1.map_or(0, |c| c.units.len()).min(x.2.units.len());
+                x.2.units[..n].iter().copied().chain([x.2.mark])
+            })
+            .collect()
     };
     let (oo, no) = (offsets(&old_items), offsets(&new_items));
     let at_new: HashMap<usize, usize> = no.iter().enumerate().map(|(k, &o)| (o, k)).collect();
     let mut pairs: Vec<(usize, usize)> = vec![];
     for (k, &o) in oo.iter().enumerate() {
         if let Some(&n) = shift(o).and_then(|x| at_new.get(&x)) {
-            if old_stream.text.get(k) == new_stream.text.get(n) && pairs.last().is_none_or(|p| p.1 < n) {
+            // Both positions exist: two past the end are no match.
+            let same = matches!((old_stream.text.get(k), new_stream.text.get(n)), (Some(a), Some(b)) if a == b);
+            if same && pairs.last().is_none_or(|p| p.1 < n) {
                 pairs.push((k, n));
             }
         }
