@@ -163,6 +163,9 @@ pub struct Edit {
     pub unit_span: Option<(Path, usize, usize)>,
     /// Whether the edit is one contiguous text change (not a move).
     pub local: bool,
+    /// The exact text edit `(start, end, new)`, when the edit knows it
+    /// (a whole slide deleted spans whole lines).
+    pub span: Option<(usize, usize, String)>,
 }
 
 impl Edit {
@@ -186,6 +189,7 @@ impl Edit {
             lenient: HashSet::new(),
             unit_span: None,
             local,
+            span: None,
         }
     }
 }
@@ -216,6 +220,7 @@ pub fn replace_span(d: &Doc, path: &[usize], s: usize, e: usize, new: &str, name
         lenient: HashSet::new(),
         unit_span: Some((path.to_vec(), s, e)),
         local: true,
+        span: None,
     }
 }
 
@@ -350,6 +355,7 @@ fn e2_insert_before_drawing(d: &Doc, cx: &Cx) -> Option<Edit> {
         lenient: HashSet::new(),
         unit_span: None,
         local: true,
+        span: None,
     })
 }
 
@@ -385,6 +391,7 @@ fn e3_delete_formatted(d: &Doc, cx: &Cx) -> Option<Edit> {
                 lenient: HashSet::new(),
                 unit_span: None,
                 local: true,
+                span: None,
             });
         }
     }
@@ -452,6 +459,7 @@ fn e4_move_section(d: &Doc, cx: &Cx) -> Option<Edit> {
         lenient: HashSet::new(),
         unit_span: None,
         local: false,
+        span: None,
     })
 }
 
@@ -496,6 +504,7 @@ fn e5_restyle(d: &Doc, cx: &Cx) -> Option<Edit> {
                 lenient: HashSet::new(),
                 unit_span: None,
                 local: true,
+                span: None,
             });
         }
     }
@@ -656,6 +665,7 @@ fn e8_split(d: &Doc, _: &Cx) -> Option<Edit> {
         lenient: HashSet::from([vec![i]]),
         unit_span: None,
         local: true,
+        span: None,
     })
 }
 
@@ -712,6 +722,7 @@ fn e9_merge(d: &Doc, cx: &Cx) -> Option<Edit> {
         lenient: HashSet::from([vec![i], vec![i + 1]]),
         unit_span: None,
         local: true,
+        span: None,
     })
 }
 
@@ -1068,6 +1079,9 @@ impl Out {
 /// The exact text span of an edit: from its unit span when it has one,
 /// else the minimal differing region.
 fn text_span(fmt: &dyn Format, old_text: &str, new_text: &str, rem: &Remainder, ed: &Edit) -> (usize, usize, String) {
+    if let Some(span) = &ed.span {
+        return span.clone();
+    }
     if let Some((path, s, e)) = &ed.unit_span {
         let (_, mut maps) = fmt.model().resolve(old_text, rem, CAPS).unwrap();
         let pm = match maps.swap_remove(path[0]).kind {

@@ -226,7 +226,7 @@ pub fn align_ambiguous(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, Has
             pair(&mut bmap, &mut used, i, j);
         }
     }
-    follow_heads(old, new, &mut bmap, &mut used);
+    follow_heads(old, new, &mut bmap, &mut used, &mut ambiguous);
     // Block placeholders are found by id wherever they went.
     for (i, b) in old.iter().enumerate() {
         if let Block::Keep(id) = b {
@@ -252,32 +252,88 @@ pub fn align_ambiguous(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, Has
     (bmap, ambiguous)
 }
 
-/// Heads follow what they hold: an unpaired head pairs with the head of its
-/// kind that the first paired block it holds now sits under; a head that
-/// holds no paired block, with the one just after where the block before it
-/// went. Inner heads (a slide's slots) are paired first.
-fn follow_heads(old: &[Block], new: &[Block], bmap: &mut [Option<usize>], used: &mut HashSet<usize>) {
-    let end = |i: usize, lv: u8| {
-        (i + 1..old.len()).find(|&k| old[k].head().is_some_and(|n| n.level <= lv)).unwrap_or(old.len())
+/// Heads follow what they hold. Each head pairs with the new head its
+/// contents mostly went under (slots and shapes first, then slides, whose
+/// contents include their slots). A slide none of whose contents survived
+/// keeps the pairing the diff gave it, else takes the place after where the
+/// block before it went; a slot or shape none of whose
+/// contents survived pairs with the head of its key on the slide its slide
+/// went to. A head is ambiguous when every block that placed it is.
+fn follow_heads(
+    old: &[Block],
+    new: &[Block],
+    bmap: &mut [Option<usize>],
+    used: &mut HashSet<usize>,
+    ambiguous: &mut HashSet<usize>,
+) {
+    let heads: Vec<usize> = (0..old.len()).filter(|&i| old[i].head().is_some()).collect();
+    let diff: HashMap<usize, usize> = heads.iter().filter_map(|&i| bmap[i].map(|j| (i, j))).collect();
+    let diff_ambiguous: HashSet<usize> = heads.iter().copied().filter(|i| ambiguous.contains(i)).collect();
+    for &i in &heads {
+        if let Some(j) = bmap[i].take() {
+            used.remove(&j);
+        }
+        ambiguous.remove(&i);
+    }
+    let level = |b: &Block| b.head().map(|h| h.level);
+    let end = |xs: &[Block], i: usize, lv: u8| {
+        (i + 1..xs.len()).find(|&k| level(&xs[k]).is_some_and(|l| l <= lv)).unwrap_or(xs.len())
     };
-    loop {
-        let mut changed = false;
-        for i in (0..old.len()).rev() {
-            let Some(h) = old[i].head().filter(|_| bmap[i].is_none()) else { continue };
-            let under = |jc: usize| (0..jc).rev().find(|&x| new[x].head().is_some_and(|n| n.level <= h.level));
-            let j = (i + 1..end(i, h.level))
-                .find_map(|k| bmap[k])
-                .and_then(under)
-                .or_else(|| i.checked_sub(1).and_then(|p| bmap[p]).map(|j| j + 1));
-            let fits = |j: usize| !used.contains(&j) && new.get(j).is_some_and(|b| same_kind(&old[i], b));
-            if let Some(j) = j.filter(|&j| fits(j)) {
-                bmap[i] = Some(j);
-                used.insert(j);
-                changed = true;
+    // The new head of level `lv` or above that new block `j` sits under.
+    let under = |j: usize, lv: u8| (0..j).rev().find(|&x| level(&new[x]).is_some_and(|l| l <= lv));
+    let pair = |bmap: &mut [Option<usize>], used: &mut HashSet<usize>, i: usize, j: usize| -> bool {
+        let fits = j < new.len() && !used.contains(&j) && same_kind(&old[i], &new[j]);
+        if fits {
+            bmap[i] = Some(j);
+            used.insert(j);
+        }
+        fits
+    };
+    for lv in [1, 0] {
+        for &i in heads.iter().filter(|&&i| level(&old[i]) == Some(lv)) {
+            let mut votes: Vec<(usize, usize, bool)> = vec![]; // (new head, count, every voter ambiguous)
+            let contents = i + 1..end(old, i, lv);
+            for (k, to) in contents.clone().zip(&bmap[contents]) {
+                let Some(x) = to.and_then(|jk| under(jk, lv)) else { continue };
+                match votes.iter_mut().find(|v| v.0 == x) {
+                    Some(v) => {
+                        v.1 += 1;
+                        v.2 &= ambiguous.contains(&k);
+                    }
+                    None => votes.push((x, 1, ambiguous.contains(&k))),
+                }
+            }
+            // Most votes; the earliest content breaks a tie.
+            let best = votes.iter().enumerate().max_by_key(|(n, v)| (v.1, std::cmp::Reverse(*n))).map(|(_, v)| *v);
+            if let Some((x, _, amb)) = best {
+                if pair(bmap, used, i, x) && amb {
+                    ambiguous.insert(i);
+                }
             }
         }
-        if !changed {
-            break;
+        if lv == 0 {
+            for &i in &heads {
+                if level(&old[i]) != Some(0) || bmap[i].is_some() {
+                    continue;
+                }
+                let by_diff = diff.get(&i).is_some_and(|&j| pair(bmap, used, i, j));
+                if by_diff {
+                    if diff_ambiguous.contains(&i) {
+                        ambiguous.insert(i);
+                    }
+                } else if let Some(j) = i.checked_sub(1).and_then(|p| bmap[p]).map(|j| j + 1) {
+                    pair(bmap, used, i, j);
+                }
+            }
+        }
+    }
+    for &i in &heads {
+        if level(&old[i]) != Some(1) || bmap[i].is_some() {
+            continue;
+        }
+        let Some(js) = (0..i).rev().find(|&s| level(&old[s]) == Some(0)).and_then(|s| bmap[s]) else { continue };
+        if let Some(x) = (js + 1..end(new, js, 0)).find(|&x| !used.contains(&x) && same_kind(&old[i], &new[x])) {
+            pair(bmap, used, i, x);
         }
     }
 }

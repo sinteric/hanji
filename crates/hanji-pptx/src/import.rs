@@ -324,10 +324,17 @@ impl Importer<'_> {
         let shell = p.shell();
         let xml: Vec<String> =
             std::iter::once(shell.to_xml()).chain([ppr, end].into_iter().flatten().map(Element::to_xml)).collect();
+        // The level and the bullet are the text's (as a run's marks are).
+        let unmodelled = ppr.map(|x| {
+            let mut x = x.clone();
+            x.remove_attr("lvl");
+            x.children.retain(|n| !matches!(n, Node::El(e) if BU.contains(&e.name.as_str())));
+            x
+        });
         let f = if shell.attrs.is_empty() && ppr.is_none() && end.is_none() {
             String::new()
         } else {
-            self.fp(&[Some(&shell), ppr, end])
+            self.fp(&[Some(&shell), unmodelled.as_ref(), end])
         };
         let meta = Meta { item, aux: vec![lvl.to_string()], ..Default::default() };
         self.entry(Kind::Ppr, xml, f, &path, None, None, meta);
@@ -461,13 +468,14 @@ pub fn match_slot<'s>(layout: &'s LayoutInfo, ty: &str, idx: u32) -> Option<&'s 
         .or_else(|| layout.slots.iter().find(|s| s.ty == ty || (title(ty) && title(&s.ty))))
 }
 
-/// A `p:sp` whose text body holds any text or inline object.
+/// A `p:sp` whose text body holds any text (whitespace alone is none) or
+/// inline object.
 pub fn has_text(sp: &Element) -> bool {
     let Some(tx) = sp.child("p:txBody") else { return false };
     tx.elements().filter(|p| p.is("a:p")).any(|p| {
         p.elements().any(|c| match c.name.as_str() {
             "a:pPr" | "a:endParaRPr" => false,
-            "a:r" => !c.text_of(&["a:t"]).is_empty(),
+            "a:r" => !c.text_of(&["a:t"]).trim().is_empty(),
             _ => true,
         })
     })
@@ -510,10 +518,12 @@ pub fn wrap(name: &str, attrs: &[(&str, &str)], child: Option<Element>) -> Eleme
     w
 }
 
-/// The skeleton without its stand-ins (for its fingerprint: what the text does not show).
+/// The skeleton without its stand-ins and empty placeholders, for its
+/// fingerprint: what the text does not show and no slot can take.
 fn without_stand_ins(skel: &Element) -> Element {
     let mut s = skel.clone();
-    s.walk_mut(&mut |e| e.children.retain(|n| !matches!(n, Node::El(x) if x.is(ITEM))));
+    let empty = |x: &Element| x.is("p:sp") && placeholder(x).is_some() && !has_text(x);
+    s.walk_mut(&mut |e| e.children.retain(|n| !matches!(n, Node::El(x) if x.is(ITEM) || x.is(LATENT) || empty(x))));
     s
 }
 
