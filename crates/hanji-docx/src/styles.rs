@@ -58,11 +58,12 @@ pub fn read(data: Option<&[u8]>) -> (StyleSet, Option<String>) {
         }
         false
     };
-    let grid = s.table.iter().find(|t| t.name == "Table Grid").map(|t| t.name.clone());
-    s.default_table = match &default_t {
-        Some(id) if bordered(id) => s.table_name(id).map(str::to_string),
-        d => grid.or_else(|| d.as_deref().and_then(|id| s.table_name(id)).map(str::to_string)),
+    let name = |id: &str| s.table_name(id).map(str::to_string);
+    let default_table = match default_t.as_deref() {
+        Some(id) if bordered(id) => name(id),
+        d => s.table_id("Table Grid").map(|_| "Table Grid".to_string()).or_else(|| d.and_then(name)),
     };
+    s.default_table = default_table;
     for p in &s.paragraph {
         let lower = p.name.to_lowercase();
         if let Some(n) = lower.strip_prefix("heading ").and_then(|d| d.parse::<usize>().ok()) {

@@ -493,15 +493,7 @@ fn list_edits_take_numbering_from_siblings_or_the_default_list() {
     let r = rewrite(&imp.remainder, &imp.text, &new, CAPS).unwrap();
     let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
     let xml = doc_xml(&out);
-    let num_of = |t: &str| {
-        let at = xml.find(&format!(">{t}<")).unwrap_or_else(|| panic!("{t}: {xml}"));
-        let p = &xml[xml[..at].rfind("<w:p>").or_else(|| xml[..at].rfind("<w:p ")).unwrap()..at];
-        let v = |k: &str| {
-            let pat = format!("<w:{k} w:val=\"");
-            p.find(&pat).map(|i| p[i + pat.len()..].split('"').next().unwrap().to_string())
-        };
-        (v("numId"), v("ilvl"))
-    };
+    let num_of = |t: &str| num_pr_of(&xml, t);
     let s = |x: &str| Some(x.to_string());
     assert_eq!(num_of("a"), (s("1"), s("0")));
     assert_eq!(num_of("b promoted"), (s("1"), s("0")), "a promoted item moves its own ilvl");
@@ -542,17 +534,20 @@ fn a_new_list_without_numbering_in_the_file_is_refused() {
     }
 }
 
+/// The `w:numId` and `w:ilvl` of the paragraph of `xml` whose text is `t`.
+fn num_pr_of(xml: &str, t: &str) -> (Option<String>, Option<String>) {
+    let at = xml.find(&format!(">{t}<")).unwrap_or_else(|| panic!("{t}: {xml}"));
+    let p = &xml[xml[..at].rfind("<w:p>").or_else(|| xml[..at].rfind("<w:p ")).unwrap()..at];
+    let v = |k: &str| {
+        let pat = format!("<w:{k} w:val=\"");
+        p.find(&pat).map(|i| p[i + pat.len()..].split('"').next().unwrap().to_string())
+    };
+    (v("numId"), v("ilvl"))
+}
+
 /// The `w:numId` of each paragraph of `xml` whose text is one of `texts`.
 fn num_ids(xml: &str, texts: &[&str]) -> Vec<String> {
-    texts
-        .iter()
-        .map(|t| {
-            let at = xml.find(&format!(">{t}<")).unwrap_or_else(|| panic!("{t}: {xml}"));
-            let p = &xml[xml[..at].rfind("<w:p>").or_else(|| xml[..at].rfind("<w:p ")).unwrap()..at];
-            let k = p.find("<w:numId w:val=\"").unwrap_or_else(|| panic!("{t} has no numId: {p}")) + 16;
-            p[k..].split('"').next().unwrap().to_string()
-        })
-        .collect()
+    texts.iter().map(|t| num_pr_of(xml, t).0.unwrap_or_else(|| panic!("{t} has no numId: {xml}"))).collect()
 }
 
 #[test]
