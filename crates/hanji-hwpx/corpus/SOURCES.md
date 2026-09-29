@@ -47,8 +47,8 @@ origin is unclear (a publisher's sample form, private notices).
 
 No openly licensed hwpx file with tracked changes was found (the
 tracked-changes spike: 0 of rhwp's 543 hwpx files have any), so the §10.2
-tests write the marks into corpus files themselves (`tests/engine.rs`,
-`tests/rhwp.rs`), in the shape the spike took from the OWPML schema.
+test writes the marks into a synthetic package itself (`tests/engine.rs`),
+in the shape the spike took from the OWPML schema.
 
 HWP 5.0 binaries are out of scope here; rhwp's samples include the `.hwp`
 originals of several of these files.

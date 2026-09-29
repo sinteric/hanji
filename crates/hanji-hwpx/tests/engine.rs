@@ -128,6 +128,13 @@ fn anchor(tables: &[String]) -> String {
     )
 }
 
+/// Keep a package next to the corpus exports, so the rhwp check (`validate/`) re-opens it too.
+fn save(dir: &str, what: &str, pkg: &[u8]) {
+    let d = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("hwpx-corpus-out").join(dir);
+    std::fs::create_dir_all(&d).unwrap();
+    std::fs::write(d.join(format!("{what}.hwpx")), pkg).unwrap();
+}
+
 fn section(pkg: &[u8]) -> String {
     String::from_utf8(package::get(&package::read(pkg).unwrap(), "Contents/section0.xml").unwrap().to_vec()).unwrap()
 }
@@ -338,9 +345,13 @@ fn tracked_changes_are_read_only_placeholders_and_never_dropped() {
     );
     assert_eq!(imp.text.matches("kind=\"tracked-change\"").count(), 3, "{}", imp.text);
     // GetPut, and an edit elsewhere keeps every mark byte for byte.
-    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg));
+    let getput = export(&imp.text, &imp.remainder);
+    assert_eq!(canon(&getput), canon(&pkg));
     let r = edit(&imp.remainder, &imp.text, "가운데", "중간", CAPS).unwrap();
     let out = export(&r.text, &r.remainder);
+    save("engine-tracked", "ORIGINAL", &pkg);
+    save("engine-tracked", "getput", &getput);
+    save("engine-tracked", "E1-exact", &out);
     let marks = |s: &str| s.matches("Begin Id=").count() + s.matches("End Id=").count();
     assert_eq!(marks(&section(&out)), 6);
     assert_eq!(import(&out).text, r.text, "PutGet");

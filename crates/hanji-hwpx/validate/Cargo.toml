@@ -1,0 +1,13 @@
+[package]
+name = "hwpx-validate"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Re-opens every hwpx export of the corpus test with rhwp (§9 validity). Not part of the workspace: rhwp comes from git and is large."
+
+# Standalone: an empty [workspace] keeps this crate out of the hanji workspace build.
+[workspace]
+
+[dependencies]
+rhwp = { git = "https://github.com/edwardkim/rhwp", rev = "680111ec7bea2fe11110de18c3676ba5a1cf7847", default-features = false }
+zip = { version = "8", default-features = false, features = ["deflate"] }
