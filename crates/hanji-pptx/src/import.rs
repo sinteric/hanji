@@ -216,7 +216,7 @@ impl Importer<'_> {
                     tree.children.push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
                     self.blocks.push(slot_head(&slot.name));
                     let bj = self.blocks.len();
-                    let keep = self.keep_entry(Kind::Bkeep, &el, &[bj], None, &k.to_string());
+                    let keep = self.keep_entry(Kind::Bkeep, &el, &[bj], None, &k.to_string(), "");
                     self.blocks.push(Block::Keep(keep.id));
                 }
                 What::Object => {
@@ -225,8 +225,7 @@ impl Importer<'_> {
                     tree.children.push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
                     self.blocks.push(object_head());
                     let bj = self.blocks.len();
-                    let keep = self.keep_entry(Kind::Bkeep, &el, &[bj], None, &k.to_string());
-                    self.entries.last_mut().unwrap().meta.tag = OBJECT_TAG.into();
+                    let keep = self.keep_entry(Kind::Bkeep, &el, &[bj], None, &k.to_string(), OBJECT_TAG);
                     self.blocks.push(Block::Keep(keep.id));
                 }
                 What::Shape(id, name) => {
@@ -242,7 +241,7 @@ impl Importer<'_> {
             }
         }
         let fpv = canon(&without_stand_ins(&skel), &self.scope);
-        let named = crate::export::named_rel_ids(root).into_iter().collect();
+        let named = named_rel_ids(root).into_iter().collect();
         let aux = vec![serde_json::to_string(&SlideInfo { ids, named, ..info }).unwrap()];
         let meta = Meta { tag: "slide".into(), aux, part: Some(self.part.clone()), ..Default::default() };
         self.entry(Kind::Slide, vec![skel.to_xml()], fpv, &[bi], None, None, meta);
@@ -319,12 +318,13 @@ impl Importer<'_> {
         Ok(())
     }
 
-    fn keep_entry(&mut self, kind: Kind, el: &Element, path: &[usize], pos: Option<usize>, k: &str) -> Keep {
+    /// A placeholder entry for `el`; `tag` marks a slide object's.
+    fn keep_entry(&mut self, kind: Kind, el: &Element, path: &[usize], pos: Option<usize>, k: &str, tag: &str) -> Keep {
         let fpv = self.fp(&[Some(el)]);
         let id = self.keep_ids.next(&fpv);
         let keep = Keep { id, kind: keep_kind(el), summary: summary(el) };
         let aux = if kind == Kind::Bkeep { vec![k.to_string(), self.part.clone()] } else { vec![] };
-        let meta = Meta { keep: Some(keep.clone()), aux, ..Default::default() };
+        let meta = Meta { keep: Some(keep.clone()), aux, tag: tag.into(), ..Default::default() };
         self.entry(kind, vec![el.to_xml()], fpv, path, pos, pos.map(|p| p + 1), meta);
         keep
     }
@@ -382,7 +382,7 @@ impl Importer<'_> {
                 }
                 _ => {
                     let pos = self.buf.len();
-                    let keep = self.keep_entry(Kind::Keep, c, &path, Some(pos), "");
+                    let keep = self.keep_entry(Kind::Keep, c, &path, Some(pos), "", "");
                     self.buf.push(Unit { atom: Atom::Keep(keep), marks: Marks::NONE });
                 }
             }
@@ -570,6 +570,10 @@ pub(crate) fn refers(xml: &str) -> bool {
 }
 
 fn keep_kind(el: &Element) -> String {
+    // On a slide: the object its first choice holds.
+    if let Some(inner) = chosen(el) {
+        return keep_kind(inner);
+    }
     match el.local() {
         "pic" => "picture".into(),
         "graphicFrame" => {
@@ -591,21 +595,20 @@ fn keep_kind(el: &Element) -> String {
         "fld" => "field".into(),
         "grpSp" => "group".into(),
         "contentPart" => "ink".into(),
-        // On a slide: the object its first choice holds.
-        "AlternateContent" if chosen(el).is_some() => chosen(el).map_or("object".into(), keep_kind),
         "AlternateContent" | "m" => "math".into(),
         "r" => "text".into(),
         other => other.into(),
     }
 }
 
-/// The first shape an `mc:AlternateContent` on a slide holds.
+/// The first shape a slide's `mc:AlternateContent` holds (`None` for anything else).
 fn chosen(el: &Element) -> Option<&Element> {
+    if !el.is("mc:AlternateContent") {
+        return None;
+    }
     let mut found = None;
     el.walk(&mut |e| {
-        if found.is_none()
-            && matches!(e.name.as_str(), "p:pic" | "p:graphicFrame" | "p:grpSp" | "p:sp" | "p:contentPart")
-        {
+        if found.is_none() && (e.is("p:sp") || (is_object(e) && !e.is("mc:AlternateContent"))) {
             found = Some(e);
         }
     });
@@ -628,7 +631,7 @@ fn paragraphs_text(el: &Element) -> String {
 }
 
 fn summary(el: &Element) -> String {
-    if let Some(inner) = chosen(el).filter(|_| el.is("mc:AlternateContent")) {
+    if let Some(inner) = chosen(el) {
         return summary(inner);
     }
     let s = match el.local() {

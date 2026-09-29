@@ -264,9 +264,9 @@ pub fn align_full(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, HashSet<
 /// Heads follow what they hold. Each head pairs with the new head its
 /// contents mostly went under (slots and shapes first, then slides, whose
 /// contents include their slots). A slide none of whose contents survived
-/// keeps the pairing the diff gave it where it stood; else it was deleted, or, when a new
-/// slide no other took could be it, it is `unsure` (with the heads it
-/// holds): §10.3 refuses an ambiguous alignment rather than guess. A slot,
+/// keeps the pairing the diff gave it where it stood; else it was deleted,
+/// or, when a new slide no other took could be it, it is `unsure` (with the
+/// heads it holds): §10.3 refuses an ambiguous alignment rather than guess. A slot,
 /// shape or object none of whose contents survived pairs with the head of
 /// its key on the slide its slide went to. A head is ambiguous when every
 /// block that placed it is.
@@ -358,16 +358,13 @@ fn follow_heads(
                     ambiguous.insert(i);
                 }
             }
-            // A slide still unplaced was deleted, unless a new slide nobody
-            // took could be it: the one where it stood, or an empty one. That
-            // is not guessed: its entries are refused.
+            // A slide still unplaced was deleted, unless there is a new slide
+            // nobody took. That is not guessed: its entries are refused.
             let free: Vec<usize> =
                 (0..new.len()).filter(|&x| level(&new[x]) == Some(0) && !used.contains(&x)).collect();
             for &i in unvoted.iter().filter(|&&i| bmap[i].is_none()) {
-                // None of its text is left, so an empty new slide could be it too.
-                let at = there(bmap, i);
-                let could_be =
-                    free.iter().any(|&x| same_kind(&old[i], &new[x]) && (x == at || end(new, x, 0) == x + 1));
+                // None of its text is left: any new slide no other took could be it, rewritten.
+                let could_be = free.iter().any(|&x| same_kind(&old[i], &new[x]));
                 if could_be {
                     unsure.insert(i);
                     unsure.extend((i + 1..end(old, i, 0)).filter(|&k| old[k].head().is_some()));
@@ -763,7 +760,7 @@ impl<'a> Placer<'a> {
                     continue;
                 }
                 self.handled.insert(e.id);
-                let why = "ambiguous alignment: the text does not say which slide this one became (it is empty, or none of its text is left, and a new slide could be it); use an exact edit".to_string();
+                let why = "ambiguous alignment: none of this slide's text is left, and the text does not say whether it was deleted or became one of the new slides; use an exact edit".to_string();
                 self.out.insert(e.id, Status::Refused(why).into());
             }
         }

@@ -158,7 +158,12 @@ impl<'a> Exporter<'a> {
         // Slides the text no longer has go, with what only they used.
         let kept: BTreeSet<&str> = outs.iter().map(|o| o.info.part.as_str()).collect();
         let deleted: Vec<&String> = self.shell.slides.iter().filter(|p| !kept.contains(p.as_str())).collect();
-        let gone = self.delete(&mut parts, &deleted)?;
+        // Only a deleted slide or a slide's changed relationships can leave parts unreached.
+        let gone = if deleted.is_empty() && outs.iter().all(|o| o.rels.is_none()) {
+            BTreeSet::new()
+        } else {
+            self.delete(&mut parts, &deleted)?
+        };
         parts.retain(|p| !gone.contains(&p.name));
         if let Some(ct) = opc::content_types(&parts, &gone, &added) {
             put(&mut parts, &template, opc::CT_PART, ct);
@@ -244,7 +249,13 @@ impl<'a> Exporter<'a> {
                             claims[n] = Some(x);
                         }
                         None => {
-                            if occupied(&stands, layout, name) {
+                            let objects: Vec<&Element> = items
+                                .iter()
+                                .zip(&els)
+                                .filter(|(i, _)| i.kind == HeadKind::Object)
+                                .filter_map(|(_, e)| e.as_ref())
+                                .collect();
+                            if occupied(&stands, &objects, layout, name) {
                                 return Err(format!("::{name}:: is filled by a placeholder the text does not show (in a group, or holding an object): the slot cannot be written twice"));
                             }
                             let slot = layout.need_slot(name)?;
@@ -891,13 +902,6 @@ fn keep_id(e: &Entry) -> &str {
     e.meta.keep.as_ref().map_or("", |k| k.id.as_str())
 }
 
-/// Every relationship id an attribute of `root` names (`r:id`, `r:embed`, …).
-pub(crate) fn named_rel_ids(root: &Element) -> BTreeSet<String> {
-    let mut ids = BTreeSet::new();
-    root.walk(&mut |e| ids.extend(e.attrs.iter().filter(|a| a.0.starts_with("r:")).map(|a| a.1.clone())));
-    ids
-}
-
 /// Set a part's data, adding the part (with `template`'s zip metadata) when
 /// the package has none: whether it was added.
 fn put(parts: &mut Vec<Part>, template: &Part, name: &str, data: Vec<u8>) -> bool {
@@ -995,11 +999,11 @@ fn stand_ins(children: Vec<Node>) -> Vec<Stand> {
         .collect()
 }
 
-/// Whether a placeholder the text does not show (one in a group, a second
-/// one of the slot) already fills slot `name`.
-fn occupied(stands: &[Stand], layout: &LayoutInfo, name: &str) -> bool {
-    stands.iter().any(|st| {
-        let Stand::Raw(Node::El(e)) = st else { return false };
+/// Whether a placeholder the text does not show as a slot (one in a group
+/// or another object, a second one of the slot) already fills slot `name`.
+fn occupied(stands: &[Stand], objects: &[&Element], layout: &LayoutInfo, name: &str) -> bool {
+    let raw = stands.iter().filter_map(|st| if let Stand::Raw(Node::El(e)) = st { Some(e) } else { None });
+    raw.chain(objects.iter().copied()).any(|e| {
         let mut hit = false;
         e.walk(&mut |x| {
             if let Some((ty, idx, _)) = placeholder(x) {

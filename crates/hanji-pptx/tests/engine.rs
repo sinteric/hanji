@@ -375,3 +375,28 @@ fn an_object_an_animation_plays_on_is_not_deleted() {
         other => panic!("expected a refusal, got {:?}", other.map(|_| ())),
     }
 }
+
+#[test]
+fn a_rewrite_that_deletes_a_slide_and_adds_one_is_refused_not_guessed() {
+    // Slide 2's text all goes and a new slide appears: from the text alone
+    // it may have been rewritten into the new one.
+    let imp = import(&deck("korean-deck.pptx"));
+    let (a, b) = slide_span(&imp.text, 1);
+    let text = format!(
+        "{}{}\n---\n\nlayout: Title and Content\n::title::\n완전히 새로운 제목\n",
+        &imp.text[..a],
+        &imp.text[b + 5..]
+    );
+    match rewrite_in(&PptxModel, &imp.remainder, &imp.text, &text, CAPS) {
+        Err(hanji_core::Refusal::Unplaceable(r)) => {
+            assert!(r.refused.iter().all(|x| x.2.contains("ambiguous alignment")), "{r:?}")
+        }
+        other => panic!("{:?}", other.map(|r| r.text)),
+    }
+    // The same change as exact edits goes through.
+    let (text, rem) = span_edit(&imp, a, b + 5, "");
+    let n = text.len();
+    let imp2 = Imported { text, remainder: rem, report: imp.report.clone() };
+    let (text, rem) = span_edit(&imp2, n, n, "\n---\n\nlayout: Title and Content\n::title::\n완전히 새로운 제목\n");
+    assert_eq!(slides(&export(&text, &rem)).len(), 7);
+}
