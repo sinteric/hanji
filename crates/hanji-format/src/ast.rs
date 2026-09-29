@@ -29,6 +29,10 @@ impl FrontMatter {
         Self::of("presentation", format, template)
     }
 
+    pub fn spreadsheet(format: &str, template: Option<&str>) -> Self {
+        Self::of("spreadsheet", format, template)
+    }
+
     fn of(doc_type: &str, format: &str, template: Option<&str>) -> Self {
         FrontMatter {
             doc_type: doc_type.into(),

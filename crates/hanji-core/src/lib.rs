@@ -1,8 +1,10 @@
 //! hanji core (DESIGN.md §4, §7, §10.3): the engine interface, the resolved
 //! model (a Document's blocks, or a Presentation's slides, slots and shapes
 //! as heads over blocks), the remainder store, and re-anchoring of the
-//! remainder after an edit. No I/O.
+//! remainder after an edit, and cell-range anchors for Spreadsheets
+//! (`cells.rs`). No I/O.
 
+pub mod cells;
 pub mod diff;
 pub mod edit;
 pub mod engine;

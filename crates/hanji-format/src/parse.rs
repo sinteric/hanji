@@ -195,7 +195,11 @@ impl<'a> Parser<'a> {
                     None => SCHEMA_VERSION,
                 };
                 if let Some(t) = ty.as_deref().filter(|t| *t != doc_type) {
-                    let what = if doc_type == "document" { "Document" } else { "Presentation" };
+                    let what = match doc_type {
+                        "document" => "Document",
+                        "presentation" => "Presentation",
+                        _ => "Spreadsheet",
+                    };
                     self.err(1, 1, format!("type: {t} is not a {what}; this parser reads type: {doc_type}."));
                 }
                 if let (Some(f), Some(allowed)) = (&format, &self.names.formats) {

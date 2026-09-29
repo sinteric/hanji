@@ -1,13 +1,17 @@
-//! The hanji text format for Documents and Presentations (DESIGN.md §5.1–5.3):
+//! The hanji text format for Documents, Presentations and Spreadsheets
+//! (DESIGN.md §5.1–5.4):
 //! a typed AST, a parser with a source map, a canonical serializer, and
 //! validator errors written for the model. No I/O.
 
 pub mod ast;
 pub mod diag;
+pub mod formula;
 pub mod names;
+pub mod ops;
 pub mod parse;
 pub mod pres;
 pub mod serialize;
+pub mod sheet;
 
 pub use ast::*;
 pub use diag::Diagnostic;
@@ -17,6 +21,7 @@ pub use pres::{
     parse_presentation, serialize_presentation, HeadMap, ItemMap, ParsedPresentation, PresentationMap, SlideMap,
 };
 pub use serialize::{serialize, serialize_inline};
+pub use sheet::{parse_spreadsheet, serialize_spreadsheet, window_text, Spreadsheet, WindowOf};
 
 /// Schema version this crate reads and writes.
 pub const SCHEMA_VERSION: u32 = 1;
