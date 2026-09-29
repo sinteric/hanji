@@ -164,8 +164,12 @@ pub struct Edit {
     /// Whether the edit is one contiguous text change (not a move).
     pub local: bool,
     /// The exact text edit `(start, end, new)`, when the edit knows it
-    /// (a whole slide deleted spans whole lines).
+    /// (a whole block or slide deleted spans whole lines).
     pub span: Option<(usize, usize, String)>,
+    /// The blocks `what` names, in its order, as blocks of the text before
+    /// the edit (a pptx edit's slides, by their heads): a tool that makes
+    /// several edits in a row can say where each one ends up.
+    pub named: Vec<usize>,
 }
 
 impl Edit {
@@ -190,12 +194,60 @@ impl Edit {
             unit_span: None,
             local,
             span: None,
+            named: vec![],
         }
     }
 }
 
 pub fn ident(n: usize) -> Vec<Option<usize>> {
     (0..n).map(Some).collect()
+}
+
+/// Where each block of `d` is in its text: `(start, end)`.
+pub fn block_ranges(cx: &Cx, d: &Doc) -> Vec<(usize, usize)> {
+    let text = cx.fmt.text_of(&d.blocks, cx.rem);
+    let (_, maps) = cx.fmt.model().resolve(&text, cx.rem, CAPS).unwrap();
+    maps.iter().map(|m| (m.start, m.end)).collect()
+}
+
+/// The exact text edit from `d` to `new` when the new text is the old with
+/// `old[a..b]` replaced: `(a, b, replacement)`.
+pub fn span_of(cx: &Cx, d: &Doc, new: &[Block], a: usize, b: usize) -> Option<(usize, usize, String)> {
+    let (ot, nt) = (cx.fmt.text_of(&d.blocks, cx.rem), cx.fmt.text_of(new, cx.rem));
+    let tail = ot.len() - b;
+    (nt.len() >= a + tail && nt[..a] == ot[..a] && nt[nt.len() - tail..] == ot[b..])
+        .then(|| (a, b, nt[a..nt.len() - tail].to_string()))
+}
+
+/// The exact text edit that deletes blocks `a..b` of `d` (giving `new`) as
+/// whole lines: the separator before them and their lines, or their lines
+/// and the separator after them when they come first. The smallest
+/// differing span can start and end inside lines when neighbours begin
+/// alike, and an exact edit cutting a line keeps the wrong block's content.
+pub fn deleted_span(cx: &Cx, d: &Doc, new: &[Block], a: usize, b: usize) -> Option<(usize, usize, String)> {
+    let m = block_ranges(cx, d);
+    if a > 0 {
+        span_of(cx, d, new, m[a - 1].1, m[b - 1].1)
+    } else {
+        span_of(cx, d, new, m[a].0, m.get(b).map_or(m[b - 1].1, |x| x.0))
+    }
+}
+
+/// A block as a description names it: `block 12 ("Its first words…")`.
+pub fn quote(d: &Doc, i: usize) -> String {
+    let text: String = match &d.blocks[i] {
+        Block::Para(p) => chars(&p.content).into_iter().filter(|&c| c != KEEP_CH && c != '\u{F0001}').collect(),
+        Block::Table(_) => return format!("block {i} (a table)"),
+        Block::Keep(_) => return format!("block {i} (an object)"),
+        Block::Head(h) => h.label.clone(),
+    };
+    let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
+    if text.is_empty() {
+        return format!("block {i}");
+    }
+    let short: String = text.chars().take(30).collect();
+    let more = if short.len() < text.len() { "…" } else { "" };
+    format!("block {i} ({short:?}{more})")
 }
 
 /// Units `s..e` of the paragraph at `path` become `new` (with the marks of the first replaced unit).
@@ -221,6 +273,7 @@ pub fn replace_span(d: &Doc, path: &[usize], s: usize, e: usize, new: &str, name
         unit_span: Some((path.to_vec(), s, e)),
         local: true,
         span: None,
+        named: vec![],
     }
 }
 
@@ -346,7 +399,7 @@ fn e2_insert_before_drawing(d: &Doc, cx: &Cx) -> Option<Edit> {
     let bmap = (0..d.blocks.len()).map(|k| Some(if k < i { k } else { k + 1 })).collect();
     Some(Edit {
         name: "E2 insert before drawing",
-        what: format!("new paragraph before block {i}"),
+        what: format!("new paragraph before {}", quote(d, i)),
         blocks,
         bmap,
         true_ops: HashMap::new(),
@@ -356,6 +409,7 @@ fn e2_insert_before_drawing(d: &Doc, cx: &Cx) -> Option<Edit> {
         unit_span: None,
         local: true,
         span: None,
+        named: vec![],
     })
 }
 
@@ -379,7 +433,8 @@ fn e3_delete_formatted(d: &Doc, cx: &Cx) -> Option<Edit> {
                     }
                 })
                 .collect();
-            let what = format!("delete block {i} ({:?}…)", chars(&p.content).iter().take(30).collect::<String>());
+            let what = format!("delete {}", quote(d, i));
+            let span = deleted_span(cx, d, &blocks, i, i + 1);
             return Some(Edit {
                 name: "E3 delete formatted paragraph",
                 what,
@@ -391,7 +446,8 @@ fn e3_delete_formatted(d: &Doc, cx: &Cx) -> Option<Edit> {
                 lenient: HashSet::new(),
                 unit_span: None,
                 local: true,
-                span: None,
+                span,
+                named: vec![],
             });
         }
     }
@@ -424,9 +480,12 @@ fn e4_move_section(d: &Doc, cx: &Cx) -> Option<Edit> {
         }
     }
     let (a0, b0, b1, what) = match pair {
-        Some(((a0, _, _), (b0, b1, _))) => {
-            (a0, b0, b1, format!("move the section at block {b0} ({} blocks) before the one at block {a0}", b1 - b0))
-        }
+        Some(((a0, _, _), (b0, b1, _))) => (
+            a0,
+            b0,
+            b1,
+            format!("move the section at {} ({} blocks) before the one at {}", quote(d, b0), b1 - b0, quote(d, a0)),
+        ),
         None => {
             let body: Vec<usize> = d
                 .blocks
@@ -439,7 +498,7 @@ fn e4_move_section(d: &Doc, cx: &Cx) -> Option<Edit> {
                 return None;
             }
             let (b0, b1, a0) = (body[body.len() - 3], body[body.len() - 1], body[0]);
-            (a0, b0, b1, format!("no same-level headings: move blocks {b0}–{} before block {a0}", b1 - 1))
+            (a0, b0, b1, format!("no same-level headings: move blocks {b0}–{} before {}", b1 - 1, quote(d, a0)))
         }
     };
     let order: Vec<usize> = (0..a0).chain(b0..b1).chain(a0..b0).chain(b1..n).collect();
@@ -460,6 +519,7 @@ fn e4_move_section(d: &Doc, cx: &Cx) -> Option<Edit> {
         unit_span: None,
         local: false,
         span: None,
+        named: vec![],
     })
 }
 
@@ -495,7 +555,7 @@ fn e5_restyle(d: &Doc, cx: &Cx) -> Option<Edit> {
             }
             return Some(Edit {
                 name: "E5 restyle",
-                what: format!("block {i} → style {pick:?}"),
+                what: format!("{} → style {pick:?}", quote(d, i)),
                 bmap: ident(blocks.len()),
                 blocks,
                 true_ops: HashMap::new(),
@@ -505,6 +565,7 @@ fn e5_restyle(d: &Doc, cx: &Cx) -> Option<Edit> {
                 unit_span: None,
                 local: true,
                 span: None,
+                named: vec![],
             });
         }
     }
@@ -656,7 +717,7 @@ fn e8_split(d: &Doc, _: &Cx) -> Option<Edit> {
     let xmap = HashMap::from([(vec![i], vec![(0, k, vec![i], 0), (k, n, vec![i + 1], 0)])]);
     Some(Edit {
         name: "E8 split paragraph",
-        what: format!("split block {i} at offset {k} of {n}"),
+        what: format!("split {} at offset {k} of {n}", quote(d, i)),
         blocks,
         bmap,
         true_ops: HashMap::new(),
@@ -666,6 +727,7 @@ fn e8_split(d: &Doc, _: &Cx) -> Option<Edit> {
         unit_span: None,
         local: true,
         span: None,
+        named: vec![],
     })
 }
 
@@ -713,7 +775,7 @@ fn e9_merge(d: &Doc, cx: &Cx) -> Option<Edit> {
     let xmap = HashMap::from([(vec![i], vec![(0, n1, vec![i], 0)]), (vec![i + 1], vec![(0, n2, vec![i], n1)])]);
     Some(Edit {
         name: "E9 merge paragraphs",
-        what: format!("join blocks {i} and {}", i + 1),
+        what: format!("join {} and {}", quote(d, i), quote(d, i + 1)),
         blocks,
         bmap,
         true_ops: HashMap::new(),
@@ -723,6 +785,7 @@ fn e9_merge(d: &Doc, cx: &Cx) -> Option<Edit> {
         unit_span: None,
         local: true,
         span: None,
+        named: vec![],
     })
 }
 

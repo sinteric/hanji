@@ -7,8 +7,8 @@
 //! ```
 //!
 //! Per source: the untouched original (`NN-…-original.ext`), then its exports,
-//! each edited one with `NN-…-edits.md` beside it (the edits in plain words
-//! and the before/after model text diff).
+//! each edited one with `NN-…-edits.md` beside it (the edits in plain words,
+//! a deck's slide order, and the before/after model text diff).
 //!
 //! Writes `target/office-kit/` (the files, `CHECKLIST.md`, `checklist.csv`)
 //! and `target/office-kit.zip` at the workspace root. Every file is an export
@@ -33,12 +33,12 @@ use std::fmt::Write as _;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 
-use hanji_core::{Engine, ImportOptions, Remainder, TextModel};
+use hanji_core::{Block, Engine, ImportOptions, Kind, Remainder};
 use hanji_docx::{DocxEngine, ExportOptions, History, Reviewer};
 use hanji_format::sheet::WindowOf;
 use hanji_hwpx::HwpxEngine;
 use hanji_pptx::PptxEngine;
-use hanji_testkit::{edit_jobs, Cx, Doc, Format, CAPS};
+use hanji_testkit::{edit_jobs, Cx, Doc, Edit, Format, CAPS};
 use hanji_xlsx::XlsxEngine;
 
 use formats::{Docx, Hwpx, Pptx};
@@ -59,6 +59,8 @@ struct Item {
     notes: Vec<String>,
     /// `NN-…-edits.md`: the edits in plain words and the model text diff.
     md: Option<String>,
+    /// A deck's slide order: which original slide each slide of the file is.
+    order: Option<String>,
 }
 
 struct Kit {
@@ -118,6 +120,7 @@ impl Kit {
             checks,
             notes,
             md: None,
+            order: None,
         });
     }
 
@@ -150,6 +153,9 @@ impl Kit {
                 let _ = writeln!(md, "; compare with `{o}`.\n");
             }
             None => md.push_str(".\n\n"),
+        }
+        if let Some(order) = &it.order {
+            let _ = writeln!(md, "{order}\n");
         }
         md.push_str("## The edits\n\n");
         for n in &it.notes {
@@ -237,19 +243,20 @@ const DOCX: &[(&str, &str)] = &[
     ("loadAndSave.docx", "Apache-2.0 (docx4j test data)"),
 ];
 
-/// An exact edit for a local change (the span the texts differ in), a design C rewrite for a move.
-fn step(
-    model: &dyn TextModel,
-    rem: &Remainder,
-    text: &str,
-    new_text: &str,
-    local: bool,
-) -> Option<hanji_core::Reanchored> {
-    let r = if local {
-        let (a, b, repl) = hanji_testkit::differing_span(text, new_text);
-        hanji_core::reanchor_span_in(model, rem, text, a, b, &repl, CAPS).ok()?
+/// An exact edit for a local change, a design C rewrite for a move. The
+/// span is the edit's own when it knows one (a whole slide or paragraph
+/// deleted spans whole lines, as in the corpus harness): the smallest
+/// differing span starts and ends inside lines when neighbours begin
+/// alike, and cut that way the edit keeps the wrong slide's or paragraph's
+/// content. Text edits within a paragraph keep the smallest span, which a
+/// tracked export shows as the smallest change ("5" inserted, not "10"
+/// replaced by "105").
+fn step(fmt: &dyn Format, rem: &Remainder, text: &str, new_text: &str, ed: &Edit) -> Option<hanji_core::Reanchored> {
+    let r = if ed.local {
+        let (a, b, repl) = ed.span.clone().unwrap_or_else(|| hanji_testkit::differing_span(text, new_text));
+        hanji_core::reanchor_span_in(fmt.model(), rem, text, a, b, &repl, CAPS).ok()?
     } else {
-        hanji_core::reanchor_rewrite_in(model, rem, text, new_text, CAPS).ok()?
+        hanji_core::reanchor_rewrite_in(fmt.model(), rem, text, new_text, CAPS).ok()?
     };
     r.report.refused.is_empty().then_some(r)
 }
@@ -309,7 +316,7 @@ fn docx(kit: &mut Kit) {
             let d = Doc { blocks, entries: cur_rem.entries.clone() };
             let Some(ed) = f(&d, &Cx { fmt: &Docx, rem: &cur_rem }) else { continue };
             let new_text = Docx.text_of(&ed.blocks, &cur_rem);
-            let Some(r) = step(&hanji_core::DocumentModel, &cur_rem, &cur_text, &new_text, ed.local) else { continue };
+            let Some(r) = step(&Docx, &cur_rem, &cur_text, &new_text, &ed) else { continue };
             let mut h2 = h.clone();
             let out = h2.push(&r).and_then(|_| DocxEngine.export_with(&r.text, &r.remainder, &tracked, Some(&h2)));
             match out {
@@ -456,17 +463,29 @@ fn pptx(kit: &mut Kit) {
             vec![],
         );
         // The edit set one edit at a time (an exact span where it is local), each kept when it places everything.
-        let model: &dyn TextModel = &hanji_pptx::PptxModel;
+        let blocks0 = hanji_testkit::written(&Pptx, &text, &rem);
+        let orig = sld_ids(&blocks0, &rem);
         let (mut cur_text, mut cur_rem) = (text.clone(), rem.clone());
-        let mut done = vec![];
+        let mut done: Vec<Done> = vec![];
         for (_, f) in pptx_edits::EDITS {
             let blocks = hanji_testkit::written(&Pptx, &cur_text, &cur_rem);
             let d = Doc { blocks, entries: cur_rem.entries.clone() };
             let Some(ed) = f(&d, &Cx { fmt: &Pptx, rem: &cur_rem }) else { continue };
             let new_text = Pptx.text_of(&ed.blocks, &cur_rem);
-            match step(model, &cur_rem, &cur_text, &new_text, ed.local) {
+            match step(&Pptx, &cur_rem, &cur_text, &new_text, &ed) {
                 Some(r) if PptxEngine.export(&r.text, &r.remainder).is_ok() => {
-                    done.push(format!("{} ({})", ed.name, ed.what));
+                    let before = slide_ids(&d.blocks, &cur_rem, &orig);
+                    let heads = slide_heads(&d.blocks);
+                    let named = ed
+                        .named
+                        .iter()
+                        .filter_map(|h| heads.iter().position(|x| x == h))
+                        .map(|n| (n + 1, heads.len(), before[n]))
+                        .collect();
+                    let after = slide_ids(&hanji_testkit::written(&Pptx, &r.text, &r.remainder), &r.remainder, &orig);
+                    let adds =
+                        after.iter().filter(|x| x.is_none()).count() > before.iter().filter(|x| x.is_none()).count();
+                    done.push(Done { name: ed.name, what: ed.what, named, adds, after });
                     (cur_text, cur_rem) = (r.text, r.remainder);
                 }
                 _ => println!("  {name}: left out {} (it would lose content the text does not show)", ed.name),
@@ -474,6 +493,8 @@ fn pptx(kit: &mut Kit) {
         }
         if !done.is_empty() {
             let out = PptxEngine.export(&cur_text, &cur_rem).unwrap();
+            let fin = slide_ids(&hanji_testkit::written(&Pptx, &cur_text, &cur_rem), &cur_rem, &orig);
+            let notes = (0..done.len()).map(|k| described(&done, k, &fin)).collect();
             kit.add(
                 "pptx",
                 name,
@@ -482,11 +503,130 @@ fn pptx(kit: &mut Kit) {
                 "the pptx edit set, one edit after another: text edits, a slide added from a layout, one deleted, one moved",
                 &out,
                 vec![ppt.clone(), "Shows the edits listed below (slides added, deleted and moved; text changed)".into()],
-                done,
+                notes,
             );
+            kit.items.last_mut().unwrap().order = Some(slide_order(&blocks0, orig.len(), &fin));
             kit.edits(&text_diff(&text, &cur_text), TEXT_DIFF);
         }
     }
+}
+
+/// One edit of a deck's edit set, as the kit made it.
+struct Done {
+    name: &'static str,
+    what: String,
+    /// The slides its description names: number, the deck's slide count, and
+    /// which original slide it is (`None`: one the edits added).
+    named: Vec<(usize, usize, Option<usize>)>,
+    /// Whether it added a slide.
+    adds: bool,
+    /// Which original slide each slide is after it.
+    after: Vec<Option<usize>>,
+}
+
+/// Level-0 heads: where each slide starts.
+fn slide_heads(blocks: &[Block]) -> Vec<usize> {
+    (0..blocks.len()).filter(|&k| blocks[k].head().is_some_and(|h| h.level == 0)).collect()
+}
+
+/// Each slide's `p:sldId`, by its skeleton entry (none for a slide the edits added).
+fn sld_ids(blocks: &[Block], rem: &Remainder) -> Vec<Option<String>> {
+    slide_heads(blocks)
+        .into_iter()
+        .map(|h| {
+            let e = rem.entries.iter().find(|e| e.kind == Kind::Slide && e.meta.tag == "slide" && e.path == [h])?;
+            let info: hanji_pptx::import::SlideInfo = serde_json::from_str(&e.meta.aux[0]).ok()?;
+            Some(info.sld_id)
+        })
+        .collect()
+}
+
+/// Which original slide (from 1) each slide is, by its `p:sldId`; `None` for a new one.
+fn slide_ids(blocks: &[Block], rem: &Remainder, orig: &[Option<String>]) -> Vec<Option<usize>> {
+    sld_ids(blocks, rem)
+        .into_iter()
+        .map(|id| id.and_then(|id| orig.iter().position(|o| o.as_ref() == Some(&id))))
+        .map(|n| n.map(|n| n + 1))
+        .collect()
+}
+
+/// An edit's line: its description, then where the slides it names are in
+/// the file, and what a later edit hides of it.
+fn described(done: &[Done], k: usize, fin: &[Option<usize>]) -> String {
+    let d = &done[k];
+    let tag = |x: &Done| x.name.split_whitespace().next().unwrap_or(x.name).to_string();
+    let at = |id: Option<usize>| fin.iter().position(|x| *x == id).map(|q| q + 1);
+    let who = |id: Option<usize>| id.map_or("new".to_string(), |o| format!("original slide {o}"));
+    // One slide's parts are split by "; ", several slides' by ", " within one and "; " between.
+    let sep = if d.named.len() + d.adds as usize > 1 { ", " } else { "; " };
+    let mut hidden = vec![];
+    let mut parts = vec![];
+    for &(n, total, id) in &d.named {
+        let mut p = who(id);
+        match at(id) {
+            Some(q) => {
+                let _ = write!(p, "{sep}slide {q} in this file");
+            }
+            // Gone after this edit: this edit deleted it.
+            None if !d.after.contains(&id) => {}
+            None => {
+                let by = done[k + 1..].iter().find(|x| !x.after.contains(&id)).map_or("a later edit".into(), tag);
+                let _ = write!(p, "{sep}not in this file");
+                hidden.push(format!("{by} deleted this slide later, so this change does not show in this file"));
+            }
+        }
+        parts.push((n, total, p));
+    }
+    if d.adds {
+        let mut p = who(None);
+        if let Some(q) = at(None) {
+            let _ = write!(p, "{sep}slide {q} in this file");
+            if q < fin.len() {
+                let last = |x: &Done| x.after.last() == Some(&None);
+                let by = done[k + 1..].iter().find(|x| !last(x)).map_or("a later edit".into(), tag);
+                hidden.push(format!("{by} moved it later, so it is not at the end in this file"));
+            }
+        }
+        parts.push((0, 0, p));
+    }
+    let mut line = format!("{} ({})", d.name, d.what);
+    match parts.as_slice() {
+        [] => {}
+        [(_, _, p)] => {
+            let _ = write!(line, " ({p})");
+        }
+        _ => {
+            let each: Vec<String> = parts.iter().map(|(n, total, p)| format!("slide {n} of {total}: {p}")).collect();
+            let _ = write!(line, " ({})", each.join("; "));
+        }
+    }
+    for h in hidden {
+        let _ = write!(line, ". **Hidden by a later edit:** {h}");
+    }
+    line
+}
+
+/// `Slide order` for a deck's -edits.md and checklist: which original slide
+/// each slide of the file is, and the original slides no longer in it.
+fn slide_order(blocks0: &[Block], n: usize, fin: &[Option<usize>]) -> String {
+    let each: Vec<String> = fin
+        .iter()
+        .enumerate()
+        .map(|(q, id)| format!("{} ← {}", q + 1, id.map_or("new".to_string(), |o| o.to_string())))
+        .collect();
+    let mut line = format!("**Slide order** (slide in this file ← original slide): {}.", each.join(", "));
+    let heads = slide_heads(blocks0);
+    let gone: Vec<String> = (1..=n)
+        .filter(|o| !fin.contains(&Some(*o)))
+        .map(|o| match pptx_edits::slide_at(blocks0, heads[o - 1]).3 {
+            t if t.is_empty() => format!("{o}"),
+            t => format!("{o} ('{t}')"),
+        })
+        .collect();
+    if !gone.is_empty() {
+        let _ = write!(line, " Deleted: original slide {}.", gone.join(", "));
+    }
+    line
 }
 
 // ---------------------------------------------------------------- xlsx
@@ -670,7 +810,10 @@ fn checklist(kit: &Kit, commit: &str) -> (String, String) {
     );
     let mut csv = String::from("file,format,source,variant,check,pass,fail,notes\n");
     let q = |s: &str| format!("\"{}\"", s.replace('"', "\"\""));
-    for it in &kit.items {
+    for (k, it) in kit.items.iter().enumerate() {
+        if it.format == "pptx" && kit.items[..k].iter().all(|i| i.format != "pptx") {
+            let _ = writeln!(md, "## How to check a deck\n\n{HOW_TO_CHECK_A_DECK}\n");
+        }
         let _ = writeln!(md, "## {}\n", it.file);
         if it.variant == "original" {
             let _ = writeln!(
@@ -681,6 +824,9 @@ fn checklist(kit: &Kit, commit: &str) -> (String, String) {
             continue;
         }
         let _ = writeln!(md, "Source: `{}`, {}. {}.\n", it.source, it.licence, cap(&it.about));
+        if let Some(order) = &it.order {
+            let _ = writeln!(md, "{order}\n");
+        }
         let named = |c: &String| match &it.md {
             Some(e) => c.replace("the -edits.md file beside this one", e),
             None => c.clone(),
@@ -711,6 +857,8 @@ fn checklist(kit: &Kit, commit: &str) -> (String, String) {
     );
     (md, csv)
 }
+
+const HOW_TO_CHECK_A_DECK: &str = "hanji's text of a deck holds only each slide's layout, the text of its slots (title, body, notes, …) and shapes, and a `<keep/>` line for each object it does not model (a picture, table, chart or group). Everything else, the geometry (positions, sizes, z-order apart from moved objects) and the design (fonts, colours, the theme, masters and layouts, transitions, animations), stays in the remainder, which the export writes back unchanged. So, comparing a `pset` export with its `original`: a slide no edit touched must look exactly like its original slide (the **Slide order** line says which original slide each one is); an edited slide may differ only in the text, order or layout its edits list. Anything else, such as a shape moved or resized, a lost picture or a changed font, is a fail: note the slide.";
 
 fn zip_dir(dir: &Path, names: &[String], out: &Path) {
     let f = std::fs::File::create(out).unwrap();

@@ -12,7 +12,9 @@ use hanji_core::{Block, Kind, ListItem, Para};
 use hanji_format::Inline;
 use hanji_pptx::import::SlideInfo;
 use hanji_pptx::DeckShell;
-use hanji_testkit::{chars, entries_at, figure_or_word, ident, replace_span, Cx, Doc, Edit, EditFn};
+use hanji_testkit::{
+    block_ranges, chars, deleted_span, entries_at, figure_or_word, ident, replace_span, span_of, Cx, Doc, Edit, EditFn,
+};
 
 pub const EDITS: [(&str, EditFn); 10] = [
     ("p1_title", p1_title),
@@ -42,6 +44,46 @@ fn slides(blocks: &[Block]) -> Vec<Slide> {
         .collect()
 }
 
+/// The slide block `k` is on: its number from 1, the deck's slide count,
+/// its head, and its title (the title slot's text, or else its first text
+/// outside the notes; empty when it has none).
+pub fn slide_at(blocks: &[Block], k: usize) -> (usize, usize, usize, String) {
+    let ss = slides(blocks);
+    let n = ss.iter().rposition(|s| s.head <= k).unwrap_or(0);
+    let s = &ss[n];
+    let (mut slot, mut title, mut first) = (None, None, None);
+    for b in &blocks[s.head + 1..s.end] {
+        match b {
+            Block::Head(h) => slot = Some(kind(h)),
+            Block::Para(p) => {
+                let t: String = chars(&p.content).into_iter().filter(|c| (*c as u32) < 0xF0000).collect();
+                let t = t.split_whitespace().collect::<Vec<_>>().join(" ");
+                if t.is_empty() {
+                    continue;
+                }
+                if slot == Some(HeadKind::Slot { name: "title" }) {
+                    title.get_or_insert(t);
+                } else if slot != Some(HeadKind::Slot { name: "notes" }) {
+                    first.get_or_insert(t);
+                }
+            }
+            _ => {}
+        }
+    }
+    let t = title.or(first).unwrap_or_default();
+    let short: String = t.chars().take(30).collect();
+    let more = if short.len() < t.len() { "…" } else { "" };
+    (n + 1, ss.len(), s.head, if short.is_empty() { short } else { format!("{short}{more}") })
+}
+
+/// How an edit names the slide block `k` is on: `slide 3 of 7 ('지역별 현황')`.
+fn slide_name(blocks: &[Block], k: usize) -> String {
+    match slide_at(blocks, k) {
+        (n, total, _, t) if t.is_empty() => format!("slide {n} of {total}"),
+        (n, total, _, t) => format!("slide {n} of {total} ('{t}')"),
+    }
+}
+
 /// The paragraphs of each slot or shape `pick` accepts: `(block, head kind)`.
 fn paras_in<'b>(blocks: &'b [Block], pick: &dyn Fn(HeadKind) -> bool) -> Vec<(usize, &'b Para)> {
     let mut out = vec![];
@@ -69,7 +111,10 @@ fn change_in(d: &Doc, cx: &Cx, paras: &[(usize, &Para)], name: &'static str, wha
     let (bi, (s, e, new)) = cands.into_iter().next()?;
     let p = paras.iter().find(|x| x.0 == bi).unwrap().1;
     let old: String = chars(&p.content)[s..e].iter().collect();
-    Some(replace_span(d, &[bi], s, e, &new, name, format!("{what}: {old:?} → {new:?} in block {bi}")))
+    let mut ed =
+        replace_span(d, &[bi], s, e, &new, name, format!("{what}: {old:?} → {new:?} on {}", slide_name(&d.blocks, bi)));
+    ed.named = vec![slide_at(&d.blocks, bi).2];
+    Some(ed)
 }
 
 fn p1_title(d: &Doc, cx: &Cx) -> Option<Edit> {
@@ -85,22 +130,6 @@ fn p2_bullet(d: &Doc, cx: &Cx) -> Option<Edit> {
 
 fn shell(cx: &Cx) -> DeckShell {
     DeckShell::of(cx.rem).unwrap()
-}
-
-/// The old and new text of an edit, and the edit's span when the new text
-/// is the old with `old[a..b]` replaced.
-fn span_of(cx: &Cx, d: &Doc, new: &[Block], a: usize, b: usize) -> Option<(usize, usize, String)> {
-    let (ot, nt) = (cx.fmt.text_of(&d.blocks, cx.rem), cx.fmt.text_of(new, cx.rem));
-    let tail = ot.len() - b;
-    (nt.len() >= a + tail && nt[..a] == ot[..a] && nt[nt.len() - tail..] == ot[b..])
-        .then(|| (a, b, nt[a..nt.len() - tail].to_string()))
-}
-
-/// Where each block of `d` is in its text.
-fn maps(cx: &Cx, d: &Doc) -> Vec<(usize, usize)> {
-    let text = cx.fmt.text_of(&d.blocks, cx.rem);
-    let (_, maps) = cx.fmt.model().resolve(&text, cx.rem, hanji_testkit::CAPS).unwrap();
-    maps.iter().map(|m| (m.start, m.end)).collect()
 }
 
 fn item(first: bool, level: usize) -> Option<ListItem> {
@@ -127,9 +156,10 @@ fn p3_add_slide(d: &Doc, cx: &Cx) -> Option<Edit> {
         blocks.extend([slot_head("body"), para("첫째 항목", item(true, 0)), para("둘째 항목 12", item(false, 1))]);
     }
     let n = d.blocks.len();
+    let count = slides(&d.blocks).len() + 1;
     let mut ed = Edit::blocks(
         "P3 add a slide from a layout",
-        format!("new slide from {:?} at the end", layout.name),
+        format!("add slide {count} of {count} ('새 슬라이드 제목') from layout {:?}, at the end", layout.name),
         blocks,
         ident(n),
         HashSet::new(),
@@ -182,14 +212,14 @@ fn p4_delete_slide(d: &Doc, cx: &Cx) -> Option<Edit> {
         .collect();
     let mut ed = Edit::blocks(
         "P4 delete a slide",
-        format!("delete the slide at block {a} ({} blocks)", b - a),
+        format!("delete {}, {} blocks", slide_name(&d.blocks, a), b - a),
         blocks,
         bmap,
         (a..b).collect(),
         true,
     );
-    let m = maps(cx, d);
-    ed.span = span_of(cx, d, &ed.blocks, m[a - 1].1, m[b - 1].1);
+    ed.span = deleted_span(cx, d, &ed.blocks, a, b);
+    ed.named = vec![a];
     Some(ed)
 }
 
@@ -235,8 +265,10 @@ fn p5_move_slide(d: &Doc, cx: &Cx) -> Option<Edit> {
     for (n, &o) in order.iter().enumerate() {
         bmap[o] = Some(n);
     }
-    let what = format!("move the slide at block {} before the one at block {}", y.head, x.head);
-    Some(Edit::blocks("P5 move a slide", what, blocks, bmap, (x.head..y.end).collect(), false))
+    let what = format!("move {} before {}", slide_name(&d.blocks, y.head), slide_name(&d.blocks, x.head));
+    let mut ed = Edit::blocks("P5 move a slide", what, blocks, bmap, (x.head..y.end).collect(), false);
+    ed.named = vec![y.head, x.head];
+    Some(ed)
 }
 
 /// Edit a word of the notes, or give the first slide without notes some.
@@ -252,10 +284,11 @@ fn p6_notes(d: &Doc, cx: &Cx) -> Option<Edit> {
     blocks.splice(s.end..s.end, [slot_head("notes"), para("발표자 메모 12", None)]);
     let bmap = (0..d.blocks.len()).map(|k| Some(if k < s.end { k } else { k + 2 })).collect();
     let touched = if s.end < d.blocks.len() { HashSet::from([s.end]) } else { HashSet::new() };
-    let mut ed =
-        Edit::blocks("P6 add notes", format!("notes for the slide at block {}", s.head), blocks, bmap, touched, true);
-    let m = maps(cx, d);
+    let what = format!("notes for {}", slide_name(&d.blocks, s.head));
+    let mut ed = Edit::blocks("P6 add notes", what, blocks, bmap, touched, true);
+    let m = block_ranges(cx, d);
     ed.span = span_of(cx, d, &ed.blocks, m[s.end - 1].1, m[s.end - 1].1);
+    ed.named = vec![s.head];
     Some(ed)
 }
 
@@ -291,22 +324,24 @@ fn p8_layout(d: &Doc, cx: &Cx) -> Option<Edit> {
         let Some(to) = cands.first() else { continue };
         let mut blocks = d.blocks.clone();
         blocks[s.head] = slide_head(&to.name);
-        let what = format!("slide at block {}: layout {layout:?} → {:?}", s.head, to.name);
-        return Some(Edit::blocks(
+        let what = format!("{}: layout {layout:?} → {:?}", slide_name(&d.blocks, s.head), to.name);
+        let mut ed = Edit::blocks(
             "P8 restyle a slide's layout",
             what,
             blocks,
             ident(d.blocks.len()),
             HashSet::from([s.head]),
             true,
-        ));
+        );
+        ed.named = vec![s.head];
+        return Some(ed);
     }
     None
 }
 
 /// Object heads (`object` head, then its placeholder) whose shape no
-/// animation of their slide plays on: `(head, slide)`.
-fn objects(d: &Doc) -> Vec<(usize, usize)> {
+/// animation of their slide plays on: `(head, slide, kind)`.
+fn objects(d: &Doc) -> Vec<(usize, usize, &str)> {
     let mut out = vec![];
     for sl in slides(&d.blocks) {
         let skel = d.entries.iter().find(|e| e.kind == Kind::Slide && e.meta.tag == "slide" && e.path == [sl.head]);
@@ -330,7 +365,7 @@ fn objects(d: &Doc) -> Vec<(usize, usize)> {
                 }
             });
             if !animated {
-                out.push((k, sl.head));
+                out.push((k, sl.head, e.meta.keep.as_ref().map_or("object", |x| x.kind.as_str())));
             }
         }
     }
@@ -339,7 +374,7 @@ fn objects(d: &Doc) -> Vec<(usize, usize)> {
 
 /// The last object that no animation plays on goes, with the parts only it used.
 fn p10_delete_object(d: &Doc, cx: &Cx) -> Option<Edit> {
-    let &(a, _) = objects(d).last()?;
+    let &(a, slide, what) = objects(d).last()?;
     let mut blocks = d.blocks.clone();
     blocks.drain(a..a + 2);
     let bmap = (0..d.blocks.len())
@@ -355,22 +390,23 @@ fn p10_delete_object(d: &Doc, cx: &Cx) -> Option<Edit> {
         .collect();
     let mut ed = Edit::blocks(
         "P10 delete an object",
-        format!("delete the object at block {a}"),
+        format!("delete the {what} on {}", slide_name(&d.blocks, a)),
         blocks,
         bmap,
         HashSet::from([a, a + 1]),
         true,
     );
-    let m = maps(cx, d);
+    let m = block_ranges(cx, d);
     ed.span = span_of(cx, d, &ed.blocks, m[a].0, m[a + 1].1);
+    ed.named = vec![slide];
     Some(ed)
 }
 
 /// The first object with an item before it on its slide moves before that item.
 fn p11_move_object(d: &Doc, _cx: &Cx) -> Option<Edit> {
-    let (a, prev) = objects(d).into_iter().find_map(|(a, slide)| {
+    let (a, slide, obj, prev) = objects(d).into_iter().find_map(|(a, slide, obj)| {
         let prev = (slide + 1..a).rev().find(|&k| d.blocks[k].head().is_some_and(|h| h.level == 1))?;
-        Some((a, prev))
+        Some((a, slide, obj, prev))
     })?;
     let order: Vec<usize> = (0..prev).chain([a, a + 1]).chain(prev..a).chain(a + 2..d.blocks.len()).collect();
     let blocks = order.iter().map(|&o| d.blocks[o].clone()).collect();
@@ -378,6 +414,13 @@ fn p11_move_object(d: &Doc, _cx: &Cx) -> Option<Edit> {
     for (n, &o) in order.iter().enumerate() {
         bmap[o] = Some(n);
     }
-    let what = format!("move the object at block {a} before the item at block {prev}");
-    Some(Edit::blocks("P11 move an object", what, blocks, bmap, (prev..a + 2).collect(), false))
+    let behind = match d.blocks[prev].head().map(kind) {
+        Some(HeadKind::Slot { name }) => format!("the {name} placeholder"),
+        Some(HeadKind::Shape { name, .. }) => format!("shape '{name}'"),
+        _ => "the object before it".into(),
+    };
+    let what = format!("move the {obj} on {} behind {behind} (before it in the z-order)", slide_name(&d.blocks, a));
+    let mut ed = Edit::blocks("P11 move an object", what, blocks, bmap, (prev..a + 2).collect(), false);
+    ed.named = vec![slide];
+    Some(ed)
 }
