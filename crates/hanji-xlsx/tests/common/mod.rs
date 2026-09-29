@@ -1,6 +1,8 @@
 //! Helpers the xlsx tests share.
 #![allow(dead_code)]
 
+pub mod fixture;
+
 use std::path::PathBuf;
 
 use hanji_xlsx::{package, xml};

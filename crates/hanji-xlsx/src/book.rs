@@ -221,6 +221,13 @@ impl Book {
         })
     }
 
+    /// Add a worksheet at the end of the sheet list (its part already added).
+    pub fn push_sheet(&mut self, info: SheetInfo) {
+        self.sheets.push(info);
+        self.stores.push(None);
+        self.dirty.push(false);
+    }
+
     /// Load worksheet `i` (a no-op when loaded).
     pub fn load_store(&mut self, i: usize) -> Result<(), String> {
         if self.stores[i].is_some() {
@@ -410,7 +417,7 @@ impl Book {
     }
 }
 
-fn read_table(part: String, sheet: usize, doc: xml::Doc) -> Result<TableInfo, String> {
+pub(crate) fn read_table(part: String, sheet: usize, doc: xml::Doc) -> Result<TableInfo, String> {
     let r = &doc.root;
     let range =
         r.get("ref").and_then(|v| CellRange::parse(&v)).ok_or_else(|| format!("{part}: the table has no ref"))?;

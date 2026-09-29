@@ -127,6 +127,15 @@ impl XlsxEngine {
         view::full_view(&mut book, rows).map_err(EngineError::Refused)
     }
 
+    /// Compute every formula and write its cached value (for a file written
+    /// without them, as openpyxl writes one).
+    pub fn recalculate(rem: &Remainder) -> Result<(Remainder, calc::Recalc), EngineError> {
+        let mut book = book_of(rem)?;
+        let ch = calc::all_formulas(&mut book).map_err(pkg)?;
+        let rc = calc::recompute(&mut book, &ch).map_err(pkg)?;
+        Ok((remainder_of(book, rem.next_id), rc))
+    }
+
     /// Apply structure edits in `text` and then the range operations in `ops`
     /// (a JSON list, §5.4), all or nothing.
     pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, EngineError> {
