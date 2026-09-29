@@ -454,7 +454,7 @@ fn scripts_ole_and_linked_files_are_neutralised_and_reported() {
     let pic = r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:pic id="6"><hc:img binaryItemIDRef="img1"/></hp:pic><hp:t>그림</hp:t></hp:run></hp:p>"#;
     let hidden = r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:ctrl><hp:hiddenComment><hp:subList><hp:p><hp:run><hp:t>숨은 설명</hp:t></hp:run></hp:p></hp:subList></hp:hiddenComment></hp:ctrl><hp:t>본문</hp:t></hp:run></hp:p>"#;
     let manifest = r#"<opf:item id="headersc" href="Scripts/headerScripts" media-type="application/x-javascript ;charset=utf-16"/><opf:item id="ole1" href="BinData/ole1.OLE" media-type="application/ole"/><opf:item id="img1" href="C:\\Users\\a\\photo.png" media-type="image/png" isEmbeded="0"/><opf:item id="img2" href="BinData/image2.png" media-type="image/png"/>"#;
-    let fills = r#"<hh:borderFills itemCnt="2"><hh:borderFill id="8"><hc:fillBrush><hc:imgBrush mode="TOTAL"><hc:img binaryItemIDRef="img1"/></hc:imgBrush></hc:fillBrush></hh:borderFill><hh:borderFill id="9"><hc:fillBrush><hc:winBrush/><hc:imgBrush mode="TOTAL"><hc:img binaryItemIDRef="img1"/></hc:imgBrush></hc:fillBrush></hh:borderFill></hh:borderFills>"#;
+    let fills = r#"<hh:borderFills itemCnt="3"><hh:borderFill id="8"><hc:fillBrush><hc:imgBrush mode="TOTAL"><hc:img binaryItemIDRef="img1"/></hc:imgBrush></hc:fillBrush></hh:borderFill><hh:borderFill id="9"><hc:fillBrush><hc:winBrush/><hc:imgBrush mode="TOTAL"><hc:img binaryItemIDRef="img1"/></hc:imgBrush></hc:fillBrush></hh:borderFill><hh:borderFill id="10"><hc:fillBrush/></hh:borderFill></hh:borderFills>"#;
     let docopt = r#"</hh:refList><hh:docOption><hh:linkinfo path="\\\\server\\share\\base.hwpx" pageInherit="1" footnoteInherit="0"/></hh:docOption><hh:refList>"#;
     let pkg = hwpx_with(
         &[p("시작"), ole.into(), pic.into(), hidden.into()],
@@ -493,10 +493,14 @@ fn scripts_ole_and_linked_files_are_neutralised_and_reported() {
     let located: Vec<&str> = imp.report.neutralised.iter().map(|n| n.location.as_str()).collect();
     assert!(located.contains(&"Contents/section0.xml <hp:pic>"), "{located:?}");
     assert!(located.contains(&"Contents/header.xml <hc:imgBrush>"), "{located:?}");
-    assert!(
-        all.contains(r#"<hh:borderFill id="9"><hc:fillBrush><hc:winBrush/></hc:fillBrush></hh:borderFill>"#),
-        "{all}"
-    );
+    // A fill that was only the image goes whole; others keep the rest and are otherwise untouched.
+    for kept in [
+        r#"<hh:borderFill id="8"/>"#,
+        r#"<hh:borderFill id="9"><hc:fillBrush><hc:winBrush/></hc:fillBrush></hh:borderFill>"#,
+        r#"<hh:borderFill id="10"><hc:fillBrush/></hh:borderFill>"#,
+    ] {
+        assert!(all.contains(kept), "{kept} not in {all}");
+    }
     let again = import(&out);
     assert!(again.report.neutralised.is_empty(), "{:?}", again.report.neutralised);
     assert_eq!(again.text, imp.text);

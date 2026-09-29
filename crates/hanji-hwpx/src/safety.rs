@@ -162,9 +162,14 @@ fn drop_references(
     if refers(root).is_none() {
         return Ok(0);
     }
-    // An image fill first (its shape stays), then a picture whose own image went.
-    let fills = remove_where(root, &|e| e.is("hc:imgBrush") && refers(e).is_some());
-    remove_where(root, &|e| e.is("hc:fillBrush") && !e.has_elements());
+    // An image fill first (its shape stays; a fill that was only that image
+    // goes whole), then a picture whose own image went.
+    let only_image = |e: &Element| e.elements().all(|c| c.is("hc:imgBrush") && refers(c).is_some());
+    let mut fills: Vec<Element> = remove_where(root, &|e| e.is("hc:fillBrush") && e.has_elements() && only_image(e))
+        .into_iter()
+        .flat_map(|f| f.elements().cloned().collect::<Vec<_>>())
+        .collect();
+    fills.extend(remove_where(root, &|e| e.is("hc:imgBrush") && refers(e).is_some()));
     let pics = remove_where(root, &|e| e.is("hp:pic") && refers(e).is_some());
     for (what, e) in fills.iter().map(|e| ("image fill", e)).chain(pics.iter().map(|e| ("picture", e))) {
         let item = refers(e).map(|r| r.1).unwrap_or_default();
