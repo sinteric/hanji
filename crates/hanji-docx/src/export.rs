@@ -203,7 +203,10 @@ impl<'a> Exporter<'a> {
         }
         // Marks as exported: a unit the text cannot state a mark on (a space
         // at a mark's edge, a page break) keeps what its run had.
-        let revs = self.track.and_then(|t| t.units.get(path)).filter(|r| r.len() == n);
+        let revs = self.track.and_then(|t| t.units.get(path));
+        if revs.is_some_and(|r| r.len() != n) {
+            return Err(format!("the tracked model of paragraph {path:?} does not match its text"));
+        }
         let eff = match revs {
             Some(r) => r.iter().map(|u| u.eff).collect(),
             None => p.written_marks(&|c| owner[c].map_or(Marks::NONE, |o| o.meta.marks)),
@@ -500,8 +503,8 @@ impl<'a> Exporter<'a> {
                 ci += span;
             }
             self.bmarkers(&mut tr, &[bi, ri, row.len()]);
-            if let Some(st) = self.track.and_then(|t| t.rows.get(&[bi, ri][..]).map(|st| (t, *st))) {
-                st.0.row(&mut tr, st.1);
+            if let Some(t) = self.track {
+                t.row(&mut tr, &[bi, ri]);
             }
             tbl.children.push(node(tr));
         }

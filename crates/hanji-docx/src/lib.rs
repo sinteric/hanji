@@ -43,6 +43,11 @@ pub(crate) struct DocShell {
 }
 
 impl DocShell {
+    pub(crate) fn of(rem: &Remainder) -> Result<DocShell, EngineError> {
+        let s = rem.shell.first().ok_or_else(|| EngineError::Package("remainder has no document shell".into()))?;
+        serde_json::from_str(s).map_err(|e| EngineError::Package(e.to_string()))
+    }
+
     /// `document.xml` around the body's children.
     pub(crate) fn document(&self, body: &[xml::Node]) -> String {
         let mut s = self.prolog.clone();
@@ -190,10 +195,7 @@ pub fn write_package(rem: &Remainder, out: Exported) -> Result<Vec<u8>, EngineEr
 
 /// `document.xml` (and numbering) for resolved blocks placed against `rem`.
 pub fn export_document(blocks: &[hanji_core::Block], rem: &Remainder) -> Result<Exported, EngineError> {
-    let shell: DocShell = serde_json::from_str(
-        rem.shell.first().ok_or_else(|| EngineError::Package("remainder has no document shell".into()))?,
-    )
-    .map_err(|e| EngineError::Package(e.to_string()))?;
+    let shell = DocShell::of(rem)?;
     let mut numbering = numbering::Numbering::read(&rem.parts);
     let lists = hanji_core::plan_lists(blocks, &rem.entries, &mut numbering).map_err(EngineError::Refused)?;
     let ex = export::Exporter::new(&rem.styles, &rem.entries, &numbering, lists);

@@ -1096,6 +1096,11 @@ fn text_span(fmt: &dyn Format, old_text: &str, new_text: &str, rem: &Remainder, 
             return (a, b, new_text[a..nb].to_string());
         }
     }
+    differing_span(old_text, new_text)
+}
+
+/// The smallest span of `old_text` whose replacement gives `new_text`: `(start, end, replacement)`.
+pub fn differing_span(old_text: &str, new_text: &str) -> (usize, usize, String) {
     let pre = old_text.bytes().zip(new_text.bytes()).take_while(|(x, y)| x == y).count();
     let mut pre = pre;
     while !old_text.is_char_boundary(pre) || !new_text.is_char_boundary(pre) {

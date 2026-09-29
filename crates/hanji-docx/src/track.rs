@@ -63,6 +63,8 @@ pub struct History {
     blocks: Vec<Block>,
     text: String,
     kept: Kept,
+    /// The current revision's remainder, as far as export can tell it apart (entries, next id).
+    rem_key: (usize, u64),
 }
 
 fn refused(m: impl Into<String>) -> EngineError {
@@ -80,6 +82,7 @@ impl History {
             base: rem.clone(),
             blocks,
             text: text.to_string(),
+            rem_key: (rem.entries.len(), rem.next_id),
         })
     }
 
@@ -111,6 +114,7 @@ impl History {
         self.kept = self.kept.then(&Kept::of(&r.old, &r.new, &r.alignment));
         self.blocks = r.new.clone();
         self.text = r.text.clone();
+        self.rem_key = (r.remainder.entries.len(), r.remainder.next_id);
         Ok(())
     }
 }
@@ -133,18 +137,15 @@ impl DocxEngine {
         let h = history.ok_or_else(|| {
             refused("tracked changes are written from the edits made since import: pass their History")
         })?;
-        if text != h.text {
-            return Err(refused("the text is not the current revision of the history"));
+        if text != h.text || (rem.entries.len(), rem.next_id) != h.rem_key {
+            return Err(refused("the text and remainder are not the current revision of the history"));
         }
         export_tracked(h, rem, reviewer)
     }
 }
 
 fn export_tracked(h: &History, rem: &Remainder, reviewer: &Reviewer) -> Result<Vec<u8>, EngineError> {
-    let shell: DocShell = serde_json::from_str(
-        rem.shell.first().ok_or_else(|| EngineError::Package("remainder has no document shell".into()))?,
-    )
-    .map_err(|e| EngineError::Package(e.to_string()))?;
+    let shell = DocShell::of(rem)?;
     let mut numbering = Numbering::read(&rem.parts);
     let lists = hanji_core::plan_lists(&h.blocks, &rem.entries, &mut numbering).map_err(EngineError::Refused)?;
     let mut m = Merge::new(h, rem);
@@ -180,7 +181,7 @@ fn max_id(base: &Remainder, rem: &Remainder) -> u64 {
             max = max.max(n.parse::<u64>().unwrap_or(0));
         }
     };
-    for p in &rem.parts {
+    for p in rem.parts.iter().filter(|p| p.name.ends_with(".xml") || p.name.ends_with(".rels")) {
         scan(&String::from_utf8_lossy(&p.data));
     }
     for s in &rem.shell {
@@ -227,7 +228,7 @@ pub(crate) struct Track {
     next_id: Counter<u64>,
     pub units: HashMap<Path, Vec<UnitRev>>,
     marks: HashMap<Path, MarkRev>,
-    pub rows: HashMap<Path, St>,
+    rows: HashMap<Path, St>,
     scope: Scope,
     /// The default paragraph style's id.
     default_style: String,
@@ -367,11 +368,11 @@ impl Track {
     }
 
     /// An inserted or deleted table row: `w:trPr/w:ins` or `w:trPr/w:del`.
-    pub fn row(&self, tr: &mut Element, st: St) {
-        let name = match st {
-            St::Ins => "w:ins",
-            St::Del => "w:del",
-            St::Eq => return,
+    pub fn row(&self, tr: &mut Element, path: &[usize]) {
+        let name = match self.rows.get(path) {
+            Some(St::Ins) => "w:ins",
+            Some(St::Del) => "w:del",
+            _ => return,
         };
         if tr.child("w:trPr").is_none() {
             let at =
@@ -479,6 +480,18 @@ impl<'a> Side<'a> {
 }
 
 // ------------------------------------------------------------------ the merge
+
+/// Merged positions → runs of consecutive ones in one paragraph: `(path, start, end)`.
+fn pieces(units: impl IntoIterator<Item = (Path, usize)>) -> Vec<(Path, usize, usize)> {
+    let mut out: Vec<(Path, usize, usize)> = vec![];
+    for (p, s) in units {
+        match out.last_mut() {
+            Some(l) if l.0 == p && l.2 == s => l.2 = s + 1,
+            _ => out.push((p, s, s + 1)),
+        }
+    }
+    out
+}
 
 /// One position of the merged model and what it is.
 #[derive(Clone, Debug)]
@@ -653,30 +666,32 @@ impl<'a> Merge<'a> {
         // Deleted paragraphs replaced by inserted ones: the last deleted mark
         // and the last inserted mark are one kept mark whose properties
         // changed, so the replacement ends in a mark kept on both sides.
+        let run_end =
+            |seq: &[It], from: usize, st: St| (from..seq.len()).find(|&x| seq[x].st != st).unwrap_or(seq.len());
+        let mut out = Vec::with_capacity(seq.len());
         let mut k = 0;
         while k < seq.len() {
-            let run_end = |from: usize, st: St| (from..seq.len()).find(|&x| seq[x].st != st).unwrap_or(seq.len());
-            let (a, b) = match seq[k].st {
-                St::Eq => {
-                    k += 1;
-                    continue;
-                }
-                st => {
-                    let d = run_end(k, st);
-                    let other = if st == St::Del { St::Ins } else { St::Del };
-                    (d, run_end(d, other))
-                }
-            };
+            let st = seq[k].st;
+            if st == St::Eq {
+                out.push(seq[k].clone());
+                k += 1;
+                continue;
+            }
+            let a = run_end(&seq, k, st);
+            let b = run_end(&seq, a, if st == St::Del { St::Ins } else { St::Del });
             if b > a && seq[a - 1].is_mark() && seq[b - 1].is_mark() {
-                let (x, y) = (seq[a - 1].clone(), seq[b - 1].clone());
-                let (d, n) = if x.st == St::Del { (x, y) } else { (y, x) };
-                seq[b - 1] = It { st: St::Eq, old: d.old, new: n.new };
-                seq.remove(a - 1);
-                k = b - 1;
+                let (d, n) = if st == St::Del { (&seq[a - 1], &seq[b - 1]) } else { (&seq[b - 1], &seq[a - 1]) };
+                let kept = It { st: St::Eq, old: d.old.clone(), new: n.new.clone() };
+                out.extend_from_slice(&seq[k..a - 1]);
+                out.extend_from_slice(&seq[a..b - 1]);
+                out.push(kept);
+                k = b;
             } else {
-                k = a.max(k + 1);
+                out.extend_from_slice(&seq[k..a]);
+                k = a;
             }
         }
+        let mut seq = out;
         let blocked = self.slide(&mut seq);
         // Each inserted or deleted mark joins its paragraph to the next when
         // rejected or accepted: a paragraph must follow it (after the tables
@@ -1089,15 +1104,10 @@ impl<'a> Merge<'a> {
                     (x.path, x.start, x.end) = (p, Some(s), Some(s + 1));
                 }
                 Kind::Run if e.end > e.start => {
-                    let mut pieces: Vec<(Path, usize, usize)> = vec![];
-                    for u in e.start.unwrap()..e.end.unwrap().min(self.new.len(&e.path)) {
-                        let (p, s) = at(self.new_unit.get(&Pos::Unit(e.path.clone(), u)).cloned())?;
-                        match pieces.last_mut() {
-                            Some(l) if l.0 == p && l.2 == s => l.2 = s + 1,
-                            _ => pieces.push((p, s, s + 1)),
-                        }
-                    }
-                    for (k, (p, s, en)) in pieces.into_iter().enumerate() {
+                    let units = (e.start.unwrap()..e.end.unwrap().min(self.new.len(&e.path)))
+                        .map(|u| at(self.new_unit.get(&Pos::Unit(e.path.clone(), u)).cloned()))
+                        .collect::<Result<Vec<_>, _>>()?;
+                    for (k, (p, s, en)) in pieces(units).into_iter().enumerate() {
                         let mut y = e.clone();
                         (y.path, y.start, y.end) = (p, Some(s), Some(en));
                         if k > 0 {
@@ -1156,18 +1166,10 @@ impl<'a> Merge<'a> {
                     }
                 }
                 Kind::Run if e.end > e.start => {
-                    let mut pieces: Vec<(Path, usize, usize)> = vec![];
-                    for u in e.start.unwrap()..e.end.unwrap().min(self.old.len(&e.path)) {
-                        let Some((p, s)) = self.old_unit.get(&Pos::Unit(e.path.clone(), u)).cloned() else { continue };
-                        if self.units[&p][s].st != St::Del {
-                            continue;
-                        }
-                        match pieces.last_mut() {
-                            Some(l) if l.0 == p && l.2 == s => l.2 = s + 1,
-                            _ => pieces.push((p, s, s + 1)),
-                        }
-                    }
-                    for (p, s, en) in pieces {
+                    let deleted = (e.start.unwrap()..e.end.unwrap().min(self.old.len(&e.path)))
+                        .filter_map(|u| self.old_unit.get(&Pos::Unit(e.path.clone(), u)).cloned())
+                        .filter(|(p, s)| self.units[p][*s].st == St::Del);
+                    for (p, s, en) in pieces(deleted) {
                         let mut y = x.clone();
                         (y.path, y.start, y.end) = (p, Some(s), Some(en));
                         y.id = fresh();

@@ -403,18 +403,8 @@ fn edit_chain(text: &str, rem: &Remainder, with_move: bool) -> Vec<hanji_core::R
         let Some(ed) = f(&d, &Cx { fmt: &Docx, rem: &rem }) else { continue };
         let new_text = Docx.text_of(&ed.blocks, &rem);
         let r = if ed.local {
-            let pre = text.bytes().zip(new_text.bytes()).take_while(|(a, b)| a == b).count();
-            let mut pre = pre;
-            while !text.is_char_boundary(pre) || !new_text.is_char_boundary(pre) {
-                pre -= 1;
-            }
-            let max = text.len().min(new_text.len()) - pre;
-            let mut suf = text.bytes().rev().zip(new_text.bytes().rev()).take_while(|(a, b)| a == b).count().min(max);
-            while !text.is_char_boundary(text.len() - suf) || !new_text.is_char_boundary(new_text.len() - suf) {
-                suf -= 1;
-            }
-            let repl = &new_text[pre..new_text.len() - suf];
-            hanji_core::reanchor_span(&rem, &text, pre, text.len() - suf, repl, CAPS).unwrap()
+            let (a, b, repl) = hanji_testkit::differing_span(&text, &new_text);
+            hanji_core::reanchor_span(&rem, &text, a, b, &repl, CAPS).unwrap()
         } else {
             hanji_core::reanchor_rewrite(&rem, &text, &new_text, CAPS).unwrap()
         };
