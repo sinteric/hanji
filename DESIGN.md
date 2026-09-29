@@ -306,9 +306,8 @@ schema: 1
 
 ### 5.3 Presentation
 
-A slide is a canvas: its objects in z-order, each where it is. Slots come from the
-layout and show a box only when the slide moved them; every other object shows its
-box (§6 round 5).
+A slide is a canvas: its objects in z-order, each where it is. Every object shows
+its box, slots included, so a slide reads on its own (§6 round 5, candidate A).
 
 ```
 ---
@@ -320,9 +319,9 @@ size: 720 x 540 pt
 ---
 
 layout: Title and Content
-::title::
+::title box="36 22 648 90"::
 핵심 지표
-::body::
+::body box="36 126 648 356"::
 - 매출 **12% 증가**
 - 신규 고객 34곳
 ::notes::
@@ -333,9 +332,9 @@ layout: Title and Content
 layout: Two Content
 ::title box="36 22 504 90"::
 지역별 현황
-::left::
+::left box="36 126 318 356"::
 - 수도권 21곳
-::right::
+::right box="366 126 318 356"::
 - 지방 13곳
 <keep id="k7" kind="picture" summary="지도" box="560 20 124 80"/>
 <shape id="s4" name="출처" box="36 490 288 29">출처: 내부 집계<p/>2026년 9월</shape>
@@ -356,8 +355,8 @@ layout: Two Content
 - **Geometry.** `box="x y w h"` is the left edge, top edge, width and height in
   points from the slide's top-left corner (72 pt = 1 inch = 2.54 cm; x grows to
   the right, y downwards). Points are the unit, decided 2026-09-29; a cm view
-  or cm input can be added later as a conversion on top of them. Numbers are shown as whole points; a written number
-  may have decimals. `rot="15"` turns an object 15° clockwise about its centre,
+  or cm input can be added later as a conversion on top of them. Numbers are
+  shown as whole points; a written number may have decimals. `rot="15"` turns an object 15° clockwise about its centre,
   and its box is the unturned one, as `a:xfrm` stores it. `flip="h"`, `"v"` or
   `"hv"` mirrors it. Both are left out when there is no rotation or flip.
   - A number left as it is shown keeps the exact stored value; a changed number
@@ -371,13 +370,20 @@ layout: Two Content
 - **Slots.** Each slot starts with a marker line — `::title::`, `::body::`,
   `::left::`, `::right::` — and its text is the lines after it, up to the next
   object or `---`. Only the layout's slots appear; an unfilled slot is left out.
-  - A slot sits where its layout puts it and shows no box. A slot the slide
-    moved or resized (it has its own `a:xfrm`) shows its box on the marker:
-    `::title box="36 22 504 90"::`. Adding a box moves a slot; removing it puts
-    the slot back where the layout puts it, and so does changing the layout.
-  - Every read that shows slides also lists the boxes of the layouts they use,
-    with the layout and slot names. A slot's place is always known without a box
-    on its marker, and a partial view (rule 11) carries only its own layouts.
+  - Every slot shows its box on its marker, `::title box="36 22 648 90"::`:
+    its own when the slide stores one (`a:xfrm` in its `p:spPr`), else the one
+    it inherits from the layout (or the master). The text does not say which;
+    the remainder does. A slide therefore reads on its own, without the
+    layout list.
+  - A box left as shown keeps what the slide stores: an inherited box writes
+    nothing back (the placeholder stays without `a:xfrm`, so GetPut is
+    byte-exact), and an own box keeps its exact EMU. A changed box gives the
+    slot an `a:xfrm` of its own, the unchanged numbers keeping their exact
+    inherited values. A marker without a box (`::title::`) removes the slot's
+    own box: it sits where its layout puts it, and the text the write returns
+    shows that box.
+  - Changing a slide's layout moves every slot whose box was left as shown
+    and inherited to the new layout's place; a slot with its own box keeps it.
   - Slot names are the layout's placeholder types: `title` (centred or not),
     `subtitle`, `body`, `picture`, `chart`, `table`, `diagram`, `media`,
     `clipart`, `date`, `footer`, `number`. Two body placeholders are `left` and
@@ -390,7 +396,14 @@ layout: Two Content
     leaves the layout's empty placeholder; a placeholder holding only spaces
     counts as empty and is left out.
   - A placeholder filled with a picture, chart or table is its slot's text: the
-    slot holds that `<keep/>` alone, and a moved one's box is on the marker.
+    slot holds that `<keep/>` alone, and its box is on the marker.
+  - *Why every slot shows its box (A over B):* round 5 tied A (every slot's
+    box shown) and B (a slot's box shown only when the slide moved it) at the
+    ceiling, with B 11% smaller in answers and 10% in input. Round 5's decks
+    were small. In a large deck, an agent under B must look each slot up in
+    the layout list to know where it is, and can misjudge how the slide looks;
+    A makes each slide self-contained, and the owner chose it for that
+    (2026-09-29) at the cost of the 11%.
 - **Shapes.** A shape that is not a placeholder is one line,
   `<shape id="s4" name="출처" box="…">text</shape>`, with its text editable;
   `<p/>` starts its next paragraph. Its paragraphs are never list items
@@ -432,9 +445,10 @@ layout: Two Content
   Nothing else is created: a new `<keep/>` of another kind, a new group or an
   invented id is an error.
 - **New slides and decks from a template** are written with `layout:` and bare
-  slot markers, with no geometry: every slot sits where its layout puts it.
-  That is the whole of the old, geometry-free form, which still reads unchanged
-  (a shape written without its box keeps its box).
+  slot markers, with no geometry: every slot sits where its layout puts it,
+  and the text the write returns shows each slot's box. The old, geometry-free
+  form still reads (a shape written without its box keeps its box); its bare
+  markers put an existing slot back in its layout's place.
 
 ### 5.4 Spreadsheet
 
@@ -685,7 +699,7 @@ rotation.
 
 | Decision | Opus landed A / Ap / B / C | Sonnet landed A / Ap / B / C | Opus chars A / Ap / B | Sonnet chars A / Ap / B | Verdict |
 |---|---|---|---|---|---|
-| Format and unit | 48 / 47 / 48 / 17 | 48 / 48 / 48 / 17 | 6,325 / 6,261 / 5,650 | 5,868 / 5,886 / 5,236 | B, in points |
+| Format and unit | 48 / 47 / 48 / 17 | 48 / 48 / 48 / 17 | 6,325 / 6,261 / 5,650 | 5,868 / 5,886 / 5,236 | A and B tie; A chosen (§10.9), in points |
 
 - Landed is first try, of 48 per A/Ap/B cell (both parts) and 30 per C cell
   (part 1). All 288 A/Ap/B answers were valid, and every A and B answer
@@ -699,12 +713,15 @@ rotation.
   line (4 of 4 answers wrong), and Sonnet called two misaligned pairs "already
   aligned". Sonnet's two invalid C answers were valid after one round and still
   missed.
-- Format: B. A and B tie at the ceiling, so size and fit decide, as in round 1.
-  B is 11% smaller in answers on both models and 10% smaller in input (21% on a
-  deck of inherited placeholders). A box on a slot says the slide stores its
-  own, as the file does. A's self-contained read did not matter: no inherited
-  slot was misread in 14 tasks that needed the layout list. Unit: points (A and
-  B 192/192; percent 191/192, its miss a unit conversion). Grid: rejected.
+- Format: A and B tie at the ceiling. On size and fit alone, as in round 1,
+  B wins: it is 11% smaller in answers on both models and 10% smaller in
+  input (21% on a deck of inherited placeholders), and a box on a slot says
+  the slide stores its own, as the file does. A's self-contained read did not
+  matter here: no inherited slot was misread in 14 tasks that needed the
+  layout list. The owner chose A
+  (§10.9): the decks were small, and in a large deck B's lookups in the layout
+  list are where an agent would misjudge a slide. Unit: points (A and B
+  192/192; percent 191/192, its miss a unit conversion). Grid: rejected.
 - Limits: the ceiling (a harder or longer round could still separate A and B),
   one run per prompt, and geometry checked in the kit's model, not yet in
   hanji-pptx or PowerPoint.
@@ -827,15 +844,20 @@ v0.7.3; "lossless … regarding content", not formatting).
    import as separate blocks. Limit: the Korean side is press releases only,
    and many source hosts were blocked.
 9. ~~Geometry in Presentations~~ — decided 2026-09-29 by §6 round 5 and the
-   owner (candidate B, in points, with the attached-connector refusal), after
-   real decks checked in PowerPoint showed a canvas without positions and
-   sizes to be too limited. The old §5.3 ("never geometry") is replaced. Slots
-   come from the layout and show a `box` only when the slide moved them.
-   Every other object shows its box in points, groups show their objects, and
-   lines show their ends. Text boxes, pictures from a file and lines can be
-   added (§5.3). Chosen over an always-shown slot box (A: tied, 11% larger),
-   percent of the slide (one unit-conversion miss) and a 12 × 12 grid (11 of
-   30 tasks unwritable, silent misreads). It also fixes a rule 8 gap: the old
+   owner: candidate A, in points, with the attached-connector refusal. Real
+   decks checked in PowerPoint showed a canvas without positions and sizes to
+   be too limited, so the old §5.3 ("never geometry") is replaced. Every
+   object shows its box in points, slots included (their inherited box when
+   the slide stores none), groups show their objects, and lines show their
+   ends. Text boxes, pictures from a file and lines can be added (§5.3). A
+   tied B (a slot's box shown only when moved) at the ceiling of round 5, and
+   B is 11% smaller; the owner chose A because round 5's decks were small,
+   and in a large deck an agent under B must look each slot up in the layout
+   list and may misjudge how a slide looks. A slide under A reads on its own.
+   Chosen over percent of the slide (one unit-conversion miss) and a 12 × 12
+   grid (11 of 30 tasks unwritable, silent misreads). Shapes keep B's one-line
+   `<shape>` form (round 5's A wrote them as `::shape::` blocks; B's form
+   landed as often, and is one line for a shape without text). It also fixes a rule 8 gap: the old
    text left out connectors and textless shapes (9 of the 19 objects in
    shapes.pptx). Across the 21 corpus decks, 36% of slide placeholders have
    their own box. A schema-1 text without boxes still reads unchanged.
@@ -852,8 +874,8 @@ v0.7.3; "lossless … regarding content", not formatting).
   exports (2026-09-28).
 - The fluency list in §6 is still mostly a model's self-report: five rounds
   ran on two Claude models only, 12–48 tasks per cell, one run per prompt.
-  Round 5 put three of its four candidates at the ceiling, so the §5.3
-  geometry rests on size and design, and its geometry was checked in the
+  Round 5 put three of its four candidates at the ceiling on small decks, so
+  the §5.3 geometry rests on design (a slide that reads on its own), and its geometry was checked in the
   kit's model (`deck.py`), not in hanji-pptx or PowerPoint. No round asked
   for a connector edit, so how often the attached-connector refusal (§5.3)
   blocks a real move is unmeasured.
