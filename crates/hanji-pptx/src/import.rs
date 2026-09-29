@@ -6,8 +6,11 @@
 //!
 //! - The slide part and its notes page: a [`Kind::Slide`] entry each on the
 //!   slide head, holding the part as it is but for the modelled shapes, which
-//!   are stand-ins (`hanji-item`). Pictures, charts, tables, groups,
-//!   connectors, shapes without text, transitions and animations stay there.
+//!   are stand-ins (`hanji-item`). Connectors, shapes without text,
+//!   transitions and animations stay there.
+//! - A picture, chart, table, group or other object that is not a layout
+//!   placeholder: an `object` head and its `<keep/>` line (rule 8; a `Bkeep`
+//!   entry tagged `object`), in z-order among the slots and shapes.
 //! - A placeholder with text: a slot (`::title::`); its element without its
 //!   paragraphs is a [`Kind::Shape`] entry on the slot's head. One without
 //!   text is left out of the text and kept in the slide entry (`hanji-latent`)
@@ -22,7 +25,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use hanji_core::presentation::{shape_head, slide_head, slot_head};
+use hanji_core::presentation::{object_head, shape_head, slide_head, slot_head};
 use hanji_core::{Block, Entry, KeepIds, Kind, ListItem, Meta, Para};
 use hanji_format::{Atom, Inline, Keep, Marks, Unit};
 use hanji_package::clip;
@@ -43,6 +46,10 @@ pub struct SlideInfo {
     pub layout: String,
     /// Every shape id (`p:cNvPr id`) the slide had.
     pub ids: Vec<u32>,
+    /// Every relationship id the slide's XML named (`r:embed`, `r:id`, …):
+    /// one the export no longer names goes, with what only it reached.
+    #[serde(default)]
+    pub named: Vec<String>,
 }
 
 /// Where a notes page came from, stored on its `Slide` entry (tag `notes`).
@@ -61,7 +68,9 @@ pub struct Stats {
     pub shapes: usize,
     pub latent: usize,
     pub notes: usize,
-    /// Shape-tree children kept as they are (pictures, charts, groups, …).
+    /// Objects shown as `<keep/>` lines (pictures, charts, tables, groups, …).
+    pub objects: usize,
+    /// Shape-tree children kept in the skeleton (connectors, shapes without text, …).
     pub kept: usize,
     pub list_items: usize,
 }
@@ -90,8 +99,12 @@ enum What<'s> {
     KeepSlot(&'s SlotInfo),
     Latent(&'s SlotInfo),
     Shape(String, String),
+    Object,
     Other,
 }
+
+/// The tag of an object's `Bkeep` entry (a slot's object has none).
+pub const OBJECT_TAG: &str = "object";
 
 impl Importer<'_> {
     pub fn new(scope: Scope) -> Self {
@@ -206,6 +219,16 @@ impl Importer<'_> {
                     let keep = self.keep_entry(Kind::Bkeep, &el, &[bj], None, &k.to_string());
                     self.blocks.push(Block::Keep(keep.id));
                 }
+                What::Object => {
+                    k += 1;
+                    self.stats.objects += 1;
+                    tree.children.push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
+                    self.blocks.push(object_head());
+                    let bj = self.blocks.len();
+                    let keep = self.keep_entry(Kind::Bkeep, &el, &[bj], None, &k.to_string());
+                    self.entries.last_mut().unwrap().meta.tag = OBJECT_TAG.into();
+                    self.blocks.push(Block::Keep(keep.id));
+                }
                 What::Shape(id, name) => {
                     k += 1;
                     self.stats.shapes += 1;
@@ -219,7 +242,8 @@ impl Importer<'_> {
             }
         }
         let fpv = canon(&without_stand_ins(&skel), &self.scope);
-        let aux = vec![serde_json::to_string(&SlideInfo { ids, ..info }).unwrap()];
+        let named = crate::export::named_rel_ids(root).into_iter().collect();
+        let aux = vec![serde_json::to_string(&SlideInfo { ids, named, ..info }).unwrap()];
         let meta = Meta { tag: "slide".into(), aux, part: Some(self.part.clone()), ..Default::default() };
         self.entry(Kind::Slide, vec![skel.to_xml()], fpv, &[bi], None, None, meta);
         if let Some((ni, nroot, bullets)) = notes {
@@ -448,8 +472,15 @@ fn what<'s>(el: &Element, layout: &'s LayoutInfo, used: &[String]) -> What<'s> {
             let name = c_nv_pr(el).and_then(|c| c.get("name")).unwrap_or_default();
             What::Shape(format!("s{id}"), name)
         }
+        _ if is_object(el) => What::Object,
         _ => What::Other,
     }
+}
+
+/// A picture, graphic frame (chart, table, SmartArt, OLE object), group,
+/// ink or alternate-content object: what rule 8 shows as a `<keep/>` line.
+fn is_object(el: &Element) -> bool {
+    matches!(el.name.as_str(), "p:pic" | "p:graphicFrame" | "p:grpSp" | "p:contentPart" | "mc:AlternateContent")
 }
 
 /// The layout slot a slide placeholder of type `ty` and index `idx` fills:
@@ -558,23 +589,58 @@ fn keep_kind(el: &Element) -> String {
             .into()
         }
         "fld" => "field".into(),
+        "grpSp" => "group".into(),
+        "contentPart" => "ink".into(),
+        // On a slide: the object its first choice holds.
+        "AlternateContent" if chosen(el).is_some() => chosen(el).map_or("object".into(), keep_kind),
         "AlternateContent" | "m" => "math".into(),
         "r" => "text".into(),
         other => other.into(),
     }
 }
 
+/// The first shape an `mc:AlternateContent` on a slide holds.
+fn chosen(el: &Element) -> Option<&Element> {
+    let mut found = None;
+    el.walk(&mut |e| {
+        if found.is_none()
+            && matches!(e.name.as_str(), "p:pic" | "p:graphicFrame" | "p:grpSp" | "p:sp" | "p:contentPart")
+        {
+            found = Some(e);
+        }
+    });
+    found
+}
+
+/// The text of every paragraph in `el`, one space between paragraphs (a
+/// table's cells, a group's shapes).
+fn paragraphs_text(el: &Element) -> String {
+    let mut out: Vec<String> = vec![];
+    el.walk(&mut |e| {
+        if e.is("a:p") {
+            let t = e.text_of(&["a:t"]);
+            if !t.trim().is_empty() {
+                out.push(t);
+            }
+        }
+    });
+    out.join(" ")
+}
+
 fn summary(el: &Element) -> String {
+    if let Some(inner) = chosen(el).filter(|_| el.is("mc:AlternateContent")) {
+        return summary(inner);
+    }
     let s = match el.local() {
         "fld" => {
             let ty = el.get("type").unwrap_or_else(|| "field".into());
             format!("{ty}: {}", el.text_of(&["a:t"]))
         }
-        "pic" | "graphicFrame" => {
+        "pic" | "graphicFrame" | "grpSp" | "contentPart" => {
             let c = c_nv_pr(el);
             let descr = c.and_then(|c| c.get("descr")).filter(|d| !d.trim().is_empty());
             let name = c.and_then(|c| c.get("name")).unwrap_or_default();
-            let text = el.text_of(&["a:t"]);
+            let text = paragraphs_text(el);
             match (descr, text.trim().is_empty()) {
                 (Some(d), _) => d,
                 (None, false) => format!("{name}: {text}"),
@@ -582,7 +648,7 @@ fn summary(el: &Element) -> String {
             }
         }
         _ => {
-            let t = el.text_of(&["a:t"]);
+            let t = paragraphs_text(el);
             if t.trim().is_empty() {
                 el.local().to_string()
             } else {

@@ -6,8 +6,8 @@
 use crate::ast::*;
 use crate::diag::{quoted, Diagnostic};
 use crate::names::{Layout, Names};
-use crate::parse::{chars_of, parse_tag, BlockMap, BlockMapKind, Parser};
-use crate::serialize::{attr, blocks, cell_text, front_lines};
+use crate::parse::{chars_of, parse_tag, BlockMap, BlockMapKind, ParaMap, Parser};
+use crate::serialize::{attr, blocks, cell_text, front_lines, keep_tag};
 
 /// Where a head line is: its byte range, and the offset that stands for it
 /// (its line end; for a shape, its `<shape` tag).
@@ -138,7 +138,57 @@ fn is_shape_line(t: &str) -> bool {
     t.starts_with("<shape") && t[6..].starts_with([' ', '>', '/'])
 }
 
+/// A line holding one `<keep …/>` tag and nothing else: the tag's id.
+fn keep_line_id(p: &Parser, i: usize) -> Option<String> {
+    let line = &p.lines[i];
+    if !line.text.trim().starts_with("<keep") {
+        return None;
+    }
+    let src = chars_of(line, line.indent());
+    let (tag, after) = parse_tag(&src, 0)?;
+    let alone = tag.name == "keep" && tag.self_closing && src[after..].iter().all(|c| c.2.is_whitespace());
+    alone.then(|| tag.attrs.iter().find(|a| a.0 == "id").map(|a| a.1.clone())).flatten()
+}
+
+/// Whether line `i` is a slide object's `<keep/>` line: one outside a slot,
+/// or inside one when its id is one of the file's objects (a slot's own
+/// `<keep/>` is not; with no list of objects, none inside a slot is).
+fn is_object_line(p: &Parser, i: usize, in_slot: bool) -> bool {
+    match (keep_line_id(p, i), &p.names.objects) {
+        (Some(id), Some(objects)) => !in_slot || objects.contains(&id),
+        (Some(_), None) => !in_slot,
+        (None, _) => false,
+    }
+}
+
 const SLOT_TEXT: &str = "Slot text is plain lines, - and 1. list items, <p/> empty paragraphs and <keep/> placeholders";
+
+/// A slide object's `<keep/>` line: the head stands on the tag's `<`, the
+/// placeholder block on the rest of the line (distinct offsets, so an exact
+/// span tells them apart).
+fn object(p: &mut Parser, i: usize) -> Option<(Keep, ItemMap)> {
+    let (b, m, _) = p.block(i)?;
+    let keep = match b {
+        Block::Para(Para { style: ParaStyle::Plain, content }) if content.units.len() == 1 => {
+            match &content.units[0].atom {
+                Atom::Keep(k) => k.clone(),
+                _ => return None,
+            }
+        }
+        Block::Keep(k) => k,
+        _ => return None,
+    };
+    let line = &p.lines[i];
+    let tag = line.at + line.indent();
+    let head = HeadMap { start: line.at, end: tag + 1, mark: tag };
+    let mark = match &m.kind {
+        BlockMapKind::Para(pm) => pm.mark,
+        _ => line.end,
+    };
+    let block =
+        BlockMap { start: tag + 1, end: m.end, kind: BlockMapKind::Para(ParaMap { units: vec![tag + 1], mark }) };
+    Some((keep, ItemMap { head, blocks: vec![block] }))
+}
 
 fn slot_list(slots: &[String]) -> String {
     slots.iter().map(|s| format!("::{s}::")).collect::<Vec<_>>().join(", ")
@@ -185,7 +235,7 @@ fn slide(p: &mut Parser, a: usize, b: usize, slidev: Option<usize>) -> Option<(S
             let end = (i + 1..b)
                 .find(|&j| {
                     let t = p.lines[j].text.trim();
-                    marker(t).is_some() || is_shape_line(t)
+                    marker(t).is_some() || is_shape_line(t) || is_object_line(p, j, true)
                 })
                 .unwrap_or(b);
             if let Some((slot, m)) = slot(p, i, end, &name, slots.as_deref(), &layout, &mut seen) {
@@ -199,6 +249,12 @@ fn slide(p: &mut Parser, a: usize, b: usize, slidev: Option<usize>) -> Option<(S
                 maps.push(m);
             }
             i += 1;
+        } else if is_object_line(p, i, false) {
+            if let Some((k, m)) = object(p, i) {
+                items.push(SlideItem::Object(k));
+                maps.push(m);
+            }
+            i += 1;
         } else {
             let msg = match key_value(t) {
                 Some("layout") if items.is_empty() => {
@@ -209,7 +265,7 @@ fn slide(p: &mut Parser, a: usize, b: usize, slidev: Option<usize>) -> Option<(S
                 ),
                 _ => {
                     let list = slots.as_deref().map(|s| format!(" This slide's slots: {}.", slot_list(s))).unwrap_or_default();
-                    format!("text outside a slot: every line of a slide after its layout: line belongs to a slot, after its marker line such as ::title:: or ::body::, or is a <shape> line.{list}")
+                    format!("text outside a slot: every line of a slide after its layout: line belongs to a slot, after its marker line such as ::title:: or ::body::, or is a <shape> line or an object's <keep/> line.{list}")
                 }
             };
             p.err(i, 1, msg);
@@ -416,6 +472,7 @@ pub fn serialize_presentation(pres: &Presentation) -> String {
                     }
                 }
                 SlideItem::Shape(sh) => out.push(shape_line(sh)),
+                SlideItem::Object(k) => out.push(keep_tag(k)),
             }
         }
     }

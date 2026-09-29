@@ -50,7 +50,7 @@ pub struct Presentation {
 pub struct Slide {
     /// `layout: Name`, as the file lists it.
     pub layout: String,
-    /// Slots and shapes in the order written (the slide's z-order); notes last.
+    /// Slots, shapes and objects in the order written (the slide's z-order); notes last.
     pub items: Vec<SlideItem>,
 }
 
@@ -62,6 +62,10 @@ pub enum SlideItem {
     /// `<shape id="…" name="…">text</shape>`: a shape that is not a layout
     /// placeholder, its text only; `<p/>` starts another paragraph.
     Shape(ShapeText),
+    /// A `<keep/>` line outside a slot: a picture, chart, table, group or
+    /// other object of the slide the text does not model (rule 8). It can be
+    /// moved or deleted, never created or changed.
+    Object(Keep),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -85,6 +89,7 @@ impl Presentation {
                 match it {
                     SlideItem::Slot(slot) => normalize_blocks(&mut slot.blocks),
                     SlideItem::Shape(sh) => sh.paras.iter_mut().for_each(Inline::normalize),
+                    SlideItem::Object(_) => {}
                 }
             }
         }

@@ -18,7 +18,7 @@ use hanji_package::package;
 use hanji_package::xml::{self, fragment, insert_ordered, Element, Node};
 
 use crate::deck::{LayoutInfo, SlotInfo};
-use crate::import::{NotesInfo, SlideInfo};
+use crate::import::{NotesInfo, SlideInfo, OBJECT_TAG};
 use crate::pml::*;
 use crate::DeckShell;
 
@@ -253,7 +253,8 @@ impl<'a> Exporter<'a> {
                         }
                     }
                 }
-                HeadKind::Slide { .. } => unreachable!(),
+                // A slide head is no item; an object always has its entry (keep_slot).
+                HeadKind::Slide { .. } | HeadKind::Object => unreachable!(),
             }
         }
         // Text, placeholder binding and names.
@@ -307,6 +308,15 @@ impl<'a> Exporter<'a> {
             rels_changed = true;
             info.layout = layout.part.clone();
         }
+        // A relationship the slide named and no longer names (a deleted
+        // object's picture, chart or media, a deleted link) goes; its part
+        // goes with it when nothing else reaches it.
+        if !new {
+            let now = named_rel_ids(&xml_root);
+            let n = rels.len();
+            rels.retain(|r| !info.named.contains(&r.id) || now.contains(&r.id));
+            rels_changed |= rels.len() != n;
+        }
         let notes = self.notes_page(s, &part, &mut rels, &mut rels_changed, numbers)?;
         let xml = format!("{}{}{}", info.prolog, xml_root.to_xml(), info.epilog).into_bytes();
         let rels_data = if rels_changed {
@@ -317,7 +327,8 @@ impl<'a> Exporter<'a> {
         Ok(SlideOut { info, xml, rels: rels_data, new, notes })
     }
 
-    /// The `Bkeep` entry of a slot that holds a placeholder's object.
+    /// The `Bkeep` entry of a slot that holds a placeholder's object, or of
+    /// a slide object (rule 8). Neither goes where the other belongs.
     fn keep_slot(&self, it: &ItemG) -> Result<Option<&'a Entry>, String> {
         let body = &self.blocks[it.body.clone()];
         let keeps: Vec<&Entry> = body
@@ -325,8 +336,18 @@ impl<'a> Exporter<'a> {
             .filter_map(|b| if let Block::Keep(id) = b { self.keep.get(id.as_str()).copied() } else { None })
             .filter(|e| e.kind == Kind::Bkeep)
             .collect();
+        let object = it.kind == HeadKind::Object;
         match (keeps.as_slice(), body.len()) {
+            ([], _) if object => Err("an object's <keep/> line stands for an object of the file".into()),
             ([], _) => Ok(None),
+            ([e], 1) if object && e.meta.tag != OBJECT_TAG => Err(format!(
+                "placeholder {} is the object of a slot: keep its <keep/> line directly after its slot's marker",
+                keep_id(e)
+            )),
+            ([e], 1) if !object && e.meta.tag == OBJECT_TAG => Err(format!(
+                "placeholder {} is an object of the slide, not a placeholder's: it cannot fill a slot; keep its <keep/> line outside the slot's text",
+                keep_id(e)
+            )),
             ([e], 1) => Ok(Some(*e)),
             _ => Err("a placeholder's object is the whole text of its slot: keep its <keep/> alone in the slot".into()),
         }
@@ -795,14 +816,11 @@ impl<'a> Exporter<'a> {
         Ok(())
     }
 
-    /// Parts that go with deleted slides: the slides, their notes, and what
-    /// only they reached. Refused when a part that stays points at one,
+    /// Parts that go with deleted slides and objects: the slides, their
+    /// notes, and what only they reached. Refused when a part that stays points at one,
     /// except the view settings' outline state, which loses the slide.
     fn delete(&self, parts: &mut [Part], deleted: &[&String]) -> Result<BTreeSet<String>, String> {
         let mut gone: BTreeSet<String> = BTreeSet::new();
-        if deleted.is_empty() {
-            return Ok(gone);
-        }
         let dset: BTreeSet<&str> = deleted.iter().map(|s| s.as_str()).collect();
         for d in deleted {
             gone.insert((*d).clone());
@@ -857,7 +875,7 @@ impl<'a> Exporter<'a> {
                 }
             }
         }
-        // What only the deleted slides reached.
+        // What only the deleted slides and objects reached.
         let before = opc::reachable(self.parts);
         let rest: Vec<Part> = parts.iter().filter(|p| !gone.contains(&p.name)).cloned().collect();
         let after = opc::reachable(&rest);
@@ -867,6 +885,17 @@ impl<'a> Exporter<'a> {
         }
         Ok(gone)
     }
+}
+
+fn keep_id(e: &Entry) -> &str {
+    e.meta.keep.as_ref().map_or("", |k| k.id.as_str())
+}
+
+/// Every relationship id an attribute of `root` names (`r:id`, `r:embed`, …).
+pub(crate) fn named_rel_ids(root: &Element) -> BTreeSet<String> {
+    let mut ids = BTreeSet::new();
+    root.walk(&mut |e| ids.extend(e.attrs.iter().filter(|a| a.0.starts_with("r:")).map(|a| a.1.clone())));
+    ids
 }
 
 /// Set a part's data, adding the part (with `template`'s zip metadata) when
@@ -1023,7 +1052,7 @@ fn assemble(
 }
 
 /// A shape id of its own for each fresh item (a new placeholder, id 0, or a
-/// shape moved in from another slide whose id is taken): the next free one.
+/// shape or object moved in from another slide whose ids are taken): the next free one.
 fn assign_ids(stands: &[Stand], items: &mut [Element], fresh: &[bool]) {
     let mut taken: HashSet<u32> = HashSet::new();
     let mut note = |e: &Element| {
@@ -1045,14 +1074,19 @@ fn assign_ids(stands: &[Stand], items: &mut [Element], fresh: &[bool]) {
         }
     }
     let mut next = taken.iter().max().copied().unwrap_or(1);
-    for (e, f) in items.iter_mut().zip(fresh) {
-        let Some(c) = c_nv_pr_mut(e).filter(|_| *f) else { continue };
-        let id = c.get("id").and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
-        if id == 0 || !taken.insert(id) {
-            next += 1;
-            c.set("id", &next.to_string());
-            taken.insert(next);
-        }
+    // A group's shapes too: every id in a fresh item.
+    for (e, _) in items.iter_mut().zip(fresh).filter(|(_, f)| **f) {
+        e.walk_mut(&mut |c| {
+            if !c.is("p:cNvPr") {
+                return;
+            }
+            let id = c.get("id").and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
+            if id == 0 || !taken.insert(id) {
+                next += 1;
+                c.set("id", &next.to_string());
+                taken.insert(next);
+            }
+        });
     }
 }
 

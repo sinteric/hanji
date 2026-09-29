@@ -1,8 +1,9 @@
 //! The pptx edit set (§9), the Presentation counterpart of the Document's
 //! E1–E10: P1 change a title, P2 edit a body bullet, P3 add a slide from a
 //! layout, P4 delete a slide, P5 move a slide, P6 edit (or add) notes, P7
-//! edit a `<shape>`'s text, P8 restyle a slide by changing its layout; P9
-//! makes them all in one revision.
+//! edit a `<shape>`'s text, P8 restyle a slide by changing its layout, P10
+//! delete an object (a picture, chart, table or group: rule 8), P11 move an
+//! object in its slide's z-order; P9 makes them all in one revision.
 
 use std::collections::HashSet;
 
@@ -13,7 +14,7 @@ use hanji_pptx::import::SlideInfo;
 use hanji_pptx::DeckShell;
 use hanji_testkit::{chars, entries_at, figure_or_word, ident, replace_span, Cx, Doc, Edit, EditFn};
 
-pub const EDITS: [(&str, EditFn); 8] = [
+pub const EDITS: [(&str, EditFn); 10] = [
     ("p1_title", p1_title),
     ("p2_bullet", p2_bullet),
     ("p3_add_slide", p3_add_slide),
@@ -22,6 +23,8 @@ pub const EDITS: [(&str, EditFn); 8] = [
     ("p6_notes", p6_notes),
     ("p7_shape", p7_shape),
     ("p8_layout", p8_layout),
+    ("p10_delete_object", p10_delete_object),
+    ("p11_move_object", p11_move_object),
 ];
 
 /// A slide: its head and the end of its blocks.
@@ -299,4 +302,82 @@ fn p8_layout(d: &Doc, cx: &Cx) -> Option<Edit> {
         ));
     }
     None
+}
+
+/// Object heads (`object` head, then its placeholder) whose shape no
+/// animation of their slide plays on: `(head, slide)`.
+fn objects(d: &Doc) -> Vec<(usize, usize)> {
+    let mut out = vec![];
+    for sl in slides(&d.blocks) {
+        let skel = d.entries.iter().find(|e| e.kind == Kind::Slide && e.meta.tag == "slide" && e.path == [sl.head]);
+        let timing = skel.map_or(String::new(), |e| {
+            let x = &e.xml[0];
+            x.find("<p:timing").map_or(String::new(), |k| x[k..].to_string())
+        });
+        for k in sl.head..sl.end {
+            if !d.blocks[k].head().is_some_and(|h| kind(h) == HeadKind::Object) {
+                continue;
+            }
+            let Some(Block::Keep(id)) = d.blocks.get(k + 1) else { continue };
+            let Some(e) = d.entries.iter().find(|e| e.meta.keep.as_ref().is_some_and(|x| &x.id == id)) else {
+                continue;
+            };
+            let el = hanji_pptx::xml::fragment(&e.xml[0]);
+            let mut animated = false;
+            el.walk(&mut |x| {
+                if x.is("p:cNvPr") {
+                    animated |= x.get("id").is_some_and(|i| timing.contains(&format!("spid=\"{i}\"")));
+                }
+            });
+            if !animated {
+                out.push((k, sl.head));
+            }
+        }
+    }
+    out
+}
+
+/// The last object that no animation plays on goes, with the parts only it used.
+fn p10_delete_object(d: &Doc, cx: &Cx) -> Option<Edit> {
+    let &(a, _) = objects(d).last()?;
+    let mut blocks = d.blocks.clone();
+    blocks.drain(a..a + 2);
+    let bmap = (0..d.blocks.len())
+        .map(|k| {
+            if k < a {
+                Some(k)
+            } else if k < a + 2 {
+                None
+            } else {
+                Some(k - 2)
+            }
+        })
+        .collect();
+    let mut ed = Edit::blocks(
+        "P10 delete an object",
+        format!("delete the object at block {a}"),
+        blocks,
+        bmap,
+        HashSet::from([a, a + 1]),
+        true,
+    );
+    let m = maps(cx, d);
+    ed.span = span_of(cx, d, &ed.blocks, m[a].0, m[a + 1].1);
+    Some(ed)
+}
+
+/// The first object with an item before it on its slide moves before that item.
+fn p11_move_object(d: &Doc, _cx: &Cx) -> Option<Edit> {
+    let (a, prev) = objects(d).into_iter().find_map(|(a, slide)| {
+        let prev = (slide + 1..a).rev().find(|&k| d.blocks[k].head().is_some_and(|h| h.level == 1))?;
+        Some((a, prev))
+    })?;
+    let order: Vec<usize> = (0..prev).chain([a, a + 1]).chain(prev..a).chain(a + 2..d.blocks.len()).collect();
+    let blocks = order.iter().map(|&o| d.blocks[o].clone()).collect();
+    let mut bmap = vec![None; d.blocks.len()];
+    for (n, &o) in order.iter().enumerate() {
+        bmap[o] = Some(n);
+    }
+    let what = format!("move the object at block {a} before the item at block {prev}");
+    Some(Edit::blocks("P11 move an object", what, blocks, bmap, (prev..a + 2).collect(), false))
 }

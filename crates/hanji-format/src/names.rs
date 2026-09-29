@@ -13,6 +13,10 @@ pub struct Names {
     pub layouts: Option<Vec<Layout>>,
     /// A presentation's shapes that are not placeholders: `(id, name)`.
     pub shapes: Option<Vec<(String, String)>>,
+    /// Ids of the placeholders (in `keeps`) that stand for a slide's objects:
+    /// a `<keep/>` line of one of these is the object, not a slot's text.
+    /// `None`: a `<keep/>` line outside a slot is an object.
+    pub objects: Option<Vec<String>>,
 }
 
 /// A slide layout: its name and the slots its placeholders give, in order.
