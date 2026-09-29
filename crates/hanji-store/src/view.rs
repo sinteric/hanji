@@ -197,10 +197,9 @@ pub fn part(ty: DocType, text: &str, w: &Window) -> Result<Option<(usize, usize)
     Ok(None)
 }
 
-/// Cut `[a, b)` to at most `limit` bytes, ending at a blank line when one
+/// Cut lines `[a, b)` to at most `limit` bytes, ending at a blank line when one
 /// is in the last quarter: the new end.
-pub fn clip(text: &str, a: usize, b: usize, limit: usize) -> usize {
-    let ls: Vec<&str> = text.split_inclusive('\n').collect();
+pub fn clip(ls: &[&str], a: usize, b: usize, limit: usize) -> usize {
     let mut size = 0;
     for k in a..b {
         size += ls[k].len();
@@ -248,7 +247,8 @@ mod tests {
     #[test]
     fn clipping_prefers_a_blank_line() {
         let text: String = (0..100).map(|k| format!("paragraph {k:03}\n\n")).collect();
-        let end = clip(&text, 0, 200, 300);
+        let ls: Vec<&str> = text.split_inclusive('\n').collect();
+        let end = clip(&ls, 0, 200, 300);
         assert!(end < 200);
         let kept: String = text.split_inclusive('\n').take(end).collect();
         assert!(kept.len() <= 300 && kept.ends_with("\n\n"), "{kept:?}");

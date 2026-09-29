@@ -27,7 +27,7 @@ pub mod view;
 
 use hanji_core::edit::{edit_in, reanchor_span_in, rewrite_in, Reanchored};
 use hanji_core::remainder::fnv1a;
-use hanji_core::{Block, ImportOptions, Remainder, Report};
+use hanji_core::{ImportOptions, Remainder, Report};
 use hanji_format::sheet::WindowOf;
 use hanji_xlsx::XlsxEngine;
 use serde::{Deserialize, Serialize};
@@ -393,10 +393,6 @@ impl<S: Storage> Workspace<S> {
         Workspace { storage }
     }
 
-    pub fn storage(&self) -> &S {
-        &self.storage
-    }
-
     // ------------------------------------------------------------ storage
 
     fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
@@ -435,14 +431,20 @@ impl<S: Storage> Workspace<S> {
         }
     }
 
+    /// The text of a revision.
+    pub fn text(&self, doc: &DocRecord, rev: u32) -> Result<String> {
+        Self::check_rev(doc, rev)?;
+        let damaged = || Error::io(format!("revision {rev} of {} has no UTF-8 text", doc.id));
+        let text = self.get(&text_key(&doc.id, rev))?.ok_or_else(damaged)?;
+        String::from_utf8(text).map_err(|_| damaged())
+    }
+
     /// The text and remainder of a revision.
     pub fn revision(&self, doc: &DocRecord, rev: u32) -> Result<(String, Remainder)> {
-        Self::check_rev(doc, rev)?;
-        let damaged = |what: &str| Error::io(format!("revision {rev} of {} has no {what}", doc.id));
-        let text = self.get(&text_key(&doc.id, rev))?.ok_or_else(|| damaged("text"))?;
-        let text = String::from_utf8(text).map_err(|_| damaged("UTF-8 text"))?;
-        let rem = self.get(&rem_key(&doc.id, rev))?.ok_or_else(|| damaged("remainder"))?;
-        let rem = Remainder::from_json(std::str::from_utf8(&rem).map_err(|_| damaged("remainder"))?)
+        let text = self.text(doc, rev)?;
+        let damaged = || Error::io(format!("revision {rev} of {} has no remainder", doc.id));
+        let rem = self.get(&rem_key(&doc.id, rev))?.ok_or_else(damaged)?;
+        let rem = Remainder::from_json(std::str::from_utf8(&rem).map_err(|_| damaged())?)
             .map_err(|e| Error::io(format!("revision {rev} of {}: {e}", doc.id)))?;
         Ok((text, rem))
     }
@@ -607,11 +609,11 @@ impl<S: Storage> Workspace<S> {
                 "table, rows, sheet and range are a Spreadsheet's; read this file by lines, section or slides.",
             ));
         }
-        let total = text.split_inclusive('\n').count();
-        let asked = view::part(ty, &text, w)?;
-        let (a, b) = asked.unwrap_or((0, total));
-        let end = view::clip(&text, a, b, view::MAX_READ_BYTES);
-        let part: String = text.split_inclusive('\n').skip(a).take(end - a).collect();
+        let ls: Vec<&str> = text.split_inclusive('\n').collect();
+        let total = ls.len();
+        let (a, b) = view::part(ty, &text, w)?.unwrap_or((0, total));
+        let end = view::clip(&ls, a, b, view::MAX_READ_BYTES);
+        let part = ls[a..end].concat();
         let partial = a > 0 || end < total;
         let next =
             (end < b).then(|| format!("lines {}:{} (this part stops at {} bytes)", end + 1, b, view::MAX_READ_BYTES));
@@ -707,18 +709,12 @@ impl<S: Storage> Workspace<S> {
         let next = if over.is_empty() {
             match doc.format.text_model() {
                 Some(m) => {
-                    let (mut t, mut r) = (text.clone(), rem.clone());
-                    let (mut removed, mut last) = (vec![], None);
-                    for (k, e) in edits.iter().enumerate() {
-                        let at = |x: Error| x.at_edit(k, edits.len());
-                        locate(&t, &e.old, rev).map_err(at)?;
-                        let ra = edit_in(m, &r, &t, &e.old, &e.new, doc.format.caps()).map_err(|x| at(x.into()))?;
-                        removed.extend(losses(&ra.report));
-                        (t, r) = (ra.text.clone(), ra.remainder.clone());
-                        last = Some(ra);
-                    }
-                    let ra = last.expect("at least one edit");
-                    self.finish(&doc, rev, &text, ra, removed)?
+                    let (ra, removed) = chain(&text, &rem, edits.len(), |k, t, r| {
+                        let (e, at) = (&edits[k], |x: Error| x.at_edit(k, edits.len()));
+                        locate(t, &e.old, rev).map_err(at)?;
+                        edit_in(m, r, t, &e.old, &e.new, doc.format.caps()).map_err(|x| at(x.into()))
+                    })?;
+                    self.finish(&doc, &text, ra.expect("at least one edit"), removed)?
                 }
                 None => {
                     let mut t = text.clone();
@@ -730,7 +726,7 @@ impl<S: Storage> Workspace<S> {
                 }
             }
         } else {
-            let (base, _) = self.revision(&doc, rev)?;
+            let base = self.text(&doc, rev)?;
             let mut ours = base.clone();
             for (k, e) in edits.iter().enumerate() {
                 let s = locate(&ours, &e.old, rev).map_err(|x| x.at_edit(k, edits.len()))?;
@@ -751,12 +747,12 @@ impl<S: Storage> Workspace<S> {
                 Some(m) => {
                     let ra = rewrite_in(m, &rem, &text, new_text, doc.format.caps())?;
                     let removed = losses(&ra.report);
-                    self.finish(&doc, rev, &text, ra, removed)?
+                    self.finish(&doc, &text, ra, removed)?
                 }
                 None => self.structure(&doc, &text, new_text, &rem)?,
             }
         } else {
-            let (base, _) = self.revision(&doc, rev)?;
+            let base = self.text(&doc, rev)?;
             self.rebase(&doc, rev, &over, &base, new_text, &text, &rem)?
         };
         let summary = format!("rewrote the text ({} lines)", new_text.lines().count());
@@ -788,7 +784,7 @@ impl<S: Storage> Workspace<S> {
         let (text, rem) = self.revision(&doc, doc.head)?;
         let a = XlsxEngine::apply(&text, &rem, ops_json).map_err(engine_err)?;
         let n = a.report.applied;
-        let next = self.applied(&doc, rev, &text, a, &text)?;
+        let next = self.applied(&doc, &text, a, &text)?;
         self.store(&mut doc, RevOp::Ops, format!("{n} range operation{}", if n == 1 { "" } else { "s" }), next)
     }
 
@@ -871,8 +867,7 @@ impl<S: Storage> Workspace<S> {
     /// The text diff of revision `from` → `to` (unified, by lines).
     pub fn diff(&self, id: &str, from: u32, to: u32) -> Result<Diff> {
         let doc = self.doc(id)?;
-        let (a, _) = self.revision(&doc, from)?;
-        let (b, _) = self.revision(&doc, to)?;
+        let (a, b) = (self.text(&doc, from)?, self.text(&doc, to)?);
         let diff = merge::unified(&a, &b, &format!("revision {from}"), &format!("revision {to}"));
         Ok(Diff { doc_id: doc.id, from, to, diff })
     }
@@ -881,7 +876,7 @@ impl<S: Storage> Workspace<S> {
 
     /// A re-anchored Document or Presentation revision: exported once so a
     /// refusal comes now, not at export, and stored in canonical form.
-    fn finish(&self, doc: &DocRecord, rev: u32, before: &str, ra: Reanchored, removed: Vec<Loss>) -> Result<Next> {
+    fn finish(&self, doc: &DocRecord, before: &str, ra: Reanchored, removed: Vec<Loss>) -> Result<Next> {
         let f = doc.format;
         f.engine().export(&ra.text, &ra.remainder)?;
         let canon = f.text_of(&ra.new, &ra.remainder, doc.template.as_deref());
@@ -889,7 +884,7 @@ impl<S: Storage> Workspace<S> {
             |t: &str| f.text_model().unwrap().resolve(t, &ra.remainder, f.caps()).is_ok_and(|(b, _)| b == ra.new);
         let (text, canonicalized) =
             if canon != ra.text && same_blocks(&canon) { (canon, true) } else { (ra.text.clone(), false) };
-        let mut changed = self.changed(doc, rev, before == text);
+        let mut changed = self.changed(doc, before == text);
         changed.canonicalized = canonicalized;
         changed.placed = Some(ra.report.placed);
         changed.removed = removed;
@@ -899,11 +894,11 @@ impl<S: Storage> Workspace<S> {
     /// A Spreadsheet's structure text edited: the engine reconciles it.
     fn structure(&self, doc: &DocRecord, before: &str, new_text: &str, rem: &Remainder) -> Result<Next> {
         let a = XlsxEngine::apply(new_text, rem, "[]").map_err(engine_err)?;
-        self.applied(doc, doc.head, before, a, new_text)
+        self.applied(doc, before, a, new_text)
     }
 
-    fn applied(&self, doc: &DocRecord, rev: u32, before: &str, a: hanji_xlsx::Applied, written: &str) -> Result<Next> {
-        let mut changed = self.changed(doc, rev, false);
+    fn applied(&self, doc: &DocRecord, before: &str, a: hanji_xlsx::Applied, written: &str) -> Result<Next> {
+        let mut changed = self.changed(doc, false);
         changed.canonicalized = a.text != written;
         changed.applied = Some(a.report.applied);
         changed.moved = a
@@ -925,8 +920,7 @@ impl<S: Storage> Workspace<S> {
         Ok(Next { text: a.text, rem: a.remainder, changed })
     }
 
-    fn changed(&self, doc: &DocRecord, rev: u32, unchanged: bool) -> Changed {
-        let _ = rev;
+    fn changed(&self, doc: &DocRecord, unchanged: bool) -> Changed {
         Changed {
             doc_id: doc.id.clone(),
             revision: doc.head,
@@ -978,21 +972,20 @@ impl<S: Storage> Workspace<S> {
         };
         let mut next = match doc.format.text_model() {
             Some(m) => {
-                let (mut t, mut r) = (theirs.to_string(), rem.clone());
-                let (mut removed, mut last) = (vec![], None);
                 // Last first, so the earlier spans stay where they are.
-                for h in hunks.iter().rev() {
-                    let ra = reanchor_span_in(m, &r, &t, h.start, h.end, &h.text, doc.format.caps())?;
-                    if !ra.report.refused.is_empty() {
-                        return Err(hanji_core::Refusal::Unplaceable(ra.report).into());
+                let last_first: Vec<&Hunk> = hunks.iter().rev().collect();
+                let (ra, removed) = chain(theirs, rem, last_first.len(), |k, t, r| {
+                    let h = last_first[k];
+                    let ra = reanchor_span_in(m, r, t, h.start, h.end, &h.text, doc.format.caps())?;
+                    if ra.report.refused.is_empty() {
+                        Ok(ra)
+                    } else {
+                        Err(hanji_core::Refusal::Unplaceable(ra.report).into())
                     }
-                    removed.extend(losses(&ra.report));
-                    (t, r) = (ra.text.clone(), ra.remainder.clone());
-                    last = Some(ra);
-                }
-                match last {
-                    Some(ra) => self.finish(doc, rev, theirs, ra, removed)?,
-                    None => Next { text: t, rem: r, changed: self.changed(doc, rev, true) },
+                })?;
+                match ra {
+                    Some(ra) => self.finish(doc, theirs, ra, removed)?,
+                    None => Next { text: theirs.to_string(), rem: rem.clone(), changed: self.changed(doc, true) },
                 }
             }
             None => self.structure(doc, theirs, &merge::apply(theirs, &hunks), rem)?,
@@ -1020,9 +1013,23 @@ fn edit_summary(edits: &[TextEdit]) -> String {
     }
 }
 
-/// The blocks a revision's text resolves to (for tests and tools).
-pub fn blocks_of(format: Format, text: &str, rem: &Remainder) -> Option<Vec<Block>> {
-    format.text_model()?.resolve(text, rem, format.caps()).ok().map(|(b, _)| b)
+/// Re-anchoring steps applied in turn, each to the text and remainder the
+/// one before made: the last result (`None` for no steps) and every entry
+/// removed on the way.
+fn chain(
+    text: &str,
+    rem: &Remainder,
+    steps: usize,
+    mut step: impl FnMut(usize, &str, &Remainder) -> Result<Reanchored>,
+) -> Result<(Option<Reanchored>, Vec<Loss>)> {
+    let (mut cur, mut removed): (Option<Reanchored>, Vec<Loss>) = (None, vec![]);
+    for k in 0..steps {
+        let (t, r) = cur.as_ref().map_or((text, rem), |c| (c.text.as_str(), &c.remainder));
+        let ra = step(k, t, r)?;
+        removed.extend(losses(&ra.report));
+        cur = Some(ra);
+    }
+    Ok((cur, removed))
 }
 
 #[cfg(not(target_family = "wasm"))]
