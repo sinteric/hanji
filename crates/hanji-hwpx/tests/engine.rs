@@ -217,6 +217,43 @@ fn exact_edits_keep_formatting_and_new_marks_get_a_shape() {
 }
 
 #[test]
+fn joining_paragraphs_keeps_the_runs_the_join_rewrites_around() {
+    // "2." at the start of a line is escaped (`2\.`, not a list item); after
+    // the join it is not. The exact span then covers the paragraph mark, the
+    // escape and the units between them, which are the same on both sides.
+    let pkg = hwpx(&[p("1부."), p_in(0, 0, &[(2, "  "), (2, " 2."), (0, " 나")])]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("1부.\n\n   2\\. 나"), "{}", imp.text);
+    let r = edit(&imp.remainder, &imp.text, "1부.\n\n   2\\.", "1부.   2.", CAPS).unwrap();
+    // Only the second paragraph's own properties go with it.
+    let removed: Vec<_> = r.report.removed.iter().map(|x| x.1).collect();
+    assert_eq!(removed, [hanji_core::Kind::Ppr], "{:?}", r.report);
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(
+        sec.contains(
+            r#"<hp:run charPrIDRef="2"><hp:t>  </hp:t></hp:run><hp:run charPrIDRef="2"><hp:t> 2.</hp:t></hp:run>"#
+        ),
+        "{sec}"
+    );
+}
+
+#[test]
+fn a_style_missing_from_the_header_keeps_its_reference() {
+    let pkg = hwpx(&[p_in(9, 0, &[(1, "유령 스타일")]), p("끝")]);
+    let imp = import(&pkg);
+    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg), "GetPut\n{}", imp.text);
+    let r = edit(&imp.remainder, &imp.text, "유령 스타일", "유령 문단", CAPS).unwrap();
+    let out = export(&r.text, &r.remainder);
+    assert!(section(&out).contains(r#"paraPrIDRef="0" styleIDRef="9""#), "{}", section(&out));
+    assert_eq!(import(&out).text, r.text, "PutGet");
+    // A new paragraph in that style takes the same reference.
+    let block = imp.text.lines().find(|b| b.contains("유령")).unwrap().to_string();
+    let added = imp.text.replace("끝", &block.replace("유령 스타일", "새 문단"));
+    let out = export(&added, &imp.remainder);
+    assert_eq!(section(&out).matches(r#"styleIDRef="9""#).count(), 2, "{}", section(&out));
+}
+
+#[test]
 fn side_by_side_tables_are_separate_blocks_in_one_paragraph() {
     let a = tbl(&[&[("담당 부서", 1, 1), ("기획과", 1, 1)]], 2);
     let b = tbl(&[&[("담당자", 1, 1), ("홍길동", 1, 1)]], 2);
@@ -416,15 +453,24 @@ fn scripts_ole_and_linked_files_are_neutralised_and_reported() {
     let ole = r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:ole id="5" binaryItemIDRef="ole1"><hp:sz width="100" height="100"/></hp:ole><hp:t>표 앞</hp:t></hp:run></hp:p>"#;
     let pic = r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:pic id="6"><hc:img binaryItemIDRef="img1"/></hp:pic><hp:t>그림</hp:t></hp:run></hp:p>"#;
     let hidden = r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:ctrl><hp:hiddenComment><hp:subList><hp:p><hp:run><hp:t>숨은 설명</hp:t></hp:run></hp:p></hp:subList></hp:hiddenComment></hp:ctrl><hp:t>본문</hp:t></hp:run></hp:p>"#;
-    let manifest = r#"<opf:item id="headersc" href="Scripts/headerScripts" media-type="application/x-javascript ;charset=utf-16"/><opf:item id="ole1" href="BinData/ole1.OLE" media-type="application/ole"/><opf:item id="img1" href="C:\\Users\\a\\photo.png" media-type="image/png" isEmbeded="0"/><opf:item id="img2" href="BinData/image2.png" media-type="image/png"/>"#;
+    let manifest = r#"<opf:item id="headersc" href="Scripts/headerScripts" media-type="application/x-javascript ;charset=utf-16"/><opf:item id="ole1" href="BinData/ole1.OLE" media-type="application/ole"/><opf:item id="ole2" href="BinData/ole2.OLE" media-type="application/ole"/><opf:item id="img1" href="C:\\Users\\a\\photo.png" media-type="image/png" isEmbeded="0"/><opf:item id="img2" href="BinData/image2.png" media-type="image/png"/>"#;
+    let fills = r#"<hh:borderFills itemCnt="3"><hh:borderFill id="8"><hc:fillBrush><hc:imgBrush mode="TOTAL"><hc:img binaryItemIDRef="img1"/></hc:imgBrush></hc:fillBrush></hh:borderFill><hh:borderFill id="9"><hc:fillBrush><hc:winBrush/><hc:imgBrush mode="TOTAL"><hc:img binaryItemIDRef="img1"/></hc:imgBrush></hc:fillBrush></hh:borderFill><hh:borderFill id="10"><hc:fillBrush/></hh:borderFill></hh:borderFills>"#;
     let docopt = r#"</hh:refList><hh:docOption><hh:linkinfo path="\\\\server\\share\\base.hwpx" pageInherit="1" footnoteInherit="0"/></hh:docOption><hh:refList>"#;
     let pkg = hwpx_with(
         &[p("시작"), ole.into(), pic.into(), hidden.into()],
-        docopt,
+        &format!("{fills}{docopt}"),
         vec![
             part("Scripts/headerScripts", "function OnDocument_New() {}"),
             part("BinData/ole1.OLE", "OLE"),
+            part("BinData/ole2.OLE", "OLE"),
             part("BinData/image2.png", "PNG"),
+            // A master page (copied through) with an object of its own.
+            part(
+                "Contents/masterpage0.xml",
+                &format!(
+                    r#"<masterPage {NS}><hp:subList><hp:p><hp:run><hp:ole id="7" binaryItemIDRef="ole2"/></hp:run></hp:p></hp:subList></masterPage>"#
+                ),
+            ),
         ],
         manifest,
     );
@@ -440,20 +486,42 @@ fn scripts_ole_and_linked_files_are_neutralised_and_reported() {
     let out = export(&imp.text, &imp.remainder);
     let parts = package::read(&out).unwrap();
     let names: Vec<&str> = parts.iter().map(|p| p.name.as_str()).collect();
-    assert!(!names.contains(&"Scripts/headerScripts") && !names.contains(&"BinData/ole1.OLE"), "{names:?}");
+    for gone in ["Scripts/headerScripts", "BinData/ole1.OLE", "BinData/ole2.OLE"] {
+        assert!(!names.contains(&gone), "{gone} in {names:?}");
+    }
     assert!(names.contains(&"BinData/image2.png"), "embedded pictures stay");
     let all: String = parts
         .iter()
         .filter(|p| p.name.ends_with(".xml") || p.name.ends_with(".hpf"))
         .map(|p| String::from_utf8_lossy(&p.data).into_owned())
         .collect();
-    for gone in ["Scripts/", "<hp:ole", "ole1", "photo.png", "server"] {
+    for gone in ["Scripts/", "<hp:ole", "ole1", "ole2", "photo.png", "server", "img1", "<hp:pic"] {
         assert!(!all.contains(gone), "{gone} still in the export");
     }
     assert!(imp.text.contains("표 앞") && imp.text.contains("그림"), "{}", imp.text);
+    // The picture of the linked image and the header's image fill of it go too.
+    let located: Vec<&str> = imp.report.neutralised.iter().map(|n| n.location.as_str()).collect();
+    assert!(located.contains(&"Contents/section0.xml <hp:pic>"), "{located:?}");
+    assert!(located.contains(&"Contents/header.xml <hc:imgBrush>"), "{located:?}");
+    assert!(located.contains(&"Contents/masterpage0.xml <hp:ole>"), "{located:?}");
+    // A fill that was only the image goes whole; others keep the rest and are otherwise untouched.
+    for kept in [
+        r#"<hh:borderFill id="8"/>"#,
+        r#"<hh:borderFill id="9"><hc:fillBrush><hc:winBrush/></hc:fillBrush></hh:borderFill>"#,
+        r#"<hh:borderFill id="10"><hc:fillBrush/></hh:borderFill>"#,
+    ] {
+        assert!(all.contains(kept), "{kept} not in {all}");
+    }
     let again = import(&out);
     assert!(again.report.neutralised.is_empty(), "{:?}", again.report.neutralised);
     assert_eq!(again.text, imp.text);
+    // A reference hanji does not know how to remove is refused, not left dangling.
+    let odd = r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:video videotype="Local" fileIDRef="img1" imageIDRef=""/><hp:t>영상</hp:t></hp:run></hp:p>"#;
+    let pkg = hwpx_with(&[p("시작"), odd.into()], "", vec![], manifest);
+    match HwpxEngine.import(&pkg, &ImportOptions::default()) {
+        Err(EngineError::Package(m)) => assert!(m.contains("<hp:video> refers to img1"), "{m}"),
+        other => panic!("{:?}", other.map(|i| i.text)),
+    }
 }
 
 #[test]

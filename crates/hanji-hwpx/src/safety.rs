@@ -6,11 +6,11 @@
 
 use std::collections::BTreeSet;
 
-use hanji_core::{notice, ImportReport, Part};
+use hanji_core::{notice, ImportReport, Notice, Part};
 use hanji_package::clip;
 use hanji_package::xml::{self, Doc, Element, Node};
 
-use crate::owpml::{CONTENT_PART, HEADER_PART};
+use crate::owpml::{section_number, CONTENT_PART, HEADER_PART};
 
 /// Remove every element (at any depth) that `drop` selects; returns what went.
 fn remove_where(e: &mut Element, drop: &dyn Fn(&Element) -> bool) -> Vec<Element> {
@@ -32,10 +32,15 @@ fn remove_where(e: &mut Element, drop: &dyn Fn(&Element) -> bool) -> Vec<Element
 
 /// Edit part `name` if the package has it. A part that does not parse is
 /// refused: what it links to could not be neutralised.
-fn edit_part(parts: &mut [Part], name: &str, f: &mut dyn FnMut(&mut Element) -> bool) -> Result<(), String> {
+/// `f` says whether it changed anything.
+fn edit_part(
+    parts: &mut [Part],
+    name: &str,
+    f: &mut dyn FnMut(&mut Element) -> Result<bool, String>,
+) -> Result<(), String> {
     let Some(p) = parts.iter_mut().find(|p| p.name == name) else { return Ok(()) };
     let mut d = xml::parse(&p.data).map_err(|e| format!("{name}: {e}"))?;
-    if f(&mut d.root) {
+    if f(&mut d.root)? {
         p.data = xml::write_doc(&d);
     }
     Ok(())
@@ -47,14 +52,29 @@ pub fn neutralise(
     report: &mut ImportReport,
 ) -> Result<(), String> {
     let out = &mut report.neutralised;
+    // The Contents parts besides the sections (header.xml, master pages),
+    // which are copied through: what they hold is neutralised in place.
+    let others: Vec<String> = parts
+        .iter()
+        .filter(|p| p.name.starts_with("Contents/") && p.name.ends_with(".xml") && section_number(&p.name).is_none())
+        .map(|p| p.name.clone())
+        .collect();
     // Embedded OLE objects: the object and its data go.
     let mut ole_items = BTreeSet::new();
-    for (name, d) in sections.iter_mut() {
-        for o in remove_where(&mut d.root, &|e| e.is("hp:ole")) {
+    let mut drop_ole = |root: &mut Element, name: &str, out: &mut Vec<Notice>| {
+        let gone = remove_where(root, &|e| e.is("hp:ole"));
+        for o in &gone {
             let item = o.get("binaryItemIDRef").unwrap_or_default();
             notice(out, "ole-object", format!("{name} <hp:ole>"), format!("embedded object {item} removed"));
             ole_items.insert(item);
         }
+        !gone.is_empty()
+    };
+    for (name, d) in sections.iter_mut() {
+        drop_ole(&mut d.root, name, out);
+    }
+    for name in &others {
+        edit_part(parts, name, &mut |root| Ok(drop_ole(root, name, out)))?;
     }
     // The package manifest: scripts, linked files and the OLE data.
     let mut gone_parts: BTreeSet<String> =
@@ -89,7 +109,7 @@ pub fn neutralise(
         for s in root.elements_mut().filter(|e| e.is("opf:spine")) {
             changed |= !remove_where(s, &|e| e.get("idref").is_some_and(|r| gone_ids.contains(&r))).is_empty();
         }
-        changed
+        Ok(changed)
     })?;
     for p in parts.iter().filter(|p| p.name.starts_with("Scripts/")) {
         if !out.iter().any(|n| n.detail == p.name) {
@@ -97,9 +117,17 @@ pub fn neutralise(
         }
     }
     edit_part(parts, "META-INF/manifest.xml", &mut |root| {
-        !remove_where(root, &|e| e.get("manifest:full-path").is_some_and(|f| gone_parts.contains(&f))).is_empty()
+        Ok(!remove_where(root, &|e| e.get("manifest:full-path").is_some_and(|f| gone_parts.contains(&f))).is_empty())
     })?;
     parts.retain(|p| !gone_parts.contains(&p.name));
+    // What showed a removed item goes with it: no reference may point at a
+    // part that is not there.
+    for (name, d) in sections.iter_mut() {
+        drop_references(&mut d.root, &gone_ids, name, out)?;
+    }
+    for name in others.iter().filter(|_| !gone_ids.is_empty()) {
+        edit_part(parts, name, &mut |root| Ok(drop_references(root, &gone_ids, name, out)? > 0))?;
+    }
     // A linked source document (`hh:linkinfo path`) is fetched to inherit pages.
     edit_part(parts, HEADER_PART, &mut |root| {
         let mut changed = false;
@@ -115,8 +143,54 @@ pub fn neutralise(
                 changed = true;
             }
         });
-        changed
+        Ok(changed)
     })
+}
+
+/// Attributes that name a manifest item.
+const ITEM_REFS: [&str; 3] = ["binaryItemIDRef", "fileIDRef", "imageIDRef"];
+
+/// Removes the pictures and image fills that show a removed manifest item
+/// (see [`ITEM_REFS`]), and returns how many went. Any other reference to
+/// one is refused: hanji does not know what removing it would take.
+fn drop_references(
+    root: &mut Element,
+    gone: &BTreeSet<String>,
+    part: &str,
+    out: &mut Vec<Notice>,
+) -> Result<usize, String> {
+    let refers = |e: &Element| {
+        let mut found = None;
+        e.walk(&mut |x| {
+            if found.is_none() {
+                found =
+                    ITEM_REFS.iter().find_map(|a| x.get(a).filter(|r| gone.contains(r))).map(|r| (x.name.clone(), r));
+            }
+        });
+        found
+    };
+    if refers(root).is_none() {
+        return Ok(0);
+    }
+    // An image fill first (its shape stays; a fill that was only that image
+    // goes whole), then a picture whose own image went.
+    let only_image = |e: &Element| e.elements().all(|c| c.is("hc:imgBrush") && refers(c).is_some());
+    let mut fills: Vec<Element> = remove_where(root, &|e| e.is("hc:fillBrush") && e.has_elements() && only_image(e))
+        .into_iter()
+        .flat_map(|f| f.elements().cloned().collect::<Vec<_>>())
+        .collect();
+    fills.extend(remove_where(root, &|e| e.is("hc:imgBrush") && refers(e).is_some()));
+    let pics = remove_where(root, &|e| e.is("hp:pic") && refers(e).is_some());
+    for (what, e) in fills.iter().map(|e| ("image fill", e)).chain(pics.iter().map(|e| ("picture", e))) {
+        let item = refers(e).map(|r| r.1).unwrap_or_default();
+        notice(out, "linked-image", format!("{part} <{}>", e.name), format!("{what} of removed item {item} removed"));
+    }
+    match refers(root) {
+        Some((name, item)) => Err(format!(
+            "{part}: <{name}> refers to {item}, a linked or embedded object that is removed on import (§8), and hanji cannot remove the reference safely; remove the object in Hancom first"
+        )),
+        None => Ok(fills.len() + pics.len()),
+    }
 }
 
 pub fn surface(parts: &[Part], sections: &[(String, Doc)], report: &mut ImportReport) {

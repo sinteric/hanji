@@ -116,8 +116,14 @@ impl<'a> Exporter<'a> {
         self.keep.get(id).copied().ok_or_else(|| format!("placeholder {id} has no remainder entry"))
     }
 
+    /// A style by its name in the text; a style missing from header.xml is
+    /// named by its id (see [`Header::style_or_missing`]).
     fn style_named(&self, name: &str) -> Result<Style, String> {
-        self.header.style_named(name).cloned().ok_or_else(|| format!("unknown paragraph style {name:?}"))
+        if let Some(s) = self.header.style_named(name) {
+            return Ok(s.clone());
+        }
+        let missing = self.styles.paragraph.iter().find(|d| d.name == name).and_then(|d| d.id.parse().ok());
+        missing.map(|id| self.header.style_or_missing(id)).ok_or_else(|| format!("unknown paragraph style {name:?}"))
     }
 
     fn default_style(&self) -> Result<Style, String> {
@@ -310,7 +316,7 @@ impl<'a> Exporter<'a> {
             Some(e) => {
                 let p = fragment(&e.xml[0]);
                 let old =
-                    e.meta.style.as_deref().and_then(|s| s.parse().ok()).and_then(|id| self.header.style(id)).cloned();
+                    e.meta.style.as_deref().and_then(|s| s.parse().ok()).map(|id| self.header.style_or_missing(id));
                 let own = pp.is_some();
                 let lines = e.xml.get(1).filter(|_| own).map(|x| fragment(x));
                 let layout = own.then(|| (e.meta.aux[2].clone(), e.meta.aux[3].parse::<usize>().unwrap_or(usize::MAX)));

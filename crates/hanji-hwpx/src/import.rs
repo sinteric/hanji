@@ -457,16 +457,11 @@ impl<'a> Importer<'a> {
     fn para(&mut self, p: &Element, path: &[usize]) -> Result<Para, String> {
         let n = |k: &str| p.get(k).and_then(|v| v.parse::<u32>().ok());
         let sid = n("styleIDRef").unwrap_or(0);
-        let style = match self.header.style(sid) {
-            Some(s) => s.clone(),
-            None => {
-                // A style id missing from header.xml: keep it by id.
-                if self.styles.paragraph_name(&sid.to_string()).is_none() {
-                    self.styles.paragraph.push(StyleDef { id: sid.to_string(), name: sid.to_string() });
-                }
-                Style { id: sid, name: sid.to_string(), para_pr: n("paraPrIDRef").unwrap_or(0), char_pr: 0 }
-            }
-        };
+        let style = self.header.style_or_missing(sid);
+        if self.header.style(sid).is_none() && self.styles.paragraph_name(&sid.to_string()).is_none() {
+            // A style id missing from header.xml: the text names it by its id.
+            self.styles.paragraph.push(StyleDef { id: sid.to_string(), name: sid.to_string() });
+        }
         let ppr = n("paraPrIDRef").unwrap_or(style.para_pr);
         let shell = p.shell();
         let lines = p.child("hp:linesegarray");
