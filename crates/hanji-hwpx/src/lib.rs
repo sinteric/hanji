@@ -97,7 +97,7 @@ impl HwpxEngine {
         }
         let mut report = ImportReport::default();
         if opts.neutralise {
-            safety::neutralise(&mut parts, &mut sections, &mut report);
+            safety::neutralise(&mut parts, &mut sections, &mut report).map_err(pkg)?;
         }
         safety::surface(&parts, &sections, &mut report);
         let header = Header::read(package::get(&parts, HEADER_PART)).map_err(pkg)?;
@@ -228,10 +228,13 @@ pub fn export_sections(blocks: &[Block], rem: &Remainder) -> Result<Exported, En
     Ok(Exported { sections, header: ex.header.part() })
 }
 
-/// The paragraphs of one tracked change stay together, in their order: a
-/// change that spans paragraphs cannot be cut or reordered.
+/// The paragraphs of one tracked change stay together, all of them and in
+/// their order: a change that spans paragraphs cannot be cut, shortened or
+/// reordered. (A paragraph inside the change holds no mark of it, so the
+/// census of tracked-change ids alone would not see it go.)
 fn tracked_groups_intact(blocks: &[Block], rem: &Remainder) -> Result<(), String> {
     let mut last: HashMap<&str, (usize, u64)> = HashMap::new();
+    let mut count: HashMap<&str, (usize, Option<usize>, &str)> = HashMap::new();
     // Page breaks are paragraph properties in hwpx: they do not part a change.
     let is_break = |b: &Block| matches!(b, Block::Para(p) if export::is_page_break(&p.content));
     for (bi, b) in blocks.iter().filter(|b| !is_break(b)).enumerate() {
@@ -245,13 +248,18 @@ fn tracked_groups_intact(blocks: &[Block], rem: &Remainder) -> Result<(), String
             continue;
         }
         let g = e.meta.aux[0].as_str();
+        let s = e.meta.keep.as_ref().unwrap().summary.as_str();
         if let Some((pb, pseq)) = last.get(g) {
             if *pb + 1 != bi || *pseq > e.seq {
-                let s = &e.meta.keep.as_ref().unwrap().summary;
                 return Err(format!("a tracked change that spans paragraphs was cut or reordered ({s}); keep its placeholders together and in order"));
             }
         }
         last.insert(g, (bi, e.seq));
+        let total = e.meta.aux.get(1).and_then(|n| n.parse().ok());
+        count.entry(g).or_insert((0, total, s)).0 += 1;
+    }
+    if let Some((_, _, s)) = count.values().find(|(n, total, _)| total.is_some_and(|t| *n != t)) {
+        return Err(format!("the edit removes a paragraph of a tracked change that spans paragraphs ({s}); tracked changes cannot be dropped on export. Keep its placeholders, or accept or reject the change in Hancom first"));
     }
     Ok(())
 }

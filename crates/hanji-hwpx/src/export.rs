@@ -142,11 +142,7 @@ impl<'a> Exporter<'a> {
             ms.sort_by_key(|e| e.seq);
             for m in ms {
                 if m.meta.tag == "hwpx:section" {
-                    let k: usize = m.meta.aux[0].parse().map_err(|_| "a section marker without its section")?;
-                    self.close_section(&mut out)?;
-                    let s = shell.sections.get(k).ok_or_else(|| format!("section {k} is not in the remainder"))?;
-                    out.sections.push(Section { shell: k, paras: vec![] });
-                    out.start = s.start_run.as_deref().map(|r| (fragment(r), s.start_merged));
+                    self.start_section(&mut out, m)?;
                 } else {
                     out.runs.push(wrap_run(m));
                 }
@@ -185,16 +181,19 @@ impl<'a> Exporter<'a> {
         if out.page_break {
             return Err("a page break at the end cannot be written to hwpx: a page break there is a property of the paragraph after it. Add a paragraph after it.".into());
         }
+        // What follows the last block: markers go into the last paragraph; a
+        // section whose blocks all went starts after it, with an empty paragraph.
         let mut tail = self.tail.clone();
         tail.sort_by_key(|e| e.seq);
-        if !tail.is_empty() {
+        for e in tail {
+            if e.meta.tag == "hwpx:section" {
+                self.start_section(&mut out, e)?;
+                continue;
+            }
             self.close_section(&mut out)?;
             let last = out.sections.last_mut().unwrap().paras.last_mut().unwrap();
             let at = last.children.iter().position(|n| matches!(n, Node::El(e) if e.is("hp:linesegarray")));
-            let at = at.unwrap_or(last.children.len());
-            for (k, e) in tail.into_iter().enumerate() {
-                last.children.insert(at + k, node(wrap_run(e)));
-            }
+            last.children.insert(at.unwrap_or(last.children.len()), node(wrap_run(e)));
         }
         self.close_section(&mut out)?;
         let mut used: Vec<usize> = out.sections.iter().map(|s| s.shell).collect();
@@ -217,6 +216,16 @@ impl<'a> Exporter<'a> {
             }
         }
         Ok(out.sections.into_iter().map(|s| (&shell.sections[s.shell], s.paras)).collect())
+    }
+
+    /// Section `m` starts here: the one before it is closed.
+    fn start_section(&self, out: &mut Out, m: &Entry) -> Result<(), String> {
+        let k: usize = m.meta.aux[0].parse().map_err(|_| "a section marker without its section")?;
+        self.close_section(out)?;
+        let s = self.shell.sections.get(k).ok_or_else(|| format!("section {k} is not in the remainder"))?;
+        out.sections.push(Section { shell: k, paras: vec![] });
+        out.start = s.start_run.as_deref().map(|r| (fragment(r), s.start_merged));
+        Ok(())
     }
 
     /// A section with no paragraph left gets an empty one for its settings.

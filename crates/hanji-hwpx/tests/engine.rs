@@ -319,6 +319,26 @@ fn deleting_the_first_paragraph_keeps_the_section_settings() {
     }
 }
 
+#[test]
+fn a_section_whose_paragraphs_all_went_keeps_its_settings() {
+    // Two sections: section1.xml is section0.xml with other text.
+    let pkg = hwpx(&[p("가"), p("나")]);
+    let mut parts = package::read(&pkg).unwrap();
+    let mut second = parts.iter().find(|p| p.name == "Contents/section0.xml").unwrap().clone();
+    second.name = "Contents/section1.xml".into();
+    second.data = String::from_utf8(second.data).unwrap().replace('가', "다").replace('나', "라").into_bytes();
+    parts.push(second);
+    let pkg = package::write(&parts).unwrap();
+    let imp = import(&pkg);
+    let r = rewrite(&imp.remainder, &imp.text, &imp.text.replace("\n\n다\n\n라\n", "\n"), CAPS).unwrap();
+    let out = export(&r.text, &r.remainder);
+    let parts = package::read(&out).unwrap();
+    let sec1 = String::from_utf8(package::get(&parts, "Contents/section1.xml").unwrap().to_vec()).unwrap();
+    assert!(sec1.contains("<hp:secPr") && !sec1.contains('다'), "{sec1}");
+    // The section keeps one empty paragraph for its settings, which the text then shows.
+    assert_eq!(import(&out).text, format!("{}\n<p/>\n", r.text));
+}
+
 // ---------------------------------------------------------------- §10.2 tracked changes
 
 const TRACKED: &str = r##"<hh:trackChanges itemCnt="2"><hh:trackChange type="Delete" date="2026-09-28T00:00:00Z" authorID="1" hide="0" id="1"/><hh:trackChange type="Insert" date="2026-09-28T00:00:00Z" authorID="1" hide="0" id="2"/></hh:trackChanges><hh:trackChangeAuthors itemCnt="1"><hh:trackChangeAuthor name="김검토" mark="1" color="#FF0000" id="1"/></hh:trackChangeAuthors>"##;
@@ -363,6 +383,19 @@ fn tracked_changes_are_read_only_placeholders_and_never_dropped() {
         Err(EngineError::Refused(m)) => {
             assert!(m.contains("tracked deletion by 김검토") && m.contains("cannot be dropped"), "{m}")
         }
+        other => panic!("{other:?}"),
+    }
+    // Nor can a paragraph inside a change that spans paragraphs go: it holds no mark.
+    let pkg3 = {
+        let open = r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:t>새 <hp:insertBegin Id="3" TcId="2" paraend="1"/>문단</hp:t></hp:run></hp:p>"#;
+        let close = r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:t>이어짐<hp:insertEnd Id="3" TcId="2" paraend="1"/></hp:t></hp:run></hp:p>"#;
+        hwpx_with(&[p("머리"), open.into(), p("안쪽"), close.into()], TRACKED, vec![], "")
+    };
+    let imp3 = import(&pkg3);
+    let inside = imp3.text.lines().find(|l| l.contains("inside a tracked change: 안쪽")).unwrap();
+    let r = rewrite(&imp3.remainder, &imp3.text, &imp3.text.replace(&format!("{inside}\n\n"), ""), CAPS).unwrap();
+    match HwpxEngine.export(&r.text, &r.remainder) {
+        Err(EngineError::Refused(m)) => assert!(m.contains("removes a paragraph of a tracked change"), "{m}"),
         other => panic!("{other:?}"),
     }
     // A change over two paragraphs cannot be cut: nothing may go between them.

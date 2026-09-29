@@ -30,15 +30,22 @@ fn remove_where(e: &mut Element, drop: &dyn Fn(&Element) -> bool) -> Vec<Element
     gone
 }
 
-fn edit_part(parts: &mut [Part], name: &str, f: &mut dyn FnMut(&mut Element) -> bool) {
-    let Some(p) = parts.iter_mut().find(|p| p.name == name) else { return };
-    let Ok(mut d) = xml::parse(&p.data) else { return };
+/// Edit part `name` if the package has it. A part that does not parse is
+/// refused: what it links to could not be neutralised.
+fn edit_part(parts: &mut [Part], name: &str, f: &mut dyn FnMut(&mut Element) -> bool) -> Result<(), String> {
+    let Some(p) = parts.iter_mut().find(|p| p.name == name) else { return Ok(()) };
+    let mut d = xml::parse(&p.data).map_err(|e| format!("{name}: {e}"))?;
     if f(&mut d.root) {
         p.data = xml::write_doc(&d);
     }
+    Ok(())
 }
 
-pub fn neutralise(parts: &mut Vec<Part>, sections: &mut [(String, Doc)], report: &mut ImportReport) {
+pub fn neutralise(
+    parts: &mut Vec<Part>,
+    sections: &mut [(String, Doc)],
+    report: &mut ImportReport,
+) -> Result<(), String> {
     let out = &mut report.neutralised;
     // Embedded OLE objects: the object and its data go.
     let mut ole_items = BTreeSet::new();
@@ -83,7 +90,7 @@ pub fn neutralise(parts: &mut Vec<Part>, sections: &mut [(String, Doc)], report:
             changed |= !remove_where(s, &|e| e.get("idref").is_some_and(|r| gone_ids.contains(&r))).is_empty();
         }
         changed
-    });
+    })?;
     for p in parts.iter().filter(|p| p.name.starts_with("Scripts/")) {
         if !out.iter().any(|n| n.detail == p.name) {
             notice(out, "macros", p.name.clone(), "script part");
@@ -91,7 +98,7 @@ pub fn neutralise(parts: &mut Vec<Part>, sections: &mut [(String, Doc)], report:
     }
     edit_part(parts, "META-INF/manifest.xml", &mut |root| {
         !remove_where(root, &|e| e.get("manifest:full-path").is_some_and(|f| gone_parts.contains(&f))).is_empty()
-    });
+    })?;
     parts.retain(|p| !gone_parts.contains(&p.name));
     // A linked source document (`hh:linkinfo path`) is fetched to inherit pages.
     edit_part(parts, HEADER_PART, &mut |root| {
@@ -109,7 +116,7 @@ pub fn neutralise(parts: &mut Vec<Part>, sections: &mut [(String, Doc)], report:
             }
         });
         changed
-    });
+    })
 }
 
 pub fn surface(parts: &[Part], sections: &[(String, Doc)], report: &mut ImportReport) {

@@ -94,7 +94,18 @@ impl<'a> Importer<'a> {
         }
     }
 
-    pub fn finish(self, blocks: Vec<Block>) -> Split {
+    pub fn finish(mut self, blocks: Vec<Block>) -> Split {
+        // Each tracked paragraph also records how many paragraphs its change has.
+        let is_tracked =
+            |e: &Entry| e.kind == Kind::Bkeep && e.meta.keep.as_ref().is_some_and(|k| k.kind == "tracked-change");
+        let mut sizes: std::collections::HashMap<String, usize> = Default::default();
+        for e in self.entries.iter().filter(|e| is_tracked(e)) {
+            *sizes.entry(e.meta.aux[0].clone()).or_default() += 1;
+        }
+        for e in self.entries.iter_mut().filter(|e| is_tracked(e)) {
+            let n = sizes[&e.meta.aux[0]];
+            e.meta.aux.push(n.to_string());
+        }
         let tracked = self
             .tracked_ids
             .iter()
@@ -313,7 +324,13 @@ impl<'a> Importer<'a> {
         });
         self.stats.tracked_paragraphs += 1;
         let k = self.keep_entry(Kind::Bkeep, p, &[bi], None, None, "tracked-change");
-        self.entries.last_mut().unwrap().meta.aux = vec![self.tracked_group.to_string()];
+        let e = self.entries.last_mut().unwrap();
+        e.meta.aux = vec![self.tracked_group.to_string()];
+        if !has_tracked_change(p) {
+            // A paragraph that lies inside a change holds none of its marks.
+            let keep = e.meta.keep.as_mut().unwrap();
+            keep.summary = clip(&format!("inside a tracked change: {}", clip(&p.text_of(&["hp:t"]), 40)), 80);
+        }
         Block::Keep(k.id)
     }
 
@@ -419,9 +436,6 @@ impl<'a> Importer<'a> {
                     let para = self.para(p, &[bi, r, c, k])?;
                     let style = (para.style != self.styles.default_paragraph).then_some(para.style);
                     paras.push(CellPara { style, content: para.content });
-                }
-                if !paras.iter().all(|p| cell_writable(&p.content)) {
-                    return Ok(None);
                 }
                 rows[r][c] = Some(Cell::Text(paras));
                 for (y, row) in rows.iter_mut().enumerate().skip(r).take(rs) {
@@ -701,11 +715,6 @@ fn t_modellable(t: &Element) -> bool {
 /// An `hp:t` of spaces, or empty.
 fn spaces_only(t: &Element) -> bool {
     t.children.iter().all(|n| matches!(n, Node::Text(s) if unescape(s).chars().all(|c| c == ' ')))
-}
-
-/// Text a pipe table cell can hold as it is.
-fn cell_writable(i: &Inline) -> bool {
-    !i.units.iter().any(|u| matches!(u.atom, Atom::PageBreak))
 }
 
 /// `rowCnt` × `colCnt` of a table.
