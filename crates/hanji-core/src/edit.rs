@@ -362,10 +362,13 @@ fn pairs_to_ops(pairs: &[(usize, usize)], a: &[u32], b: &[u32]) -> Vec<Op> {
             } else {
                 Tag::Insert
             };
-            let no_marks = |x: &[u32]| x.iter().copied().filter(|&u| u != place::SEP).collect::<Vec<_>>();
+            let same_text = || {
+                let text = |x: &[u32]| x.iter().filter(|&&u| u != place::SEP).copied().collect::<Vec<_>>();
+                text(&a[i..k]) == text(&b[j..n])
+            };
             if tag == Tag::Equal && k > i {
                 push(&mut ops, tag, i, k, j, n);
-            } else if tag == Tag::Replace && no_marks(&a[i..k]) == no_marks(&b[j..n]) {
+            } else if tag == Tag::Replace && same_text() {
                 let (mut x, mut y) = (i, j);
                 while x < k || y < n {
                     if x < k && a[x] == place::SEP && (y == n || b[y] != place::SEP) {
