@@ -12,6 +12,7 @@ hanji-format.workspace = true
 hanji-core.workspace = true
 hanji-package.workspace = true
 quick-xml = "0.42"
+memchr = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 # A calculator only (§5.4): cached values are computed over the model; IronCalc never reads or writes the file.

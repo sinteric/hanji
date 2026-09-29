@@ -127,11 +127,12 @@ impl XlsxEngine {
         view::full_view(&mut book, rows).map_err(EngineError::Refused)
     }
 
-    /// Compute every formula and write its cached value (for a file written
-    /// without them, as openpyxl writes one).
+    /// Compute the formulas that have no cached value (a file written without
+    /// them, as openpyxl writes one), and those that read them, and write
+    /// their cached values. Cached values the file has are kept.
     pub fn recalculate(rem: &Remainder) -> Result<(Remainder, calc::Recalc), EngineError> {
         let mut book = book_of(rem)?;
-        let ch = calc::all_formulas(&mut book).map_err(pkg)?;
+        let ch = calc::uncached_formulas(&mut book).map_err(pkg)?;
         let rc = calc::recompute(&mut book, &ch).map_err(pkg)?;
         Ok((remainder_of(book, rem.next_id), rc))
     }

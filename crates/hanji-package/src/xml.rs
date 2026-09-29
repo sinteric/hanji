@@ -230,6 +230,22 @@ fn push_merged(children: &mut Vec<Node>, node: Node) {
 
 fn start(s: &quick_xml::events::BytesStart<'_>) -> Result<Element, XmlError> {
     let name = s.name().as_ref().to_string();
+    // quick-xml reads `a="1"b="2"`; XML needs white space between attributes.
+    let raw: &[u8] = s.as_ref().as_bytes();
+    let mut quote = None;
+    for (k, &b) in raw.iter().enumerate() {
+        match quote {
+            Some(q) if b == q => {
+                quote = None;
+                if raw.get(k + 1).is_some_and(|n| !n.is_ascii_whitespace() && *n != b'/') {
+                    return Err(XmlError(format!("<{name}>: no white space between attributes")));
+                }
+            }
+            Some(_) => {}
+            None if b == b'"' || b == b'\'' => quote = Some(b),
+            None => {}
+        }
+    }
     let mut attrs = vec![];
     for a in s.attributes() {
         let a = a.map_err(|e| XmlError(format!("bad attribute in <{name}>: {e}")))?;
@@ -498,5 +514,7 @@ mod tests {
         let b = parse(b"<b:r xmlns:b=\"u\" b:y=\"2\" b:x=\"1\"><b:t>x</b:t></b:r>").unwrap();
         assert_eq!(canon(&a.root, &Scope::new()), canon(&b.root, &Scope::new()));
         assert!(parse(b"<!DOCTYPE x><x/>").is_err());
+        assert!(parse(b"<c r=\"A1\"t=\"s\"/>").is_err());
+        assert!(parse(b"<c r=\"A1\" t='s'/>").is_ok());
     }
 }

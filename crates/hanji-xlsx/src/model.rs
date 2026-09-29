@@ -3,7 +3,7 @@
 //! (merged cells, conditional formats, data validations, hyperlinks) taken
 //! out of each worksheet at import and put back at export, at their anchors.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use hanji_core::cells::{parse_sqref, CellRange};
 use hanji_core::{Entry, KeepIds, Kind, Meta};
@@ -13,10 +13,9 @@ use hanji_format::{FrontMatter, Keep};
 use hanji_package::clip;
 use hanji_package::xml::{self, Element, Node};
 
-use crate::book::{Book, SheetKind, TableInfo};
+use crate::book::{Book, SheetKind, TableInfo, ValueKind};
 use crate::drawing;
 use crate::store::SHEET_ORDER;
-use crate::value::CellValue;
 
 /// The worksheet children that become range entries: (container, child, anchor attribute).
 pub const RANGE_ELEMENTS: &[(Option<&str>, &str, &str)] = &[
@@ -207,32 +206,40 @@ fn list_summary(ranges: &[&str]) -> String {
 /// source), the formula from the table's calculated column.
 pub fn table_decl(book: &Book, t: &TableInfo) -> TableDecl {
     let (first, last) = t.data_rows();
-    let st = book.store(t.sheet);
-    let rows = if first <= last { st.rows_in(first, last) } else { vec![] };
+    let n = t.cols.len();
+    let c0 = t.range.first.col;
+    // Per column: texts, numbers, others; cells by style; the first cell's style.
+    let mut kinds = vec![(0usize, 0usize, 0usize); n];
+    let mut styles: Vec<HashMap<u32, usize>> = vec![HashMap::new(); n];
+    let mut first_style: Vec<Option<u32>> = vec![None; n];
+    if first <= last {
+        book.store(t.sheet).for_each_row_in(first, last, &mut |r| {
+            for cell in r.cells.iter().filter(|c| c.col >= c0 && ((c.col - c0) as usize) < n) {
+                let k = (cell.col - c0) as usize;
+                first_style[k].get_or_insert(cell.style());
+                match book.kind(cell) {
+                    ValueKind::Empty => continue,
+                    ValueKind::Text => kinds[k].0 += 1,
+                    ValueKind::Number => kinds[k].1 += 1,
+                    ValueKind::Other => kinds[k].2 += 1,
+                }
+                *styles[k].entry(cell.style()).or_insert(0) += 1;
+            }
+        });
+    }
     let mut columns = vec![];
     for (k, c) in t.cols.iter().enumerate() {
-        let col = t.range.first.col + k as u32;
         let mut counts: BTreeMap<String, usize> = BTreeMap::new();
-        let (mut texts, mut nums, mut others) = (0, 0, 0);
-        let mut first_style = None;
-        for r in &rows {
-            let Some(cell) = r.cell(col) else { continue };
-            first_style.get_or_insert(cell.style());
-            let v = book.value(cell);
-            match v {
-                CellValue::Empty => continue,
-                CellValue::Text(_) => texts += 1,
-                CellValue::Number(_) => nums += 1,
-                _ => others += 1,
-            }
-            *counts.entry(book.styles.format_of(cell.style())).or_insert(0) += 1;
+        for (s, m) in &styles[k] {
+            *counts.entry(book.styles.format_of(*s)).or_insert(0) += m;
         }
+        let (texts, nums, others) = kinds[k];
         let format = counts
             .iter()
             .max_by_key(|(_, n)| **n)
             .map(|(f, _)| f.clone())
             .or_else(|| c.dxf.and_then(|d| book.styles.dxf_fmt.get(&d).cloned()))
-            .or_else(|| first_style.map(|s| book.styles.format_of(s)))
+            .or_else(|| first_style[k].map(|s| book.styles.format_of(s)))
             .unwrap_or_else(|| "General".into());
         let kind = format_kind(&format);
         let ty = match (texts, nums, others) {

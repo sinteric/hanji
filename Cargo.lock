@@ -295,6 +295,7 @@ dependencies = [
  "hanji-package",
  "hanji-testkit",
  "ironcalc_base",
+ "memchr",
  "quick-xml",
  "serde",
  "serde_json",

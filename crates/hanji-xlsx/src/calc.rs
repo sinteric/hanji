@@ -7,7 +7,7 @@
 //! compute (a function it lacks, an array formula, a volatile function) keeps
 //! its cached value, and the workbook asks to be recalculated when opened.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use hanji_core::cells::{CellRange, CellRef, MAX_COL, MAX_ROW};
 use hanji_format::formula::{self, Tok};
@@ -23,15 +23,43 @@ use crate::value::CellValue;
 #[derive(Clone, Debug, Default)]
 pub struct Changed {
     pub cells: HashSet<(usize, u32, u32)>,
+    /// Areas whose cells changed in place (a sort, a new table).
     pub areas: Vec<(usize, CellRange)>,
+    /// Areas whose rows moved (inserted or deleted rows and those below them):
+    /// their cells keep their values, but a range over them may change extent.
+    pub moved: Vec<(usize, CellRange)>,
     pub formulas: HashSet<(usize, u32, u32)>,
     /// Tables whose rows or columns changed: a reference to them reads new cells.
     pub tables: HashSet<String>,
 }
 
 impl Changed {
+    /// Follow rows of sheet `i` that `sh` moves: what changed there before is where it now is.
+    pub fn follow(&mut self, i: usize, sh: &hanji_core::cells::RowShift) {
+        use hanji_core::cells::Moved;
+        let at =
+            |&(s, r, c): &(usize, u32, u32)| if s == i { sh.row(c, r).map(|r| (s, r, c)) } else { Some((s, r, c)) };
+        self.cells = self.cells.iter().filter_map(at).collect();
+        self.formulas = self.formulas.iter().filter_map(at).collect();
+        for list in [&mut self.areas, &mut self.moved] {
+            *list = list
+                .iter()
+                .filter_map(|&(s, a)| match (s == i).then(|| sh.range(&a)) {
+                    Some(Moved::To(to)) => Some((s, to)),
+                    Some(Moved::Gone) => None,
+                    // Torn areas (a moved area reaching past the columns) keep their place.
+                    _ => Some((s, a)),
+                })
+                .collect();
+        }
+    }
+
     pub fn is_empty(&self) -> bool {
-        self.cells.is_empty() && self.areas.is_empty() && self.formulas.is_empty() && self.tables.is_empty()
+        self.cells.is_empty()
+            && self.areas.is_empty()
+            && self.moved.is_empty()
+            && self.formulas.is_empty()
+            && self.tables.is_empty()
     }
 }
 
@@ -236,7 +264,7 @@ fn dirty(fs: &[Formula], ch: &Changed, book: &Book) -> Vec<usize> {
     }
     for ((s, r), ks) in &ranges {
         let hit = seed_cells.iter().any(|&(cs, cr, cc)| cs == *s && r.contains(CellRef::new(cc, cr)))
-            || ch.areas.iter().chain(&table_areas).any(|(a, ar)| a == s && ar.intersects(r));
+            || ch.areas.iter().chain(&ch.moved).chain(&table_areas).any(|(a, ar)| a == s && ar.intersects(r));
         if hit {
             for k in ks {
                 mark(*k, &mut queue, &mut is_dirty);
@@ -244,12 +272,16 @@ fn dirty(fs: &[Formula], ch: &Changed, book: &Book) -> Vec<usize> {
         }
     }
     for ((s, r, c), ks) in &single {
-        if ch.areas.iter().chain(&table_areas).any(|(a, ar)| a == s && ar.contains(CellRef::new(*c, *r))) {
+        if ch.areas.iter().any(|(a, ar)| a == s && ar.contains(CellRef::new(*c, *r))) {
             for k in ks {
                 mark(*k, &mut queue, &mut is_dirty);
             }
         }
     }
+    // A single cell that moved kept its value, and a formula reading it was
+    // rewritten to follow it (and is in `ch.formulas` then); one that went is
+    // `#REF!` in a rewritten formula. So moved areas matter only to ranges,
+    // whose extent may change.
     // Formulas reading dirty formulas.
     let range_list: Vec<(&(usize, CellRange), &Vec<usize>)> = ranges.iter().collect();
     while let Some(k) = queue.pop() {
@@ -277,16 +309,84 @@ fn to_ironcalc(text: &str) -> String {
 }
 
 /// Every formula cell of the book, as changed (to compute them all).
-pub fn all_formulas(book: &mut Book) -> Result<Changed, String> {
+pub fn uncached_formulas(book: &mut Book) -> Result<Changed, String> {
     let mut ch = Changed::default();
-    for f in formulas(book)? {
-        ch.formulas.insert((f.sheet, f.row, f.col));
+    for i in 0..book.sheets.len() {
+        if book.sheets[i].kind != SheetKind::Work {
+            continue;
+        }
+        book.load_store(i)?;
+        book.store(i).for_each_cell_if(&has_formula, &mut |r, c| {
+            // openpyxl writes `<v></v>`: no value, unless the formula gives text.
+            if c.f.is_some() && c.v.as_deref().is_none_or(|v| v.is_empty() && c.ty() != "str") {
+                ch.formulas.insert((i, r, c.col));
+            }
+        });
     }
     Ok(ch)
 }
 
 /// A dirty formula cell: row, column, its computed value (`None`: not computed), whether it is left to the application.
-type Computed = (u32, u32, Option<CellValue>, bool);
+type Computed = (u32, u32, Option<CellValue>, Option<&'static str>);
+
+/// Functions whose result depends on the date system (IronCalc knows 1900 only).
+const EPOCH_FUNCTIONS: &[&str] = &[
+    "DATE",
+    "DATEVALUE",
+    "DAY",
+    "MONTH",
+    "YEAR",
+    "WEEKDAY",
+    "WEEKNUM",
+    "ISOWEEKNUM",
+    "EDATE",
+    "EOMONTH",
+    "NETWORKDAYS",
+    "NETWORKDAYS.INTL",
+    "WORKDAY",
+    "WORKDAY.INTL",
+    "DAYS",
+    "DAYS360",
+    "DATEDIF",
+    "YEARFRAC",
+    "TEXT",
+    "VALUE",
+    "NUMBERVALUE",
+    "NOW",
+    "TODAY",
+    "DATESTRING",
+];
+
+/// In a 1904 workbook, the dirty formulas whose value depends on the date
+/// system: they call a date function or hold a text constant (which may read
+/// as a date), or read such a formula. Arithmetic on serial numbers is the
+/// same in both systems, so the others are computed.
+fn reads_the_epoch(fs: &[Formula], dirty: &[usize]) -> HashSet<usize> {
+    let mut out: HashSet<usize> = dirty
+        .iter()
+        .copied()
+        .filter(|&k| {
+            let toks = formula::tokenize(&fs[k].text);
+            toks.iter().any(|t| matches!(t.kind, Tok::Str))
+                || formula::functions(&toks).iter().any(|n| EPOCH_FUNCTIONS.contains(&n.trim_start_matches("_xlfn.")))
+        })
+        .collect();
+    loop {
+        let reads = |k: usize, out: &HashSet<usize>| {
+            fs[k].precs.iter().any(|p| match p {
+                Prec::Unknown => !out.is_empty(),
+                Prec::Area(s, r) => {
+                    out.iter().any(|&j| fs[j].sheet == *s && r.contains(CellRef::new(fs[j].col, fs[j].row)))
+                }
+            })
+        };
+        let more: Vec<usize> = dirty.iter().copied().filter(|k| !out.contains(k) && reads(*k, &out)).collect();
+        if more.is_empty() {
+            return out;
+        }
+        out.extend(more);
+    }
+}
 
 /// The calculator's value of each formula cell: (sheet, row, column) → value.
 type Values = HashMap<(usize, u32, u32), Option<CellValue>>;
@@ -306,29 +406,33 @@ pub fn recompute(book: &mut Book, ch: &Changed) -> Result<Recalc, String> {
     if d.is_empty() {
         return Ok(rc);
     }
-    let values = evaluate(book, &fs)?;
+    let epoch = if book.date1904 { reads_the_epoch(&fs, &d) } else { HashSet::new() };
+    let values = evaluate(book, &fs, &d)?;
     let names: Vec<String> = book.sheets.iter().map(|s| s.name.clone()).collect();
     let mut by_sheet: HashMap<usize, Vec<Computed>> = HashMap::new();
     for &k in &d {
         let f = &fs[k];
-        let v = if f.constant { None } else { values.get(&(f.sheet, f.row, f.col)).cloned().flatten() };
-        by_sheet.entry(f.sheet).or_default().push((f.row, f.col, v, f.constant));
+        let why = if f.constant {
+            Some("volatile or array formula")
+        } else if epoch.contains(&k) {
+            Some("reads dates in the 1904 system")
+        } else {
+            None
+        };
+        let v = if why.is_some() { None } else { values.get(&(f.sheet, f.row, f.col)).cloned().flatten() };
+        by_sheet.entry(f.sheet).or_default().push((f.row, f.col, v, why));
     }
     for (s, list) in by_sheet {
         let mut writes = vec![];
         {
             let st = book.store(s);
-            for (r, c, v, constant) in &list {
+            for (r, c, v, why) in &list {
                 let Some(row) = st.row(*r) else { continue };
                 let Some(cell) = row.cell(*c) else { continue };
                 let cached = book.value(cell);
                 let at = format!("{}!{}{r}", names[s], hanji_core::cells::col_letters(*c));
                 match v {
-                    None => rc.left.push(if *constant {
-                        format!("{at} (volatile or array formula)")
-                    } else {
-                        format!("{at} (not computed)")
-                    }),
+                    None => rc.left.push(format!("{at} ({})", why.unwrap_or("not computed"))),
                     Some(CellValue::Error(e))
                         if e == "#N/IMPL" || (e == "#NAME?" && cached != CellValue::Error("#NAME?".into())) =>
                     {
@@ -343,11 +447,17 @@ pub fn recompute(book: &mut Book, ch: &Changed) -> Result<Recalc, String> {
             continue;
         }
         let st = book.store_mut(s)?;
+        let mut by_row: BTreeMap<u32, Vec<(u32, CellValue)>> = BTreeMap::new();
         for (r, c, v) in writes {
-            let cell = st.row_mut(r).cell_mut(c);
-            write_cached(cell, &v);
+            by_row.entry(r).or_default().push((c, v));
             rc.written += 1;
         }
+        let rows: Vec<u32> = by_row.keys().copied().collect();
+        st.edit_rows(&rows, &mut |row| {
+            for (c, v) in by_row.get(&row.r).into_iter().flatten() {
+                write_cached(row.cell_mut(*c), v);
+            }
+        });
     }
     if !rc.left.is_empty() {
         book.shell.recalc_on_open = true;
@@ -392,9 +502,13 @@ pub fn num_text(n: f64) -> String {
 }
 
 /// IronCalc's value of every formula cell of the book.
-fn evaluate(book: &Book, fs: &[Formula]) -> Result<Values, String> {
+fn evaluate(book: &Book, fs: &[Formula], dirty: &[usize]) -> Result<Values, String> {
+    use ironcalc_base::expressions::parser::stringify::to_rc_format;
+    use ironcalc_base::expressions::parser::{new_parser_english, Node};
+    use ironcalc_base::expressions::types::CellReferenceRC;
+    use ironcalc_base::types::Cell as C;
     use ironcalc_base::types::{
-        DefinedName, Metadata, SheetState, Table, TableColumn, TableStyleInfo, Workbook, WorkbookSettings,
+        DefinedName, Metadata, SheetData, SheetState, Table, TableColumn, TableStyleInfo, Workbook, WorkbookSettings,
         WorkbookView, Worksheet, WorksheetView,
     };
     use ironcalc_base::Model;
@@ -476,56 +590,153 @@ fn evaluate(book: &Book, fs: &[Formula]) -> Result<Values, String> {
         tables,
         views,
     };
+    // The cells go straight into the workbook, each formula parsed once and
+    // stored once per distinct R1C1 form (as IronCalc's own loader does; its
+    // cell-by-cell setters search the formula list, quadratic in the cells).
+    let mut wb = wb;
+    let sheet_names: Vec<String> = wb.worksheets.iter().map(|w| w.name.clone()).collect();
+    let mut parser = new_parser_english(sheet_names, wb.get_defined_names_with_scope(), wb.tables.clone());
+    // The calculator gets the dirty formulas and the rows they read; every
+    // other formula is its cached value. A dirty formula that may read
+    // anything (INDIRECT, OFFSET), or an input formula without a cached value,
+    // gets the whole book, every formula computed.
+    let live: HashSet<(usize, u32, u32)> = dirty.iter().map(|&k| (fs[k].sheet, fs[k].row, fs[k].col)).collect();
+    let mut spans: HashMap<usize, Vec<(u32, u32)>> = HashMap::new();
+    let mut all = false;
+    for &k in dirty {
+        let f = &fs[k];
+        spans.entry(f.sheet).or_default().push((f.row, f.row));
+        for p in &f.precs {
+            match p {
+                Prec::Unknown => all = true,
+                Prec::Area(s, r) => spans.entry(*s).or_default().push((r.first.row, r.last.row)),
+            }
+        }
+    }
+    for v in spans.values_mut() {
+        v.sort_unstable();
+        let mut merged: Vec<(u32, u32)> = vec![];
+        for &(a, b) in v.iter() {
+            match merged.last_mut() {
+                Some(last) if a <= last.1.saturating_add(1) => last.1 = last.1.max(b),
+                _ => merged.push((a, b)),
+            }
+        }
+        *v = merged;
+    }
+    let formula_at: HashMap<(usize, u32, u32), &Formula> = fs.iter().map(|f| ((f.sheet, f.row, f.col), f)).collect();
+    let mut strings: HashMap<String, i32> = HashMap::new();
+    let mut errors = vec![];
+    let mut sheets: Vec<(SheetData, Vec<String>)> = vec![];
+    'fill: for pass in 0..2 {
+        (strings, errors, sheets) = (HashMap::new(), vec![], vec![]);
+        all |= pass == 1;
+        for i in 0..book.sheets.len() {
+            let mut index: HashMap<String, i32> = HashMap::new();
+            let (mut data, mut shared): (SheetData, Vec<String>) = (HashMap::new(), vec![]);
+            if book.sheets[i].kind == SheetKind::Work && (all || spans.contains_key(&i)) {
+                let name = book.sheets[i].name.clone();
+                let st = book.store(i);
+                let whole = [(1, MAX_ROW)];
+                let spans: &[(u32, u32)] = if all { &whole } else { &spans[&i] };
+                let mut restart = false;
+                for &(a, b) in spans {
+                    st.for_each_row_in(a, b, &mut |row| {
+                        if restart {
+                            return;
+                        }
+                        for c in &row.cells {
+                            let (r, rr, col) = (row.r, row.r as i32, c.col as i32 + 1);
+                            let f = formula_at
+                                .get(&(i, r, c.col))
+                                .filter(|f| !f.constant && (all || live.contains(&(i, r, c.col))));
+                            let cell = match f {
+                                Some(f) => {
+                                    let at = CellReferenceRC { sheet: name.clone(), row: rr, column: col };
+                                    let text = to_ironcalc(&f.text);
+                                    let mut node = parser.parse(&text[1..], &at);
+                                    if matches!(node, Node::ParseErrorKind { .. }) {
+                                        let again = parser.parse(&format!("{})", &text[1..]), &at);
+                                        if !matches!(again, Node::ParseErrorKind { .. }) {
+                                            node = again;
+                                        }
+                                    }
+                                    let rc = to_rc_format(&node);
+                                    let n = shared.len() as i32;
+                                    let f = *index.entry(rc.clone()).or_insert_with(|| {
+                                        shared.push(rc);
+                                        n
+                                    });
+                                    C::CellFormula { f, s: 0 }
+                                }
+                                None if !all
+                                    && c.f.is_some()
+                                    && c.v.as_deref().is_none_or(str::is_empty)
+                                    && c.ty() != "str" =>
+                                {
+                                    restart = true;
+                                    return;
+                                }
+                                None => match book.value(c) {
+                                    CellValue::Empty => continue,
+                                    CellValue::Number(v) => C::NumberCell { v, s: 0 },
+                                    CellValue::Bool(v) => C::BooleanCell { v, s: 0 },
+                                    CellValue::Text(t) => {
+                                        let n = strings.len() as i32;
+                                        C::SharedString { si: *strings.entry(t).or_insert(n), s: 0 }
+                                    }
+                                    CellValue::Error(e) => {
+                                        errors.push((i as u32, rr, col, e));
+                                        continue;
+                                    }
+                                },
+                            };
+                            data.entry(rr).or_default().insert(col, cell);
+                        }
+                    });
+                }
+                if restart {
+                    continue 'fill;
+                }
+            }
+            sheets.push((data, shared));
+        }
+        break;
+    }
+    for (i, (data, shared)) in sheets.into_iter().enumerate() {
+        wb.worksheets[i].sheet_data = data;
+        wb.worksheets[i].shared_formulas = shared;
+    }
+    let mut ss = vec![String::new(); strings.len()];
+    for (t, k) in strings {
+        ss[k as usize] = t;
+    }
+    wb.shared_strings = ss;
     let mut m = match Model::from_workbook(wb, "en") {
         Ok(m) => m,
         Err(_) => return Ok(HashMap::new()),
     };
-    let formula_at: HashMap<(usize, u32, u32), &Formula> = fs.iter().map(|f| ((f.sheet, f.row, f.col), f)).collect();
-    for i in 0..book.sheets.len() {
-        if book.sheets[i].kind != SheetKind::Work {
-            continue;
-        }
-        let st = book.store(i);
-        let mut err = None;
-        st.for_each_cell(&mut |r, c| {
-            let (s, row, col) = (i as u32, r as i32, c.col as i32 + 1);
-            let res = match formula_at.get(&(i, r, c.col)) {
-                Some(f) if !f.constant => m.update_cell_with_formula(s, row, col, to_ironcalc(&f.text)),
-                _ => match book.value(c) {
-                    CellValue::Empty => Ok(()),
-                    CellValue::Number(n) => m.update_cell_with_number(s, row, col, n),
-                    CellValue::Text(t) => m.update_cell_with_text(s, row, col, &t),
-                    CellValue::Bool(b) => m.update_cell_with_bool(s, row, col, b),
-                    CellValue::Error(e) => m.set_user_input(s, row, col, e),
-                },
-            };
-            if let Err(e) = res {
-                err.get_or_insert(e);
-            }
-        });
-        let _ = err;
+    for (s, row, col, e) in errors {
+        let _ = m.set_user_input(s, row, col, e);
     }
     m.evaluate();
     let mut out = HashMap::new();
-    for f in fs {
+    for f in dirty.iter().map(|&k| &fs[k]) {
         let v = m
             .workbook
             .worksheet(f.sheet as u32)
             .ok()
             .and_then(|w| w.cell(f.row as i32, f.col as i32 + 1).cloned())
-            .map(|c| {
-                use ironcalc_base::types::Cell as C;
-                match c {
-                    C::CellFormulaNumber { v, .. } | C::NumberCell { v, .. } => CellValue::Number(v),
-                    C::CellFormulaBoolean { v, .. } | C::BooleanCell { v, .. } => CellValue::Bool(v),
-                    C::CellFormulaString { v, .. } => CellValue::Text(v),
-                    C::CellFormulaError { ei, .. } | C::ErrorCell { ei, .. } => CellValue::Error(ei.to_string()),
-                    C::SharedString { si, .. } => {
-                        m.workbook.shared_strings.get(si as usize).cloned().map_or(CellValue::Empty, CellValue::Text)
-                    }
-                    C::EmptyCell { .. } => CellValue::Empty,
-                    C::CellFormula { .. } => CellValue::Error("#N/IMPL".into()),
+            .map(|c| match c {
+                C::CellFormulaNumber { v, .. } | C::NumberCell { v, .. } => CellValue::Number(v),
+                C::CellFormulaBoolean { v, .. } | C::BooleanCell { v, .. } => CellValue::Bool(v),
+                C::CellFormulaString { v, .. } => CellValue::Text(v),
+                C::CellFormulaError { ei, .. } | C::ErrorCell { ei, .. } => CellValue::Error(ei.to_string()),
+                C::SharedString { si, .. } => {
+                    m.workbook.shared_strings.get(si as usize).cloned().map_or(CellValue::Empty, CellValue::Text)
                 }
+                C::EmptyCell { .. } => CellValue::Empty,
+                C::CellFormula { .. } => CellValue::Error("#N/IMPL".into()),
             });
         out.insert((f.sheet, f.row, f.col), v);
     }

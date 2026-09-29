@@ -19,7 +19,7 @@ use hanji_format::formula;
 use hanji_format::ops::{
     check_ops, date_of, parse_ops, render_errors, ColumnSpec, Formats, RangeOp, Row, SortKey, Value,
 };
-use hanji_format::sheet::{format_kind, parse_spreadsheet, FormatKind};
+use hanji_format::sheet::{format_kind, parse_spreadsheet, serialize_spreadsheet, FormatKind};
 use hanji_package::xml::{self, Element, Node};
 
 use crate::book::{Book, SheetInfo, SheetKind, TableCol, TableInfo, CT_SHEET, MAIN_NS, R_NS};
@@ -28,7 +28,7 @@ use crate::numfmt;
 use crate::shift::{self, f_element};
 use crate::store::{Cell, SHEET_ORDER};
 use crate::value::CellValue;
-use crate::{book_of, remainder_of, structure, Applied, XlsxEngine};
+use crate::{book_of, model, remainder_of, structure, Applied, XlsxEngine};
 
 /// Number formats round 4 lists, allowed in every workbook besides its own and the built-in ones.
 pub const ROUND4_FORMATS: &[&str] =
@@ -74,11 +74,12 @@ fn refused(m: String) -> EngineError {
 
 pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, EngineError> {
     let parsed = parse_spreadsheet(text, &XlsxEngine::names(rem)).map_err(EngineError::Invalid)?;
-    let current = XlsxEngine::structure(rem, parsed.front.template.as_deref())?;
+    let mut book = book_of(rem)?;
+    let template = parsed.front.template.as_deref();
+    let current = model::structure(&mut book, template).map_err(EngineError::Package)?;
     let (text_ops, drops) = structure::reconcile(&parsed, &current).map_err(refused)?;
     let user_ops =
         parse_ops(ops_json).map_err(|e| refused(format!("the operations are not valid:\n{}", render_errors(&e))))?;
-    let mut book = book_of(rem)?;
     let mut formats: Vec<String> = book.styles.all_codes();
     for f in ROUND4_FORMATS {
         if !formats.iter().any(|x| x == f) {
@@ -137,6 +138,7 @@ pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, Eng
         apply_op(&mut book, op, &mut cx).map_err(|m| refused(format!("{which}: {m}")))?;
     }
     let recalc = calc::recompute(&mut book, &cx.changed).map_err(refused)?;
+    shift::refresh_pivots(&mut book, &cx.changed, &mut cx.notices);
     for i in 0..book.sheets.len() {
         if book.is_dirty(i) {
             fix_dimension(&mut book, i).map_err(refused)?;
@@ -154,8 +156,8 @@ pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, Eng
         })
         .collect();
     let report = OpReport { applied: all.len(), entries, notices: cx.notices, recalc };
+    let text = serialize_spreadsheet(&model::structure(&mut book, template).map_err(EngineError::Package)?);
     let remainder = remainder_of(book, rem.next_id);
-    let text = XlsxEngine::text_of(&remainder, parsed.front.template.as_deref())?;
     Ok(Applied { text, remainder, report })
 }
 
@@ -453,10 +455,13 @@ fn check_merge(book: &Book, i: usize, col: u32, row: u32, at: &str) -> Result<()
     }
 }
 
-/// A value checked against the data validation of its cell: list and
-/// number rules with constant bounds are checked; others are reported unchecked.
+/// A value checked against the data validation of its cell. List rules (a
+/// constant list or a range of cells), number and text-length rules with
+/// constant bounds are checked. Any other rule cannot be: under the default
+/// error style (`stop`, Excel refuses a value that breaks it) the write is
+/// refused; under `warning` or `information` it is reported unchecked.
 fn check_validation(
-    book: &Book,
+    book: &mut Book,
     i: usize,
     col: u32,
     row: u32,
@@ -467,82 +472,154 @@ fn check_validation(
     if *v == Value::Null {
         return Ok(());
     }
-    for e in book.entries.iter().filter(|e| e.kind == Kind::Range && e.path[0] == i && e.meta.tag == "dataValidation") {
-        let Some(ranges) = parse_sqref(e.meta.range.as_deref().unwrap_or("")) else { continue };
-        if !ranges.iter().any(|r| r.contains(CellRef::new(col, row))) {
-            continue;
-        }
-        let x = xml::fragment(&e.xml[0]);
+    let rules: Vec<(String, String)> = book
+        .entries
+        .iter()
+        .filter(|e| e.kind == Kind::Range && e.path[0] == i && e.meta.tag == "dataValidation")
+        .filter(|e| {
+            parse_sqref(e.meta.range.as_deref().unwrap_or(""))
+                .is_some_and(|rs| rs.iter().any(|r| r.contains(CellRef::new(col, row))))
+        })
+        .map(|e| (e.xml[0].clone(), e.meta.range.clone().unwrap_or_default()))
+        .collect();
+    for (rule_xml, range) in rules {
+        let x = xml::fragment(&rule_xml);
         let ty = x.get("type").unwrap_or_else(|| "none".into());
-        let f = |n: &str| x.elements().find(|c| c.local() == n).map(|c| c.text_of(&[c.name.as_str()]));
-        let range = e.meta.range.clone().unwrap_or_default();
+        let f = |n: &str| x.elements().find(|c| c.local() == n).map(|c| xml::unescape(&c.text_of(&[c.name.as_str()])));
         let fail = |what: String| Err(format!("{at}: {v} breaks the data validation of {range} ({what})"));
-        match ty.as_str() {
-            "none" => {}
+        let text = match v {
+            Value::Text(s) => s.clone(),
+            Value::Number(n) => numfmt::general(*n),
+            Value::Bool(b) => (if *b { "TRUE" } else { "FALSE" }).into(),
+            Value::Null => String::new(),
+        };
+        let bounds = || {
+            (
+                f("formula1").and_then(|s| s.trim().parse::<f64>().ok()),
+                f("formula2").and_then(|s| s.trim().parse::<f64>().ok()),
+            )
+        };
+        let op = x.get("operator").unwrap_or_else(|| "between".into());
+        let within = |n: f64, a: Option<f64>, b: Option<f64>| -> Option<bool> {
+            Some(match (op.as_str(), a, b) {
+                ("between", Some(a), Some(b)) => (a..=b).contains(&n),
+                ("notBetween", Some(a), Some(b)) => !(a..=b).contains(&n),
+                ("equal", Some(a), _) => n == a,
+                ("notEqual", Some(a), _) => n != a,
+                ("greaterThan", Some(a), _) => n > a,
+                ("lessThan", Some(a), _) => n < a,
+                ("greaterThanOrEqual", Some(a), _) => n >= a,
+                ("lessThanOrEqual", Some(a), _) => n <= a,
+                _ => return None,
+            })
+        };
+        let rule = |a: Option<f64>, b: Option<f64>| {
+            format!(
+                "{op} {}{}",
+                a.map(numfmt::general).unwrap_or_default(),
+                b.map(|b| format!(" and {}", numfmt::general(b))).unwrap_or_default()
+            )
+        };
+        // `None`: the rule cannot be checked (why).
+        let unchecked: Option<String> = match ty.as_str() {
+            "none" => None,
             "list" => match f("formula1") {
                 Some(l) if l.starts_with('"') && l.ends_with('"') && l.len() >= 2 => {
                     let items: Vec<&str> = l[1..l.len() - 1].split(',').map(str::trim).collect();
-                    let s = match v {
-                        Value::Text(s) => s.clone(),
-                        Value::Number(n) => numfmt::general(*n),
-                        Value::Bool(b) => (if *b { "TRUE" } else { "FALSE" }).into(),
-                        Value::Null => String::new(),
-                    };
-                    if !items.iter().any(|it| it.eq_ignore_ascii_case(s.trim())) {
+                    if !items.iter().any(|it| it.eq_ignore_ascii_case(text.trim())) {
                         return fail(format!("one of {}", items.join(", ")));
                     }
+                    None
                 }
-                _ => notice(
-                    &mut cx.notices,
-                    "unchecked-validation",
-                    at.to_string(),
-                    format!(
-                        "the list of the data validation of {range} is a formula; the value is not checked against it"
-                    ),
-                ),
+                Some(l) => match list_cells(book, i, &l) {
+                    Some(items) => {
+                        if !items.iter().any(|it| it.eq_ignore_ascii_case(text.trim())) {
+                            return fail(format!("a value of {}", l.trim_start_matches('=')));
+                        }
+                        None
+                    }
+                    None => Some(format!("its list is the formula {l}")),
+                },
+                None => Some("it has no list".into()),
             },
             "whole" | "decimal" => {
                 let Value::Number(n) = v else { return fail(format!("a {ty} number")) };
                 if ty == "whole" && n.fract() != 0.0 {
                     return fail("a whole number".into());
                 }
-                let (a, b) = (
-                    f("formula1").and_then(|s| s.trim().parse::<f64>().ok()),
-                    f("formula2").and_then(|s| s.trim().parse::<f64>().ok()),
-                );
-                let op = x.get("operator").unwrap_or_else(|| "between".into());
-                let ok = match (op.as_str(), a, b) {
-                    ("between", Some(a), Some(b)) => (a..=b).contains(n),
-                    ("notBetween", Some(a), Some(b)) => !(a..=b).contains(n),
-                    ("equal", Some(a), _) => *n == a,
-                    ("notEqual", Some(a), _) => *n != a,
-                    ("greaterThan", Some(a), _) => *n > a,
-                    ("lessThan", Some(a), _) => *n < a,
-                    ("greaterThanOrEqual", Some(a), _) => *n >= a,
-                    ("lessThanOrEqual", Some(a), _) => *n <= a,
-                    _ => {
-                        notice(&mut cx.notices, "unchecked-validation", at.to_string(), format!("the bounds of the data validation of {range} are formulas; the value is not checked against them"));
-                        true
-                    }
-                };
-                if !ok {
-                    return fail(format!(
-                        "{op} {}{}",
-                        a.map(numfmt::general).unwrap_or_default(),
-                        b.map(|b| format!(" and {}", numfmt::general(b))).unwrap_or_default()
-                    ));
+                let (a, b) = bounds();
+                match within(*n, a, b) {
+                    Some(true) => None,
+                    Some(false) => return fail(rule(a, b)),
+                    None => Some("its bounds are formulas".into()),
                 }
             }
-            other => notice(
-                &mut cx.notices,
-                "unchecked-validation",
-                at.to_string(),
-                format!("the {other} rule of the data validation of {range} is not checked"),
-            ),
+            "textLength" => {
+                let (a, b) = bounds();
+                match within(text.chars().count() as f64, a, b) {
+                    Some(true) => None,
+                    Some(false) => return fail(format!("a text length {}", rule(a, b))),
+                    None => Some("its bounds are formulas".into()),
+                }
+            }
+            other => Some(format!("it is a {other} rule")),
+        };
+        if let Some(why) = unchecked {
+            match x.get("errorStyle").as_deref() {
+                Some("warning") | Some("information") => notice(
+                    &mut cx.notices,
+                    "unchecked-validation",
+                    at.to_string(),
+                    format!("the data validation of {range} is not checked: {why}"),
+                ),
+                _ => {
+                    return Err(format!(
+                        "{at}: the data validation of {range} cannot be checked ({why}), and it refuses values that break it"
+                    ))
+                }
+            }
         }
     }
     Ok(())
 }
+
+/// The values of a list validation's range (`$A$1:$A$9`, `Sheet!$A$1:$A$9`), as shown.
+fn list_cells(book: &mut Book, i: usize, formula: &str) -> Option<Vec<String>> {
+    let toks = formula::tokenize(formula.trim_start_matches('='));
+    let refs: Vec<&formula::Reference> = toks
+        .iter()
+        .filter_map(|t| match &t.kind {
+            formula::Tok::Ref(r) => Some(r),
+            formula::Tok::Space => None,
+            _ => Some(&EMPTY_REF),
+        })
+        .collect();
+    let [r] = refs.as_slice() else { return None };
+    let (a, b) = (r.first?, r.last.or(r.first)?);
+    let sheet = match &r.sheet {
+        Some(p) if p.external || p.to.is_some() => return None,
+        Some(p) => book.sheets.iter().position(|s| s.name.eq_ignore_ascii_case(&p.name))?,
+        None => i,
+    };
+    let area = CellRange::new(CellRef::new(a.col?, a.row?), CellRef::new(b.col?, b.row?));
+    if book.sheets[sheet].kind != SheetKind::Work {
+        return None;
+    }
+    book.load_store(sheet).ok()?;
+    let mut out = vec![];
+    for row in book.store(sheet).rows_in(area.first.row, area.last.row) {
+        for c in row.cells.iter().filter(|c| (area.first.col..=area.last.col).contains(&c.col)) {
+            let shown = book.display(c);
+            if !shown.is_empty() {
+                out.push(shown.trim().to_string());
+            }
+        }
+    }
+    Some(out)
+}
+
+/// Stands for any token other than one reference in [`list_cells`].
+static EMPTY_REF: formula::Reference = formula::Reference { sheet: None, first: None, last: None };
 
 /// The style a new cell of table `k`'s column `ci` takes: its neighbour's in
 /// the column (the row above, else below), with the column's format.
@@ -578,7 +655,9 @@ fn insert_rows(book: &mut Book, k: usize, at: u32, rows: &[Row], cx: &mut Ctx) -
     let sh = RowShift::Insert { cols: (c0, c1), at, n };
     shift::check(book, i, &sh, Some(k))?;
     let old_last = book.tables[k].range.last.row;
-    shift::apply(book, i, &sh, &mut cx.notices)?;
+    let rewritten = shift::apply(book, i, &sh, &mut cx.notices)?;
+    cx.changed.follow(i, &sh);
+    cx.changed.formulas.extend(rewritten);
     let t = &mut book.tables[k];
     t.range.last.row = old_last + n;
     t.changed = true;
@@ -602,7 +681,7 @@ fn insert_rows(book: &mut Book, k: usize, at: u32, rows: &[Row], cx: &mut Ctx) -
             }
         }
     }
-    cx.changed.areas.push((i, CellRange::new(CellRef::new(c0, at), CellRef::new(c1, MAX_ROW))));
+    cx.changed.moved.push((i, CellRange::new(CellRef::new(c0, at), CellRef::new(c1, MAX_ROW))));
     cx.changed.tables.insert(name.clone());
     let cols = cols_of(cx, &book.tables[k]);
     let calc: Vec<Option<String>> = book.tables[k].cols.iter().map(|c| c.calc.clone()).collect();
@@ -637,7 +716,9 @@ fn delete_rows(book: &mut Book, k: usize, first: u32, last: u32, cx: &mut Ctx) -
     if from <= last {
         let sh = RowShift::Delete { cols: (c0, c1), first: from, last };
         shift::check(book, i, &sh, Some(k))?;
-        shift::apply(book, i, &sh, &mut cx.notices)?;
+        let rewritten = shift::apply(book, i, &sh, &mut cx.notices)?;
+        cx.changed.follow(i, &sh);
+        cx.changed.formulas.extend(rewritten);
     }
     if keep_one {
         for col in c0..=c1 {
@@ -651,7 +732,7 @@ fn delete_rows(book: &mut Book, k: usize, first: u32, last: u32, cx: &mut Ctx) -
         }
     }
     book.tables[k].changed = true;
-    cx.changed.areas.push((i, CellRange::new(CellRef::new(c0, first), CellRef::new(c1, MAX_ROW))));
+    cx.changed.moved.push((i, CellRange::new(CellRef::new(c0, first), CellRef::new(c1, MAX_ROW))));
     cx.changed.tables.insert(book.tables[k].name.clone());
     Ok(())
 }

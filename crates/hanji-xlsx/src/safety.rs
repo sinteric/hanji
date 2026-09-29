@@ -237,6 +237,18 @@ fn reads_other_workbook(f: &str) -> bool {
         || f.contains("]!")
 }
 
+/// A row pre-check for [`neutralise_formulas`]: a formula, and a fetching
+/// function's name, a DDE `|`, or a `]` and a `!` (a reference into another
+/// workbook: `[1]Sheet!A1`, `'C:\[b.xlsx]S'!A1`, `[1]!Name`).
+fn may_need_neutralising(row: &[u8]) -> bool {
+    let has = |b: u8| memchr::memchr(b, row).is_some();
+    crate::store::has_formula(row)
+        && (has(b'|') || (has(b']') && has(b'!')) || {
+            let lower = row.to_ascii_lowercase();
+            formula::FETCH_FUNCTIONS.iter().any(|n| crate::store::holds(&lower, n.to_ascii_lowercase().as_bytes()))
+        })
+}
+
 /// Neutralise the package, then the formulas of every worksheet.
 pub fn neutralise(book: &mut Book, report: &mut ImportReport) -> Result<(), String> {
     let mut parts = std::mem::take(&mut book.parts);
@@ -256,7 +268,7 @@ fn neutralise_formulas(book: &mut Book, i: usize, report: &mut ImportReport) -> 
     let sheet = book.sheets[i].name.clone();
     let mut hits: Vec<(u32, u32, &'static str, String)> = vec![];
     let mut shared: BTreeSet<String> = BTreeSet::new();
-    book.store(i).for_each_cell_if(&crate::store::has_formula, &mut |r, c| {
+    book.store(i).for_each_cell_if(&may_need_neutralising, &mut |r, c| {
         let Some(f) = c.formula() else { return };
         let kind = match formula::safety_problem(&f) {
             Some(FormulaProblem::Fetch(_)) => Some("fetching-function"),

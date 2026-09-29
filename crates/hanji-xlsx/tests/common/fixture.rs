@@ -83,7 +83,7 @@ pub fn build(sheets: &[SheetSpec]) -> Vec<u8> {
             for (ci, c) in t.cols.iter().enumerate() {
                 let k = intern(&c.name, &mut sst);
                 refs += 1;
-                rows.entry(t.row).or_default().push((t.col + ci as u32, format!("t=\"s\"><v>{k}</v>")));
+                rows.entry(t.row).or_default().push((t.col + ci as u32, format!(" t=\"s\"><v>{k}</v>")));
             }
             for (ri, r) in t.rows.iter().enumerate() {
                 let rr = t.row + 1 + ri as u32;

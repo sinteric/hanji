@@ -15,7 +15,7 @@ native targets and on wasm32 (§10.4).
 | `hanji-docx` | The docx engine. Splits `word/document.xml` at the XML level and copies every other part through byte for byte. Numbered paragraphs are list items; `numbering.rs` reads their kind and gives new items and lists their numbering. §8: removes and reports active and remote content on import, and lists what to surface before export. `examples/dump.rs` prints a file's model text |
 | `hanji-hwpx` | The hwpx engine (OWPML, KS X 6101). Splits `Contents/section*.xml` at the XML level and copies every other part through byte for byte, `header.xml` too unless the text needs a new character or paragraph shape. Paragraph styles by their own (Korean) names, outline styles as `#`, bold/italic/underline/strikeout from the character shapes, tables with merges and multi-paragraph cells, side-by-side tables as separate blocks (§10.8), bullets and numbering as list items, tracked changes as read-only placeholders (§10.2). §8: removes scripts, embedded OLE objects and linked files. `examples/dump_hwpx.rs` prints a file's model text |
 | `hanji-pptx` | The pptx engine. Splits each slide and notes page at the XML level into a skeleton (with stand-ins for the placeholders and text shapes the text shows) and text entries, and copies every other part through byte for byte. Layout names and slots come from the layouts' placeholders (`deck.rs`), bullets from the inheritance chain up to the master text styles. Objects that are not placeholders (pictures, charts, tables, groups) are `<keep/>` lines in z-order. Slides can be added from a layout, deleted (their notes and unreachable parts go; a slide something else links to is refused) and moved; `sldIdLst`, sections, rels and content types follow. §8 (`safety.rs`): macros, ActiveX, OLE objects (their preview picture stays), program and macro click actions, linked media, images and objects, other external relationships. `examples/dump_pptx.rs` prints a file's model text |
-| `hanji-xlsx` | The xlsx engine (§5.4). The structure (sheets, tables, column types, formats and formulas, placeholders) is text; cells are read through row windows (`view.rs`) and written by range operations (`ops.rs`). Each worksheet is a skeleton plus its rows as byte ranges, parsed only when read or changed (`store.rs`); merged cells, conditional formats, data validations and hyperlinks are range entries (`hanji_core::cells`). Values as displayed (`numfmt.rs`). §8 (`safety.rs`): macros and macro sheets, external links, DDE, OLE, ActiveX, connections and query tables, fetching formulas. `examples/dump_xlsx.rs` prints a file's structure and windows |
+| `hanji-xlsx` | The xlsx engine (§5.4). The structure (sheets, tables, column types, formats and formulas, placeholders) is text; cells are read through row windows (`view.rs`) and written by range operations (`ops.rs`). Each worksheet is a skeleton plus its rows as byte ranges, parsed only when read or changed (`store.rs`); merged cells, conditional formats, data validations and hyperlinks are range entries (`hanji_core::cells`). Values as displayed (`numfmt.rs`). Row shifts move formulas, tables, entries, defined names, drawings, notes and pivot sources, and refuse what they would tear (`shift.rs`). Cached values: IronCalc computes the formulas whose inputs changed, over the rows they read, and writes only their `<v>`; what it cannot compute keeps its value and the file asks to be recalculated when opened (`calc.rs`). §8 (`safety.rs`): macros and macro sheets, external links, DDE, OLE, ActiveX, connections and query tables, fetching formulas. `examples/dump_xlsx.rs` prints a file's structure and windows, `examples/apply_ops.rs` applies an operation list |
 | `hanji-testkit` | The corpus harness the engines run (not published): the prototype's E1–E10 edits (P1–P9 for pptx), oracle and scoring, GetPut, PutGet and well-formedness |
 
 rdocx is not on the import/export path. Its typed model (`CT_P`, `CT_RPr`,
@@ -24,6 +24,13 @@ bookmarks and wrappers that the remainder stores. It remains a candidate for
 rendering, which is a stub for now. rpptx is not on the pptx path for the same
 reason: it rewrites the parts it opens through its typed model. Adding a slide
 from a layout, the one thing it would have saved, is done at the XML level.
+
+umya-spreadsheet is not on the xlsx import/export path, for the same reason:
+it reads a workbook into its model and writes every part again from it. The
+engine does the package, the XML and the cells itself; IronCalc (0.7.1: later
+versions need JavaScript's time zone on every wasm32 target) is used as a
+calculator only, over cells the engine hands it, and never reads or writes
+the file.
 
 rhwp is not on the hwpx import/export path either: it parses into its own
 document model and writes the package from it, which drops what the model
@@ -39,6 +46,8 @@ HANJI_REPORT=1 cargo test --release -p hanji-hwpx --test corpus -- --nocapture  
 HANJI_REPORT=1 cargo test --release -p hanji-pptx --test corpus -- --nocapture   # the same for pptx (edits P1–P9)
 HANJI_SOFFICE=1 cargo test --release -p hanji-docx --test corpus -- --nocapture  # also convert every export with LibreOffice
 HANJI_SOFFICE=1 cargo test --release -p hanji-pptx --test corpus -- --nocapture  # the same, checking PDF page count against the slide count
+HANJI_REPORT=1 cargo test --release -p hanji-xlsx -- --nocapture                 # xlsx: corpus, op set, round 4, the 100k-row sheet
+HANJI_SOFFICE=1 cargo test --release -p hanji-xlsx -- --nocapture                # also compare LibreOffice's values with the windows
 cargo build --target wasm32-unknown-unknown --workspace
 # rhwp re-opens every hwpx export the corpus and engine tests wrote (native, not part of the workspace):
 cargo run --release --manifest-path crates/hanji-hwpx/validate/Cargo.toml
@@ -50,7 +59,8 @@ The corpus tests run the shared harness (`hanji-testkit`): the docx ones on
 the prototype's 13 files in `prototype/remainder/corpus/`, the hwpx ones on
 the 16 files in `hanji-hwpx/corpus/` (sources and licences in its
 SOURCES.md), the pptx ones on the 21 decks in `hanji-pptx/corpus/` (its
-SOURCES.md; `fetch.sh` checks their SHA-256). They port the prototype's E1–E10 edits, oracle and scoring, and
+SOURCES.md; `fetch.sh` checks their SHA-256), the xlsx ones on the 46
+workbooks in `hanji-xlsx/corpus/` (the same). They port the prototype's E1–E10 edits, oracle and scoring, and
 also run on wasm32-wasip1: the runner preopens the workspace. The LibreOffice
 conversion runs natively only, and the rhwp check is a separate crate
 (`hanji-hwpx/validate`) so the workspace does not build rhwp.
@@ -93,6 +103,25 @@ hwpx, in addition:
 - HWP 5.0 (`.hwp`): rhwp can convert it to hwpx (all 25 of rhwp's Hancom
   `.hwp` samples then import and round-trip), but that puts rhwp's document
   model on the import path and exports hwpx, not hwp.
+
+xlsx, in addition:
+
+- Charts, pictures, shapes, notes and pivot tables are `<keep/>` lines: they
+  can be deleted, and their anchors and data ranges follow row shifts, but a
+  new `<chart>` line is refused. Pivot tables whose source changed refresh
+  when the file is opened.
+- The structure text cannot rename or delete a sheet, table or column, or
+  change a table's range; range operations do the rest.
+- Operations that would tear a merged area, an array formula, a data table,
+  a filter or a pivot table are refused with the reason, as are values that
+  break a data validation. Validations the engine cannot check (custom, date
+  and time rules, bounds or lists that are formulas) refuse the write under
+  their default error style and are reported under `warning` and
+  `information`. Column inserts and deletes are not operations.
+- 1904-date workbooks: formulas whose inputs changed are left to the
+  application (IronCalc knows the 1900 system only).
+- Rich text in new cells, cell styles beyond a column's number format, and
+  threaded comments.
 
 pptx, in addition:
 

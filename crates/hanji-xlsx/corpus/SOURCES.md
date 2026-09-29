@@ -80,5 +80,6 @@ No openly licensed Korean .xlsx was found in the two projects searched
 searched). `korean-sales.xlsx` and `korean-sales-lo.xlsx` fill the gap and are
 labelled synthetic wherever they are reported (CC0-1.0, written for this
 project). The round-4 workbooks (`fluency/round4`) are built as xlsx at test
-time from their seeds, and cover the Korean table layouts the fluency test
-used.
+time from their seeds (`tests/round4.rs`), and cover the Korean table layouts
+the fluency test used. `tests/large.rs` generates its 100,000-row workbook the
+same way.

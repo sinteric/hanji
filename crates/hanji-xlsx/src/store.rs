@@ -26,6 +26,22 @@ pub struct Store {
     self_closed: bool,
 }
 
+/// Rows taken out of a sheet ([`Store::take_tail`]), parsed as they are read.
+pub struct Tail {
+    slots: std::vec::IntoIter<RowSlot>,
+    raw: std::sync::Arc<Vec<u8>>,
+}
+
+impl Iterator for Tail {
+    type Item = Result<Row, String>;
+    fn next(&mut self) -> Option<Self::Item> {
+        Some(match self.slots.next()? {
+            RowSlot::Parsed(row) => Ok(row),
+            RowSlot::Raw(raw) => Row::from_bytes(&self.raw[raw.start as usize..raw.end as usize], raw.r),
+        })
+    }
+}
+
 #[derive(Clone, Debug)]
 pub enum RowSlot {
     Raw(RawRow),
@@ -229,6 +245,140 @@ impl Row {
         out.push_str(&format!("</{p}row>"));
     }
 
+    /// A row read from its bytes, as [`Row::from_element`] reads its parse,
+    /// without building the element tree (the common cell, `<c …><v>…</v></c>`,
+    /// costs its attributes and its value; `<f>`, `<is>` and anything else
+    /// are parsed as elements).
+    pub fn from_bytes(bytes: &[u8], implied: u32) -> Result<Row, String> {
+        let text = std::str::from_utf8(bytes).map_err(|_| "a row is not UTF-8".to_string())?;
+        let mut rd = Reader::from_str(text);
+        rd.config_mut().check_end_names = true;
+        let bad = |e: &dyn std::fmt::Display| format!("row {implied}: {e}");
+        let attrs_of = |s: &quick_xml::events::BytesStart<'_>| -> Result<Vec<(String, String)>, String> {
+            let mut out = vec![];
+            for a in s.attributes() {
+                let a = a.map_err(|e| bad(&e))?;
+                let mut v = a.value.to_string();
+                if v.contains('"') {
+                    v = v.replace('"', "&quot;");
+                }
+                out.push((a.key.as_ref().to_string(), v));
+            }
+            Ok(out)
+        };
+        // The element starting at `from` whose start tag was just read (`empty`: `<x/>`), parsed whole.
+        let element = |rd: &mut Reader<&[u8]>, from: usize, empty: bool| -> Result<Element, String> {
+            if !empty {
+                let mut depth = 1;
+                while depth > 0 {
+                    match rd.read_event().map_err(|e| bad(&e))? {
+                        Event::Start(_) => depth += 1,
+                        Event::End(_) => depth -= 1,
+                        Event::Eof => return Err(bad(&"unclosed element")),
+                        _ => {}
+                    }
+                }
+            }
+            let to = rd.buffer_position() as usize;
+            xml::parse(&bytes[from..to]).map(|d| d.root).map_err(|e| bad(&e))
+        };
+        let mut row: Option<Row> = None;
+        let mut next_col = 0;
+        loop {
+            let before = rd.buffer_position() as usize;
+            let ev = rd.read_event().map_err(|e| bad(&e))?;
+            let (s, empty) = match ev {
+                Event::Eof => break,
+                Event::End(_) => continue,
+                Event::Start(s) => (s, false),
+                Event::Empty(s) => (s, true),
+                _ => continue,
+            };
+            let Some(row) = row.as_mut() else {
+                let mut attrs = attrs_of(&s)?;
+                let r = attr(&attrs, "r").and_then(|v| v.parse().ok()).unwrap_or(implied);
+                if attr(&attrs, "r").is_none() {
+                    attrs.insert(0, ("r".into(), r.to_string()));
+                }
+                row = Some(Row { r, attrs, cells: vec![], extra: vec![] });
+                if empty {
+                    break;
+                }
+                continue;
+            };
+            let r = row.r;
+            let name = s.name();
+            if local(name.as_ref()) != "c" {
+                row.extra.push(Node::El(element(&mut rd, before, empty)?));
+                continue;
+            }
+            let attrs = attrs_of(&s)?;
+            let col = match attr(&attrs, "r") {
+                Some(a) => {
+                    let k = a.find(|ch: char| !ch.is_ascii_alphabetic()).unwrap_or(a.len());
+                    col_index(&a[..k]).ok_or_else(|| format!("row {r}: bad cell address {a:?}"))?
+                }
+                None => next_col,
+            };
+            next_col = col + 1;
+            let mut cell = Cell { col, attrs, ..Default::default() };
+            if cell.get("r").is_none() {
+                cell.set_row(r);
+            }
+            if !empty {
+                loop {
+                    let at = rd.buffer_position() as usize;
+                    let (x, x_empty) = match rd.read_event().map_err(|e| bad(&e))? {
+                        Event::End(_) => break,
+                        Event::Eof => return Err(bad(&"unclosed cell")),
+                        Event::Start(x) => (x, false),
+                        Event::Empty(x) => (x, true),
+                        _ => continue,
+                    };
+                    let xn = x.name();
+                    let xl = local(xn.as_ref()).to_string();
+                    if xl == "v" && x.attributes().next().is_none() {
+                        let from = rd.buffer_position() as usize;
+                        let mut to = from;
+                        if !x_empty {
+                            loop {
+                                to = rd.buffer_position() as usize;
+                                match rd.read_event().map_err(|e| bad(&e))? {
+                                    Event::End(_) => break,
+                                    Event::Text(_) | Event::GeneralRef(_) => {}
+                                    Event::Eof => return Err(bad(&"unclosed value")),
+                                    // Markup inside a value: read it as an element.
+                                    _ => {
+                                        let mut e = element(&mut rd, at, false)?;
+                                        cell.v = Some(xml::write_nodes(&std::mem::take(&mut e.children)));
+                                        to = usize::MAX;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        if to != usize::MAX {
+                            cell.v = Some(text[from..to].to_string());
+                        }
+                        continue;
+                    }
+                    let e = element(&mut rd, at, x_empty)?;
+                    match xl.as_str() {
+                        "f" => cell.f = Some(e),
+                        "v" => cell.v = Some(xml::write_nodes(&e.children)),
+                        "is" => cell.is = Some(e),
+                        _ => cell.extra.push(Node::El(e)),
+                    }
+                }
+            }
+            if row.cells.last().is_some_and(|l| l.col >= col) {
+                return Err(format!("row {r}: cells are not in column order"));
+            }
+            row.cells.push(cell);
+        }
+        row.ok_or_else(|| bad(&"no row element"))
+    }
+
     /// A row read from its element.
     pub fn from_element(e: &Element, implied: u32) -> Result<Row, String> {
         let r = e.get("r").and_then(|v| v.parse().ok()).unwrap_or(implied);
@@ -408,11 +558,7 @@ impl Store {
     fn parse_slot(&self, k: usize, implied: u32) -> Result<Row, String> {
         match &self.rows[k] {
             RowSlot::Parsed(r) => Ok(r.clone()),
-            RowSlot::Raw(raw) => {
-                let bytes = &self.raw[raw.start as usize..raw.end as usize];
-                let d = xml::parse(bytes).map_err(|e| format!("row {}: {e}", raw.r))?;
-                Row::from_element(&d.root, implied)
-            }
+            RowSlot::Raw(raw) => Row::from_bytes(&self.raw[raw.start as usize..raw.end as usize], implied),
         }
     }
 
@@ -461,7 +607,77 @@ impl Store {
         }
     }
 
+    /// Edit many rows in one pass: each of `rows` (ascending; a missing one is
+    /// created) goes through `f` and is written back to bytes at once, so the
+    /// sheet never holds them all parsed. Untouched rows keep their bytes.
+    pub fn edit_rows(&mut self, rows: &[u32], f: &mut dyn FnMut(&mut Row)) {
+        if rows.len() < 64 {
+            for &r in rows {
+                f(self.row_mut(r));
+            }
+            return;
+        }
+        for &r in rows {
+            if self.find(r).is_err() {
+                self.row_mut(r);
+            }
+        }
+        let mut buf: Vec<u8> = Vec::with_capacity(self.raw.len() + rows.len() * 16);
+        let mut text = String::new();
+        let mut want = rows.iter().copied().peekable();
+        let old = std::mem::take(&mut self.rows);
+        let mut slots = Vec::with_capacity(old.len());
+        for slot in old {
+            let r = Store::slot_row(&slot);
+            while want.next_if(|&w| w < r).is_some() {}
+            let edit = want.next_if_eq(&r).is_some();
+            match slot {
+                RowSlot::Parsed(mut row) => {
+                    if edit {
+                        f(&mut row);
+                    }
+                    slots.push(RowSlot::Parsed(row));
+                }
+                RowSlot::Raw(raw) => {
+                    let start = buf.len() as u32;
+                    let bytes = &self.raw[raw.start as usize..raw.end as usize];
+                    let mut cols = raw.cols;
+                    if edit {
+                        let mut row = Row::from_bytes(bytes, r).expect("an indexed row parses");
+                        f(&mut row);
+                        text.clear();
+                        row.write(&self.prefix, &mut text);
+                        buf.extend_from_slice(text.as_bytes());
+                        cols = row.cols();
+                    } else {
+                        buf.extend_from_slice(bytes);
+                    }
+                    slots.push(RowSlot::Raw(RawRow { r, start, end: buf.len() as u32, cols }));
+                }
+            }
+        }
+        self.rows = slots;
+        self.raw = std::sync::Arc::new(buf);
+    }
+
     /// Rows `a..=b` that exist, parsed (copies).
+    /// Rows `a..=b`, parsed one at a time (a raw row is not kept parsed).
+    pub fn for_each_row_in(&self, a: u32, b: u32, f: &mut dyn FnMut(&Row)) {
+        let from = self.find(a).unwrap_or_else(|k| k);
+        for k in from..self.rows.len() {
+            match &self.rows[k] {
+                RowSlot::Parsed(row) if row.r > b => break,
+                RowSlot::Parsed(row) => f(row),
+                RowSlot::Raw(raw) if raw.r > b => break,
+                RowSlot::Raw(raw) => {
+                    if let Ok(row) = self.parse_slot(k, raw.r) {
+                        f(&row);
+                    }
+                }
+            }
+        }
+    }
+
     pub fn rows_in(&self, a: u32, b: u32) -> Vec<Row> {
         let from = self.find(a).unwrap_or_else(|k| k);
         let mut out = vec![];
@@ -489,6 +705,24 @@ impl Store {
             .collect();
         self.rows.drain(from..to);
         out
+    }
+
+    /// Rows `from` on, taken out to be read one at a time and written back
+    /// through [`Store::push_row`] (so a shift never holds them all parsed).
+    pub fn take_tail(&mut self, from: u32) -> Tail {
+        let k = self.find(from).unwrap_or_else(|k| k);
+        Tail { slots: self.rows.split_off(k).into_iter(), raw: self.raw.clone() }
+    }
+
+    /// Append a row after every row the sheet holds, as bytes.
+    pub fn push_row(&mut self, row: &Row) {
+        debug_assert!(self.rows.last().is_none_or(|s| Store::slot_row(s) < row.r));
+        let mut text = String::new();
+        row.write(&self.prefix, &mut text);
+        let raw = std::sync::Arc::make_mut(&mut self.raw);
+        let start = raw.len() as u32;
+        raw.extend_from_slice(text.as_bytes());
+        self.rows.push(RowSlot::Raw(RawRow { r: row.r, start, end: raw.len() as u32, cols: row.cols() }));
     }
 
     /// Put parsed rows back (their numbers set; none may collide with a row the sheet holds).
@@ -613,7 +847,7 @@ fn cell_col(s: &quick_xml::events::BytesStart<'_>, implicit: &mut bool, next: u3
 
 /// Whether `hay` holds `needle`.
 pub fn holds(hay: &[u8], needle: &[u8]) -> bool {
-    hay.windows(needle.len()).any(|w| w == needle)
+    memchr::memmem::find(hay, needle).is_some()
 }
 
 /// A row pre-check: the row holds a formula (`<f>` or `<f …`, any prefix).
@@ -691,6 +925,44 @@ mod tests {
         assert!(out.contains("<row r=\"1\" spans=\"1:2\"><c r=\"A1\" t=\"s\"><v>0</v></c><c r=\"B1\" s=\"2\"><v>6</v></c></row><row r=\"2\"><c r=\"A2\"><v>7</v></c></row><row r=\"3\">"), "{out}");
         let again = Store::load(out.into_bytes()).unwrap();
         assert_eq!(again.rows.len(), 3);
+    }
+
+    #[test]
+    fn rows_read_from_bytes_as_from_their_parse() {
+        let tricky = [
+            "<row r=\"4\" spans=\"1:3\" x14ac:dyDescent=\"0.25\"><c r=\"A4\" t=\"s\"><v>0</v></c><c r=\"B4\"><f t=\"shared\" si=\"0\"/><v>1.5</v></c><c r=\"C4\" t=\"inlineStr\"><is><t xml:space=\"preserve\"> a &amp; b </t></is></c></row>",
+            "<x:row><x:c><x:v>&lt;1&gt;</x:v></x:c><x:c t=\"str\"><x:f>\"a\"&amp;\"b\"</x:f><x:v></x:v></x:c><x:c/><x:extLst><x:ext uri=\"u\"/></x:extLst></x:row>",
+            "<row r=\"2\"/>",
+            "<row r=\"9\"><c r=\"A9\"><v><![CDATA[7]]></v></c><c r=\"B9\"><!-- note --><v>8</v></c></row>",
+        ];
+        for t in tricky {
+            let a = Row::from_bytes(t.as_bytes(), 3).unwrap();
+            let b = Row::from_element(&xml::parse(t.as_bytes()).unwrap().root, 3).unwrap();
+            assert_eq!(a, b, "{t}");
+        }
+        // Every row of every corpus worksheet.
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("corpus");
+        let mut n = 0;
+        for f in std::fs::read_dir(dir).unwrap() {
+            let p = f.unwrap().path();
+            if !p.extension().is_some_and(|e| e == "xlsx" || e == "xlsm") {
+                continue;
+            }
+            let parts = hanji_package::package::read(&std::fs::read(&p).unwrap()).unwrap();
+            for part in parts.iter().filter(|x| x.name.starts_with("xl/worksheets/sheet")) {
+                let Ok(st) = Store::load(part.data.clone()) else { continue };
+                for slot in &st.rows {
+                    if let RowSlot::Raw(raw) = slot {
+                        let bytes = &st.raw[raw.start as usize..raw.end as usize];
+                        let a = Row::from_bytes(bytes, raw.r).unwrap();
+                        let b = Row::from_element(&xml::parse(bytes).unwrap().root, raw.r).unwrap();
+                        assert_eq!(a, b, "{}: {}", p.display(), String::from_utf8_lossy(bytes));
+                        n += 1;
+                    }
+                }
+            }
+        }
+        assert!(n > 1000, "{n} rows");
     }
 
     #[test]

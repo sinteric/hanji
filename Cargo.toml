@@ -14,3 +14,20 @@ hanji-format = { path = "crates/hanji-format" }
 hanji-core = { path = "crates/hanji-core" }
 hanji-package = { path = "crates/hanji-package" }
 hanji-testkit = { path = "crates/hanji-testkit" }
+
+# The spreadsheet engine's tests read 100,000-row sheets (§2 rule 11) in
+# debug builds too: its parsers and calculator are optimised there.
+[profile.dev.package.hanji-xlsx]
+opt-level = 2
+
+[profile.dev.package.hanji-package]
+opt-level = 2
+
+[profile.dev.package.quick-xml]
+opt-level = 2
+
+[profile.dev.package.memchr]
+opt-level = 2
+
+[profile.dev.package.ironcalc_base]
+opt-level = 2

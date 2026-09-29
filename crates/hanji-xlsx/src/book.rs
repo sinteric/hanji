@@ -54,6 +54,16 @@ pub struct TableCol {
     pub dxf: Option<u32>,
 }
 
+/// What a cell holds: [`Book::kind`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ValueKind {
+    Empty,
+    Text,
+    Number,
+    /// A boolean or an error.
+    Other,
+}
+
 #[derive(Clone, Debug)]
 pub struct TableInfo {
     pub part: String,
@@ -282,6 +292,31 @@ impl Book {
                     s.trim().parse::<f64>().map_or(CellValue::Text(s), CellValue::Number)
                 }
                 _ => CellValue::Empty,
+            },
+        }
+    }
+
+    /// What a cell holds, as [`Book::value`] reads it, without its value.
+    pub fn kind(&self, c: &Cell) -> ValueKind {
+        let v = c.v.as_deref();
+        match c.ty() {
+            "s" => match v.and_then(|i| i.trim().parse::<usize>().ok()) {
+                Some(i) if self.sst.as_ref().is_some_and(|s| s.get(i).is_some()) => ValueKind::Text,
+                _ => ValueKind::Empty,
+            },
+            "str" | "d" if v.is_some() => ValueKind::Text,
+            "inlineStr" if c.is.is_some() => ValueKind::Text,
+            "b" | "e" if v.is_some() => ValueKind::Other,
+            "str" | "d" | "inlineStr" | "b" | "e" => ValueKind::Empty,
+            _ => match v.map(str::trim) {
+                Some(s) if s.contains('&') => match self.value(c) {
+                    CellValue::Number(_) => ValueKind::Number,
+                    CellValue::Empty => ValueKind::Empty,
+                    _ => ValueKind::Text,
+                },
+                Some("") | None => ValueKind::Empty,
+                Some(s) if s.parse::<f64>().is_ok() => ValueKind::Number,
+                Some(_) => ValueKind::Text,
             },
         }
     }
