@@ -52,14 +52,29 @@ pub fn neutralise(
     report: &mut ImportReport,
 ) -> Result<(), String> {
     let out = &mut report.neutralised;
+    // The Contents parts besides the sections (header.xml, master pages),
+    // which are copied through: what they hold is neutralised in place.
+    let others: Vec<String> = parts
+        .iter()
+        .filter(|p| p.name.starts_with("Contents/") && p.name.ends_with(".xml") && section_number(&p.name).is_none())
+        .map(|p| p.name.clone())
+        .collect();
     // Embedded OLE objects: the object and its data go.
     let mut ole_items = BTreeSet::new();
-    for (name, d) in sections.iter_mut() {
-        for o in remove_where(&mut d.root, &|e| e.is("hp:ole")) {
+    let mut drop_ole = |root: &mut Element, name: &str, out: &mut Vec<Notice>| {
+        let gone = remove_where(root, &|e| e.is("hp:ole"));
+        for o in &gone {
             let item = o.get("binaryItemIDRef").unwrap_or_default();
             notice(out, "ole-object", format!("{name} <hp:ole>"), format!("embedded object {item} removed"));
             ole_items.insert(item);
         }
+        !gone.is_empty()
+    };
+    for (name, d) in sections.iter_mut() {
+        drop_ole(&mut d.root, name, out);
+    }
+    for name in &others {
+        edit_part(parts, name, &mut |root| Ok(drop_ole(root, name, out)))?;
     }
     // The package manifest: scripts, linked files and the OLE data.
     let mut gone_parts: BTreeSet<String> =
@@ -110,14 +125,8 @@ pub fn neutralise(
     for (name, d) in sections.iter_mut() {
         drop_references(&mut d.root, &gone_ids, name, out)?;
     }
-    let others: Vec<String> = parts
-        .iter()
-        .filter(|p| !gone_ids.is_empty() && p.name.starts_with("Contents/") && p.name.ends_with(".xml"))
-        .filter(|p| section_number(&p.name).is_none())
-        .map(|p| p.name.clone())
-        .collect();
-    for name in others {
-        edit_part(parts, &name, &mut |root| Ok(drop_references(root, &gone_ids, &name, out)? > 0))?;
+    for name in others.iter().filter(|_| !gone_ids.is_empty()) {
+        edit_part(parts, name, &mut |root| Ok(drop_references(root, &gone_ids, name, out)? > 0))?;
     }
     // A linked source document (`hh:linkinfo path`) is fetched to inherit pages.
     edit_part(parts, HEADER_PART, &mut |root| {
@@ -138,8 +147,11 @@ pub fn neutralise(
     })
 }
 
+/// Attributes that name a manifest item.
+const ITEM_REFS: [&str; 3] = ["binaryItemIDRef", "fileIDRef", "imageIDRef"];
+
 /// Removes the pictures and image fills that show a removed manifest item
-/// (`binaryItemIDRef`), and returns how many went. Any other reference to
+/// (see [`ITEM_REFS`]), and returns how many went. Any other reference to
 /// one is refused: hanji does not know what removing it would take.
 fn drop_references(
     root: &mut Element,
@@ -151,7 +163,8 @@ fn drop_references(
         let mut found = None;
         e.walk(&mut |x| {
             if found.is_none() {
-                found = x.get("binaryItemIDRef").filter(|r| gone.contains(r)).map(|r| (x.name.clone(), r));
+                found =
+                    ITEM_REFS.iter().find_map(|a| x.get(a).filter(|r| gone.contains(r))).map(|r| (x.name.clone(), r));
             }
         });
         found

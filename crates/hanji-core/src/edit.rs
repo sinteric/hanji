@@ -397,6 +397,38 @@ fn pairs_to_ops(pairs: &[(usize, usize)], a: &[u32], b: &[u32]) -> Vec<Op> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Opcodes as (tag, old range, new range).
+    fn ops_of(pairs: &[(usize, usize)], a: &str, b: &str) -> Vec<(Tag, usize, usize, usize, usize)> {
+        let units = |s: &str| s.chars().map(|c| if c == '|' { place::SEP } else { c as u32 }).collect::<Vec<_>>();
+        pairs_to_ops(pairs, &units(a), &units(b)).iter().map(|o| (o.tag, o.i1, o.i2, o.j1, o.j2)).collect()
+    }
+
+    #[test]
+    fn a_stretch_that_differs_only_in_paragraph_marks_keeps_its_units() {
+        // A join ("ab|cd" → "abcd"), nothing paired inside the span.
+        assert_eq!(
+            ops_of(&[(0, 0), (4, 3)], "ab|cd", "abcd"),
+            [(Tag::Equal, 0, 2, 0, 2), (Tag::Delete, 2, 3, 2, 2), (Tag::Equal, 3, 5, 2, 4)]
+        );
+        // A split, and a paragraph mark that moved.
+        assert_eq!(
+            ops_of(&[], "abcd", "ab|cd"),
+            [(Tag::Equal, 0, 2, 0, 2), (Tag::Insert, 2, 2, 2, 3), (Tag::Equal, 2, 4, 3, 5)]
+        );
+        assert_eq!(
+            ops_of(&[], "a|bc", "ab|c"),
+            [
+                (Tag::Equal, 0, 1, 0, 1),
+                (Tag::Delete, 1, 2, 1, 1),
+                (Tag::Equal, 2, 3, 1, 2),
+                (Tag::Insert, 3, 3, 2, 3),
+                (Tag::Equal, 3, 4, 3, 4)
+            ]
+        );
+        // Other text changes stay one replacement.
+        assert_eq!(ops_of(&[], "ab|c", "ax|c"), [(Tag::Replace, 0, 4, 0, 4)]);
+    }
     use crate::model::{StyleDef, StyleSet};
     use crate::remainder::{Entry, Meta};
 
