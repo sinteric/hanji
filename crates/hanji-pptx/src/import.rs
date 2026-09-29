@@ -339,7 +339,7 @@ impl Importer<'_> {
     /// entry on the head just pushed.
     fn whole(&mut self, el: &Element, k: &str) {
         let hi = self.blocks.len() - 1;
-        let f = self.fp(&[Some(el)]);
+        let f = self.fp(&[Some(&geom::without_geometry(el))]);
         let meta = Meta {
             tag: el.name.clone(),
             aux: vec![k.to_string(), self.part.clone(), shown(geom::own(el))],
@@ -372,7 +372,7 @@ impl Importer<'_> {
                 pr.children.retain(|n| !matches!(n, Node::El(e) if e.is("p:ph")));
             }
         }
-        let f = self.fp(&[Some(&fshell)]);
+        let f = self.fp(&[Some(&geom::without_geometry(&fshell))]);
         let meta = Meta {
             tag: shell.name.clone(),
             aux: vec![k.to_string(), self.part.clone(), shown(g)],
@@ -392,8 +392,9 @@ impl Importer<'_> {
 
     /// A placeholder entry for `el`; `tag` marks a slide object's.
     fn keep_entry(&mut self, kind: Kind, el: &Element, path: &[usize], pos: Option<usize>, k: &str, tag: &str) -> Keep {
-        let fpv = self.fp(&[Some(el)]);
-        let id = self.keep_ids.next(&self.fp(&[Some(&geom::without_geometry(el))]));
+        // Geometry is the text's (§5.3): neither the id nor the fingerprint holds it.
+        let fpv = self.fp(&[Some(&geom::without_geometry(el))]);
+        let id = self.keep_ids.next(&fpv);
         let keep = Keep { id, kind: keep_kind(el), summary: summary(el) };
         let aux = if kind == Kind::Bkeep { vec![k.to_string(), self.part.clone()] } else { vec![] };
         let meta = Meta { keep: Some(keep.clone()), aux, tag: tag.into(), ..Default::default() };

@@ -3,20 +3,22 @@
 //! layout, P4 delete a slide, P5 move a slide, P6 edit (or add) notes, P7
 //! edit a `<shape>`'s text, P8 restyle a slide by changing its layout, P10
 //! delete an object (a picture, chart, table or group: rule 8), P11 move an
-//! object in its slide's z-order; P9 makes them all in one revision.
+//! object in its slide's z-order; P12 move a shape, P13 resize a picture,
+//! P14 add a text box under a title, P15 align two objects' left edges
+//! (geometry, §5.3); P9 makes them all in one revision.
 
 use std::collections::HashSet;
 
-use hanji_core::presentation::{kind, slide_head, slot_head, HeadKind};
-use hanji_core::{Block, Kind, ListItem, Para};
-use hanji_format::Inline;
+use hanji_core::presentation::{geom_of, kind, shape_head, slide_head, slot_head, HeadKind};
+use hanji_core::{Block, Kind, ListItem, Para, Place};
+use hanji_format::{Geom, Inline};
 use hanji_pptx::import::SlideInfo;
 use hanji_pptx::DeckShell;
 use hanji_testkit::{
     block_ranges, chars, deleted_span, entries_at, figure_or_word, ident, replace_span, span_of, Cx, Doc, Edit, EditFn,
 };
 
-pub const EDITS: [(&str, EditFn); 10] = [
+pub const EDITS: [(&str, EditFn); 14] = [
     ("p1_title", p1_title),
     ("p2_bullet", p2_bullet),
     ("p3_add_slide", p3_add_slide),
@@ -27,6 +29,10 @@ pub const EDITS: [(&str, EditFn); 10] = [
     ("p8_layout", p8_layout),
     ("p10_delete_object", p10_delete_object),
     ("p11_move_object", p11_move_object),
+    ("p12_move_shape", p12_move_shape),
+    ("p13_resize_picture", p13_resize_picture),
+    ("p14_add_text_box", p14_add_text_box),
+    ("p15_align", p15_align),
 ];
 
 /// A slide: its head and the end of its blocks.
@@ -429,4 +435,178 @@ fn p11_move_object(d: &Doc, _cx: &Cx) -> Option<Edit> {
     let mut ed = Edit::blocks("P11 move an object", what, blocks, bmap, (prev..a + 2).collect(), false);
     ed.named = vec![slide];
     Some(ed)
+}
+
+// ---------------------------------------------------------------- geometry (§5.3)
+
+const PT: i64 = 12_700;
+
+/// A box as the text shows it: `36 475 288 29`.
+fn pts(g: &Geom) -> String {
+    let p = hanji_format::pres::pt;
+    format!("{} {} {} {}", p(g.x), p(g.y), p(g.w), p(g.h))
+}
+
+/// The slide size, else 720 × 540 pt.
+fn slide_size(cx: &Cx) -> (i64, i64) {
+    shell(cx).deck.size.unwrap_or((720 * PT, 540 * PT))
+}
+
+/// Whether a connector of the slide at `slide` is attached to shape `id`
+/// (moving it alone is refused, §5.3).
+fn attached(d: &Doc, slide: usize, id: u32) -> bool {
+    let end = slides(&d.blocks).into_iter().find(|s| s.head == slide).map_or(slide + 1, |s| s.end);
+    let pats = [format!("<a:stCxn id=\"{id}\""), format!("<a:endCxn id=\"{id}\"")];
+    d.entries
+        .iter()
+        .filter(|e| e.path.first().is_some_and(|&k| (slide..end).contains(&k)))
+        .any(|e| e.xml.iter().any(|x| pats.iter().any(|p| x.contains(p))))
+}
+
+/// The shape id of a shape head (`s7` → 7) or of an object head's placeholder.
+fn shape_id_of(d: &Doc, k: usize) -> Option<u32> {
+    match d.blocks[k].head().map(kind)? {
+        HeadKind::Shape { id, .. } => id.strip_prefix('s')?.parse().ok(),
+        HeadKind::Object => {
+            let Some(Block::Keep(kid)) = d.blocks.get(k + 1) else { return None };
+            let e = d.entries.iter().find(|e| e.meta.keep.as_ref().is_some_and(|x| &x.id == kid))?;
+            let x = &e.xml[0];
+            let at = x.find("<p:cNvPr id=\"")? + 13;
+            x[at..].split('"').next()?.parse().ok()
+        }
+        _ => None,
+    }
+}
+
+/// Boxed shapes and objects no connector is attached to: `(head, slide, box)`.
+fn movable(d: &Doc, pick: &dyn Fn(&Doc, usize) -> bool) -> Vec<(usize, usize, Geom)> {
+    let mut out = vec![];
+    for sl in slides(&d.blocks) {
+        for k in sl.head + 1..sl.end {
+            let Some(h) = d.blocks[k].head() else { continue };
+            let (Some(g), Some(id)) = (geom_of(h), shape_id_of(d, k)) else { continue };
+            if g.rot == 0 && !g.flip_h && !g.flip_v && pick(d, k) && !attached(d, sl.head, id) {
+                out.push((k, sl.head, g));
+            }
+        }
+    }
+    out
+}
+
+/// `blocks` with head `k` at `g`.
+fn moved(d: &Doc, k: usize, g: Geom) -> Vec<Block> {
+    let mut blocks = d.blocks.clone();
+    if let Block::Head(h) = &mut blocks[k] {
+        h.place = Some(Place::Box(g.shown()));
+    }
+    blocks
+}
+
+fn label(d: &Doc, k: usize) -> String {
+    match d.blocks[k].head().map(kind) {
+        Some(HeadKind::Shape { name, .. }) => format!("shape {name:?}"),
+        Some(HeadKind::Object) => {
+            let kid = match d.blocks.get(k + 1) {
+                Some(Block::Keep(id)) => id.as_str(),
+                _ => "",
+            };
+            let kind = d
+                .entries
+                .iter()
+                .find(|e| e.meta.keep.as_ref().is_some_and(|x| x.id == kid))
+                .and_then(|e| e.meta.keep.as_ref())
+                .map_or("object", |x| x.kind.as_str());
+            format!("the {kind}")
+        }
+        _ => "object".into(),
+    }
+}
+
+fn geometry_edit(name: &'static str, what: String, blocks: Vec<Block>, k: usize, slide: usize) -> Edit {
+    let n = blocks.len();
+    let mut ed = Edit::blocks(name, what, blocks, ident(n), HashSet::from([k]), true);
+    ed.named = vec![slide];
+    ed
+}
+
+/// The first shape with a box moves half an inch (36 pt) right, or left when it would leave the slide.
+fn p12_move_shape(d: &Doc, cx: &Cx) -> Option<Edit> {
+    let is_shape = |d: &Doc, k: usize| matches!(d.blocks[k].head().map(kind), Some(HeadKind::Shape { .. }));
+    let (k, slide, g) = movable(d, &is_shape).into_iter().next()?;
+    let (w, _) = slide_size(cx);
+    let dx = if g.x + g.w + 36 * PT <= w { 36 * PT } else { -36 * PT };
+    let to = Geom { x: (g.x + dx).max(0), ..g.shown() };
+    let what = format!("move {} from box {} to {} on {}", label(d, k), pts(&g), pts(&to), slide_name(&d.blocks, k));
+    Some(geometry_edit("P12 move a shape", what, moved(d, k, to), k, slide))
+}
+
+/// The first picture grows by half about its top-left corner, or shrinks by a third when that would leave the slide.
+fn p13_resize_picture(d: &Doc, cx: &Cx) -> Option<Edit> {
+    let picture = |d: &Doc, k: usize| label(d, k) == "the picture";
+    let (k, slide, g) = movable(d, &picture).into_iter().next()?;
+    let (w, h) = slide_size(cx);
+    let s = |v: i64, num: i64, den: i64| hanji_format::shown_pt(v * num / den) * PT;
+    let big = Geom { w: s(g.w, 3, 2), h: s(g.h, 3, 2), ..g.shown() };
+    let to = if big.x + big.w <= w && big.y + big.h <= h {
+        big
+    } else {
+        Geom { w: s(g.w, 2, 3), h: s(g.h, 2, 3), ..g.shown() }
+    };
+    let what = format!("resize {} from box {} to {} on {}", label(d, k), pts(&g), pts(&to), slide_name(&d.blocks, k));
+    Some(geometry_edit("P13 resize a picture", what, moved(d, k, to), k, slide))
+}
+
+/// A text box right under the first title with a box, as wide as it, 28 pt tall.
+fn p14_add_text_box(d: &Doc, cx: &Cx) -> Option<Edit> {
+    let (_, h) = slide_size(cx);
+    let ss = slides(&d.blocks);
+    for sl in &ss {
+        let Some(t) = (sl.head + 1..sl.end).find(|&k| d.blocks[k].head().is_some_and(|h| h.key == "slot:title")) else {
+            continue;
+        };
+        let Some(g) = d.blocks[t].head().and_then(geom_of) else { continue };
+        let top = g.y + g.h + 6 * PT;
+        if top + 28 * PT > h {
+            continue;
+        }
+        let at = (t + 1..sl.end).find(|&k| d.blocks[k].head().is_some()).unwrap_or(sl.end);
+        let bx = Geom { x: g.x, y: top, w: g.w, h: 28 * PT, ..Default::default() }.shown();
+        let mut blocks = d.blocks.clone();
+        blocks.splice(at..at, [shape_head("", "", Some(bx)), para("출처: 편집 12", None)]);
+        let bmap = (0..d.blocks.len()).map(|k| Some(if k < at { k } else { k + 2 })).collect();
+        let what = format!(
+            "add a text box '출처: 편집 12' at box {} under the title of {}",
+            pts(&bx),
+            slide_name(&d.blocks, t)
+        );
+        let touched = if at < d.blocks.len() { HashSet::from([at]) } else { HashSet::new() };
+        let mut ed = Edit::blocks("P14 add a text box", what, blocks, bmap, touched, true);
+        let m = block_ranges(cx, d);
+        ed.span = span_of(cx, d, &ed.blocks, m[at - 1].1, m[at - 1].1);
+        ed.named = vec![sl.head];
+        return Some(ed);
+    }
+    None
+}
+
+/// On the first slide with two boxed objects whose left edges differ, the second takes the first's left edge.
+fn p15_align(d: &Doc, _: &Cx) -> Option<Edit> {
+    let any = |_: &Doc, _: usize| true;
+    let all = movable(d, &any);
+    for (n, &(a, slide, ga)) in all.iter().enumerate() {
+        let Some(&(b, _, gb)) = all[n + 1..].iter().find(|x| x.1 == slide && x.2.shown().x != ga.shown().x) else {
+            continue;
+        };
+        let to = Geom { x: ga.x, ..gb.shown() }.shown();
+        let what = format!(
+            "align the left edge of {} (box {}) with {} (x {}) on {}",
+            label(d, b),
+            pts(&gb),
+            label(d, a),
+            hanji_format::pres::pt(ga.x),
+            slide_name(&d.blocks, b)
+        );
+        return Some(geometry_edit("P15 align two objects", what, moved(d, b, to), b, slide));
+    }
+    None
 }
