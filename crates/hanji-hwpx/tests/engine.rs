@@ -454,10 +454,11 @@ fn scripts_ole_and_linked_files_are_neutralised_and_reported() {
     let pic = r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:pic id="6"><hc:img binaryItemIDRef="img1"/></hp:pic><hp:t>그림</hp:t></hp:run></hp:p>"#;
     let hidden = r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:ctrl><hp:hiddenComment><hp:subList><hp:p><hp:run><hp:t>숨은 설명</hp:t></hp:run></hp:p></hp:subList></hp:hiddenComment></hp:ctrl><hp:t>본문</hp:t></hp:run></hp:p>"#;
     let manifest = r#"<opf:item id="headersc" href="Scripts/headerScripts" media-type="application/x-javascript ;charset=utf-16"/><opf:item id="ole1" href="BinData/ole1.OLE" media-type="application/ole"/><opf:item id="img1" href="C:\\Users\\a\\photo.png" media-type="image/png" isEmbeded="0"/><opf:item id="img2" href="BinData/image2.png" media-type="image/png"/>"#;
+    let fills = r#"<hh:borderFills itemCnt="2"><hh:borderFill id="8"><hc:fillBrush><hc:imgBrush mode="TOTAL"><hc:img binaryItemIDRef="img1"/></hc:imgBrush></hc:fillBrush></hh:borderFill><hh:borderFill id="9"><hc:fillBrush><hc:winBrush/><hc:imgBrush mode="TOTAL"><hc:img binaryItemIDRef="img1"/></hc:imgBrush></hc:fillBrush></hh:borderFill></hh:borderFills>"#;
     let docopt = r#"</hh:refList><hh:docOption><hh:linkinfo path="\\\\server\\share\\base.hwpx" pageInherit="1" footnoteInherit="0"/></hh:docOption><hh:refList>"#;
     let pkg = hwpx_with(
         &[p("시작"), ole.into(), pic.into(), hidden.into()],
-        docopt,
+        &format!("{fills}{docopt}"),
         vec![
             part("Scripts/headerScripts", "function OnDocument_New() {}"),
             part("BinData/ole1.OLE", "OLE"),
@@ -484,13 +485,28 @@ fn scripts_ole_and_linked_files_are_neutralised_and_reported() {
         .filter(|p| p.name.ends_with(".xml") || p.name.ends_with(".hpf"))
         .map(|p| String::from_utf8_lossy(&p.data).into_owned())
         .collect();
-    for gone in ["Scripts/", "<hp:ole", "ole1", "photo.png", "server"] {
+    for gone in ["Scripts/", "<hp:ole", "ole1", "photo.png", "server", "img1", "<hp:pic"] {
         assert!(!all.contains(gone), "{gone} still in the export");
     }
     assert!(imp.text.contains("표 앞") && imp.text.contains("그림"), "{}", imp.text);
+    // The picture of the linked image and the header's image fill of it go too.
+    let located: Vec<&str> = imp.report.neutralised.iter().map(|n| n.location.as_str()).collect();
+    assert!(located.contains(&"Contents/section0.xml <hp:pic>"), "{located:?}");
+    assert!(located.contains(&"Contents/header.xml <hc:imgBrush>"), "{located:?}");
+    assert!(
+        all.contains(r#"<hh:borderFill id="9"><hc:fillBrush><hc:winBrush/></hc:fillBrush></hh:borderFill>"#),
+        "{all}"
+    );
     let again = import(&out);
     assert!(again.report.neutralised.is_empty(), "{:?}", again.report.neutralised);
     assert_eq!(again.text, imp.text);
+    // A reference hanji does not know how to remove is refused, not left dangling.
+    let odd = r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:video binaryItemIDRef="img1"/><hp:t>영상</hp:t></hp:run></hp:p>"#;
+    let pkg = hwpx_with(&[p("시작"), odd.into()], "", vec![], manifest);
+    match HwpxEngine.import(&pkg, &ImportOptions::default()) {
+        Err(EngineError::Package(m)) => assert!(m.contains("<hp:video> refers to img1"), "{m}"),
+        other => panic!("{:?}", other.map(|i| i.text)),
+    }
 }
 
 #[test]
