@@ -20,7 +20,9 @@
 //!   many as the tracked export writes (it refuses some, with the reason);
 //!   and two new documents from hanji-store's blank docx.
 //! - pptx: per deck, GetPut and P9 (title, bullet, notes and shape text
-//!   edits, a slide added from a layout, one deleted, one moved, …).
+//!   edits, a slide added from a layout, one deleted, one moved, …, and the
+//!   geometry edits: a shape moved, a picture resized, a text box added
+//!   under a title, two objects aligned).
 //! - xlsx: per workbook, GetPut and range operations that change the inputs
 //!   of formulas, whose cached values the export recomputes.
 //! - hwpx: per file, GetPut and E10.
@@ -500,9 +502,12 @@ fn pptx(kit: &mut Kit) {
                 name,
                 licence,
                 "pset",
-                "the pptx edit set, one edit after another: text edits, a slide added from a layout, one deleted, one moved",
+                "the pptx edit set, one edit after another: text edits, a slide added from a layout, one deleted, one moved, and geometry edits (a shape moved, a picture resized, a text box added, two objects aligned)",
                 &out,
-                vec![ppt.clone(), "Shows the edits listed below (slides added, deleted and moved; text changed)".into()],
+                vec![
+                    ppt.clone(),
+                    "Shows the edits listed below (slides added, deleted and moved; text changed; objects moved, resized, added and aligned where the listed boxes say)".into(),
+                ],
                 notes,
             );
             kit.items.last_mut().unwrap().order = Some(slide_order(&blocks0, orig.len(), &fin));
@@ -858,7 +863,7 @@ fn checklist(kit: &Kit, commit: &str) -> (String, String) {
     (md, csv)
 }
 
-const HOW_TO_CHECK_A_DECK: &str = "hanji's text of a deck holds only each slide's layout, the text of its slots (title, body, notes, …) and shapes, and a `<keep/>` line for each object it does not model (a picture, table, chart or group). Everything else, the geometry (positions, sizes, z-order apart from moved objects) and the design (fonts, colours, the theme, masters and layouts, transitions, animations), stays in the remainder, which the export writes back unchanged. So, comparing a `pset` export with its `original`: a slide no edit touched must look exactly like its original slide (the **Slide order** line says which original slide each one is); an edited slide may differ only in the text, order or layout its edits list. Anything else, such as a shape moved or resized, a lost picture or a changed font, is a fail: note the slide.";
+const HOW_TO_CHECK_A_DECK: &str = "hanji's text of a deck holds each slide's layout, and every object on it in z-order with its position and size in points (`box=\"x y w h\"` from the slide's top-left corner, 72 pt = 1 inch = 2.54 cm): the slots (title, body, …) and shapes with their text, lines and connectors by their two ends, groups with their objects, and a `<keep/>` line for each object it does not model (a picture, table or chart). The design (fonts, colours, fills, the theme, masters and layouts, transitions, animations) stays in the remainder, which the export writes back unchanged. So, comparing a `pset` export with its `original`: a slide no edit touched must look exactly like its original slide (the **Slide order** line says which original slide each one is); an edited slide may differ only in the text, order, layout, positions and sizes its edits list, and an object an edit moved or resized must sit at the box it names (a new text box under a title: just below it, as wide as it). Anything else, such as an object moved that no edit names, a lost picture, a connector come loose or a changed font, is a fail: note the slide.";
 
 fn zip_dir(dir: &Path, names: &[String], out: &Path) {
     let f = std::fs::File::create(out).unwrap();

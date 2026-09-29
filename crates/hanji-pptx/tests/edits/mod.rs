@@ -384,9 +384,11 @@ fn objects(d: &Doc) -> Vec<(usize, usize, &str)> {
     out
 }
 
-/// The last object that no animation plays on goes, with the parts only it used.
+/// The last object that no animation plays on goes, with the parts only it
+/// used: the last that is not a picture when there is one (P13 resizes a picture).
 fn p10_delete_object(d: &Doc, cx: &Cx) -> Option<Edit> {
-    let &(a, slide, what) = objects(d).last()?;
+    let all = objects(d);
+    let &(a, slide, what) = all.iter().rev().find(|o| o.2 != "picture").or(all.last())?;
     let mut blocks = d.blocks.clone();
     blocks.drain(a..a + 2);
     let bmap = (0..d.blocks.len())
@@ -529,13 +531,25 @@ fn geometry_edit(name: &'static str, what: String, blocks: Vec<Block>, k: usize,
     ed
 }
 
-/// The first shape with a box moves half an inch (36 pt) right, or left when it would leave the slide.
+/// The first shape with a box moves half an inch (36 pt): right, else left,
+/// down or up, the first way that keeps it on the slide.
 fn p12_move_shape(d: &Doc, cx: &Cx) -> Option<Edit> {
     let is_shape = |d: &Doc, k: usize| matches!(d.blocks[k].head().map(kind), Some(HeadKind::Shape { .. }));
-    let (k, slide, g) = movable(d, &is_shape).into_iter().next()?;
-    let (w, _) = slide_size(cx);
-    let dx = if g.x + g.w + 36 * PT <= w { 36 * PT } else { -36 * PT };
-    let to = Geom { x: (g.x + dx).max(0), ..g.shown() };
+    let (w, h) = slide_size(cx);
+    let step = 36 * PT;
+    let (k, slide, g, to) = movable(d, &is_shape).into_iter().find_map(|(k, slide, g)| {
+        let s = g.shown();
+        let to = [
+            (g.x + g.w + step <= w).then(|| Geom { x: s.x + step, ..s }),
+            (g.x >= step).then(|| Geom { x: s.x - step, ..s }),
+            (g.y + g.h + step <= h).then(|| Geom { y: s.y + step, ..s }),
+            (g.y >= step).then(|| Geom { y: s.y - step, ..s }),
+        ]
+        .into_iter()
+        .flatten()
+        .next()?;
+        Some((k, slide, g, to))
+    })?;
     let what = format!("move {} from box {} to {} on {}", label(d, k), pts(&g), pts(&to), slide_name(&d.blocks, k));
     Some(geometry_edit("P12 move a shape", what, moved(d, k, to), k, slide))
 }
