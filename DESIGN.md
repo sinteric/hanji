@@ -232,7 +232,10 @@ schema: 1
     starts at the margin and nests one level at a time.
   - Canonical form writes `1.` for every numbered item. Consecutive items are
     consecutive lines. A blank line ends a list, so two lists are separated by
-    one, and an item written after one starts a new list.
+    one, and an item written after one starts a new list. An item at the
+    margin of the other kind (`1.` after `- ` items, or `- ` after `1.`)
+    starts a new list too, as in GFM; canonical form puts the blank line
+    before it.
   - The text says only bullet or numbered, and the level. The item's paragraph
     style, list definition and number format stay in the remainder.
   - A new item takes the numbering of its nearest sibling: at its level, or the
@@ -288,7 +291,9 @@ schema: 1
 - Table style (§6 round 2): a `{style="Name"}` line directly before the
   header row, no blank line between; the braces hold only `style="Name"`;
   nothing closes the table. A pipe table without the line has the default
-  table style.
+  table style, the one a new table gets (docx: the file's default table
+  style, or Table Grid when that draws no borders, as Word's Normal Table
+  does); a line naming it is written as no line.
 - Headers, footers and section setup come from the template or the remainder
   at first; exposing their text is a later extension.
 - Tracked changes and comments (`<ins>`, `<del>`, `<comment>`) are read-only

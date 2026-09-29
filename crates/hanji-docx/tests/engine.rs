@@ -111,11 +111,7 @@ fn empty_paragraphs_and_multi_paragraph_cells_round_trip() {
     let body = format!("{}<w:p/><w:p><w:pPr><w:pStyle w:val=\"Note\"/></w:pPr></w:p>{tbl}", p("앞"));
     let pkg = docx(&body, vec![]);
     let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
-    assert!(
-        imp.text.contains("앞\n\n<p/>\n<p style=\"Note\"/>\n\n{style=\"Table Grid\"}\n| 지역 | 비고 |"),
-        "{}",
-        imp.text
-    );
+    assert!(imp.text.contains("앞\n\n<p/>\n<p style=\"Note\"/>\n\n| 지역 | 비고 |"), "{}", imp.text);
     assert!(imp.text.contains("| 부산 | 해운대 1곳<p/><p style=\"Note\"/>잠정치 |"), "{}", imp.text);
     let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
     assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, imp.text);
@@ -474,7 +470,7 @@ fn numbered_paragraphs_are_list_items() {
     .concat();
     let pkg = list_docx(&body, true);
     let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
-    let want = "# Title\n\n- a\n  - b\n- c\n\nplain\n\n1. d\n   1. d1\n1. e\n\n- other list\n- by style\n\n| <p style=\"List Paragraph\"/>in cell |\n|---|\n";
+    let want = "# Title\n\n- a\n  - b\n- c\n\nplain\n\n1. d\n   1. d1\n1. e\n\n- other list\n- by style\n\n{style=\"Normal Table\"}\n| <p style=\"List Paragraph\"/>in cell |\n|---|\n";
     assert!(imp.text.ends_with(want), "{}", imp.text);
     // GetPut.
     let canon = |pkg: &[u8]| hanji_docx::xml::canon_part(doc_xml(pkg).as_bytes()).unwrap();
@@ -543,5 +539,192 @@ fn a_new_list_without_numbering_in_the_file_is_refused() {
     match DocxEngine.export(&new, &imp.remainder) {
         Err(EngineError::Refused(m)) => assert!(m.contains("no bulleted list to take numbering from"), "{m}"),
         other => panic!("{other:?}"),
+    }
+}
+
+/// The `w:numId` of each paragraph of `xml` whose text is one of `texts`.
+fn num_ids(xml: &str, texts: &[&str]) -> Vec<String> {
+    texts
+        .iter()
+        .map(|t| {
+            let at = xml.find(&format!(">{t}<")).unwrap_or_else(|| panic!("{t}: {xml}"));
+            let p = &xml[xml[..at].rfind("<w:p>").or_else(|| xml[..at].rfind("<w:p ")).unwrap()..at];
+            let k = p.find("<w:numId w:val=\"").unwrap_or_else(|| panic!("{t} has no numId: {p}")) + 16;
+            p[k..].split('"').next().unwrap().to_string()
+        })
+        .collect()
+}
+
+#[test]
+fn adjacent_lists_of_another_kind_stay_separate() {
+    // A bullet list right before a numbered one: two lists (§5.2). Numbers
+    // under a bullet on a numbering of their own are nested items.
+    let body = [li(1, 0, "a"), li(2, 1, "a1"), li(1, 0, "b"), li(2, 0, "one"), li(2, 0, "two"), li(1, 0, "c")].concat();
+    let pkg = list_docx(&body, true);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(imp.text.ends_with("---\n- a\n  1. a1\n- b\n\n1. one\n1. two\n\n- c\n"), "{}", imp.text);
+    let canon = |pkg: &[u8]| hanji_docx::xml::canon_part(doc_xml(pkg).as_bytes()).unwrap();
+    assert_eq!(canon(&DocxEngine.export(&imp.text, &imp.remainder).unwrap()), canon(&pkg), "GetPut");
+    // Written as new text, each reads back as written, every list on a numbering of its own.
+    let base = DocxEngine.import(&list_docx(&p("end"), true), &ImportOptions::default()).unwrap();
+    for (lists, items) in [
+        ("- a\n  - a1\n\n1. one\n", &["a", "a1", "one"][..]),
+        ("1. one\n1. two\n\n- a\n", &["one", "two", "a"]),
+        // Two numbered lists: the second restarts, on a numbering of its own.
+        ("1. one\n1. two\n\n1. new one\n", &["one", "two", "new one"]),
+        // A list nests the other kind, and the outer list goes on after it.
+        ("- a\n  1. one\n  1. two\n- b\n\n1. three\n", &["a", "one", "b", "three"]),
+    ] {
+        let r = rewrite(&base.remainder, &base.text, &base.text.replace("end\n", &format!("{lists}\nend\n")), CAPS)
+            .unwrap();
+        let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+        assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, r.text, "PutGet");
+        let ids = num_ids(&doc_xml(&out), items);
+        match lists {
+            "- a\n  - a1\n\n1. one\n" | "1. one\n1. two\n\n- a\n" => {
+                assert_eq!(ids[0], ids[1], "{lists}: {ids:?}");
+                assert_ne!(ids[1], ids[2], "{lists}: {ids:?}");
+            }
+            "1. one\n1. two\n\n1. new one\n" => assert!(ids[0] == ids[1] && ids[1] != ids[2], "{ids:?}"),
+            _ => assert!(ids[0] == ids[2] && ids[1] != ids[0] && ids[3] != ids[1], "{ids:?}"),
+        }
+    }
+    // Written on consecutive lines, as in §5.2's example, the item of the
+    // other kind still starts a new list; canonical form separates the two.
+    let r = rewrite(&base.remainder, &base.text, &base.text.replace("end\n", "- a\n1. one\n\nend\n"), CAPS).unwrap();
+    let canonical = DocxEngine::text_of(&r.new, &r.remainder, None);
+    assert!(canonical.contains("\n- a\n\n1. one\n\nend\n"), "{canonical}");
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, canonical, "PutGet");
+}
+
+/// §5.2's example, without what the docx engine does not write yet
+/// (footnotes, fields) and the placeholder a new file cannot have.
+fn design_example() -> String {
+    let design = include_str!("../../../DESIGN.md");
+    let from = design.find("### 5.2 Document").unwrap();
+    let block = &design[from..];
+    let block = &block[block.find("```\n").unwrap() + 4..];
+    let block = &block[..block.find("```\n").unwrap()];
+    let body = block.splitn(3, "---\n").nth(2).unwrap();
+    body.lines()
+        .filter(|l| !["<field", "<keep", "[^1]:"].iter().any(|p| l.starts_with(p)))
+        .map(|l| format!("{}\n", l.replace("[^1]", "")))
+        .collect::<String>()
+        .trim_end()
+        .to_string()
+        + "\n"
+}
+
+#[test]
+fn the_design_example_round_trips() {
+    let styles = STYLES.replace(
+        "</w:styles>",
+        "<w:style w:type=\"paragraph\" w:styleId=\"Narrow\"><w:name w:val=\"좁은 간격\"/></w:style><w:style w:type=\"paragraph\" w:styleId=\"TableNote\"><w:name w:val=\"표 참고\"/></w:style><w:style w:type=\"table\" w:styleId=\"GridTable4\"><w:name w:val=\"Grid Table 4\"/></w:style><w:style w:type=\"paragraph\" w:styleId=\"ListParagraph\"><w:name w:val=\"List Paragraph\"/></w:style></w:styles>",
+    );
+    let mut parts = package::read(&docx(&p("end"), vec![part("word/numbering.xml", NUMBERING)])).unwrap();
+    parts.iter_mut().find(|x| x.name == "word/styles.xml").unwrap().data = styles.into_bytes();
+    let base = DocxEngine.import(&package::write(&parts).unwrap(), &ImportOptions::default()).unwrap();
+    let example = design_example();
+    assert!(example.contains("- 신규 고객 34곳\n  - 수도권 21곳\n1. 다음 분기 목표\n"), "{example}");
+    let r = rewrite(&base.remainder, &base.text, &base.text.replace("end\n", &example), CAPS).unwrap();
+    // Its canonical form (as the store keeps it) has a blank line after the
+    // heading and between the bullet and the numbered list.
+    let canonical = DocxEngine::text_of(&r.new, &r.remainder, None);
+    assert!(canonical.contains("- 신규 고객 34곳\n  - 수도권 21곳\n\n1. 다음 분기 목표\n"), "{canonical}");
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, canonical, "PutGet");
+    let xml = doc_xml(&out);
+    let ids = num_ids(&xml, &["신규 고객 34곳", "수도권 21곳", "다음 분기 목표"]);
+    assert!(ids[0] == ids[1] && ids[1] != ids[2], "{ids:?}");
+    // The table without a style line takes Table Grid (Normal Table draws no borders).
+    assert_eq!(xml.matches("<w:tblStyle w:val=\"Grid\"/>").count(), 1, "{xml}");
+    assert_eq!(xml.matches("<w:tblStyle w:val=\"GridTable4\"/>").count(), 1, "{xml}");
+    if let Ok(dir) = std::env::var("HANJI_SAVE") {
+        std::fs::write(format!("{dir}/design-example.docx"), &out).unwrap();
+    }
+}
+
+/// A package whose styles are `STYLES` with `from` replaced by `to`.
+fn docx_styles(body: &str, from: &str, to: &str) -> Vec<u8> {
+    let mut parts = package::read(&docx(body, vec![])).unwrap();
+    assert!(STYLES.contains(from), "{from}");
+    parts.iter_mut().find(|x| x.name == "word/styles.xml").unwrap().data = STYLES.replace(from, to).into_bytes();
+    package::write(&parts).unwrap()
+}
+
+#[test]
+fn a_new_table_takes_the_default_table_style_and_reads_back() {
+    let table = "| 지역 | 매출 |\n|---|---|\n| 서울 | 120 |\n";
+    let normal =
+        r#"<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/></w:style>"#;
+    let grid = r#"<w:style w:type="table" w:styleId="Grid"><w:name w:val="Table Grid"/></w:style>"#;
+    let borders = r#"<w:tblPr><w:tblBorders><w:top w:val="single" w:sz="4" w:space="0" w:color="auto"/></w:tblBorders></w:tblPr>"#;
+    let bordered = format!(
+        r#"<w:style w:type="table" w:default="1" w:styleId="Boxed"><w:name w:val="Boxed"/><w:basedOn w:val="Plain"/></w:style><w:style w:type="table" w:styleId="Plain"><w:name w:val="Plain"/>{borders}</w:style>"#
+    );
+    for (what, pkg, want) in [
+        // Word's Normal Table draws no borders: Table Grid, as Word inserts a table.
+        ("Normal Table is the default", docx(&p("end"), vec![]), "Grid"),
+        // A default that draws borders (here through the style it is based on).
+        ("a bordered default", docx_styles(&p("end"), normal, &bordered), "Boxed"),
+        // No Table Grid: the default, written out.
+        ("no Table Grid", docx_styles(&p("end"), grid, ""), "TableNormal"),
+    ] {
+        let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+        let r =
+            rewrite(&imp.remainder, &imp.text, &imp.text.replace("end\n", &format!("{table}\nend\n")), CAPS).unwrap();
+        let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+        let xml = doc_xml(&out);
+        assert!(xml.contains(&format!("<w:tblPr><w:tblStyle w:val=\"{want}\"/>")), "{what}: {xml}");
+        assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, r.text, "{what}: PutGet");
+    }
+    // Named in the text: another style reads back as written; the default
+    // is no style line (canonical form), in the text and on reading back.
+    let imp = DocxEngine.import(&docx(&p("end"), vec![]), &ImportOptions::default()).unwrap();
+    for (style, line) in [("Normal Table", true), ("Table Grid", false)] {
+        let new = imp.text.replace("end\n", &format!("{{style=\"{style}\"}}\n{table}\nend\n"));
+        let r = rewrite(&imp.remainder, &imp.text, &new, CAPS).unwrap();
+        let canonical = DocxEngine::text_of(&r.new, &r.remainder, None);
+        assert_eq!(canonical.contains("{style="), line, "{style}: {canonical}");
+        let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+        assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, canonical, "{style}: PutGet");
+    }
+    // An existing table without a style of its own is drawn with the default
+    // table style, and the text says so; it keeps its XML (GetPut).
+    let tbl = "<w:tbl><w:tblPr/><w:tblGrid><w:gridCol w:w=\"2000\"/></w:tblGrid><w:tr><w:tc><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl>";
+    let pkg = docx(tbl, vec![]);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(imp.text.ends_with("---\n{style=\"Normal Table\"}\n| x |\n|---|\n"), "{}", imp.text);
+    let canon = |pkg: &[u8]| hanji_docx::xml::canon_part(doc_xml(pkg).as_bytes()).unwrap();
+    assert_eq!(canon(&DocxEngine.export(&imp.text, &imp.remainder).unwrap()), canon(&pkg), "GetPut");
+    // Dropping the line gives it the default for new tables.
+    let r = rewrite(&imp.remainder, &imp.text, &imp.text.replace("{style=\"Normal Table\"}\n", ""), CAPS).unwrap();
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert!(doc_xml(&out).contains("<w:tblPr><w:tblStyle w:val=\"Grid\"/></w:tblPr>"), "{}", doc_xml(&out));
+    assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, r.text, "PutGet");
+}
+
+#[test]
+fn splitting_a_paragraph_at_an_empty_bookmark_keeps_its_start_before_its_end() {
+    // An empty bookmark (Word's _GoBack) where the paragraph is split, and a
+    // bookmark round text the split deletes: a start keeps right affinity
+    // and an end left, which put the end in the first paragraph and the start in the second.
+    let body = "<w:p><w:r><w:t>abc</w:t></w:r><w:bookmarkStart w:id=\"0\" w:name=\"_GoBack\"/><w:bookmarkEnd w:id=\"0\"/><w:r><w:t>def</w:t></w:r></w:p><w:p><w:r><w:t>gh</w:t></w:r><w:bookmarkStart w:id=\"1\" w:name=\"x\"/><w:r><w:t>X</w:t></w:r><w:bookmarkEnd w:id=\"1\"/><w:r><w:t>ij</w:t></w:r></w:p>";
+    let imp = DocxEngine.import(&docx(body, vec![]), &ImportOptions::default()).unwrap();
+    for (old, new) in [("abcdef", "abc\n\ndef"), ("ghXij", "gh\n\nij")] {
+        let by_edit = edit(&imp.remainder, &imp.text, old, new, CAPS).unwrap();
+        let by_rewrite = rewrite(&imp.remainder, &imp.text, &imp.text.replace(old, new), CAPS).unwrap();
+        for (how, r) in [("exact edit", by_edit), ("rewrite", by_rewrite)] {
+            assert!(r.report.refused.is_empty(), "{how}: {:?}", r.report);
+            let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+            let xml = doc_xml(&out);
+            for id in ["0", "1"] {
+                let start = xml.find(&format!("<w:bookmarkStart w:id=\"{id}\"")).unwrap();
+                let end = xml.find(&format!("<w:bookmarkEnd w:id=\"{id}\"/>")).unwrap();
+                assert!(start < end, "{how} {old:?}: bookmark {id} ends before it starts: {xml}");
+            }
+            assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, r.text, "{how}: PutGet");
+        }
     }
 }

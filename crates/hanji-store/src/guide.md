@@ -25,14 +25,14 @@ Document (docx, hwpx)
 - `#` … `######`: the file's Heading 1–6.
 - <div style="Name">text</div>: a paragraph in style Name (one style name exactly as the file lists it, spaces included).
 - <p/> on its own line: an empty paragraph; <p style="Name"/>: an empty one in style Name.
-- `- item` bullets, `1. item` numbered. Nest by indenting to the parent's text: 2 spaces under `- `, 3 under `1. `. A blank line ends a list.
+- `- item` bullets, `1. item` numbered. Nest by indenting to the parent's text: 2 spaces under `- `, 3 under `1. `. A blank line ends a list; so does an item at the margin of the other kind.
 - Tables are pipe tables, one line per row, one cell per column in every row:
   | 지역 | 지점 | 매출 |
   |---|---|---|
   | 서울 | 강남 | 120 |
   | ^^ | 종로 | 95 |
   | 합계 || 215 |
-  `^^` as the whole cell: merged into the cell above. `||` (no space between the pipes): the cell to the left extends into this column; `|||` spans three. Text goes in the top-left cell of a merge only. In a cell, <p/> starts another paragraph. A line {style="Name"} right before the header row sets the table style.
+  `^^` as the whole cell: merged into the cell above. `||` (no space between the pipes): the cell to the left extends into this column; `|||` spans three. Text goes in the top-left cell of a merge only. In a cell, <p/> starts another paragraph. A line {style="Name"} right before the header row sets the table style; without it a table has the file's default.
 - <pagebreak/> on its own line.
 
 Presentation (pptx)

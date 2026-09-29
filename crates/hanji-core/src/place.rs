@@ -601,7 +601,37 @@ pub fn place(old: &[Block], new: &[Block], entries: &[Entry], al: &Alignment) ->
     let mut p =
         Placer { old, new, entries, al, out: HashMap::new(), handled: HashSet::new(), by_path, owners: HashMap::new() };
     p.run();
+    keep_marker_order(entries, &mut p.out);
     p.out
+}
+
+/// Markers of one paragraph stay in their order, so a bookmark or comment
+/// range never ends before it starts. A start keeps right affinity and an
+/// end left affinity; where both sat at one place (an empty bookmark) or
+/// only deleted text lay between them, a split there would put the end in
+/// the first paragraph and the start in the second. A marker that would
+/// land before one that preceded it goes where that one went.
+fn keep_marker_order(entries: &[Entry], out: &mut HashMap<u64, Outcome>) {
+    let mut by_para: HashMap<&Path, Vec<&Entry>> = HashMap::new();
+    for e in entries.iter().filter(|e| e.kind == Kind::Marker) {
+        by_para.entry(&e.path).or_default().push(e);
+    }
+    for list in by_para.values_mut() {
+        list.sort_by_key(|e| (e.start, e.seq));
+        let mut last: Option<(Path, Option<usize>)> = None;
+        for e in list.iter() {
+            let Some(Outcome { status: Status::Placed { entry: x, .. }, .. }) = out.get_mut(&e.id) else { continue };
+            if x.kind != Kind::Marker {
+                continue;
+            }
+            match &last {
+                Some((path, at)) if (&x.path, x.start) < (path, *at) => {
+                    (x.path, x.start, x.end) = (path.clone(), *at, *at);
+                }
+                _ => last = Some((x.path.clone(), x.start)),
+            }
+        }
+    }
 }
 
 impl<'a> Placer<'a> {

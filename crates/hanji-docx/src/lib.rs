@@ -94,13 +94,13 @@ impl DocxEngine {
             ));
         }
         let scope = xml::scope_of(root);
-        let styles = styles::read(package::get(&parts, "word/styles.xml"));
+        let (styles, default_table) = styles::read(package::get(&parts, "word/styles.xml"));
         let notes = notes(&parts);
         let body_at = root.children.iter().position(|n| matches!(n, xml::Node::El(e) if e.is("w:body")));
         let Some(body_at) = body_at else { return Err(EngineError::Package("document.xml has no w:body".into())) };
         let xml::Node::El(body) = &root.children[body_at] else { unreachable!() };
         let numbering = numbering::Numbering::read(&parts);
-        let split = import::Importer::new(&scope, styles, &notes, &numbering)
+        let split = import::Importer::new(&scope, styles, default_table, &notes, &numbering)
             .body(body)
             .map_err(|e| EngineError::Package(format!("{DOC_PART}: {e}")))?;
         let shell = DocShell {

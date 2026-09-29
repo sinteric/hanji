@@ -52,7 +52,8 @@ pub struct ListItem {
     pub ordered: bool,
     /// Nesting level, 0 at the margin.
     pub level: usize,
-    /// First item of a list in the text (a blank line or another block before it).
+    /// First item of a list in the text: a blank line or another block
+    /// before it, or an item of the other kind before it at the margin.
     pub first: bool,
 }
 
@@ -83,6 +84,8 @@ pub struct StyleSet {
     /// Names of Heading 1–6, where the file has them.
     pub headings: [Option<String>; 6],
     pub table: Vec<StyleDef>,
+    /// Name of the style of a table the text gives no `{style}` line: the
+    /// one a new table gets (the engine chooses it).
     pub default_table: Option<String>,
 }
 
@@ -238,12 +241,18 @@ pub fn resolve(
                         }
                     }
                 }
-                out.push(Block::Table(Table { style: t.style.clone(), rows }));
+                // The default table style named is no style line (canonical form).
+                let style = t.style.clone().filter(|s| Some(s) != styles.default_table.as_ref());
+                out.push(Block::Table(Table { style, rows }));
             }
             fmt::Block::List(items) => {
-                for (k, it) in items.iter().enumerate() {
+                let mut margin = None;
+                for it in items {
                     check_inline(&it.content, caps, is_block_keep, &mut err);
-                    let item = ListItem { ordered: it.ordered, level: it.level, first: k == 0 };
+                    // An item at the margin of the other kind starts a new list,
+                    // as in GFM (§5.2); canonical form puts a blank line before it.
+                    let first = it.level == 0 && margin.replace(it.ordered) != Some(it.ordered);
+                    let item = ListItem { ordered: it.ordered, level: it.level, first };
                     out.push(Block::Para(Para { style: String::new(), content: it.content.clone(), item: Some(item) }));
                 }
             }

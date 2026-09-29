@@ -32,6 +32,8 @@ pub struct Stats {
 pub struct Importer<'a> {
     scope: &'a Scope,
     styles: StyleSet,
+    /// The id of the table style a table without `w:tblStyle` is drawn with.
+    default_table: Option<String>,
     entries: Vec<Entry>,
     next_id: u64,
     next_seq: u64,
@@ -42,9 +44,9 @@ pub struct Importer<'a> {
     /// Namespace declarations on ancestors below the root.
     inherited: Vec<(String, String)>,
     numbering: &'a Numbering,
-    /// The list the previous block belonged to: its numId and the ilvl of
-    /// each open level.
-    list: Option<(u32, Vec<u32>)>,
+    /// The list the previous block belonged to: the numId of its items at
+    /// the margin, whether they are numbered, and the ilvl of each open level.
+    list: Option<(u32, bool, Vec<u32>)>,
 }
 
 /// Import-time checkpoint, so a table that turns out not to be a pipe
@@ -55,12 +57,14 @@ impl<'a> Importer<'a> {
     pub fn new(
         scope: &'a Scope,
         styles: StyleSet,
+        default_table: Option<String>,
         notes: &'a HashMap<(String, String), String>,
         numbering: &'a Numbering,
     ) -> Self {
         Importer {
             scope,
             styles,
+            default_table,
             entries: vec![],
             next_id: 1,
             next_seq: 1000,
@@ -357,7 +361,9 @@ impl<'a> Importer<'a> {
     fn table_inner(&mut self, tbl: &Element, bi: usize) -> Result<Option<Table>, String> {
         let shell = tbl.shell();
         let head: Vec<&Element> = tbl.elements().filter(|e| e.is("w:tblPr") || e.is("w:tblGrid")).collect();
+        // The style the table is drawn with: its own, or the file's default.
         let style_id = tbl.child("w:tblPr").and_then(|p| p.child("w:tblStyle")).and_then(|s| s.get("w:val"));
+        let style_id = style_id.or_else(|| self.default_table.clone());
         let mut head_fp: Vec<Element> = head.iter().map(|e| (*e).clone()).collect();
         for h in &mut head_fp {
             if h.is("w:tblPr") {
@@ -492,18 +498,27 @@ impl<'a> Importer<'a> {
         let direct = ppr.and_then(|p| p.child("w:numPr")).is_some();
         let ilvl = lvl.or(style.filter(|_| !direct).map(|s| s.1)).unwrap_or(0);
         let ordered = self.numbering.ordered(num, ilvl)?;
-        // Levels nest by ilvl within one list (numId); the text level counts
+        // A list is one numId and one kind at the margin: an item back at the
+        // margin with another numId, or of the other kind, starts a new list,
+        // as it does in the text (§5.2). A nested item may use another numId
+        // (numbers under a bullet). Levels nest by ilvl; the text level counts
         // the open levels, so a list starting at ilvl 2 is still at the margin.
-        let (first, level) = match &mut self.list {
-            Some((n, stack)) if *n == num => {
+        let nested = match &mut self.list {
+            Some((n, margin, stack)) => {
                 while stack.last().is_some_and(|&t| t >= ilvl) {
                     stack.pop();
                 }
-                stack.push(ilvl);
-                (false, stack.len() - 1)
+                (!stack.is_empty() || (*n == num && *margin == ordered)).then(|| {
+                    stack.push(ilvl);
+                    stack.len() - 1
+                })
             }
-            _ => {
-                self.list = Some((num, vec![ilvl]));
+            _ => None,
+        };
+        let (first, level) = match nested {
+            Some(level) => (false, level),
+            None => {
+                self.list = Some((num, ordered, vec![ilvl]));
                 (true, 0)
             }
         };

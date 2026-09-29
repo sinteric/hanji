@@ -72,7 +72,8 @@ pub struct Meta {
     pub opens: bool,
     /// Sequence number of a wrapper's end.
     pub seq_close: u64,
-    /// Style id at import (`Ppr`, `Tbl`).
+    /// Style id at import (`Ppr`, `Tbl`; docx: a table without
+    /// `w:tblStyle` has the file's default table style's).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub style: Option<String>,
     /// Marks the run had at import (`Run`).
