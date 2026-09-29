@@ -106,9 +106,16 @@ pub fn align(old: &[Block], new: &[Block]) -> Vec<Option<usize>> {
 /// identical blocks: matched only through a run of repeated blocks, or
 /// moved while an identical block exists.
 pub fn align_ambiguous(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, HashSet<usize>) {
+    let (bmap, ambiguous, _) = align_full(old, new);
+    (bmap, ambiguous)
+}
+
+/// [`align_ambiguous`], and the heads left `unsure`: unplaced, with a new
+/// head they could be (see [`follow_heads`]).
+pub fn align_full(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, HashSet<usize>, HashSet<usize>) {
     // Nothing changed: every block is where it was, identical ones included.
     if old == new {
-        return ((0..old.len()).map(Some).collect(), HashSet::new());
+        return ((0..old.len()).map(Some).collect(), HashSet::new(), HashSet::new());
     }
     let mut bmap: Vec<Option<usize>> = vec![None; old.len()];
     let mut used: HashSet<usize> = HashSet::new();
@@ -226,14 +233,16 @@ pub fn align_ambiguous(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, Has
             pair(&mut bmap, &mut used, i, j);
         }
     }
-    follow_heads(old, new, &mut bmap, &mut used, &mut ambiguous);
-    // Block placeholders are found by id wherever they went.
+    // Block placeholders are found by id wherever they went (before heads
+    // follow them: an object's head goes where its placeholder went).
     for (i, b) in old.iter().enumerate() {
         if let Block::Keep(id) = b {
             bmap[i] = new.iter().position(|x| matches!(x, Block::Keep(y) if y == id));
             ambiguous.remove(&i);
         }
     }
+    let mut unsure = HashSet::new();
+    follow_heads(old, new, &mut bmap, &mut used, &mut ambiguous, &mut unsure);
     // A repeated block is pinned by a run of consecutive pairs (i → j,
     // i+1 → j+1, …) that holds a block paired without ambiguity.
     let mut k = 0;
@@ -249,24 +258,30 @@ pub fn align_ambiguous(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, Has
         }
         k = e;
     }
-    (bmap, ambiguous)
+    (bmap, ambiguous, unsure)
 }
 
 /// Heads follow what they hold. Each head pairs with the new head its
 /// contents mostly went under (slots and shapes first, then slides, whose
 /// contents include their slots). A slide none of whose contents survived
-/// keeps the pairing the diff gave it, else takes the place after where the
-/// block before it went; a slot or shape none of whose
-/// contents survived pairs with the head of its key on the slide its slide
-/// went to. A head is ambiguous when every block that placed it is.
+/// keeps the pairing the diff gave it where it stood; else it was deleted,
+/// or, when a new slide no other took could be it, it is `unsure` (with the
+/// heads it holds): §10.3 refuses an ambiguous alignment rather than guess. A slot,
+/// shape or object none of whose contents survived pairs with the head of
+/// its key on the slide its slide went to. A head is ambiguous when every
+/// block that placed it is.
 fn follow_heads(
     old: &[Block],
     new: &[Block],
     bmap: &mut [Option<usize>],
     used: &mut HashSet<usize>,
     ambiguous: &mut HashSet<usize>,
+    unsure: &mut HashSet<usize>,
 ) {
     let heads: Vec<usize> = (0..old.len()).filter(|&i| old[i].head().is_some()).collect();
+    if heads.is_empty() {
+        return;
+    }
     let diff: HashMap<usize, usize> = heads.iter().filter_map(|&i| bmap[i].map(|j| (i, j))).collect();
     let diff_ambiguous: HashSet<usize> = heads.iter().copied().filter(|i| ambiguous.contains(i)).collect();
     for &i in &heads {
@@ -305,45 +320,60 @@ fn follow_heads(
         fits
     };
     for lv in [1, 0] {
+        // Every head's votes: (old head, new head, count, every voter ambiguous).
+        let mut votes: Vec<(usize, usize, usize, bool)> = vec![];
         for &i in heads.iter().filter(|&&i| level(&old[i]) == Some(lv)) {
-            let mut votes: Vec<(usize, usize, bool)> = vec![]; // (new head, count, every voter ambiguous)
             let contents = i + 1..end(old, i, lv);
             for (k, to) in contents.clone().zip(&bmap[contents]) {
                 let Some(x) = to.and_then(|jk| under(jk, lv)) else { continue };
-                match votes.iter_mut().find(|v| v.0 == x) {
+                match votes.iter_mut().find(|v| v.0 == i && v.1 == x) {
                     Some(v) => {
-                        v.1 += 1;
-                        v.2 &= ambiguous.contains(&k);
+                        v.2 += 1;
+                        v.3 &= ambiguous.contains(&k);
                     }
-                    None => votes.push((x, 1, ambiguous.contains(&k))),
-                }
-            }
-            // Most votes; the earliest content breaks a tie.
-            let best = votes.iter().enumerate().max_by_key(|(n, v)| (v.1, std::cmp::Reverse(*n))).map(|(_, v)| *v);
-            if let Some((x, _, amb)) = best {
-                if pair(bmap, used, i, x) && amb {
-                    ambiguous.insert(i);
+                    None => votes.push((i, x, 1, ambiguous.contains(&k))),
                 }
             }
         }
+        // Two heads wanting one new head: the one with more votes gets it,
+        // then the one the diff paired there, then the earlier; the other
+        // takes its next choice, or none.
+        votes.sort_by_key(|&(i, x, n, _)| (std::cmp::Reverse(n), diff.get(&i) != Some(&x), i, x));
+        for (i, x, _, amb) in votes {
+            if bmap[i].is_none() && pair(bmap, used, i, x) && amb {
+                ambiguous.insert(i);
+            }
+        }
         if lv == 0 {
-            for &i in &heads {
-                if level(&old[i]) != Some(0) || bmap[i].is_some() {
-                    continue;
+            let unvoted: Vec<usize> =
+                heads.iter().copied().filter(|&i| level(&old[i]) == Some(0) && bmap[i].is_none()).collect();
+            // Where a slide stood: after where the last placed block before it went.
+            let there = |bmap: &[Option<usize>], i: usize| (0..i).rev().find_map(|p| bmap[p]).map_or(0, |j| j + 1);
+            // The diff's pairing, when it keeps the slide where it stood (a
+            // slide whose text all changed in place). One elsewhere is no
+            // evidence: the slide may as well have been deleted and another added.
+            for &i in &unvoted {
+                let Some(&j) = diff.get(&i) else { continue };
+                if j == there(bmap, i) && pair(bmap, used, i, j) && diff_ambiguous.contains(&i) {
+                    ambiguous.insert(i);
                 }
-                let by_diff = diff.get(&i).is_some_and(|&j| pair(bmap, used, i, j));
-                if by_diff {
-                    if diff_ambiguous.contains(&i) {
-                        ambiguous.insert(i);
-                    }
-                } else if let Some(j) = i.checked_sub(1).and_then(|p| bmap[p]).map(|j| j + 1) {
-                    pair(bmap, used, i, j);
+            }
+            // A slide still unplaced was deleted, unless there is a new slide
+            // nobody took. That is not guessed: its entries are refused.
+            let free: Vec<usize> =
+                (0..new.len()).filter(|&x| level(&new[x]) == Some(0) && !used.contains(&x)).collect();
+            for &i in unvoted.iter().filter(|&&i| bmap[i].is_none()) {
+                // None of its text is left: any new slide no other took could be it, rewritten.
+                let could_be = free.iter().any(|&x| same_kind(&old[i], &new[x]));
+                if could_be {
+                    unsure.insert(i);
+                    unsure.extend((i + 1..end(old, i, 0)).filter(|&k| old[k].head().is_some()));
                 }
             }
         }
     }
     for &i in &heads {
-        if level(&old[i]) != Some(1) || bmap[i].is_some() {
+        if level(&old[i]) != Some(1) || bmap[i].is_some() || unsure.contains(&i) {
             continue;
         }
         let Some(js) = (0..i).rev().find(|&s| level(&old[s]) == Some(0)).and_then(|s| bmap[s]) else { continue };
@@ -506,13 +536,15 @@ pub struct Alignment {
     pub lenient: HashSet<Path>,
     /// Old blocks paired by choosing among identical blocks.
     pub ambiguous: HashSet<usize>,
+    /// Old heads the alignment cannot place without guessing (their entries are refused).
+    pub unsure: HashSet<usize>,
 }
 
 impl Alignment {
     /// Design C: block alignment, then one character diff over every
     /// top-level paragraph that did not align unchanged.
     pub fn design_c(old: &[Block], new: &[Block]) -> Alignment {
-        let (bmap, ambiguous) = align_ambiguous(old, new);
+        let (bmap, ambiguous, unsure) = align_full(old, new);
         let (mut same_old, mut same_new) = (HashSet::new(), HashSet::new());
         for (i, j) in bmap.iter().enumerate() {
             let Some(j) = *j else { continue };
@@ -532,7 +564,7 @@ impl Alignment {
             let ops = diff::opcodes(&o.text, &n.text);
             Global { old: o, new: n, ops, min_equal: 3 }
         });
-        Alignment { bmap, global, ambiguous, ..Default::default() }
+        Alignment { bmap, global, ambiguous, unsure, ..Default::default() }
     }
 }
 
@@ -633,6 +665,7 @@ impl<'a> Placer<'a> {
             }
         }
         self.refuse_ambiguous();
+        self.refuse_unsure();
         if !self.al.cross.is_empty() {
             self.cross_map();
         }
@@ -712,6 +745,22 @@ impl<'a> Placer<'a> {
             for e in self.entries.iter().filter(|e| carried(e, i)) {
                 self.handled.insert(e.id);
                 let why = format!("its block is one of {n} identical blocks, and the text does not say which one went where; use an exact edit");
+                self.out.insert(e.id, Status::Refused(why).into());
+            }
+        }
+    }
+
+    /// Entries of a head the alignment could not place: refused, not dropped.
+    fn refuse_unsure(&mut self) {
+        let mut unsure: Vec<usize> = self.al.unsure.iter().copied().collect();
+        unsure.sort();
+        for i in unsure {
+            for e in self.entries_at(&vec![i]) {
+                if matches!(e.kind, Kind::Keep | Kind::Bkeep) {
+                    continue;
+                }
+                self.handled.insert(e.id);
+                let why = "ambiguous alignment: none of this slide's text is left, and the text does not say whether it was deleted or became one of the new slides; use an exact edit".to_string();
                 self.out.insert(e.id, Status::Refused(why).into());
             }
         }

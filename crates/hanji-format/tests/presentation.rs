@@ -16,7 +16,12 @@ fn names() -> Names {
             l("Blank", &[]),
         ]),
         shapes: Some(vec![("s4".into(), "출처".into())]),
-        keeps: Some(vec![Keep { id: "k1".into(), kind: "picture".into(), summary: "logo".into() }]),
+        keeps: Some(vec![
+            Keep { id: "k1".into(), kind: "picture".into(), summary: "logo".into() },
+            Keep { id: "k5".into(), kind: "chart".into(), summary: "매출 추이".into() },
+            Keep { id: "k6".into(), kind: "picture".into(), summary: "map".into() },
+        ]),
+        objects: Some(vec!["k5".into(), "k6".into()]),
         ..Default::default()
     }
 }
@@ -54,6 +59,7 @@ fn design_example_is_canonical() {
         .map(|i| match i {
             SlideItem::Slot(s) => s.name.as_str(),
             SlideItem::Shape(_) => "shape",
+            SlideItem::Object(_) => "object",
         })
         .collect();
     assert_eq!(names, ["title", "body", "notes"]);
@@ -227,4 +233,34 @@ fn a_document_is_not_a_presentation() {
     );
     let e = hanji_format::parse("---\ntype: presentation\nformat: pptx\nschema: 1\n---\n").unwrap_err();
     assert!(e[0].to_string().contains("type: presentation is not a Document"), "{e:?}");
+}
+
+#[test]
+fn objects_are_keep_lines_among_the_slots() {
+    let text = format!(
+        "{FM}\nlayout: Title and Content\n<keep id=\"k6\" kind=\"picture\" summary=\"map\"/>\n::title::\n매출\n<keep id=\"k5\" kind=\"chart\" summary=\"매출 추이\"/>\n::body::\n<keep id=\"k1\" kind=\"picture\" summary=\"logo\"/>\n"
+    );
+    assert_eq!(roundtrip(&text), text);
+    let p = parse(&text).unwrap();
+    let kinds: Vec<String> = p.pres.slides[0]
+        .items
+        .iter()
+        .map(|i| match i {
+            SlideItem::Slot(s) => s.name.clone(),
+            SlideItem::Object(k) => k.id.clone(),
+            SlideItem::Shape(_) => "shape".into(),
+        })
+        .collect();
+    // k5 ends the title slot; k1, a slot's object, is the body's text.
+    assert_eq!(kinds, ["k6", "title", "k5", "body"]);
+    let SlideItem::Slot(body) = &p.pres.slides[0].items[3] else { panic!() };
+    assert!(matches!(&body.blocks[..], [Block::Keep(k)] if k.id == "k1"));
+    // Head and placeholder have distinct offsets on the line.
+    let m = &p.map.slides[0].items[0];
+    assert!(m.head.mark < m.blocks[0].start && m.blocks[0].end > m.blocks[0].start);
+    // An object is kept exactly: never created or altered.
+    let bad = errors("\nlayout: Blank\n<keep id=\"k5\" kind=\"chart\" summary=\"other\"/>\n");
+    assert!(bad.iter().any(|e| e.contains("altered")), "{bad:?}");
+    let bad = errors("\nlayout: Blank\n<keep id=\"k9\" kind=\"chart\" summary=\"x\"/>\n");
+    assert!(bad.iter().any(|e| e.contains("not in this file")), "{bad:?}");
 }

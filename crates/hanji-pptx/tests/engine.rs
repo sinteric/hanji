@@ -306,3 +306,97 @@ fn a_deleted_slide_leaves_the_outline_view_settings() {
     assert!(!r.contains("rId1") && r.contains("rId2"), "{r}");
     assert!(package::get(&out, &second).is_none());
 }
+
+/// The `<keep/>` line of the slide object whose kind is `kind`.
+fn object_line(text: &str, kind: &str) -> String {
+    text.lines().find(|l| l.starts_with("<keep ") && l.contains(&format!("kind=\"{kind}\""))).unwrap().to_string()
+        + "\n"
+}
+
+#[test]
+fn objects_are_shown_moved_and_deleted_never_changed() {
+    let pkg = deck("korean-deck.pptx");
+    let before = package::read(&pkg).unwrap();
+    let imp = import(&pkg);
+    let (pic, table) = (object_line(&imp.text, "picture"), object_line(&imp.text, "table"));
+    assert!(imp.text.contains(&format!("::title::\n분기별 매출\n{table}{pic}::notes::")), "{}", imp.text);
+    let s4 = slides(&before)[3].clone();
+    // Moving one changes the z-order and nothing else.
+    let moved = imp.text.replace(&format!("{table}{pic}"), &format!("{pic}{table}"));
+    let r = rewrite_in(&PptxModel, &imp.remainder, &imp.text, &moved, CAPS).unwrap_or_else(|e| panic!("{e:?}"));
+    let parts = export(&r.text, &r.remainder);
+    let x = xml(&parts, &s4);
+    assert!(x.find("<p:pic>").unwrap() < x.find("<p:graphicFrame>").unwrap(), "{x}");
+    assert_eq!(xml(&parts, &opc::rels_part(&s4)), xml(&before, &opc::rels_part(&s4)));
+    // Deleting one is explicit: its relationship and its picture go.
+    let at = imp.text.find(&pic).unwrap();
+    let (text, rem) = span_edit(&imp, at, at + pic.len(), "");
+    let parts = export(&text, &rem);
+    assert!(!xml(&parts, &s4).contains("<p:pic>"));
+    assert!(rel_targets(&parts, &s4, "image").is_empty());
+    assert!(package::get(&parts, "ppt/media/image1.png").is_none(), "the picture only it used goes");
+    assert!(xml(&parts, &s4).contains("<p:graphicFrame>"), "the table stays");
+    // An object cannot be altered, created, or moved to another slide (its picture is this slide's).
+    let altered = imp.text.replace(&pic, &pic.replace("summary=\"", "summary=\"x"));
+    assert!(matches!(PptxEngine.export(&altered, &imp.remainder), Err(EngineError::Invalid(_))));
+    let onto_first =
+        imp.text.replacen(&pic, "", 1).replacen("::notes::\n인사말", &format!("{pic}::notes::\n인사말"), 1);
+    match PptxEngine.export(&onto_first, &imp.remainder) {
+        Err(EngineError::Refused(m)) => assert!(m.contains("cannot move"), "{m}"),
+        other => panic!("expected a refusal, got {:?}", other.map(|_| ())),
+    }
+}
+
+#[test]
+fn an_empty_slide_design_c_cannot_place_is_refused_not_dropped() {
+    // Moving the empty second slide first: from the text alone it may as
+    // well be deleted and a new empty slide added.
+    let imp = import(&deck("sld-notes.pptx"));
+    let body = slide_span(&imp.text, 0).0;
+    let mut chunks: Vec<&str> = imp.text[body..].trim_end().split("\n\n---\n\n").collect();
+    chunks.rotate_right(1);
+    let text = format!("{}{}\n", &imp.text[..body], chunks.join("\n\n---\n\n"));
+    match rewrite_in(&PptxModel, &imp.remainder, &imp.text, &text, CAPS) {
+        Err(hanji_core::Refusal::Unplaceable(r)) => {
+            assert!(r.refused.iter().any(|x| x.2.contains("ambiguous alignment")), "{r:?}")
+        }
+        other => panic!("{:?}", other.map(|r| r.text)),
+    }
+}
+
+#[test]
+fn an_object_an_animation_plays_on_is_not_deleted() {
+    let imp = import(&deck("EmbeddedVideo.pptx"));
+    let line = object_line(&imp.text, "picture");
+    let at = imp.text.find(&line).unwrap();
+    let r = reanchor_span_in(&PptxModel, &imp.remainder, &imp.text, at, at + line.len(), "", CAPS).unwrap();
+    match PptxEngine.export(&r.text, &r.remainder) {
+        Err(EngineError::Refused(m)) => assert!(m.contains("animation"), "{m}"),
+        other => panic!("expected a refusal, got {:?}", other.map(|_| ())),
+    }
+}
+
+#[test]
+fn a_rewrite_that_deletes_a_slide_and_adds_one_is_refused_not_guessed() {
+    // Slide 2's text all goes and a new slide appears: from the text alone
+    // it may have been rewritten into the new one.
+    let imp = import(&deck("korean-deck.pptx"));
+    let (a, b) = slide_span(&imp.text, 1);
+    let text = format!(
+        "{}{}\n---\n\nlayout: Title and Content\n::title::\n완전히 새로운 제목\n",
+        &imp.text[..a],
+        &imp.text[b + 5..]
+    );
+    match rewrite_in(&PptxModel, &imp.remainder, &imp.text, &text, CAPS) {
+        Err(hanji_core::Refusal::Unplaceable(r)) => {
+            assert!(r.refused.iter().all(|x| x.2.contains("ambiguous alignment")), "{r:?}")
+        }
+        other => panic!("{:?}", other.map(|r| r.text)),
+    }
+    // The same change as exact edits goes through.
+    let (text, rem) = span_edit(&imp, a, b + 5, "");
+    let n = text.len();
+    let imp2 = Imported { text, remainder: rem, report: imp.report.clone() };
+    let (text, rem) = span_edit(&imp2, n, n, "\n---\n\nlayout: Title and Content\n::title::\n완전히 새로운 제목\n");
+    assert_eq!(slides(&export(&text, &rem)).len(), 7);
+}

@@ -185,3 +185,10 @@ pub fn marks_of(rpr: Option<&Element>) -> hanji_format::Marks {
 
 /// The `a:rPr` attributes the marks are written in.
 pub const MARK_ATTRS: &[&str] = &["b", "i", "u", "strike"];
+
+/// Every relationship id an attribute of `root` names (`r:id`, `r:embed`, …).
+pub fn named_rel_ids(root: &Element) -> std::collections::BTreeSet<String> {
+    let mut ids = std::collections::BTreeSet::new();
+    root.walk(&mut |e| ids.extend(e.attrs.iter().filter(|a| a.0.starts_with("r:")).map(|a| a.1.clone())));
+    ids
+}

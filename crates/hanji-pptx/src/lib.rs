@@ -62,7 +62,8 @@ impl DeckShell {
         serde_json::from_str(rem.shell.first().ok_or("the remainder has no deck shell")?).map_err(|e| e.to_string())
     }
 
-    /// The names the text may use: layouts and their slots, shapes, placeholders.
+    /// The names the text may use: layouts and their slots, shapes,
+    /// placeholders and which of them are slide objects.
     pub fn names(&self, rem: &Remainder) -> Names {
         Names {
             layouts: Some(
@@ -74,6 +75,13 @@ impl DeckShell {
             ),
             shapes: Some(self.shapes.clone()),
             keeps: Some(rem.keep_list()),
+            objects: Some(
+                rem.entries
+                    .iter()
+                    .filter(|e| e.kind == hanji_core::Kind::Bkeep && e.meta.tag == import::OBJECT_TAG)
+                    .filter_map(|e| e.meta.keep.as_ref().map(|k| k.id.clone()))
+                    .collect(),
+            ),
             formats: Some(vec!["pptx".into()]),
             ..Default::default()
         }
@@ -190,6 +198,7 @@ impl PptxEngine {
                 sld_id: sld.to_xml(),
                 layout: lpart.clone(),
                 ids: vec![],
+                named: vec![],
             };
             let notes = notes_of.get(part).map(|n| {
                 let nd = &docs[n];

@@ -1,6 +1,6 @@
 //! The Presentation model (DESIGN.md §5.3): a presentation's text resolved
-//! to one flat list of blocks, a [`Head`] for each slide, slot and shape
-//! followed by the paragraphs it holds. Re-anchoring (design C, exact spans)
+//! to one flat list of blocks, a [`Head`] for each slide, slot, shape and
+//! object followed by the blocks it holds (an object: its placeholder). Re-anchoring (design C, exact spans)
 //! then treats slides and shapes as blocks like any other: remainder entries
 //! anchored to a slide or a shape sit on its head.
 
@@ -10,6 +10,9 @@ use crate::model::{self, Block, BlockSrc, Capabilities, Head, Para, SrcKind, Sty
 
 /// Key of every slide head.
 pub const SLIDE: &str = "slide";
+
+/// Key of every object head: which object is its placeholder's id.
+pub const OBJECT: &str = "object";
 
 pub fn slot_key(name: &str) -> String {
     format!("slot:{name}")
@@ -22,9 +25,18 @@ pub fn shape_key(id: &str) -> String {
 /// What a head stands for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HeadKind<'a> {
-    Slide { layout: &'a str },
-    Slot { name: &'a str },
-    Shape { id: &'a str, name: &'a str },
+    Slide {
+        layout: &'a str,
+    },
+    Slot {
+        name: &'a str,
+    },
+    Shape {
+        id: &'a str,
+        name: &'a str,
+    },
+    /// A slide object (rule 8): the head is followed by its `Block::Keep`.
+    Object,
 }
 
 pub fn kind(h: &Head) -> HeadKind<'_> {
@@ -32,6 +44,8 @@ pub fn kind(h: &Head) -> HeadKind<'_> {
         HeadKind::Slot { name }
     } else if let Some(id) = h.key.strip_prefix("shape:") {
         HeadKind::Shape { id, name: &h.label }
+    } else if h.key == OBJECT {
+        HeadKind::Object
     } else {
         HeadKind::Slide { layout: &h.label }
     }
@@ -47,6 +61,10 @@ pub fn slot_head(name: &str) -> Block {
 
 pub fn shape_head(id: &str, name: &str) -> Block {
     Block::Head(Head { level: 1, key: shape_key(id), label: name.into() })
+}
+
+pub fn object_head() -> Block {
+    Block::Head(Head { level: 1, key: OBJECT.into(), label: String::new() })
 }
 
 /// A presentation's paragraphs have no style: formatting comes from the layout.
@@ -94,6 +112,11 @@ pub fn resolve(
                         fmt::Block::Para(fmt::Para { style: fmt::ParaStyle::Plain, content: c.clone() })
                     };
                     sh.paras.iter().map(para).collect()
+                }
+                // `Names::objects` lets only an object's placeholder stand here.
+                fmt::SlideItem::Object(k) => {
+                    blocks.push(object_head());
+                    vec![fmt::Block::Keep(k.clone())]
                 }
             };
             maps.push(head_src(&im.head));
@@ -149,6 +172,11 @@ pub fn unresolve(blocks: &[Block], front: fmt::FrontMatter, keep: &dyn Fn(&str) 
                     .collect();
                 if let Some(s) = pres.slides.last_mut() {
                     s.items.push(fmt::SlideItem::Shape(fmt::ShapeText { id: id.into(), name: name.into(), paras }));
+                }
+            }
+            HeadKind::Object => {
+                if let (Some(s), Some(Block::Keep(id))) = (pres.slides.last_mut(), body.first()) {
+                    s.items.push(fmt::SlideItem::Object(keep(id)));
                 }
             }
         }

@@ -14,7 +14,7 @@ native targets and on wasm32 (§10.4).
 | `hanji-package` | Plumbing the XML engines share: zip parts read and written with their metadata, a lossless XML tree over quick-xml with the canonical form GetPut compares, and OPC helpers (`opc.rs`: relationships, targets, reachable parts, content types) |
 | `hanji-docx` | The docx engine. Splits `word/document.xml` at the XML level and copies every other part through byte for byte. Numbered paragraphs are list items; `numbering.rs` reads their kind and gives new items and lists their numbering. §8: removes and reports active and remote content on import, and lists what to surface before export. `examples/dump.rs` prints a file's model text |
 | `hanji-hwpx` | The hwpx engine (OWPML, KS X 6101). Splits `Contents/section*.xml` at the XML level and copies every other part through byte for byte, `header.xml` too unless the text needs a new character or paragraph shape. Paragraph styles by their own (Korean) names, outline styles as `#`, bold/italic/underline/strikeout from the character shapes, tables with merges and multi-paragraph cells, side-by-side tables as separate blocks (§10.8), bullets and numbering as list items, tracked changes as read-only placeholders (§10.2). §8: removes scripts, embedded OLE objects and linked files. `examples/dump_hwpx.rs` prints a file's model text |
-| `hanji-pptx` | The pptx engine. Splits each slide and notes page at the XML level into a skeleton (with stand-ins for the placeholders and text shapes the text shows) and text entries, and copies every other part through byte for byte. Layout names and slots come from the layouts' placeholders (`deck.rs`), bullets from the inheritance chain up to the master text styles. Slides can be added from a layout, deleted (their notes and unreachable parts go; a slide something else links to is refused) and moved; `sldIdLst`, sections, rels and content types follow. §8 (`safety.rs`): macros, ActiveX, OLE objects (their preview picture stays), program and macro click actions, linked media, images and objects, other external relationships. `examples/dump_pptx.rs` prints a file's model text |
+| `hanji-pptx` | The pptx engine. Splits each slide and notes page at the XML level into a skeleton (with stand-ins for the placeholders and text shapes the text shows) and text entries, and copies every other part through byte for byte. Layout names and slots come from the layouts' placeholders (`deck.rs`), bullets from the inheritance chain up to the master text styles. Objects that are not placeholders (pictures, charts, tables, groups) are `<keep/>` lines in z-order. Slides can be added from a layout, deleted (their notes and unreachable parts go; a slide something else links to is refused) and moved; `sldIdLst`, sections, rels and content types follow. §8 (`safety.rs`): macros, ActiveX, OLE objects (their preview picture stays), program and macro click actions, linked media, images and objects, other external relationships. `examples/dump_pptx.rs` prints a file's model text |
 | `hanji-testkit` | The corpus harness the engines run (not published): the prototype's E1–E10 edits (P1–P9 for pptx), oracle and scoring, GetPut, PutGet and well-formedness |
 
 rdocx is not on the import/export path. Its typed model (`CT_P`, `CT_RPr`,
@@ -95,9 +95,15 @@ hwpx, in addition:
 
 pptx, in addition:
 
-- Pictures, charts, tables, SmartArt and groups that are not placeholders are
-  not shown in the text (they stay in the slide's skeleton); a placeholder
-  holding one is a slot whose content the text keeps as a placeholder.
+- Pictures, charts, tables, SmartArt, groups and ink that are not
+  placeholders are `<keep/>` lines among the slots, in z-order (rule 8): the
+  text can move them within their slide or delete them (their parts go when
+  nothing else uses them; refused when an animation plays on one), never
+  change or create them. Connectors and shapes without text stay in the
+  slide's skeleton unshown.
+- Design C refuses (orphans, with the reason "ambiguous alignment") a slide
+  it cannot place from the text: an empty slide, or one none of whose text
+  is left, when a new slide could be it.
 - Text in shapes is `<shape>` paragraphs only: their bullets stay in the
   remainder, and bulleted shape paragraphs are not list items.
 - Moving a text shape to another slide keeps its text but not what refers to
