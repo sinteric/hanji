@@ -11,10 +11,10 @@ pub mod export;
 pub mod import;
 pub mod numbering;
 pub mod ooxml;
-pub mod package;
 pub mod safety;
 pub mod styles;
-pub mod xml;
+
+pub use hanji_package::{package, xml};
 
 use std::collections::HashMap;
 
@@ -125,7 +125,7 @@ fn notes(parts: &[hanji_core::Part]) -> HashMap<(String, String), String> {
         let Some(d) = package::get(parts, part).and_then(|d| xml::parse(d).ok()) else { continue };
         for n in d.root.elements().filter(|e| e.is(tag)) {
             if let Some(id) = n.get("w:id") {
-                out.insert((kind.to_string(), id), import::clip(&n.text_of(&["w:t"]), 40));
+                out.insert((kind.to_string(), id), hanji_package::clip(&n.text_of(&["w:t"]), 40));
             }
         }
     }
@@ -182,7 +182,7 @@ pub fn export_document(blocks: &[hanji_core::Block], rem: &Remainder) -> Result<
     )
     .map_err(|e| EngineError::Package(e.to_string()))?;
     let mut numbering = numbering::Numbering::read(&rem.parts);
-    let lists = export::plan_lists(blocks, &rem.entries, &mut numbering).map_err(EngineError::Refused)?;
+    let lists = hanji_core::plan_lists(blocks, &rem.entries, &mut numbering).map_err(EngineError::Refused)?;
     let ex = export::Exporter::new(&rem.styles, &rem.entries, &numbering, lists);
     let body = ex.body(blocks).map_err(EngineError::Refused)?;
     let mut s = shell.prolog.clone();

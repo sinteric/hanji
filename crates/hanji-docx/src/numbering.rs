@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use hanji_core::Part;
+use hanji_core::{ListDefs, Part};
 
 use crate::package;
 use crate::xml::{self, Element, Node};
@@ -132,23 +132,6 @@ impl Numbering {
         }
     }
 
-    /// The file's first list whose top level is a bullet (`ordered: false`)
-    /// or decimal: (numId, abstractNumId).
-    pub fn default_list(&self, ordered: bool) -> Option<(u32, u32)> {
-        let mut nums: Vec<(&u32, &u32)> = self.nums.iter().collect();
-        nums.sort();
-        let want = if ordered { "decimal" } else { "bullet" };
-        nums.into_iter().find(|(n, _)| self.format(**n, 0) == Some(want)).map(|(n, a)| (*n, *a))
-    }
-
-    /// A new list over `abstract_id` that starts again at 1.
-    pub fn new_list(&mut self, abstract_id: u32) -> u32 {
-        let id = self.nums.keys().chain(self.added.iter().map(|a| &a.0)).max().map_or(1, |m| m + 1);
-        self.added.push((id, abstract_id));
-        self.nums.insert(id, abstract_id);
-        id
-    }
-
     /// `numbering.xml` with the new lists, if any were added.
     pub fn part(&self) -> Option<Vec<u8>> {
         if self.added.is_empty() {
@@ -170,5 +153,28 @@ impl Numbering {
             d.root.children.insert(at + k, Node::El(num));
         }
         Some(xml::write_doc(&d))
+    }
+}
+
+impl ListDefs for Numbering {
+    fn ordered(&self, num: u32, ilvl: u32) -> Option<bool> {
+        Numbering::ordered(self, num, ilvl)
+    }
+
+    /// The file's first list whose top level is a bullet (`ordered: false`)
+    /// or decimal: (numId, abstractNumId).
+    fn default_list(&self, ordered: bool) -> Option<(u32, u32)> {
+        let mut nums: Vec<(&u32, &u32)> = self.nums.iter().collect();
+        nums.sort();
+        let want = if ordered { "decimal" } else { "bullet" };
+        nums.into_iter().find(|(n, _)| self.format(**n, 0) == Some(want)).map(|(n, a)| (*n, *a))
+    }
+
+    /// A new `w:num` over `abstract_id` that starts again at 1.
+    fn new_list(&mut self, abstract_id: u32) -> u32 {
+        let id = self.nums.keys().chain(self.added.iter().map(|a| &a.0)).max().map_or(1, |m| m + 1);
+        self.added.push((id, abstract_id));
+        self.nums.insert(id, abstract_id);
+        id
     }
 }

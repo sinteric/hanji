@@ -295,22 +295,47 @@ impl Inline {
         }
     }
 
-    /// Whether the text can state mark `m` on unit `i`. A space at the edge
-    /// of a mark cannot carry it (see [`Inline::normalize`]), and a page
-    /// break, written as the block line `<pagebreak/>`, carries none.
-    pub fn mark_expressible(&self, i: usize, m: Marks) -> bool {
-        let u = &self.units[i];
-        if u.atom == Atom::PageBreak {
-            return false;
+    /// The marks to write for each unit: the text's own, except where the
+    /// text cannot state a mark. A page break carries none, and a space at a
+    /// mark's edge cannot carry it (see [`Inline::normalize`]): there
+    /// `fallback(i)` (what the unit's run had) is kept, as long as the text
+    /// reads back the same. The one case it would not is a stretch of spaces
+    /// between two units with the mark that all get it back: the text shows
+    /// those spaces without the mark, so they are written without it.
+    pub fn written_marks(&self, fallback: &dyn Fn(usize) -> Marks) -> Vec<Marks> {
+        let mut out: Vec<Marks> = self.units.iter().map(|u| u.marks).collect();
+        for (a, b, _) in self.segments() {
+            for m in Marks::ALL {
+                let unstated = |i: usize| !self.units[i].marks.has(m);
+                for (i, x) in out.iter_mut().enumerate().take(b).skip(a) {
+                    if self.units[i].atom == Atom::PageBreak && unstated(i) {
+                        *x = x.with(m, fallback(i).has(m));
+                    }
+                }
+                let mut i = a;
+                while i < b {
+                    if !(self.units[i].atom.is_space() && unstated(i)) {
+                        i += 1;
+                        continue;
+                    }
+                    let s = i;
+                    while i < b && self.units[i].atom.is_space() && unstated(i) {
+                        out[i] = out[i].with(m, fallback(i).has(m));
+                        i += 1;
+                    }
+                    let marked = |k: Option<usize>| {
+                        k.is_some_and(|k| !self.units[k].atom.is_space() && self.units[k].marks.has(m))
+                    };
+                    let (left, right) = (s.checked_sub(1).filter(|&k| k >= a), (i < b).then_some(i));
+                    if marked(left) && marked(right) && out[s..i].iter().all(|x| x.has(m)) {
+                        for x in &mut out[s..i] {
+                            *x = x.with(m, false);
+                        }
+                    }
+                }
+            }
         }
-        if !u.atom.is_space() {
-            return true;
-        }
-        let (a, b) =
-            self.segments().iter().find(|s| s.0 <= i && i < s.1).map(|s| (s.0, s.1)).unwrap_or((0, self.units.len()));
-        let left = (a..i).rev().find(|&k| !self.units[k].atom.is_space());
-        let right = (i + 1..b).find(|&k| !self.units[k].atom.is_space());
-        matches!((left, right), (Some(l), Some(r)) if self.units[l].marks.has(m) && self.units[r].marks.has(m))
+        out
     }
 }
 

@@ -110,6 +110,13 @@ impl Element {
             c.walk(f);
         }
     }
+    /// [`Element::walk`] with mutable access.
+    pub fn walk_mut(&mut self, f: &mut dyn FnMut(&mut Element)) {
+        f(self);
+        for c in self.elements_mut() {
+            c.walk_mut(f);
+        }
+    }
     pub fn descendants(&self, qname: &str) -> Vec<&Element> {
         let mut out = vec![];
         self.walk(&mut |e| {
@@ -426,6 +433,38 @@ pub fn write_nodes(nodes: &[Node]) -> String {
         write_node(n, &mut s);
     }
     s
+}
+
+// ---------------------------------------------------------------- tree edits and fingerprints
+
+/// Insert `el` among `parent`'s children following `order` (by local name).
+pub fn insert_ordered(parent: &mut Element, el: Element, order: &[&str]) {
+    let rank = |e: &Element| order.iter().position(|x| *x == e.local());
+    let mine = rank(&el).unwrap_or(order.len());
+    let at = parent.children.iter().position(|n| matches!(n, Node::El(c) if rank(c).is_some_and(|r| r > mine)));
+    match at {
+        Some(k) => parent.children.insert(k, Node::El(el)),
+        None => parent.children.push(Node::El(el)),
+    }
+}
+
+/// Remove the first child element named `qname`.
+pub fn remove_child(e: &mut Element, qname: &str) -> Option<Element> {
+    let k = e.children.iter().position(|n| matches!(n, Node::El(c) if c.name == qname))?;
+    match e.children.remove(k) {
+        Node::El(x) => Some(x),
+        _ => None,
+    }
+}
+
+/// Fingerprint of fragments (canonical, joined; `-` for none).
+pub fn fp(scope: &Scope, els: &[Option<&Element>]) -> String {
+    els.iter().map(|e| e.map_or_else(|| "-".to_string(), |e| canon(e, scope))).collect::<Vec<_>>().join("|")
+}
+
+/// Whitespace-only character data (between elements).
+pub fn is_blank(n: &Node) -> bool {
+    matches!(n, Node::Text(t) if unescape(t).trim().is_empty())
 }
 
 #[cfg(test)]

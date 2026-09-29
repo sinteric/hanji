@@ -4,9 +4,9 @@
 
 use hanji_core::{ImportReport, Notice, Part};
 
-use crate::import::clip;
 use crate::ooxml::DOC_PART;
 use crate::xml::{self, Element, Node};
+use hanji_package::clip;
 
 /// Field instructions that fetch or run something when the file opens or updates.
 const FETCHING_FIELDS: &[&str] = &["DDE", "DDEAUTO", "INCLUDEPICTURE", "INCLUDETEXT", "LINK", "IMPORT", "RD"];

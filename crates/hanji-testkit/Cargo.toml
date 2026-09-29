@@ -1,0 +1,14 @@
+[package]
+name = "hanji-testkit"
+description = "hanji test harness shared by the engines: the prototype's E1–E10 edits, oracle and scoring over a corpus (§9)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+publish = false
+
+[dependencies]
+hanji-format.workspace = true
+hanji-core.workspace = true
+hanji-package.workspace = true

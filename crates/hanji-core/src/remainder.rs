@@ -98,6 +98,34 @@ impl Entry {
     }
 }
 
+/// Placeholder ids, stable across imports of the same file: `k` and four
+/// base-32 digits of a hash of the object's content; the same object again
+/// gets `-2`, `-3`, … in document order.
+#[derive(Clone, Debug, Default)]
+pub struct KeepIds(std::collections::HashSet<String>);
+
+impl KeepIds {
+    /// A fresh id for the object with fingerprint `fp`.
+    pub fn next(&mut self, fp: &str) -> String {
+        let mut h: u64 = 0xcbf2_9ce4_8422_2325;
+        for b in fp.bytes() {
+            h = (h ^ b as u64).wrapping_mul(0x0100_0000_01b3);
+        }
+        let base: String = std::iter::once('k')
+            .chain((0..4).map(|k| char::from_digit(((h >> (k * 5)) & 31) as u32, 32).unwrap()))
+            .collect();
+        if self.0.insert(base.clone()) {
+            return base;
+        }
+        (2..).map(|k| format!("{base}-{k}")).find(|id| self.0.insert(id.clone())).unwrap()
+    }
+
+    /// Give back an id (an import step that was rolled back).
+    pub fn release(&mut self, id: &str) {
+        self.0.remove(id);
+    }
+}
+
 /// A package part copied through unchanged.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Part {

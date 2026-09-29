@@ -942,6 +942,11 @@ impl<'a> Placer<'a> {
                 if src < 0 || old.text[src as usize] == SEP {
                     src = o.i1 as isize; // inserted at a paragraph start: join the run on the right
                 }
+                // Replaced text that starts with a paragraph mark takes the run of
+                // the first character it replaces.
+                if o.tag == Tag::Replace && old.text[src as usize] == SEP {
+                    src = (o.i1..o.i2).find(|&k| old.text[k] != SEP).unwrap_or(o.i1) as isize;
+                }
                 let src = (src as usize).min(old.text.len().saturating_sub(1));
                 let Some((p, _)) = old.char_at(src) else { continue };
                 let lo = old.base[&p];
