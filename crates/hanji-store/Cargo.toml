@@ -1,0 +1,19 @@
+[package]
+name = "hanji-store"
+description = "hanji documents and revisions, and the operations the CLI and the MCP server share"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+hanji-format.workspace = true
+hanji-core.workspace = true
+hanji-package.workspace = true
+hanji-docx = { path = "../hanji-docx" }
+hanji-hwpx = { path = "../hanji-hwpx" }
+hanji-pptx = { path = "../hanji-pptx" }
+hanji-xlsx = { path = "../hanji-xlsx" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

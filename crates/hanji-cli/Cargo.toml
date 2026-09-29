@@ -1,0 +1,23 @@
+[package]
+name = "hanji-cli"
+description = "hanji: office documents for LLM agents, from the command line"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[[bin]]
+name = "hanji"
+path = "src/main.rs"
+
+[dependencies]
+hanji-store = { path = "../hanji-store" }
+clap = { version = "4.5", features = ["derive", "env"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[dev-dependencies]
+assert_cmd = "2"
+hanji-package.workspace = true
+hanji-core.workspace = true
