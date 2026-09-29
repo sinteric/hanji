@@ -1031,7 +1031,7 @@ fn normalise_ids(s: &str) -> String {
     out + rest
 }
 
-const RAW: ImportOptions = ImportOptions { neutralise: false, template: None };
+pub const RAW: ImportOptions = ImportOptions { neutralise: false, template: None };
 
 fn export_and_check(
     cx: &Cx,
@@ -1096,6 +1096,11 @@ fn text_span(fmt: &dyn Format, old_text: &str, new_text: &str, rem: &Remainder, 
             return (a, b, new_text[a..nb].to_string());
         }
     }
+    differing_span(old_text, new_text)
+}
+
+/// The smallest span of `old_text` whose replacement gives `new_text`: `(start, end, replacement)`.
+pub fn differing_span(old_text: &str, new_text: &str) -> (usize, usize, String) {
     let pre = old_text.bytes().zip(new_text.bytes()).take_while(|(x, y)| x == y).count();
     let mut pre = pre;
     while !old_text.is_char_boundary(pre) || !new_text.is_char_boundary(pre) {
@@ -1107,6 +1112,65 @@ fn text_span(fmt: &dyn Format, old_text: &str, new_text: &str, rem: &Remainder, 
         suf -= 1;
     }
     (pre, old_text.len() - suf, new_text[pre..new_text.len() - suf].to_string())
+}
+
+/// One scripted edit of a revision: E1–E9 and the combined one (E10).
+pub struct Job {
+    /// `E1 figure`, …
+    pub name: String,
+    pub what: String,
+    pub new_text: String,
+    /// The oracle's outcome for every entry.
+    pub expected: HashMap<u64, Outcome>,
+    pub touched: HashSet<usize>,
+    /// The exact text edit, for a local edit.
+    pub span: Option<(usize, usize, String)>,
+}
+
+/// The edits `edits` make to `d` (whose text is `text`), then all of them in
+/// one revision, named `all`. Edits that do not apply are skipped (and
+/// printed as `n/a` under `report`, the file's name).
+pub fn edit_jobs(
+    fmt: &dyn Format,
+    d: &Doc,
+    cx: &Cx,
+    text: &str,
+    edits: &[(&str, EditFn)],
+    all: &str,
+    report: Option<&str>,
+) -> Vec<Job> {
+    let rem = cx.rem;
+    let mut jobs = vec![];
+    for (fname, f) in edits {
+        let Some(ed) = f(d, cx) else {
+            if let Some(name) = report {
+                println!("  {name} {fname}: n/a");
+            }
+            continue;
+        };
+        let new_text = fmt.text_of(&ed.blocks, rem);
+        let new_blocks = written(fmt, &new_text, rem);
+        let expected = oracle(d, &new_blocks, &ed);
+        let span = ed.local.then(|| text_span(fmt, text, &new_text, rem, &ed));
+        jobs.push(Job {
+            name: ed.name.to_string(),
+            what: ed.what.clone(),
+            new_text,
+            expected,
+            touched: ed.touched.clone(),
+            span,
+        });
+    }
+    let (fb, fexp, steps) = combined(d, cx, edits);
+    jobs.push(Job {
+        name: format!("{all} all edits in one revision"),
+        what: steps.join("; "),
+        new_text: fmt.text_of(&fb, rem),
+        expected: fexp,
+        touched: (0..d.blocks.len()).collect(),
+        span: None,
+    });
+    jobs
 }
 
 #[derive(Default)]
@@ -1176,37 +1240,8 @@ pub fn run_corpus_with(
             sum.failures.push(format!("{name}: GetPut split parts equal={same}, other parts byte-equal={others}"));
         }
         // Edits.
-        let mut jobs: Vec<(
-            String,
-            String,
-            String,
-            HashMap<u64, Outcome>,
-            HashSet<usize>,
-            Option<(usize, usize, String)>,
-        )> = vec![];
-        for (fname, f) in edits {
-            let Some(ed) = f(&d, &cx) else {
-                if report {
-                    println!("  {name} {fname}: n/a");
-                }
-                continue;
-            };
-            let new_text = fmt.text_of(&ed.blocks, &rem);
-            let new_blocks = written(fmt, &new_text, &rem);
-            let expected = oracle(&d, &new_blocks, &ed);
-            let span = ed.local.then(|| text_span(fmt, &text, &new_text, &rem, &ed));
-            jobs.push((ed.name.to_string(), ed.what.clone(), new_text, expected, ed.touched.clone(), span));
-        }
-        let (fb, fexp, steps) = combined(&d, &cx, edits);
-        jobs.push((
-            format!("{all} all edits in one revision"),
-            steps.join("; "),
-            fmt.text_of(&fb, &rem),
-            fexp,
-            (0..d.blocks.len()).collect(),
-            None,
-        ));
-        for (ename, what, new_text, expected, touched, span) in jobs {
+        let jobs = edit_jobs(fmt, &d, &cx, &text, edits, all, report.then_some(name.as_str()));
+        for Job { name: ename, what, new_text, expected, touched, span } in jobs {
             let short = ename.split_whitespace().next().unwrap().to_string();
             let mut designs: Vec<(&'static str, hanji_core::Reanchored)> =
                 vec![("C", hanji_core::reanchor_rewrite_in(fmt.model(), &rem, &text, &new_text, CAPS).unwrap())];

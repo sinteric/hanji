@@ -183,8 +183,14 @@ fn refusals_are_exit_status_1_with_the_reason() {
     assert_eq!(e["code"], "surfaced_not_acknowledged");
     assert_eq!(e["surfaced"][0]["kind"], "comment");
     assert!(!env.dir.join("x.docx").exists(), "nothing is written");
-    let e = env.err(&["export", "korean-report", &env.path("x.docx"), "--acknowledge-surfaced", "--tracked-changes"]);
-    assert_eq!(e["code"], "unsupported");
+    // Tracked changes (§10.2): revision 2's edit ("4분기에는" → "4분기부터") as w:del / w:ins.
+    env.ok(&["export", "korean-report", &env.path("t.docx"), "--acknowledge-surfaced", "--tracked-changes"]);
+    let parts = hanji_package::package::read(&std::fs::read(env.dir.join("t.docx")).unwrap()).unwrap();
+    let doc = String::from_utf8_lossy(hanji_package::package::get(&parts, "word/document.xml").unwrap()).into_owned();
+    let rev = |tag: &str| doc.matches(&format!("<w:{tag} w:id=")).count();
+    assert!(rev("del") >= 1 && rev("ins") >= 1, "{doc}");
+    assert!(doc.contains("w:author=\"hanji (model edit)\""));
+    assert!(doc.contains("분기에는</w:delText>") || doc.contains("에는</w:delText>"), "{doc}");
     let e = env.err(&["export", "korean-report", &env.path("x.docm"), "--acknowledge-surfaced"]);
     assert_eq!(e["code"], "bad_request", "an export carries no macros: not a .docm");
     assert_eq!(env.err(&["read", "nope"])["code"], "not_found");

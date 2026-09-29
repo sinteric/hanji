@@ -127,6 +127,8 @@ pub struct Reanchored {
     pub remainder: Remainder,
     pub report: Report,
     pub outcomes: HashMap<u64, Outcome>,
+    /// How `old` maps onto `new`: what a tracked-change export reads.
+    pub alignment: Alignment,
 }
 
 fn refuse_unplaceable(r: Reanchored) -> Result<Reanchored, Refusal> {
@@ -157,9 +159,9 @@ pub fn reanchor_rewrite_in(
 ) -> Result<Reanchored, Refusal> {
     let (old, _) = m.resolve(old_text, rem, caps).map_err(Refusal::Invalid)?;
     let (new, _) = m.resolve(new_text, rem, caps).map_err(Refusal::Invalid)?;
-    let al = Alignment::design_c(&old, &new);
-    let (remainder, report, outcomes) = reanchor(rem, &old, &new, &al);
-    Ok(Reanchored { text: new_text.to_string(), old, new, remainder, report, outcomes })
+    let alignment = Alignment::design_c(&old, &new);
+    let (remainder, report, outcomes) = reanchor(rem, &old, &new, &alignment);
+    Ok(Reanchored { text: new_text.to_string(), old, new, remainder, report, outcomes, alignment })
 }
 
 /// Re-anchor the edit `text[start..end] → new`; refusals are in the report.
@@ -194,9 +196,9 @@ pub fn reanchor_span_in(
     let new_text = format!("{}{}{}", &text[..s], repl, &text[e..]);
     let (old, om) = m.resolve(text, rem, caps).map_err(Refusal::Invalid)?;
     let (nb, nm) = m.resolve(&new_text, rem, caps).map_err(Refusal::Invalid)?;
-    let al = exact_alignment(&om, &old, &nm, &nb, s, e, repl.len());
-    let (remainder, report, outcomes) = reanchor(rem, &old, &nb, &al);
-    Ok(Reanchored { text: new_text, old, new: nb, remainder, report, outcomes })
+    let alignment = exact_alignment(&om, &old, &nm, &nb, s, e, repl.len());
+    let (remainder, report, outcomes) = reanchor(rem, &old, &nb, &alignment);
+    Ok(Reanchored { text: new_text, old, new: nb, remainder, report, outcomes, alignment })
 }
 
 /// A whole-file rewrite: `old_text` (the revision `rem` belongs to) becomes

@@ -524,7 +524,7 @@ pub struct Global {
 }
 
 /// How the old model maps onto the new one.
-#[derive(Default)]
+#[derive(Clone, Debug, Default)]
 pub struct Alignment {
     pub bmap: Vec<Option<usize>>,
     /// True per-paragraph opcodes (old path → ops), e.g. from an exact span.

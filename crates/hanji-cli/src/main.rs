@@ -99,7 +99,7 @@ enum Cmd {
         /// Export although hidden text, comments, tracked deletions or metadata would leave with the file.
         #[arg(long)]
         acknowledge_surfaced: bool,
-        /// Write the edits as tracked changes (docx; not available yet).
+        /// Write the edits since the file was opened or re-imported as tracked changes (docx).
         #[arg(long)]
         tracked_changes: bool,
     },
