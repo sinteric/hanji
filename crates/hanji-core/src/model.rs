@@ -9,6 +9,31 @@ pub enum Block {
     Table(Table),
     /// A block placeholder, by id.
     Keep(String),
+    /// A structural line of a Presentation (§5.3) that holds the blocks after
+    /// it: a slide, or a slot or shape of one.
+    Head(Head),
+}
+
+/// A slide (`level` 0, `key` `slide`, `label` its layout), or a slot
+/// (`level` 1, `key` `slot:title`) or shape (`level` 1, `key` `shape:s4`,
+/// `label` its name) of the slide before it. The blocks after it, up to the
+/// next head of its level or above, belong to it. Heads are aligned by what
+/// they hold, and a slide's layout is its `label`: a changed layout is a
+/// restyled slide, not another one.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Head {
+    pub level: u8,
+    pub key: String,
+    pub label: String,
+}
+
+impl Block {
+    pub fn head(&self) -> Option<&Head> {
+        match self {
+            Block::Head(h) => Some(h),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -113,37 +138,47 @@ fn single(atom: Atom) -> Inline {
 }
 
 /// Where a resolved block is in the text.
-pub struct BlockSrc<'a> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct BlockSrc {
     /// Byte range of its lines.
     pub start: usize,
     pub end: usize,
-    pub kind: SrcKind<'a>,
+    pub kind: SrcKind,
 }
 
-pub enum SrcKind<'a> {
-    Para(&'a fmt::ParaMap),
-    Table(&'a [Vec<Option<Vec<fmt::ParaMap>>>]),
+/// A block's paragraph map: for a paragraph (a head: its mark only), or per
+/// table cell.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SrcKind {
+    Para(fmt::ParaMap),
+    Table(Vec<Vec<Option<Vec<fmt::ParaMap>>>>),
 }
 
 /// The source of each block [`resolve`] returns, in the same order:
 /// footnote definitions are not blocks of the model, and each list item is one.
-pub fn block_maps(parsed: &fmt::Parsed) -> Vec<BlockSrc<'_>> {
+pub fn block_maps(parsed: &fmt::Parsed) -> Vec<BlockSrc> {
     let mut out = vec![];
     for (b, m) in parsed.doc.blocks.iter().zip(&parsed.map.blocks) {
-        match (&m.kind, b) {
-            (_, fmt::Block::FootnoteDef(_)) => {}
-            (fmt::BlockMapKind::List(items), _) => {
-                out.extend(items.iter().map(|(s, e, pm)| BlockSrc { start: *s, end: *e, kind: SrcKind::Para(pm) }))
-            }
-            (fmt::BlockMapKind::Para(pm), _) => {
-                out.push(BlockSrc { start: m.start, end: m.end, kind: SrcKind::Para(pm) })
-            }
-            (fmt::BlockMapKind::Table(t), _) => {
-                out.push(BlockSrc { start: m.start, end: m.end, kind: SrcKind::Table(t) })
-            }
+        if !matches!(b, fmt::Block::FootnoteDef(_)) {
+            push_block_map(&mut out, m);
         }
     }
     out
+}
+
+/// The sources of one parsed block: one per list item, else one.
+pub(crate) fn push_block_map(out: &mut Vec<BlockSrc>, m: &fmt::BlockMap) {
+    match &m.kind {
+        fmt::BlockMapKind::List(items) => {
+            out.extend(items.iter().map(|(s, e, pm)| BlockSrc { start: *s, end: *e, kind: SrcKind::Para(pm.clone()) }))
+        }
+        fmt::BlockMapKind::Para(pm) => {
+            out.push(BlockSrc { start: m.start, end: m.end, kind: SrcKind::Para(pm.clone()) })
+        }
+        fmt::BlockMapKind::Table(t) => {
+            out.push(BlockSrc { start: m.start, end: m.end, kind: SrcKind::Table(t.clone()) })
+        }
+    }
 }
 
 /// Model text → resolved blocks. `is_block_keep(id)` says whether a
@@ -278,6 +313,8 @@ pub fn unresolve(
             continue;
         }
         out.push(match b {
+            // A Document has no heads.
+            Block::Head(_) => continue,
             Block::Keep(id) => fmt::Block::Keep(keep(id)),
             Block::Table(t) => fmt::Block::Table(fmt::Table { style: t.style.clone(), rows: t.rows.clone() }),
             Block::Para(p) => {
@@ -308,7 +345,7 @@ pub fn paras(blocks: &[Block]) -> Vec<(Path, Option<&Inline>)> {
     for (j, b) in blocks.iter().enumerate() {
         match b {
             Block::Para(p) => out.push((vec![j], Some(&p.content))),
-            Block::Keep(_) => out.push((vec![j], None)),
+            Block::Keep(_) | Block::Head(_) => out.push((vec![j], None)),
             Block::Table(t) => {
                 for (r, row) in t.rows.iter().enumerate() {
                     for (c, cell) in row.iter().enumerate() {

@@ -78,6 +78,7 @@ impl<'a> Exporter<'a> {
                         out.push(node(fragment(x)));
                     }
                 }
+                Block::Head(_) => return Err("a Document has no slides, slots or shapes".into()),
             }
         }
         let mut tail = self.tail.clone();

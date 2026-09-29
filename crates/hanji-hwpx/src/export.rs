@@ -181,6 +181,7 @@ impl<'a> Exporter<'a> {
                     self.emit(&mut out, x);
                     1
                 }
+                Block::Head(_) => return Err("a Document has no slides, slots or shapes".into()),
             };
             bi += step;
         }

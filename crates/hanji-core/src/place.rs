@@ -83,11 +83,16 @@ fn content(b: &Block) -> Vec<u32> {
             out
         }
         Block::Keep(id) => std::iter::once(3).chain(id.chars().map(|c| c as u32)).collect(),
+        // What a head is, not its label: a slide whose layout changed has the same content.
+        Block::Head(h) => [5, h.level as u32].into_iter().chain(h.key.chars().map(|c| c as u32)).collect(),
     }
 }
 
 pub(crate) fn same_kind(a: &Block, b: &Block) -> bool {
-    matches!((a, b), (Block::Para(_), Block::Para(_)) | (Block::Table(_), Block::Table(_)))
+    match (a, b) {
+        (Block::Head(x), Block::Head(y)) => x.level == y.level && x.key == y.key,
+        _ => matches!((a, b), (Block::Para(_), Block::Para(_)) | (Block::Table(_), Block::Table(_))),
+    }
 }
 
 /// Old block index → new block index. Diff on whole blocks, then pair moved
@@ -101,6 +106,10 @@ pub fn align(old: &[Block], new: &[Block]) -> Vec<Option<usize>> {
 /// identical blocks: matched only through a run of repeated blocks, or
 /// moved while an identical block exists.
 pub fn align_ambiguous(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, HashSet<usize>) {
+    // Nothing changed: every block is where it was, identical ones included.
+    if old == new {
+        return ((0..old.len()).map(Some).collect(), HashSet::new());
+    }
     let mut bmap: Vec<Option<usize>> = vec![None; old.len()];
     let mut used: HashSet<usize> = HashSet::new();
     let mut stretches: Vec<(Vec<usize>, Vec<usize>)> = vec![];
@@ -161,7 +170,8 @@ pub fn align_ambiguous(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, Has
         }
     }
     for &i in &moved {
-        if bmap[i].is_none() {
+        // A head is not paired by chance among identical heads: it follows what it holds (below).
+        if bmap[i].is_none() && old[i].head().is_none() {
             if let Some(&j) = free_new.iter().find(|&&j| !used.contains(&j) && new[j] == old[i]) {
                 pair(&mut bmap, &mut used, i, j);
             }
@@ -172,7 +182,7 @@ pub fn align_ambiguous(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, Has
     }
     let contents_old: Vec<Vec<u32>> = old.iter().map(content).collect();
     let contents_new: Vec<Vec<u32>> = new.iter().map(content).collect();
-    let pairable = |i: usize, j: usize| same_kind(&old[i], &new[j]);
+    let pairable = |i: usize, j: usize| same_kind(&old[i], &new[j]) && old[i].head().is_none();
     let ratio = |i: usize, j: usize| diff::ratio(&contents_old[i], &contents_new[j]);
     for (olds, _) in &stretches {
         for &i in olds {
@@ -216,6 +226,7 @@ pub fn align_ambiguous(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, Has
             pair(&mut bmap, &mut used, i, j);
         }
     }
+    follow_heads(old, new, &mut bmap, &mut used);
     // Block placeholders are found by id wherever they went.
     for (i, b) in old.iter().enumerate() {
         if let Block::Keep(id) = b {
@@ -239,6 +250,36 @@ pub fn align_ambiguous(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, Has
         k = e;
     }
     (bmap, ambiguous)
+}
+
+/// Heads follow what they hold: an unpaired head pairs with the head of its
+/// kind that the first paired block it holds now sits under; a head that
+/// holds no paired block, with the one just after where the block before it
+/// went. Inner heads (a slide's slots) are paired first.
+fn follow_heads(old: &[Block], new: &[Block], bmap: &mut [Option<usize>], used: &mut HashSet<usize>) {
+    let end = |i: usize, lv: u8| {
+        (i + 1..old.len()).find(|&k| old[k].head().is_some_and(|n| n.level <= lv)).unwrap_or(old.len())
+    };
+    loop {
+        let mut changed = false;
+        for i in (0..old.len()).rev() {
+            let Some(h) = old[i].head().filter(|_| bmap[i].is_none()) else { continue };
+            let under = |jc: usize| (0..jc).rev().find(|&x| new[x].head().is_some_and(|n| n.level <= h.level));
+            let j = (i + 1..end(i, h.level))
+                .find_map(|k| bmap[k])
+                .and_then(under)
+                .or_else(|| i.checked_sub(1).and_then(|p| bmap[p]).map(|j| j + 1));
+            let fits = |j: usize| !used.contains(&j) && new.get(j).is_some_and(|b| same_kind(&old[i], b));
+            if let Some(j) = j.filter(|&j| fits(j)) {
+                bmap[i] = Some(j);
+                used.insert(j);
+                changed = true;
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
 }
 
 type CellMap = Box<dyn Fn(usize, usize) -> Option<(usize, usize)>>;
@@ -548,6 +589,13 @@ impl<'a> Placer<'a> {
             match (&old[i], &new[j]) {
                 (Block::Para(op), Block::Para(np)) => self.para(&op.content, vec![i], &np.content, vec![j], &[]),
                 (Block::Table(ot), Block::Table(nt)) => self.table(ot, i, nt, j),
+                (Block::Head(_), Block::Head(_)) => {
+                    for e in self.entries_at(&vec![i]) {
+                        if !matches!(e.kind, Kind::Keep | Kind::Bkeep | Kind::Bmarker) {
+                            self.put(e, vec![j], None, None);
+                        }
+                    }
+                }
                 _ => self.deleted_block(i),
             }
         }
