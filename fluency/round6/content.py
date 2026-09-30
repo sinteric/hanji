@@ -37,6 +37,7 @@ def seed_model(rep):
         text = open(today_path(rep), encoding='utf-8').read()
         m = D.attach(text, X.extract(os.path.join(ROOT, s['path'])), s['fmt'])
         D.normalize(m)
+        D.compute_sections(m)
         _cache[rep] = m
     return copy.deepcopy(_cache[rep])
 
@@ -532,7 +533,7 @@ def gold_paras(m, cand, idxs, props, style=None):
     """Direct formatting on each paragraph; under F2/F3 through the named style(s) when given (the style's
     paragraphs are exactly the targets). F3 has only the style route."""
     styles = (style,) if isinstance(style, str) else (style or ())
-    if cand in ('F2', 'F3') and styles:
+    if cand in ('F2', 'F2s', 'F3') and styles:
         for s in styles:
             for k, v in props.items():
                 edit_style(m, s, k, v)
@@ -547,7 +548,7 @@ def gold_paras(m, cand, idxs, props, style=None):
 
 
 def gold_cellparas(m, cand, refs, props, style=None):
-    if cand in ('F2', 'F3') and style:
+    if cand in ('F2', 'F2s', 'F3') and style:
         for k, v in props.items():
             edit_style(m, style, k, v)
         return m
@@ -577,3 +578,126 @@ def gold_text(m, i, old, new):
             runs.append((ch, pr))
     p.runs = runs
     return m
+
+
+# ================================================================ part C: section defaults (F2 against F2s) and new styles
+
+def cellpara_eff(m, start, which='para'):
+    for b in nr(m):
+        if isinstance(b, D.T):
+            for _, c in b.cells():
+                for p in c.paras:
+                    if re.sub(r'\s+', ' ', p.plain.strip()).startswith(start):
+                        return p.para if which == 'para' else D.lifted(p.runs)
+    raise KeyError(start)
+
+
+def para_char(m, start):
+    return D.lifted(nr(m)[para(m, start)].runs)
+
+
+def gold_new_style(m, cand, name, base, props, idxs):
+    """A new style: `base` with `props`, given to the paragraphs idxs (a plain paragraph becomes a <div>)."""
+    st = copy.deepcopy(m.styles[base])
+    for k, v in props.items():
+        (st['para'] if k in D.PKEYS else st['char'])[k] = v
+    m.styles[name] = st
+    m.order.append(name)
+    for i in idxs:
+        p = nr(m)[i]
+        if p.kind == 'plain':
+            p.kind = 'div'
+        p.style = name
+        set_para(p, {k: v for k, v in props.items() if k in D.PKEYS},
+                 {k: v for k, v in props.items() if k not in D.PKEYS})
+    return m
+
+
+def by_id(rep, tid):
+    return next(t for t in TASKS[rep] if t.id == tid)
+
+
+def tasks_s1():
+    t = [by_id(1, x) for x in ('fn-q3', 'fn-q4')]
+    t.append(T_('fn-q5', 'read', 'What is the line spacing of the list item "산업용 샘플을 찍어내던 것에서 발전해…"? '
+                'Answer `ANSWER: line-spacing=<value>`.',
+                expect=lambda m: {'type': 'props', 'value': pick(eff_para(m, para(m, '산업용 샘플을')), 'line-spacing')}))
+    t.append(T_('fn-q6', 'read', 'In the first banner, what are the font size and the line spacing of its first line '
+                '"3D 프린팅 기술의 등장과"? Answer `ANSWER: size=<pt> line-spacing=<value>`.',
+                expect=lambda m: {'type': 'props', 'value': dict(
+                    pick(cellpara_eff(m, '3D 프린팅 기술의 등장과'), 'line-spacing'),
+                    **pick(cellpara_eff(m, '3D 프린팅 기술의 등장과', 'char'), 'size'))}))
+    t.append(T_('fn-q7', 'read', 'What are the font and the font size of the text "기술발전에 따른 예상되는 사회적 변화…와 '
+                '문제점" in the heading table of part Ⅱ? Answer `ANSWER: font=<name> size=<pt>`.',
+                expect=lambda m: {'type': 'props', 'value': pick(cellpara_eff(m, '기술발전에 따른', 'char'),
+                                                                 'font', 'size')}))
+    t.append(by_id(1, 'fn-e1'))
+    t.append(by_id(1, 'fn-e6'))
+    t.append(T_('fn-n1', 'noop', 'Set the line spacing of the list item "소비재, 의료, 교육, 건축, 자동차…" to 170%. If '
+                'it already has that line spacing, change nothing and answer `ANSWER: unchanged`.',
+                targets=lambda m: [('P', para(m, '소비재, 의료'))]))
+    t.append(T_('fn-e12', 'edit', 'Set the line spacing of the list item "3D기술을 활용하면 비용 효율성을…" to 200%. No '
+                'other paragraph may change.',
+                targets=lambda m: [('P', para(m, '3D기술을 활용하면'))], change_para={'line-spacing': exact('200%')},
+                gold=lambda m, c: set_para(nr(m)[para(m, '3D기술을 활용하면')], {'line-spacing': '200%'})))
+    t.append(T_('fn-e11', 'refuse', 'Create a new style named "개요 4" with 12pt text and apply it to the list item "저가의 '
+                '장비 및 S/W 보급…".'))
+    t.append(by_id(1, 'fn-e5'))
+    t.append(by_id(1, 'fn-e8'))
+    NS = ('개요 3 강조', '개요 3', {'color': DARKRED})
+    t.append(T_('fn-e10', 'edit', 'Create a new style named "개요 3 강조" that looks exactly like 개요 3 but with dark red '
+                'text (%s), and apply it to the two list items "(일반 접근성)…" and "(인력부족)…". Their other formatting '
+                'stays as it is.' % DARKRED,
+                targets=lambda m: [('P', para(m, '(일반 접근성)')), ('P', para(m, '(인력부족)'))],
+                change={'color': exact(DARKRED)}, styles=True, new_style=NS,
+                gold=lambda m, c: gold_new_style(m, c, NS[0], NS[1], NS[2],
+                                                 [para(m, '(일반 접근성)'), para(m, '(인력부족)')])))
+    return t
+
+
+def tasks_s2():
+    t = [by_id(2, x) for x in ('mel-q3', 'mel-q4')]
+    t.append(T_('mel-q5', 'read', 'What are the line spacing and the font of the paragraph that begins "ㅇ (현장 '
+                '밀착관리)"? Answer `ANSWER: line-spacing=<value> font=<name>`.',
+                expect=lambda m: {'type': 'props', 'value': dict(
+                    pick(eff_para(m, para(m, 'ㅇ (현장 밀착관리)')), 'line-spacing'),
+                    **pick(para_char(m, 'ㅇ (현장 밀착관리)'), 'font'))}))
+    t.append(T_('mel-q6', 'read', 'What are the first-line indent, the space before and the line spacing of the paragraph '
+                '"□ 기본이 지켜지는 일터: 임금체불 청산율 88.3%로 역대 최고…"? Answer `ANSWER: first-line=<pt> '
+                'space-before=<pt> line-spacing=<value>`.',
+                expect=lambda m: {'type': 'props', 'value': pick(eff_para(m, para(m, '□ 기본이 지켜지는')),
+                                                                 'first-line', 'space-before', 'line-spacing')}))
+    t.append(T_('mel-q7', 'read', 'In the organisation chart (the table with 장관, 차관, 대변인…), what is the line spacing '
+                'of the cell "대변인"? Answer `ANSWER: line-spacing=<value>`.',
+                expect=lambda m: {'type': 'props', 'value': pick(cellpara_eff(m, '대변인'), 'line-spacing')}))
+    t.append(by_id(2, 'mel-e1'))
+    t.append(by_id(2, 'mel-e6'))
+    t.append(T_('mel-n1', 'noop', 'Set the line spacing of the paragraph that begins "ㅇ (임금체불 근절)" to 162%. If it '
+                'already has that line spacing, change nothing and answer `ANSWER: unchanged`.',
+                targets=lambda m: [('P', para(m, 'ㅇ (임금체불 근절)'))]))
+    t.append(T_('mel-e12', 'edit', 'Set the space before of the paragraph that begins "ㅇ (근본 대책)" to 12pt. No other '
+                'paragraph may change.',
+                targets=lambda m: [('P', para(m, 'ㅇ (근본 대책)'))], change_para={'space-before': length_is(12)},
+                gold=lambda m, c: set_para(nr(m)[para(m, 'ㅇ (근본 대책)')], {'space-before': '12pt'})))
+    t.append(T_('mel-e11', 'refuse', 'Create a new style named "표가운데" with 9pt text and apply it to the figures of the '
+                'staff table (인원 현황).'))
+    t.append(by_id(2, 'mel-e5'))
+    t.append(by_id(2, 'mel-e8'))
+    NS = ('강조 문단', '바탕글', {'color': DARKRED})
+    t.append(T_('mel-e10', 'edit', 'Create a new style named "강조 문단" that is the default style (바탕글) with dark red '
+                'text (%s), and apply it to the two paragraphs that begin "ㅇ (근본 대책)" and "ㅇ (현장 밀착관리)". Their '
+                'other formatting stays as it is.' % DARKRED,
+                targets=lambda m: [('P', para(m, 'ㅇ (근본 대책)')), ('P', para(m, 'ㅇ (현장 밀착관리)'))],
+                change={'color': exact(DARKRED)}, styles=True, new_style=NS,
+                gold=lambda m, c: gold_new_style(m, c, NS[0], NS[1], NS[2],
+                                                 [para(m, 'ㅇ (근본 대책)'), para(m, 'ㅇ (현장 밀착관리)')])))
+    return t
+
+
+TASKS_S = {1: tasks_s1(), 2: tasks_s2()}
+SEEDS_S = (1, 2)
+CANDS_S = ('F2', 'F2s')
+
+
+def tasks_of(unit_id):
+    return TASKS_S if unit_id.startswith('r6s-') else TASKS

@@ -1,0 +1,142 @@
+[
+ {
+  "unit_id": "r6s-F2-1",
+  "part": "a",
+  "candidate": "F2",
+  "seed": 1,
+  "file_chars": 4664,
+  "prompt_chars": 11951,
+  "tasks": [
+   "fn-q3",
+   "fn-q4",
+   "fn-q5",
+   "fn-q6",
+   "fn-q7",
+   "fn-e1",
+   "fn-e6",
+   "fn-n1",
+   "fn-e12",
+   "fn-e11"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6s-F2-1",
+  "part": "b",
+  "candidate": "F2",
+  "seed": 1,
+  "file_chars": 4664,
+  "prompt_chars": 11003,
+  "tasks": [
+   "fn-e5",
+   "fn-e8",
+   "fn-e10"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6s-F2s-1",
+  "part": "a",
+  "candidate": "F2s",
+  "seed": 1,
+  "file_chars": 4578,
+  "prompt_chars": 12778,
+  "tasks": [
+   "fn-q3",
+   "fn-q4",
+   "fn-q5",
+   "fn-q6",
+   "fn-q7",
+   "fn-e1",
+   "fn-e6",
+   "fn-n1",
+   "fn-e12",
+   "fn-e11"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6s-F2s-1",
+  "part": "b",
+  "candidate": "F2s",
+  "seed": 1,
+  "file_chars": 4578,
+  "prompt_chars": 11830,
+  "tasks": [
+   "fn-e5",
+   "fn-e8",
+   "fn-e10"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6s-F2-2",
+  "part": "a",
+  "candidate": "F2",
+  "seed": 2,
+  "file_chars": 84442,
+  "prompt_chars": 91846,
+  "tasks": [
+   "mel-q3",
+   "mel-q4",
+   "mel-q5",
+   "mel-q6",
+   "mel-q7",
+   "mel-e1",
+   "mel-e6",
+   "mel-n1",
+   "mel-e12",
+   "mel-e11"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6s-F2-2",
+  "part": "b",
+  "candidate": "F2",
+  "seed": 2,
+  "file_chars": 84442,
+  "prompt_chars": 90775,
+  "tasks": [
+   "mel-e5",
+   "mel-e8",
+   "mel-e10"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6s-F2s-2",
+  "part": "a",
+  "candidate": "F2s",
+  "seed": 2,
+  "file_chars": 76393,
+  "prompt_chars": 84710,
+  "tasks": [
+   "mel-q3",
+   "mel-q4",
+   "mel-q5",
+   "mel-q6",
+   "mel-q7",
+   "mel-e1",
+   "mel-e6",
+   "mel-n1",
+   "mel-e12",
+   "mel-e11"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6s-F2s-2",
+  "part": "b",
+  "candidate": "F2s",
+  "seed": 2,
+  "file_chars": 76393,
+  "prompt_chars": 83639,
+  "tasks": [
+   "mel-e5",
+   "mel-e8",
+   "mel-e10"
+  ],
+  "unreachable": []
+ }
+]

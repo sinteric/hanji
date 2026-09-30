@@ -1,0 +1,72 @@
+{
+ "answers": [
+  {
+   "task_id": "ks-q1",
+   "text": "ANSWER: font=Cambria size=14pt"
+  },
+  {
+   "task_id": "ks-q2",
+   "text": "ANSWER: align=center"
+  },
+  {
+   "task_id": "ks-q3",
+   "text": "ANSWER: A1:E1; B2:C9"
+  },
+  {
+   "task_id": "ks-e1",
+   "ops": [
+    {
+     "op": "format",
+     "range": "매출!A3:F3",
+     "set": {
+      "bold": true,
+      "align": "center",
+      "fill": "#D9D9D9"
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "ks-e2",
+   "ops": [
+    {
+     "op": "format",
+     "range": "매출!F4:F48",
+     "set": {
+      "color": "accent6"
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "ks-e3",
+   "ops": [
+    {
+     "op": "format",
+     "range": "매출!A3:F3",
+     "set": {
+      "border-bottom": "0.75pt solid #000000"
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "ks-e4",
+   "ops": [
+    {
+     "op": "format",
+     "range": "담당자!A1:E1",
+     "set": {
+      "fill": "accent1",
+      "color": "#FFFFFF",
+      "bold": true
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "ks-e5",
+   "text": "REFUSE: Pattern fills can be shown but cannot be written in this file format."
+  }
+ ]
+}

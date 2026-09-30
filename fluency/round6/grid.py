@@ -1,7 +1,8 @@
 """Workbooks (xlsx) in the candidates: cell formatting as range lines in the sheet structure (render only).
 
   F1  `<format range="B4:C4" fill=… bold border-bottom=…/>` for every rectangle of cells whose effective formatting
-      is not the default (the Normal style), inside the sheet block; a range operation `format` writes it.
+      is not the default (the Normal style), inside the sheet block, and one `<format default …/>` line at the top
+      (Normal's font, size and colour); a range operation `format` writes it (xlsx_kit.py).
   F2  the named cell styles as `<style name="Heading 1" …/>` lines; a range shows `style="Name"` and what its cells
       set beyond the style.
   F3  `<format range style="Name"/>` for cells in a style other than Normal, and the style lines.
@@ -179,7 +180,7 @@ DEFAULT_XL = {'fill': 'none', 'border-top': 'none', 'border-right': 'none', 'bor
 
 
 def props_text(d):
-    d = {k: v for k, v in d.items() if not (k == 'align' and v == 'general')}
+    d = {k: v for k, v in d.items() if not (k == 'align' and v == 'general') and not (k == 'font' and not v)}
     return V.fmt_attrs(d)
 
 
@@ -224,6 +225,10 @@ def render(path, text, cand):
     out = []
     lines = text.split('\n')
     k = 0
+    if cand == 'F1':
+        # the workbook's default cell formatting (Normal), so a cell in no range line reads on its own
+        d = {k2: v for k2, v in base.items() if k2 in ('font', 'size', 'color') and v}
+        out += ['<format default %s/>' % V.fmt_attrs(d), '']
     if cand in ('F2', 'F3'):
         end = lines.index('---', 1) if lines and lines[0] == '---' and '---' in lines[1:] else -1
         out += lines[:end + 1] + ([''] if end >= 0 else [])

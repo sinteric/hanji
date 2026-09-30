@@ -1,0 +1,98 @@
+{
+ "answers": [
+  {
+   "task_id": "fn-q3",
+   "text": "ANSWER: indent-left=20pt first-line=0pt"
+  },
+  {
+   "task_id": "fn-q4",
+   "text": "ANSWER: size=14pt"
+  },
+  {
+   "task_id": "fn-q5",
+   "text": "ANSWER: line-spacing=170%"
+  },
+  {
+   "task_id": "fn-q6",
+   "text": "ANSWER: size=18pt line-spacing=160%"
+  },
+  {
+   "task_id": "fn-q7",
+   "text": "ANSWER: font=HY견명조 size=16pt"
+  },
+  {
+   "task_id": "fn-e1",
+   "edits": [
+    {
+     "old": "{fill=#FFF0C3 border-top",
+     "new": "{fill=#DDEBF7 border-top"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e6",
+   "edits": [
+    {
+     "old": "시제품 제작 시간과 비용 절감",
+     "new": "시제품 제작 기간과 비용 절감"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-n1",
+   "text": "ANSWER: unchanged"
+  },
+  {
+   "task_id": "fn-e12",
+   "edits": [
+    {
+     "old": "본격 상용화 {style=\"개요 3\" indent-left=19pt line-spacing=170%}",
+     "new": "본격 상용화 {style=\"개요 3\" indent-left=19pt line-spacing=200%}"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e11",
+   "text": "REFUSE: A style named \"개요 4\" already exists in the file, and a new style cannot reuse a name that is already a style."
+  },
+  {
+   "task_id": "fn-e5",
+   "edits": [
+    {
+     "old": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt/>",
+     "new": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt color=#1F3864/>"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e8",
+   "edits": [
+    {
+     "old": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt/>",
+     "new": "<style name=\"개요 3\" indent-left=20pt space-before=5pt first-line=10pt font=휴먼명조 size=15pt/>"
+    },
+    {
+     "old": "<style name=\"개요 4\" indent-left=30pt space-before=3pt font=휴먼명조 size=14pt/>",
+     "new": "<style name=\"개요 4\" indent-left=30pt space-before=3pt first-line=10pt font=휴먼명조 size=14pt/>"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e10",
+   "edits": [
+    {
+     "old": "<style name=\"개요 4\" indent-left=30pt space-before=3pt font=휴먼명조 size=14pt/>",
+     "new": "<style name=\"개요 4\" indent-left=30pt space-before=3pt font=휴먼명조 size=14pt/>\n<style name=\"개요 3 강조\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt color=#C00000/>"
+    },
+    {
+     "old": "장비 등의 인프라 부족 {style=\"개요 3\"}",
+     "new": "장비 등의 인프라 부족 {style=\"개요 3 강조\"}"
+    },
+    {
+     "old": "인재양성 체계 등 미흡 {style=\"개요 3\"}",
+     "new": "인재양성 체계 등 미흡 {style=\"개요 3 강조\"}"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,77 @@
+<format default font="Century Gothic" size=9pt color=tx2/>
+
+<sheet name="Simple Monthly Budget" range="A1:H23">
+
+<format range="A1" valign=bottom align=left size=25pt indent=1/>
+<format range="B3" valign=top size=14pt/>
+<format range="C3" valign=bottom/>
+<format range="E3" valign=top size=14pt/>
+<format range="B4" border-top="1.5pt solid bg2-10%" border-bottom="1.5pt solid bg2-10%" font=Georgia size=10pt color=accent1-25% italic/>
+<format range="C4" border-top="1.5pt solid bg2-10%" border-bottom="1.5pt solid bg2-10%" align=right font=Georgia size=10pt color=accent1-25% italic indent=2/>
+<format range="E4" fill=bg2-10% border-top="2.25pt solid bg1" border-left="2.25pt solid bg1"/>
+<format range="F4:G4" fill=bg2-10% border-top="2.25pt solid bg1"/>
+<format range="H4" border-top="2.25pt solid bg1" border-right="2.25pt solid bg1" align=right size=22pt color=accent1-25% indent=1/>
+<format range="E5" fill=bg2-10% border-bottom="2.25pt solid bg1" border-left="2.25pt solid bg1"/>
+<format range="F5:G5" fill=bg2-10% border-bottom="2.25pt solid bg1"/>
+<format range="H5" border-right="2.25pt solid bg1" border-bottom="2.25pt solid bg1" align=right size=22pt color=accent1-25% indent=1/>
+<format range="E7" valign=top size=14pt/>
+<format range="F7:G7" valign=bottom/>
+<format range="B8:C8" valign=bottom align=center/>
+<format range="E8:H8" border-top="1.5pt solid bg2-10%" border-bottom="1.5pt solid bg2-10%" align=left font=Georgia size=10pt color=accent1-25% italic/>
+<format range="B9" valign=top size=14pt/>
+<format range="C9" valign=bottom/>
+<format range="E9:H9" border-top="1.5pt solid bg2-10%" valign=top align=left size=16pt/>
+<format range="B10" border-top="1.5pt solid bg2-10%" border-bottom="1.5pt solid bg2-10%" font=Georgia size=10pt color=accent1-25% italic/>
+<format range="C10" border-top="1.5pt solid bg2-10%" border-bottom="1.5pt solid bg2-10%" align=right font=Georgia size=10pt color=accent1-25% italic indent=2/>
+<format range="E10" valign=top size=15.75pt/>
+<format range="F10:H10" valign=top size=16pt/>
+
+<table name="tblIncome" range="B4:C7">
+| column | type | format | formula |
+|---|---|---|---|
+| Item | text | General |  |
+| Amount | number | "$"#,##0.00 |  |
+</table>
+
+<data table="tblIncome">
+| row | Item | Amount |
+|---|---|---|
+| 5 | Income 1 | $2,500.00 |
+| 6 | Income 2 | $1,000.00 |
+| 7 | Other | $250.00 |
+</data>
+
+<table name="tblExpenses" range="B10:C23">
+| column | type | format | formula |
+|---|---|---|---|
+| Item | text | General |  |
+| Amount | number | "$"#,##0.00 |  |
+</table>
+
+<data table="tblExpenses">
+| row | Item | Amount |
+|---|---|---|
+| 11 | Rent/mortgage | $800.00 |
+| 12 | Electric | $120.00 |
+| 13 | Gas | $50.00 |
+| 14 | Cell phone | $45.00 |
+| 15 | Groceries | $500.00 |
+| 16 | Car payment | $273.00 |
+| 17 | Auto expenses | $120.00 |
+| 18 | Student loans | $50.00 |
+| 19 | Credit cards | $100.00 |
+| 20 | Auto Insurance | $78.00 |
+| 21 | Personal care | $50.00 |
+| 22 | Entertainment | $100.00 |
+| 23 | Miscellaneous | $50.00 |
+</data>
+
+<keep id="k8a8r" kind="merged-cells" summary="H4:H5, B8:C8, E4:G5, G8:H8, G9:H9"/>
+
+<keep id="k0k51" kind="conditional-format" summary="E4"/>
+
+<keep id="kushr" kind="chart" summary="column chart: 'Simple Monthly Budget'!$E$9:$F$9 at E11"/>
+
+<keep id="kr189" kind="shape" summary="Need to add more income entries? Start typing below the last entry and the table will automatically expand when you press Enter. at B25: Need to add more entrie…"/>
+</sheet>
+

@@ -19,7 +19,8 @@ from difflib import SequenceMatcher
 import inline as I
 import vocab as V
 
-CANDS = ('F1', 'F2', 'F3')
+CANDS = ('F1', 'F2', 'F2s', 'F3')
+TWO = ('F2', 'F2s')                        # F2s: F2 plus a defaults line per section (<pagebreak/> to <pagebreak/>)
 CHARV = ('font', 'size', 'color')          # char properties written in braces and spans
 FLAGS = V.FLAGS
 PKEYS = V.PARA_KEYS + ('fill',) + V.SIDES   # paragraph properties (fill/borders: paragraph shading and borders)
@@ -88,6 +89,8 @@ DIV_RE = re.compile(r'^<div style="([^"]*)">(.*)</div>$')
 EMPTY_RE = re.compile(r'^<p(?: style="([^"]*)")?/>$')
 PTAG_RE = re.compile(r'<p(?: style="([^"]*)")?/>')
 STYLE_LINE_RE = re.compile(r'^<style name="([^"]*)"(.*?)/>$')
+DEFAULTS_RE = re.compile(r'^<defaults(.*?)/>$')
+SECK = V.PARA_KEYS + CHARV                  # what a section's defaults line may hold
 BRACE_END_RE = re.compile(r'\{([^{}]*)\}$')
 
 
@@ -179,7 +182,7 @@ def lines_to_blocks(text, cand=None):
     order = []
     blocks = []
     style_spans = {}
-    braces = cand in ('F1', 'F2', 'F3')
+    braces = cand in ('F1', 'F2', 'F2s', 'F3')
     para_allow = set(V.PARA_KEYS + ('fill',) + V.SIDES + CHARV + FLAGS)
     if cand == 'F3':
         para_allow = set()
@@ -205,6 +208,25 @@ def lines_to_blocks(text, cand=None):
             continue
         if ln.startswith('<style') and cand:
             raise ParseError(no, 'a style line is <style name="Name" key=value …/>')
+        md = DEFAULTS_RE.match(ln) if cand == 'F2s' else None
+        if md:
+            try:
+                props = V.parse_attrs(md.group(1))
+            except V.VocabError as e:
+                raise ParseError(no, 'defaults line: %s' % e)
+            bad = [k for k in props if k not in SECK]
+            if bad:
+                raise ParseError(no, 'a defaults line holds paragraph and text properties (%s), not %s'
+                                 % (', '.join(SECK), ', '.join(bad)))
+            r = Raw(ln)
+            r.defaults = props
+            r.span = (i, i + 1)
+            blocks.append(r)
+            i += 1
+            continue
+        if ln.startswith('<defaults') and cand:
+            raise ParseError(no, 'there is no <defaults …/> line in this file' if cand != 'F2s'
+                             else 'a defaults line is <defaults key=value …/> on its own line')
         if ln.startswith('|') or (braces and ln.startswith('{') and i + 1 < len(lines)
                                   and lines[i + 1].startswith('|')) or (ln.startswith('{style=') and i + 1 < len(lines)
                                                                        and lines[i + 1].startswith('|')):
@@ -315,7 +337,7 @@ def parse_para_line(ln, no, cand, allow):
         p.style = brace.pop('style')
     p.brace = brace
     try:
-        I.runs_of(p.inline, spans=cand in ('F1', 'F2'))
+        I.runs_of(p.inline, spans=cand in ('F1',) + TWO)
     except V.VocabError as e:
         raise ParseError(no, str(e))
     if cand == 'F3' and re.search(r'\]\{', p.inline):
@@ -363,7 +385,7 @@ def parse_cell(c, no, cand, allow):
             raise ParseError(no, 'this file has no paragraph formatting in cells')
         p = P('cell', '', style, txt, tag=tag, brace=b)
         try:
-            I.runs_of(txt, spans=cand in ('F1', 'F2'))
+            I.runs_of(txt, spans=cand in ('F1',) + TWO)
         except V.VocabError as e:
             raise ParseError(no, str(e))
         paras.append(p)
@@ -594,6 +616,94 @@ def style_eff(m, name):
 TLP = tuple(k for k in V.PARA_KEYS) + CHARV   # paragraph properties a table line can hold
 
 
+# ---------------------------------------------------------------- F2s: section defaults
+
+def own_keys(styles, name, default):
+    """The properties a style line shows: those that differ from the default style (none for the default)."""
+    if name == default or name not in styles:
+        return set()
+    s, d = styles[name], styles[default]
+    return {k for k in s['para'] if s['para'].get(k) != d['para'].get(k)} | \
+        {k for k in s['char'] if s['char'].get(k) != d['char'].get(k)}
+
+
+def layered(styles, default, name, sec, own=None):
+    """F2s: the default style, under the section's defaults line, under the style's own properties."""
+    d = styles[default]
+    out = {'para': dict(d['para']), 'char': dict(d['char'])}
+    for k, v in (sec or {}).items():
+        (out['para'] if k in PKEYS else out['char'])[k] = v
+    st = styles.get(name) or d
+    for k in (own_keys(styles, name, default) if own is None else own):
+        if k in st['para']:
+            out['para'][k] = st['para'][k]
+        elif k in st['char']:
+            out['char'][k] = st['char'][k]
+    return out
+
+
+def sec_base(m, name, sec):
+    return layered(m.styles, m.default, name or m.default, sec)
+
+
+def section_starts(m):
+    """Block index where each section starts: the first block, and the block after each <pagebreak/>."""
+    starts = [0]
+    for i, b in enumerate(m.blocks):
+        if isinstance(b, Raw) and b.line == '<pagebreak/>' and i + 1 < len(m.blocks):
+            starts.append(i + 1)
+    return starts
+
+
+def section_paras(m, lo, hi):
+    for b in m.blocks[lo:hi]:
+        if isinstance(b, P):
+            yield b
+        elif isinstance(b, T):
+            for _, c in b.cells():
+                yield from c.paras
+
+
+SEC_RULE = 'plurality'   # 'majority': more than half; 'plurality': the commonest value, when more have it than the default
+SEC_OVER = 'all'   # which paragraphs vote for a section's defaults: 'all' (cells too) or 'body'
+
+
+def compute_sections(m):
+    """Each section's defaults: for each property, the value more than half of the section's paragraphs with text
+    have (two or more), among the paragraphs whose style does not set the property itself, when it is not the
+    default style's. Stored on the model (m.secd) so an edit keeps them."""
+    starts = section_starts(m)
+    dflt = m.styles[m.default]
+    m.secd = []
+    for n, lo in enumerate(starts):
+        hi = starts[n + 1] if n + 1 < len(starts) else len(m.blocks)
+        ps = [p for p in section_paras(m, lo, hi) if p.plain.strip() and (SEC_OVER == 'all' or p.kind != 'cell')]
+        d = {}
+        for k in SECK:
+            vals = []
+            for p in ps:
+                if k in own_keys(m.styles, p.style or m.default, m.default):
+                    continue
+                vals.append(p.para.get(k) if k in PKEYS else lifted(p.runs).get(k))
+            ref = (dflt['para'] if k in PKEYS else dflt['char']).get(k)
+            v, c = mode([x for x in vals if x != ref])
+            if v is not None and c >= 2 and (2 * c > len(vals) if SEC_RULE == 'majority' else c > vals.count(ref)):
+                d[k] = v
+        m.secd.append(d)
+    return m
+
+
+def assign_sections(m):
+    if not hasattr(m, 'secd'):
+        compute_sections(m)
+    starts = section_starts(m)
+    m.sec_at = {lo: n for n, lo in enumerate(starts)}
+    for n, lo in enumerate(starts):
+        hi = starts[n + 1] if n + 1 < len(starts) else len(m.blocks)
+        for p in section_paras(m, lo, hi):
+            p.sec = m.secd[n] if n < len(m.secd) else {}
+
+
 def para_brace(m, p, cand, tlp=None):
     """The paragraph's {…} (dict) under cand, or None. tlp: the table line's paragraph properties (cells)."""
     if p.kind == 'empty' or not p.plain.strip():
@@ -605,6 +715,9 @@ def para_brace(m, p, cand, tlp=None):
     explicit = cand == 'F1' and bool(tlp)
     if cand == 'F1':
         base_p, base_c = dict(dflt['para']), dict(dflt['char'])
+    elif cand == 'F2s':
+        st = sec_base(m, p.style, getattr(p, 'sec', None))
+        base_p, base_c = dict(st['para']), dict(st['char'])
     else:
         base_p, base_c = dict(st['para']), dict(st['char'])
     for k, v in (tlp or {}).items():
@@ -619,7 +732,7 @@ def para_brace(m, p, cand, tlp=None):
         for f in FLAGS:
             if cand == 'F1' and lift.get(f) == 'yes' and st['char'].get(f) == 'yes' and dflt['char'].get(f) != 'yes':
                 out[f] = 'yes'
-            if cand == 'F2' and lift.get(f) == 'no' and st['char'].get(f) == 'yes':
+            if cand in TWO and lift.get(f) == 'no' and st['char'].get(f) == 'yes':
                 out[f] = 'no'
     if p.kind == 'list' and p.style != m.default:
         out['style'] = p.style
@@ -645,7 +758,10 @@ def ref_char(m, p, cand, br, tlp=None):
         for f in FLAGS:
             base[f] = (br or {}).get(f, dflt.get(f))
     else:
-        base = dict(style_eff(m, p.style)['char'])
+        if cand == 'F2s':
+            base = dict(sec_base(m, p.style, getattr(p, 'sec', None))['char'])
+        else:
+            base = dict(style_eff(m, p.style)['char'])
         for k, v in (tlp or {}).items():
             if k in CHARV:
                 base[k] = v
@@ -739,7 +855,7 @@ def table_line_props(m, t, cand):
                 if cand == 'F1':
                     vals.append(eff)
                 else:
-                    st = style_eff(m, p.style)
+                    st = sec_base(m, p.style, getattr(p, 'sec', None)) if cand == 'F2s' else style_eff(m, p.style)
                     ref = st['para'].get(k) if k in PKEYS else st['char'].get(k)
                     vals.append(eff if eff != ref else None)
             v, n = mode(vals)
@@ -796,7 +912,10 @@ def render_cell(m, t, c, tl, cand, tlp=None):
 def render(m, cand):
     out = list(m.front)
     out.append('')
-    names = m.order if cand in ('F2', 'F3') else [m.default]
+    names = m.order if cand in ('F2', 'F2s', 'F3') else [m.default]
+    if cand == 'F2s':
+        assign_sections(m)
+    prev_d = {}
     dflt = style_eff(m, m.default)
     for n in names:
         s = style_eff(m, n)
@@ -815,7 +934,12 @@ def render(m, cand):
             d.update({k: v for k, v in s['char'].items() if v != dflt['char'].get(k)})
         out.append('<style name="%s"%s/>' % (n, (' ' + V.fmt_attrs(d)) if d else ''))
     out.append('')
-    for b in m.blocks:
+    for bi, b in enumerate(m.blocks):
+        if cand == 'F2s' and bi in m.sec_at:
+            d = m.secd[m.sec_at[bi]]
+            if d or prev_d:
+                out.append('<defaults%s/>' % ((' ' + V.fmt_attrs(d)) if d else ''))
+            prev_d = d
         if isinstance(b, Raw):
             out.append(b.line)
         elif isinstance(b, P):
@@ -899,15 +1023,21 @@ def effective(text, cand, truth):
     front, st_lines, order, blocks = lines_to_blocks(text, cand)
     styles = style_defs_from_text(truth, st_lines, cand)
     for n in st_lines:
-        if n not in truth.styles:
+        if n not in truth.styles and cand not in TWO:
             raise ParseError(1, 'style %r is not in this file; the styles are %s' % (n, ', '.join(truth.order)))
+    if cand in TWO and truth.default not in st_lines:
+        raise ParseError(1, 'the default style\'s line <style name="%s" …/> is missing' % truth.default)
     hidden = hidden_map(truth, blocks) if cand in ('F1', 'F3') else {}
     out = []
+    sec = {}
+    eff_para.own = {n: (set(v) if n != truth.default else set()) for n, v in st_lines.items()}
     for bi, b in enumerate(blocks):
         if isinstance(b, Raw):
+            if getattr(b, 'defaults', None) is not None:
+                sec = b.defaults
             out.append(('R', b.line))
         elif isinstance(b, P):
-            out.append(eff_para(b, cand, styles, truth, hidden.get(id(b))))
+            out.append(eff_para(b, cand, styles, truth, hidden.get(id(b)), sec=sec))
         else:
             cells = {}
             tl = {k: v for k, v in (b.brace or {}).items() if k in BOXK}
@@ -923,7 +1053,7 @@ def effective(text, cand, truth):
                     box.update(c.brace or {})
                 ps = []
                 for p in c.paras:
-                    ps.append(eff_para(p, cand, styles, truth, hidden.get(id(p)), tlp))
+                    ps.append(eff_para(p, cand, styles, truth, hidden.get(id(p)), tlp, sec=sec))
                 cells[rc] = (box, ps)
             out.append(('T', cells, b.pre))
     effective.spans = [b.span for b in blocks]
@@ -931,7 +1061,7 @@ def effective(text, cand, truth):
     return out, styles
 
 
-def eff_para(p, cand, styles, truth, hidden, tlp=None):
+def eff_para(p, cand, styles, truth, hidden, tlp=None, sec=None):
     if p.kind == 'heading':
         style = truth.heading.get(p.level)
     elif p.kind in ('div', 'empty', 'cell'):
@@ -947,8 +1077,8 @@ def eff_para(p, cand, styles, truth, hidden, tlp=None):
                              % (p.style, ', '.join(truth.order)))
         style = truth.default
     st = styles[style]
-    plain, runs, zw = I.runs_of(p.inline, spans=cand in ('F1', 'F2'))
-    base_inline = canon_inline(I.strip_spans(p.inline) if cand in ('F1', 'F2') else p.inline)
+    plain, runs, zw = I.runs_of(p.inline, spans=cand in ('F1',) + TWO)
+    base_inline = canon_inline(I.strip_spans(p.inline) if cand in ('F1',) + TWO else p.inline)
     if not plain.strip():
         return ('P', p.kind, style, plain, {}, [(plain, {})] if plain else [], base_inline, p.prefix, p.tag)
     if cand == 'F1':
@@ -967,8 +1097,12 @@ def eff_para(p, cand, styles, truth, hidden, tlp=None):
             if hidden is not None and p.kind in ('list',):
                 st = styles.get(hidden.style, st)
             para, char = dict(st['para']), dict(st['char'])
-    elif cand == 'F2':
-        para, char = dict(st['para']), dict(st['char'])
+    elif cand in TWO:
+        if cand == 'F2s':
+            lay = layered(styles, truth.default, style, sec, eff_para.own.get(style, set()))
+            para, char = lay['para'], lay['char']
+        else:
+            para, char = dict(st['para']), dict(st['char'])
         for k, v in list((tlp or {}).items()) + list((p.brace or {}).items()):
             if k == 'style':
                 continue
@@ -1033,6 +1167,26 @@ def eff_para(p, cand, styles, truth, hidden, tlp=None):
                 cur.append((ch, pr))
         eruns = cur
     return ('P', p.kind, style, plain, para, merge_runs(eruns), base_inline, p.prefix, p.tag)
+
+
+def getput_view(effs):
+    """Effective blocks with the text properties of white space dropped (a space between two differently formatted
+    stretches takes whatever its paragraph has; no candidate shows it): what GetPut compares."""
+    def para(e):
+        if e[0] != 'P':
+            return e
+        flat = []
+        for t, pr in e[5]:
+            for ch in t:
+                flat.append((ch, None if not ch.strip() else tuple(sorted(pr.items()))))
+        return e[:5] + (flat,) + e[6:]
+    out = []
+    for e in effs:
+        if e[0] == 'T':
+            out.append(('T', {rc: (box, [para(p) for p in ps]) for rc, (box, ps) in e[1].items()}, e[2]))
+        else:
+            out.append(para(e))
+    return out
 
 
 def merge_runs(runs):

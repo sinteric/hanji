@@ -40,11 +40,11 @@ def flow(dumps):
             try:
                 m = D.attach(text, X.extract(os.path.join(d, f)), fmt)
                 D.normalize(m)
-                truth = [e for e in D.effective(D.render(m, 'F1'), 'F1', m)[0] if e[0] != 'R']
+                truth = D.getput_view([e for e in D.effective(D.render(m, 'F1'), 'F1', m)[0] if e[0] != 'R'])
                 for c in D.CANDS:
                     t = D.render(m, c)
                     row[c] = len(t)
-                    e = [x for x in D.effective(t, c, m)[0] if x[0] != 'R']
+                    e = D.getput_view([x for x in D.effective(t, c, m)[0] if x[0] != 'R'])
                     row['getput_' + c] = e == truth
                 row['blocks'] = m.stats['blocks']
                 row['matched'] = m.stats['matched']
@@ -74,12 +74,12 @@ def main():
     rows = flow(dumps) + other(dumps)
     json.dump(rows, open(os.path.join(HERE, 'data', 'measure.json'), 'w', encoding='utf-8'), indent=1)
     tot = {}
-    print('%-44s %-5s %8s %8s %8s %8s  %s' % ('file', 'fmt', 'today', 'F1', 'F2', 'F3', 'getput'))
+    print('%-44s %-5s %8s %8s %8s %8s %8s  %s' % ('file', 'fmt', 'today', 'F1', 'F2', 'F2s/F2o', 'F3', 'getput'))
     for r in rows:
         if 'error' in r:
             print('%-44s %-5s %8d  error: %s' % (r['file'], r['format'], r['today'], r['error']))
             continue
-        cands = [c for c in ('F1', 'F2', 'F2o', 'F3') if c in r]
+        cands = [c for c in ('F1', 'F2', 'F2s', 'F2o', 'F3') if c in r]
         print('%-44s %-5s %8d %s  %s' % (r['file'][:44], r['format'], r['today'],
                                          ' '.join('%8s' % ('%.2f' % (r[c] / r['today'])) for c in cands),
                                          all(r.get('getput_' + c, True) for c in cands)))
@@ -91,7 +91,7 @@ def main():
     print()
     for fmt, t in tot.items():
         print('%-5s %d files, today %d chars: %s' % (fmt, t['n'], t['today'], ', '.join(
-            '%s %.2fx' % (c, t[c] / t['today']) for c in ('F1', 'F2', 'F2o', 'F3') if c in t)))
+            '%s %.2fx' % (c, t[c] / t['today']) for c in ('F1', 'F2', 'F2s', 'F2o', 'F3') if c in t)))
 
 
 if __name__ == '__main__':

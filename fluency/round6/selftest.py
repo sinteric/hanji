@@ -137,6 +137,41 @@ def main():
     ts = line_with(p1, 'Series A')
     pb.append(('r6p-F1-1', 'pp-e5', edit(ts, ts.replace('Series A', 'Series B').replace('size=22pt', 'size=20pt')),
                'formatting changed with the text', False))
+    # part C (section defaults, new styles)
+    s1 = seed('r6s-F2s-1')
+    d1 = line_with(s1, '<defaults line-spacing=170%')
+    item = line_with(s1, '3D기술을 활용하면')
+    cons = line_with(s1, '소비재, 의료')
+    broken.append(('r6s-F2s-1', 'fn-q5', {'text': 'ANSWER: line-spacing=160%'}, 'the default style, not the defaults'))
+    broken.append(('r6s-F2s-1', 'fn-q7', {'text': 'ANSWER: font=휴먼명조 size=15pt'}, 'another style\'s values'))
+    broken.append(('r6s-F2s-1', 'fn-e12', edit(d1, d1.replace('170%', '200%')), 'the defaults line reaches others'))
+    good.append(('r6s-F2s-1', 'fn-e12', edit(item, item.replace('indent-left=19pt', 'line-spacing=200% indent-left=19pt')),
+                 'the item\'s own brace'))
+    good.append(('r6s-F2s-1', 'fn-n1', edit(cons, cons[:-1] + ' line-spacing=170%}'), 'written out, unchanged'))
+    broken.append(('r6s-F2s-1', 'fn-n1', edit(cons, cons[:-1] + ' line-spacing=160%}'), 'changed'))
+    broken.append(('r6s-F2s-1', 'fn-n1', {'text': 'ANSWER: line-spacing=170%'}, 'neither unchanged nor an edit'))
+    st4 = line_with(s1, '<style name="개요 4"')
+    broken.append(('r6s-F2s-1', 'fn-e10', edit(st4, st4 + '\n<style name="개요 3"/>'), 'a duplicate name'))
+    ga = line_with(s1, '(일반 접근성)')
+    gb = line_with(s1, '(인력부족)')
+    broken.append(('r6s-F2s-1', 'fn-e10', {'edits': [
+        {'old': st4, 'new': st4 + '\n<style name="개요 3 강조" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt/>'},
+        {'old': ga, 'new': ga.replace('"개요 3"', '"개요 3 강조" color=#C00000')},
+        {'old': gb, 'new': gb.replace('"개요 3"', '"개요 3 강조" color=#C00000')}]}, 'the colour on the items'))
+    good.append(('r6s-F2s-1', 'fn-e10', {'edits': [
+        {'old': st4, 'new': st4 + '\n<style name="개요 3 강조" indent-left=20pt space-before=5pt font=휴먼명조 '
+                                  'size=15pt color=#C00000/>'},
+        {'old': ga, 'new': ga.replace('"개요 3"', '"개요 3 강조"')},
+        {'old': gb, 'new': gb.replace('"개요 3"', '"개요 3 강조"')}]}, 'the new style'))
+    broken.append(('r6s-F2s-1', 'fn-e11', edit(st4, st4.replace('size=14pt', 'size=12pt')), 'should refuse'))
+    s2 = seed('r6s-F2s-2')
+    root = line_with(s2, '(근본 대책)')
+    dl = [ln for ln in s2.split('\n') if ln.startswith('<defaults') and 'line-spacing=162%' in ln][0]
+    broken.append(('r6s-F2s-2', 'mel-e12', edit(dl, dl.replace('space-before=20pt', 'space-before=12pt')),
+                   'the defaults line reaches others'))
+    good.append(('r6s-F2s-2', 'mel-e12', edit(root, root + ' {space-before=12pt}'), 'its own brace'))
+    broken.append(('r6s-F2s-2', 'mel-q4', {'text': 'ANSWER: first-line=0pt'}, 'the default style, not the defaults'))
+    broken.append(('r6s-F2s-2', 'mel-q7', {'text': 'ANSWER: line-spacing=130%'}, 'the defaults over the style'))
     for uid, tid, ans, why, want in pb:
         r = next(x for x in PK.score_answer(uid, {'answers': [dict(ans, task_id=tid)]}) if x['task_id'] == tid)
         if r['landed'] != want:

@@ -1,0 +1,145 @@
+{
+ "answers": [
+  {
+   "task_id": "tb-q1",
+   "text": "ANSWER: border-top=0.75pt solid #000000 border-right=0.75pt solid #000000 border-bottom=0.75pt solid #000000 border-left=none"
+  },
+  {
+   "task_id": "tb-q2",
+   "text": "ANSWER: size=12pt align=center"
+  },
+  {
+   "task_id": "tb-q3",
+   "text": "ANSWER: bold=yes size=14pt"
+  },
+  {
+   "task_id": "tb-e1",
+   "ops": [
+    {
+     "op": "format",
+     "range": "Exp1!A7:J7",
+     "set": {
+      "fill": "#D9D9D9"
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "tb-e2",
+   "ops": [
+    {
+     "op": "format",
+     "range": "Exp1!A7:J22",
+     "set": {
+      "outline": "2.25pt solid #000000"
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "tb-e3",
+   "ops": [
+    {
+     "op": "format",
+     "range": "Exp1!A1",
+     "set": {
+      "size": "14pt"
+     }
+    },
+    {
+     "op": "format",
+     "range": "'Exp2 (2)'!A1",
+     "set": {
+      "size": "14pt"
+     }
+    },
+    {
+     "op": "format",
+     "range": "'Exp3 (2)'!A1",
+     "set": {
+      "size": "14pt"
+     }
+    },
+    {
+     "op": "format",
+     "range": "Exp4!A1",
+     "set": {
+      "size": "14pt"
+     }
+    },
+    {
+     "op": "format",
+     "range": "Exp5!A1",
+     "set": {
+      "size": "14pt"
+     }
+    },
+    {
+     "op": "format",
+     "range": "'Exp6 (2)'!A1",
+     "set": {
+      "size": "14pt"
+     }
+    },
+    {
+     "op": "format",
+     "range": "'Exp7 (2)'!A1",
+     "set": {
+      "size": "14pt"
+     }
+    },
+    {
+     "op": "format",
+     "range": "Exp8!A1",
+     "set": {
+      "size": "14pt"
+     }
+    },
+    {
+     "op": "format",
+     "range": "Exp9!A1",
+     "set": {
+      "size": "14pt"
+     }
+    },
+    {
+     "op": "format",
+     "range": "'Exp10 (2)'!A1",
+     "set": {
+      "size": "14pt"
+     }
+    },
+    {
+     "op": "format",
+     "range": "'Exp11 (2)'!A1",
+     "set": {
+      "size": "14pt"
+     }
+    },
+    {
+     "op": "format",
+     "range": "Exp12!A1",
+     "set": {
+      "size": "14pt"
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "tb-e4",
+   "ops": [
+    {
+     "op": "format",
+     "range": "Exp4!A1:K24",
+     "set": {
+      "font": "Arial"
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "tb-e5",
+   "text": "REFUSE: Diagonal lines in a cell cannot be expressed or written in this format's vocabulary."
+  }
+ ]
+}

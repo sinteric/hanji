@@ -89,6 +89,8 @@ def fix_one(workdir, unit, model):
     import score as S
     if unit.startswith('r6p-'):
         import pptx_kit as S
+    if unit.startswith('r6x-'):
+        import xlsx_kit as S
     rd = os.path.join(HERE, 'runs', unit)
     first = json.load(open(os.path.join(rd, '%s-first.json' % model), encoding='utf-8'))
     res = S.score_answer(unit, first)

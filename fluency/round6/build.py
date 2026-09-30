@@ -12,7 +12,7 @@ from difflib import SequenceMatcher
 import content as CT
 import doc as D
 import score as S
-from guides import GUIDES
+from guides import GUIDES, GUIDES_S
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 OUT = {k: os.path.join(HERE, *p) for k, p in {
@@ -59,6 +59,9 @@ One entry per task, in the order of the tasks.
 
 # Each unit is sent as two prompts with the same file: reads, single edits and the refusal (a); the edits that
 # touch many places, the style edit and the new table (b). One prompt with all thirteen could outgrow an answer.
+PART_A = ('F1', 'F2', 'F3')
+# part C (section defaults and new styles): F2 against F2s on the two hwpx seeds
+PARTS_S = {'a': ('q3', 'q4', 'q5', 'q6', 'q7', 'e1', 'e6', 'n1', 'e12', 'e11'), 'b': ('e5', 'e8', 'e10')}
 PARTS = {'a': ('q1', 'q2', 'q3', 'q4', 'e1', 'e2', 'e6', 'e9'), 'b': ('e3', 'e4', 'e5', 'e7', 'e8')}
 
 
@@ -118,14 +121,14 @@ def main():
     index = []
     for rep in sorted(CT.SEEDS):
         m = CT.seed_model(rep)
-        texts = {c: D.render(m, c) for c in D.CANDS}
-        truth = [e for e in D.effective(texts['F1'], 'F1', m)[0] if e[0] != 'R']
-        for c in D.CANDS:
-            e = [x for x in D.effective(texts[c], c, m)[0] if x[0] != 'R']
+        texts = {c: D.render(m, c) for c in PART_A}
+        truth = D.getput_view([e for e in D.effective(texts['F1'], 'F1', m)[0] if e[0] != 'R'])
+        for c in PART_A:
+            e = D.getput_view([x for x in D.effective(texts[c], c, m)[0] if x[0] != 'R'])
             assert e == truth, 'GetPut on the text fails: seed %d under %s' % (rep, c)
             again = D.render(m, c)
             assert again == texts[c]
-        for c in D.CANDS:
+        for c in PART_A:
             uid = 'r6-%s-%d' % (c, rep)
             open(os.path.join(OUT['seeds'], uid + '.txt'), 'w', encoding='utf-8').write(texts[c])
             gold = []
@@ -172,7 +175,57 @@ def main():
                 print(uid, part, 'file', len(texts[c]), 'prompt', len(prompt), 'max line',
                       max(len(x) for x in prompt.split('\n')), 'unreachable', len(index[-1]['unreachable']))
     json.dump(index, open(os.path.join(HERE, 'data', 'index.json'), 'w', encoding='utf-8'), indent=1)
+    build_sections()
+
+
+def build_sections():
+    """Part C: units r6s-<F2|F2s>-<seed>, with the new-style guide (F2) and the defaults lines (F2s)."""
+    for c, g in GUIDES_S.items():
+        open(os.path.join(OUT['guides'], 'doc-s-%s.md' % c), 'w', encoding='utf-8').write(g)
+    index = []
+    for rep in CT.SEEDS_S:
+        m = CT.seed_model(rep)
+        texts = {c: D.render(m, c) for c in CT.CANDS_S}
+        truth = D.getput_view([e for e in D.effective(D.render(m, 'F1'), 'F1', m)[0] if e[0] != 'R'])
+        for c in CT.CANDS_S:
+            e = D.getput_view([x for x in D.effective(texts[c], c, m)[0] if x[0] != 'R'])
+            assert e == truth, 'GetPut on the text fails: seed %d under %s' % (rep, c)
+            assert D.render(m, c) == texts[c]
+            uid = 'r6s-%s-%d' % (c, rep)
+            open(os.path.join(OUT['seeds'], uid + '.txt'), 'w', encoding='utf-8').write(texts[c])
+            gold = []
+            for t in CT.TASKS_S[rep]:
+                if t.kind == 'read':
+                    gold.append({'task_id': t.id, 'text': fmt_expect(t.expect(m))})
+                elif t.kind == 'refuse':
+                    gold.append({'task_id': t.id, 'text': 'REFUSE: this cannot be done here.'})
+                elif t.kind == 'noop':
+                    gold.append({'task_id': t.id, 'text': 'ANSWER: unchanged'})
+                else:
+                    m2 = CT.seed_model(rep)
+                    t.gold(m2, c)
+                    gold.append({'task_id': t.id, 'edits': make_edits(texts[c], D.render(m2, c))})
+            unit = {'unit_id': uid, 'candidate': c, 'seed': rep, 'name': CT.SEEDS[rep]['name'],
+                    'format': CT.SEEDS[rep]['fmt'], 'file': texts[c], 'unreachable': [],
+                    'tasks': [{'task_id': t.id, 'kind': t.kind, 'text': t.text} for t in CT.TASKS_S[rep]]}
+            json.dump(unit, open(os.path.join(OUT['units'], uid + '.json'), 'w', encoding='utf-8'),
+                      ensure_ascii=False, indent=1)
+            json.dump({'answers': gold}, open(os.path.join(OUT['gold'], uid + '.json'), 'w', encoding='utf-8'),
+                      ensure_ascii=False, indent=1)
+            for r in S.score_answer(uid, {'answers': gold}):
+                assert r['landed'], 'gold does not land: %s %s: %s %s' % (uid, r['task_id'], r['error'], r['detail'])
+            for part, ids in PARTS_S.items():
+                ts = [t for t in CT.TASKS_S[rep] if t.id.split('-', 1)[1] in ids]
+                tasks = '\n'.join('%d. `%s` (%s): %s' % (k + 1, t.id, 'read' if t.kind == 'read' else 'edit', t.text)
+                                  for k, t in enumerate(ts))
+                prompt = HEADER.format(n=len(ts), guide=GUIDES_S[c], file=texts[c], tasks=tasks)
+                open(os.path.join(OUT['prompts'], '%s-%s.md' % (uid, part)), 'w', encoding='utf-8').write(prompt)
+                index.append({'unit_id': uid, 'part': part, 'candidate': c, 'seed': rep, 'file_chars': len(texts[c]),
+                              'prompt_chars': len(prompt), 'tasks': [t.id for t in ts], 'unreachable': []})
+                print(uid, part, 'file', len(texts[c]), 'prompt', len(prompt))
+    json.dump(index, open(os.path.join(HERE, 'data', 'index-s.json'), 'w', encoding='utf-8'), indent=1)
 
 
 if __name__ == '__main__':
-    main()
+    import sys
+    build_sections() if sys.argv[1:] == ['sections'] else main()

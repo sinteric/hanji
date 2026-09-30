@@ -31,7 +31,7 @@ REFUSE = 'REFUSE:'
 
 
 def unit_parts(unit_id):
-    m = re.fullmatch(r'r6-(F\d)-(\d)', unit_id)
+    m = re.fullmatch(r'r6s?-(F\d\w?)-(\d)', unit_id)
     return m.group(1), int(m.group(2))
 
 
@@ -53,8 +53,8 @@ def declines(a):
     return bool(DECLINE_RE.search(t)) and not re.search(r'[a-z-]+\s*=\s*\S', t) and not re.search(r'#[0-9A-Fa-f]{6}', t)
 
 
-def task_of(rep, tid):
-    for t in CT.TASKS[rep]:
+def task_of(rep, tid, unit_id='r6-'):
+    for t in CT.tasks_of(unit_id)[rep]:
         if t.id == tid:
             return t
     raise KeyError(tid)
@@ -119,9 +119,13 @@ def read_ok(task, m, text, cand):
 
 # ---------------------------------------------------------------- edit checks
 
+def kind_of(k):
+    return 'plain' if k == 'div' else k     # giving a plain paragraph a style makes it a <div>
+
+
 def bkey(e):
     if e[0] == 'P':
-        return 'P:' + e[1] + ':' + re.sub(r'\s+', '', e[3])
+        return 'P:' + kind_of(e[1]) + ':' + re.sub(r'\s+', '', e[3])
     return 'T:' + '|'.join(re.sub(r'\s+', '', p[3]) for rc in sorted(e[1]) for p in e[1][rc][1])[:300]
 
 
@@ -136,7 +140,7 @@ def align(seff, aeff):
             jj = j1
             for i in range(i1, i2):
                 for j in range(jj, j2):
-                    if seff[i][0] == aeff[j][0] and (seff[i][0] == 'T' or seff[i][1] == aeff[j][1]):
+                    if seff[i][0] == aeff[j][0] and (seff[i][0] == 'T' or kind_of(seff[i][1]) == kind_of(aeff[j][1])):
                         pairs[i] = j
                         jj = j + 1
                         break
@@ -156,7 +160,7 @@ def per_char(runs):
     return out
 
 
-def cmp_para(s, a, change=None, change_para=None, text=None):
+def cmp_para(s, a, change=None, change_para=None, text=None, want_style=None):
     """-> list of error strings."""
     errs = []
     change = change or {}
@@ -170,8 +174,8 @@ def cmp_para(s, a, change=None, change_para=None, text=None):
     if a[3] != splain:
         errs.append('text: got %r, want %r' % (a[3][:60], splain[:60]))
         return errs
-    if s[2] != a[2]:
-        errs.append('style: got %s, want %s' % (a[2], s[2]))
+    if (want_style or s[2]) != a[2]:
+        errs.append('style: got %s, want %s' % (a[2], want_style or s[2]))
     if not s[4]:
         return errs
     for k in set(s[4]) | set(a[4]):
@@ -290,7 +294,21 @@ def check_edit(task, cand, rep, m, seed_text, ans_text):
     change = getattr(task, 'change', None) or {}
     change_para = getattr(task, 'change_para', None) or {}
     text = getattr(task, 'retext', None)
+    ns = getattr(task, 'new_style', None)
     errs = []
+    if ns:
+        name, base, props = ns
+        if name in m.styles:
+            errs.append('style %r is already in the file' % name)
+        elif name not in astyles:
+            errs.append('there is no style line for the new style %r' % name)
+        else:
+            want = {'para': dict(m.styles[base]['para']), 'char': dict(m.styles[base]['char'])}
+            for k, v in props.items():
+                (want['para'] if k in D.PKEYS else want['char'])[k] = v
+            diff = [k for part in ('para', 'char') for k in want[part] if astyles[name][part].get(k) != want[part][k]]
+            if diff:
+                errs.append('the new style %r differs from what was asked in %s' % (name, ', '.join(diff)))
     allowed = set()
     for i, e in enumerate(seff):
         j = pairs.get(i)
@@ -301,7 +319,7 @@ def check_edit(task, cand, rep, m, seed_text, ans_text):
             continue
         a = aeff[j]
         if i in P:
-            errs += cmp_para(e, a, change=change, change_para=change_para, text=text)
+            errs += cmp_para(e, a, change=change, change_para=change_para, text=text, want_style=ns and ns[0])
         elif i in Cs or i in CPs:
             cell_spec = {rc: {'box': box, 'change': change} for rc in Cs.get(i, ())}
             cp_spec = {x: {'change': change} for x in CPs.get(i, ())}
@@ -377,12 +395,12 @@ def no_match_hint(seed_text, edits, flag):
 def score_answer(unit_id, answers):
     cand, rep = unit_parts(unit_id)
     m = CT.seed_model(rep)
-    seed_text = open(os.path.join(HERE, 'seeds', 'r6-%s-%d.txt' % (cand, rep)), encoding='utf-8').read()
+    seed_text = open(os.path.join(HERE, 'seeds', unit_id + '.txt'), encoding='utf-8').read()
     unit = json.load(open(os.path.join(HERE, 'data', 'units', unit_id + '.json'), encoding='utf-8'))
     unreach = set(unit['unreachable'])
     by_id = {a.get('task_id'): a for a in answers.get('answers', []) if isinstance(a, dict)}
     out = []
-    for task in CT.TASKS[rep]:
+    for task in CT.tasks_of(unit_id)[rep]:
         a = by_id.get(task.id)
         res = {'task_id': task.id, 'valid': False, 'landed': False, 'error': None, 'chars': 0, 'flags': [],
                'detail': '', 'method': None}
@@ -413,6 +431,13 @@ def score_answer(unit_id, answers):
                 res['flags'] = ['no_style_refused']
             else:
                 res['flags'] = ['wrong_refusal']
+            continue
+        if task.kind == 'noop' and isinstance(a.get('text'), str):
+            res['valid'] = True
+            res['landed'] = bool(re.match(r'\s*ANSWER:.*\b(unchanged|already|no change)', a['text'], re.I | re.S))
+            if not res['landed']:
+                res['flags'] = ['wrong_answer']
+                res['detail'] = a['text'][:200]
             continue
         if task.kind == 'read':
             if not isinstance(a.get('text'), str):

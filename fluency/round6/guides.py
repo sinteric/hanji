@@ -120,3 +120,34 @@ Example:
 """
 
 GUIDES = {'F1': SHARED + '\n' + F1, 'F2': SHARED + '\n' + F2, 'F3': SHARED + '\n' + F3}
+
+
+# ---------------------------------------------------------------- part C: new styles (F2) and section defaults (F2s)
+
+NEW_STYLES = ('New styles cannot be created.', 'A new style is a new style line, after the others, with a name no '
+              'other style has (a name that is already a style is an error); like the other lines it holds what '
+              'differs from the default style. A paragraph takes it like any style: `<div style="Name">…</div>`, a '
+              'list item\'s `style="Name"`, `<p style="Name"/>` in a cell.')
+F2N = F2.replace(*NEW_STYLES)
+assert F2N != F2
+
+SECTION = """- **The defaults lines.** A line `<defaults …/>` holds the formatting most paragraphs share from that line to the next `<defaults …/>` line (usually a page's worth, after a `<pagebreak/>`); `<defaults/>` holds nothing. A paragraph's property is, first found: its own `{…}`, the table line (in a table), its style's line when the style is not the default style and the line sets the property, the defaults line in force, the default style's line. So a paragraph in the default style takes the defaults line's values, and another style's own values win over them. A change to a defaults line changes every paragraph after it, up to the next one, that does not set the property itself or through its style.
+"""
+F2S = F2N.replace('- **Paragraph:** `{…}` at the end of the paragraph\'s line (after `</div>` for a `<div>`) is its own '
+                  'formatting: the properties that differ from its style. A property left out is the style\'s.',
+                  SECTION + '- **Paragraph:** `{…}` at the end of the paragraph\'s line (after `</div>` for a `<div>`) '
+                  'is its own formatting: the properties that differ from what its style and the defaults line give '
+                  'it. A property left out comes from them, in the order above.')
+F2S = F2S.replace('Change a style line to change every paragraph in that style that does not set the property itself.',
+                  'Change a style line to change every paragraph in that style that does not set the property itself '
+                  '(for the default style: nor has it from a defaults line).')
+F2S = F2S.replace("""# 개요
+본문 문단입니다.""", """<defaults line-spacing=170% size=11pt/>
+# 개요
+본문 문단입니다.""")
+assert F2S.count('defaults') > 5 and 'size=11pt' in F2S
+
+F2S = F2S.replace('each paragraph, cell and stretch of text shows only what differs from its style.',
+                  'a defaults line holds what most paragraphs of a page share; each paragraph, cell and stretch of '
+                  'text shows only what differs from those.')
+GUIDES_S = {'F2': SHARED + '\n' + F2N, 'F2s': SHARED + '\n' + F2S}

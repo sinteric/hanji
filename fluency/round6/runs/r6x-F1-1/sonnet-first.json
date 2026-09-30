@@ -1,0 +1,81 @@
+{
+ "answers": [
+  {
+   "task_id": "xb-q1",
+   "text": "ANSWER: fill=bg2-10%"
+  },
+  {
+   "task_id": "xb-q2",
+   "text": "ANSWER: font=Georgia size=10pt color=accent1-25%"
+  },
+  {
+   "task_id": "xb-q3",
+   "text": "ANSWER: A1; C4; C10; H4:H5"
+  },
+  {
+   "task_id": "xb-e1",
+   "ops": [
+    {
+     "op": "format",
+     "range": "'Simple Monthly Budget'!B10:C10",
+     "set": {
+      "fill": "accent2+80%"
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "xb-e2",
+   "ops": [
+    {
+     "op": "format",
+     "range": "'Simple Monthly Budget'!B4:C7",
+     "set": {
+      "outline": "2pt solid #000080"
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "xb-e3",
+   "ops": [
+    {
+     "op": "format",
+     "range": "'Simple Monthly Budget'!H4",
+     "set": {
+      "bold": true,
+      "color": "accent2"
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "xb-e4",
+   "ops": [
+    {
+     "op": "format",
+     "range": "'Simple Monthly Budget'!B11:B23",
+     "set": {
+      "indent": 1
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "xb-e5",
+   "ops": [
+    {
+     "op": "format",
+     "range": "'Simple Monthly Budget'!E4:G5",
+     "set": {
+      "fill": "none"
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "xb-e6",
+   "text": "REFUSE: Gradient fills cannot be written in this file format."
+  }
+ ]
+}

@@ -1,0 +1,72 @@
+{
+ "answers": [
+  {
+   "task_id": "ks-q1",
+   "text": "ANSWER: font=Cambria size=14pt"
+  },
+  {
+   "task_id": "ks-q2",
+   "text": "ANSWER: align=center"
+  },
+  {
+   "task_id": "ks-q3",
+   "text": "ANSWER: A1; B1; B2; B3; B4; B5; B6; B7; B8; B9; C1; C2; C3; C4; C5; C6; C7; C8; C9; D1; E1"
+  },
+  {
+   "task_id": "ks-e1",
+   "ops": [
+    {
+     "op": "format",
+     "range": "매출!A3:F3",
+     "set": {
+      "bold": true,
+      "align": "center",
+      "fill": "#D9D9D9"
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "ks-e2",
+   "ops": [
+    {
+     "op": "format",
+     "range": "매출!F4:F48",
+     "set": {
+      "color": "accent6"
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "ks-e3",
+   "ops": [
+    {
+     "op": "format",
+     "range": "매출!A3:F3",
+     "set": {
+      "border-bottom": "0.75pt solid #000000"
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "ks-e4",
+   "ops": [
+    {
+     "op": "format",
+     "range": "담당자!A1:E1",
+     "set": {
+      "fill": "accent1",
+      "color": "bg1",
+      "bold": true
+     }
+    }
+   ]
+  },
+  {
+   "task_id": "ks-e5",
+   "text": "REFUSE: this cannot be expressed in a workbook here."
+  }
+ ]
+}

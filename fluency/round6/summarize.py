@@ -139,6 +139,90 @@ def part_b():
     return out, tasks_rows, chars, tok
 
 
+def part_c():
+    """F2 against F2s (section defaults) and new styles, on the two hwpx seeds."""
+    import content as CT
+    print('\n## Part C (section defaults, new styles; hwpx seeds 1 and 2)\n')
+    print('| model | cand | landed, first try | after one fix round | invalid first try | reads | new style (e10) | '
+          'no-op (n1) | answer chars | tokens in |')
+    print('|---|---|---|---|---|---|---|---|---|---|')
+    for model in MODELS:
+        for c in CT.CANDS_S:
+            n = l1 = l2 = inv = rd = rdn = ns = nsn = nop = nopn = ch = 0
+            tin = 0
+            for rep in CT.SEEDS_S:
+                u = 'r6s-%s-%d' % (c, rep)
+                r1, r2 = results(u, model, S.score_answer)
+                if r1 is None:
+                    continue
+                r2 = r2 or r1
+                tin += usage(u, model)['in']
+                for x, y, t in zip(r1, r2, CT.TASKS_S[rep]):
+                    n += 1
+                    l1 += x['landed']
+                    l2 += y['landed']
+                    inv += not x['valid']
+                    ch += x['chars']
+                    if t.kind == 'read':
+                        rdn += 1
+                        rd += x['landed']
+                    if t.id.endswith('-e10'):
+                        nsn += 1
+                        ns += y['landed']
+                    if t.kind == 'noop':
+                        nopn += 1
+                        nop += x['landed']
+            print('| %s | %s | %d / %d | %d / %d | %d | %d / %d | %d / %d | %d / %d | %s | %s |' % (
+                model.capitalize(), c, l1, n, l2, n, inv, rd, rdn, ns, nsn, nop, nopn, format(ch, ','),
+                format(tin, ',')))
+    print('\n| task | ' + ' | '.join('%s %s' % (m.capitalize(), c) for m in MODELS for c in CT.CANDS_S) + ' |')
+    print('|---|' + '---|' * 4)
+    for rep in CT.SEEDS_S:
+        for k, t in enumerate(CT.TASKS_S[rep]):
+            cells = []
+            for model in MODELS:
+                for c in CT.CANDS_S:
+                    r1, r2 = results('r6s-%s-%d' % (c, rep), model, S.score_answer)
+                    x, y = r1[k], (r2 or r1)[k]
+                    cells.append('L' if x['landed'] else ('x→L' if y['landed'] else 'x'))
+            print('| %s | %s |' % (t.id, ' | '.join(cells)))
+
+
+def part_d():
+    import xlsx_kit as XK
+    print('\n## Part D (workbooks: F1 range lines and the format operation)\n')
+    print('| model | landed, first try | after one fix round | invalid first try | reads | edits | refusals | '
+          'ops | answer chars |')
+    print('|---|---|---|---|---|---|---|---|---|')
+    for model in MODELS:
+        n = l1 = l2 = inv = ops = ch = 0
+        kinds = defaultdict(lambda: [0, 0])
+        for rep in XK.SEEDS:
+            u = 'r6x-F1-%d' % rep
+            r1, r2 = results(u, model, XK.score_answer)
+            if r1 is None:
+                continue
+            r2 = r2 or r1
+            for x, y, t in zip(r1, r2, XK.TASKS[rep]):
+                n += 1
+                l1 += x['landed']
+                l2 += y['landed']
+                inv += not x['valid']
+                ops += x['ops']
+                ch += x['chars']
+                kinds[t.kind][0] += x['landed']
+                kinds[t.kind][1] += 1
+        print('| %s | %d / %d | %d / %d | %d | %d / %d | %d / %d | %d / %d | %d | %s |' % (
+            model.capitalize(), l1, n, l2, n, inv, kinds['read'][0], kinds['read'][1], kinds['edit'][0],
+            kinds['edit'][1], kinds['refuse'][0], kinds['refuse'][1], ops, format(ch, ',')))
+    for model in MODELS:
+        for rep in XK.SEEDS:
+            r1, r2 = results('r6x-F1-%d' % rep, model, XK.score_answer)
+            for x in r1 or []:
+                if not x['landed']:
+                    print('- %s %s %s: %s %s' % (model, rep, x['task_id'], x['flags'], (x['error'] or x['detail'])[:160]))
+
+
 def main():
     a, per_task, chars, methods, tok = part_a()
     print('## Part A (flow documents)\n')
@@ -211,6 +295,8 @@ def main():
             d = chars_b[(m, c)]
             print('| %s | %s | %d | %d | %d | %d | %d | %d |' % (m, c, d[1], d[2], d[3], sum(d.values()),
                                                                tok_b[(m, c)]['in'], tok_b[(m, c)]['out']))
+    part_c()
+    part_d()
 
 
 if __name__ == '__main__':

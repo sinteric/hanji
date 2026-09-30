@@ -1,0 +1,90 @@
+{
+ "answers": [
+  {
+   "task_id": "fn-q3",
+   "text": "ANSWER: indent-left=20pt first-line=0pt"
+  },
+  {
+   "task_id": "fn-q4",
+   "text": "ANSWER: size=14pt"
+  },
+  {
+   "task_id": "fn-q5",
+   "text": "ANSWER: line-spacing=170%"
+  },
+  {
+   "task_id": "fn-q6",
+   "text": "ANSWER: line-spacing=160% size=18pt"
+  },
+  {
+   "task_id": "fn-q7",
+   "text": "ANSWER: font=HY견명조 size=16pt"
+  },
+  {
+   "task_id": "fn-e1",
+   "edits": [
+    {
+     "old": "| {fill=#FFF0C3 border-top=\"0.34pt solid #000000\" border-bottom=\"2.83pt solid #7F7F7F\"} **3D 프린팅 기술의 미래와 전망** {align=center font=나눔고딕 size=20pt} |\n",
+     "new": "| {fill=#DDEBF7 border-top=\"0.34pt solid #000000\" border-bottom=\"2.83pt solid #7F7F7F\"} **3D 프린팅 기술의 미래와 전망** {align=center font=나눔고딕 size=20pt} |\n"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e6",
+   "edits": [
+    {
+     "old": "  - 시제품 제작 시간과 비용 절감 및 이를 통한 제품 혁신의 가속화 {style=\"개요 3\"}\n",
+     "new": "  - 시제품 제작 기간과 비용 절감 및 이를 통한 제품 혁신의 가속화 {style=\"개요 3\"}\n"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-n1",
+   "text": "ANSWER: unchanged"
+  },
+  {
+   "task_id": "fn-e12",
+   "edits": [
+    {
+     "old": "  - 3D기술을 활용하면 비용 효율성을 높일 수 있기 때문에 변화가 빠른 제조업 분야에 활용도가 높고 일본, 미국 등에서는 본격 상용화 {style=\"개요 3\" indent-left=19pt line-spacing=170%}\n",
+     "new": "  - 3D기술을 활용하면 비용 효율성을 높일 수 있기 때문에 변화가 빠른 제조업 분야에 활용도가 높고 일본, 미국 등에서는 본격 상용화 {style=\"개요 3\" indent-left=19pt line-spacing=200%}\n"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e11",
+   "text": "REFUSE: this cannot be done here."
+  },
+  {
+   "task_id": "fn-e5",
+   "edits": [
+    {
+     "old": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt/>\n",
+     "new": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt color=#1F3864/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e8",
+   "edits": [
+    {
+     "old": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt/>\n<style name=\"개요 4\" indent-left=30pt space-before=3pt font=휴먼명조 size=14pt/>\n",
+     "new": "<style name=\"개요 3\" indent-left=20pt first-line=10pt space-before=5pt font=휴먼명조 size=15pt/>\n<style name=\"개요 4\" indent-left=30pt first-line=10pt space-before=3pt font=휴먼명조 size=14pt/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e10",
+   "edits": [
+    {
+     "old": "<style name=\"개요 4\" indent-left=30pt space-before=3pt font=휴먼명조 size=14pt/>\n",
+     "new": "<style name=\"개요 4\" indent-left=30pt space-before=3pt font=휴먼명조 size=14pt/>\n<style name=\"개요 3 강조\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt color=#C00000/>\n"
+    },
+    {
+     "old": "  - (일반 접근성) 3D 프린팅에 대한 높은 관심에 비해 일반 국민이 이를 체험‧활용할 수 있는 장비 등의 인프라 부족 {style=\"개요 3\"}\n  - (인력부족) 3D 프린팅의 도입‧보급이 확대되고 있으나, 이를 활용할 수 있는 인력이 부족하고, 관련 교육, 인재양성 체계 등 미흡 {style=\"개요 3\"}\n",
+     "new": "  - (일반 접근성) 3D 프린팅에 대한 높은 관심에 비해 일반 국민이 이를 체험‧활용할 수 있는 장비 등의 인프라 부족 {style=\"개요 3 강조\"}\n  - (인력부족) 3D 프린팅의 도입‧보급이 확대되고 있으나, 이를 활용할 수 있는 인력이 부족하고, 관련 교육, 인재양성 체계 등 미흡 {style=\"개요 3 강조\"}\n"
+    }
+   ]
+  }
+ ]
+}
