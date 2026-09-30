@@ -140,7 +140,7 @@ fn every_object_shows_its_box_and_getput_keeps_every_xfrm() {
         "<picture id=\"s2\" name=\"Picture 1\" box=\"402 78 144 132\" src=\"media/image1.jpg\"/>",
         "<keep id=\"?\" kind=\"table\" summary=\"Table 2: Column1 Column2 Column3 data1 data2 data3\" box=\"300 372 372 96\"/>",
         "<line id=\"s8\" name=\"Straight Arrow Connector 7\" from=\"468 366\" to=\"468 216\" border=\"0.75pt solid accent1*\" start=arrow end=arrow/>",
-        "<line id=\"s10\" name=\"Elbow Connector 9\" from=\"186 252\" to=\"402 144\" border=\"0.75pt solid accent1*\" end=arrow/>",
+        "<line id=\"s10\" name=\"Elbow Connector 9\" from=\"186 252\" to=\"402 144\" kind=\"bentConnector3\" border=\"0.75pt solid accent1*\" end=arrow/>",
     ]
     .join("\n");
     assert!(keep_ids_out(&imp.text).contains(&s1), "{}", imp.text);
@@ -349,7 +349,7 @@ fn groups_move_whole_or_by_their_objects() {
     let (text, rem) = exact(
         &imp.text,
         &imp.remainder,
-        "name=\"Oval 2\" box=\"306 150 72 72\" fill",
+        "name=\"Oval 2\" box=\"306 150 72 72\" kind=\"ellipse\" fill",
         "name=\"Oval 2\" box=\"406 150 72 72\" fill",
     );
     let c = canonical(&text, &rem);
@@ -369,8 +369,8 @@ fn groups_move_whole_or_by_their_objects() {
     let (text, rem) = exact(
         &imp.text,
         &imp.remainder,
-        "name=\"Oval 2\" box=\"306 150 72 72\" fill=accent1 border=\"2pt solid accent1*\"/>",
-        "name=\"Oval 2\" box=\"306 150 72 72\" fill=accent1 border=\"2pt solid accent1*\">text</shape>",
+        "name=\"Oval 2\" box=\"306 150 72 72\" kind=\"ellipse\" fill=accent1 border=\"2pt solid accent1*\"/>",
+        "name=\"Oval 2\" box=\"306 150 72 72\" kind=\"ellipse\" fill=accent1 border=\"2pt solid accent1*\">text</shape>",
     );
     let x = xml(&export(&text, &rem), &s3);
     assert!(x.contains("<a:t>text</a:t>"), "{x}");
@@ -472,9 +472,9 @@ fn a_stored_rotation_left_as_shown_keeps_its_exact_value() {
     let imp = import(&pkg);
     for shown in [
         "name=\"Minus ninety\" box=\"60 160 200 40\" rot=\"270\" fill=gradient border=\"0.75pt solid accent1*\" font=Calibri size=18pt color=lt1>",
-        "name=\"Minus fifteen flipped\" box=\"300 160 160 60\" rot=\"345\" flip=\"h\" fill=gradient border=\"0.75pt solid accent1*\" font=Calibri size=18pt color=lt1>",
+        "name=\"Minus fifteen flipped\" box=\"300 160 160 60\" rot=\"345\" flip=\"h\" kind=\"rightArrow\" fill=gradient border=\"0.75pt solid accent1*\" font=Calibri size=18pt color=lt1>",
         "name=\"Past a turn\" box=\"500 160 160 60\" rot=\"60\" fill=gradient border=\"0.75pt solid accent1*\" font=Calibri size=18pt color=lt1>",
-        "name=\"Turned in group\" box=\"80 420 80 80\" rot=\"315\" fill=gradient border=\"0.75pt solid accent1*\"/>",
+        "name=\"Turned in group\" box=\"80 420 80 80\" rot=\"315\" kind=\"ellipse\" fill=gradient border=\"0.75pt solid accent1*\"/>",
     ] {
         assert!(imp.text.contains(shown), "{shown}\n{}", imp.text);
     }

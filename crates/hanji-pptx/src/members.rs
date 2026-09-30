@@ -11,6 +11,7 @@ use hanji_package::xml::{self, Element, Node};
 
 use crate::deck::LayoutInfo;
 use crate::fill::{self, ThemeFills};
+use crate::kind;
 use crate::outline;
 use crate::pml::*;
 use crate::text::{self, RunStyle, ThemeFonts};
@@ -35,18 +36,23 @@ fn level(p: &Element) -> usize {
     p.child("a:pPr").and_then(|x| x.get("lvl")).and_then(|v| v.parse().ok()).unwrap_or(0usize).min(8)
 }
 
-/// The fill a group's shape shows.
+/// The preset shape, fill and outline a group's shape shows.
 pub fn look(sp: &Element, sty: Option<Styling>) -> Look {
-    let Some(s) = sty else { return Look::default() };
+    let (kind, adj) = kind::shown(sp, None, false);
+    let Some(s) = sty else { return Look { kind, adj, ..Default::default() } };
     Look {
+        kind,
+        adj,
         fill: fill::shown(fill::effective(sp, None, s.fills).as_ref()),
         ..outline::effective(sp, None, s.fills).look(false)
     }
 }
 
-/// The outline and arrowheads a group's line shows.
+/// The kind, outline and arrowheads a group's line shows.
 pub fn line_look(c: &Element, sty: Option<Styling>) -> Look {
-    sty.map_or_else(Look::default, |s| outline::effective(c, None, s.fills).look(true))
+    let (kind, adj) = kind::shown(c, None, true);
+    let l = sty.map_or_else(Look::default, |s| outline::effective(c, None, s.fills).look(true));
+    Look { kind, adj, ..l }
 }
 
 /// One source unit of a paragraph: its atom, marks and the run (`a:rPr`) it
@@ -288,9 +294,9 @@ pub fn without_shown(group: &Element) -> Element {
     let mut g = group.clone();
     for c in g.elements_mut() {
         match c.name.as_str() {
-            "p:cxnSp" => *c = outline::without_outline(c),
+            "p:cxnSp" => *c = kind::without_kind(&outline::without_outline(c)),
             "p:sp" => {
-                *c = outline::without_outline(&fill::without_fill(c));
+                *c = kind::without_kind(&outline::without_outline(&fill::without_fill(c)));
                 if let Some(tx) = c.child_mut("p:txBody") {
                     tx.children.retain(|n| !matches!(n, Node::El(e) if e.is("a:p")));
                 }

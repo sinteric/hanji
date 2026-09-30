@@ -45,6 +45,7 @@ use hanji_package::xml::{canon, fp, is_blank, Element, Node, Scope};
 use crate::deck::{LayoutInfo, SlotInfo};
 use crate::fill;
 use crate::geom::{self, Frame};
+use crate::kind;
 use crate::members::{self, Styling};
 use crate::outline;
 use crate::pml::*;
@@ -248,6 +249,7 @@ impl Importer<'_> {
                     let g = geom::own(&el).or(slot.geom);
                     self.blocks.push(slot_head(&slot.name, g));
                     self.show_fill(&el, slot.fill.as_ref(), &layout.fills);
+                    self.show_kind(&el, slot.geo.as_ref(), false);
                     self.show_outline(&el, slot.line.as_ref(), &layout.fills, false);
                     let t = Some((&slot.text, &layout.fonts));
                     self.text_shape(&el, &slot.bullets, &k.to_string(), true, g, t)?;
@@ -281,6 +283,7 @@ impl Importer<'_> {
                     tree.children.push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
                     let g = geom::own(&el);
                     self.blocks.push(shape_head(&id, &name, g));
+                    self.show_kind(&el, None, false);
                     self.show_fill(&el, None, &layout.fills);
                     self.show_outline(&el, None, &layout.fills, false);
                     self.name_shape(id, name);
@@ -321,6 +324,7 @@ impl Importer<'_> {
                         self.show_fill(&el, None, &layout.fills);
                     }
                     if matches!(what, What::Bare(..) | What::Line(..)) {
+                        self.show_kind(&el, None, matches!(what, What::Line(..)));
                         self.show_outline(&el, None, &layout.fills, matches!(what, What::Line(..)));
                     }
                     self.name_shape(id, name);
@@ -393,6 +397,12 @@ impl Importer<'_> {
         }
     }
 
+    fn show_kind(&mut self, el: &Element, parent: Option<&kind::Geo>, line: bool) {
+        if let Some(Block::Head(h)) = self.blocks.last_mut() {
+            (h.look.kind, h.look.adj) = kind::shown(el, parent, line);
+        }
+    }
+
     fn show_fill(&mut self, el: &Element, parent: Option<&fill::FillXml>, theme: &fill::ThemeFills) {
         if let Some(Block::Head(h)) = self.blocks.last_mut() {
             h.look.fill = fill::shown(fill::effective(el, parent, theme).as_ref());
@@ -403,7 +413,7 @@ impl Importer<'_> {
         let hi = self.blocks.len() - 1;
         // A shape's fill is the text's (§5.3), as its geometry is.
         let bare = geom::without_geometry(&match el.name.as_str() {
-            "p:sp" | "p:cxnSp" => outline::without_outline(&fill::without_fill(el)),
+            "p:sp" | "p:cxnSp" => kind::without_kind(&outline::without_outline(&fill::without_fill(el))),
             // A group's shapes' text and fills are the text's too.
             "p:grpSp" => members::without_shown(el),
             _ => el.clone(),
@@ -446,7 +456,8 @@ impl Importer<'_> {
                 pr.children.retain(|n| !matches!(n, Node::El(e) if e.is("p:ph")));
             }
         }
-        let f = self.fp(&[Some(&geom::without_geometry(&outline::without_outline(&fill::without_fill(&fshell))))]);
+        let bare = kind::without_kind(&outline::without_outline(&fill::without_fill(&fshell)));
+        let f = self.fp(&[Some(&geom::without_geometry(&bare))]);
         let meta = Meta {
             tag: shell.name.clone(),
             aux: vec![k.to_string(), self.part.clone(), shown(g)],

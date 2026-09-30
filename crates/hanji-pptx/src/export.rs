@@ -23,6 +23,7 @@ use crate::geom::{self, Frame};
 use crate::import::{
     crop_of, group_item, object_geom, part_of_src, picture_item, shown_of, NotesInfo, Rels, SlideInfo, OBJECT_TAG,
 };
+use crate::kind;
 use crate::members::{self, Styling};
 use crate::outline;
 use crate::pml::*;
@@ -388,14 +389,17 @@ impl<'a> Exporter<'a> {
                 let p = fill::Parents { now, then, theme: &layout.fills };
                 fill::write(&mut e, self.head(it).look.fill.as_deref(), p)?;
             }
-            // Its outline (and a line's arrowheads), likewise.
+            // Its outline (and a line's arrowheads), and its preset shape, likewise.
             let lined = matches!(it.kind, HeadKind::Line { .. }) && e.is("p:cxnSp");
             if (lined || (text && e.is("p:sp"))) && self.keep_slot(it)?.is_none() {
-                let parent = match it.kind {
-                    HeadKind::Slot { name } => layout.slot(name).and_then(|s| s.line.as_ref()),
+                let slot = match it.kind {
+                    HeadKind::Slot { name } => layout.slot(name),
                     _ => None,
                 };
-                outline::write(&mut e, &self.head(it).look, parent, &layout.fills, lined)?;
+                let look = &self.head(it).look;
+                outline::write(&mut e, look, slot.and_then(|s| s.line.as_ref()), &layout.fills, lined)?;
+                kind::write(&mut e, look, slot.and_then(|s| s.geo.as_ref()), lined)
+                    .map_err(|m| format!("{}: {m}", item_label(it)))?;
             }
             if text && self.keep_slot(it)?.is_none() {
                 let bullets = bullets_of(it, &e);
@@ -1641,11 +1645,13 @@ fn group_text(el: &mut Element, st: &GroupItem, w: &GroupItem, sty: Option<Styli
                         .map_err(|m| format!("{what}: {m}"))?;
                     outline::write(c, &b.look, None, theme, false).map_err(|m| format!("{what}: {m}"))?;
                 }
+                kind::write(c, &b.look, None, false).map_err(|m| format!("{what}: {m}"))?;
             }
             (SlideItem::Line(a), SlideItem::Line(b)) if a.look != b.look => {
                 let what = format!("<line id=\"{}\" name=\"{}\">", b.id, b.name);
                 let theme = sty.map(|s| s.fills).ok_or("a group's outlines are written only on a slide")?;
                 outline::write(c, &b.look, None, theme, true).map_err(|m| format!("{what}: {m}"))?;
+                kind::write(c, &b.look, None, true).map_err(|m| format!("{what}: {m}"))?;
             }
             (SlideItem::Group(a), SlideItem::Group(b)) => group_text(c, a, b, sty)?,
             _ => {}

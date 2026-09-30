@@ -530,8 +530,8 @@ layout: Two Content
   `<shape id="s4" name="출처" box="…">text</shape>`, with its text editable;
   `<p/>` starts its next paragraph. Its paragraphs are never list items
   (bullets stay in the remainder). A shape without text is
-  `<shape id="s9" name="Oval 8" box="…"/>`. Its fill and outline are shown
-  (below); its preset geometry stays in the remainder. *Proposed (§10 item 10, round 6 F1):* its
+  `<shape id="s9" name="Oval 8" box="…" kind="ellipse"/>`. Its preset
+  shape, fill and outline are shown (below). *Proposed (§10 item 10, round 6 F1):* its
   effective formatting follows `box` on the tag, whether the shape sets it
   or takes it from the theme's `p:style` or the layout, like `box` itself:
   `<shape id="s8" name="Card" box="354 130 260 320" fill=accent1 border="2pt solid accent1-50%" size=18pt color=#FFFFFF>…</shape>`;
@@ -576,7 +576,7 @@ layout: Two Content
     (`accent1*`, `gradient`) written where the run does not show it, an
     unknown key (`colour`), a value outside the grammar.
 - **Fill** (built). A slot or shape shows the fill it has as `fill=` after
-  its box (`<shape id="s9" name="Oval 8" box="…" fill=accent1+40%/>`,
+  its box (`<shape id="s9" name="Oval 8" box="…" kind="ellipse" fill=accent1+40%/>`,
   `::title box="…" fill=accent2::`): its `p:spPr`'s own, else its
   `p:style` `a:fillRef` into the theme's fill styles (the style's `phClr`
   the reference's colour, its adjustments kept), else, for a placeholder,
@@ -617,6 +617,29 @@ layout: Two Content
     or style written anew, `outline=`, `stroke=` and other spellings (the key
     is `border`), `fill=` on a line (its colour is its border's), and
     arrowheads on a shape or slot.
+- **Preset shape** (built). A slot, shape or line shows its DrawingML
+  preset as `kind="…"` right after its box (`kind="roundRect"`,
+  `kind="chevron"`, a connector's `kind="bentConnector3"`), and the
+  preset's adjustments, when the file sets them, as `adj="…"`: one number
+  for a preset whose one guide is `adj` (`adj="16667"`), else its guides by
+  name (`adj="adj1=50000 adj2=50000"`), in the file's units (thousandths of
+  a percent of the shape's size for most, as PowerPoint stores them). The
+  preset is the object's own `a:prstGeom`, else, for a placeholder, its
+  layout's and master's placeholder's. A rectangle, and a straight line
+  (`line`, `straightConnector1`), show no kind; adjustments left out are
+  the preset's own. Custom geometry (`a:custGeom`) shows no kind and is
+  kept; guides that are formulas rather than values are kept and not shown.
+  - A kind and adjustments left as shown keep the XML. A changed kind
+    writes `a:prstGeom`'s `prst` and the adjustments the text gives (none:
+    the new preset's own); changed adjustments rewrite `a:avLst`. A kind
+    left out writes `rect`, or `straightConnector1` for a connector (a
+    `line` stays one). One equal to what the layout gives removes a
+    placeholder's own. A new text box or line may take a kind, and a bare
+    marker takes its layout's.
+  - The object's fingerprint leaves its preset out. Refused: a kind that is
+    not a DrawingML preset (with the nearest names), adjustments that are
+    not numbers or `name=number` pairs, a kind on custom geometry, and
+    `shape=`, `preset=` and other spellings (the key is `kind`).
 - **Pictures** are a line each, `<picture id="s7" name="지도" box="…"
   src="media/image1.png" crop="10 0 5 0" mask="ellipse" alt="…"/>`, in this
   attribute order; `crop`, `mask` and `alt` are left out when the picture has
@@ -657,8 +680,9 @@ layout: Two Content
   on it.
 - **Lines and connectors** are `<line id="s6" name="…" from="x y" to="x y"/>`:
   the two ends, not a box. Writing them rewrites `a:off`, `a:ext` and the flips.
-  Its outline and arrowheads are shown (Outline, above); the connector's
-  path and its connection ids stay in the remainder.
+  Its outline, arrowheads and kind (a straight, bent or curved connector)
+  are shown (Outline and Preset shape, above); its connection ids stay in
+  the remainder.
   - *Attached connectors.* Moving or resizing an object that a connector is
     attached to (its `stCxn` or `endCxn` names the object) is refused, with the
     connector and the reason named, unless the same edit also rewrites every

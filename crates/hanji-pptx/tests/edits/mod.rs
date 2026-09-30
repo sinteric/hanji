@@ -9,8 +9,9 @@
 //! give it alternative text (pictures, §5.3); P18 format a word of a shape's
 //! text, P19 change a shape's font (text formatting, §5.3); P20 fill a shape,
 //! P21 clear a shape's fill (§5.3); P22 edit a group's shape's text (§5.3);
-//! P23 outline a shape, P24 put an arrowhead on a line (§5.3); P9 makes them
-//! all in one revision.
+//! P23 outline a shape, P24 put an arrowhead on a line (§5.3); P25 make a
+//! shape a rounded rectangle, P26 bend a straight line or straighten a bent one
+//! (preset shapes, §5.3); P9 makes them all in one revision.
 
 use std::collections::HashSet;
 
@@ -24,7 +25,7 @@ use hanji_testkit::{
     block_ranges, chars, deleted_span, entries_at, figure_or_word, ident, replace_span, span_of, Cx, Doc, Edit, EditFn,
 };
 
-pub const EDITS: [(&str, EditFn); 23] = [
+pub const EDITS: [(&str, EditFn); 25] = [
     ("p1_title", p1_title),
     ("p2_bullet", p2_bullet),
     ("p3_add_slide", p3_add_slide),
@@ -48,6 +49,8 @@ pub const EDITS: [(&str, EditFn); 23] = [
     ("p22_group_text", p22_group_text),
     ("p23_outline_shape", p23_outline_shape),
     ("p24_arrowhead", p24_arrowhead),
+    ("p25_round_corners", p25_round_corners),
+    ("p26_bend_line", p26_bend_line),
 ];
 
 /// A slide: its head and the end of its blocks.
@@ -935,4 +938,46 @@ fn p24_arrowhead(d: &Doc, _: &Cx) -> Option<Edit> {
     let label = d.blocks[k].head()?.label.clone();
     let what = format!("line {label:?}: end=triangle on {}", slide_name(&d.blocks, k));
     Some(head_edit(d, k, |h| h.look.end = Some("triangle".into()), "P24 put an arrowhead on a line", what))
+}
+
+/// A preset shape becomes a rounded rectangle, its corners a sixth of its
+/// shorter side. (A shape without a kind may be drawn with custom geometry,
+/// which keeps its own.)
+fn p25_round_corners(d: &Doc, _: &Cx) -> Option<Edit> {
+    let k = (0..d.blocks.len()).find(|&k| {
+        d.blocks[k].head().is_some_and(|h| {
+            matches!(kind(h), HeadKind::Shape { id, .. } if !id.is_empty())
+                && h.look.kind.as_deref().is_some_and(|k| k != "roundRect")
+        })
+    })?;
+    let label = d.blocks[k].head()?.label.clone();
+    let what = format!("shape {label:?}: kind=\"roundRect\" adj=\"16667\" on {}", slide_name(&d.blocks, k));
+    let f = |h: &mut hanji_core::Head| {
+        h.look.kind = Some("roundRect".into());
+        h.look.adj = Some("16667".into());
+    };
+    Some(head_edit(d, k, f, "P25 make a shape a rounded rectangle", what))
+}
+
+/// A straight line is bent at its middle (an elbow connector), or a bent one made straight.
+fn p26_bend_line(d: &Doc, _: &Cx) -> Option<Edit> {
+    let k = (0..d.blocks.len()).find(|&k| {
+        d.blocks[k].head().is_some_and(|h| {
+            matches!(kind(h), HeadKind::Line { id, .. } if !id.is_empty())
+                && matches!(h.look.kind.as_deref(), None | Some("bentConnector3"))
+        })
+    })?;
+    let h = d.blocks[k].head()?;
+    let bent = h.look.kind.is_some();
+    let label = h.label.clone();
+    let what = if bent {
+        format!("line {label:?}: straight, kind left out, on {}", slide_name(&d.blocks, k))
+    } else {
+        format!("line {label:?}: kind=\"bentConnector3\" on {}", slide_name(&d.blocks, k))
+    };
+    let f = move |h: &mut hanji_core::Head| {
+        h.look.kind = (!bent).then(|| "bentConnector3".into());
+        h.look.adj = None;
+    };
+    Some(head_edit(d, k, f, "P26 bend a line or straighten one", what))
 }
