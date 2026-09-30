@@ -96,8 +96,16 @@ pub fn window(book: &mut Book, of: &WindowOf) -> Result<String, String> {
 pub fn full_view(book: &mut Book, rows: u32) -> Result<String, String> {
     let st = model::structure(book, None)?;
     let mut out = vec![];
+    if let Some(d) = &st.default_format {
+        out.push(hanji_format::cellfmt::default_line(d));
+        out.push(String::new());
+    }
     for (i, sh) in st.sheets.iter().enumerate() {
         out.push(sheet_open(sh));
+        if !sh.formats.is_empty() {
+            out.push(String::new());
+            out.extend(sh.formats.iter().map(|f| f.line()));
+        }
         let mut any_table = false;
         for item in &sh.items {
             out.push(String::new());

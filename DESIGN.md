@@ -650,6 +650,36 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
   nearest one; theme colours stay names (`accent2+80%`). Round 6 part D, on
   three corpus workbooks: 25/25 per model on the first try, every op valid.
 
+  Built (2026-09-30), and settled there:
+  - The default line comes after the front matter, before the first sheet:
+    the Normal style's (`cellStyles` `builtinId="0"`, its `cellStyleXfs`
+    entry) font, size and colour, and any other key where Normal is not
+    none, off, general, bottom or indent 0. A sheet's lines come right
+    after its `<sheet>` line, ordered by top-left cell; each is a run of
+    equal cells along a row, stacked over consecutive rows with the same
+    columns. A line shows a cell's own style (`s`) only: column and row
+    styles of cells the sheet does not hold are not shown.
+  - Values: the theme index as Excel numbers it (0 `bg1`, 1 `tx1`, 2 `bg2`,
+    3 `tx2`, 4–9 the accents, 10 `hlink`, 11 `folHlink`); a `tint` within
+    0.05% of a whole percent is `+N%`/`-N%`, any other `*`; an `rgb` colour
+    and the legacy `indexed` palette as `#RRGGBB`; a font colour left
+    automatic and a solid fill without a colour as `#000000`; a font without
+    a name shows no `font`. `centerContinuous` shows as `center`;
+    `slantDashDot` as `1.5pt dash-dot`.
+  - The lines are read-only: a text whose lines differ from the workbook's
+    is refused with the operation to use. The `format` operation
+    changes a cell's style to a copy with the written keys changed (a new
+    font, fill or border only when no existing one is equal; a new `xf`
+    only when none is), so number formats, wrap, rotation, protection and
+    diagonal borders stay; setting `font` drops the font's theme `scheme`,
+    which would win over the name; an indent on general, centred or
+    justified text makes it left-aligned, as Excel does. Cells in the
+    range that the sheet does not hold are made; at most 100,000 cells per
+    operation. Refused: a gradient, pattern or picture fill, `/NN%`
+    opacity, a `*` colour, border styles other than the six, `style`
+    (shown, not written yet), and a key of another kind with a hint
+    (`first-line` → `indent`).
+
   `range` on `<sheet>` is the used range, tables included. A column's type
   is `text`, `number`, `date` or `mixed` (cells of more than one kind, or
   empty cells in General format). Merges, validations, conditional formats,
@@ -1094,7 +1124,7 @@ v0.7.3; "lossless … regarding content", not formatting).
    rotated groups (kept whole), pictures from a file, and cm as a view or
    input over points (the unit Korean PowerPoint shows; not measured).
 
-10. **Direct formatting (proposed, 2026-09-30)** — by §6 round 6, per kind:
+10. **Direct formatting (proposed, 2026-09-30; xlsx built, §5.4)** — by §6 round 6, per kind:
     flow documents F2 (a style section plus visible direct overrides,
     §5.2), Presentations F1 (effective formatting inline on every object,
     §5.3), Spreadsheets range lines and a `format` operation (§5.4); one

@@ -7,6 +7,7 @@
 //! operations (`ops.rs`), never as text.
 
 use crate::ast::{FrontMatter, Keep};
+use crate::cellfmt::{self, CellFormat, FormatLine};
 use crate::diag::{quoted, Diagnostic};
 use crate::names::Names;
 use crate::parse::{chars_of, parse_tag, Parser};
@@ -22,6 +23,9 @@ pub const CHART_TYPES: &[&str] = &["bar", "column", "line", "pie", "area", "scat
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Spreadsheet {
     pub front: FrontMatter,
+    /// The Normal style's formatting (`<format default …/>`), when the
+    /// workbook shows formatting (read-only: §5.4, the `format` operation).
+    pub default_format: Option<CellFormat>,
     pub sheets: Vec<SheetDecl>,
 }
 
@@ -30,6 +34,8 @@ pub struct SheetDecl {
     pub name: String,
     /// The used range, as the file has it (read-only; `None` for an empty sheet).
     pub range: Option<String>,
+    /// The sheet's formatted cells, one line per rectangle (read-only).
+    pub formats: Vec<FormatLine>,
     pub items: Vec<SheetItem>,
 }
 
@@ -239,6 +245,7 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
     let n = p.lines.len();
     let mut i = first;
     let mut open: Option<(usize, SheetDecl)> = None;
+    let mut default_format: Option<CellFormat> = None;
     while i < n {
         let text = p.lines[i].text;
         let t = text.trim();
@@ -266,6 +273,26 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
             }
             if let Some(s) = sheet_tag(&mut p, i) {
                 open = Some((i, s));
+            }
+            i += 1;
+            continue;
+        }
+        if t.starts_with("<format") {
+            match cellfmt::parse_line(t) {
+                Ok(cellfmt::Parsed::Default(f)) if open.is_none() && sheets.is_empty() && default_format.is_none() => {
+                    default_format = Some(f)
+                }
+                Ok(cellfmt::Parsed::Default(_)) => p.err(
+                    i,
+                    col,
+                    "the line <format default …/> comes once, after the front matter and before the first sheet.",
+                ),
+                Ok(cellfmt::Parsed::Range(l)) => match open.as_mut() {
+                    Some((_, sheet)) if is_range(&l.range) => sheet.formats.push(l),
+                    Some(_) => p.err(i, col, format!("range=\"{}\" is not an A1 range such as B4:C7.", l.range)),
+                    None => p.err(i, col, format!("a <format range=…/> line is inside a sheet: {SHEET_FORM}.")),
+                },
+                Err((c, m)) => p.err(i, col + c - 1, format!("{m}.")),
             }
             i += 1;
             continue;
@@ -303,7 +330,7 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
         } else if t.starts_with('|') {
             p.err(i, col, format!("a pipe table here belongs inside a table block: {TABLE_FORM}. Cell data is written by range operations."));
         } else {
-            p.err(i, col, format!("a sheet holds only table blocks ({TABLE_FORM}), chart lines ({CHART_FORM}) and placeholders ({KEEP_FORM})."));
+            p.err(i, col, format!("a sheet holds only table blocks ({TABLE_FORM}), chart lines ({CHART_FORM}), placeholders ({KEEP_FORM}) and the format lines of its cells."));
         }
         i += 1;
     }
@@ -315,7 +342,7 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
         p.errors.sort_by_key(|d| (d.line, d.col));
         return Err(p.errors);
     }
-    Ok(Spreadsheet { front, sheets })
+    Ok(Spreadsheet { front, default_format, sheets })
 }
 
 /// The attributes of a single-line tag at line `i`, checked against `allowed`.
@@ -382,7 +409,7 @@ fn sheet_tag(p: &mut Parser<'_>, i: usize) -> Option<SheetDecl> {
             return None;
         }
     }
-    Some(SheetDecl { name: name.to_string(), range, items: vec![] })
+    Some(SheetDecl { name: name.to_string(), range, formats: vec![], items: vec![] })
 }
 
 fn is_range(r: &str) -> bool {
@@ -610,9 +637,17 @@ fn check_names(p: &mut Parser<'_>, sheets: &[SheetDecl], keeps: &[(usize, usize,
 /// line between the items of a sheet and between sheets, no table padding.
 pub fn serialize_spreadsheet(s: &Spreadsheet) -> String {
     let mut out = front_lines(&s.front);
+    if let Some(d) = &s.default_format {
+        out.push(String::new());
+        out.push(cellfmt::default_line(d));
+    }
     for sh in &s.sheets {
         out.push(String::new());
         out.push(sheet_open(sh));
+        if !sh.formats.is_empty() {
+            out.push(String::new());
+            out.extend(sh.formats.iter().map(FormatLine::line));
+        }
         for item in &sh.items {
             out.push(String::new());
             match item {
