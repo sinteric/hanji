@@ -195,7 +195,7 @@ impl Header {
     pub fn style_set(&self) -> StyleSet {
         let mut s = StyleSet::default();
         for st in &self.styles {
-            s.paragraph.push(StyleDef { id: st.id.to_string(), name: st.name.clone() });
+            s.paragraph.push(StyleDef::new(st.id.to_string(), st.name.clone()));
             if let Some(Heading::Outline(l)) = self.heading(st.para_pr) {
                 if let Some(slot) = s.headings.get_mut(l as usize) {
                     slot.get_or_insert_with(|| st.name.clone());
@@ -205,7 +205,7 @@ impl Header {
         s.default_paragraph = match self.styles.iter().find(|x| x.id == 0).or(self.styles.first()) {
             Some(st) => st.name.clone(),
             None => {
-                s.paragraph.push(StyleDef { id: "0".into(), name: "바탕글".into() });
+                s.paragraph.push(StyleDef::new("0", "바탕글"));
                 "바탕글".into()
             }
         };

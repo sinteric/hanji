@@ -119,13 +119,22 @@ fn escapes_only_where_needed() {
     for (text, want) in cases {
         assert_eq!(serialize_inline(&Inline::plain(text)), want, "{text}");
         let line = serialize(&Document {
+            styles: vec![],
             front: FrontMatter::document("docx", None),
-            blocks: vec![Block::Para(Para { style: ParaStyle::Plain, content: Inline::plain(text) })],
+            blocks: vec![Block::Para(Para {
+                props: Default::default(),
+                style: ParaStyle::Plain,
+                content: Inline::plain(text),
+            })],
         });
         let d = parse(&line).unwrap();
         assert_eq!(
             d.blocks,
-            vec![Block::Para(Para { style: ParaStyle::Plain, content: Inline::plain(text) })],
+            vec![Block::Para(Para {
+                props: Default::default(),
+                style: ParaStyle::Plain,
+                content: Inline::plain(text)
+            })],
             "{line}"
         );
     }
@@ -133,8 +142,13 @@ fn escapes_only_where_needed() {
         ["# not a heading", "- not a list", "1. not a list", "> quote", "| not a table", "{style}", "---", "  |x"]
     {
         let d = Document {
+            styles: vec![],
             front: FrontMatter::document("docx", None),
-            blocks: vec![Block::Para(Para { style: ParaStyle::Plain, content: Inline::plain(start) })],
+            blocks: vec![Block::Para(Para {
+                props: Default::default(),
+                style: ParaStyle::Plain,
+                content: Inline::plain(start),
+            })],
         };
         let s = serialize(&d);
         assert_eq!(parse(&s).unwrap(), d, "{s}");
@@ -145,8 +159,10 @@ fn escapes_only_where_needed() {
 fn table_cell_escapes() {
     let cell = |s: &str| Cell::text(Inline::plain(s));
     let d = Document {
+        styles: vec![],
         front: FrontMatter::document("docx", None),
         blocks: vec![Block::Table(Table {
+            boxes: vec![],
             style: None,
             rows: vec![
                 vec![cell("a|b"), cell("^^"), cell(""), cell(" pad ")],
@@ -218,7 +234,7 @@ fn random_inline(r: &mut Rng, notes: &mut Vec<String>, allow_spans: bool) -> Inl
             }
             _ => Atom::Char(*r.pick(ALPHABET)),
         };
-        units.push(Unit { atom, marks });
+        units.push(Unit::new(atom, marks));
     }
     let mut spans = vec![];
     if allow_spans && units.len() > 2 && r.below(3) == 0 {
@@ -255,7 +271,7 @@ fn random_doc(seed: u64) -> Document {
                 {
                     content = Inline::plain("x");
                 }
-                Block::Para(Para { style, content })
+                Block::Para(Para { props: Default::default(), style, content })
             }
             2 => {
                 let w = 1 + r.below(4);
@@ -267,6 +283,7 @@ fn random_doc(seed: u64) -> Document {
                                 let n = 1 + r.below(3) * r.below(2);
                                 let ps = (0..n)
                                     .map(|_| CellPara {
+                                        props: Default::default(),
                                         style: (r.below(3) == 0).then(|| "표 참고".to_string()),
                                         content: random_inline(&mut r, &mut notes, true),
                                     })
@@ -276,13 +293,15 @@ fn random_doc(seed: u64) -> Document {
                             .collect()
                     })
                     .collect();
-                Block::Table(Table { style: (r.below(2) == 0).then(|| "Grid Table 4".into()), rows })
+                Block::Table(Table { boxes: vec![], style: (r.below(2) == 0).then(|| "Grid Table 4".into()), rows })
             }
             3 => Block::Keep(Keep { id: "kb".into(), kind: "table".into(), summary: "x".into() }),
             4 => Block::PageBreak,
             6 => Block::List(
                 (0..1 + r.below(4))
                     .map(|_| Item {
+                        props: Default::default(),
+                        style: None,
                         ordered: r.below(2) == 0,
                         level: r.below(3),
                         content: random_inline(&mut r, &mut notes, true),
@@ -290,10 +309,15 @@ fn random_doc(seed: u64) -> Document {
                     .collect(),
             ),
             5 => Block::Para(Para {
+                props: Default::default(),
                 style: if r.below(2) == 0 { ParaStyle::Plain } else { ParaStyle::Named("좁은 간격".into()) },
                 content: Inline::default(),
             }),
-            _ => Block::Para(Para { style: ParaStyle::Plain, content: Inline::plain("plain") }),
+            _ => Block::Para(Para {
+                props: Default::default(),
+                style: ParaStyle::Plain,
+                content: Inline::plain("plain"),
+            }),
         };
         blocks.push(b);
     }
@@ -302,7 +326,7 @@ fn random_doc(seed: u64) -> Document {
     for l in notes {
         blocks.push(Block::FootnoteDef(FootnoteDef { label: l, content: Inline::plain("def") }));
     }
-    let mut d = Document { front: FrontMatter::document("docx", Some("t")), blocks };
+    let mut d = Document { styles: vec![], front: FrontMatter::document("docx", Some("t")), blocks };
     d.normalize();
     d
 }
@@ -397,7 +421,7 @@ fn errors_have_line_column_and_form() {
     let e = errors("{style=\"Grid\"}\n\n| a |\n|---|\n");
     assert!(e[0].contains("must be directly followed by the header row"), "{e:?}");
     let e = errors("{style=\"Grid\" color=\"red\"}\n| a |\n|---|\n");
-    assert!(e[0].contains("has no attribute \"color\""), "{e:?}");
+    assert!(e[0].contains("\"red\" is not a colour"), "{e:?}");
     let e = errors("<table style=\"Grid\">\n| a |\n|---|\n</table>\n");
     assert!(e[0].contains("{style=\"Name\"}"), "{e:?}");
     let e = errors("| a |\n|:---|\n");
@@ -471,17 +495,22 @@ fn empty_paragraph_lines() {
     assert_eq!(roundtrip(&text), text);
     let d = parse(&text).unwrap();
     assert_eq!(d.blocks.len(), 5);
-    assert_eq!(d.blocks[1], Block::Para(Para { style: ParaStyle::Plain, content: Inline::default() }));
+    assert_eq!(
+        d.blocks[1],
+        Block::Para(Para { props: Default::default(), style: ParaStyle::Plain, content: Inline::default() })
+    );
     assert_eq!(
         d.blocks[3],
-        Block::Para(Para { style: ParaStyle::Named("좁은 간격".into()), content: Inline::default() })
+        Block::Para(Para {
+            props: Default::default(),
+            style: ParaStyle::Named("좁은 간격".into()),
+            content: Inline::default()
+        })
     );
     // blank lines between them are dropped in canonical form; a <br/> line is text, not an empty paragraph
     let loose = parse(&doc("<p/>\n\n<p/>\n\n<br/>\n")).unwrap();
     assert_eq!(serialize(&loose), doc("<p/>\n<p/>\n\n<br/>\n"));
-    assert!(
-        matches!(&loose.blocks[2], Block::Para(p) if p.content.units == vec![Unit { atom: Atom::Break, marks: Marks::NONE }])
-    );
+    assert!(matches!(&loose.blocks[2], Block::Para(p) if p.content.units == vec![Unit::new(Atom::Break, Marks::NONE)]));
 }
 
 #[test]
@@ -508,7 +537,11 @@ fn p_tag_errors() {
 
 #[test]
 fn multi_paragraph_cells() {
-    let cp = |style: Option<&str>, t: &str| CellPara { style: style.map(str::to_string), content: Inline::plain(t) };
+    let cp = |style: Option<&str>, t: &str| CellPara {
+        props: Default::default(),
+        style: style.map(str::to_string),
+        content: Inline::plain(t),
+    };
     let cell = |src: &str| -> Vec<CellPara> {
         let d = parse(&doc(&format!("| h |\n|---|\n| {src} |\n"))).unwrap();
         let Block::Table(t) = &d.blocks[0] else { panic!() };

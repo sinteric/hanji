@@ -120,10 +120,18 @@ fn quoted_layouts_and_lines_that_look_like_markers() {
     let mut pres = parse(&text).unwrap().pres;
     let SlideItem::Slot(t) = &mut pres.slides[0].items[0] else { panic!() };
     t.blocks = vec![
-        Block::Para(Para { style: ParaStyle::Plain, content: Inline::plain("::body::") }),
-        Block::Para(Para { style: ParaStyle::Plain, content: Inline::plain("---") }),
-        Block::Para(Para { style: ParaStyle::Plain, content: Inline::plain("<shape id=\"s4\">") }),
-        Block::Para(Para { style: ParaStyle::Plain, content: Inline::plain("layout: Blank") }),
+        Block::Para(Para { props: Default::default(), style: ParaStyle::Plain, content: Inline::plain("::body::") }),
+        Block::Para(Para { props: Default::default(), style: ParaStyle::Plain, content: Inline::plain("---") }),
+        Block::Para(Para {
+            props: Default::default(),
+            style: ParaStyle::Plain,
+            content: Inline::plain("<shape id=\"s4\">"),
+        }),
+        Block::Para(Para {
+            props: Default::default(),
+            style: ParaStyle::Plain,
+            content: Inline::plain("layout: Blank"),
+        }),
     ];
     let s = serialize_presentation(&pres);
     assert!(s.contains("\\::body::\n\n\\---\n\n\\<shape id=\"s4\">\n\nlayout: Blank\n"), "{s}");

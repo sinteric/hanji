@@ -6,7 +6,8 @@ use hanji_docx::{package, DocxEngine};
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const CAPS: Capabilities = Capabilities { links: false, fields: false, footnotes: false, math: false };
+const CAPS: Capabilities =
+    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: true };
 
 fn part(name: &str, data: &str) -> Part {
     Part { name: name.into(), data: data.as_bytes().to_vec(), dos_time: 0x5b21_0000, external_attr: 0, deflate: true }
@@ -49,7 +50,7 @@ fn exact_edit_lands_and_refuses_ambiguous_old_text() {
     let pkg = docx(&body, vec![]);
     let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
     let r = edit(&imp.remainder, &imp.text, "2023", "2024", CAPS).unwrap();
-    assert!(r.text.contains("매출 2024 증가"), "{}", r.text);
+    assert!(r.text.contains("[매출 2024]{color=#FF0000} 증가"), "{}", r.text);
     assert!(r.report.refused.is_empty() && r.report.removed.is_empty(), "{:?}", r.report);
     let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
     let again = DocxEngine.import(&out, &ImportOptions::default()).unwrap();
@@ -470,7 +471,7 @@ fn numbered_paragraphs_are_list_items() {
     .concat();
     let pkg = list_docx(&body, true);
     let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
-    let want = "# Title\n\n- a\n  - b\n- c\n\nplain\n\n1. d\n   1. d1\n1. e\n\n- other list\n- by style\n\n{style=\"Normal Table\"}\n| <p style=\"List Paragraph\"/>in cell |\n|---|\n";
+    let want = "# Title\n\n- a\n  - b\n- c\n\nplain\n\n1. d\n   1. d1\n1. e\n\n- other list\n- by style {style=\"List Bullet\"}\n\n{style=\"Normal Table\"}\n| <p style=\"List Paragraph\"/>in cell |\n|---|\n";
     assert!(imp.text.ends_with(want), "{}", imp.text);
     // GetPut.
     let canon = |pkg: &[u8]| hanji_docx::xml::canon_part(doc_xml(pkg).as_bytes()).unwrap();
@@ -557,7 +558,11 @@ fn adjacent_lists_of_another_kind_stay_separate() {
     let body = [li(1, 0, "a"), li(2, 1, "a1"), li(1, 0, "b"), li(2, 0, "one"), li(2, 0, "two"), li(1, 0, "c")].concat();
     let pkg = list_docx(&body, true);
     let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
-    assert!(imp.text.ends_with("---\n- a\n  1. a1\n- b\n\n1. one\n1. two\n\n- c\n"), "{}", imp.text);
+    assert!(
+        imp.text.ends_with("<style name=\"List Paragraph\"/>\n\n- a\n  1. a1\n- b\n\n1. one\n1. two\n\n- c\n"),
+        "{}",
+        imp.text
+    );
     let canon = |pkg: &[u8]| hanji_docx::xml::canon_part(doc_xml(pkg).as_bytes()).unwrap();
     assert_eq!(canon(&DocxEngine.export(&imp.text, &imp.remainder).unwrap()), canon(&pkg), "GetPut");
     // Written as new text, each reads back as written, every list on a numbering of its own.
@@ -573,7 +578,9 @@ fn adjacent_lists_of_another_kind_stay_separate() {
         let r = rewrite(&base.remainder, &base.text, &base.text.replace("end\n", &format!("{lists}\nend\n")), CAPS)
             .unwrap();
         let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
-        assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, r.text, "PutGet");
+        // The canonical text lists the style the new items are in.
+        let canonical = DocxEngine::text_of(&r.new, &r.remainder, None);
+        assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, canonical, "PutGet");
         let ids = num_ids(&doc_xml(&out), items);
         match lists {
             "- a\n  - a1\n\n1. one\n" | "1. one\n1. two\n\n- a\n" => {
@@ -690,7 +697,7 @@ fn a_new_table_takes_the_default_table_style_and_reads_back() {
     let tbl = "<w:tbl><w:tblPr/><w:tblGrid><w:gridCol w:w=\"2000\"/></w:tblGrid><w:tr><w:tc><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl>";
     let pkg = docx(tbl, vec![]);
     let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
-    assert!(imp.text.ends_with("---\n{style=\"Normal Table\"}\n| x |\n|---|\n"), "{}", imp.text);
+    assert!(imp.text.ends_with("/>\n\n{style=\"Normal Table\"}\n| x |\n|---|\n"), "{}", imp.text);
     let canon = |pkg: &[u8]| hanji_docx::xml::canon_part(doc_xml(pkg).as_bytes()).unwrap();
     assert_eq!(canon(&DocxEngine.export(&imp.text, &imp.remainder).unwrap()), canon(&pkg), "GetPut");
     // Dropping the line gives it the default for new tables.

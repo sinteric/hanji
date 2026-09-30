@@ -21,7 +21,8 @@
 //! that deletes or moves a placeholder (a field, another author's tracked
 //! change, a note reference, a moved picture, which would be written twice),
 //! text inside a field's result, a section break inserted or deleted,
-//! changed table shape or style, and a whole-file rewrite whose alignment
+//! changed table shape or style, a changed style line or cell box (fill,
+//! borders, valign), and a whole-file rewrite whose alignment
 //! chose among identical blocks (make it as exact edits instead).
 
 use std::cell::Cell as Counter;
@@ -29,7 +30,7 @@ use std::collections::{HashMap, HashSet};
 
 use hanji_core::revision::{paragraphs, same_shape};
 use hanji_core::{Block, EngineError, Entry, Kept, Kind, Para, Path, Pos, Reanchored, Remainder, Table};
-use hanji_format::{Atom, Cell, CellPara, Inline, Marks, Unit};
+use hanji_format::{Atom, Cell, CellPara, Inline, Marks, Props, Unit};
 
 use crate::export::{with_marks, Exporter};
 use crate::numbering::Numbering;
@@ -191,15 +192,25 @@ fn export_tracked(h: &History, rem: &Remainder, reviewer: &Reviewer) -> Result<V
         date: reviewer.date.clone(),
         next_id: Counter::new(max_id(&h.base, rem) + 1),
         units: m.units,
+        stated: m.stated,
         marks: m.marks,
         rows: m.rows,
         scope,
         default_style: rem.styles.default_paragraph_id().to_string(),
     };
-    let ex = Exporter::new(&rem.styles, &entries, &numbering, lists).tracked(&track);
+    let (styles, styles_part) = crate::written_styles(rem)?;
+    if styles_part.is_some() {
+        return Err(refused(
+            "the edits change a style's definition (a style line), which is not written as a tracked change yet: export without tracked changes, or leave the style lines as they are",
+        ));
+    }
+    let mut ex = Exporter::new(&styles, &entries, &numbering, lists).tracked(&track);
+    if styles.formatting {
+        ex = ex.formatted(crate::export::Fmt::new(&styles, crate::format::Theme::read(&rem.parts)));
+    }
     let body = ex.body(&m.blocks).map_err(EngineError::Refused)?;
     let document = shell.document(&body).into_bytes();
-    write_package(rem, Exported { document, numbering: numbering.part() })
+    write_package(rem, Exported { document, numbering: numbering.part(), styles: None })
 }
 
 /// The largest numeric `w:id` anywhere in the package, so revision ids are new.
@@ -260,6 +271,8 @@ pub(crate) struct Track {
     date: String,
     next_id: Counter<u64>,
     pub units: HashMap<Path, Vec<UnitRev>>,
+    /// Merged paragraphs whose properties are written (see `Merge::stated`).
+    pub stated: HashSet<Path>,
     marks: HashMap<Path, MarkRev>,
     rows: HashMap<Path, St>,
     scope: Scope,
@@ -500,14 +513,15 @@ impl<'a> Side<'a> {
         self.ppr.get(mark).and_then(|e| e.xml.get(1)).is_some_and(|x| fragment(x).child("w:sectPr").is_some())
     }
 
-    fn para(&self, path: &Path) -> (String, Option<hanji_core::ListItem>, Option<String>) {
+    /// A paragraph's style, list item, cell paragraph style and own properties.
+    fn para(&self, path: &Path) -> (String, Option<hanji_core::ListItem>, Option<String>, Props) {
         match (&self.blocks[path[0]], path.len()) {
-            (Block::Para(p), 1) => (p.style.clone(), p.item, None),
+            (Block::Para(p), 1) => (p.style.clone(), p.item, None, p.props.clone()),
             (Block::Table(t), 4) => match &t.rows[path[1]][path[2]] {
-                Cell::Text(ps) => (String::new(), None, ps[path[3]].style.clone()),
-                _ => (String::new(), None, None),
+                Cell::Text(ps) => (String::new(), None, ps[path[3]].style.clone(), ps[path[3]].props.clone()),
+                _ => (String::new(), None, None, Props::new()),
             },
-            _ => (String::new(), None, None),
+            _ => (String::new(), None, None, Props::new()),
         }
     }
 }
@@ -642,6 +656,9 @@ struct Merge<'a> {
     old_covered: HashMap<Path, usize>,
     /// Complex fields open at this point of the merged model (they may span paragraphs).
     depth: i32,
+    /// Merged paragraphs whose properties the current text states (§5.2):
+    /// their mark is a new paragraph's, and that paragraph has text.
+    stated: HashSet<Path>,
 }
 
 impl<'a> Merge<'a> {
@@ -667,6 +684,7 @@ impl<'a> Merge<'a> {
             new_covered: HashMap::new(),
             old_covered: HashMap::new(),
             depth: 0,
+            stated: HashSet::new(),
         }
     }
 
@@ -825,8 +843,8 @@ impl<'a> Merge<'a> {
             let mi = self.blocks.len();
             match item {
                 Item::Para(units, mark) => {
-                    let (inline, style, item) = self.para(&units, &mark, &[mi])?;
-                    self.blocks.push(Block::Para(Para { style, content: inline, item }));
+                    let (inline, style, item, props) = self.para(&units, &mark, &[mi])?;
+                    self.blocks.push(Block::Para(Para { props, style, content: inline, item }));
                 }
                 Item::Block(it) => {
                     let b = self.block(&it, mi)?;
@@ -843,7 +861,7 @@ impl<'a> Merge<'a> {
         units: &[It],
         mark: &It,
         mp: &[usize],
-    ) -> Result<(Inline, String, Option<hanji_core::ListItem>), String> {
+    ) -> Result<(Inline, String, Option<hanji_core::ListItem>, Props), String> {
         let mp = mp.to_vec();
         let mut out = vec![];
         let mut revs = vec![];
@@ -854,12 +872,14 @@ impl<'a> Merge<'a> {
                     let old_rpr = match &it.old {
                         Some(Pos::Unit(op, ou)) => {
                             let (a, b) = (self.old.rpr(op, *ou), self.new.rpr(np, *nu));
-                            if a != b && a.contains("rPrChange") {
+                            // Text properties the text changed (§5.2) change the run too.
+                            let changed = a != b || self.old.unit(op, *ou).props != unit.props;
+                            if changed && a.contains("rPrChange") {
                                 return Err("the edit changes formatting that is already a tracked change of \
                                             another author; accept or reject that change first"
                                     .into());
                             }
-                            (a != b).then_some(a)
+                            changed.then_some(a)
                         }
                         _ => None,
                     };
@@ -919,12 +939,17 @@ impl<'a> Merge<'a> {
         };
         self.units.insert(mp.clone(), revs);
         self.marks.insert(mp.clone(), MarkRev { st: mark.st, old_ppr });
-        let (style, item, _) = match (&np, &op) {
+        if let Some(np) = &np {
+            if hanji_core::model::content_at(self.new.blocks, np).is_some_and(hanji_format::styled::shows) {
+                self.stated.insert(mp.clone());
+            }
+        }
+        let (style, item, _, props) = match (&np, &op) {
             (Some(np), _) => self.new.para(np),
             (None, Some(op)) => self.old.para(op),
             _ => unreachable!("a mark"),
         };
-        Ok((Inline { units: out, spans: vec![] }, style, item))
+        Ok((Inline { units: out, spans: vec![] }, style, item, props))
     }
 
     /// Why a placeholder cannot be inserted or deleted as a tracked change, if it cannot.
@@ -995,6 +1020,11 @@ impl<'a> Merge<'a> {
         if a.style != b.style {
             return Err("the edit changes a table's style, which is not written as a tracked change yet".into());
         }
+        if a.boxes != b.boxes {
+            return Err("the edit changes a table cell's fill, borders or vertical alignment, which is not written \
+                        as a tracked change yet"
+                .into());
+        }
         let mut rows = vec![];
         for (r, (ra, rb)) in a.rows.iter().zip(&b.rows).enumerate() {
             let mut row = vec![];
@@ -1014,7 +1044,7 @@ impl<'a> Merge<'a> {
             }
             rows.push(row);
         }
-        Ok(Block::Table(Table { style: b.style.clone(), rows }))
+        Ok(Block::Table(Table { boxes: b.boxes.clone(), style: b.style.clone(), rows }))
     }
 
     /// A table inserted or deleted whole.
@@ -1047,7 +1077,7 @@ impl<'a> Merge<'a> {
             rows.push(out);
         }
         let style = t.style.clone();
-        Ok(Block::Table(Table { style, rows }))
+        Ok(Block::Table(Table { boxes: t.boxes.clone(), style, rows }))
     }
 
     fn cell(&mut self, seq: Vec<It>, at: &[usize]) -> Result<Vec<CellPara>, String> {
@@ -1057,8 +1087,8 @@ impl<'a> Merge<'a> {
             let mp: Path = at.iter().copied().chain([out.len()]).collect();
             let side = if mark.new.is_some() { &self.new } else { &self.old };
             let style = side.para(mark_path(&mark.new).or(mark_path(&mark.old)).unwrap()).2;
-            let (content, _, _) = self.para(&units, &mark, &mp)?;
-            out.push(CellPara { style, content });
+            let (content, _, _, props) = self.para(&units, &mark, &mp)?;
+            out.push(CellPara { props, style, content });
         }
         self.cell_len.insert(at.to_vec(), out.len());
         Ok(out)

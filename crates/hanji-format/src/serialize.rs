@@ -4,10 +4,19 @@
 
 use crate::ast::*;
 use crate::parse::{closer, delim};
+use crate::styled::{self, StyleTable};
 
 pub fn serialize(doc: &Document) -> String {
     let mut out = front_lines(&doc.front);
-    blocks(&mut out, &doc.blocks);
+    let table = StyleTable { default: doc.styles.first().map(|l| l.name.clone()), lines: doc.styles.clone() };
+    for l in &doc.styles {
+        let p = l.props.write();
+        out.push(format!("<style name=\"{}\"{}{p}/>", attr(&l.name), if p.is_empty() { "" } else { " " }));
+    }
+    if !doc.styles.is_empty() && !doc.blocks.is_empty() {
+        out.push(String::new());
+    }
+    blocks_in(&mut out, &doc.blocks, &table);
     out.join("\n") + "\n"
 }
 
@@ -27,47 +36,24 @@ pub(crate) fn front_lines(f: &FrontMatter) -> Vec<String> {
 
 /// Blocks, a blank line between them.
 pub(crate) fn blocks(out: &mut Vec<String>, blocks: &[Block]) {
+    blocks_in(out, blocks, &StyleTable::default())
+}
+
+fn blocks_in(out: &mut Vec<String>, blocks: &[Block], st: &StyleTable) {
     for (k, b) in blocks.iter().enumerate() {
         // Consecutive empty paragraphs are consecutive lines; a blank line
         // separates the group from other blocks.
         if k > 0 && !(is_empty_para(b) && is_empty_para(&blocks[k - 1])) {
             out.push(String::new());
         }
-        block(out, b);
+        block(out, b, st);
     }
 }
 
-fn block(out: &mut Vec<String>, b: &Block) {
+fn block(out: &mut Vec<String>, b: &Block, st: &StyleTable) {
     match b {
         Block::Para(p) => out.push(para_line(p)),
-        Block::Table(t) => {
-            if let Some(s) = &t.style {
-                out.push(format!("{{style=\"{}\"}}", attr(s)));
-            }
-            for (r, row) in t.rows.iter().enumerate() {
-                let mut line = String::from("|");
-                for c in row {
-                    match c {
-                        Cell::Left => line.push('|'),
-                        Cell::Up => line.push_str(" ^^ |"),
-                        Cell::Text(ps) => {
-                            let mut s = cell_text(ps).replace('|', "\\|");
-                            if s.trim() == "^^" {
-                                let k = s.find('^').unwrap();
-                                s.insert(k, '\\');
-                            }
-                            line.push(' ');
-                            line.push_str(&s);
-                            line.push_str(" |");
-                        }
-                    }
-                }
-                out.push(line);
-                if r == 0 {
-                    out.push(format!("|{}", "---|".repeat(row.len())));
-                }
-            }
-        }
+        Block::Table(t) => table(out, t, st),
         Block::Keep(k) => out.push(keep_tag(k)),
         Block::List(items) => {
             // Each item is indented to its parent's content column: the
@@ -76,8 +62,14 @@ fn block(out: &mut Vec<String>, b: &Block) {
             for it in items {
                 widths.truncate(it.level);
                 let indent: usize = widths.iter().sum();
-                let body = serialize_inline(&it.content);
-                let line = if body.is_empty() { it.marker().to_string() } else { format!("{} {body}", it.marker()) };
+                let (body, own) = with_own(&it.content, &it.props, &Props::new(), &Props::new());
+                let mut line =
+                    if body.is_empty() { it.marker().to_string() } else { format!("{} {body}", it.marker()) };
+                let style = it.style.as_ref().map(|s| format!("style=\"{}\"", attr(s)));
+                let brace: Vec<String> = style.into_iter().chain((!own.is_empty()).then(|| own.write())).collect();
+                if !brace.is_empty() {
+                    line.push_str(&format!(" {{{}}}", brace.join(" ")));
+                }
                 out.push(format!("{}{line}", " ".repeat(indent)));
                 widths.push(it.marker().len() + 1);
             }
@@ -106,19 +98,191 @@ fn p_tag(style: Option<&str>) -> String {
 /// one. A leading plain `<p/>` is written only where it is needed (an empty
 /// first paragraph followed by others).
 pub(crate) fn cell_text(ps: &[CellPara]) -> String {
+    cell_text_in(ps, &StyleTable::default(), &Props::new())
+}
+
+/// [`cell_text`] with each paragraph's `{…}`: what differs from its style
+/// under the table line's `tl`.
+fn cell_text_in(ps: &[CellPara], st: &StyleTable, tl: &Props) -> String {
     let mut s = String::new();
     for (k, p) in ps.iter().enumerate() {
         let lead_needed = k > 0 || p.style.is_some() || (p.content.is_empty() && ps.len() > 1);
         if lead_needed {
             s.push_str(&p_tag(p.style.as_deref()));
         }
-        s.push_str(&serialize_inline(&p.content));
+        let base = if tl.is_empty() { Props::new() } else { st.values(p.style.as_deref()) };
+        let (body, own) = with_own(&p.content, &p.props, &base, tl);
+        s.push_str(&body);
+        if !own.is_empty() {
+            s.push_str(&format!(" {{{}}}", own.write()));
+        }
     }
     s
 }
 
+/// A paragraph's text and its `{…}`: `props` (its own keys) and `units`'
+/// text keys are what differs from `base` (its style's values, or nothing
+/// where only differences matter); `tl` is the table line's. The `{…}`
+/// holds what differs from `base` under `tl`, and the text keys every unit
+/// has; each unit's other text keys are a `[text]{…}`.
+fn with_own(content: &Inline, props: &Props, base: &Props, tl: &Props) -> (String, Props) {
+    if !styled::shows(content) {
+        return (serialize_inline(content), Props::new());
+    }
+    let reference = base.overlay(tl);
+    let mut own = base.overlay(props).only(&styled::PARA_OWN).diff(&reference.only(&styled::PARA_OWN));
+    let text_base = base.only(&Key::TEXT);
+    let eff = |u: &Unit| text_base.overlay(&u.props);
+    let mut common: Option<Props> = None;
+    for u in content.units.iter().filter(|u| u.takes_props()) {
+        let e = eff(u);
+        common = Some(match common {
+            None => e,
+            Some(mut c) => {
+                c.0.retain(|k, v| e.get(*k) == Some(v));
+                c
+            }
+        });
+    }
+    let text_ref = reference.only(&Key::TEXT);
+    let lift = common.unwrap_or_default().diff(&text_ref);
+    own = own.overlay(&lift);
+    let span_ref = text_ref.overlay(&lift);
+    (inline_spans(content, &|u| eff(u).diff(&span_ref)), own)
+}
+
+/// A table: its line, then its rows. Canonical form lifts what is shared
+/// (§5.2): a box value more than half of the cells have is on the table
+/// line, more than half of a row's (differing from the line's) on the row;
+/// a layout or text value more than half of the cell paragraphs with text
+/// set beyond their style is on the table line (a table of one cell has no
+/// table line values). Each cell and paragraph writes what differs.
+fn table(out: &mut Vec<String>, t: &Table, st: &StyleTable) {
+    let dflt = styled::box_default();
+    let text_cells: Vec<(usize, usize)> = t
+        .rows
+        .iter()
+        .enumerate()
+        .flat_map(|(r, row)| {
+            row.iter().enumerate().filter(|(_, c)| matches!(c, Cell::Text(_))).map(move |(c, _)| (r, c))
+        })
+        .collect();
+    let eff_box = |r: usize, c: usize| dflt.overlay(t.box_at(r, c));
+    let lift = |cells: &[(usize, usize)], reference: &Props| {
+        let mut out = Props::new();
+        if cells.len() < 2 {
+            return out;
+        }
+        for k in Key::BOX {
+            let vals: Vec<Option<Value>> = cells.iter().map(|&(r, c)| eff_box(r, c).get(k).cloned()).collect();
+            if let Some((Some(v), n)) = styled::mode(&vals) {
+                if 2 * n > vals.len() && reference.get(k) != Some(&v) {
+                    out.set(k, v);
+                }
+            }
+        }
+        out
+    };
+    let table_box = lift(&text_cells, &dflt);
+    // The cell paragraphs' layout and text keys.
+    let paras: Vec<(&CellPara, Props)> = t
+        .rows
+        .iter()
+        .flatten()
+        .filter_map(|c| if let Cell::Text(ps) = c { Some(ps) } else { None })
+        .flatten()
+        .filter(|p| styled::shows(&p.content))
+        .map(|p| (p, st.values(p.style.as_deref())))
+        .collect();
+    let mut table_para = Props::new();
+    if paras.len() >= 2 && text_cells.len() >= 2 {
+        for k in styled::TABLE_PARA {
+            let text = Key::TEXT.contains(&k);
+            // A paragraph's value beyond its style; whether every one can state its own.
+            let mut vals: Vec<Option<Value>> = vec![];
+            let mut all_known = true;
+            for (p, base) in &paras {
+                if text {
+                    let effs: Vec<Option<Value>> = p
+                        .content
+                        .units
+                        .iter()
+                        .filter(|u| u.takes_props())
+                        .map(|u| u.props.get(k).or(base.get(k)).cloned())
+                        .collect();
+                    all_known &= effs.iter().all(Option::is_some);
+                    let same = effs.windows(2).all(|w| w[0] == w[1]);
+                    let v = effs.first().cloned().flatten().filter(|_| same);
+                    vals.push(v.filter(|v| base.get(k) != Some(v)));
+                } else {
+                    all_known &= p.props.get(k).or(base.get(k)).is_some();
+                    vals.push(p.props.get(k).cloned());
+                }
+            }
+            if let Some((Some(v), n)) = styled::mode(&vals).filter(|_| all_known) {
+                if 2 * n > vals.len() {
+                    table_para.set(k, v);
+                }
+            }
+        }
+    }
+    let head = table_box.overlay(&table_para);
+    let style = t.style.as_ref().map(|s| format!("style=\"{}\"", attr(s)));
+    let parts: Vec<String> = style.into_iter().chain((!head.is_empty()).then(|| head.write())).collect();
+    if !parts.is_empty() {
+        out.push(format!("{{{}}}", parts.join(" ")));
+    }
+    for (r, row) in t.rows.iter().enumerate() {
+        let in_row: Vec<(usize, usize)> = text_cells.iter().copied().filter(|x| x.0 == r).collect();
+        let line_ref = dflt.overlay(&table_box);
+        let row_box = lift(&in_row, &line_ref);
+        let cell_ref = line_ref.overlay(&row_box);
+        let mut line = String::from("|");
+        for (c, cell) in row.iter().enumerate() {
+            match cell {
+                Cell::Left => line.push('|'),
+                Cell::Up => line.push_str(" ^^ |"),
+                Cell::Text(ps) => {
+                    let mut s = cell_text_in(ps, st, &table_para).replace('|', "\\|");
+                    if s.trim() == "^^" {
+                        let k = s.find('^').unwrap();
+                        s.insert(k, '\\');
+                    }
+                    let own = eff_box(r, c).diff(&cell_ref);
+                    if !own.is_empty() {
+                        s = if s.is_empty() {
+                            format!("{{{}}}", own.write())
+                        } else {
+                            format!("{{{}}} {s}", own.write())
+                        };
+                    }
+                    line.push(' ');
+                    line.push_str(&s);
+                    line.push_str(" |");
+                }
+            }
+        }
+        if !row_box.is_empty() {
+            line.push_str(&format!(" {{{}}}", row_box.write()));
+        }
+        out.push(line);
+        if r == 0 {
+            out.push(format!("|{}", "---|".repeat(row.len())));
+        }
+    }
+}
+
 pub(crate) fn para_line(p: &Para) -> String {
-    let body = serialize_inline(&p.content);
+    let (body, own) = with_own(&p.content, &p.props, &Props::new(), &Props::new());
+    let line = para_body(p, body);
+    if own.is_empty() {
+        line
+    } else {
+        format!("{line} {{{}}}", own.write())
+    }
+}
+
+fn para_body(p: &Para, body: String) -> String {
     match &p.style {
         ParaStyle::Heading(n) => {
             let hashes = "#".repeat(*n as usize);
@@ -153,7 +317,7 @@ fn escape_line_start(mut s: String) -> String {
     }
     let bullet =
         (first == Some('-') && matches!(second, Some(' ') | None)) || (first == Some('+') && second == Some(' '));
-    if matches!(first, Some('|') | Some('{')) || bullet {
+    if first == Some('|') || bullet {
         s.insert(lead, '\\');
         return s;
     }
@@ -166,25 +330,63 @@ fn escape_line_start(mut s: String) -> String {
 }
 
 pub fn serialize_inline(inl: &Inline) -> String {
+    inline_spans(inl, &|u| u.props.clone())
+}
+
+/// Inline text, a unit's `want` (its text keys beyond what the paragraph
+/// states) written as `[text]{…}`.
+fn inline_spans(inl: &Inline, want: &dyn Fn(&Unit) -> Props) -> String {
     let mut out = Out { dollar: dollar_escapes(inl), ..Out::default() };
     for (a, b, span) in inl.segments() {
+        let spans = prop_spans(&inl.units, a, b, want);
         match span.map(|s| &s.kind) {
             Some(SpanKind::Link(url)) => {
                 out.s.push('[');
-                run(&mut out, &inl.units, a, b, true);
+                run(&mut out, &inl.units, a, b, true, &spans);
                 out.s.push_str("](");
                 out.s.push_str(&link_url(url));
                 out.s.push(')');
             }
             Some(SpanKind::Field(name)) => {
                 out.s.push_str(&format!("<field name=\"{}\">", attr(name)));
-                run(&mut out, &inl.units, a, b, false);
+                run(&mut out, &inl.units, a, b, false, &spans);
                 out.s.push_str("</field>");
             }
-            None => run(&mut out, &inl.units, a, b, false),
+            None => run(&mut out, &inl.units, a, b, false, &spans),
         }
     }
     out.s
+}
+
+/// The `[text]{…}` stretches of `units[a..b]`: maximal runs of units with
+/// the same non-empty `want`. A space or atom (which states no properties)
+/// is inside a stretch when the units around it are.
+fn prop_spans(units: &[Unit], a: usize, b: usize, want: &dyn Fn(&Unit) -> Props) -> Vec<(usize, usize, Props)> {
+    let mut w: Vec<Option<Props>> =
+        (a..b).map(|i| units[i].takes_props().then(|| want(&units[i]).only(&Key::TEXT))).collect();
+    for i in 0..w.len() {
+        if w[i].is_some() {
+            continue;
+        }
+        let prev = w[..i].iter().rev().find_map(|x| x.clone());
+        let next = w[i + 1..].iter().find(|x| x.is_some()).cloned().flatten();
+        w[i] = Some(match (prev, next) {
+            (Some(p), Some(n)) if p == n => p,
+            _ => Props::new(),
+        });
+    }
+    let mut out: Vec<(usize, usize, Props)> = vec![];
+    for (k, p) in w.into_iter().enumerate() {
+        let p = p.unwrap_or_default();
+        if p.is_empty() {
+            continue;
+        }
+        match out.last_mut() {
+            Some(l) if l.1 == a + k && l.2 == p => l.1 += 1,
+            _ => out.push((a + k, a + k + 1, p)),
+        }
+    }
+    out
 }
 
 /// Which literal `$` units need `\$`: those that could open math (a
@@ -251,9 +453,11 @@ impl Out {
 
 /// One marked stretch `units[a..b]`: nested where possible (the
 /// longest-lasting mark opens first), toggled where marks cross.
-fn run(out: &mut Out, all: &[Unit], a: usize, b: usize, in_link: bool) {
+fn run(out: &mut Out, all: &[Unit], a: usize, b: usize, in_link: bool, spans: &[(usize, usize, Props)]) {
     let units = &all[a..b];
     let mut open: Vec<Marks> = vec![];
+    let close_at = |at: usize| spans.iter().find(|s| s.1 == at).map(|s| format!("]{{{}}}", s.2.write()));
+    let mut in_span = false;
     for i in 0..units.len() {
         let want = units[i].marks;
         for k in (0..open.len()).rev() {
@@ -262,6 +466,14 @@ fn run(out: &mut Out, all: &[Unit], a: usize, b: usize, in_link: bool) {
                 open.remove(k);
             }
         }
+        if let Some(c) = close_at(a + i) {
+            out.text(&c);
+            in_span = false;
+        }
+        if spans.iter().any(|s| s.0 == a + i) {
+            out.text("[");
+            in_span = true;
+        }
         let mut new: Vec<Marks> = Marks::ALL.into_iter().filter(|&m| want.has(m) && !open.contains(&m)).collect();
         let end = |m: Marks| (i..units.len()).find(|&j| !units[j].marks.has(m)).unwrap_or(units.len());
         new.sort_by_key(|&m| std::cmp::Reverse(end(m)));
@@ -269,10 +481,13 @@ fn run(out: &mut Out, all: &[Unit], a: usize, b: usize, in_link: bool) {
             out.delim(delim(m));
             open.push(m);
         }
-        unit(out, all, a + i, in_link);
+        unit(out, all, a + i, in_link || in_span);
     }
     for m in open.into_iter().rev() {
         out.delim(closer(m));
+    }
+    if let Some(c) = close_at(b) {
+        out.text(&c);
     }
 }
 
@@ -293,6 +508,7 @@ fn unit(out: &mut Out, units: &[Unit], i: usize, in_link: bool) {
             '^' if in_link && out.s.ends_with('[') => out.text("\\^"),
             ']' if in_link || next_char == Some('(') => out.text("\\]"),
             '$' if out.dollar[i] => out.text("\\$"),
+            '{' => out.text("\\{"),
             c => {
                 let mut b = [0u8; 4];
                 out.text(c.encode_utf8(&mut b));
@@ -324,6 +540,11 @@ fn dollar_math_ok(m: &str) -> bool {
 
 pub(crate) fn keep_tag(k: &Keep) -> String {
     format!("<keep id=\"{}\" kind=\"{}\" summary=\"{}\"/>", attr(&k.id), attr(&k.kind), attr(&k.summary))
+}
+
+/// An attribute value as the text writes it between quotes.
+pub fn attr_value(s: &str) -> String {
+    attr(s)
 }
 
 pub(crate) fn attr(s: &str) -> String {

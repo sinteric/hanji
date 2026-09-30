@@ -147,7 +147,7 @@ fn item(first: bool, level: usize) -> Option<ListItem> {
 }
 
 fn para(text: &str, item: Option<ListItem>) -> Block {
-    Block::Para(Para { style: String::new(), content: Inline::plain(text), item })
+    Block::Para(Para::new(String::new(), Inline::plain(text), item))
 }
 
 /// A new slide at the end, from a layout with a title and a body.

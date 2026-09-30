@@ -156,7 +156,7 @@ fn refusals_are_exit_status_1_with_the_reason() {
     // Ambiguous old.
     let e = env.err(&["edit", "korean-report", "--rev", "2", "--old", "수도권", "--new", "x"]);
     assert_eq!((e["code"].as_str(), e["matches"].as_u64()), (Some("ambiguous_match"), Some(2)));
-    assert_eq!(e["lines"], serde_json::json!([8, 10]));
+    assert_eq!(e["lines"], serde_json::json!([14, 16]));
     // Validator errors: line, column, allowed names.
     let e = env.err(&[
         "edit",
@@ -169,7 +169,7 @@ fn refusals_are_exit_status_1_with_the_reason() {
         "<div style=\"Callout\">",
     ]);
     assert_eq!(e["code"], "invalid");
-    assert_eq!((e["diagnostics"][0]["line"].as_u64(), e["diagnostics"][0]["col"].as_u64()), (Some(10), Some(6)));
+    assert_eq!((e["diagnostics"][0]["line"].as_u64(), e["diagnostics"][0]["col"].as_u64()), (Some(16), Some(6)));
     assert!(e["diagnostics"][0]["message"].as_str().unwrap().contains("\"Block Quotation\""));
     std::fs::write(
         env.dir.join("bad.md"),
@@ -216,7 +216,13 @@ fn reimport_of_a_file_a_person_changed() {
     std::fs::write(&out, hanji_package::package::write(&parts).unwrap()).unwrap();
     let r = env.ok(&["reimport", "korean-report", &out]);
     assert_eq!((r["parent"].as_u64(), r["revision"].as_u64()), (Some(1), Some(2)));
-    assert!(r["diff"].as_str().unwrap().contains("+4분기부터는 부산과 대구에 지점을 연다."), "{r:#}");
+    assert!(
+        r["diff"]
+            .as_str()
+            .unwrap()
+            .contains("+4분기부터는 [부산]{color=#C00000}과 [대구]{color=#C00000}에 지점을 연다."),
+        "{r:#}"
+    );
     // An edit the model made against revision 1 is merged over it.
     let c = env.ok(&["edit", "korean-report", "--rev", "1", "--old", "| 합계 || 215 |", "--new", "| 합계 || 217 |"]);
     assert_eq!(c["rebased_over"], serde_json::json!([2]));
@@ -249,9 +255,9 @@ fn a_part_of_a_large_file() {
     assert!(r["next"].as_str().unwrap().starts_with("lines "));
     let r = env.ok(&["read", "document", "--section", "장 12"]);
     assert!(r["text"].as_str().unwrap().starts_with("# 장 12\n\n장 12, 문단 1:"));
-    let out = env.cmd().args(["read", "document", "--lines", "6:8"]).output().unwrap();
+    let out = env.cmd().args(["read", "document", "--lines", "9:11"]).output().unwrap();
     assert_eq!(String::from_utf8(out.stdout).unwrap(), "# 장 1\n\n장 1, 문단 1: 지점별 매출과 원가를 정리한다.\n");
-    assert!(String::from_utf8(out.stderr).unwrap().contains("lines 6–8 of"));
+    assert!(String::from_utf8(out.stderr).unwrap().contains("lines 9–11 of"));
 }
 
 #[test]

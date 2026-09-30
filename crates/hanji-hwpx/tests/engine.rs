@@ -5,7 +5,8 @@
 use hanji_core::{edit, rewrite, Capabilities, Engine, EngineError, ImportOptions, Part, Refusal};
 use hanji_hwpx::{package, xml, HwpxEngine};
 
-const CAPS: Capabilities = Capabilities { links: false, fields: false, footnotes: false, math: false };
+const CAPS: Capabilities =
+    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: false };
 const NS: &str = r#"xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hh="http://www.hancom.co.kr/hwpml/2011/head" xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core""#;
 
 fn part(name: &str, data: &str) -> Part {

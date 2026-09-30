@@ -12,8 +12,10 @@ pub mod ops;
 pub mod parse;
 pub mod pres;
 pub mod presets;
+pub mod props;
 pub mod serialize;
 pub mod sheet;
+pub mod styled;
 pub mod vocab;
 
 pub use ast::*;

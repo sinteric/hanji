@@ -8,6 +8,7 @@
 //! remainder must store.
 
 pub mod export;
+pub mod format;
 pub mod import;
 pub mod numbering;
 pub mod ooxml;
@@ -73,6 +74,61 @@ impl DocxEngine {
         fmt::serialize(&d)
     }
 
+    /// A new revision's blocks with what its text could not show (§5.2): a
+    /// paragraph that had no text, and has now without writing its own
+    /// `{…}`, keeps the formatting it had, and the text shows it from now
+    /// on. `rem`'s entries stop marking a paragraph whose text shows it.
+    pub fn complete(blocks: &mut [hanji_core::Block], rem: &mut Remainder) {
+        use hanji_core::{Block, Kind};
+        use hanji_format::{styled, Cell, Inline, Props};
+        if !rem.styles.formatting {
+            return;
+        }
+        let f = export::Fmt::new(&rem.styles, format::Theme::read(&rem.parts));
+        let default_id = rem.styles.default_paragraph_id().to_string();
+        let mut fill = |path: Vec<usize>, style: &str, content: &Inline, props: &mut Props| {
+            if !styled::shows(content) {
+                return;
+            }
+            let Some(e) = rem.entries.iter_mut().find(|e| e.kind == Kind::Ppr && e.path == path && e.meta.unshown)
+            else {
+                return;
+            };
+            e.meta.unshown = false;
+            if props.is_empty() {
+                let style = if style.is_empty() {
+                    let id = e.meta.style.clone().unwrap_or_else(|| default_id.clone());
+                    rem.styles.paragraph_name(&id).unwrap_or(&rem.styles.default_paragraph).to_string()
+                } else {
+                    style.to_string()
+                };
+                let base = f.values.get(&style).cloned().unwrap_or_default();
+                let size = base.get(hanji_format::Key::Size).and_then(|v| v.length()).unwrap_or(1000);
+                if let Some(x) = e.xml.get(1).map(|x| xml::fragment(x)) {
+                    *props = format::ppr_props(&x, size).only(&styled::PARA_OWN).diff(&base);
+                }
+            }
+        };
+        for (bi, b) in blocks.iter_mut().enumerate() {
+            match b {
+                Block::Para(p) => fill(vec![bi], &p.style, &p.content, &mut p.props),
+                Block::Table(t) => {
+                    for (ri, row) in t.rows.iter_mut().enumerate() {
+                        for (ci, c) in row.iter_mut().enumerate() {
+                            if let Cell::Text(ps) = c {
+                                for (k, p) in ps.iter_mut().enumerate() {
+                                    let style = p.style.clone().unwrap_or_default();
+                                    fill(vec![bi, ri, ci, k], &style, &p.content, &mut p.props);
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
     /// Model blocks of an import (for tests and tools).
     pub fn split(
         package: &[u8],
@@ -94,15 +150,22 @@ impl DocxEngine {
             ));
         }
         let scope = xml::scope_of(root);
-        let (styles, default_table) = styles::read(package::get(&parts, "word/styles.xml"));
+        let (mut styles, default_table) = styles::read(package::get(&parts, "word/styles.xml"));
+        let fmt = format::Styles::read(&parts);
+        fmt.lines_into(&mut styles);
+        let numbering = numbering::Numbering::read(&parts);
+        // A list item that names no style is in List Paragraph, as Word
+        // gives a new item.
+        styles.default_item =
+            numbering.list_paragraph.as_deref().and_then(|id| styles.paragraph_name(id)).map(str::to_string);
         let notes = notes(&parts);
         let body_at = root.children.iter().position(|n| matches!(n, xml::Node::El(e) if e.is("w:body")));
         let Some(body_at) = body_at else { return Err(EngineError::Package("document.xml has no w:body".into())) };
         let xml::Node::El(body) = &root.children[body_at] else { unreachable!() };
-        let numbering = numbering::Numbering::read(&parts);
-        let split = import::Importer::new(&scope, styles, default_table, &notes, &numbering)
+        let mut split = import::Importer::new(&scope, styles, default_table, &notes, &numbering, &fmt)
             .body(body)
             .map_err(|e| EngineError::Package(format!("{DOC_PART}: {e}")))?;
+        hanji_core::model::mark_shown(&mut split.styles, &split.blocks);
         let shell = DocShell {
             prolog: doc.prolog.clone(),
             epilog: doc.epilog.clone(),
@@ -156,7 +219,7 @@ impl Engine for DocxEngine {
     }
 
     fn capabilities(&self) -> Capabilities {
-        Capabilities::default()
+        Capabilities { formatting: true, ..Default::default() }
     }
 
     fn import(&self, package: &[u8], opts: &ImportOptions) -> Result<Imported, EngineError> {
@@ -167,15 +230,20 @@ impl Engine for DocxEngine {
 
     fn export(&self, text: &str, rem: &Remainder) -> Result<Vec<u8>, EngineError> {
         let (_, blocks) = hanji_core::model_of(text, rem, self.capabilities()).map_err(EngineError::Invalid)?;
-        write_package(rem, export_document(&blocks, rem)?)
+        // The style section as the text has it.
+        let mut rem = rem.clone();
+        hanji_core::TextModel::restyle(&hanji_core::DocumentModel, text, &mut rem, self.capabilities());
+        write_package(&rem, export_document(&blocks, &rem)?)
     }
 }
 
-/// What export writes: `word/document.xml`, and `word/numbering.xml` when a
-/// new list needed its own numbering.
+/// What export writes: `word/document.xml`, `word/numbering.xml` when a
+/// new list needed its own numbering, and `word/styles.xml` when the style
+/// section changed a style or made one.
 pub struct Exported {
     pub document: Vec<u8>,
     pub numbering: Option<Vec<u8>>,
+    pub styles: Option<Vec<u8>>,
 }
 
 /// The package: `rem`'s parts, with the exported ones in place.
@@ -188,17 +256,37 @@ pub fn write_package(rem: &Remainder, out: Exported) -> Result<Vec<u8>, EngineEr
             if let Some(n) = &out.numbering {
                 p.data = n.clone();
             }
+        } else if p.name == "word/styles.xml" {
+            if let Some(n) = &out.styles {
+                p.data = n.clone();
+            }
         }
     }
     package::write(&parts).map_err(EngineError::Package)
 }
 
 /// `document.xml` (and numbering) for resolved blocks placed against `rem`.
+/// The style section is `rem`'s (the text's, once re-anchored).
 pub fn export_document(blocks: &[hanji_core::Block], rem: &Remainder) -> Result<Exported, EngineError> {
     let shell = DocShell::of(rem)?;
     let mut numbering = numbering::Numbering::read(&rem.parts);
     let lists = hanji_core::plan_lists(blocks, &rem.entries, &mut numbering).map_err(EngineError::Refused)?;
-    let ex = export::Exporter::new(&rem.styles, &rem.entries, &numbering, lists);
+    let (styles, styles_part) = written_styles(rem)?;
+    let mut ex = export::Exporter::new(&styles, &rem.entries, &numbering, lists);
+    if styles.formatting {
+        ex = ex.formatted(export::Fmt::new(&styles, format::Theme::read(&rem.parts)));
+    }
     let body = ex.body(blocks).map_err(EngineError::Refused)?;
-    Ok(Exported { document: shell.document(&body).into_bytes(), numbering: numbering.part() })
+    Ok(Exported { document: shell.document(&body).into_bytes(), numbering: numbering.part(), styles: styles_part })
+}
+
+/// The style set with new styles' ids, and `word/styles.xml` when the style
+/// section changes it.
+pub(crate) fn written_styles(rem: &Remainder) -> Result<(hanji_core::StyleSet, Option<Vec<u8>>), EngineError> {
+    let mut styles = rem.styles.clone();
+    if !styles.formatting {
+        return Ok((styles, None));
+    }
+    let part = format::write_styles(&rem.parts, &mut styles, &[]).map_err(EngineError::Refused)?;
+    Ok((styles, part))
 }

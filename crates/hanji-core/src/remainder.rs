@@ -92,6 +92,10 @@ pub struct Meta {
     /// list (`A1:B2 D4`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub range: Option<String>,
+    /// A paragraph the text shows no formatting for (it had no text, §5.2):
+    /// its properties stay as stored until the text states its own.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub unshown: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

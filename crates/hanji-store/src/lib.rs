@@ -930,8 +930,9 @@ impl<S: Storage> Workspace<S> {
 
     /// A re-anchored Document or Presentation revision: exported once so a
     /// refusal comes now, not at export, and stored in canonical form.
-    fn finish(&self, doc: &DocRecord, before: &str, ra: Reanchored, removed: Vec<Loss>) -> Result<Next> {
+    fn finish(&self, doc: &DocRecord, before: &str, mut ra: Reanchored, removed: Vec<Loss>) -> Result<Next> {
         let f = doc.format;
+        f.complete(&mut ra.new, &mut ra.remainder);
         f.engine().export(&ra.text, &ra.remainder)?;
         let canon = f.text_of(&ra.new, &ra.remainder, doc.template.as_deref());
         let same_blocks =

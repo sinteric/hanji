@@ -54,6 +54,9 @@ pub fn names(rem: &Remainder) -> Names {
         fields: None,
         keeps: Some(rem.keep_list()),
         formats: Some(vec![rem.format.clone()]),
+        style_lines: rem.styles.formatting.then(|| rem.styles.lines()),
+        headings: rem.styles.headings.clone(),
+        item_style: rem.styles.default_item.clone().filter(|_| rem.styles.formatting),
         ..Default::default()
     }
 }
@@ -77,6 +80,10 @@ pub trait TextModel {
         rem: &Remainder,
         caps: Capabilities,
     ) -> Result<(Vec<Block>, Vec<BlockSrc>), Vec<Diagnostic>>;
+
+    /// The new revision's remainder takes what its text says beyond the
+    /// blocks (a Document's style section, §5.2). `text` is valid.
+    fn restyle(&self, _text: &str, _rem: &mut Remainder, _caps: Capabilities) {}
 }
 
 /// The Document grammar (§5.2).
@@ -91,6 +98,12 @@ impl TextModel for DocumentModel {
     ) -> Result<(Vec<Block>, Vec<BlockSrc>), Vec<Diagnostic>> {
         let (parsed, blocks) = model_of(text, rem, caps)?;
         Ok((blocks, model::block_maps(&parsed)))
+    }
+
+    fn restyle(&self, text: &str, rem: &mut Remainder, caps: Capabilities) {
+        if let Ok((parsed, blocks)) = model_of(text, rem, caps) {
+            model::restyle(&mut rem.styles, &parsed, &blocks);
+        }
     }
 }
 
@@ -160,7 +173,8 @@ pub fn reanchor_rewrite_in(
     let (old, _) = m.resolve(old_text, rem, caps).map_err(Refusal::Invalid)?;
     let (new, _) = m.resolve(new_text, rem, caps).map_err(Refusal::Invalid)?;
     let alignment = Alignment::design_c(&old, &new);
-    let (remainder, report, outcomes) = reanchor(rem, &old, &new, &alignment);
+    let (mut remainder, report, outcomes) = reanchor(rem, &old, &new, &alignment);
+    m.restyle(new_text, &mut remainder, caps);
     Ok(Reanchored { text: new_text.to_string(), old, new, remainder, report, outcomes, alignment })
 }
 
@@ -197,7 +211,8 @@ pub fn reanchor_span_in(
     let (old, om) = m.resolve(text, rem, caps).map_err(Refusal::Invalid)?;
     let (nb, nm) = m.resolve(&new_text, rem, caps).map_err(Refusal::Invalid)?;
     let (mut s, mut e) = (s, e);
-    let mut alignment = exact_alignment(&om, &old, &nm, &nb, s, e, repl.len());
+    let plain = |a: &str, b: &str| plain_text(a) && plain_text(b);
+    let mut alignment = exact_alignment(&om, &old, &nm, &nb, s, e, repl.len(), plain(&text[s..e], repl));
     // A span that cuts a head's line and leaves it unpaired is read by
     // whole lines: the same text change, with the lines it repeats left out
     // (deleting a slide whose neighbour begins alike cuts both slide lines).
@@ -205,7 +220,7 @@ pub fn reanchor_span_in(
     if !cut.is_empty() {
         let (s2, e2, r2) = whole_lines(text, s, e, repl);
         debug_assert_eq!(format!("{}{r2}{}", &text[..s2], &text[e2..]), new_text);
-        let al2 = exact_alignment(&om, &old, &nm, &nb, s2, e2, r2.len());
+        let al2 = exact_alignment(&om, &old, &nm, &nb, s2, e2, r2.len(), plain(&text[s2..e2], &r2));
         let gone_whole = |i: usize| {
             let level = old[i].head().map_or(0, |h| h.level);
             let end =
@@ -217,7 +232,8 @@ pub fn reanchor_span_in(
             (s, e, alignment) = (s2, e2, al2);
         }
     }
-    let (remainder, mut report, mut outcomes) = reanchor(rem, &old, &nb, &alignment);
+    let (mut remainder, mut report, mut outcomes) = reanchor(rem, &old, &nb, &alignment);
+    m.restyle(&new_text, &mut remainder, caps);
     refuse_cut_heads(rem, text, &om, &cut_heads(&old, &om, &alignment, s, e), &mut report, &mut outcomes);
     Ok(Reanchored { text: new_text, old, new: nb, remainder, report, outcomes, alignment })
 }
@@ -415,6 +431,16 @@ fn para_maps<'a>(
 /// The alignment an exact span implies: blocks outside it map one to one;
 /// units inside the touched blocks map through their source offsets; a
 /// paragraph follows its paragraph mark.
+/// Text with no markup the parser reads as syntax around the units: an edit
+/// of it replaces its units whole.
+fn plain_text(t: &str) -> bool {
+    !t.contains(['[', ']', '{', '}', '<', '\\', '*', '~', '$', '|', '\n'])
+}
+
+/// `plain`: the span and its replacement are text only; otherwise the
+/// units the span keeps at its two ends stay (a `[text]{…}` whose bracket
+/// moved rewrites the syntax around them, not them).
+#[allow(clippy::too_many_arguments)]
 fn exact_alignment(
     old_maps: &[BlockSrc],
     ob: &[Block],
@@ -423,6 +449,7 @@ fn exact_alignment(
     s: usize,
     e: usize,
     new_len: usize,
+    plain: bool,
 ) -> Alignment {
     let shift = |o: usize| -> Option<usize> {
         if o < s {
@@ -472,6 +499,50 @@ fn exact_alignment(
                 pairs.push((k, n));
             }
         }
+    }
+    // Inside a span that rewrites syntax, the units it keeps at its ends.
+    let old_in: Vec<usize> = (0..oo.len()).filter(|&k| (s..e).contains(&oo[k])).collect();
+    let new_in: Vec<usize> = (0..no.len()).filter(|&n| (s..s + new_len).contains(&no[n])).collect();
+    let same =
+        |k: usize, n: usize| old_stream.text.get(k).is_some() && old_stream.text.get(k) == new_stream.text.get(n);
+    // Only within one paragraph: a span across blocks aligns as before.
+    let one = |st: &Stream, v: &[usize]| {
+        let paths: Vec<Option<Path>> = v.iter().map(|&g| st.locate(g).map(|p| p.0)).collect();
+        paths.windows(2).all(|w| w[0] == w[1])
+    };
+    let within = one(&old_stream, &old_in) && one(&new_stream, &new_in);
+    let most = if plain || !within { 0 } else { old_in.len().min(new_in.len()) };
+    let pre = (0..most).take_while(|&x| same(old_in[x], new_in[x])).count();
+    let suf = (0..most - pre).take_while(|&x| same(old_in[old_in.len() - 1 - x], new_in[new_in.len() - 1 - x])).count();
+    if pre + suf > 0 {
+        pairs.extend((0..pre).map(|x| (old_in[x], new_in[x])));
+        pairs.extend((0..suf).map(|x| (old_in[old_in.len() - 1 - x], new_in[new_in.len() - 1 - x])));
+        pairs.sort();
+        let mut kept: Vec<(usize, usize)> = vec![];
+        for p in pairs {
+            if kept.last().is_none_or(|l| l.1 < p.1) {
+                kept.push(p);
+            }
+        }
+        pairs = kept;
+    }
+    // A stretch between pairs that is the same on both sides (a span that
+    // rewrote only syntax, as formatting on several lines): its units and
+    // marks stay, and its paragraphs with them.
+    if !plain {
+        let (a, b) = (&old_stream.text, &new_stream.text);
+        let mut filled = vec![];
+        let (mut i, mut j) = (0, 0);
+        for (k, n) in pairs.iter().copied().chain([(a.len(), b.len())]) {
+            if k > i && k - i == n - j && a[i..k] == b[j..n] {
+                filled.extend((0..k - i).map(|x| (i + x, j + x)));
+            }
+            if k < a.len() {
+                filled.push((k, n));
+            }
+            (i, j) = (k + 1, n + 1);
+        }
+        pairs = filled;
     }
     let ops = pairs_to_ops(&pairs, &old_stream.text, &new_stream.text);
     // A paragraph follows its mark; one whose mark went follows its first surviving unit.
@@ -628,7 +699,7 @@ mod tests {
     #[test]
     fn footnote_definitions_do_not_shift_later_blocks() {
         let styles = StyleSet {
-            paragraph: vec![StyleDef { id: "Normal".into(), name: "Normal".into() }],
+            paragraph: vec![StyleDef::new("Normal", "Normal")],
             default_paragraph: "Normal".into(),
             ..Default::default()
         };

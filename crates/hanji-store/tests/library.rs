@@ -80,13 +80,16 @@ fn docx_open_read_edit_export_reopen() {
             2,
             &[
                 TextEdit { old: "4분기에는".into(), new: "4분기부터".into() },
-                TextEdit { old: "4분기부터 부산과 ".into(), new: "4분기부터 부산·".into() },
+                TextEdit {
+                    old: "4분기부터 [부산]{color=#C00000}과 ".into(),
+                    new: "4분기부터 [부산]{color=#C00000}·".into(),
+                },
             ],
         )
         .unwrap();
     assert_eq!(c.revision, 3);
     let (_, t) = text(&ws, &o.doc_id);
-    assert!(t.contains("| ^^ | 종로 | 97 |") && t.contains("4분기부터 부산·대구"), "{t}");
+    assert!(t.contains("| ^^ | 종로 | 97 |") && t.contains("4분기부터 [부산]{color=#C00000}·[대구]"), "{t}");
     putget(&mut ws, &o.doc_id, "korean-report.docx");
     let h = ws.history(&o.doc_id).unwrap();
     assert_eq!(h.revisions.iter().map(|r| r.op).collect::<Vec<_>>(), [RevOp::Open, RevOp::Edit, RevOp::Edit]);
@@ -197,6 +200,13 @@ fn new_files_from_the_blank_packages() {
                     })
                     .collect();
                 assert_eq!(bare, body);
+            } else if f == Format::Docx {
+                // A docx text's canonical form adds the style lines of the
+                // styles it uses (§5.2).
+                let t = text(&ws, &o.doc_id).1;
+                assert!(c.canonicalized && t.contains("\n<style name=\"Normal\" "), "{t}");
+                let bare: String = t.split_inclusive('\n').filter(|l| !l.starts_with("<style ")).collect();
+                assert_eq!(bare.replacen("---\n\n", "---\n", 1), body);
             } else {
                 assert!(!c.canonicalized, "{f:?}: the text was written canonical:\n{}", text(&ws, &o.doc_id).1);
                 assert_eq!(text(&ws, &o.doc_id).1, body);
@@ -284,8 +294,8 @@ fn an_ambiguous_or_missing_old_is_refused_with_its_count() {
     let o = open(&mut ws, "prototype/remainder/corpus/korean-report.docx");
     let e = ws.edit(&o.doc_id, 1, &one("수도권", "서울·경기")).unwrap_err();
     assert_eq!((e.code, e.detail.matches), (Code::AmbiguousMatch, Some(2)));
-    assert_eq!(e.detail.lines, [8, 10]);
-    assert!(e.message.contains("occurs 2 times (lines 8, 10)"), "{}", e.message);
+    assert_eq!(e.detail.lines, [14, 16]);
+    assert!(e.message.contains("occurs 2 times (lines 14, 16)"), "{}", e.message);
     let e = ws.edit(&o.doc_id, 1, &one("5분기", "6분기")).unwrap_err();
     assert_eq!((e.code, e.detail.matches), (Code::NoMatch, Some(0)));
     // In a list, the error names the edit, and nothing is applied.
@@ -311,7 +321,7 @@ fn validator_errors_have_line_column_and_the_allowed_names() {
     let e = ws.edit(&o.doc_id, 1, &one("<div style=\"Note\">", "<div style=\"Callout\">")).unwrap_err();
     assert_eq!(e.code, Code::Invalid);
     let d = &e.detail.diagnostics[0];
-    assert_eq!((d.line, d.col), (10, 6), "{d:?}");
+    assert_eq!((d.line, d.col), (16, 6), "{d:?}");
     assert!(d.message.contains("\"Callout\"") && d.message.contains("\"Note\""), "{}", d.message);
     // validate: the grammar alone, or against a document's names.
     let bad = "---\ntype: document\nformat: docx\nschema: 1\n---\n| a | b |\n|---|---|\n| 1 |\n";
@@ -363,7 +373,7 @@ fn a_person_s_edits_come_back_in_and_a_pending_edit_is_merged_or_refused() {
     let r = ws.reimport_bytes(&o.doc_id, "korean-report.docx", &polished).unwrap();
     assert_eq!((r.parent, r.revision), (1, 2));
     assert!(
-        r.diff.contains("-4분기에는 부산과 대구에 지점을 연다.\n+4분기부터는 부산과 대구에 지점을 연다."),
+        r.diff.contains("-4분기에는 [부산]{color=#C00000}과 [대구]{color=#C00000}에 지점을 연다.\n+4분기부터는 [부산]{color=#C00000}과 [대구]{color=#C00000}에 지점을 연다."),
         "{}",
         r.diff
     );
@@ -374,12 +384,20 @@ fn a_person_s_edits_come_back_in_and_a_pending_edit_is_merged_or_refused() {
     let (_, t) = text(&ws, &o.doc_id);
     assert!(t.contains("4분기부터는") && t.contains("| ^^ | 종로 | 97 |"));
     // One against revision 1 on the line the person changed: refused.
-    let e = ws.edit(&o.doc_id, 1, &one("4분기에는 부산과", "4분기에는 광주와")).unwrap_err();
+    let e = ws
+        .edit(&o.doc_id, 1, &one("4분기에는 [부산]{color=#C00000}과", "4분기에는 [광주]{color=#C00000}와"))
+        .unwrap_err();
     assert_eq!(e.code, Code::StaleRevision, "revision 3 is a model edit: stale, not merged");
     let (_, exported) = ws.export_bytes(&o.doc_id, None, &ACK).unwrap();
     let polished = person_edits(&exported, "word/document.xml", ">대구<", ">대구, 광주<");
     ws.reimport_bytes(&o.doc_id, "korean-report.docx", &polished).unwrap();
-    let e = ws.edit(&o.doc_id, 3, &one("부산과 대구에 지점을", "부산에 지점을")).unwrap_err();
+    let e = ws
+        .edit(
+            &o.doc_id,
+            3,
+            &one("[부산]{color=#C00000}과 [대구]{color=#C00000}에 지점을", "[부산]{color=#C00000}에 지점을"),
+        )
+        .unwrap_err();
     assert_eq!(e.code, Code::MergeConflict, "{}", e.message);
     assert_eq!(e.detail.conflicts[0].first_line, e.detail.conflicts[0].last_line);
     assert_eq!(e.detail.head, Some(4));
@@ -388,7 +406,7 @@ fn a_person_s_edits_come_back_in_and_a_pending_edit_is_merged_or_refused() {
     let c = ws.write(&o.doc_id, 3, &base.replace("부록: 지점 목록", "부록: 지점 목록 (2026년)")).unwrap();
     assert_eq!(c.rebased_over, [4]);
     let (_, t) = text(&ws, &o.doc_id);
-    assert!(t.contains("부산과 대구, 광주에") && t.contains("(2026년)"));
+    assert!(t.contains("[부산]{color=#C00000}과 [대구, 광주]{color=#C00000}에") && t.contains("(2026년)"));
     // Re-importing the same file again changes nothing.
     let (_, exported) = ws.export_bytes(&o.doc_id, None, &ACK).unwrap();
     let r = ws.reimport_bytes(&o.doc_id, "korean-report.docx", &exported).unwrap();
@@ -433,7 +451,7 @@ fn a_large_document_is_read_a_part_at_a_time() {
         .unwrap();
     assert_eq!(l.text.lines().count(), 4);
     let e = ws.read(&o.doc_id, None, &Window { section: Some("제99장".into()), ..Default::default() }).unwrap_err();
-    assert!(e.message.contains("# 제1장 (line 6)"), "{}", e.message);
+    assert!(e.message.contains("# 제1장 (line 9)"), "{}", e.message);
 }
 
 #[test]
@@ -456,4 +474,31 @@ fn an_edit_that_would_lose_content_is_refused_with_the_reason() {
     let e = ws.edit(&o.doc_id, 1, &one("| 9 | 10 |", "| 9 | ^^ |")).unwrap_err();
     assert_eq!(e.code, Code::Refused, "{e:?}");
     assert!(e.message.contains("row 3, column 2 is now covered by a merge"), "{}", e.message);
+}
+
+/// The guide's docx formatting example, written into a new docx, reads back
+/// as written and exports with PutGet: its style edits, new style,
+/// paragraph, run, cell, row and table formatting all land. The blank's
+/// Heading 1 is not shown before the text uses it, so its line changes in a
+/// second write (§5.2).
+#[test]
+fn the_guide_s_formatting_example_is_a_docx_text() {
+    let from = GUIDE.find("<style name=\"Normal\" line-spacing=115%").unwrap();
+    let body = &GUIDE[from..from + GUIDE[from..].find("\nPresentation (pptx)").unwrap()];
+    // The blank's Heading 1 is named as Word names it.
+    let body = body.trim_end().replace("\"Heading 1\"", "\"heading 1\"") + "\n";
+    let text = format!("---\ntype: document\nformat: docx\nschema: 1\n---\n{body}");
+    let heading = text.lines().find(|l| l.starts_with("<style name=\"heading 1\"")).unwrap().to_string() + "\n";
+    let mut ws = ws();
+    let o = ws.create(DocType::Document, Some(Format::Docx), None).unwrap();
+    let c = ws.write(&o.doc_id, 1, &text.replace(&heading, "")).unwrap_or_else(|e| panic!("{e}"));
+    assert!(c.canonicalized, "the text lists Heading 1's line");
+    let (rev, shown) = self::text(&ws, &o.doc_id);
+    let line = shown.lines().find(|l| l.starts_with("<style name=\"heading 1\"")).unwrap().to_string() + "\n";
+    ws.write(&o.doc_id, rev, &shown.replace(&line, &heading)).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(self::text(&ws, &o.doc_id).1, text);
+    let bytes = putget(&mut ws, &o.doc_id, "guide.docx");
+    let parts = package::read(&bytes).unwrap();
+    let styles = String::from_utf8(package::get(&parts, "word/styles.xml").unwrap().to_vec()).unwrap();
+    assert!(styles.contains("<w:name w:val=\"Callout\"/>"), "{styles}");
 }

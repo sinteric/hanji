@@ -275,8 +275,13 @@ impl<'a> Importer<'a> {
 
     fn top_para(&mut self, p: &Element, blocks: &mut Vec<Block>) -> Result<(), String> {
         if p.get("pageBreak").as_deref() == Some("1") {
-            let content = Inline { units: vec![Unit { atom: Atom::PageBreak, marks: Marks::NONE }], spans: vec![] };
-            blocks.push(Block::Para(Para { style: self.styles.default_paragraph.clone(), content, item: None }));
+            let content = Inline { units: vec![Unit::new(Atom::PageBreak, Marks::NONE)], spans: vec![] };
+            blocks.push(Block::Para(Para {
+                props: Default::default(),
+                style: self.styles.default_paragraph.clone(),
+                content,
+                item: None,
+            }));
             self.list = None;
         }
         let bi = blocks.len();
@@ -436,7 +441,7 @@ impl<'a> Importer<'a> {
                     let k = paras.len();
                     let para = self.para(p, &[bi, r, c, k])?;
                     let style = (para.style != self.styles.default_paragraph).then_some(para.style);
-                    paras.push(CellPara { style, content: para.content });
+                    paras.push(CellPara { props: Default::default(), style, content: para.content });
                 }
                 rows[r][c] = Some(Cell::Text(paras));
                 for (y, row) in rows.iter_mut().enumerate().skip(r).take(rs) {
@@ -450,7 +455,7 @@ impl<'a> Importer<'a> {
         }
         let rows: Vec<Vec<Cell>> =
             rows.into_iter().map(|r| r.into_iter().map(|c| c.expect("covered")).collect()).collect();
-        Ok(Some(Table { style: None, rows }))
+        Ok(Some(Table { boxes: vec![], style: None, rows }))
     }
 
     // ------------------------------------------------------------ paragraphs
@@ -461,7 +466,7 @@ impl<'a> Importer<'a> {
         let style = self.header.style_or_missing(sid);
         if self.header.style(sid).is_none() && self.styles.paragraph_name(&sid.to_string()).is_none() {
             // A style id missing from header.xml: the text names it by its id.
-            self.styles.paragraph.push(StyleDef { id: sid.to_string(), name: sid.to_string() });
+            self.styles.paragraph.push(StyleDef::new(sid.to_string(), sid.to_string()));
         }
         let ppr = n("paraPrIDRef").unwrap_or(style.para_pr);
         let shell = p.shell();
@@ -501,7 +506,7 @@ impl<'a> Importer<'a> {
                 Node::El(e) => {
                     let pos = self.buf.len();
                     let keep = self.keep_entry(Kind::Keep, e, path, Some(pos), None, &keep_kind(&e.name));
-                    self.buf.push(Unit { atom: Atom::Keep(keep), marks: Marks::NONE });
+                    self.buf.push(Unit::new(Atom::Keep(keep), Marks::NONE));
                 }
                 n if is_blank(n) => {}
                 _ => return Err("text or a comment directly inside <hp:p> is not supported yet".into()),
@@ -516,7 +521,7 @@ impl<'a> Importer<'a> {
         let item = item.map(|i| i.0);
         // A list item's style is not in the text; it stays in the remainder.
         let style = if item.is_some() { String::new() } else { style.name };
-        Ok(Para { style, content, item })
+        Ok(Para::new(style, content, item))
     }
 
     /// The list item a paragraph shape makes: the item, its list and level.
@@ -540,7 +545,7 @@ impl<'a> Importer<'a> {
     }
 
     fn push(&mut self, atom: Atom, marks: Marks) {
-        self.buf.push(Unit { atom, marks });
+        self.buf.push(Unit::new(atom, marks));
     }
 
     fn run(&mut self, r: &Element, path: &[usize], style: &Style) -> Result<(), String> {

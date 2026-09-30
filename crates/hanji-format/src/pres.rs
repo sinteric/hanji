@@ -99,6 +99,13 @@ pub fn parse_presentation(text: &str, names: &Names) -> Result<ParsedPresentatio
             map.slides.push(m);
         }
     }
+    if let Some((line, col)) = p.formatted {
+        p.err(
+            line,
+            col,
+            "formatting ({…} and [text]{…}) cannot be written in a Presentation yet; write the text only.",
+        );
+    }
     p.check_names_after();
     if !p.errors.is_empty() {
         return Err(p.errors);
@@ -380,7 +387,7 @@ fn object(p: &mut Parser, i: usize) -> Option<(ObjectItem, ItemMap)> {
     let geom = p.object_geom.take();
     let (b, m, _) = parsed?;
     let keep = match b {
-        Block::Para(Para { style: ParaStyle::Plain, content }) if content.units.len() == 1 => {
+        Block::Para(Para { style: ParaStyle::Plain, content, .. }) if content.units.len() == 1 => {
             match &content.units[0].atom {
                 Atom::Keep(k) => k.clone(),
                 _ => return None,
@@ -725,7 +732,7 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
             return None;
         }
         let close = (after..stop).rev().find(|&k| src[k].2 == '<').map_or(at, |k| src[k].0);
-        let (paras, pmaps) = out.cell_paras(close);
+        let (paras, pmaps, _) = out.cell_paras(close);
         if paras.iter().any(|x| x.style.is_some()) {
             p.err(i, lead + 1, "a slide has no paragraph styles: a shape's paragraphs are started by <p/> alone.");
             return None;
@@ -1153,7 +1160,8 @@ fn escape_slot_line(l: &mut String) {
 
 pub fn shape_line(sh: &ShapeText) -> String {
     let g = geom_attrs(&sh.geom);
-    let ps: Vec<CellPara> = sh.paras.iter().map(|c| CellPara { style: None, content: c.clone() }).collect();
+    let ps: Vec<CellPara> =
+        sh.paras.iter().map(|c| CellPara { style: None, content: c.clone(), props: Default::default() }).collect();
     match (sh.id.is_empty(), sh.paras.is_empty()) {
         (true, _) => format!("<shape{g}>{}</shape>", cell_text(&ps)),
         (false, true) => format!("<shape id=\"{}\" name=\"{}\"{g}/>", attr(&sh.id), attr(&sh.name)),

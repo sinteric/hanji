@@ -209,7 +209,7 @@ mod tests {
     use crate::model::Para;
 
     fn para(s: &str) -> Block {
-        Block::Para(Para { style: "Normal".into(), content: Inline::plain(s), item: None })
+        Block::Para(Para::new("Normal".into(), Inline::plain(s), None))
     }
 
     #[test]

@@ -17,7 +17,8 @@ use hanji_core::{
 use hanji_format::{Atom, Cell, Inline, Marks, Unit};
 use hanji_package::{package, xml};
 
-pub const CAPS: Capabilities = Capabilities { links: false, fields: false, footnotes: false, math: false };
+pub const CAPS: Capabilities =
+    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: true };
 
 /// What the harness needs from an engine.
 pub trait Format {
@@ -48,6 +49,9 @@ pub trait Format {
     fn model(&self) -> &dyn TextModel {
         &DocumentModel
     }
+    /// A new revision's blocks with what its text could not show filled in
+    /// from the remainder, as the store does before it returns the text.
+    fn complete(&self, _blocks: &mut [Block], _rem: &mut Remainder) {}
 }
 
 /// The files with extension `ext` in `dir`, by name.
@@ -170,6 +174,8 @@ pub struct Edit {
     /// the edit (a pptx edit's slides, by their heads): a tool that makes
     /// several edits in a row can say where each one ends up.
     pub named: Vec<usize>,
+    /// The styles after the edit, when it changes the style section (§5.2).
+    pub styles: Option<hanji_core::StyleSet>,
 }
 
 impl Edit {
@@ -195,7 +201,16 @@ impl Edit {
             local,
             span: None,
             named: vec![],
+            styles: None,
         }
+    }
+}
+
+/// `rem` with the styles `styles` says, when it says any.
+pub fn with_styles<'a>(rem: &'a Remainder, styles: Option<&hanji_core::StyleSet>) -> std::borrow::Cow<'a, Remainder> {
+    match styles {
+        Some(st) => std::borrow::Cow::Owned(Remainder { styles: st.clone(), ..rem.clone() }),
+        None => std::borrow::Cow::Borrowed(rem),
     }
 }
 
@@ -250,14 +265,28 @@ pub fn quote(d: &Doc, i: usize) -> String {
     format!("block {i} ({short:?}{more})")
 }
 
-/// Units `s..e` of the paragraph at `path` become `new` (with the marks of the first replaced unit).
+/// Units `s..e` of the paragraph at `path` become `new`, with the marks of
+/// the first replaced unit and the text properties of the nearest character
+/// (as typing takes them, §5.2).
 pub fn replace_span(d: &Doc, path: &[usize], s: usize, e: usize, new: &str, name: &'static str, what: String) -> Edit {
     let mut blocks = d.blocks.clone();
     let p = get_para(&mut blocks, path);
     let n = p.units.len();
     let src = if e > s { s } else { s.saturating_sub(1) };
     let marks = p.units.get(src).map_or(Marks::NONE, |u| u.marks);
-    let ins: Vec<Unit> = new.chars().map(|c| Unit { atom: Atom::Char(c), marks }).collect();
+    let near =
+        p.units[..(src + 1).min(n)].iter().rev().chain(p.units[(src + 1).min(n)..].iter()).find(|u| u.takes_props());
+    let props = near.map(|u| u.props.clone()).unwrap_or_default();
+    let ins: Vec<Unit> = new
+        .chars()
+        .map(|c| {
+            let mut u = Unit::new(Atom::Char(c), marks);
+            if u.takes_props() {
+                u.props = props.clone();
+            }
+            u
+        })
+        .collect();
     let k = ins.len();
     p.units.splice(s..e, ins);
     let true_ops = HashMap::from([(path.to_vec(), span_ops(n, s, e, k))]);
@@ -274,6 +303,7 @@ pub fn replace_span(d: &Doc, path: &[usize], s: usize, e: usize, new: &str, name
         local: true,
         span: None,
         named: vec![],
+        styles: None,
     }
 }
 
@@ -395,7 +425,15 @@ fn e2_insert_before_drawing(d: &Doc, cx: &Cx) -> Option<Edit> {
     let mut blocks = d.blocks.clone();
     let text = "Inserted paragraph before the drawing.";
     let content = Inline::plain(text);
-    blocks.insert(i, Block::Para(Para { style: cx.rem.styles.default_paragraph.clone(), content, item: None }));
+    blocks.insert(
+        i,
+        Block::Para(Para {
+            props: Default::default(),
+            style: cx.rem.styles.default_paragraph.clone(),
+            content,
+            item: None,
+        }),
+    );
     let bmap = (0..d.blocks.len()).map(|k| Some(if k < i { k } else { k + 1 })).collect();
     Some(Edit {
         name: "E2 insert before drawing",
@@ -410,6 +448,7 @@ fn e2_insert_before_drawing(d: &Doc, cx: &Cx) -> Option<Edit> {
         local: true,
         span: None,
         named: vec![],
+        styles: None,
     })
 }
 
@@ -448,6 +487,7 @@ fn e3_delete_formatted(d: &Doc, cx: &Cx) -> Option<Edit> {
                 local: true,
                 span,
                 named: vec![],
+                styles: None,
             });
         }
     }
@@ -520,6 +560,7 @@ fn e4_move_section(d: &Doc, cx: &Cx) -> Option<Edit> {
         local: false,
         span: None,
         named: vec![],
+        styles: None,
     })
 }
 
@@ -566,6 +607,7 @@ fn e5_restyle(d: &Doc, cx: &Cx) -> Option<Edit> {
                 local: true,
                 span: None,
                 named: vec![],
+                styles: None,
             });
         }
     }
@@ -711,7 +753,12 @@ fn e8_split(d: &Doc, _: &Cx) -> Option<Edit> {
     let tail = p.content.units.split_off(k);
     // A split list item gives two items of that list.
     let item = p.item.map(|it| hanji_core::ListItem { first: false, ..it });
-    let q = Block::Para(Para { style: p.style.clone(), content: Inline { units: tail, spans: vec![] }, item });
+    let q = Block::Para(Para {
+        props: Default::default(),
+        style: p.style.clone(),
+        content: Inline { units: tail, spans: vec![] },
+        item,
+    });
     blocks.insert(i + 1, q);
     let bmap = (0..d.blocks.len()).map(|x| Some(if x <= i { x } else { x + 1 })).collect();
     let xmap = HashMap::from([(vec![i], vec![(0, k, vec![i], 0), (k, n, vec![i + 1], 0)])]);
@@ -728,6 +775,7 @@ fn e8_split(d: &Doc, _: &Cx) -> Option<Edit> {
         local: true,
         span: None,
         named: vec![],
+        styles: None,
     })
 }
 
@@ -786,6 +834,7 @@ fn e9_merge(d: &Doc, cx: &Cx) -> Option<Edit> {
         local: true,
         span: None,
         named: vec![],
+        styles: None,
     })
 }
 
@@ -803,6 +852,205 @@ pub const EDITS: [(&str, EditFn); 9] = [
     ("e8_split", e8_split),
     ("e9_merge", e9_merge),
 ];
+
+// ---------------------------------------------------------------- formatting, F1–F4
+
+/// The Document edits with formatting (§5.2, F2): E1–E9, then F1–F4.
+pub const FORMATTED_EDITS: [(&str, EditFn); 13] = [
+    EDITS[0],
+    EDITS[1],
+    EDITS[2],
+    EDITS[3],
+    EDITS[4],
+    EDITS[5],
+    EDITS[6],
+    EDITS[7],
+    EDITS[8],
+    ("f1_first_line", f1_first_line),
+    ("f2_restyle_heading", f2_restyle_heading),
+    ("f3_new_style", f3_new_style),
+    ("f4_cell_fill", f4_cell_fill),
+];
+
+fn val(k: hanji_format::Key, v: &str) -> hanji_format::Value {
+    k.parse(Some(v)).unwrap_or_else(|e| panic!("{k}={v}: {e}"))
+}
+
+/// A body paragraph in the default style with text that shows formatting.
+fn body_para(d: &Doc, rem: &Remainder, i: usize) -> bool {
+    matches!(&d.blocks[i], Block::Para(p) if p.item.is_none()
+        && p.style == rem.styles.default_paragraph
+        && hanji_format::styled::shows(&p.content)
+        && !is_page_break(&p.content))
+}
+
+/// F1: a first-line indent of 10pt on the first run of up to three body
+/// paragraphs in a row that have none.
+fn f1_first_line(d: &Doc, cx: &Cx) -> Option<Edit> {
+    use hanji_format::Key;
+    if !cx.rem.styles.formatting {
+        return None;
+    }
+    let indent = val(Key::FirstLine, "10pt");
+    let set = |i: usize| {
+        body_para(d, cx.rem, i) && !matches!(&d.blocks[i], Block::Para(p) if p.props.get(Key::FirstLine).is_some())
+    };
+    let first = (0..d.blocks.len()).find(|&i| set(i))?;
+    let run: Vec<usize> = (first..d.blocks.len()).take_while(|&i| set(i)).take(3).collect();
+    let mut blocks = d.blocks.clone();
+    for &i in &run {
+        if let Block::Para(p) = &mut blocks[i] {
+            p.props.set(Key::FirstLine, indent.clone());
+        }
+    }
+    let named = run.iter().map(|&i| quote(d, i)).collect::<Vec<_>>().join(", ");
+    let mut ed = Edit::blocks(
+        "F1 first-line indent",
+        format!("first-line=10pt on body paragraphs {named}"),
+        blocks,
+        ident(d.blocks.len()),
+        run.iter().copied().collect(),
+        true,
+    );
+    ed.named = run;
+    Some(ed)
+}
+
+/// The paragraphs in style `name`, as a description names them.
+fn in_style(d: &Doc, name: &str) -> (Vec<usize>, String) {
+    let at: Vec<usize> =
+        (0..d.blocks.len()).filter(|&i| matches!(&d.blocks[i], Block::Para(p) if p.style == name)).collect();
+    let mut named = at.iter().take(2).map(|&i| quote(d, i)).collect::<Vec<_>>().join(", ");
+    if at.len() > 2 {
+        named.push_str(&format!(" and {} more", at.len() - 2));
+    }
+    (at, named)
+}
+
+/// F2: Heading 2 (else the first heading style, else the first named style
+/// a paragraph uses) restyled: its style line takes a colour and space
+/// before, and every paragraph in it changes.
+fn f2_restyle_heading(d: &Doc, cx: &Cx) -> Option<Edit> {
+    use hanji_format::Key;
+    let st = &cx.rem.styles;
+    if !st.formatting {
+        return None;
+    }
+    // A style the revision shows (a line it did not show cannot change, §5.2).
+    let used = |n: &str| {
+        st.paragraph_def(n).is_some_and(|s| s.shown)
+            && d.blocks.iter().any(|b| matches!(b, Block::Para(p) if p.style == n && !p.content.units.is_empty()))
+    };
+    let pick = st.headings[1]
+        .clone()
+        .filter(|h| used(h))
+        .or_else(|| st.headings.iter().flatten().find(|h| used(h)).cloned())
+        .or_else(|| {
+            d.blocks.iter().find_map(|b| match b {
+                Block::Para(p) if p.style != st.default_paragraph && !p.style.is_empty() && used(&p.style) => {
+                    Some(p.style.clone())
+                }
+                _ => None,
+            })
+        })?;
+    let mut styles = st.clone();
+    let def = styles.paragraph.iter_mut().find(|s| s.name == pick)?;
+    let color = if def.props.get(Key::Color) == Some(&val(Key::Color, "#1F4E79")) { "#C00000" } else { "#1F4E79" };
+    def.props.set(Key::Color, val(Key::Color, color));
+    def.props.set(Key::SpaceBefore, val(Key::SpaceBefore, "18pt"));
+    let (at, named) = in_style(d, &pick);
+    let mut ed = Edit::blocks(
+        "F2 restyle",
+        format!("style {pick:?} (paragraphs {named}) → color={color} space-before=18pt"),
+        d.blocks.clone(),
+        ident(d.blocks.len()),
+        at.iter().copied().collect(),
+        true,
+    );
+    ed.named = at.into_iter().take(2).collect();
+    ed.styles = Some(styles);
+    Some(ed)
+}
+
+/// F3: a new style (a shaded, left-ruled callout) created and given to the
+/// first body paragraph that sets nothing itself (the exact edit runs from
+/// the style section to it).
+fn f3_new_style(d: &Doc, cx: &Cx) -> Option<Edit> {
+    use hanji_format::Key;
+    let st = &cx.rem.styles;
+    if !st.formatting {
+        return None;
+    }
+    let taken = |n: &str| st.paragraph.iter().chain(&st.table).any(|s| s.name.eq_ignore_ascii_case(n));
+    let name = ["Callout", "hanji Callout", "hanji Callout 2"].into_iter().find(|n| !taken(n))?;
+    // One that sets nothing itself (not the one F1 indented), else any.
+    let bare = |i: usize| matches!(&d.blocks[i], Block::Para(p) if p.props.is_empty());
+    let i = (0..d.blocks.len())
+        .find(|&i| body_para(d, cx.rem, i) && bare(i))
+        .or_else(|| (0..d.blocks.len()).find(|&i| body_para(d, cx.rem, i)))?;
+    let mut def = hanji_core::StyleDef::new("", name);
+    def.shown = true;
+    def.props.set(Key::Fill, val(Key::Fill, "#FFF2CC"));
+    def.props.set(Key::BorderLeft, val(Key::BorderLeft, "2.25pt solid #C00000"));
+    def.props.set(Key::IndentLeft, val(Key::IndentLeft, "10pt"));
+    let mut styles = st.clone();
+    styles.paragraph.push(def);
+    let mut blocks = d.blocks.clone();
+    if let Block::Para(p) = &mut blocks[i] {
+        p.style = name.to_string();
+    }
+    let mut ed = Edit::blocks(
+        "F3 new style",
+        format!("new style {name:?} (fill=#FFF2CC border-left=\"2.25pt solid #C00000\") given to {}", quote(d, i)),
+        blocks,
+        ident(d.blocks.len()),
+        HashSet::from([i]),
+        true,
+    );
+    ed.named = vec![i];
+    ed.styles = Some(styles);
+    Some(ed)
+}
+
+/// F4: a fill on the header row of the first table with two or more text
+/// cells there.
+fn f4_cell_fill(d: &Doc, cx: &Cx) -> Option<Edit> {
+    use hanji_format::Key;
+    if !cx.rem.styles.formatting {
+        return None;
+    }
+    let fill = val(Key::Fill, "#DDEBF7");
+    let text_cells =
+        |t: &hanji_core::Table| t.rows.first().map_or(0, |r| r.iter().filter(|c| matches!(c, Cell::Text(_))).count());
+    let i = (0..d.blocks.len()).find(|&i| matches!(&d.blocks[i], Block::Table(t) if text_cells(t) >= 2))?;
+    let mut blocks = d.blocks.clone();
+    let Block::Table(t) = &mut blocks[i] else { unreachable!() };
+    let cols = t.rows[0].len();
+    if t.boxes.is_empty() {
+        t.boxes = vec![vec![]; t.rows.len()];
+    }
+    t.boxes[0].resize(cols, Default::default());
+    let mut first = String::new();
+    for c in 0..cols {
+        if let Cell::Text(ps) = &t.rows[0][c] {
+            t.boxes[0][c].set(Key::Fill, fill.clone());
+            if first.is_empty() {
+                first = ps.iter().map(|p| p.content.text()).collect::<Vec<_>>().join(" ");
+            }
+        }
+    }
+    let first: String = first.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(30).collect();
+    let mut ed = Edit::blocks(
+        "F4 cell fill",
+        format!("fill=#DDEBF7 on the header row of the table at block {i} (cells {first:?} to the last)"),
+        blocks,
+        ident(d.blocks.len()),
+        HashSet::from([i]),
+        true,
+    );
+    ed.named = vec![i];
+    Some(ed)
+}
 
 // ---------------------------------------------------------------- oracle, E10
 
@@ -824,15 +1072,25 @@ fn oracle(d: &Doc, new: &[Block], ed: &Edit) -> HashMap<u64, Outcome> {
 }
 
 /// E10: every edit in one revision; the oracle composed step by step.
-fn combined(d0: &Doc, cx: &Cx, edits: &[(&str, EditFn)]) -> (Vec<Block>, HashMap<u64, Outcome>, Vec<String>) {
+fn combined(
+    d0: &Doc,
+    cx: &Cx,
+    edits: &[(&str, EditFn)],
+) -> (Vec<Block>, HashMap<u64, Outcome>, Vec<String>, Option<hanji_core::StyleSet>) {
     let mut cur = d0.clone();
     let mut origin: HashMap<u64, u64> = d0.entries.iter().map(|e| (e.id, e.id)).collect();
     let mut next_id = 1_000_000;
     let mut gone: HashMap<u64, &'static str> = HashMap::new();
     let mut steps = vec![];
+    // The styles so far: what the edits wrote. A style stays shown as the
+    // revision before the edits showed it: E10 is one revision.
+    let mut styles = cx.rem.styles.clone();
     for (_, f) in edits {
-        let Some(ed) = f(&cur, cx) else { continue };
-        let new = written(cx.fmt, &cx.fmt.text_of(&ed.blocks, cx.rem), cx.rem);
+        let rem_now = with_styles(cx.rem, Some(&styles));
+        let Some(ed) = f(&cur, &Cx { fmt: cx.fmt, rem: &rem_now }) else { continue };
+        let after = ed.styles.as_ref().unwrap_or(&styles);
+        let new = written(cx.fmt, &cx.fmt.text_of(&ed.blocks, &with_styles(cx.rem, Some(after))), &rem_now);
+        styles = after.clone();
         let outs = oracle(&cur, &new, &ed);
         let mut nxt = vec![];
         for e in &cur.entries {
@@ -885,7 +1143,7 @@ fn combined(d0: &Doc, cx: &Cx, edits: &[(&str, EditFn)]) -> (Vec<Block>, HashMap
         };
         expected.insert(e.id, o);
     }
-    (cur.blocks, expected, steps)
+    (cur.blocks, expected, steps, Some(styles))
 }
 
 // ---------------------------------------------------------------- scoring (check.py)
@@ -1122,6 +1380,7 @@ fn export_and_check(
     d: &Doc,
     new_text: &str,
     new_blocks: &[Block],
+    styles: &hanji_core::StyleSet,
     got: &HashMap<u64, Outcome>,
     expected: &HashMap<u64, Outcome>,
     touched: &HashSet<usize>,
@@ -1131,16 +1390,20 @@ fn export_and_check(
     let rem = cx.rem;
     let mut next = rem.next_id;
     let entries = place::placed_entries(&d.entries, got, &mut next);
-    let r2 = Remainder { entries, next_id: next, ..rem.clone() };
-    let (pkg, well_formed) = cx.fmt.export_blocks(new_blocks, &r2).unwrap_or_else(|e| panic!("{name} {out_name}: {e}"));
+    let mut r2 = Remainder { entries, next_id: next, styles: styles.clone(), ..rem.clone() };
+    // What the write returns: the text, completed as the store completes it.
+    let mut blocks = new_blocks.to_vec();
+    cx.fmt.complete(&mut blocks, &mut r2);
+    let returned = if blocks == new_blocks { new_text.to_string() } else { cx.fmt.text_of(&blocks, &r2) };
+    let (pkg, well_formed) = cx.fmt.export_blocks(&blocks, &r2).unwrap_or_else(|e| panic!("{name} {out_name}: {e}"));
     out.save(name, out_name, &pkg);
     let (rb, rr, _, _) = cx.fmt.split(&pkg, &RAW).unwrap();
     let re_text = cx.fmt.text_of(&rb, &rr);
     let tally = score(d, expected, got, &rr.entries, touched);
     Run {
         tally,
-        putget: re_text == new_text,
-        putget_ids: normalise_ids(&re_text) == normalise_ids(new_text),
+        putget: re_text == returned,
+        putget_ids: normalise_ids(&re_text) == normalise_ids(&returned),
         well_formed,
     }
 }
@@ -1165,6 +1428,11 @@ fn text_span(fmt: &dyn Format, old_text: &str, new_text: &str, rem: &Remainder, 
     if let Some(span) = &ed.span {
         return span.clone();
     }
+    // An edit of the style section writes its lines (a new style's line
+    // with the paragraph that takes it).
+    if ed.styles.is_some() {
+        return differing_span(old_text, new_text);
+    }
     if let Some((path, s, e)) = &ed.unit_span {
         let (_, mut maps) = fmt.model().resolve(old_text, rem, CAPS).unwrap();
         let pm = match maps.swap_remove(path[0]).kind {
@@ -1178,6 +1446,36 @@ fn text_span(fmt: &dyn Format, old_text: &str, new_text: &str, rem: &Remainder, 
         if old_text[..a] == new_text[..a] && old_text[b..] == new_text[nb..] {
             return (a, b, new_text[a..nb].to_string());
         }
+    }
+    edit_span(old_text, new_text)
+}
+
+/// Where a Document's text leaves its style section (§5.2): the offset of
+/// the first line after the front matter that is not a style line.
+pub fn body_start(text: &str) -> usize {
+    let mut at = 0;
+    let mut dashes = 0;
+    for line in text.split_inclusive('\n') {
+        let t = line.trim();
+        if dashes < 2 {
+            dashes += (t == "---") as usize;
+        } else if !(t.is_empty() || t.starts_with("<style ")) {
+            return at;
+        }
+        at += line.len();
+    }
+    at
+}
+
+/// The exact edit an edit of the body makes: [`differing_span`] of the
+/// body when both the style section and the body changed (the canonical
+/// text adds a style line for a style the edit starts to use, and drops one
+/// no paragraph uses any more; an agent's edit would not write it).
+pub fn edit_span(old_text: &str, new_text: &str) -> (usize, usize, String) {
+    let (bo, bn) = (body_start(old_text), body_start(new_text));
+    if old_text[..bo] != new_text[..bn] && old_text[bo..] != new_text[bn..] {
+        let (a, b, r) = differing_span(&old_text[bo..], &new_text[bn..]);
+        return (a + bo, b + bo, r);
     }
     differing_span(old_text, new_text)
 }
@@ -1231,7 +1529,7 @@ pub fn edit_jobs(
             }
             continue;
         };
-        let new_text = fmt.text_of(&ed.blocks, rem);
+        let new_text = fmt.text_of(&ed.blocks, &with_styles(rem, ed.styles.as_ref()));
         let new_blocks = written(fmt, &new_text, rem);
         let expected = oracle(d, &new_blocks, &ed);
         let span = ed.local.then(|| text_span(fmt, text, &new_text, rem, &ed));
@@ -1244,11 +1542,11 @@ pub fn edit_jobs(
             span,
         });
     }
-    let (fb, fexp, steps) = combined(d, cx, edits);
+    let (fb, fexp, steps, styles) = combined(d, cx, edits);
     jobs.push(Job {
         name: format!("{all} all edits in one revision"),
         what: steps.join("; "),
-        new_text: fmt.text_of(&fb, rem),
+        new_text: fmt.text_of(&fb, &with_styles(rem, styles.as_ref())),
         expected: fexp,
         touched: (0..d.blocks.len()).collect(),
         span: None,
@@ -1331,7 +1629,11 @@ pub fn run_corpus_with(
             if let Some((s, e, ref new)) = span {
                 let r = hanji_core::reanchor_span_in(fmt.model(), &rem, &text, s, e, new, CAPS)
                     .unwrap_or_else(|e| panic!("{name} {ename}: {e}"));
-                assert_eq!(r.text, new_text, "{name} {ename}: the exact span does not give the edited text");
+                assert_eq!(
+                    fmt.text_of(&r.new, &r.remainder),
+                    new_text,
+                    "{name} {ename}: the exact span does not give the edited text"
+                );
                 designs.push(("exact", r));
             }
             for (design, r) in designs {
@@ -1341,6 +1643,7 @@ pub fn run_corpus_with(
                     &d,
                     &new_text,
                     &r.new,
+                    &r.remainder.styles,
                     &r.outcomes,
                     &expected,
                     &touched,

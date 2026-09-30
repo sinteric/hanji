@@ -131,6 +131,15 @@ impl Format {
         }
     }
 
+    /// A new revision's blocks with what its text could not show filled in
+    /// from the remainder (docx: a paragraph that had no text keeps its
+    /// formatting when it gets some, §5.2).
+    pub fn complete(self, blocks: &mut [Block], rem: &mut Remainder) {
+        if self == Format::Docx {
+            DocxEngine::complete(blocks, rem);
+        }
+    }
+
     /// The canonical text of resolved blocks (Documents and Presentations).
     pub fn text_of(self, blocks: &[Block], rem: &Remainder, template: Option<&str>) -> String {
         match self {
