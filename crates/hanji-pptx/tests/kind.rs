@@ -77,7 +77,7 @@ fn every_preset_is_shown_and_a_rectangle_is_none() {
         "name=\"Oval 2\" box=\"306 150 72 72\" kind=\"ellipse\" fill=accent1",
         "name=\"Right Arrow 3\" box=\"144 222 77 38\" kind=\"rightArrow\" fill=accent1",
         // A connector: bent is shown, straight is not.
-        "from=\"186 252\" to=\"402 144\" kind=\"bentConnector3\" border=",
+        "from=\"186 252\" to=\"s2.1\" kind=\"bentConnector3\" border=",
         "from=\"468 366\" to=\"468 216\" border=",
         // A rectangle and custom geometry show no kind.
         "name=\"Rectangle 8\" box=\"174 72 72 72\" fill=",
@@ -115,7 +115,7 @@ fn a_changed_kind_writes_only_the_preset() {
 fn a_connector_s_kind_a_new_shape_s_and_a_group_s_shape_s_are_written() {
     let imp = import(&deck("shapes.pptx"));
     // A bent connector made straight, and a straight one bent with its midpoint moved.
-    let (parts, _) = edited(&imp, "to=\"402 144\" kind=\"bentConnector3\" border=", "to=\"402 144\" border=");
+    let (parts, _) = edited(&imp, "to=\"s2.1\" kind=\"bentConnector3\" border=", "to=\"s2.1\" border=");
     assert!(
         sp_pr(&parts, "Elbow Connector 9").contains("<a:prstGeom prst=\"straightConnector1\"><a:avLst/></a:prstGeom>")
     );

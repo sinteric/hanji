@@ -11,7 +11,8 @@
 //! P21 clear a shape's fill (§5.3); P22 edit a group's shape's text (§5.3);
 //! P23 outline a shape, P24 put an arrowhead on a line (§5.3); P25 make a
 //! shape a rounded rectangle, P26 bend a straight line or straighten a bent one
-//! (preset shapes, §5.3); P9 makes them all in one revision.
+//! (preset shapes, §5.3); P27 move an object a connector is attached to, P28
+//! re-attach a connector (connectors, §5.3); P9 makes them all in one revision.
 
 use std::collections::HashSet;
 
@@ -25,7 +26,7 @@ use hanji_testkit::{
     block_ranges, chars, deleted_span, entries_at, figure_or_word, ident, replace_span, span_of, Cx, Doc, Edit, EditFn,
 };
 
-pub const EDITS: [(&str, EditFn); 25] = [
+pub const EDITS: [(&str, EditFn); 27] = [
     ("p1_title", p1_title),
     ("p2_bullet", p2_bullet),
     ("p3_add_slide", p3_add_slide),
@@ -51,6 +52,8 @@ pub const EDITS: [(&str, EditFn); 25] = [
     ("p24_arrowhead", p24_arrowhead),
     ("p25_round_corners", p25_round_corners),
     ("p26_bend_line", p26_bend_line),
+    ("p27_move_connected", p27_move_connected),
+    ("p28_reattach", p28_reattach),
 ];
 
 /// A slide: its head and the end of its blocks.
@@ -980,4 +983,114 @@ fn p26_bend_line(d: &Doc, _: &Cx) -> Option<Edit> {
         h.look.adj = None;
     };
     Some(head_edit(d, k, f, "P26 bend a line or straighten one", what))
+}
+
+/// How many connection sites head `k` has, when the write knows where they
+/// are: a picture's rectangle (or its ellipse), a shape of a known preset.
+fn known_sites(d: &Doc, k: usize) -> Option<u32> {
+    let h = d.blocks[k].head()?;
+    let n = |kind: Option<&str>| match kind {
+        Some("rect" | "roundRect" | "diamond" | "flowChartProcess" | "flowChartDecision") => Some(4),
+        Some("ellipse" | "flowChartConnector") => Some(8),
+        _ => None,
+    };
+    match (kind(h), &h.place) {
+        (HeadKind::Picture { .. }, Some(Place::Picture(p))) => match p.mask.as_deref() {
+            None => Some(4),
+            m => n(m),
+        },
+        (HeadKind::Shape { .. }, _) => n(h.look.kind.as_deref()),
+        _ => None,
+    }
+}
+
+/// Top-level connectors attached to an object whose sites the write knows,
+/// and which it reroutes: `(line head, which end, target head, site count, slide)`.
+fn connections(d: &Doc) -> Vec<(usize, usize, usize, u32, usize)> {
+    let mut out = vec![];
+    for sl in slides(&d.blocks) {
+        for k in sl.head + 1..sl.end {
+            let Some(h) = d.blocks[k].head() else { continue };
+            let Some(Place::Line(e)) = &h.place else { continue };
+            if !matches!(h.look.kind.as_deref(), None | Some("bentConnector2" | "bentConnector3")) {
+                continue;
+            }
+            for (end, at) in [e.from_at, e.to_at].into_iter().enumerate() {
+                let Some(a) = at.filter(|a| !a.group) else { continue };
+                let target = (sl.head + 1..sl.end).find(|&t| shape_id_of(d, t) == Some(a.id) && t != k);
+                if let Some((t, n)) = target.and_then(|t| Some((t, known_sites(d, t)?))) {
+                    out.push((k, end, t, n, sl.head));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Whether every connector attached to shape `id` on `slide` is a top-level
+/// straight or elbow line, which the write reroutes (a group's are not).
+fn only_top_level_connectors(d: &Doc, slide: usize, id: u32) -> bool {
+    let end = slides(&d.blocks).into_iter().find(|s| s.head == slide).map_or(slide + 1, |s| s.end);
+    let pats = [format!("<a:stCxn id=\"{id}\""), format!("<a:endCxn id=\"{id}\"")];
+    d.entries
+        .iter()
+        .filter(|e| e.path.first().is_some_and(|&k| (slide..end).contains(&k)))
+        .filter(|e| e.xml.iter().any(|x| pats.iter().any(|p| x.contains(p))))
+        .all(|e| {
+            let straight_or_elbow = ["line", "straightConnector1", "bentConnector2", "bentConnector3"]
+                .iter()
+                .any(|k| e.xml[0].contains(&format!("prst=\"{k}\"")));
+            e.meta.tag == "p:cxnSp" && straight_or_elbow
+        })
+}
+
+/// An object a connector is attached to moves half an inch (36 pt) right,
+/// else left; its connectors follow.
+fn p27_move_connected(d: &Doc, cx: &Cx) -> Option<Edit> {
+    let (w, _) = slide_size(cx);
+    let step = 36 * PT;
+    let (_, _, t, _, slide) = connections(d).into_iter().find(|&(_, _, t, _, slide)| {
+        let g = d.blocks[t].head().and_then(geom_of);
+        g.is_some_and(|g| g.rot == 0 && !g.flip_h && !g.flip_v)
+            && shape_id_of(d, t).is_some_and(|id| only_top_level_connectors(d, slide, id))
+    })?;
+    let g = d.blocks[t].head().and_then(geom_of)?;
+    let s = g.shown();
+    let to = if g.x + g.w + step <= w { Geom { x: s.x + step, ..s } } else { Geom { x: s.x - step, ..s } };
+    let what = format!(
+        "move {} (a connector is attached to it) from box {} to {} on {}; its connectors follow",
+        label(d, t),
+        pts(&g),
+        pts(&to),
+        slide_name(&d.blocks, t)
+    );
+    Some(geometry_edit("P27 move an object a connector is attached to", what, moved(d, t, to), t, slide))
+}
+
+/// A connector's end moves to the opposite site of the object it is attached to.
+fn p28_reattach(d: &Doc, _: &Cx) -> Option<Edit> {
+    let (k, end, _, n, slide) = connections(d).into_iter().find(|&(k, _, t, _, slide)| {
+        let other = d.blocks[k].head().and_then(|h| match &h.place {
+            Some(Place::Line(e)) => Some([e.from_at, e.to_at]),
+            _ => None,
+        });
+        // Both ends on the same object would meet: leave those.
+        other.is_some_and(|[a, b]| !(a.is_some() && a.map(|x| x.id) == b.map(|x| x.id)))
+            && shape_id_of(d, t).is_some_and(|id| only_top_level_connectors(d, slide, id))
+    })?;
+    let mut blocks = d.blocks.clone();
+    let Block::Head(h) = &mut blocks[k] else { return None };
+    let Some(Place::Line(e)) = &mut h.place else { return None };
+    let at = if end == 0 { &mut e.from_at } else { &mut e.to_at };
+    let a = at.as_mut()?;
+    let old = a.to_string();
+    a.site = (a.site + n / 2) % n;
+    let what = format!(
+        "line {:?}: its {} end from {old} to {} (the opposite side) on {}",
+        h.label,
+        if end == 0 { "from" } else { "to" },
+        a,
+        slide_name(&d.blocks, k)
+    );
+    Some(geometry_edit("P28 re-attach a connector", what, blocks, k, slide))
 }

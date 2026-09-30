@@ -139,13 +139,45 @@ pub fn remove(el: &mut Element) {
 pub fn ends_of(g: &Geom) -> Ends {
     let (x0, x1) = if g.flip_h { (g.x + g.w, g.x) } else { (g.x, g.x + g.w) };
     let (y0, y1) = if g.flip_v { (g.y + g.h, g.y) } else { (g.y, g.y + g.h) };
-    Ends { from: (x0, y0), to: (x1, y1) }
+    // A turned line's ends turn with it, about its box's centre.
+    let c = ((g.x as f64) + g.w as f64 / 2.0, (g.y as f64) + g.h as f64 / 2.0);
+    let t = |p: (i64, i64)| turned(p, c, g.rot);
+    Ends { from: t((x0, y0)), to: t((x1, y1)), ..Default::default() }
 }
 
-/// The box and flips of a line from `from` to `to` (its rotation kept).
+/// `p` turned `rot` (60,000ths of a degree, clockwise) about `c`.
+pub fn turned(p: (i64, i64), c: (f64, f64), rot: i64) -> (i64, i64) {
+    if rot.rem_euclid(hanji_format::FULL_TURN) == 0 {
+        return p;
+    }
+    let (s, k) = (rot as f64 / 60_000.0).to_radians().sin_cos();
+    let (dx, dy) = (p.0 as f64 - c.0, p.1 as f64 - c.1);
+    ((c.0 + dx * k - dy * s).round() as i64, (c.1 + dx * s + dy * k).round() as i64)
+}
+
+/// The box and flips of a line from `from` to `to`, turned `rot` (kept):
+/// the box about the ends' midpoint whose turned corners they are.
 pub fn box_of(e: &Ends, rot: i64) -> Geom {
     let ((x0, y0), (x1, y1)) = (e.from, e.to);
-    Geom { x: x0.min(x1), y: y0.min(y1), w: (x1 - x0).abs(), h: (y1 - y0).abs(), rot, flip_h: x1 < x0, flip_v: y1 < y0 }
+    if rot.rem_euclid(hanji_format::FULL_TURN) == 0 {
+        return Geom {
+            x: x0.min(x1),
+            y: y0.min(y1),
+            w: (x1 - x0).abs(),
+            h: (y1 - y0).abs(),
+            rot,
+            flip_h: x1 < x0,
+            flip_v: y1 < y0,
+        };
+    }
+    let c = ((x0 + x1) as f64 / 2.0, (y0 + y1) as f64 / 2.0);
+    let (s, k) = (-(rot as f64) / 60_000.0).to_radians().sin_cos();
+    let (dx, dy) = ((x1 - x0) as f64, (y1 - y0) as f64);
+    let (ux, uy) = (dx * k - dy * s, dx * s + dy * k);
+    let (w, h) = (ux.abs().round() as i64, uy.abs().round() as i64);
+    let x = (c.0 - w as f64 / 2.0).round() as i64;
+    let y = (c.1 - h as f64 / 2.0).round() as i64;
+    Geom { x, y, w, h, rot, flip_h: ux < -0.5, flip_v: uy < -0.5 }
 }
 
 /// A group's mapping from child coordinates to its parent's: `a:off`,
@@ -234,6 +266,20 @@ pub fn connections(cxn: &Element) -> Vec<(&'static str, u32)> {
         .into_iter()
         .filter_map(|(end, n)| Some((end, c.child(n)?.get("id")?.parse().ok()?)))
         .collect()
+}
+
+/// A connector's two ends' attachments, each a shape id and site index.
+pub type Attachments = [Option<(u32, u32)>; 2];
+
+/// A connector's ends' attachments: the shape id and connection site index
+/// of its `a:stCxn` and `a:endCxn`.
+pub fn attachments(cxn: &Element) -> Attachments {
+    let c = cxn.child("p:nvCxnSpPr").and_then(|n| n.child("p:cNvCxnSpPr"));
+    let at = |n: &str| {
+        let e = c?.child(n)?;
+        Some((e.get("id")?.parse().ok()?, e.get("idx")?.parse().ok()?))
+    };
+    [at("a:stCxn"), at("a:endCxn")]
 }
 
 /// Scale a table's column widths and row heights to a frame of `w` × `h`

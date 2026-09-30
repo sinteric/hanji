@@ -34,7 +34,9 @@ use serde::{Deserialize, Serialize};
 
 use std::collections::BTreeMap;
 
-use hanji_core::presentation::{group_head, line_head, object_head, picture_head, shape_head, slide_head, slot_head};
+use hanji_core::presentation::{
+    group_head, kind, line_head, object_head, picture_head, shape_head, slide_head, slot_head, HeadKind,
+};
 use hanji_core::{Block, Entry, KeepIds, Kind, ListItem, Meta, Para};
 use hanji_format::{
     Atom, Crop, Geom, GroupItem, Inline, Keep, LineItem, Marks, ObjectItem, PictureItem, ShapeText, SlideItem, Unit,
@@ -49,6 +51,7 @@ use crate::kind;
 use crate::members::{self, Styling};
 use crate::outline;
 use crate::pml::*;
+use crate::route;
 use crate::text::{self, RunStyle, ThemeFonts};
 use hanji_format::inline_style::{self as istyle, TextStyle};
 
@@ -218,6 +221,8 @@ impl Importer<'_> {
             skel.child_mut("p:cSld").and_then(|c| c.child_mut("p:spTree")).ok_or("the slide has no p:cSld/p:spTree")?;
         let mut used: Vec<String> = vec![];
         let mut k = 0;
+        // Each connector's head, and its ends' attachments (shown after the loop).
+        let mut attached: Vec<(usize, geom::Attachments)> = vec![];
         for n in std::mem::take(&mut tree.children) {
             let Node::El(el) = n else {
                 tree.children.push(n);
@@ -320,6 +325,9 @@ impl Importer<'_> {
                         }
                     };
                     self.blocks.push(head);
+                    if matches!(what, What::Line(..)) {
+                        attached.push((self.blocks.len() - 1, geom::attachments(&el)));
+                    }
                     if matches!(what, What::Bare(..)) {
                         self.show_fill(&el, None, &layout.fills);
                     }
@@ -332,6 +340,7 @@ impl Importer<'_> {
                 }
             }
         }
+        show_attachments(&mut self.blocks[bi..], &attached, bi);
         let fpv = canon(&without_stand_ins(&skel), &self.scope);
         let named = named_rel_ids(root).into_iter().collect();
         let aux = vec![serde_json::to_string(&SlideInfo { ids, named, ..info }).unwrap()];
@@ -413,7 +422,9 @@ impl Importer<'_> {
         let hi = self.blocks.len() - 1;
         // A shape's fill is the text's (§5.3), as its geometry is.
         let bare = geom::without_geometry(&match el.name.as_str() {
-            "p:sp" | "p:cxnSp" => kind::without_kind(&outline::without_outline(&fill::without_fill(el))),
+            "p:sp" => kind::without_kind(&outline::without_outline(&fill::without_fill(el))),
+            // A connector's attachments are the text's too.
+            "p:cxnSp" => route::without_attachments(&kind::without_kind(&outline::without_outline(el))),
             // A group's shapes' text and fills are the text's too.
             "p:grpSp" => members::without_shown(el),
             _ => el.clone(),
@@ -1046,4 +1057,48 @@ fn summary(el: &Element) -> String {
         }
     };
     clip(&s, 80)
+}
+
+/// A connector's end attached to an object the text shows by its id shows
+/// as that object's connection site (§5.3), `s3.2`; one attached to a slot or
+/// an object shown as `<keep/>` shows its point.
+fn show_attachments(blocks: &mut [Block], attached: &[(usize, geom::Attachments)], base: usize) {
+    fn ids(items: &[SlideItem], out: &mut Vec<(bool, u32)>) {
+        for it in items {
+            match it {
+                SlideItem::Shape(s) => out.extend(num(&s.id).map(|n| (false, n))),
+                SlideItem::Picture(p) => out.extend(num(&p.id).map(|n| (false, n))),
+                SlideItem::Group(g) => {
+                    out.extend(num(&g.id).map(|n| (true, n)));
+                    ids(&g.items, out);
+                }
+                _ => {}
+            }
+        }
+    }
+    fn num(id: &str) -> Option<u32> {
+        id.strip_prefix(['s', 'g'])?.parse().ok()
+    }
+    let mut shown: Vec<(bool, u32)> = vec![];
+    for b in blocks.iter() {
+        let Some(h) = b.head() else { continue };
+        match (kind(h), &h.place) {
+            (HeadKind::Shape { id, .. } | HeadKind::Picture { id, .. }, _) => shown.extend(num(id).map(|n| (false, n))),
+            (HeadKind::Group { id, .. }, Some(hanji_core::Place::Group(g))) => {
+                shown.extend(num(id).map(|n| (true, n)));
+                ids(&g.items, &mut shown);
+            }
+            _ => {}
+        }
+    }
+    for (b, [st, en]) in attached {
+        let Some(Block::Head(h)) = blocks.get_mut(b - base) else { continue };
+        let Some(hanji_core::Place::Line(e)) = &mut h.place else { continue };
+        let at = |a: &Option<(u32, u32)>| {
+            let (id, site) = (*a)?;
+            let (group, _) = shown.iter().find(|x| x.1 == id)?;
+            Some(hanji_format::Attach { group: *group, id, site })
+        };
+        (e.from_at, e.to_at) = (at(st), at(en));
+    }
 }

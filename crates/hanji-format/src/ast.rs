@@ -112,11 +112,45 @@ pub struct Geom {
     pub flip_v: bool,
 }
 
-/// A line's two ends in EMU, as written.
+/// A line's two ends in EMU, as written, and the connection sites they are
+/// attached to (§5.3): an attached end is where its site is.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Ends {
     pub from: (i64, i64),
     pub to: (i64, i64),
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub from_at: Option<Attach>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub to_at: Option<Attach>,
+}
+
+/// A connector end's attachment: the object (`s3`, a group `g5`) by its
+/// shape id, and the index of its connection site, written `s3.2`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Attach {
+    pub group: bool,
+    pub id: u32,
+    pub site: u32,
+}
+
+impl Attach {
+    /// `s3.2` or `g5.0` → the attachment.
+    pub fn parse(v: &str) -> Option<Attach> {
+        let v = v.trim();
+        let group = v.starts_with('g');
+        let (id, site) = v.strip_prefix(['s', 'g'])?.split_once('.')?;
+        let digits = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_digit());
+        if !digits(id) || !digits(site) {
+            return None;
+        }
+        Some(Attach { group, id: id.parse().ok()?, site: site.parse().ok()? })
+    }
+}
+
+impl std::fmt::Display for Attach {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}{}.{}", if self.group { 'g' } else { 's' }, self.id, self.site)
+    }
 }
 
 /// EMU per point.
@@ -200,7 +234,7 @@ impl Ends {
 
     pub fn merged(&self, written: &Ends) -> Ends {
         let k = |a: (i64, i64), b: (i64, i64)| (keep_or(a.0, b.0), keep_or(a.1, b.1));
-        Ends { from: k(self.from, written.from), to: k(self.to, written.to) }
+        Ends { from: k(self.from, written.from), to: k(self.to, written.to), ..*written }
     }
 }
 

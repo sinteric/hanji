@@ -27,6 +27,7 @@ use crate::kind;
 use crate::members::{self, Styling};
 use crate::outline;
 use crate::pml::*;
+use crate::route;
 use crate::text::{self, RunStyle, ThemeFonts};
 use crate::DeckShell;
 use hanji_format::inline_style::{self as istyle, TextStyle};
@@ -468,6 +469,8 @@ impl<'a> Exporter<'a> {
             .collect();
         let mut moved: Vec<(u32, String)> = vec![];
         let mut lines_written: HashSet<u32> = HashSet::new();
+        // Connectors whose ends the text attaches: written once every box is (below).
+        let mut attached: Vec<usize> = vec![];
         for (n, it) in items.iter().enumerate() {
             let e = &mut out_items[n];
             let head = self.head(it);
@@ -478,6 +481,11 @@ impl<'a> Exporter<'a> {
             };
             let mut changed = vec![];
             match (&it.kind, &head.place) {
+                (HeadKind::Line { .. }, Some(Place::Line(w)))
+                    if w.from_at.is_some() || w.to_at.is_some() || geom::attachments(e).iter().any(Option::is_some) =>
+                {
+                    attached.push(n);
+                }
                 (HeadKind::Line { .. }, Some(Place::Line(w))) => {
                     let st = geom::own(e).unwrap_or_default();
                     let ends = geom::ends_of(&st);
@@ -524,6 +532,23 @@ impl<'a> Exporter<'a> {
         }
         assign_ids(&stands, &mut out_items, &fresh);
         name_new(&mut out_items, &created);
+        // Connectors (§5.3): an attached end goes where its object's site now is.
+        if !attached.is_empty() {
+            let moved_ids: Vec<u32> = moved.iter().map(|m| m.0).collect();
+            let visible = visible_ids(&items, |it| self.head(it));
+            for &n in &attached {
+                let Some(Place::Line(w)) = &self.head(items[n]).place else { continue };
+                let mut e = out_items[n].clone();
+                let others: Vec<&Element> =
+                    out_items.iter().enumerate().filter(|(k, _)| *k != n).map(|x| x.1).collect();
+                let what = item_label(items[n]);
+                route::write(&mut e, w, &others, &moved_ids, &visible, created[n])
+                    .map_err(|m| format!("{what}: {m}"))?;
+                // Its attached ends are where their objects' sites are now.
+                lines_written.extend(geom::shape_id(&e));
+                out_items[n] = e;
+            }
+        }
         check_connectors(&stands, &out_items, &moved, &lines_written)?;
         let tree_children =
             assemble(std::mem::take(&mut stands), &claims, out_items, &|slot: &str| layout.slot(slot).is_some())?;
@@ -2260,4 +2285,42 @@ fn rewrite_rels(parts: &[Part], part: &str, rels: &[Rel]) -> Result<Vec<u8>, Str
     }
     d.root.children = kids;
     Ok(xml::write_doc(&d))
+}
+
+/// The shape ids of the objects the text shows by id on a slide: its
+/// shapes, pictures and groups, and the groups' objects.
+fn visible_ids<'b>(items: &[&ItemG], head: impl Fn(&ItemG) -> &'b Head) -> Vec<u32> {
+    fn num(id: &str) -> Option<u32> {
+        id.strip_prefix(['s', 'g'])?.parse().ok()
+    }
+    fn members(g: &GroupItem, out: &mut Vec<u32>) {
+        for it in &g.items {
+            match it {
+                SlideItem::Shape(s) => out.extend(num(&s.id)),
+                SlideItem::Picture(p) => out.extend(num(&p.id)),
+                SlideItem::Line(l) => out.extend(num(&l.id)),
+                SlideItem::Group(x) => {
+                    out.extend(num(&x.id));
+                    members(x, out);
+                }
+                _ => {}
+            }
+        }
+    }
+    let mut out = vec![];
+    for it in items {
+        match it.kind {
+            HeadKind::Shape { id, .. } | HeadKind::Picture { id, .. } | HeadKind::Line { id, .. } => {
+                out.extend(num(id))
+            }
+            HeadKind::Group { id, .. } => {
+                out.extend(num(id));
+                if let Some(Place::Group(g)) = &head(it).place {
+                    members(g, &mut out);
+                }
+            }
+            _ => {}
+        }
+    }
+    out
 }
