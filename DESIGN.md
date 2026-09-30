@@ -349,7 +349,21 @@ schema: 1
     paragraphs show no formatting.
   - Changing a style line changes every paragraph in that style that does not
     set the property itself; the returned text shows them unchanged.
-    Creating a style is refused for now.
+  - A new style is a new style line with a name no style has, holding what
+    differs from the default style; a paragraph takes it like any style
+    (`<div style="Name">`, a list item's `style="Name"`, `<p style="Name"/>`
+    in a cell). A name that is already a style is refused, with the line
+    named. docx writes a `w:style` (`basedOn` the default paragraph style),
+    hwpx a `hh:style` with its own `paraPr` and `charPr` in `header.xml`
+    (decided 2026-09-30; round 6 part C: 4/4 per model after one fix round,
+    duplicates refused 8/8).
+  - No section defaults: a `<defaults …/>` line per page (F2s: the values
+    most of a page's paragraphs share, between the default style and a named
+    style's own values) was measured and not adopted: it cut hwpx text by 6%
+    (2.16× to 2.02× today's), read as well as F2 (all 10 reads per model that
+    resolve defaults, style and override), and landed one answer fewer
+    (49/52 against 50/52 after one fix round, a look-alike space in `old`),
+    so it did not meet the bar of correctness at least F2's (round 6 part C).
   - docx: `w:pPr`/`w:rPr` children, `w:tcPr` `w:shd`/`w:tcBorders`,
     `w:tblBorders`, styles through `basedOn`, docDefaults and the table
     style. hwpx: `paraPr` (margins from the `HwpUnitChar` branch, both
@@ -359,7 +373,9 @@ schema: 1
     formatting) on every direct task, and only F2 could change a style (6/6,
     one line against every paragraph); F2's style lookups landed 10/10, on an
     84k-char file too; F3 (styles only) could not do 21 of 39 tasks and
-    misread hidden formatting as the style's.
+    misread hidden formatting as the style's. Part C repeated F2 on both hwpx
+    seeds with the new-style guide: 25/26 per model after one fix round, the
+    miss a look-alike character, not formatting.
 - Headers, footers and section setup come from the template or the remainder
   at first; exposing their text is a later extension.
 - Tracked changes and comments (`<ins>`, `<del>`, `<comment>`) are read-only
@@ -574,10 +590,15 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
   block, one per rectangle of cells with the same effective formatting that
   is not Normal's, `style="Name"` on ranges in a named cell style; they are
   written by a `format` range operation
-  (`{"op": "format", "range": "매출!A1:D1", "set": {"fill": "#D9D9D9", "bold": true}}`).
-  Excel border styles show as widths (thin 0.75pt, medium 1.5pt, thick
-  2.25pt, double, hair) and a written width snaps to the nearest one.
-  Not measured by fluency.
+  (`{"op": "format", "range": "매출!A1:D1", "set": {"fill": "#D9D9D9", "bold": true}}`),
+  which sets the properties written on every cell of the range and keeps
+  the rest; `border` sets all four sides of every cell and `outline` the
+  outer edges of the range. A `<format default font=Calibri size=11pt color=tx1/>`
+  line at the top is Normal's, so a cell in no range line reads on its own.
+  Excel border styles show as widths (hair 0.25pt, thin 0.75pt, medium
+  1.5pt, thick 2.25pt, double 2.25pt) and a written width snaps to the
+  nearest one; theme colours stay names (`accent2+80%`). Round 6 part D, on
+  three corpus workbooks: 25/25 per model on the first try, every op valid.
 
   `range` on `<sheet>` is the used range, tables included. A column's type
   is `text`, `number`, `date` or `mixed` (cells of more than one kind, or
@@ -856,10 +877,28 @@ F1, effective formatting inline; F2o, only what the object sets itself.
 - Size on the corpus, over today's text: hwpx F1 2.13×, F2 2.16×, F3 1.04×
   (Hancom keeps formatting on each paragraph and cell, so F2 cannot factor
   it); docx 1.40×, 1.38×, 1.12×; pptx F1 1.27×, F2o 1.14×; xlsx F1 range
-  lines 2.48× (2.04× without one outlier, median 1.00). Row and table
-  lifting took fdi-2025q2.hwpx from 4.4× to 2.0×.
+  lines 2.52× with the default line (2.08× without one outlier, median
+  1.17). Row and table lifting took fdi-2025q2.hwpx from 4.4× to 2.0×.
+- Part C (after the owner's answers, 2026-09-30), F2 against F2s on the two
+  hwpx seeds, 13 tasks each: reads that resolve a page's defaults line, the
+  style and the paragraph's own `{…}`, a no-op ("set it to 170%" where it
+  already is), a single override, a new style applied to two paragraphs, and
+  a new style with a name already taken (a refusal). Landed after one fix
+  round: F2 25/26 per model, F2s 25/26 (Opus) and 24/26 (Sonnet); first
+  try 23 and 24 against 23 and 23. Every miss, in both, is an `old` that
+  dropped a U+2007 or U+F076 on mel-001; every read (20/20 per candidate),
+  no-op, new style and refusal landed. F2s is 6% smaller on the hwpx corpus
+  (2.02× against 2.16×; mel-001 76,393 against 84,442 chars) and not adopted
+  (the bar was correctness at least F2's). New styles: adopted.
+- Part D, Spreadsheets: F1 range lines and the `format` operation on three
+  corpus workbooks (simple-monthly-budget, korean-sales-lo, the 12-sheet
+  Tables.xlsx at 74,769 chars), 8–9 tasks each: reads through the range
+  lines (a theme colour as written, borders, which cells have an indent),
+  fills and font colours by theme name, an outline, one op per sheet across
+  twelve sheets, refusals. Both models 25/25 on the first try, 24 ops each,
+  none invalid; theme colours were written as names.
 - Limits: formatting read, written and checked by the kit, not the engines
-  or Office; no large docx; xlsx not run; one run per prompt.
+  or Office; no large docx; one run per prompt; part D at the ceiling.
 
 ## 7. Engines (surveyed 2026-09-28)
 
@@ -919,7 +958,7 @@ v0.7.3; "lossless … regarding content", not formatting).
 | Rule 5 (fidelity) | Per-page SSIM of our preview against the native application's own PDF export — Word, PowerPoint, Excel, Hancom — not against LibreOffice |
 | Presentation geometry | GetPut per object on the pptx corpus: every `a:xfrm` (and every absent one) unchanged after import → export; PutGet after box, z-order, group and new-object edits; the office-kit shows moved, resized and added objects where the text puts them, in PowerPoint |
 | Rule 8 (the model sees it) | Per corpus deck, every object on a slide appears in the text: slots, shapes with or without text, lines, groups and their objects, `<keep/>` lines |
-| Direct formatting (proposed, §10 item 10) | GetPut per element on every corpus file: a formatting value left as shown leaves its `pPr`/`rPr`/`tcPr`, `paraPrIDRef`/`charPrIDRef`/`borderFillIDRef`, `spPr`/`p:style` and cell `s` untouched (the kit holds this on the text for 28 of 29 flow files); PutGet after fill, border, colour, size, indent and style-line edits, the returned text canonical (lifting, snapped widths); each vocabulary value opens as written in Word, Hancom, PowerPoint and Excel (the office-kit) |
+| Direct formatting (proposed, §10 item 10) | GetPut per element on every corpus file: a formatting value left as shown leaves its `pPr`/`rPr`/`tcPr`, `paraPrIDRef`/`charPrIDRef`/`borderFillIDRef`, `spPr`/`p:style` and cell `s` untouched (the kit holds this on the text for 28 of 29 flow files); PutGet after fill, border, colour, size, indent and style-line edits, the returned text canonical (lifting, snapped widths); a new style line adds one style (docx `w:style`, hwpx `hh:style` with its `paraPr`/`charPr`) and a taken name is refused; a `format` op changes only the properties it writes, on the cells of its range; each vocabulary value opens as written in Word, Hancom, PowerPoint and Excel (the office-kit) |
 | Rule 2 (fluency) | §6 |
 
 ## 10. Open decisions
@@ -1007,12 +1046,18 @@ v0.7.3; "lossless … regarding content", not formatting).
     §5.2), Presentations F1 (effective formatting inline on every object,
     §5.3), Spreadsheets range lines and a `format` operation (§5.4); one
     vocabulary for all four (§5.1). Replaces "formatting by name only" when
-    accepted. Open: the size of Hancom files (2.1× today's text: cell
-    borders, fonts and sizes set on every paragraph and cell, which no style
-    factors); whether new styles can be created; xlsx not measured; the
-    text must escape look-alike and private-use characters (round 6's only
-    invalid answers), a hanji-format follow-up. The kit's formatting reader
-    is its own, not the engines'.
+    accepted. Decided with the owner (2026-09-30): agents may create named
+    styles, and a name already in use is refused (part C: 4/4 per model);
+    per-page defaults lines (F2s) were tried for the size of Hancom files
+    and not adopted, since they did not match F2's correctness (49/52
+    against 50/52) for 6% less text; theme colours stay names, and the
+    xlsx `format` operation landed 25/25 per model (part D). Open: Hancom
+    files stay at 2.2× today's text (cell borders, fonts and sizes set on
+    every paragraph and cell, which no style factors); the text must escape
+    look-alike and private-use characters (round 6's only invalid answers,
+    and part C's only misses), a hanji-format follow-up, after which F2s
+    could be retried. The kit's formatting reader is its own, not the
+    engines'.
 
 ## 11. Blind spots
 
@@ -1023,7 +1068,8 @@ v0.7.3; "lossless … regarding content", not formatting).
 - The fluency list in §6 is still mostly a model's self-report: six rounds
   ran on two Claude models only, 12–48 tasks per cell, one run per prompt.
   Round 6's formatting was read and checked by its kit, not by the engines,
-  on three flow seeds (two hwpx, one small docx) and three decks.
+  on three flow seeds (two hwpx, one small docx), three decks and three
+  workbooks; its xlsx trial (part D) hit the ceiling.
   Round 5 put three of its four candidates at the ceiling on small decks, so
   the §5.3 geometry rests on design (a slide that reads on its own), and its geometry was checked in the
   kit's model (`deck.py`), not in hanji-pptx or PowerPoint. No round asked

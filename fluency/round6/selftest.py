@@ -37,6 +37,8 @@ def main():
     import pptx_kit as PK
     for f in sorted(os.listdir(os.path.join(HERE, 'data', 'gold'))):
         uid = f[:-5]
+        if uid.startswith('r6x-'):
+            continue    # part D has its own: python3 xlsx_kit.py selftest
         unit = json.load(open(os.path.join(HERE, 'data', 'units', f), encoding='utf-8'))
         gold = json.load(open(os.path.join(HERE, 'data', 'gold', f), encoding='utf-8'))
         scorer = PK.score_answer if uid.startswith('r6p-') else S.score_answer

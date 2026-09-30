@@ -19,6 +19,17 @@ Presentation shapes, (c) Spreadsheet ranges.
 | **F2** overrides + styles | a style section (`<style name="개요 3" …/>` lines, editable) and, on each paragraph, cell and run, only what differs from its style | tested as **F2o** (the pptx canvas audit's proposal): an object shows only what it sets itself; theme-style and layout values are not shown | named cell styles as style lines; a range shows `style="Name"` and what it sets beyond it |
 | **F3** styles only | the style section, editable; direct formatting stays hidden in the remainder | – | ranges show `style="Name"` only |
 
+**F2s** (part C, after the owner's answers): F2 plus a `<defaults …/>` line at the start of each page, holding the
+values most of the page's paragraphs share where their style does not set them; a property resolves from the
+paragraph's `{…}`, the table line, a named style's own line, the defaults line, then the default style. On
+footnote-01.hwpx's first page:
+
+```
+<defaults line-spacing=170% font=HY견명조 size=18pt/>
+| {fill=#E3F8FF …} 3D 프린팅 기술의 등장과 {align=center line-spacing=160%}<p/>기술 발전에 따른 … {align=center line-spacing=160% size=20pt} |
+  - 산업용 샘플을 찍어내던 것에서 발전해 … {style="개요 3"}        (line spacing 170% from the defaults, 15pt from 개요 3)
+```
+
 A fourth candidate, automatic styles (every distinct direct combination named, as ODF's `P1`/`T1` and hwpx's
 `charPr`/`paraPr` ids do), was considered and not built: it moves every value one lookup away (the owner's objection
 to B in round 5), and an edit of one paragraph through a shared automatic style silently changes every paragraph
@@ -208,10 +219,10 @@ The candidate's text over today's text, whole files (`measure.py`; data/measure.
 
 | format (files) | F1 | F2 | F3 | median F1 / F2 / F3 |
 |---|---|---|---|---|
-| hwpx (16) | 2.13× | 2.16× | 1.04× | 1.87 / 1.77 / 1.13 |
-| docx (13) | 1.40× | 1.38× | 1.12× | 1.38 / 1.37 / 1.17 |
+| hwpx (16) | 2.13× | 2.16× (F2s 2.02×) | 1.04× | 1.87 / 1.77 / 1.13 |
+| docx (13) | 1.40× | 1.38× (F2s 1.36×) | 1.12× | 1.38 / 1.37 / 1.17 |
 | pptx (19) | 1.27× | F2o 1.14× (F2 with a section 1.23×) | 1.09× | – |
-| xlsx (43) | 2.48× (2.04× without 57893-many-merges.xlsx, 40×) | 2.55× | 1.08× | 1.00 / 1.26 / 1.14 |
+| xlsx (43) | 2.52× with the `<format default …/>` line (2.08× without 57893-many-merges.xlsx, 40×) | 2.55× | 1.08× | 1.17 / 1.26 / 1.14 |
 
 On hwpx, F2 is no smaller than F1: Hancom documents put nearly all formatting on the element (a `paraPrIDRef` and
 `charPrIDRef` per paragraph, a `borderFill` per cell), not in styles. The cost is the formatting itself: cell borders

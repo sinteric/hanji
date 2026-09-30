@@ -9,6 +9,8 @@ ranges. The candidates, the vocabulary, the samples on real corpus files and the
 |---|---|---|---|
 | A, flow documents | F1 effective always; F2 overrides + editable style section; F3 style section only | footnote-01.hwpx (report with a title banner, 2,708 chars today), mel-001.hwpx (ministry work report, 1,717 paragraphs, 32,752 chars today, 81–84k chars with formatting), korean-report.docx | 13 each: 4 reads, 2 single edits, many-place edits, restyle a set of headings, a style edit, a text-only edit that must keep formatting byte-identical, a new table with a header fill, a first-line indent on every body paragraph, a refusal |
 | B, Presentations | F1 effective inline; F2o own values only (the pptx canvas audit's proposal) | the audit's synthetic modern pitch deck and Korean report deck (CC0), the ONLYOFFICE sample deck (210 objects) | 8 each: a read of an inherited value, a read of a direct one, a card fill to accent2, a 2pt navy outline, a 24pt coral span, connectors 3pt keeping their colour, a text-only edit, a refusal |
+| C, section defaults and new styles | F2 (with the new-style sentence); F2s, F2 plus a `<defaults …/>` line per page | footnote-01.hwpx, mel-001.hwpx | 13 each: 7 reads (5 need the defaults line under F2s), the banner fill, a text-only edit, a no-op, one override, a style edit, a first-line indent on many paragraphs, a new style applied to two paragraphs, a taken style name (refusal) |
+| D, Spreadsheets | F1 range lines, written by the `format` operation | simple-monthly-budget.xlsx, korean-sales-lo.xlsx, Tables.xlsx (12 sheets) | 8–9 each: 3 reads, 4–5 `format` edits (theme colours, outlines, one op per sheet), a refusal |
 
 ## The kit
 
@@ -30,6 +32,10 @@ ranges. The candidates, the vocabulary, the samples on real corpus files and the
   every gold answer and checks that it lands, and records what F3 cannot do (`unreachable`). `score.py` scores an
   answer file. `selftest.py`: gold, broken and alternative answers.
 - `pptx_kit.py`: part B (build, gold, score) on the text.
+- Part C is in `content.py` (`TASKS_S`), `doc.py` (F2s: `compute_sections`, `layered`), `guides.py` (`GUIDES_S`) and
+  `build.py sections`; its units are `r6s-<F2|F2s>-<seed>`.
+- `xlsx_kit.py`: part D (build, gold, score, selftest): the workbook's cells, the `format` operation applied to them,
+  and the check that only the cells and properties asked for changed; units `r6x-F1-<seed>`.
 - `measure.py`: the size of each candidate on every corpus file (data/measure.json).
 - `run.py`: sends the prompts; `summarize.py`: the tables in RESULTS.md, re-scored from `runs/`.
 
@@ -38,6 +44,7 @@ Standard library only (Python 3.11); round 2's `apply_edits` is imported from `.
 ```
 cd fluency/round6
 python3 build.py && python3 pptx_kit.py build && python3 selftest.py   # ends with SELFTEST PASSED
+python3 xlsx_kit.py build && python3 xlsx_kit.py selftest
 python3 score.py r6-F2-2 runs/r6-F2-2/sonnet-first.json
 python3 pptx_kit.py score r6p-F2o-3 runs/r6p-F2o-3/opus-first.json
 python3 summarize.py
@@ -78,3 +85,6 @@ many-place, style and new-table edits), so no answer outgrows its output. Answer
 `*.usage.json`). The one fix round (part A, the units with an invalid answer) is `<model>-fix.json`, sent as a fresh
 conversation with the prompt, the first answer and the validator's errors, which name the closest line of the file
 and any character in it that looks like a space but is not.
+
+Parts C and D were sent the same way (`INDEX=index-s.json` and `INDEX=index-x.json` for `run.py`), part C as two
+prompts per unit and part D as one; part C had one fix round, part D needed none.

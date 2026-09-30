@@ -4,15 +4,19 @@
 
 **Subjects:** Claude Opus and Claude Sonnet, blind, each unit in a fresh conversation whose only tool was Read (the
 prompt read from its own file, [README.md](README.md#runs)). Part A (flow documents): 3 candidates × 3 seeds × 13
-tasks, 117 answers per model. Part B (Presentations): 2 candidates × 3 decks × 8 tasks, 48 answers per model. 330
+tasks, 117 answers per model. Part B (Presentations): 2 candidates × 3 decks × 8 tasks, 48 answers per model. Parts
+C and D followed the owner's answers the same day: part C (section defaults and new styles), 2 candidates × 2 hwpx
+seeds × 13 tasks, 52 answers per model; part D (workbooks), 3 workbooks × 8–9 tasks, 25 answers per model. 484
 answers in all. Prompts were 6,575–91,090 chars; the two mel-001 prompts per candidate were read in parts (18–20
 turns). One fix round, for part A's invalid answers.
 
-Re-score any answer with `python3 score.py <unit> <file>` or `python3 pptx_kit.py score <unit> <file>`;
-`python3 summarize.py` reproduces every table here. The self-test passes: 159 gold answers land (or are the right
-refusal where the candidate cannot do the task), 24/24 broken part A answers and 6/6 broken part B answers are
-caught, 14/14 alternative answers pass (a style edit or direct edits for a style task, a row brace for a header
-fill, another light blue, a darker red, a navy `#000080`, another coral), and GetPut holds on the text for every seed.
+Re-score any answer with `python3 score.py <unit> <file>`, `python3 pptx_kit.py score <unit> <file>` or
+`python3 xlsx_kit.py score <unit> <file>`; `python3 summarize.py` reproduces every table here. The self-tests pass:
+211 gold answers land (or are the right refusal where the candidate cannot do the task), 35/35 broken part A and C
+answers and 6/6 broken part B answers are caught, 18/18 alternative answers pass (a style edit or direct edits for a
+style task, a row brace for a header fill, another light blue, a darker red, a navy `#000080`, another coral, a
+defaults value written out, an override in the paragraph's own brace, a new style line), and GetPut holds on the
+text for every seed; `xlsx_kit.py selftest`: 25 gold answers and 16 cases.
 
 ### What round 6 decides
 
@@ -137,8 +141,84 @@ Input, the seed file in each candidate (today's text in brackets):
 | synth Korean report deck | 4,691 | F2o 4,372 | – |
 | ONLYOFFICE sample deck | 20,786 | F2o 20,444 | – |
 
-On the whole corpus (CANDIDATES.md): hwpx F1 2.13×, F2 2.16×, F3 1.04×; docx 1.40×, 1.38×, 1.12×; pptx F1 1.27×,
-F2o 1.14×; xlsx F1 2.48× (2.04× without one 40× outlier, median 1.00).
+On the whole corpus (CANDIDATES.md): hwpx F1 2.13×, F2 2.16×, F3 1.04× (part C's F2s 2.02×); docx 1.40×, 1.38×,
+1.12× (F2s 1.36×); pptx F1 1.27×, F2o 1.14×; xlsx F1 2.52× with part D's default line (2.08× without one 40×
+outlier, median 1.17; 2.48× before the default line).
+
+### Part C: section defaults (F2s) and new styles
+
+The owner asked (2026-09-30) whether Hancom files could be made smaller by per-section defaults, if that does not
+confuse the model, and allowed agents to create new named styles (a taken name refused). F2s is F2 plus a
+`<defaults …/>` line at the start of each page (after each `<pagebreak/>`): for each property, the commonest value
+among the page's paragraphs whose style does not set it, when more paragraphs have it than the default style's.
+A property resolves, first found: the paragraph's `{…}`, the table line, a named style's own line, the defaults line
+in force, the default style. Both candidates got the same new-style sentence in their guide (`guides/doc-s-*.md`).
+
+Seeds footnote-01.hwpx and mel-001.hwpx, 13 tasks each, the same for F2 and F2s: two of part A's reads and five new
+ones that need the defaults line under F2s (a line spacing and a font from it, a first-line indent from it next to
+an override, a style's own value that wins over it, a banner line that overrides it back); the banner fill, the
+text-only edit, the style edit and the first-line indent on many paragraphs from part A; a no-op ("set the line
+spacing to 170%" where it already is; `ANSWER: unchanged` or an edit that changes nothing); one override on one
+paragraph (the tempting wrong answer edits the defaults line); a new style like 개요 3 but dark red, or like the
+default style, applied to two paragraphs; a new style under a name already taken (a refusal).
+
+| model | cand | landed, first try | after one fix round | invalid first try | reads | new style | no-op | refusal | answer chars | tokens in |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Opus | F2 | 23 / 26 | 25 / 26 | 3 | 10 / 10 | 2 / 2 | 2 / 2 | 2 / 2 | 8,190 | 271,984 |
+| Opus | F2s | 23 / 26 | 25 / 26 | 3 | 10 / 10 | 2 / 2 | 2 / 2 | 2 / 2 | 9,096 | 269,013 |
+| Sonnet | F2 | 24 / 26 | 25 / 26 | 2 | 10 / 10 | 2 / 2 | 2 / 2 | 2 / 2 | 7,427 | 415,638 |
+| Sonnet | F2s | 23 / 26 | 24 / 26 | 3 | 10 / 10 | 2 / 2 | 2 / 2 | 2 / 2 | 8,786 | 405,651 |
+
+(new style: after the fix round; on mel-001 all four first answers missed a U+2007 in `old`.)
+
+- **Every miss is a look-alike character, in both candidates.** The banner edit on mel-001 (U+F076, not named by the
+  validator) failed in all four; the new style and, for three of four, the many-paragraph indent on mel-001 missed a
+  U+2007 on the first try and landed after it was named. Sonnet's F2s indent missed a U+2007 in its 22nd edit again
+  after the fix round: the one answer that separates the candidates.
+- **The defaults line did not confuse either model.** Every read that resolves defaults, style and override landed
+  under F2s (10/10 per model), the no-op was answered `unchanged` or left alone, the single override was written on
+  the paragraph (none edited the defaults line), and the new styles and the refusal were the same as under F2.
+- **Size:** F2s is 6% smaller on the hwpx corpus (2.02× today's text against F2's 2.16×), 10% on mel-001 (76,393
+  against 84,442 chars), 2% on footnote-01 (4,578 against 4,664), 2% on docx (1.36× against 1.38×). The input the
+  models read shrank 1–2%; the answers grew 11–18% (under F2s the many-paragraph edit adds a brace to lines that had
+  none, and copies them whole). A strict-majority rule and body-only votes were smaller gains (2.08–2.09×).
+- **Decision:** F2s is not adopted. The owner's bar was correctness at least F2's; it landed one answer fewer (49/52
+  against 50/52 after the fix round, 46 against 47 first try), by a look-alike character, not by formatting. For 6%
+  less text that is not worth a second place to look. It can be retried once the text escapes look-alike characters.
+- **New styles: adopted.** 4/4 per model after one fix round, the name-taken refusal 8/8.
+
+### Part D: workbooks, F1 range lines and the `format` operation
+
+The short trial the owner asked for: F1 range lines (`<format range="B4:C4" …/>`, one per rectangle of cells whose
+formatting is not Normal's, and one `<format default …/>` line with Normal's font, size and colour), written by a
+range operation, not by text edits:
+
+```
+{"op": "format", "range": "Sheet!A1:D1", "set": {"fill": "accent2+80%", "bold": true, "outline": "2pt solid #1F3864"}}
+```
+
+`set` changes only the properties written, on every cell of the range; `border` sets all four sides of every cell,
+`outline` the outer edges of the range; a width snaps to the nearest Excel border; theme colours stay names. Three
+corpus workbooks: simple-monthly-budget.xlsx (theme colours, borders and indents, 3,459 chars), korean-sales-lo.xlsx
+(Korean sheets and tables, 3,722) and Tables.xlsx (twelve sheets of bordered forms, 74,769). Tasks: reads through
+the range lines (a fill written as a theme colour, a header's font, size and colour, which cells have an indent,
+the alignment of a cell inside a merged title's range, four borders of one cell, a cell in a 10-row range), edits
+(a fill as `accent2+80%`, a 2pt navy outline, bold and `accent2`, one indent level, removing a fill and keeping the
+borders, a header row bold, centred and grey, a column in `accent6`, a thin bottom border, `accent1` fill with white
+bold text, a fill keeping mixed borders, a thick outline around 16 rows, 14pt A1 on all twelve sheets, a font on a
+whole used range) and refusals (a gradient, a pattern, a diagonal line).
+
+| model | landed, first try | invalid | reads | edits | refusals | ops | answer chars |
+|---|---|---|---|---|---|---|---|
+| Opus | 25 / 25 | 0 | 9 / 9 | 13 / 13 | 3 / 3 | 24 | 2,402 |
+| Sonnet | 25 / 25 | 0 | 9 / 9 | 13 / 13 | 3 / 3 | 24 | 2,417 |
+
+- Both models wrote the theme colours as names (`accent2+80%`, `accent6`, `accent1`), used `outline` for both
+  outlines, one op per sheet for the twelve sheets (`'Exp2 (2)'!A1` quoted), and kept every property they were not
+  asked to change. No fix round was needed.
+- At the ceiling, like round 1: it shows the op and the range lines are easy, not that they beat an alternative.
+- Size with the default line: 2.52× today's text on the 43 corpus workbooks (2.08× without the 40× outlier,
+  57893-many-merges.xlsx; median 1.17×).
 
 ### Failure patterns
 
@@ -166,7 +246,9 @@ not made (both models wrote direct first-line indents there under F2).
 |---|---|---|
 | flow documents (docx, hwpx) | F1 = F2 on every direct task (35 and 37 of 37–39 after the fix round, the same misses); only F2 edits a style (6/6, 10–20× smaller); F2's style lookups 10/10 on an 84k-char file; F3: 21/39 tasks impossible and 4 silent misreads | **F2**: named style + visible direct overrides + editable style section |
 | Presentations (pptx) | F1 48/48; F2o 36/48 possible, 11 right refusals, 1 silent misread; F2o 7–8% smaller answers, input within 4% | **F1**: effective formatting inline on every object, like `box` |
-| Spreadsheets (xlsx) | not measured by fluency; 4 of 43 corpus workbooks use a named cell style besides Normal | **F1** range lines (`<format range …/>`), written by a `format` range operation; a named style shown as `style="Name"` on its ranges |
+| flow documents: section defaults | F2s ties F2 on reads (10/10 per model) and on everything but one answer (49/52 against 50/52, a U+2007); 6% smaller on hwpx | **not adopted** (the bar was correctness at least F2's) |
+| flow documents: new styles | 4/4 per model, a taken name refused 8/8 | **adopted**: a new style line with a new name; a taken name is refused |
+| Spreadsheets (xlsx) | part D: 25/25 per model, first try, 0 invalid ops, theme colours kept as names; 4 of 43 corpus workbooks use a named cell style besides Normal | **F1** range lines (`<format range …/>`) and a `<format default …/>` line, written by a `format` range operation; a named style shown as `style="Name"` on its ranges |
 
 - **Flow documents: F2**, as the owner's hypothesis. On what the text shows directly the two tie; on consistency
   only F2 can act, with the smallest answers; and the cost the owner feared for lookups did not appear: every
@@ -177,7 +259,7 @@ not made (both models wrote direct first-line indents there under F2).
   a quarter of the tasks cannot be done and one was answered wrong. F1's cost is small (1.27× against 1.14× on the
   corpus, the same answer size). This matches round 5's choice of A for geometry.
 - **Spreadsheets: F1**, on design: a grid has no flow for styles to keep consistent, named cell styles are rare, and
-  the range lines merge equal cells into rectangles.
+  the range lines merge equal cells into rectangles. Part D's trial landed every task.
 
 ### Limits
 
@@ -188,6 +270,7 @@ not made (both models wrote direct first-line indents there under F2).
 - Part A's F1 is strong because hwpx formatting is direct; a large docx built on styles would give F2 more to show
   off, and F1 more to repeat. Row lifting, table lifting and run merging were fixed before the round; other noise
   rules (dropping a font equal to the document's commonest) were not tried.
-- xlsx was not run; its design rests on the corpus and on part B's result.
+- Part D ran one candidate, at the ceiling, with ops applied by the kit to its own cell model, not by hanji-xlsx.
+- Part C's candidates differ by one answer, from one run per prompt; the difference is a look-alike character.
 - `chars` stands in for tokens, as before. The tokens read (cache included) were 212,841–762,699 per unit on
   mel-001, 27,465–37,523 on the small seeds.
