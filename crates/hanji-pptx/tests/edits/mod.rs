@@ -8,7 +8,8 @@
 //! (geometry, §5.3); P16 crop a picture, P17 cut a picture to an ellipse and
 //! give it alternative text (pictures, §5.3); P18 format a word of a shape's
 //! text, P19 change a shape's font (text formatting, §5.3); P20 fill a shape,
-//! P21 clear a shape's fill (§5.3); P9 makes them all in one revision.
+//! P21 clear a shape's fill (§5.3); P22 edit a group's shape's text (§5.3);
+//! P9 makes them all in one revision.
 
 use std::collections::HashSet;
 
@@ -22,7 +23,7 @@ use hanji_testkit::{
     block_ranges, chars, deleted_span, entries_at, figure_or_word, ident, replace_span, span_of, Cx, Doc, Edit, EditFn,
 };
 
-pub const EDITS: [(&str, EditFn); 20] = [
+pub const EDITS: [(&str, EditFn); 21] = [
     ("p1_title", p1_title),
     ("p2_bullet", p2_bullet),
     ("p3_add_slide", p3_add_slide),
@@ -43,6 +44,7 @@ pub const EDITS: [(&str, EditFn); 20] = [
     ("p19_shape_font", p19_shape_font),
     ("p20_fill_shape", p20_fill_shape),
     ("p21_clear_fill", p21_clear_fill),
+    ("p22_group_text", p22_group_text),
 ];
 
 /// A slide: its head and the end of its blocks.
@@ -849,4 +851,49 @@ fn p21_clear_fill(d: &Doc, _: &Cx) -> Option<Edit> {
     let label = d.blocks[k].head()?.label.clone();
     let what = format!("shape {label:?}: no fill on {}", slide_name(&d.blocks, k));
     Some(look_edit(d, k, None, "P21 clear a shape's fill", what))
+}
+
+/// A figure or word of a group's shape changes, keeping its formatting.
+fn p22_group_text(d: &Doc, _: &Cx) -> Option<Edit> {
+    for (k, b) in d.blocks.iter().enumerate() {
+        let Some(Place::Group(g)) = b.head().and_then(|h| h.place.as_ref()) else { continue };
+        for (m, it) in g.items.iter().enumerate() {
+            let hanji_format::SlideItem::Shape(sh) = it else { continue };
+            let Some((pi, (s, e, new))) =
+                sh.paras.iter().enumerate().find_map(|(i, p)| figure_or_word(&chars(p)).map(|f| (i, f)))
+            else {
+                continue;
+            };
+            let p = &sh.paras[pi];
+            let old: String = chars(p)[s..e].iter().collect();
+            let mut q = p.clone();
+            let marks = q.units[s].marks;
+            let mut st = inline_style::unit_styles(&q);
+            let like = st[s].clone();
+            st.splice(s..e, std::iter::repeat_n(like, new.chars().count()));
+            q.units.splice(s..e, new.chars().map(|c| hanji_format::Unit::new(hanji_format::Atom::Char(c), marks)));
+            inline_style::set_unit_styles(&mut q, &st);
+            let mut g2 = g.clone();
+            if let hanji_format::SlideItem::Shape(x) = &mut g2.items[m] {
+                x.paras[pi] = q;
+            }
+            let mut blocks = d.blocks.clone();
+            if let Block::Head(h) = &mut blocks[k] {
+                h.place = Some(Place::Group(g2));
+            }
+            let what =
+                format!("group {:?}, shape {:?}: {old:?} → {new:?} on {}", g.name, sh.name, slide_name(&d.blocks, k));
+            let mut ed = Edit::blocks(
+                "P22 edit a group's shape's text",
+                what,
+                blocks,
+                ident(d.blocks.len()),
+                HashSet::from([k]),
+                true,
+            );
+            ed.named = vec![slide_at(&d.blocks, k).2];
+            return Some(ed);
+        }
+    }
+    None
 }

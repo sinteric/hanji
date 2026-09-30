@@ -23,6 +23,7 @@ use crate::geom::{self, Frame};
 use crate::import::{
     crop_of, group_item, object_geom, part_of_src, picture_item, shown_of, NotesInfo, Rels, SlideInfo, OBJECT_TAG,
 };
+use crate::members::{self, Styling};
 use crate::pml::*;
 use crate::text::{self, RunStyle, ThemeFonts};
 use crate::DeckShell;
@@ -474,7 +475,8 @@ impl<'a> Exporter<'a> {
                 (HeadKind::Group { .. }, Some(Place::Group(w))) => {
                     let w = GroupItem { geom: snapped, ..w.clone() };
                     let map = rels_map(&rels, &part);
-                    changed = apply_group(e, &w, &geom::Frame::SLIDE, &map).map_err(|m| format!("{what}: {m}"))?;
+                    changed = apply_group(e, &w, &geom::Frame::SLIDE, &map, Some(Styling::of(layout)))
+                        .map_err(|m| format!("{what}: {m}"))?;
                     lines_written.extend(changed.iter().filter(|x| x.1).map(|x| x.0));
                 }
                 (kind, place) => {
@@ -1535,9 +1537,8 @@ pub fn sig(items: &[SlideItem]) -> Vec<String> {
     items
         .iter()
         .map(|it| match it {
-            SlideItem::Shape(sh) => {
-                hanji_format::pres::shape_line(&hanji_format::ShapeText { geom: None, ..sh.clone() })
-            }
+            // A shape's text and fill are written (§5.3); its id and name are what it is.
+            SlideItem::Shape(sh) => format!("<shape id=\"{}\" name=\"{}\"/>", sh.id, sh.name),
             SlideItem::Object(o) => {
                 hanji_format::pres::object_line(&hanji_format::ObjectItem { geom: None, ..o.clone() })
             }
@@ -1603,10 +1604,51 @@ fn ids_in(el: &Element) -> Vec<(u32, bool)> {
 /// move them, and the group's box follows them; both at once must agree.
 /// Anything else about its objects is refused. The shape ids that moved
 /// (marked when a connector).
-pub fn apply_group(el: &mut Element, w: &GroupItem, parent: &Frame, rels: &Rels) -> Result<Vec<(u32, bool)>, String> {
-    let st = group_item(el, parent, rels).ok_or("the group's objects are not as they were read")?;
+pub fn apply_group(
+    el: &mut Element,
+    w: &GroupItem,
+    parent: &Frame,
+    rels: &Rels,
+    sty: Option<Styling>,
+) -> Result<Vec<(u32, bool)>, String> {
+    let st = group_item(el, parent, rels, sty).ok_or("the group's objects are not as they were read")?;
+    let ids = group_geometry(el, w, parent, rels, sty)?;
+    group_text(el, &st, w, sty)?;
+    Ok(ids)
+}
+
+/// The text and fill of a group's shapes, where the text changes them.
+fn group_text(el: &mut Element, st: &GroupItem, w: &GroupItem, sty: Option<Styling>) -> Result<(), String> {
+    let kids = el.elements_mut().filter(|e| !matches!(e.name.as_str(), "p:nvGrpSpPr" | "p:grpSpPr" | "p:extLst"));
+    for ((c, a), b) in kids.zip(&st.items).zip(&w.items) {
+        match (a, b) {
+            (SlideItem::Shape(a), SlideItem::Shape(b)) => {
+                let what = format!("<shape id=\"{}\" name=\"{}\">", b.id, b.name);
+                members::write(c, &a.paras, &b.paras, sty, &what).map_err(|m| format!("{what}: {m}"))?;
+                if a.look != b.look {
+                    let theme = sty.map(|s| s.fills).ok_or("a group's fills are written only on a slide")?;
+                    fill::write(c, b.look.fill.as_deref(), fill::Parents { now: None, then: None, theme })
+                        .map_err(|m| format!("{what}: {m}"))?;
+                }
+            }
+            (SlideItem::Group(a), SlideItem::Group(b)) => group_text(c, a, b, sty)?,
+            _ => {}
+        }
+    }
+    Ok(())
+}
+
+/// The group's geometry (see [`apply_group`]).
+fn group_geometry(
+    el: &mut Element,
+    w: &GroupItem,
+    parent: &Frame,
+    rels: &Rels,
+    sty: Option<Styling>,
+) -> Result<Vec<(u32, bool)>, String> {
+    let st = group_item(el, parent, rels, sty).ok_or("the group's objects are not as they were read")?;
     if sig(&st.items) != sig(&w.items) {
-        return Err("a group's objects can be moved and resized here, never added, deleted, reordered, renamed or edited: keep each object's line as it is but for its box, or change the group in PowerPoint".into());
+        return Err("a group's objects can be moved and resized here, and their shapes' text and fill changed, but never added, deleted, reordered, renamed or otherwise edited: keep each object's id and name as they are, or change the group in PowerPoint".into());
     }
     let (Some(sg), wg) = (st.geom, w.geom) else { return Err("the group has no box".into()) };
     let box_changed = wg.is_some_and(|g| !g.shows_as(&sg));
@@ -1620,8 +1662,8 @@ pub fn apply_group(el: &mut Element, w: &GroupItem, parent: &Frame, rels: &Rels)
     if box_changed && !members.is_empty() {
         let mut alone = el.clone();
         let only = GroupItem { items: st.items.clone(), ..w.clone() };
-        if let Ok(ids) = apply_group(&mut alone, &only, parent, rels) {
-            let after = group_item(&alone, parent, rels);
+        if let Ok(ids) = group_geometry(&mut alone, &only, parent, rels, sty) {
+            let after = group_item(&alone, parent, rels, sty);
             if after.is_some_and(|a| a.items.iter().zip(&w.items).all(|(x, y)| !member_changed(x, y))) {
                 *el = alone;
                 return Ok(ids);
@@ -1679,7 +1721,7 @@ pub fn apply_group(el: &mut Element, w: &GroupItem, parent: &Frame, rels: &Rels)
     for &m in &members {
         let Node::El(c) = &mut el.children[kids[m]] else { unreachable!() };
         match (&st.items[m], &w.items[m]) {
-            (SlideItem::Group(_), SlideItem::Group(wg)) => moved.extend(apply_group(c, wg, &f, rels)?),
+            (SlideItem::Group(_), SlideItem::Group(wg)) => moved.extend(group_geometry(c, wg, &f, rels, sty)?),
             (SlideItem::Line(a), SlideItem::Line(b)) => {
                 let own = geom::own(c).unwrap_or_default();
                 let ends = a.ends.merged(&b.ends);
@@ -2152,7 +2194,7 @@ fn set_bullet(ppr: &mut Option<Element>, lvl: u32, want: Bu, bullets: &[Bu; 9]) 
 }
 
 /// Bold, italic, underline and strike on a run's `a:rPr`, changed only where they differ.
-fn set_marks(rpr: &mut Element, want: Marks) {
+pub(crate) fn set_marks(rpr: &mut Element, want: Marks) {
     let have = marks_of(Some(rpr));
     for (m, attr, on) in [
         (Marks::BOLD, "b", "1"),

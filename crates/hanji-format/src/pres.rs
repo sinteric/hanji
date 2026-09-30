@@ -821,10 +821,6 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
         );
         return None;
     }
-    if member && !look.is_empty() {
-        p.err(i, tag.col, "a group's objects show no fill yet: their fill stays as the file has it; leave fill= out.");
-        return None;
-    }
     let sh = ShapeText { id, name, geom, look, paras };
     Some((sh, ItemMap { head, blocks }))
 }
