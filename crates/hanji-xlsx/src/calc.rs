@@ -4,8 +4,9 @@
 //! defined names — are computed by IronCalc over the engine's own cells, and
 //! their cached `<v>` values written; nothing else in the file changes and
 //! IronCalc never reads or writes the package. A formula IronCalc cannot
-//! compute (a function it lacks, an array formula, a volatile function) keeps
-//! its cached value, and the workbook asks to be recalculated when opened.
+//! compute (a function it lacks, an array formula, a volatile function, a
+//! lookup that searches unsorted data by bisection) keeps its cached value,
+//! and the workbook asks to be recalculated when opened.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -91,8 +92,12 @@ struct Formula {
     col: u32,
     /// Text as the file stores it (shared formulas expanded).
     text: String,
+    /// The cells it writes, when more than its own (an array formula's `ref`).
+    area: Option<String>,
     /// IronCalc cannot compute it: an array or data-table formula, or a volatile one.
     constant: bool,
+    /// Its lookups that search a sorted vector (bisection, approximate match).
+    searches: Vec<Search>,
     precs: Vec<Prec>,
     /// Its value as the file has it, and whether it has none.
     cached: CellValue,
@@ -108,8 +113,9 @@ fn formulas(book: &mut Book) -> Result<Vec<Formula>, String> {
         }
         book.load_store(i)?;
         let mut masters: HashMap<String, (u32, u32, String)> = HashMap::new();
-        // (row, column, `t`, the `si` of a shared formula's follower, text, cached value, whether it has none)
-        type Found = (u32, u32, String, Option<String>, String, CellValue, bool);
+        // (row, column, `t`, the `si` of a shared formula's follower, text, cached value, whether it
+        // has none, an array formula's area)
+        type Found = (u32, u32, String, Option<String>, String, CellValue, bool, Option<String>);
         let mut cells: Vec<Found> = vec![];
         let st = book.store(i);
         st.for_each_cell_if(&has_formula, &mut |r, c| {
@@ -117,13 +123,14 @@ fn formulas(book: &mut Book) -> Result<Vec<Formula>, String> {
             let t = f.get("t").unwrap_or_default();
             let text = f.text_of(&[f.name.as_str()]);
             let si = f.get("si").filter(|_| t == "shared");
+            let area = f.get("ref").filter(|r| t == "array" && r.contains(':'));
             if si.is_some() && f.get("ref").is_some() {
                 masters.insert(si.clone().unwrap_or_default(), (r, c.col, text.clone()));
             }
             let follower = si.filter(|_| f.get("ref").is_none());
-            cells.push((r, c.col, t, follower, text, book.value(c), c.lacks_cached_value()));
+            cells.push((r, c.col, t, follower, text, book.value(c), c.lacks_cached_value(), area));
         });
-        for (r, col, t, follower, mut text, cached, uncached) in cells {
+        for (r, col, t, follower, mut text, cached, uncached, area) in cells {
             if let Some(si) = follower {
                 match masters.get(&si) {
                     Some((mr, mc, mt)) => text = translate(mt, r as i64 - *mr as i64, col as i64 - *mc as i64),
@@ -132,13 +139,256 @@ fn formulas(book: &mut Book) -> Result<Vec<Formula>, String> {
             }
             let fns = formula::functions(&formula::tokenize(&text));
             let constant = t == "array" || t == "dataTable" || fns.iter().any(|n| VOLATILE.contains(&n.as_str()));
-            out.push(Formula { sheet: i, row: r, col, precs: vec![], text, constant, cached, uncached });
+            out.push(Formula {
+                sheet: i,
+                row: r,
+                col,
+                precs: vec![],
+                text,
+                area,
+                constant,
+                searches: vec![],
+                cached,
+                uncached,
+            });
         }
     }
     for f in out.iter_mut() {
         f.precs = precedents(book, f);
+        f.searches = searches(book, f);
     }
     Ok(out)
+}
+
+/// A defined name's formula (workbook `definedNames`), as the file stores it.
+fn name_formula(book: &Book, n: &str) -> Option<String> {
+    book.wb.root.elements().find(|e| e.local() == "definedNames").and_then(|d| {
+        d.elements()
+            .find(|e| e.get("name").is_some_and(|x| x.eq_ignore_ascii_case(n)))
+            .map(|e| e.text_of(&[e.name.as_str()]))
+    })
+}
+
+/// The first defined name a formula reads whose formula is not a reference
+/// (`SUM(Table[Amount])`, a constant): IronCalc evaluates names that are
+/// references only, and gives `#NAME?` for the others.
+fn computed_name(book: &Book, text: &str) -> Option<String> {
+    formula::tokenize(text).into_iter().find_map(|t| match t.kind {
+        Tok::Name(n) => {
+            let def = name_formula(book, &n)?;
+            let toks: Vec<Tok> =
+                formula::tokenize(&def).into_iter().map(|t| t.kind).filter(|k| *k != Tok::Space).collect();
+            (!matches!(toks.as_slice(), [Tok::Ref(_)])).then_some(n)
+        }
+        _ => None,
+    })
+}
+
+/// A lookup that finds its row by bisection, assuming its vector sorted:
+/// XLOOKUP and XMATCH with search mode 2 or -2, and the approximate match of
+/// MATCH, VLOOKUP, HLOOKUP and LOOKUP. Over data that is not sorted, where
+/// the search lands depends on how it bisects, and IronCalc does not bisect
+/// as Excel does: such a formula is computed only when the vector is sorted.
+#[derive(Clone, Debug)]
+enum Search {
+    /// Its mode, key or vector is not one the calculator can check (an
+    /// expression, a wildcard match): it is left to the application.
+    Unknown,
+    Sorted {
+        /// The value looked up: a cell (sheet, row, column), or a constant.
+        key: Result<Key, CellValue>,
+        /// The vector searched, one row or one column.
+        sheet: usize,
+        vector: CellRange,
+        ascending: bool,
+    },
+}
+
+/// A constant argument: a number (signed), text, or a logical value.
+fn constant_arg(text: &str, arg: &[&formula::Token]) -> Option<CellValue> {
+    let lit = |t: &formula::Token| &text[t.start..t.end];
+    match arg {
+        [t] if t.kind == Tok::Num => lit(t).parse().ok().map(CellValue::Number),
+        [s, t] if t.kind == Tok::Num && matches!(&s.kind, Tok::Op(o) if o == "-" || o == "+") => {
+            let n: f64 = lit(t).parse().ok()?;
+            Some(CellValue::Number(if lit(s) == "-" { -n } else { n }))
+        }
+        [t] if t.kind == Tok::Bool => Some(CellValue::Bool(lit(t).eq_ignore_ascii_case("TRUE"))),
+        [t] if t.kind == Tok::Str => {
+            let q = lit(t);
+            Some(CellValue::Text(q[1..q.len() - 1].replace("\"\"", "\"")))
+        }
+        _ => None,
+    }
+}
+
+/// The arguments of each call in a formula: (function, arguments), each
+/// argument its tokens without spaces.
+fn calls(toks: &[formula::Token]) -> Vec<(String, Vec<Vec<&formula::Token>>)> {
+    let mut out = vec![];
+    for (i, t) in toks.iter().enumerate() {
+        let Tok::Func(n) = &t.kind else { continue };
+        let mut args: Vec<Vec<&formula::Token>> = vec![vec![]];
+        let mut depth = 0;
+        for u in &toks[i + 1..] {
+            match &u.kind {
+                Tok::Open | Tok::Array('{') => {
+                    depth += 1;
+                    if depth == 1 {
+                        continue;
+                    }
+                }
+                Tok::Close | Tok::Array('}') => {
+                    depth -= 1;
+                    if depth == 0 {
+                        break;
+                    }
+                }
+                Tok::Comma if depth == 1 => {
+                    args.push(vec![]);
+                    continue;
+                }
+                Tok::Space => continue,
+                _ => {}
+            }
+            if depth == 0 {
+                break;
+            }
+            args.last_mut().unwrap().push(u);
+        }
+        if args.len() == 1 && args[0].is_empty() {
+            args.clear();
+        }
+        out.push((formula::bare_function(n), args));
+    }
+    out
+}
+
+/// The formula's lookups that bisect a sorted vector.
+fn searches(book: &Book, f: &Formula) -> Vec<Search> {
+    let toks = formula::tokenize(&f.text);
+    let text = f.text.as_str();
+    // The area an argument names: one reference, structured reference, or
+    // defined name that is one.
+    let area = |arg: &[&formula::Token]| -> Option<(usize, CellRange)> {
+        let [t] = arg else { return None };
+        match &t.kind {
+            Tok::Ref(_) | Tok::Structured(_) => {}
+            Tok::Name(n) if computed_name(book, n).is_none() && name_formula(book, n).is_some() => {}
+            _ => return None,
+        }
+        let mut p = vec![];
+        refs_of(book, &text[t.start..t.end], f.sheet, f.row, f.col, &mut p, 0);
+        match p.as_slice() {
+            [Prec::Area(s, r)] => Some((*s, *r)),
+            _ => None,
+        }
+    };
+    let key = |arg: Option<&Vec<&formula::Token>>| -> Option<Result<Key, CellValue>> {
+        let arg = arg?;
+        if let Some(v) = constant_arg(text, arg) {
+            return Some(Err(v));
+        }
+        match area(arg)? {
+            (s, r) if r.first == r.last => Some(Ok((s, r.first.row, r.first.col))),
+            _ => None,
+        }
+    };
+    // A numeric mode argument: absent, empty, a number, or something else.
+    enum Mode {
+        Absent,
+        Empty,
+        Is(f64),
+        Unknown,
+    }
+    let mode = |arg: Option<&Vec<&formula::Token>>| match arg {
+        None => Mode::Absent,
+        Some(a) if a.is_empty() => Mode::Empty,
+        Some(a) => match constant_arg(text, a) {
+            Some(CellValue::Number(n)) => Mode::Is(n.trunc()),
+            Some(CellValue::Bool(b)) => Mode::Is(f64::from(u8::from(b))),
+            _ => Mode::Unknown,
+        },
+    };
+    let mut out = vec![];
+    for (name, args) in calls(&toks) {
+        // (whether it bisects ascending, descending, or not; the vector; the key)
+        let (asc, vector) = match name.as_str() {
+            "XLOOKUP" | "XMATCH" => {
+                let (mi, si) = if name == "XLOOKUP" { (4, 5) } else { (2, 3) };
+                let asc = match mode(args.get(si)) {
+                    Mode::Absent | Mode::Empty => continue,
+                    Mode::Is(2.0) => true,
+                    Mode::Is(-2.0) => false,
+                    Mode::Is(_) => continue,
+                    Mode::Unknown => {
+                        out.push(Search::Unknown);
+                        continue;
+                    }
+                };
+                // A wildcard match (mode 2) compares patterns, not order.
+                let plain = match mode(args.get(mi)) {
+                    Mode::Absent | Mode::Empty => true,
+                    Mode::Is(n) => [-1.0, 0.0, 1.0].contains(&n),
+                    Mode::Unknown => false,
+                };
+                if !plain {
+                    out.push(Search::Unknown);
+                    continue;
+                }
+                (asc, args.get(1).and_then(|a| area(a)))
+            }
+            "MATCH" => {
+                let asc = match mode(args.get(2)) {
+                    Mode::Absent => true,
+                    Mode::Is(0.0) => continue,
+                    Mode::Is(n) => n > 0.0,
+                    Mode::Empty | Mode::Unknown => {
+                        out.push(Search::Unknown);
+                        continue;
+                    }
+                };
+                (asc, args.get(1).and_then(|a| area(a)))
+            }
+            "VLOOKUP" | "HLOOKUP" => {
+                match mode(args.get(3)) {
+                    Mode::Absent => {}
+                    Mode::Is(0.0) => continue,
+                    Mode::Is(_) => {}
+                    Mode::Empty | Mode::Unknown => {
+                        out.push(Search::Unknown);
+                        continue;
+                    }
+                }
+                // The table's first column (VLOOKUP) or first row (HLOOKUP).
+                let v = args.get(1).and_then(|a| area(a)).map(|(s, mut r)| {
+                    if name == "VLOOKUP" {
+                        r.last.col = r.first.col;
+                    } else {
+                        r.last.row = r.first.row;
+                    }
+                    (s, r)
+                });
+                (true, v)
+            }
+            // The vector form; the array form (two arguments) is left.
+            "LOOKUP" if args.len() == 3 => (true, args.get(1).and_then(|a| area(a))),
+            "LOOKUP" => {
+                out.push(Search::Unknown);
+                continue;
+            }
+            _ => continue,
+        };
+        match (vector, key(args.first())) {
+            (Some((sheet, vector)), Some(key))
+                if vector.first.row == vector.last.row || vector.first.col == vector.last.col =>
+            {
+                out.push(Search::Sorted { key, sheet, vector, ascending: asc })
+            }
+            _ => out.push(Search::Unknown),
+        }
+    }
+    out
 }
 
 fn precedents(book: &Book, f: &Formula) -> Vec<Prec> {
@@ -207,18 +457,11 @@ fn refs_of(book: &Book, text: &str, sheet: usize, row: u32, col: u32, out: &mut 
             Tok::Func(n) if matches!(formula::bare_function(&n).as_str(), "INDIRECT" | "OFFSET") => {
                 out.push(Prec::Unknown)
             }
-            Tok::Name(n) => {
-                let def = book.wb.root.elements().find(|e| e.local() == "definedNames").and_then(|d| {
-                    d.elements()
-                        .find(|e| e.get("name").is_some_and(|x| x.eq_ignore_ascii_case(&n)))
-                        .map(|e| e.text_of(&[e.name.as_str()]))
-                });
-                match def {
-                    Some(d) if depth < 8 => refs_of(book, &d, sheet, row, col, out, depth + 1),
-                    Some(_) => out.push(Prec::Unknown),
-                    None => {}
-                }
-            }
+            Tok::Name(n) => match name_formula(book, &n) {
+                Some(d) if depth < 8 => refs_of(book, &d, sheet, row, col, out, depth + 1),
+                Some(_) => out.push(Prec::Unknown),
+                None => {}
+            },
             _ => {}
         }
     }
@@ -430,14 +673,28 @@ pub fn recompute(book: &mut Book, ch: &Changed) -> Result<Recalc, String> {
         return Ok(rc);
     }
     let epoch = if book.date1904 { reads_the_epoch(&fs, &d) } else { HashSet::new() };
-    let values = evaluate(book, &fs, &d)?;
+    // A lookup over data not sorted as it searches keeps its cached value, and
+    // what reads it is computed again with that value.
+    let mut unsorted: HashSet<Key> = HashSet::new();
+    let values = loop {
+        let (values, more) = evaluate(book, &fs, &d, &unsorted)?;
+        if more.is_empty() {
+            break values;
+        }
+        unsorted.extend(more);
+    };
     // Cached values to write: sheet → row → (column, value).
     let mut writes: BTreeMap<usize, BTreeMap<u32, Vec<(u32, CellValue)>>> = BTreeMap::new();
     for &k in &d {
         let f = &fs[k];
-        let at = || format!("{}!{}{}", book.sheets[f.sheet].name, hanji_core::cells::col_letters(f.col), f.row);
+        let at = || match &f.area {
+            Some(a) => format!("{}!{a}", book.sheets[f.sheet].name),
+            None => format!("{}!{}{}", book.sheets[f.sheet].name, hanji_core::cells::col_letters(f.col), f.row),
+        };
         let why = if f.constant {
             Some("volatile or array formula")
+        } else if unsorted.contains(&(f.sheet, f.row, f.col)) {
+            Some("a lookup that bisects data not sorted as it searches")
         } else if epoch.contains(&k) {
             Some("reads dates in the 1904 system")
         } else {
@@ -452,7 +709,13 @@ pub fn recompute(book: &mut Book, ch: &Changed) -> Result<Recalc, String> {
                 if !EXCEL_ERRORS.contains(&e.as_str())
                     || (e == "#NAME?" && f.cached != CellValue::Error("#NAME?".into())) =>
             {
-                rc.left.push(format!("{} ({e} in the calculator)", at()))
+                match computed_name(book, &f.text) {
+                    Some(n) if e == "#NAME?" => rc.left.push(format!(
+                        "{} (reads the defined name {n}, a formula: the calculator reads names that are references only)",
+                        at()
+                    )),
+                    _ => rc.left.push(format!("{} ({e} in the calculator)", at())),
+                }
             }
             Some(v) if v != f.cached || f.uncached => {
                 writes.entry(f.sheet).or_default().entry(f.row).or_default().push((f.col, v));
@@ -512,8 +775,10 @@ pub fn num_text(n: f64) -> String {
     }
 }
 
-/// IronCalc's value of every formula cell of the book.
-fn evaluate(book: &Book, fs: &[Formula], dirty: &[usize]) -> Result<Values, String> {
+/// IronCalc's value of every dirty formula, with the formulas of `fixed`
+/// taken at their cached values; and the dirty formulas, not in `fixed`,
+/// whose lookups bisect a vector not sorted as they search.
+fn evaluate(book: &Book, fs: &[Formula], dirty: &[usize], fixed: &HashSet<Key>) -> Result<(Values, Vec<Key>), String> {
     use ironcalc_base::expressions::parser::new_parser_english;
     use ironcalc_base::types::Cell as C;
     use ironcalc_base::types::{
@@ -633,9 +898,9 @@ fn evaluate(book: &Book, fs: &[Formula], dirty: &[usize]) -> Result<Values, Stri
         }
         *v = merged;
     }
-    let partial = if all { None } else { load_cells(book, fs, Some((&live, &spans)), &mut parser) };
+    let partial = if all { None } else { load_cells(book, fs, Some((&live, &spans)), fixed, &mut parser) };
     let Cells { sheets, strings, errors } =
-        partial.unwrap_or_else(|| load_cells(book, fs, None, &mut parser).expect("the whole book loads"));
+        partial.unwrap_or_else(|| load_cells(book, fs, None, fixed, &mut parser).expect("the whole book loads"));
     for (i, (data, shared)) in sheets.into_iter().enumerate() {
         wb.worksheets[i].sheet_data = data;
         wb.worksheets[i].shared_formulas = shared;
@@ -647,33 +912,86 @@ fn evaluate(book: &Book, fs: &[Formula], dirty: &[usize]) -> Result<Values, Stri
     wb.shared_strings = ss;
     let mut m = match Model::from_workbook(wb, "en") {
         Ok(m) => m,
-        Err(_) => return Ok(HashMap::new()),
+        Err(_) => return Ok((HashMap::new(), vec![])),
     };
     for (s, row, col, e) in errors {
         let _ = m.set_user_input(s, row, col, e);
     }
     m.evaluate();
+    let value = |s: usize, r: u32, c: u32| -> Option<CellValue> {
+        let cell = m.workbook.worksheet(s as u32).ok()?.cell(r as i32, c as i32 + 1).cloned()?;
+        Some(match cell {
+            C::CellFormulaNumber { v, .. } | C::NumberCell { v, .. } => CellValue::Number(v),
+            C::CellFormulaBoolean { v, .. } | C::BooleanCell { v, .. } => CellValue::Bool(v),
+            C::CellFormulaString { v, .. } => CellValue::Text(v),
+            C::CellFormulaError { ei, .. } | C::ErrorCell { ei, .. } => CellValue::Error(ei.to_string()),
+            C::SharedString { si, .. } => {
+                m.workbook.shared_strings.get(si as usize).cloned().map_or(CellValue::Empty, CellValue::Text)
+            }
+            C::EmptyCell { .. } => CellValue::Empty,
+            C::CellFormula { .. } => CellValue::Error("#N/IMPL".into()),
+        })
+    };
     let mut out = HashMap::new();
+    let mut unsorted = vec![];
     for f in dirty.iter().map(|&k| &fs[k]) {
-        let v = m
-            .workbook
-            .worksheet(f.sheet as u32)
-            .ok()
-            .and_then(|w| w.cell(f.row as i32, f.col as i32 + 1).cloned())
-            .map(|c| match c {
-                C::CellFormulaNumber { v, .. } | C::NumberCell { v, .. } => CellValue::Number(v),
-                C::CellFormulaBoolean { v, .. } | C::BooleanCell { v, .. } => CellValue::Bool(v),
-                C::CellFormulaString { v, .. } => CellValue::Text(v),
-                C::CellFormulaError { ei, .. } | C::ErrorCell { ei, .. } => CellValue::Error(ei.to_string()),
-                C::SharedString { si, .. } => {
-                    m.workbook.shared_strings.get(si as usize).cloned().map_or(CellValue::Empty, CellValue::Text)
-                }
-                C::EmptyCell { .. } => CellValue::Empty,
-                C::CellFormula { .. } => CellValue::Error("#N/IMPL".into()),
-            });
-        out.insert((f.sheet, f.row, f.col), v);
+        let key = (f.sheet, f.row, f.col);
+        if !f.constant && !fixed.contains(&key) && !f.searches.iter().all(|s| sorted(s, &value)) {
+            unsorted.push(key);
+        }
+        out.insert(key, value(f.sheet, f.row, f.col));
     }
-    Ok(out)
+    Ok((out, unsorted))
+}
+
+/// Text whose order is the same in Excel's comparison and in IronCalc's
+/// (letters, digits and spaces, compared without case).
+fn plain_text(t: &str) -> bool {
+    t.chars().all(|c| c.is_ascii_alphanumeric() || c == ' ')
+}
+
+/// Whether a lookup's vector is sorted as it searches, strictly (a repeated
+/// value is found at a place that depends on the bisection too), every value
+/// of the key's kind: numbers, or plain text.
+fn sorted(s: &Search, value: &dyn Fn(usize, u32, u32) -> Option<CellValue>) -> bool {
+    let Search::Sorted { key, sheet, vector, ascending } = s else { return false };
+    let key = match key {
+        Ok((s, r, c)) => value(*s, *r, *c).unwrap_or(CellValue::Empty),
+        Err(v) => v.clone(),
+    };
+    // Numbers as IronCalc compares them, to 15 significant digits.
+    let order = |a: &CellValue, b: &CellValue| -> Option<std::cmp::Ordering> {
+        match (a, b) {
+            (CellValue::Number(x), CellValue::Number(y)) => {
+                let p = |v: f64| format!("{v:.14e}").parse::<f64>().unwrap_or(v);
+                p(*x).partial_cmp(&p(*y))
+            }
+            (CellValue::Text(x), CellValue::Text(y)) if plain_text(x) && plain_text(y) => {
+                Some(x.to_ascii_uppercase().cmp(&y.to_ascii_uppercase()))
+            }
+            _ => None,
+        }
+    };
+    if order(&key, &key).is_none() {
+        return false;
+    }
+    let want = if *ascending { std::cmp::Ordering::Less } else { std::cmp::Ordering::Greater };
+    let mut last: Option<CellValue> = None;
+    for r in vector.first.row..=vector.last.row {
+        for c in vector.first.col..=vector.last.col {
+            let v = value(*sheet, r, c).unwrap_or(CellValue::Empty);
+            if order(&key, &v).is_none() {
+                return false;
+            }
+            if let Some(p) = &last {
+                if order(p, &v) != Some(want) {
+                    return false;
+                }
+            }
+            last = Some(v);
+        }
+    }
+    true
 }
 
 /// A cell: sheet, row, column.
@@ -691,12 +1009,14 @@ struct Cells {
 }
 
 /// The dirty formulas (`live`) and the rows they read (`spans`), every other
-/// formula as its cached value; `None` when one of those has no cached value.
+/// formula (and those of `fixed`) as its cached value; `None` when one of
+/// those has no cached value.
 /// With `only` `None`, every cell and every formula.
 fn load_cells(
     book: &Book,
     fs: &[Formula],
     only: Option<(&HashSet<Key>, &Spans)>,
+    fixed: &HashSet<Key>,
     parser: &mut ironcalc_base::expressions::parser::Parser<'_>,
 ) -> Option<Cells> {
     use ironcalc_base::types::Cell as C;
@@ -720,9 +1040,9 @@ fn load_cells(
                     }
                     let (rr, col) = (row.r as i32, c.col as i32 + 1);
                     let key = (i, row.r, c.col);
-                    let f = formula_at
-                        .get(&key)
-                        .filter(|f| !f.constant && only.is_none_or(|(live, _)| live.contains(&key)));
+                    let f = formula_at.get(&key).filter(|f| {
+                        !f.constant && !fixed.contains(&key) && only.is_none_or(|(live, _)| live.contains(&key))
+                    });
                     let cell = match f {
                         Some(f) => {
                             let at = CellReferenceRC { sheet: book.sheets[i].name.clone(), row: rr, column: col };
