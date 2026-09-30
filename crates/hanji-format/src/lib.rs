@@ -4,6 +4,7 @@
 //! validator errors written for the model. No I/O.
 
 pub mod ast;
+pub mod cellfmt;
 pub mod chars;
 pub mod diag;
 pub mod formula;

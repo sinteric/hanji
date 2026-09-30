@@ -296,7 +296,7 @@ impl Hanji {
     }
 
     #[tool(
-        description = "Write spreadsheet cells with range operations: `ops` is a JSON array applied in order, all or nothing, from set, append_rows, insert_rows, delete_rows, fill_formula, set_type, add_column, sort, add_table, add_sheet (keys in the instructions). Read the structure and a row window first. Numbers are JSON numbers, dates \"YYYY-MM-DD\" text; a value starting with = is stored as text: formulas go only in a column's formula or fill_formula, with structured references ([@매출]). At most 50 new rows per call. `revision` must be the current one. Returns the new revision, ranges that moved, notices and recalculated formulas."
+        description = "Write spreadsheet cells with range operations: `ops` is a JSON array applied in order, all or nothing, from set, append_rows, insert_rows, delete_rows, fill_formula, set_type, add_column, sort, add_table, add_sheet, and format for cell formatting (keys in the instructions). Read the structure and a row window first. Numbers are JSON numbers, dates \"YYYY-MM-DD\" text; a value starting with = is stored as text: formulas go only in a column's formula or fill_formula, with structured references ([@매출]). At most 50 new rows per call. `revision` must be the current one. Returns the new revision, ranges that moved, notices and recalculated formulas."
     )]
     async fn hanji_ops(&self, Parameters(a): Parameters<OpsArgs>) -> Result<CallToolResult, ErrorData> {
         let ops = match a.ops {

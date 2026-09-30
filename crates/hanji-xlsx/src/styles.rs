@@ -12,7 +12,7 @@ use crate::numfmt;
 #[derive(Clone, Debug, Default)]
 pub struct Styles {
     pub part: Option<String>,
-    doc: Option<xml::Doc>,
+    pub(crate) doc: Option<xml::Doc>,
     /// Custom number formats: id → code.
     pub fmts: BTreeMap<u32, String>,
     /// The number format id of each cell style (`cellXfs`, by index).

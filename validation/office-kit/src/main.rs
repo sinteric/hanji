@@ -26,7 +26,9 @@
 //!   cropped, one cut to an ellipse with new alternative text; and text
 //!   formatting: a word made 24 pt coral, a shape's font changed).
 //! - xlsx: per workbook, GetPut and range operations that change the inputs
-//!   of formulas, whose cached values the export recomputes.
+//!   of formulas, whose cached values the export recomputes, and `format`
+//!   operations on named ranges (a header row filled and bold, a column in
+//!   a theme colour, a range filled, an outline).
 //! - hwpx: per file, GetPut and E10.
 
 mod formats;
@@ -651,7 +653,8 @@ const XLSX: &[XlsxCase] = &[
         "korean-sales.xlsx",
         "CC0-1.0, synthetic (written for this project with openpyxl)",
         r##"[{"op": "set", "range": "매출!D5", "values": [[18420000]]},
-             {"op": "append_rows", "table": "Sales", "rows": [{"월": "2026-04", "지점": "강남", "제품군": "가전", "매출": 12400000, "원가": 9000000}]}]"##,
+             {"op": "append_rows", "table": "Sales", "rows": [{"월": "2026-04", "지점": "강남", "제품군": "가전", "매출": 12400000, "원가": 9000000}]},
+             {"op": "format", "range": "매출!A3:F3", "set": {"fill": "#D9D9D9", "bold": true, "border-bottom": "0.75pt solid #000000"}}]"##,
         &[("요약", "A1:B8"), ("매출", "A3:F6")],
     ),
     (
@@ -663,14 +666,17 @@ const XLSX: &[XlsxCase] = &[
     (
         "ExcelTables.xlsx",
         "Apache-2.0 (Apache POI test data)",
-        r##"[{"op": "set", "range": "ExcelTable!H3", "values": [[58]]}]"##,
+        r##"[{"op": "set", "range": "ExcelTable!H3", "values": [[58]]},
+             {"op": "format", "range": "ExcelTable!I2:I4", "set": {"color": "accent6", "italic": true}}]"##,
         &[("ExcelTable", "G1:I4")],
     ),
     (
         "simple-monthly-budget.xlsx",
         "Apache-2.0 (Apache POI test data)",
         r##"[{"op": "set", "range": "Simple Monthly Budget!C5", "values": [[3200]]},
-             {"op": "set", "range": "Simple Monthly Budget!C11", "values": [[950]]}]"##,
+             {"op": "set", "range": "Simple Monthly Budget!C11", "values": [[950]]},
+             {"op": "format", "range": "Simple Monthly Budget!B5:C7", "set": {"fill": "accent2+80%"}},
+             {"op": "format", "range": "Simple Monthly Budget!E4:H5", "set": {"outline": "2pt solid #1F3864"}}]"##,
         &[("Simple Monthly Budget", "A1:H8")],
     ),
     (
@@ -749,10 +755,19 @@ fn xlsx(kit: &mut Kit) {
             name,
             licence,
             "ops",
-            "range operations that change the inputs of formulas",
+            if ops.contains("\"format\"") {
+                "range operations that change the inputs of formulas, and format operations (fill, borders, font) on the ranges they name"
+            } else {
+                "range operations that change the inputs of formulas"
+            },
             &out,
             vec![
                 excel.clone(),
+                if ops.contains("\"format\"") {
+                    "Each format operation's range (in the operations below) shows what it sets: the fill, bold, italic, colour or border it names, and nothing else of the cells changes".into()
+                } else {
+                    "No cell's formatting changes".into()
+                },
                 if left.is_empty() {
                     "Formula results show the new values without pressing F9 (compare the values listed below)".into()
                 } else {
