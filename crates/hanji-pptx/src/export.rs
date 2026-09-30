@@ -1728,9 +1728,6 @@ fn group_geometry(
     if members.is_empty() {
         // The group's box alone: its objects follow in its child coordinates.
         let g = sg.merged(&wg.unwrap());
-        if g.rot != 0 || g.flip_h || g.flip_v {
-            return Err("a group is not rotated or flipped here".into());
-        }
         let own = geom::own(el).unwrap_or_default();
         let at = parent.back(&g);
         let keep = |a: i64, b: i64, s: i64, x: i64| {
@@ -1746,7 +1743,10 @@ fn group_geometry(
             y: keep(own.y, at.y, sg.y, wv.y),
             w: keep(own.w, at.w, sg.w, wv.w),
             h: keep(own.h, at.h, sg.h, wv.h),
-            ..own
+            // Turned or flipped as a whole, its objects with it.
+            rot: g.rot,
+            flip_h: g.flip_h,
+            flip_v: g.flip_v,
         };
         geom::write(el, &next)?;
         return Ok(ids_in(el));
@@ -1824,7 +1824,12 @@ fn group_geometry(
         })
         .collect();
     let u = geom::union(&boxes).ok_or("a group without objects")?;
-    if (u.x, u.y, u.w, u.h) != (local.ch_off.0, local.ch_off.1, local.ch_ext.0, local.ch_ext.1) && u.w > 0 && u.h > 0 {
+    let turned = geom::own(el).is_some_and(|g| g.rot.rem_euclid(hanji_format::FULL_TURN) != 0 || g.flip_h || g.flip_v);
+    let refit = (u.x, u.y, u.w, u.h) != (local.ch_off.0, local.ch_off.1, local.ch_ext.0, local.ch_ext.1);
+    if turned && refit {
+        return Err("it is turned or flipped, and its objects are moved or resized beyond the box they fill: its turn is about that box's centre, so the others would move on the slide. Move them within it, move, resize or turn the whole group, or ungroup it in PowerPoint".into());
+    }
+    if refit && u.w > 0 && u.h > 0 {
         let out = local.out(&u);
         let own = geom::own(el).unwrap_or_default();
         geom::write(el, &Geom { x: out.x, y: out.y, w: out.w, h: out.h, ..own })?;
