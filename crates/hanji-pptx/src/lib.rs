@@ -17,6 +17,7 @@ pub mod export;
 pub mod fill;
 pub mod geom;
 pub mod import;
+pub mod kind;
 pub mod members;
 pub mod outline;
 pub mod pml;
@@ -128,6 +129,8 @@ impl TextModel for PptxModel {
                     if h.look.is_empty() {
                         h.look.fill = fill::shown(slot.and_then(|s| s.fill.as_ref()));
                         h.look.border = slot.and_then(|s| s.line.as_ref()).and_then(|l| l.border());
+                        (h.look.kind, h.look.adj) =
+                            slot.and_then(|s| s.geo.as_ref()).map_or((None, None), |g| g.shown(false));
                     }
                 }
                 _ => {}

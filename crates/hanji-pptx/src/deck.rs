@@ -44,6 +44,9 @@ pub struct SlotInfo {
     /// The outline it inherits, likewise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub line: Option<Ln>,
+    /// The preset shape it inherits, likewise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub geo: Option<crate::kind::Geo>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -190,6 +193,7 @@ impl Deck {
                         (Some(a), Some(b)) => Some(a.over(&b)),
                         (a, b) => a.or(b),
                     };
+                    let geo = ph.geo.clone().or_else(|| master_ph.and_then(|m| m.geo.clone()));
                     slots.push(SlotInfo {
                         name,
                         ty: ph.ty.clone(),
@@ -202,6 +206,7 @@ impl Deck {
                         text,
                         fill,
                         line,
+                        geo,
                     });
                 }
                 deck.layouts.push(LayoutInfo {
@@ -276,6 +281,8 @@ pub(crate) struct Ph {
     pub fill: Option<FillXml>,
     /// Its own outline over its style's.
     pub line: Option<Ln>,
+    /// Its own preset or custom geometry.
+    pub geo: Option<crate::kind::Geo>,
 }
 
 /// The placeholders of a master's or layout's shape tree, in order.
@@ -297,7 +304,18 @@ pub(crate) fn placeholders(root: &Element, fills: &ThemeFills) -> Vec<Ph> {
                 (Some(a), Some(b)) => Some(a.over(&b)),
                 (a, b) => a.or(b),
             };
-            Some(Ph { ty, idx, ph: ph.to_xml(), name, x, lst, geom: crate::geom::own(sh), fill, line })
+            Some(Ph {
+                ty,
+                idx,
+                ph: ph.to_xml(),
+                name,
+                x,
+                lst,
+                geom: crate::geom::own(sh),
+                fill,
+                line,
+                geo: crate::kind::own(sh),
+            })
         })
         .collect()
 }

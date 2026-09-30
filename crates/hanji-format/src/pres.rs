@@ -833,7 +833,7 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
     Some((sh, ItemMap { head, blocks }))
 }
 
-const LINE_FORM: &str = "a line is <line id=\"…\" name=\"…\" from=\"x y\" to=\"x y\"/>, its two ends in points, its id and name as they are in the file, with border=\"<width>pt <style> <colour>\" and start= and end= arrowheads (triangle, stealth, diamond, oval, arrow) when it has them; a new line is <line from=\"x y\" to=\"x y\"/>";
+const LINE_FORM: &str = "a line is <line id=\"…\" name=\"…\" from=\"x y\" to=\"x y\"/>, its two ends in points, its id and name as they are in the file, with kind=\"bentConnector3\" (or another connector) when it is not straight, border=\"<width>pt <style> <colour>\" and start= and end= arrowheads (triangle, stealth, diamond, oval, arrow) when it has them; a new line is <line from=\"x y\" to=\"x y\"/>";
 
 /// A `<line …/>` line.
 fn line_item(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Option<(LineItem, ItemMap)> {
