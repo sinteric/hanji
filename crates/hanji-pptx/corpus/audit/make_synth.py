@@ -6,7 +6,9 @@ shapes, gradients, cropped/masked pictures, connectors, a chart, a table,
 transitions and an entrance animation. python-pptx 1.0.2.
 
 Run: pip install python-pptx==1.0.2 pillow && python3 make_synth.py .
-Regenerating gives the same content, not the same bytes (zip timestamps)."""
+Regenerating gives the same content, not the same bytes (zip timestamps). The output must pass
+validation/ooxml-schema/validate.py (the transitional schemas): the first version wrote an
+empty animation list and negative chart axis ids, and PowerPoint repaired the pitch deck."""
 import io, copy, random
 from PIL import Image, ImageDraw, ImageFilter
 from pptx import Presentation
@@ -134,13 +136,24 @@ def transition(slide, kind='fade'):
 
 
 def appear(slide, spids):
-    """An entrance (fade) on click for each shape id."""
+    """An entrance (fade) on click for each shape id. A timing tree needs at least one effect:
+    an empty p:childTnLst is invalid, and PowerPoint repairs the file."""
+    assert spids, 'no shapes to animate'
     pars = ''
     for n, sid in enumerate(spids):
         c = 10 + n * 10
         pars += f'''<p:par><p:cTn id="{c}" fill="hold"><p:stCondLst><p:cond delay="indefinite"/></p:stCondLst><p:childTnLst><p:par><p:cTn id="{c+1}" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst><p:par><p:cTn id="{c+2}" presetID="10" presetClass="entr" presetSubtype="0" fill="hold" nodeType="clickEffect"><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst><p:set><p:cBhvr><p:cTn id="{c+3}" dur="1" fill="hold"><p:stCondLst><p:cond delay="0"/></p:stCondLst></p:cTn><p:tgtEl><p:spTgt spid="{sid}"/></p:tgtEl><p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst></p:cBhvr><p:to><p:strVal val="visible"/></p:to></p:set><p:animEffect transition="in" filter="fade"><p:cBhvr><p:cTn id="{c+4}" dur="500"/><p:tgtEl><p:spTgt spid="{sid}"/></p:tgtEl></p:cBhvr></p:animEffect></p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par>'''
     xml = f'''<p:timing xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:tnLst><p:par><p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot"><p:childTnLst><p:seq concurrent="1" nextAc="seek"><p:cTn id="2" dur="indefinite" nodeType="mainSeq"><p:childTnLst>{pars}</p:childTnLst></p:cTn><p:prevCondLst><p:cond evt="onPrev" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:prevCondLst><p:nextCondLst><p:cond evt="onNext" delay="0"><p:tgtEl><p:sldTgt/></p:tgtEl></p:cond></p:nextCondLst></p:seq></p:childTnLst></p:cTn></p:par></p:tnLst></p:timing>'''
     slide._element.append(etree.fromstring(xml))
+
+
+def chart(s, kind, x, y, w, h, cd):
+    """python-pptx 1.0.2 writes negative axis ids (c:axId, c:crossAx), which the schema's
+    xsd:unsignedInt rejects; they are made positive here."""
+    gf = s.shapes.add_chart(kind, x, y, w, h, cd)
+    for el in gf.chart._chartSpace.iter(qn('c:axId'), qn('c:crossAx')):
+        el.set('val', str(abs(int(el.get('val')))))
+    return gf
 
 
 def mask(pic, prst='ellipse'):
@@ -206,7 +219,6 @@ def pitch(path):
         hd = textbox(s, x + 24, 214, 212, 40, h, 24, NAVY, True)
         bd = textbox(s, x + 24, 260, 212, 120, b, 16, (0x55, 0x55, 0x55))
         s.shapes.add_group_shape([card, ic, hd, bd]).name = 'Card %d' % (i + 1)
-    appear(s, [])
 
     s = prs.slides.add_slide(blank)  # 4 big numbers, chevrons (rotated), gradient band
     band = shape(s, MSO_SHAPE.RECTANGLE, 0, 0, 960, 180, fill=TEAL)
@@ -253,7 +265,7 @@ def pitch(path):
     cd.categories = ['Q1', 'Q2', 'Q3', 'Q4']
     cd.add_series('Revenue', (1.2, 2.1, 3.3, 4.8))
     cd.add_series('Cost', (1.8, 2.0, 2.4, 2.9))
-    s.shapes.add_chart(XL_CHART_TYPE.COLUMN_CLUSTERED, Pt(64), Pt(120), Pt(480), Pt(340), cd)
+    chart(s, XL_CHART_TYPE.COLUMN_CLUSTERED, Pt(64), Pt(120), Pt(480), Pt(340), cd)
     tb = s.shapes.add_table(4, 2, Pt(580), Pt(140), Pt(320), Pt(160)).table
     for r, (a, b) in enumerate([('Metric', 'Value'), ('CAC', '$18'), ('LTV', '$240'), ('Payback', '4 mo')]):
         tb.cell(r, 0).text, tb.cell(r, 1).text = a, b
@@ -333,7 +345,7 @@ def report(path):
     cd = CategoryChartData()
     cd.categories = ['구독', '라이선스', '서비스']
     cd.add_series('비중', (0.55, 0.3, 0.15))
-    s.shapes.add_chart(XL_CHART_TYPE.DOUGHNUT, Pt(60), Pt(130), Pt(360), Pt(360), cd)
+    chart(s, XL_CHART_TYPE.DOUGHNUT, Pt(60), Pt(130), Pt(360), Pt(360), cd)
     for i, (lab, col) in enumerate([('구독 55%', BLUE), ('라이선스 30%', (0xF5, 0x9E, 0x0B)), ('서비스 15%', (0x10, 0xB9, 0x81))]):
         shape(s, MSO_SHAPE.RECTANGLE, 500, 200 + i * 50, 20, 20, fill=col)
         textbox(s, 530, 195 + i * 50, 300, 30, lab, 18, INK, font='맑은 고딕')
