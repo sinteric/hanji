@@ -554,9 +554,20 @@ fn p12_move_shape(d: &Doc, cx: &Cx) -> Option<Edit> {
     Some(geometry_edit("P12 move a shape", what, moved(d, k, to), k, slide))
 }
 
+/// Whether head `k` is an object stored in `mc:AlternateContent`, which
+/// the write refuses to move or resize (DESIGN.md §5.3).
+fn alternate_content(d: &Doc, k: usize) -> bool {
+    let Some(Block::Keep(kid)) = d.blocks.get(k + 1) else { return false };
+    d.entries.iter().any(|e| {
+        e.meta.keep.as_ref().is_some_and(|x| &x.id == kid)
+            && e.xml.first().is_some_and(|x| x.starts_with("<mc:AlternateContent"))
+    })
+}
+
 /// The first picture grows by half about its top-left corner, or shrinks by a third when that would leave the slide.
+/// A picture in `mc:AlternateContent` cannot be resized here and is passed over.
 fn p13_resize_picture(d: &Doc, cx: &Cx) -> Option<Edit> {
-    let picture = |d: &Doc, k: usize| label(d, k) == "the picture";
+    let picture = |d: &Doc, k: usize| label(d, k) == "the picture" && !alternate_content(d, k);
     let (k, slide, g) = movable(d, &picture).into_iter().next()?;
     let (w, h) = slide_size(cx);
     let s = |v: i64, num: i64, den: i64| hanji_format::shown_pt(v * num / den) * PT;
