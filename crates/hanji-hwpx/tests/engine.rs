@@ -341,6 +341,98 @@ fn bullets_and_numbers_are_list_items() {
     assert_eq!(import(&out).text, r.text, "PutGet");
 }
 
+/// A package with `body` and a second bullet: shape 2 is bullet 1 at the
+/// margin, shape 4 bullet 2 one level down, indented.
+fn nested_lists(body: &[String]) -> Vec<u8> {
+    // Shape 4: a second bullet one level down, indented.
+    let nested = r#"<hh:paraPr id="4"><hh:align horizontal="JUSTIFY"/><hh:heading type="BULLET" idRef="2" level="1"/><hh:margin><hc:left value="2000" unit="HWPUNIT"/></hh:margin></hh:paraPr>"#;
+    let mut parts = package::read(&hwpx(body)).unwrap();
+    let h = parts.iter_mut().find(|p| p.name == "Contents/header.xml").unwrap();
+    h.data = String::from_utf8(std::mem::take(&mut h.data))
+        .unwrap()
+        .replace(
+            r#"<hh:bullets itemCnt="1"><hh:bullet id="1" char="-"/>"#,
+            r#"<hh:bullets itemCnt="2"><hh:bullet id="1" char="-"/><hh:bullet id="2" char="o"/>"#,
+        )
+        .replace(r#"<hh:paraProperties itemCnt="4">"#, r#"<hh:paraProperties itemCnt="5">"#)
+        .replace("</hh:paraProperties>", &format!("{nested}</hh:paraProperties>"))
+        .into_bytes();
+    package::write(&parts).unwrap()
+}
+
+/// A new item takes the shape of an item at its own level: a level's shape
+/// holds its indent and bullet, which Hancom shows (the kit's 73: the first
+/// half of a split nested item took the outer item's shape with only its
+/// heading level changed, and Hancom showed it at the outer level).
+#[test]
+fn a_new_nested_item_takes_the_shape_of_its_level() {
+    let body = [
+        p_in(0, 2, &[(0, "상위")]),
+        p_in(0, 4, &[(0, "짧게 그리고 아주 길게 이어지는 문장")]),
+        p_in(0, 2, &[(0, "다음 상위")]),
+    ];
+    let pkg = nested_lists(&body);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("- 상위\n  - 짧게 그리고 아주 길게 이어지는 문장\n- 다음 상위\n"), "{}", imp.text);
+    // Split the nested item: the longer half keeps the paragraph, so the first half is the new
+    // one, between the outer item and it. Both are nested items in shape 4; no shape is added.
+    let split = imp.text.replace("짧게 그리고", "짧게\n  - 그리고");
+    let r = rewrite(&imp.remainder, &imp.text, &split, CAPS).unwrap();
+    let out = export(&r.text, &r.remainder);
+    let sec = section(&out);
+    for t in ["짧게", "그리고 아주 길게 이어지는 문장"] {
+        let root = xml::parse(sec.as_bytes()).unwrap().root;
+        let p = root.elements().find(|p| p.is("hp:p") && p.text_of(&["hp:t"]) == t).unwrap().clone();
+        assert_eq!(p.get("paraPrIDRef").as_deref(), Some("4"), "{t}: {sec}");
+    }
+    let parts = package::read(&out).unwrap();
+    assert_eq!(
+        package::get(&parts, "Contents/header.xml"),
+        package::get(&package::read(&pkg).unwrap(), "Contents/header.xml")
+    );
+    assert_eq!(import(&out).text, r.text, "PutGet");
+    save("engine-lists", "ORIGINAL", &pkg);
+    save("engine-lists", "split-nested", &out);
+}
+
+/// An item the text moves to another level takes that level's shape from an
+/// item there, bullet and indent (the kit's 73: E4 moved a level-3 item out
+/// to head a list; only its heading level changed, and Hancom showed it at
+/// its old indent).
+#[test]
+fn an_item_moved_to_another_level_takes_that_levels_shape() {
+    let body = [
+        p_in(0, 2, &[(0, "상위")]),
+        p_in(0, 4, &[(0, "하위")]),
+        p_in(0, 4, &[(0, "하위 둘")]),
+        p_in(0, 2, &[(0, "다음 상위")]),
+        p("본문"),
+        p_in(0, 2, &[(0, "끝 항목")]),
+    ];
+    let pkg = nested_lists(&body);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("- 상위\n  - 하위\n  - 하위 둘\n- 다음 상위\n\n본문\n\n- 끝 항목\n"), "{}", imp.text);
+    let shape = |out: &[u8], t: &str| {
+        let root = xml::parse(section(out).as_bytes()).unwrap().root;
+        let p = root.elements().find(|p| p.is("hp:p") && p.text_of(&["hp:t"]) == t).unwrap().get("paraPrIDRef");
+        p
+    };
+    let header = |pkg: &[u8]| package::get(&package::read(pkg).unwrap(), "Contents/header.xml").unwrap().to_vec();
+    // The nested item moves out to the margin, into the list after "본문"; "다음 상위" moves
+    // under "상위".
+    let moved = imp
+        .text
+        .replace("  - 하위\n  - 하위 둘\n- 다음 상위\n", "  - 하위 둘\n  - 다음 상위\n")
+        .replace("\n- 끝 항목\n", "\n- 하위\n- 끝 항목\n");
+    let r = rewrite(&imp.remainder, &imp.text, &moved, CAPS).unwrap();
+    let out = export(&r.text, &r.remainder);
+    assert_eq!(shape(&out, "하위").as_deref(), Some("2"), "{}", section(&out));
+    assert_eq!(shape(&out, "다음 상위").as_deref(), Some("4"), "{}", section(&out));
+    assert_eq!(header(&out), header(&pkg));
+    assert_eq!(import(&out).text, r.text, "PutGet");
+    save("engine-lists", "moved-levels", &out);
+}
+
 #[test]
 fn adjacent_lists_of_another_kind_or_definition_stay_separate() {
     // A bullet list right before a numbered one: two lists, as in docx (§5.2).
