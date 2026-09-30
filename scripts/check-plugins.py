@@ -108,7 +108,8 @@ def handshake(label, command, args, cwd, env):
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
+            # MCP is UTF-8 JSON; the locale's encoding (cp1252 on Windows) is not.
+            encoding="utf-8",
         )
     except OSError as e:
         fail(f"{label}: cannot start {command} {args}: {e}")
