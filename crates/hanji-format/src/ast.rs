@@ -114,6 +114,15 @@ pub fn shown_deg(rot: i64) -> i64 {
     (rot as f64 / 60_000.0).round() as i64
 }
 
+/// A full turn in 60,000ths of a degree.
+pub const FULL_TURN: i64 = 21_600_000;
+
+/// Whether two rotations (60,000ths of a degree) turn an object the same
+/// way: -90° is 270°, 360° is 0°. Files store either form.
+pub fn same_turn(a: i64, b: i64) -> bool {
+    (a - b).rem_euclid(FULL_TURN) == 0
+}
+
 /// `written` where it differs from how `stored` is shown, else `stored`:
 /// a number left as shown keeps its exact value (§5.3).
 pub fn keep_or(stored: i64, written: i64) -> i64 {
@@ -132,14 +141,21 @@ impl Geom {
             && p(self.y, other.y)
             && p(self.w, other.w)
             && p(self.h, other.h)
-            && shown_deg(self.rot) == shown_deg(other.rot)
+            && same_turn(shown_deg(self.rot) * 60_000, shown_deg(other.rot) * 60_000)
             && self.flip_h == other.flip_h
             && self.flip_v == other.flip_v
     }
 
-    /// `written`, with each number left as `self` shows it kept exact.
+    /// `written`, with each number left as `self` shows it kept exact. A
+    /// rotation that turns the way `self` is shown keeps its stored value,
+    /// whatever its sign or range (`rot="-5400000"`, shown 270, stays); a
+    /// changed one is from 0 up to a full turn, as the parse reads it.
     pub fn merged(&self, written: &Geom) -> Geom {
-        let rot = if shown_deg(self.rot) * 60_000 == written.rot { self.rot } else { written.rot };
+        let rot = if same_turn(shown_deg(self.rot) * 60_000, written.rot) {
+            self.rot
+        } else {
+            written.rot.rem_euclid(FULL_TURN)
+        };
         Geom {
             x: keep_or(self.x, written.x),
             y: keep_or(self.y, written.y),

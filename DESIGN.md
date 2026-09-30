@@ -359,6 +359,9 @@ layout: Two Content
   shown as whole points; a written number may have decimals. `rot="15"` turns an object 15° clockwise about its centre,
   and its box is the unturned one, as `a:xfrm` stores it. `flip="h"`, `"v"` or
   `"hv"` mirrors it. Both are left out when there is no rotation or flip.
+  A rotation is shown from 0 to 359; one a file stores negative or past a full
+  turn (`rot="-5400000"`, as Google Slides writes) is shown within one turn
+  (`rot="270"`) and, like any number left as shown, keeps its stored value.
   - A number left as it is shown keeps the exact stored value; a changed number
     is used as written (1 pt = 12,700 EMU). A box whose four numbers are
     unchanged leaves its `a:xfrm` untouched (GetPut, §4).

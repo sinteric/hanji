@@ -127,7 +127,7 @@ fn every_object_shows_its_box_and_getput_keeps_every_xfrm() {
         }
         n += 1;
     }
-    assert_eq!(n, 21);
+    assert_eq!(n, 22);
     // shapes.pptx slide 1 reads as round 5's rendering of it: connectors and
     // textless shapes are shown (rule 8), every object with its box.
     let imp = import(&deck("shapes.pptx"));
@@ -428,4 +428,78 @@ fn a_changed_number_another_object_shows_takes_its_exact_emu() {
     let (text, rem) = exact(&text, &rem, "box=\"206 255 308 29\"", "box=\"232 255 308 29\"");
     let f = xfrm_of(&xml(&export(&text, &rem), &s5), "TextBox 2");
     assert!(f.contains("<a:off x=\"2946400\" y=\"3244334\"/>"), "{f}");
+}
+
+#[test]
+fn a_stored_rotation_left_as_shown_keeps_its_exact_value() {
+    // turns-deck.pptx slide 1 stores rotations as Google Slides and older
+    // PowerPoint files do: negative, past a full turn, flipH="true".
+    let pkg = deck("turns-deck.pptx");
+    let before = package::read(&pkg).unwrap();
+    let s1 = slides(&before)[0].clone();
+    let imp = import(&pkg);
+    for shown in [
+        "name=\"Minus ninety\" box=\"60 160 200 40\" rot=\"270\">",
+        "name=\"Minus fifteen flipped\" box=\"300 160 160 60\" rot=\"345\" flip=\"h\">",
+        "name=\"Past a turn\" box=\"500 160 160 60\" rot=\"60\">",
+        "name=\"Turned in group\" box=\"80 420 80 80\" rot=\"315\"/>",
+    ] {
+        assert!(imp.text.contains(shown), "{shown}\n{}", imp.text);
+    }
+    // GetPut: nothing edited, every part as it was (the text is its own canonical form).
+    assert_eq!(canonical(&imp.text, &imp.remainder), imp.text);
+    let parts = export(&imp.text, &imp.remainder);
+    for p in &before {
+        assert_eq!(package::get(&parts, &p.name), Some(&p.data[..]), "{} changed", p.name);
+    }
+    // The same turn written another way (-90 for 270, -300 for 60): still unchanged.
+    let (text, rem) = exact(&imp.text, &imp.remainder, "rot=\"270\">rot", "rot=\"-90\">rot");
+    let (text, rem) = exact(&text, &rem, "rot=\"60\"", "rot=\"-300\"");
+    let out = PptxEngine.export(&text, &rem).unwrap_or_else(|e| panic!("{e}"));
+    assert_eq!(xml(&package::read(&out).unwrap(), &s1), xml(&before, &s1));
+    // A box moved: its rotation, left as shown, keeps its stored value and sign.
+    let (text, rem) = exact(&imp.text, &imp.remainder, "box=\"60 160 200 40\"", "box=\"72 160 200 40\"");
+    let x = xml(&export(&text, &rem), &s1);
+    assert!(xfrm_of(&x, "Minus ninety").starts_with("<a:xfrm rot=\"-5400000\"><a:off x=\"914400\""), "{x}");
+    assert!(xfrm_of(&x, "Past a turn").starts_with("<a:xfrm rot=\"25200000\">"));
+    // A changed rotation is written from 0 up to a full turn; a changed flip
+    // goes, an unchanged one stays as the file writes it.
+    let (text, rem) = exact(&imp.text, &imp.remainder, "rot=\"270\">rot", "rot=\"90\">rot");
+    let (text, rem) = exact(&text, &rem, "rot=\"60\"", "rot=\"-30\"");
+    let (text, rem) = exact(&text, &rem, "rot=\"345\" flip=\"h\"", "rot=\"345\"");
+    let x = xml(&export(&text, &rem), &s1);
+    assert!(xfrm_of(&x, "Minus ninety").starts_with("<a:xfrm rot=\"5400000\">"), "{x}");
+    assert!(xfrm_of(&x, "Past a turn").starts_with("<a:xfrm rot=\"19800000\">"), "{x}");
+    assert!(xfrm_of(&x, "Minus fifteen flipped").starts_with("<a:xfrm rot=\"-900000\">"), "{x}");
+    let (text, rem) = exact(&imp.text, &imp.remainder, "rot=\"60\"", "rot=\"-30\"");
+    let x = xml(&export(&text, &rem), &s1);
+    assert!(xfrm_of(&x, "Minus fifteen flipped").starts_with("<a:xfrm rot=\"-900000\" flipH=\"true\">"), "{x}");
+    // A group's object moved: the turned one beside it keeps its stored rotation.
+    let (text, rem) = exact(&imp.text, &imp.remainder, "box=\"200 430 120 60\"", "box=\"200 440 120 60\"");
+    let x = xml(&export(&text, &rem), &s1);
+    assert!(xfrm_of(&x, "Turned in group").starts_with("<a:xfrm rot=\"-2700000\">"), "{x}");
+}
+
+#[test]
+fn an_alternate_content_object_left_as_shown_is_kept() {
+    // turns-deck.pptx slide 2: a picture in mc:AlternateContent at the top
+    // of the slide, its box not whole points (as Open XML SDK's 3dtestdash
+    // stores a 3D model). Left as shown, the export keeps it; moved, it is
+    // refused with the reason.
+    let pkg = deck("turns-deck.pptx");
+    let before = package::read(&pkg).unwrap();
+    let s2 = slides(&before)[1].clone();
+    let imp = import(&pkg);
+    let line = "kind=\"picture\" summary=\"Smiling face\" box=\"363 151 234 237\"/>";
+    assert!(imp.text.contains(line), "{}", imp.text);
+    assert_eq!(xml(&export(&imp.text, &imp.remainder), &s2), xml(&before, &s2));
+    // An edit elsewhere on the slide leaves it alone too.
+    let (text, rem) = exact(&imp.text, &imp.remainder, "One object in two forms", "One object, two forms");
+    let x = xml(&export(&text, &rem), &s2);
+    assert_eq!(xfrms(&x), xfrms(&xml(&before, &s2)));
+    let moved = imp.text.replace("box=\"363 151 234 237\"", "box=\"300 151 234 237\"");
+    match PptxEngine.export(&moved, &imp.remainder) {
+        Err(e) => assert!(e.to_string().contains("stored in more than one form"), "{e}"),
+        Ok(_) => panic!("an alternate-content object was moved"),
+    }
 }

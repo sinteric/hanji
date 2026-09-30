@@ -19,7 +19,7 @@ use hanji_package::xml::{self, fragment, insert_ordered, Element, Node};
 
 use crate::deck::{LayoutInfo, SlotInfo};
 use crate::geom::{self, Frame};
-use crate::import::{group_item, shown_of, NotesInfo, SlideInfo, OBJECT_TAG};
+use crate::import::{group_item, object_geom, shown_of, NotesInfo, SlideInfo, OBJECT_TAG};
 use crate::pml::*;
 use crate::DeckShell;
 
@@ -359,7 +359,7 @@ impl<'a> Exporter<'a> {
                     HeadKind::Slot { name } => layout.slot(name).and_then(|s| s.geom),
                     _ => None,
                 };
-                let stored = (!created[n]).then(|| shown[n].or(geom::own(e)).or(slot)).flatten();
+                let stored = (!created[n]).then(|| shown[n].or(object_geom(e)).or(slot)).flatten();
                 match &self.head(it).place {
                     Some(Place::Box(g)) => geom::Written { stored, written: Some(*g) },
                     Some(Place::Group(g)) => geom::Written { stored: geom::own(e), written: g.geom },
@@ -1246,7 +1246,8 @@ fn place_box(
     layout: Option<Option<Geom>>,
 ) -> Result<bool, String> {
     let slot = layout.is_some();
-    let own = geom::own(e);
+    // An alternate-content object has no box of its own: its first choice's is the one shown.
+    let own = object_geom(e);
     let now = own.or(layout.flatten());
     let g = match written {
         Some(w) if now.is_some_and(|n| w.shows_as(&n)) => return Ok(false),
@@ -1467,7 +1468,7 @@ pub fn apply_group(el: &mut Element, w: &GroupItem, parent: &Frame) -> Result<Ve
     let boxes: Vec<Geom> = kids
         .iter()
         .filter_map(|&k| match &el.children[k] {
-            Node::El(c) => geom::own(c).map(|g| Geom { rot: 0, flip_h: false, flip_v: false, ..g }),
+            Node::El(c) => object_geom(c).map(|g| Geom { rot: 0, flip_h: false, flip_v: false, ..g }),
             _ => None,
         })
         .collect();
