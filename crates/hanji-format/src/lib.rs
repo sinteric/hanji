@@ -9,6 +9,7 @@ pub mod chars;
 pub mod diag;
 pub mod formula;
 pub mod inline_style;
+pub mod look;
 pub mod names;
 pub mod ops;
 pub mod parse;

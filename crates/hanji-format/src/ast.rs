@@ -209,6 +209,8 @@ pub struct Slot {
     pub name: String,
     /// Where the slot is; `None` (a bare marker) is where its layout puts it.
     pub geom: Option<Geom>,
+    /// Its fill (§5.3).
+    pub look: crate::look::Look,
     pub blocks: Vec<Block>,
 }
 
@@ -218,6 +220,8 @@ pub struct ShapeText {
     pub id: String,
     pub name: String,
     pub geom: Option<Geom>,
+    /// Its fill (§5.3).
+    pub look: crate::look::Look,
     pub paras: Vec<Inline>,
 }
 

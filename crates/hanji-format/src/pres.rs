@@ -8,6 +8,7 @@
 use crate::ast::*;
 use crate::diag::{quoted, Diagnostic};
 use crate::inline_style::{self as style, TextStyle};
+use crate::look::{self, Look};
 use crate::names::{Layout, Names};
 use crate::parse::{chars_of, parse_tag, BlockMap, BlockMapKind, ParaMap, Parser, Tag};
 use crate::serialize::{attr, blocks_with, cell_text_with, front_lines, keep_tag};
@@ -263,17 +264,18 @@ fn split_attrs(
     split_attrs_of(&tag.attrs, &tag.name, tag.col, named, geometry, form)
 }
 
-/// [`split_attrs`] of a tag's text formatting too (§5.3): the style its
-/// `font`, `size` and `color` give.
+/// [`split_attrs`] of a tag's look and text formatting too (§5.3): the fill
+/// it gives, and the style its `font`, `size` and `color` give.
 #[allow(clippy::type_complexity)]
 fn split_styled_attrs(
     tag: &Tag,
     named: &[&str],
     form: &str,
-) -> Result<(Vec<Option<String>>, Option<Geom>, TextStyle), (usize, String)> {
+) -> Result<(Vec<Option<String>>, Option<Geom>, Look, TextStyle), (usize, String)> {
     let (st, rest) = style::split_text_keys(&tag.attrs)?;
+    let (look, rest) = look::split_look_keys(&rest)?;
     let (vals, geom) = split_attrs_of(&rest, &tag.name, tag.col, named, true, form)?;
-    Ok((vals, geom, st))
+    Ok((vals, geom, look, st))
 }
 
 #[allow(clippy::type_complexity)]
@@ -322,6 +324,15 @@ pub fn geom_attrs(g: &Option<Geom>) -> String {
         out.push_str(&format!(" flip=\"{flip}\""));
     }
     out
+}
+
+/// ` fill=…` when the object has a fill.
+fn look_attrs(l: &Look) -> String {
+    if l.is_empty() {
+        String::new()
+    } else {
+        format!(" {}", l.attrs())
+    }
 }
 
 /// Parse `key="value"` attributes after a marker's name: (key, value, column).
@@ -566,30 +577,35 @@ fn slot(
         let line = &p.lines[i];
         let lead = line.indent();
         let col0 = line.text[..lead].chars().count() + 2 + inner[..at].chars().count() + 1;
-        match marker_attrs(&inner[at..], col0).and_then(|a| style::split_text_keys(&a)) {
-            Ok((st, attrs)) => match attrs.iter().find(|a| !matches!(a.0.as_str(), "box" | "rot" | "flip")) {
+        let split = marker_attrs(&inner[at..], col0).and_then(|a| style::split_text_keys(&a)).and_then(|(st, a)| {
+            let (look, rest) = look::split_look_keys(&a)?;
+            Ok((st, look, rest))
+        });
+        match split {
+            Ok((st, look, attrs)) => match attrs.iter().find(|a| !matches!(a.0.as_str(), "box" | "rot" | "flip")) {
                 Some((k, _, col)) => Err((
                     *col,
-                    format!("a slot marker has no attribute \"{k}\"; it is ::{name}:: or ::{name} {BOX_FORM}::, with the text's font, size and color after the box."),
+                    format!("a slot marker has no attribute \"{k}\"; it is ::{name}:: or ::{name} {BOX_FORM}::, with its fill and the text's font, size and color after the box."),
                 )),
-                None => geom_of(&attrs, col0).map(|g| (g, st)),
+                None => geom_of(&attrs, col0).map(|g| (g, look, st)),
             },
             Err(e) => Err(e),
         }
     };
-    let (geom, obj_style) = match geom {
-        Ok((Some(_), _)) if name == "notes" => {
+    let none = || (None, Look::default(), TextStyle::default());
+    let (geom, look, obj_style) = match geom {
+        Ok((Some(_), _, _)) if name == "notes" => {
             p.err(i, 1, "::notes:: has no box: speaker notes are not on the slide. Write the marker ::notes::.");
-            (None, TextStyle::default())
+            none()
         }
-        Ok((_, st)) if name == "notes" && !st.is_empty() => {
+        Ok((_, look, st)) if name == "notes" && !(st.is_empty() && look.is_empty()) => {
             p.err(i, 1, "::notes:: shows no formatting: speaker notes keep theirs. Write the marker ::notes::.");
-            (None, TextStyle::default())
+            none()
         }
         Ok(g) => g,
         Err((col, msg)) => {
             p.err(i, col, msg);
-            (None, TextStyle::default())
+            none()
         }
     };
     if !valid_slot_name(name) {
@@ -657,7 +673,7 @@ fn slot(
         p.err(i, 1, format!("::{name}:: has no text. An unfilled slot is left out: delete this marker line, or write the slot's text after it."));
         return None;
     }
-    Some((Slot { name: name.to_string(), geom, blocks: bl }, ItemMap { head, blocks: bm }))
+    Some((Slot { name: name.to_string(), geom, look, blocks: bl }, ItemMap { head, blocks: bm }))
 }
 
 /// Why a block cannot be slot text.
@@ -687,7 +703,7 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
         p.err(i, lead + 1, format!("expected {form}."));
         return None;
     };
-    let (vals, geom, obj_style) = match split_styled_attrs(&tag, &["id", "name"], form) {
+    let (vals, geom, look, obj_style) = match split_styled_attrs(&tag, &["id", "name"], form) {
         Ok(v) => v,
         Err((col, msg)) => {
             p.err(i, col, msg);
@@ -805,7 +821,11 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
         );
         return None;
     }
-    let sh = ShapeText { id, name, geom, paras };
+    if member && !look.is_empty() {
+        p.err(i, tag.col, "a group's objects show no fill yet: their fill stays as the file has it; leave fill= out.");
+        return None;
+    }
+    let sh = ShapeText { id, name, geom, look, paras };
     Some((sh, ItemMap { head, blocks }))
 }
 
@@ -1145,7 +1165,7 @@ fn item_lines(out: &mut Vec<String>, items: &[SlideItem]) {
                 let mut bl = sl.blocks.clone();
                 let (obj, ends) = lifted(&mut bl);
                 let st = if obj.is_empty() { String::new() } else { format!(" {}", obj.attrs()) };
-                out.push(format!("::{}{}{st}::", sl.name, geom_attrs(&sl.geom)));
+                out.push(format!("::{}{}{}{st}::", sl.name, geom_attrs(&sl.geom), look_attrs(&sl.look)));
                 let from = out.len();
                 blocks_with(out, &bl, true, &ends);
                 for l in &mut out[from..] {
@@ -1187,6 +1207,7 @@ pub fn shape_line(sh: &ShapeText) -> String {
     let refs: Vec<&Inline> = sh.paras.iter().collect();
     let (obj, own, stated) = style::lift(&refs);
     let mut g = geom_attrs(&sh.geom);
+    g.push_str(&look_attrs(&sh.look));
     if !obj.is_empty() {
         g.push(' ');
         g.push_str(&obj.attrs());

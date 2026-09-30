@@ -18,6 +18,7 @@ use hanji_package::package;
 use hanji_package::xml::{self, fragment, insert_ordered, Element, Node};
 
 use crate::deck::{LayoutInfo, SlotInfo};
+use crate::fill;
 use crate::geom::{self, Frame};
 use crate::import::{
     crop_of, group_item, object_geom, part_of_src, picture_item, shown_of, NotesInfo, Rels, SlideInfo, OBJECT_TAG,
@@ -371,6 +372,20 @@ impl<'a> Exporter<'a> {
                 }
             }
             let text = matches!(it.kind, HeadKind::Slot { .. } | HeadKind::Shape { .. });
+            // Its fill (§5.3): written where the text changes what it shows.
+            if text && e.is("p:sp") && self.keep_slot(it)?.is_none() {
+                let old = self.shell.deck.layouts.iter().find(|l| l.part == info.layout);
+                let (now, then) = match it.kind {
+                    HeadKind::Slot { name } => (
+                        layout.slot(name).and_then(|s| s.fill.as_ref()),
+                        old.and_then(|o| o.slot(name)).and_then(|s| s.fill.as_ref()),
+                    ),
+                    _ => (None, None),
+                };
+                let then = if old.is_some() { then } else { now };
+                let p = fill::Parents { now, then, theme: &layout.fills };
+                fill::write(&mut e, self.head(it).look.fill.as_deref(), p)?;
+            }
             if text && self.keep_slot(it)?.is_none() {
                 let bullets = bullets_of(it, &e);
                 let lists = matches!(it.kind, HeadKind::Slot { .. });
