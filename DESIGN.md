@@ -161,7 +161,13 @@ package ─────────────────────► model
   Presentation resize it by its box (§5.3); it never alters its content, and
   never creates one except a picture from a file (§5.3).
 - **Validator errors are written for the model:** line and column, the
-  expected form, and the allowed names (styles, layouts, fields).
+  expected form, and the allowed names (styles, layouts, fields). Every
+  error names the characters a reader cannot see or tell from a space by
+  code point, as `⟨U+2007 FIGURE SPACE⟩` or `⟨U+F076 private use⟩`
+  (whitespace variants, invisible and format characters, private use,
+  controls), and an `old` that misses only by them is told where it would
+  match. The text keeps them as they are: marking them in the read view
+  would change the text edits match against (GetPut).
 - **Front matter** names the type, home format, template and schema version.
   Every file carries its schema version; migrations are part of the toolchain
   from day one.

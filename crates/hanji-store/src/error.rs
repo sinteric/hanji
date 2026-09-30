@@ -5,6 +5,7 @@
 use std::fmt;
 
 use hanji_core::{EngineError, Kind, Notice, Refusal};
+use hanji_format::chars::name_in;
 use hanji_format::Diagnostic;
 use serde::Serialize;
 
@@ -48,7 +49,7 @@ pub struct Loss {
 
 impl Loss {
     pub fn of(kind: Kind, reason: &str) -> Loss {
-        Loss { kind: format!("{kind:?}").to_lowercase(), reason: reason.to_string() }
+        Loss { kind: format!("{kind:?}").to_lowercase(), reason: name_in(reason).into_owned() }
     }
 }
 
@@ -79,7 +80,7 @@ pub struct Diag {
 }
 
 pub fn diags(ds: &[Diagnostic]) -> Vec<Diag> {
-    ds.iter().map(|d| Diag { line: d.line, col: d.col, message: d.message.clone() }).collect()
+    ds.iter().map(|d| Diag { line: d.line, col: d.col, message: name_in(&d.message).into_owned() }).collect()
 }
 
 /// Lines of a revision the edit and a person's edits both change.
@@ -126,8 +127,15 @@ pub struct Detail {
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl Error {
+    /// Unusual characters in `message` are named by code point
+    /// ([`hanji_format::chars::name_in`]).
     pub fn new(code: Code, message: impl Into<String>) -> Error {
-        Error { code, message: message.into(), detail: Box::default() }
+        let message = message.into();
+        let message = match name_in(&message) {
+            std::borrow::Cow::Borrowed(_) => message,
+            std::borrow::Cow::Owned(m) => m,
+        };
+        Error { code, message, detail: Box::default() }
     }
 
     pub fn bad(message: impl Into<String>) -> Error {

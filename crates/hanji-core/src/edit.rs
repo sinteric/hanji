@@ -34,13 +34,13 @@ impl std::fmt::Display for Refusal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Refusal::Invalid(d) => write!(f, "{}", fmt::diag::render(d)),
-            Refusal::Edit(m) => write!(f, "{m}"),
+            Refusal::Edit(m) => write!(f, "{}", fmt::chars::name_in(m)),
             Refusal::Unplaceable(r) => {
-                write!(f, "the edit would lose content the text does not show:")?;
+                let mut m = "the edit would lose content the text does not show:".to_string();
                 for (_, k, why) in &r.refused {
-                    write!(f, "\n- {k:?}: {why}")?;
+                    m.push_str(&format!("\n- {k:?}: {why}"));
                 }
-                Ok(())
+                write!(f, "{}", fmt::chars::name_in(&m))
             }
         }
     }
@@ -329,7 +329,12 @@ pub fn edit_in(
     let s = match hits.as_slice() {
         [s] => *s,
         [] => {
-            return Err(Refusal::Edit("the old text was not found; copy it exactly from the current revision.".into()))
+            let mut m = "the old text was not found; copy it exactly from the current revision.".to_string();
+            if let Some(near) = fmt::chars::near_miss(text, old) {
+                m.push(' ');
+                m.push_str(&near.message);
+            }
+            return Err(Refusal::Edit(m));
         }
         _ => {
             return Err(Refusal::Edit(format!(
@@ -606,6 +611,18 @@ mod tests {
 
     fn entry(id: u64, kind: Kind, path: Path, start: Option<usize>, end: Option<usize>) -> Entry {
         Entry { id, kind, xml: vec![], fp: format!("fp{id}"), path, start, end, seq: id * 1000, meta: Meta::default() }
+    }
+
+    #[test]
+    fn a_missing_old_names_the_characters_it_missed() {
+        let rem = Remainder { format: "hwpx".into(), ..Default::default() };
+        let text = "---\ntype: document\nformat: hwpx\nschema: 1\n---\n□\u{2007}추진 배경\n";
+        let e = edit(&rem, text, "□ 추진 배경", "□ 추진 경과", Capabilities::default()).unwrap_err();
+        let m = e.to_string();
+        assert!(m.contains("matches line 6") && m.contains("\"□⟨U+2007 FIGURE SPACE⟩추진 배경\""), "{m}");
+        // A refusal quoting text with a debug escape names the character too.
+        let r = Refusal::Edit("the edit cuts through the line \"a\\u{f076}b\"".into());
+        assert!(r.to_string().contains("\"a⟨U+F076 private use⟩b\""), "{r}");
     }
 
     #[test]

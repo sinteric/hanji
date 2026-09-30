@@ -346,7 +346,11 @@ fn locate(text: &str, old: &str, rev: u32) -> Result<usize> {
             } else {
                 occurrences(text, first).iter().map(|&k| line_of(text, k)).collect()
             };
-            if !old.trim().is_empty() && squash(text).contains(&squash(old)) {
+            if let Some(near) = hanji_format::chars::near_miss(text, old) {
+                // Look-alike characters: name them where it would match.
+                msg.push(' ');
+                msg.push_str(&near.message);
+            } else if !old.trim().is_empty() && squash(text).contains(&squash(old)) {
                 msg.push_str(" It matches if spaces and line breaks are ignored: copy them exactly as the revision has them (no padding, one paragraph per line).");
             } else if !at.is_empty() {
                 let shown: Vec<String> = at.iter().take(10).map(|l| l.to_string()).collect();
@@ -1166,5 +1170,20 @@ mod tests {
         assert_eq!(e.code, Code::NoMatch);
         assert!(e.message.contains("spaces and line breaks"), "{}", e.message);
         assert_eq!(locate("aaa", "aa", 1).unwrap_err().detail.matches, Some(2));
+    }
+
+    #[test]
+    fn a_missing_old_names_the_look_alike_characters_of_the_revision() {
+        let e = locate("# 계획\n\n□\u{2007}추진 배경\n", "□ 추진 배경", 1).unwrap_err();
+        assert_eq!(e.code, Code::NoMatch);
+        assert!(e.message.contains("matches line 3"), "{}", e.message);
+        assert!(e.message.contains("\"□⟨U+2007 FIGURE SPACE⟩추진 배경\""), "{}", e.message);
+        assert!(e.message.contains("\\u2007 in a JSON string"), "{}", e.message);
+        let e = locate("\u{f076}2025년 계획\n다음 줄\n", " 2025년 계획\n다음", 1).unwrap_err();
+        assert!(e.message.contains("⟨U+F076 private use⟩"), "{}", e.message);
+        // A first line quoted from the revision is named too.
+        let e = locate("□\u{2007}추진\n가\n", "□\u{2007}추진\n나", 1).unwrap_err();
+        assert!(e.message.contains("Its first line \"□⟨U+2007 FIGURE SPACE⟩추진\" is at line 1"), "{}", e.message);
+        assert!(!e.message.contains('\u{2007}') && !e.message.contains("\\u{2007}"), "{}", e.message);
     }
 }
