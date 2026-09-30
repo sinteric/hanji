@@ -10,6 +10,12 @@
 //! each edited one with `NN-…-edits.md` beside it (the edits in plain words,
 //! a deck's slide order, and the before/after model text diff).
 //!
+//! A deck's -edits.md gives each box an edit names in cm too, in PowerPoint's
+//! Format Shape → Size & Properties fields. With LibreOffice, PyMuPDF and
+//! Pillow installed, `render.py` draws each edited slide of a `pset` file
+//! next to its original slide (`NN-…-pset-slideK.png`, the changed objects
+//! outlined); `OFFICE_KIT_RENDER=0` skips it.
+//!
 //! Writes `target/office-kit/` (the files, `CHECKLIST.md`, `checklist.csv`)
 //! and `target/office-kit.zip` at the workspace root. Every file is an export
 //! of a corpus file whose licence allows redistribution (the corpora's
@@ -75,6 +81,8 @@ struct Item {
 struct Kit {
     dir: PathBuf,
     items: Vec<Item>,
+    /// Decks whose edited slides `render.py` draws before and after.
+    renders: Vec<serde_json::Value>,
 }
 
 fn slug(name: &str) -> String {
@@ -506,7 +514,7 @@ fn pptx(kit: &mut Kit) {
         if !done.is_empty() {
             let out = PptxEngine.export(&cur_text, &cur_rem).unwrap();
             let fin = slide_ids(&hanji_testkit::written(&Pptx, &cur_text, &cur_rem), &cur_rem, &orig);
-            let notes = (0..done.len()).map(|k| described(&done, k, &fin)).collect();
+            let notes = (0..done.len()).map(|k| in_cm(described(&done, k, &fin))).collect();
             kit.add(
                 "pptx",
                 name,
@@ -516,14 +524,70 @@ fn pptx(kit: &mut Kit) {
                 &out,
                 vec![
                     ppt.clone(),
-                    "Shows the edits listed below (slides added, deleted and moved; text changed; objects moved, resized, added and aligned where the listed boxes say; a picture cropped as its crop says, the percent cut off its left, top, right and bottom; a picture cut to an ellipse, its alternative text (Format Picture > Alt Text) as listed; the listed word 24 pt coral, the listed shape in Noto Sans KR; the listed shapes filled accent 2 and without fill)".into(),
+                    "Shows the edits listed below (slides added, deleted and moved; text changed; objects moved, resized, added and aligned where the listed boxes say, in PowerPoint's cm as each line gives them; a picture cropped as its crop says, the percent cut off its left, top, right and bottom; a picture cut to an ellipse, its alternative text (Format Picture > Alt Text) as listed; the listed word 24 pt coral, the listed shape in Noto Sans KR; the listed shapes filled accent 2 and without fill)".into(),
                 ],
                 notes,
             );
             kit.items.last_mut().unwrap().order = Some(slide_order(&blocks0, orig.len(), &fin));
             kit.edits(&text_diff(&text, &cur_text), TEXT_DIFF);
+            kit.renders.push(serde_json::json!({
+                "file": kit.items.last().unwrap().file,
+                "md": kit.items.last().unwrap().md,
+                "original": kit.file_of(name, "original"),
+                "before": text,
+                "after": cur_text,
+                "order": fin,
+            }));
         }
     }
+}
+
+/// Where PowerPoint shows a box: Format Shape → Size & Properties (도형 서식 → 크기 및 속성), in cm
+/// from the slide's top-left corner, rounded to 0.01 cm.
+const PPT_FIELDS: [&str; 4] =
+    ["가로 위치 (Horizontal position)", "세로 위치 (Vertical position)", "너비 (Width)", "높이 (Height)"];
+
+/// A box in pt as PowerPoint's four fields in cm (1 pt = 12700 EMU, 1 cm = 360000 EMU), rounded
+/// half up to 0.01 cm.
+fn box_cm(b: [f64; 4]) -> String {
+    let cm = |pt: f64| {
+        let emu = (pt * 12700.0).round() as i64;
+        let h = (emu * 100 + emu.signum() * 180_000) / 360_000;
+        format!("{}{}.{:02}", if h < 0 { "-" } else { "" }, h.abs() / 100, h.abs() % 100)
+    };
+    let f: Vec<String> = PPT_FIELDS.iter().zip(b).map(|(n, v)| format!("{n} {} cm", cm(v))).collect();
+    format!("{} (box {} {} {} {} pt)", f.join(", "), b[0], b[1], b[2], b[3])
+}
+
+/// An edit line that names a box (P12 move, P13 resize, P14 add, P15 align), with the box
+/// before and after as PowerPoint shows it, in cm.
+fn in_cm(line: String) -> String {
+    fn four(s: &str) -> Option<[f64; 4]> {
+        let v: Vec<f64> = s
+            .split_whitespace()
+            .take(4)
+            .map(|t| t.trim_end_matches(|c: char| !c.is_ascii_digit()).parse().ok())
+            .collect::<Option<_>>()?;
+        (v.len() == 4).then(|| [v[0], v[1], v[2], v[3]])
+    }
+    let after_word = |w: &str| line.find(w).map(|k| &line[k + w.len()..]);
+    let (before, after) = if let Some(rest) = after_word("from box ") {
+        (four(rest), rest.find(" to ").and_then(|k| four(&rest[k + 4..])))
+    } else if let Some(rest) = after_word(" at box ") {
+        (None, four(rest))
+    } else if let Some(rest) = after_word("(box ") {
+        let b = four(rest);
+        let x = after_word("(x ").and_then(|r| r.split(')').next()?.trim().parse::<f64>().ok());
+        (b, b.zip(x).map(|(b, x)| [x, b[1], b[2], b[3]]))
+    } else {
+        return line;
+    };
+    let Some(after) = after else { return line };
+    let before = before.map_or("none (a new object)".to_string(), box_cm);
+    format!(
+        "{line}. **In PowerPoint** (도형 서식 → 크기 및 속성 / Format Shape → Size & Properties; for a picture 그림 서식 / Format Picture): before {before}; after {}. PowerPoint rounds to 0.01 cm",
+        box_cm(after)
+    )
 }
 
 /// One edit of a deck's edit set, as the kit made it.
@@ -955,6 +1019,16 @@ fn checklist(kit: &Kit, commit: &str) -> (String, String) {
         if let Some(e) = &it.md {
             let _ = writeln!(md, "\nWhat changed, and the before/after diff: `{e}`.");
         }
+        let stem = format!("{}-slide", it.file.rsplit_once('.').unwrap().0);
+        let imgs: Vec<String> =
+            pngs(&kit.dir).into_iter().filter(|n| n.starts_with(&stem)).map(|n| format!("`{n}`")).collect();
+        if !imgs.is_empty() {
+            let _ = writeln!(
+                md,
+                "\nEach edited slide before (left, the original slide) and after (right), the changed objects outlined in red: {}. These are LibreOffice renders, which can differ slightly from PowerPoint.",
+                imgs.join(", ")
+            );
+        }
         if !it.notes.is_empty() {
             let _ = writeln!(md, "\n<details><summary>What changed</summary>\n");
             for n in &it.notes {
@@ -975,7 +1049,34 @@ fn checklist(kit: &Kit, commit: &str) -> (String, String) {
     (md, csv)
 }
 
-const HOW_TO_CHECK_A_DECK: &str = "hanji's text of a deck holds each slide's layout, and every object on it in z-order with its position and size in points (`box=\"x y w h\"` from the slide's top-left corner, 72 pt = 1 inch = 2.54 cm): the slots (title, body, …) and shapes with their text, lines and connectors by their two ends, groups with their objects, pictures as `<picture/>` lines with their image, crop (percent cut off each edge), mask (the shape they are cut to) and alternative text, and a `<keep/>` line for each object it does not model (a table or chart). The design (fonts, colours, fills, the theme, masters and layouts, transitions, animations) stays in the remainder, which the export writes back unchanged. So, comparing a `pset` export with its `original`: a slide no edit touched must look exactly like its original slide (the **Slide order** line says which original slide each one is); an edited slide may differ only in the text, order, layout, positions and sizes its edits list, and an object an edit moved or resized must sit at the box it names (a new text box under a title: just below it, as wide as it). Anything else, such as an object moved that no edit names, a lost picture, a connector come loose or a changed font, is a fail: note the slide.";
+const HOW_TO_CHECK_A_DECK: &str = "hanji's text of a deck holds each slide's layout, and every object on it in z-order with its position and size in points (`box=\"x y w h\"` from the slide's top-left corner, 72 pt = 1 inch = 2.54 cm; each -edits.md line that names a box also gives it in cm as PowerPoint shows it under 도형 서식 → 크기 및 속성 (Format Shape → Size & Properties): 가로 위치 (Horizontal position) and 세로 위치 (Vertical position), from the top-left corner, 너비 (Width) and 높이 (Height). PowerPoint rounds to 0.01 cm, so a field can differ from the listed value by 0.01 cm): the slots (title, body, …) and shapes with their text, lines and connectors by their two ends, groups with their objects, pictures as `<picture/>` lines with their image, crop (percent cut off each edge), mask (the shape they are cut to) and alternative text, and a `<keep/>` line for each object it does not model (a table or chart). The design (fonts, colours, fills, the theme, masters and layouts, transitions, animations) stays in the remainder, which the export writes back unchanged. So, comparing a `pset` export with its `original`: a slide no edit touched must look exactly like its original slide (the **Slide order** line says which original slide each one is); an edited slide may differ only in the text, order, layout, positions and sizes its edits list, and an object an edit moved or resized must sit at the box it names (a new text box under a title: just below it, as wide as it). Beside each `pset` file's -edits.md, `NN-…-pset-slideK.png` shows slide K of the file after its edits (right) next to the original slide it came from (left), the objects the edits changed outlined in red. These are LibreOffice renders, which can differ slightly from PowerPoint (fonts, text wrapping, effects): they show where to look, and PowerPoint is what the check is about. Anything else, such as an object moved that no edit names, a lost picture, a connector come loose or a changed font, is a fail: note the slide.";
+
+/// Before/after PNGs of the decks' edited slides (`render.py`: LibreOffice, then PyMuPDF), when
+/// LibreOffice is installed; `OFFICE_KIT_RENDER=0` skips them.
+fn render(kit: &Kit) {
+    if kit.renders.is_empty() || std::env::var("OFFICE_KIT_RENDER").is_ok_and(|v| v == "0") {
+        return;
+    }
+    let manifest = kit.dir.with_extension("renders.json");
+    std::fs::write(&manifest, serde_json::to_string(&kit.renders).unwrap()).unwrap();
+    let script = root().join("validation/office-kit/render.py");
+    println!("renders");
+    match std::process::Command::new("python3").arg(&script).arg(&manifest).arg(&kit.dir).status() {
+        Ok(s) if s.success() => {}
+        r => println!("  no renders: {} failed ({r:?})", script.display()),
+    }
+    let _ = std::fs::remove_file(&manifest);
+}
+
+fn pngs(dir: &Path) -> Vec<String> {
+    let mut v: Vec<String> = std::fs::read_dir(dir)
+        .unwrap()
+        .filter_map(|e| e.ok()?.file_name().into_string().ok())
+        .filter(|n| n.ends_with(".png"))
+        .collect();
+    v.sort();
+    v
+}
 
 fn zip_dir(dir: &Path, names: &[String], out: &Path) {
     let f = std::fs::File::create(out).unwrap();
@@ -992,7 +1093,7 @@ fn main() {
     let dir = std::env::args().nth(1).map(PathBuf::from).unwrap_or_else(|| root().join("target/office-kit"));
     let _ = std::fs::remove_dir_all(&dir);
     std::fs::create_dir_all(&dir).unwrap();
-    let mut kit = Kit { dir: dir.clone(), items: vec![] };
+    let mut kit = Kit { dir: dir.clone(), items: vec![], renders: vec![] };
     println!("docx");
     docx(&mut kit);
     println!("pptx");
@@ -1006,11 +1107,14 @@ fn main() {
         .output()
         .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
         .unwrap_or_default();
+    render(&kit);
     let (md, csv) = checklist(&kit, &commit);
     std::fs::write(dir.join("CHECKLIST.md"), md).unwrap();
     std::fs::write(dir.join("checklist.csv"), csv).unwrap();
     let mut names: Vec<String> =
         kit.items.iter().flat_map(|i| std::iter::once(i.file.clone()).chain(i.md.clone())).collect();
+    names.sort();
+    names.extend(pngs(&dir));
     names.sort();
     names.extend(["CHECKLIST.md".to_string(), "checklist.csv".to_string()]);
     let zip = dir.with_extension("zip");
