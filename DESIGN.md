@@ -897,7 +897,8 @@ v0.7.3; "lossless … regarding content", not formatting).
     stale labels, 55 showed stale labels (both #26).
   - hwpx: 64 raised a repair prompt in Hancom (a stale `linesegarray`
     textpos after a first-paragraph insert, #27); 73 lost a list level
-    (#28). v6 passed.
+    (#28). v6 passed, and on 2026-09-30 so did 73 in v7 (with #28's
+    moved-item indent fix).
 
   Beyond the kit, the engines' corpora and every other library above are
   unchecked in real apps; their defect and fidelity statements still come
