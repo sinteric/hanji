@@ -28,6 +28,8 @@ pub struct Head {
     /// Where a slot, shape, object, line or group is on its slide (§5.3).
     /// Like the label, not what the head is: a moved shape is the same shape.
     pub place: Option<Place>,
+    /// A slot's or shape's fill (§5.3), likewise.
+    pub look: fmt::look::Look,
 }
 
 /// A head's geometry: a box, a line's ends, or a group with its objects.

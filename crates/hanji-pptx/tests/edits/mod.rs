@@ -7,8 +7,8 @@
 //! P14 add a text box under a title, P15 align two objects' left edges
 //! (geometry, §5.3); P16 crop a picture, P17 cut a picture to an ellipse and
 //! give it alternative text (pictures, §5.3); P18 format a word of a shape's
-//! text, P19 change a shape's font (text formatting, §5.3); P9 makes them
-//! all in one revision.
+//! text, P19 change a shape's font (text formatting, §5.3); P20 fill a shape,
+//! P21 clear a shape's fill (§5.3); P9 makes them all in one revision.
 
 use std::collections::HashSet;
 
@@ -22,7 +22,7 @@ use hanji_testkit::{
     block_ranges, chars, deleted_span, entries_at, figure_or_word, ident, replace_span, span_of, Cx, Doc, Edit, EditFn,
 };
 
-pub const EDITS: [(&str, EditFn); 18] = [
+pub const EDITS: [(&str, EditFn); 20] = [
     ("p1_title", p1_title),
     ("p2_bullet", p2_bullet),
     ("p3_add_slide", p3_add_slide),
@@ -41,6 +41,8 @@ pub const EDITS: [(&str, EditFn); 18] = [
     ("p17_mask_picture", p17_mask_picture),
     ("p18_format_word", p18_format_word),
     ("p19_shape_font", p19_shape_font),
+    ("p20_fill_shape", p20_fill_shape),
+    ("p21_clear_fill", p21_clear_fill),
 ];
 
 /// A slide: its head and the end of its blocks.
@@ -178,14 +180,18 @@ fn p3_add_slide(d: &Doc, cx: &Cx) -> Option<Edit> {
     // Written with bare markers, a new slide reads back with each slot's layout box (§5.3).
     let at = |n: &str| layout.slot(n).and_then(|s| s.geom);
     let text = |n: &str, lvl: usize| layout.slot(n).unwrap().text[lvl].clone();
-    blocks.extend([
-        slide_head(&layout.name),
-        slot_head("title", at("title")),
-        styled(para("새 슬라이드 제목", None), &text("title", 0)),
-    ]);
+    // …and the fill its layout gives (§5.3).
+    let slot = |n: &str| {
+        let mut b = slot_head(n, at(n));
+        if let Block::Head(h) = &mut b {
+            h.look.fill = hanji_pptx::fill::shown(layout.slot(n).and_then(|s| s.fill.as_ref()));
+        }
+        b
+    };
+    blocks.extend([slide_head(&layout.name), slot("title"), styled(para("새 슬라이드 제목", None), &text("title", 0))]);
     if has(&layout, "body") {
         blocks.extend([
-            slot_head("body", at("body")),
+            slot("body"),
             styled(para("첫째 항목", item(true, 0)), &text("body", 0)),
             styled(para("둘째 항목 12", item(false, 1)), &text("body", 1)),
         ]);
@@ -808,4 +814,39 @@ fn p17_mask_picture(d: &Doc, _: &Cx) -> Option<Edit> {
     );
     let pic = PictureItem { mask: Some("ellipse".into()), alt: Some(alt), ..p };
     Some(geometry_edit("P17 mask a picture", what, with_picture(d, k, pic), k, slide))
+}
+
+/// A top-level `<shape>` head `pick` accepts, and its fill.
+fn shape_with(d: &Doc, pick: &dyn Fn(Option<&str>) -> bool) -> Option<usize> {
+    (0..d.blocks.len()).find(|&k| {
+        d.blocks[k].head().is_some_and(|h| {
+            matches!(kind(h), HeadKind::Shape { id, .. } if !id.is_empty()) && pick(h.look.fill.as_deref())
+        })
+    })
+}
+
+fn look_edit(d: &Doc, k: usize, fill: Option<&str>, name: &'static str, what: String) -> Edit {
+    let mut blocks = d.blocks.clone();
+    if let Block::Head(h) = &mut blocks[k] {
+        h.look.fill = fill.map(str::to_string);
+    }
+    let mut ed = Edit::blocks(name, what, blocks, ident(d.blocks.len()), HashSet::from([k]), true);
+    ed.named = vec![slide_at(&d.blocks, k).2];
+    ed
+}
+
+/// A shape takes a theme fill.
+fn p20_fill_shape(d: &Doc, _: &Cx) -> Option<Edit> {
+    let k = shape_with(d, &|f| f != Some("accent2"))?;
+    let label = d.blocks[k].head()?.label.clone();
+    let what = format!("shape {label:?}: fill=accent2 on {}", slide_name(&d.blocks, k));
+    Some(look_edit(d, k, Some("accent2"), "P20 fill a shape", what))
+}
+
+/// A shape with a fill the text can write loses it.
+fn p21_clear_fill(d: &Doc, _: &Cx) -> Option<Edit> {
+    let k = shape_with(d, &|f| f.is_some_and(|f| !hanji_format::look::is_kept_fill(f)))?;
+    let label = d.blocks[k].head()?.label.clone();
+    let what = format!("shape {label:?}: no fill on {}", slide_name(&d.blocks, k));
+    Some(look_edit(d, k, None, "P21 clear a shape's fill", what))
 }

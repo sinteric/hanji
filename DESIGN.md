@@ -508,8 +508,8 @@ layout: Two Content
   `<shape id="s4" name="출처" box="…">text</shape>`, with its text editable;
   `<p/>` starts its next paragraph. Its paragraphs are never list items
   (bullets stay in the remainder). A shape without text is
-  `<shape id="s9" name="Oval 8" box="…"/>`. Its outline, fill and preset
-  geometry stay in the remainder. *Proposed (§10 item 10, round 6 F1):* its
+  `<shape id="s9" name="Oval 8" box="…"/>`. Its fill is shown (below); its
+  outline and preset geometry stay in the remainder. *Proposed (§10 item 10, round 6 F1):* its
   effective formatting follows `box` on the tag, whether the shape sets it
   or takes it from the theme's `p:style` or the layout, like `box` itself:
   `<shape id="s8" name="Card" box="354 130 260 320" fill=accent1 border="2pt solid accent1-50%" size=18pt color=#FFFFFF>…</shape>`;
@@ -523,7 +523,7 @@ layout: Two Content
   (a read of an inherited value, an edit that must keep one) could not be
   done, and one was answered wrong; F1 did all 48, at 1.27× today's text
   against 1.14× on the corpus.
-- **Text formatting** (built: `font`, `size`, `color`; fill, outline and the
+- **Text formatting** (built: `font`, `size`, `color`; the outline and the
   paragraph properties are still proposed). Every run of a slot or shape
   shows the font, size and colour it has, from the run's `a:rPr` over what
   it inherits: the shape's list style and `p:style` font, its layout and
@@ -553,6 +553,24 @@ layout: Two Content
     fonts), so a restyled run is found again. Refused: a kept colour
     (`accent1*`, `gradient`) written where the run does not show it, an
     unknown key (`colour`), a value outside the grammar.
+- **Fill** (built). A slot or shape shows the fill it has as `fill=` after
+  its box (`<shape id="s9" name="Oval 8" box="…" fill=accent1+40%/>`,
+  `::title box="…" fill=accent2::`): its `p:spPr`'s own, else its
+  `p:style` `a:fillRef` into the theme's fill styles (the style's `phClr`
+  the reference's colour, its adjustments kept), else, for a placeholder,
+  its layout's and master's placeholder's. No fill shows nothing, and a fill
+  left out is none; a gradient, pattern or picture fill is shown
+  (`fill=gradient`) and kept while left as shown, as is a colour the style
+  adjusts other than by Office's tints (`fill=accent1*`).
+  - A fill left as shown keeps the XML. A changed one is set in `p:spPr`
+    after the geometry and before the outline, other children kept; one equal
+    to what the style or layout gives removes the shape's own; leaving a
+    style's fill out writes `a:noFill`. A bare marker (`::title::`) takes
+    its layout's fill as it takes its box. A layout change keeps the fill the
+    text shows (a kept one copied from the old layout).
+  - The shape's fingerprint leaves its fill out, as its geometry. Refused:
+    writing a kept fill anew, `background=` and other spellings (the key is
+    `fill`), and a fill on a group's objects (not shown yet).
 - **Pictures** are a line each, `<picture id="s7" name="지도" box="…"
   src="media/image1.png" crop="10 0 5 0" mask="ellipse" alt="…"/>`, in this
   attribute order; `crop`, `mask` and `alt` are left out when the picture has

@@ -88,27 +88,57 @@ pub fn kind(h: &Head) -> HeadKind<'_> {
 }
 
 pub fn slide_head(layout: &str) -> Block {
-    Block::Head(Head { level: 0, key: SLIDE.into(), label: layout.into(), place: None })
+    Block::Head(Head { level: 0, key: SLIDE.into(), label: layout.into(), place: None, look: Default::default() })
 }
 
 pub fn slot_head(name: &str, geom: Option<fmt::Geom>) -> Block {
-    Block::Head(Head { level: 1, key: slot_key(name), label: String::new(), place: geom.map(Place::Box) })
+    Block::Head(Head {
+        level: 1,
+        key: slot_key(name),
+        label: String::new(),
+        place: geom.map(Place::Box),
+        look: Default::default(),
+    })
 }
 
 pub fn shape_head(id: &str, name: &str, geom: Option<fmt::Geom>) -> Block {
-    Block::Head(Head { level: 1, key: shape_key(id), label: name.into(), place: geom.map(Place::Box) })
+    Block::Head(Head {
+        level: 1,
+        key: shape_key(id),
+        label: name.into(),
+        place: geom.map(Place::Box),
+        look: Default::default(),
+    })
 }
 
 pub fn object_head(geom: Option<fmt::Geom>) -> Block {
-    Block::Head(Head { level: 1, key: OBJECT.into(), label: String::new(), place: geom.map(Place::Box) })
+    Block::Head(Head {
+        level: 1,
+        key: OBJECT.into(),
+        label: String::new(),
+        place: geom.map(Place::Box),
+        look: Default::default(),
+    })
 }
 
 pub fn line_head(id: &str, name: &str, ends: fmt::Ends) -> Block {
-    Block::Head(Head { level: 1, key: line_key(id), label: name.into(), place: Some(Place::Line(ends)) })
+    Block::Head(Head {
+        level: 1,
+        key: line_key(id),
+        label: name.into(),
+        place: Some(Place::Line(ends)),
+        look: Default::default(),
+    })
 }
 
 pub fn group_head(g: &fmt::GroupItem) -> Block {
-    Block::Head(Head { level: 1, key: group_key(&g.id), label: g.name.clone(), place: Some(Place::Group(g.clone())) })
+    Block::Head(Head {
+        level: 1,
+        key: group_key(&g.id),
+        label: g.name.clone(),
+        place: Some(Place::Group(g.clone())),
+        look: Default::default(),
+    })
 }
 
 pub fn picture_head(p: &fmt::PictureItem) -> Block {
@@ -117,6 +147,7 @@ pub fn picture_head(p: &fmt::PictureItem) -> Block {
         key: picture_key(&p.id),
         label: p.name.clone(),
         place: Some(Place::Picture(p.clone())),
+        look: Default::default(),
     })
 }
 
@@ -151,6 +182,13 @@ pub fn model_of(
     resolve(&parsed, text, caps, is_block_keep)
 }
 
+/// The last block, a head, takes `look`.
+fn set_look(blocks: &mut [Block], look: &fmt::look::Look) {
+    if let Some(Block::Head(h)) = blocks.last_mut() {
+        h.look = look.clone();
+    }
+}
+
 /// Parsed presentation → flat blocks and their sources.
 pub fn resolve(
     parsed: &fmt::ParsedPresentation,
@@ -167,10 +205,12 @@ pub fn resolve(
             let body = match it {
                 fmt::SlideItem::Slot(slot) => {
                     blocks.push(slot_head(&slot.name, slot.geom));
+                    set_look(&mut blocks, &slot.look);
                     slot.blocks.clone()
                 }
                 fmt::SlideItem::Shape(sh) => {
                     blocks.push(shape_head(&sh.id, &sh.name, sh.geom));
+                    set_look(&mut blocks, &sh.look);
                     let para = |c: &fmt::Inline| {
                         fmt::Block::Para(fmt::Para { style: fmt::ParaStyle::Plain, content: c.clone() })
                     };
@@ -238,7 +278,12 @@ pub fn unresolve(blocks: &[Block], front: fmt::FrontMatter, keep: &dyn Fn(&str) 
             HeadKind::Slot { name } => {
                 let blocks = model::unresolve(body, &styles, front.clone(), keep).blocks;
                 if let Some(s) = pres.slides.last_mut() {
-                    s.items.push(fmt::SlideItem::Slot(fmt::Slot { name: name.into(), geom, blocks }));
+                    s.items.push(fmt::SlideItem::Slot(fmt::Slot {
+                        name: name.into(),
+                        geom,
+                        look: h.look.clone(),
+                        blocks,
+                    }));
                 }
             }
             HeadKind::Shape { id, name } => {
@@ -250,7 +295,7 @@ pub fn unresolve(blocks: &[Block], front: fmt::FrontMatter, keep: &dyn Fn(&str) 
                     })
                     .collect();
                 if let Some(s) = pres.slides.last_mut() {
-                    let sh = fmt::ShapeText { id: id.into(), name: name.into(), geom, paras };
+                    let sh = fmt::ShapeText { id: id.into(), name: name.into(), geom, look: h.look.clone(), paras };
                     s.items.push(fmt::SlideItem::Shape(sh));
                 }
             }

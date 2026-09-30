@@ -43,6 +43,7 @@ use hanji_package::clip;
 use hanji_package::xml::{canon, fp, is_blank, Element, Node, Scope};
 
 use crate::deck::{LayoutInfo, SlotInfo};
+use crate::fill;
 use crate::geom::{self, Frame};
 use crate::pml::*;
 use crate::text::{self, RunStyle, ThemeFonts};
@@ -244,6 +245,7 @@ impl Importer<'_> {
                     )));
                     let g = geom::own(&el).or(slot.geom);
                     self.blocks.push(slot_head(&slot.name, g));
+                    self.show_fill(&el, slot.fill.as_ref(), &layout.fills);
                     let t = Some((&slot.text, &layout.fonts));
                     self.text_shape(&el, &slot.bullets, &k.to_string(), true, g, t)?;
                 }
@@ -276,6 +278,7 @@ impl Importer<'_> {
                     tree.children.push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
                     let g = geom::own(&el);
                     self.blocks.push(shape_head(&id, &name, g));
+                    self.show_fill(&el, None, &layout.fills);
                     self.name_shape(id, name);
                     let t = Some((&layout.other_text, &layout.fonts));
                     self.text_shape(&el, &layout.other, &k.to_string(), false, g, t)?;
@@ -309,6 +312,9 @@ impl Importer<'_> {
                         }
                     };
                     self.blocks.push(head);
+                    if matches!(what, What::Bare(..)) {
+                        self.show_fill(&el, None, &layout.fills);
+                    }
                     self.name_shape(id, name);
                     self.whole(&el, &k.to_string());
                 }
@@ -370,9 +376,17 @@ impl Importer<'_> {
 
     /// A shape without text, a line or a group: its element whole, a `Shape`
     /// entry on the head just pushed.
+    /// The head just pushed shows the fill `el` has (§5.3).
+    fn show_fill(&mut self, el: &Element, parent: Option<&fill::FillXml>, theme: &fill::ThemeFills) {
+        if let Some(Block::Head(h)) = self.blocks.last_mut() {
+            h.look.fill = fill::shown(fill::effective(el, parent, theme).as_ref());
+        }
+    }
+
     fn whole(&mut self, el: &Element, k: &str) {
         let hi = self.blocks.len() - 1;
-        let bare = geom::without_geometry(el);
+        // A shape's fill is the text's (§5.3), as its geometry is.
+        let bare = geom::without_geometry(&if el.is("p:sp") { fill::without_fill(el) } else { el.clone() });
         let f = self.fp(&[Some(&if el.is("p:pic") { unmodelled_picture(&bare) } else { bare })]);
         let meta = Meta {
             tag: el.name.clone(),
@@ -411,7 +425,7 @@ impl Importer<'_> {
                 pr.children.retain(|n| !matches!(n, Node::El(e) if e.is("p:ph")));
             }
         }
-        let f = self.fp(&[Some(&geom::without_geometry(&fshell))]);
+        let f = self.fp(&[Some(&geom::without_geometry(&fill::without_fill(&fshell)))]);
         let meta = Meta {
             tag: shell.name.clone(),
             aux: vec![k.to_string(), self.part.clone(), shown(g)],
@@ -680,6 +694,7 @@ fn member(c: &Element, f: &Frame, rels: &Rels) -> Option<SlideItem> {
             id: format!("s{id}"),
             name,
             geom: geom::own(c).map(|g| f.out(&g)),
+            look: Default::default(),
             paras: member_paras(c),
         }),
         "p:cxnSp" => {

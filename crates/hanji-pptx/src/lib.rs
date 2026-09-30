@@ -14,6 +14,7 @@
 
 pub mod deck;
 pub mod export;
+pub mod fill;
 pub mod geom;
 pub mod import;
 pub mod pml;
@@ -112,8 +113,12 @@ impl TextModel for PptxModel {
             match hanji_core::presentation::kind(h) {
                 hanji_core::presentation::HeadKind::Slide { layout: l } => layout = shell.deck.layout(l),
                 hanji_core::presentation::HeadKind::Slot { name } if h.place.is_none() && name != "notes" => {
-                    let g = layout.and_then(|l| l.slot(name)).and_then(|s| s.geom);
-                    h.place = g.map(|g| hanji_core::Place::Box(g.shown()));
+                    let slot = layout.and_then(|l| l.slot(name));
+                    h.place = slot.and_then(|s| s.geom).map(|g| hanji_core::Place::Box(g.shown()));
+                    // …and looks as its layout has it.
+                    if h.look.is_empty() {
+                        h.look.fill = fill::shown(slot.and_then(|s| s.fill.as_ref()));
+                    }
                 }
                 _ => {}
             }

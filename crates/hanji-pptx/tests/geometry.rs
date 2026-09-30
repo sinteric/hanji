@@ -135,7 +135,7 @@ fn every_object_shows_its_box_and_getput_keeps_every_xfrm() {
         "layout: Blank",
         "<shape id=\"s4\" name=\"TextBox 3\" box=\"72 72 180 29\" font=Calibri size=18pt color=tx1>Learning PPTX</shape>",
         "<line id=\"s6\" name=\"Straight Connector 5\" from=\"84 144\" to=\"252 144\"/>",
-        "<shape id=\"s7\" name=\"Freeform 6\" box=\"47 211 185 136\" font=Calibri size=18pt color=lt1>Cloud</shape>",
+        "<shape id=\"s7\" name=\"Freeform 6\" box=\"47 211 185 136\" fill=accent1 font=Calibri size=18pt color=lt1>Cloud</shape>",
         "<picture id=\"s2\" name=\"Picture 1\" box=\"402 78 144 132\" src=\"media/image1.jpg\"/>",
         "<keep id=\"?\" kind=\"table\" summary=\"Table 2: Column1 Column2 Column3 data1 data2 data3\" box=\"300 372 372 96\"/>",
         "<line id=\"s8\" name=\"Straight Arrow Connector 7\" from=\"468 366\" to=\"468 216\"/>",
@@ -144,7 +144,7 @@ fn every_object_shows_its_box_and_getput_keeps_every_xfrm() {
     .join("\n");
     assert!(keep_ids_out(&imp.text).contains(&s1), "{}", imp.text);
     assert!(imp.text.contains("<group id=\"g5\" name=\"Group 4\" box=\"120 108 258 152\">\n<shape id=\"s2\" name=\"Rectangle 1\" box=\"120 108 138 60\"/>\n"), "{}", imp.text);
-    assert!(imp.text.contains("<shape id=\"s13\" name=\"Rectangle 12\" box=\"594 72 72 72\"/>"));
+    assert!(imp.text.contains("<shape id=\"s13\" name=\"Rectangle 12\" box=\"594 72 72 72\" fill=accent1-50%/>"));
     assert!(imp.text.starts_with("---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 720 x 540 pt\n---\n"));
     // Every slot shows its box, inherited from the layout or the master.
     let k = import(&deck("korean-deck.pptx"));
@@ -460,9 +460,9 @@ fn a_stored_rotation_left_as_shown_keeps_its_exact_value() {
     let s1 = slides(&before)[0].clone();
     let imp = import(&pkg);
     for shown in [
-        "name=\"Minus ninety\" box=\"60 160 200 40\" rot=\"270\" font=Calibri size=18pt color=lt1>",
-        "name=\"Minus fifteen flipped\" box=\"300 160 160 60\" rot=\"345\" flip=\"h\" font=Calibri size=18pt color=lt1>",
-        "name=\"Past a turn\" box=\"500 160 160 60\" rot=\"60\" font=Calibri size=18pt color=lt1>",
+        "name=\"Minus ninety\" box=\"60 160 200 40\" rot=\"270\" fill=gradient font=Calibri size=18pt color=lt1>",
+        "name=\"Minus fifteen flipped\" box=\"300 160 160 60\" rot=\"345\" flip=\"h\" fill=gradient font=Calibri size=18pt color=lt1>",
+        "name=\"Past a turn\" box=\"500 160 160 60\" rot=\"60\" fill=gradient font=Calibri size=18pt color=lt1>",
         "name=\"Turned in group\" box=\"80 420 80 80\" rot=\"315\"/>",
     ] {
         assert!(imp.text.contains(shown), "{shown}\n{}", imp.text);
@@ -474,7 +474,7 @@ fn a_stored_rotation_left_as_shown_keeps_its_exact_value() {
         assert_eq!(package::get(&parts, &p.name), Some(&p.data[..]), "{} changed", p.name);
     }
     // The same turn written another way (-90 for 270, -300 for 60): still unchanged.
-    let (text, rem) = exact(&imp.text, &imp.remainder, "rot=\"270\" font=", "rot=\"-90\" font=");
+    let (text, rem) = exact(&imp.text, &imp.remainder, "rot=\"270\" fill=", "rot=\"-90\" fill=");
     let (text, rem) = exact(&text, &rem, "rot=\"60\"", "rot=\"-300\"");
     let out = PptxEngine.export(&text, &rem).unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(xml(&package::read(&out).unwrap(), &s1), xml(&before, &s1));
@@ -485,7 +485,7 @@ fn a_stored_rotation_left_as_shown_keeps_its_exact_value() {
     assert!(xfrm_of(&x, "Past a turn").starts_with("<a:xfrm rot=\"25200000\">"));
     // A changed rotation is written from 0 up to a full turn; a changed flip
     // goes, an unchanged one stays as the file writes it.
-    let (text, rem) = exact(&imp.text, &imp.remainder, "rot=\"270\" font=", "rot=\"90\" font=");
+    let (text, rem) = exact(&imp.text, &imp.remainder, "rot=\"270\" fill=", "rot=\"90\" fill=");
     let (text, rem) = exact(&text, &rem, "rot=\"60\"", "rot=\"-30\"");
     let (text, rem) = exact(&text, &rem, "rot=\"345\" flip=\"h\"", "rot=\"345\"");
     let x = xml(&export(&text, &rem), &s1);

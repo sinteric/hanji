@@ -40,6 +40,7 @@ Slides are separated by a line `---`. Each slide's first line is `layout: Name` 
 <shape id="s4" name="출처">text<p/>more</shape> is an existing text shape: edit its text, delete its line to delete it; never create one.
 Text shows its font, size and color: what an object's text shares on its marker or tag (::title font=Calibri size=44pt color=tx1::), a paragraph's own at its end (- 매출 증가 {size=28pt}), a run's as [text]{size=24pt color=#FF7F50}. Change a value to restyle; leave one out to take what the layout gives. Colours: #RRGGBB, a theme name (tx1, accent1…), accent1+40% lighter, accent1-25% darker, /50% opacity; a value with * (accent1*) or gradient is kept as the file has it.
 <picture id="s7" name="Picture 6" box="x y w h" src="media/image1.png" crop="10 0 5 0" mask="ellipse" alt="…"/> is a picture (box in points from the slide's top-left corner): change its box, crop (percent cut off the left, top, right and bottom), mask (a preset shape such as ellipse or roundRect; none is a rectangle) or alt (its alternative text); src may name another picture's image. Keep its id and name.
+A slot or shape shows its fill after its box (<shape id="s9" name="Oval 8" box="…" fill=accent1/>, ::title box="…" fill=accent2::); write fill=colour to fill it, leave fill out for none.
 layout: Title and Content
 ::title::
 핵심 지표
