@@ -18,6 +18,7 @@ use hanji_package::package;
 use hanji_package::xml::{self, fragment, insert_ordered, Element, Node};
 
 use crate::deck::{LayoutInfo, SlotInfo};
+use crate::effects;
 use crate::fill;
 use crate::geom::{self, Frame};
 use crate::import::{
@@ -399,6 +400,8 @@ impl<'a> Exporter<'a> {
                 };
                 let look = &self.head(it).look;
                 outline::write(&mut e, look, slot.and_then(|s| s.line.as_ref()), &layout.fills, lined)?;
+                effects::write(&mut e, look.effects.as_deref(), slot.and_then(|s| s.fx.as_ref()), &layout.fills)
+                    .map_err(|m| format!("{}: {m}", item_label(it)))?;
                 kind::write(&mut e, look, slot.and_then(|s| s.geo.as_ref()), lined)
                     .map_err(|m| format!("{}: {m}", item_label(it)))?;
             }
@@ -1671,12 +1674,17 @@ fn group_text(el: &mut Element, st: &GroupItem, w: &GroupItem, sty: Option<Styli
                     outline::write(c, &b.look, None, theme, false).map_err(|m| format!("{what}: {m}"))?;
                 }
                 kind::write(c, &b.look, None, false).map_err(|m| format!("{what}: {m}"))?;
+                if a.look != b.look {
+                    let theme = sty.map(|s| s.fills).ok_or("a group's effects are written only on a slide")?;
+                    effects::write(c, b.look.effects.as_deref(), None, theme).map_err(|m| format!("{what}: {m}"))?;
+                }
             }
             (SlideItem::Line(a), SlideItem::Line(b)) if a.look != b.look => {
                 let what = format!("<line id=\"{}\" name=\"{}\">", b.id, b.name);
                 let theme = sty.map(|s| s.fills).ok_or("a group's outlines are written only on a slide")?;
                 outline::write(c, &b.look, None, theme, true).map_err(|m| format!("{what}: {m}"))?;
                 kind::write(c, &b.look, None, true).map_err(|m| format!("{what}: {m}"))?;
+                effects::write(c, b.look.effects.as_deref(), None, theme).map_err(|m| format!("{what}: {m}"))?;
             }
             (SlideItem::Group(a), SlideItem::Group(b)) => group_text(c, a, b, sty)?,
             _ => {}

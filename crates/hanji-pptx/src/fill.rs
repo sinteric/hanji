@@ -45,6 +45,9 @@ pub struct ThemeFills {
     /// `a:lnStyleLst`: each line style's `a:ln`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub lines: Vec<String>,
+    /// `a:effectStyleLst`: each `a:effectStyle`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub effects: Vec<String>,
 }
 
 impl ThemeFills {
@@ -53,7 +56,12 @@ impl ThemeFills {
         let list = |n: &str| -> Vec<FillXml> {
             scheme.and_then(|s| s.child(n)).map(|l| l.elements().map(Element::to_xml).collect()).unwrap_or_default()
         };
-        ThemeFills { fills: list("a:fillStyleLst"), bg: list("a:bgFillStyleLst"), lines: list("a:lnStyleLst") }
+        ThemeFills {
+            fills: list("a:fillStyleLst"),
+            bg: list("a:bgFillStyleLst"),
+            lines: list("a:lnStyleLst"),
+            effects: list("a:effectStyleLst"),
+        }
     }
 }
 

@@ -665,6 +665,27 @@ layout: Two Content
     not a DrawingML preset (with the nearest names), adjustments that are
     not numbers or `name=number` pairs, a kind on custom geometry, and
     `shape=`, `preset=` and other spellings (the key is `kind`).
+- **Effects** (built). A slot, shape or line shows what it draws beyond its
+  fill and outline as a summary, `effects="…"`, last on its tag: the names
+  of its effects in the file's order, from `shadow` (an outer or preset
+  shadow), `inner-shadow`, `glow`, `soft-edges`, `reflection`, `blur` and
+  `fill-overlay`, or `custom` for an effect graph (`a:effectDag`):
+  `<shape id="s3" name="Card" box="…" fill=#FFFFFF effects="shadow"/>`. They
+  are the object's own `a:effectLst`, else its `p:style` `a:effectRef` into
+  the theme's effect styles, else, for a placeholder, its layout's and
+  master's placeholder's. No effects show nothing. The summary does not
+  show an effect's settings (a shadow's blur, distance or colour), and 3-D
+  (`a:scene3d`, `a:sp3d`) is not an effect here.
+  - Effects left as shown keep the XML. Leaving them out writes none: the
+    object's own `a:effectLst` goes, or an empty one is written over a
+    style's or layout's. `effects="shadow"` on an object without a shadow
+    writes PowerPoint's preset outer shadow (Offset: Bottom Right, black at
+    40%). Effects equal to what the style or layout gives remove the
+    object's own.
+  - The object's fingerprint leaves its effects out. Refused: any other
+    change (adding a glow, a shadow to a list with other effects), a name
+    outside the list, and `shadow=`, `effect=` and other spellings (the key
+    is `effects`).
 - **Pictures** are a line each, `<picture id="s7" name="지도" box="…"
   src="media/image1.png" crop="10 0 5 0" mask="ellipse" alt="…"/>`, in this
   attribute order; `crop`, `mask` and `alt` are left out when the picture has

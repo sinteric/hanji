@@ -27,10 +27,18 @@ pub struct Look {
     pub start: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub end: Option<String>,
+    /// Its effects' summary, their names in the file's order (one of
+    /// [`EFFECTS`] each); `None` is none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effects: Option<String>,
 }
 
 /// The keys of an object's look, in canonical order.
-pub const LOOK_KEYS: &[&str] = &["kind", "adj", "fill", "border", "start", "end"];
+pub const LOOK_KEYS: &[&str] = &["kind", "adj", "fill", "border", "start", "end", "effects"];
+
+/// The effects a summary names; `custom` is an effect graph.
+pub const EFFECTS: &[&str] =
+    &["shadow", "inner-shadow", "glow", "soft-edges", "reflection", "blur", "fill-overlay", "custom"];
 
 /// Arrowheads (DrawingML's line end types), `none` for none.
 pub const ARROWS: &[&str] = &["triangle", "stealth", "diamond", "oval", "arrow"];
@@ -43,6 +51,7 @@ impl Look {
             && self.border.is_none()
             && self.start.is_none()
             && self.end.is_none()
+            && self.effects.is_none()
     }
 
     /// `kind=… adj=… fill=… border=… start=… end=…`, as a tag writes them
@@ -56,18 +65,41 @@ impl Look {
             ("border", &self.border),
             ("start", &self.start),
             ("end", &self.end),
+            ("effects", &self.effects),
         ];
         for (k, v) in keys {
             if let Some(v) = v {
                 // A shape's kind and adjustments are quoted, as a picture's mask is.
                 match k {
-                    "kind" | "adj" => out.push(format!("{k}=\"{v}\"")),
+                    "kind" | "adj" | "effects" => out.push(format!("{k}=\"{v}\"")),
                     _ => out.push(format!("{k}={}", vocab::quote(v))),
                 }
             }
         }
         out.join(" ")
     }
+}
+
+/// An effects summary as the text writes it → its canonical form; `None`
+/// for `none`.
+pub fn parse_effects(v: &str) -> Result<Option<String>, String> {
+    let names: Vec<&str> = v.split_whitespace().collect();
+    if names == ["none"] {
+        return Ok(None);
+    }
+    if names.is_empty() {
+        return Err("effects=\"\" names no effect; leave effects out for none.".into());
+    }
+    let mut out: Vec<&str> = vec![];
+    for n in names {
+        if !EFFECTS.contains(&n) {
+            return Err(format!("effects=\"{v}\": {n} is not an effect; they are {}.", EFFECTS.join(", ")));
+        }
+        if !out.contains(&n) {
+            out.push(n);
+        }
+    }
+    Ok(Some(out.join(" ")))
 }
 
 /// A preset shape as the text writes it: one of DrawingML's names.
@@ -193,6 +225,13 @@ pub fn split_look_keys(
             "border" => look.border = parse_border(v).map_err(e)?,
             "start" => look.start = parse_arrow(k, v).map_err(e)?,
             "end" => look.end = parse_arrow(k, v).map_err(e)?,
+            "effects" => look.effects = parse_effects(v).map_err(e)?,
+            "shadow" | "effect" | "glow" => {
+                return Err((
+                    *col,
+                    format!("{k}= is not a key here: an object's effects are effects=, as in effects=\"shadow\"."),
+                ));
+            }
             "outline" | "stroke" | "line-color" => {
                 return Err((
                     *col,

@@ -12,7 +12,9 @@
 //! P23 outline a shape, P24 put an arrowhead on a line (§5.3); P25 make a
 //! shape a rounded rectangle, P26 bend a straight line or straighten a bent one
 //! (preset shapes, §5.3); P27 move an object a connector is attached to, P28
-//! re-attach a connector (connectors, §5.3); P9 makes them all in one revision.
+//! re-attach a connector (connectors, §5.3); P29 remove a shape's effects,
+//! P30 give a shape a shadow (effects, §5.3); P9 makes them all in one
+//! revision.
 
 use std::collections::HashSet;
 
@@ -26,7 +28,7 @@ use hanji_testkit::{
     block_ranges, chars, deleted_span, entries_at, figure_or_word, ident, replace_span, span_of, Cx, Doc, Edit, EditFn,
 };
 
-pub const EDITS: [(&str, EditFn); 27] = [
+pub const EDITS: [(&str, EditFn); 29] = [
     ("p1_title", p1_title),
     ("p2_bullet", p2_bullet),
     ("p3_add_slide", p3_add_slide),
@@ -54,6 +56,8 @@ pub const EDITS: [(&str, EditFn); 27] = [
     ("p26_bend_line", p26_bend_line),
     ("p27_move_connected", p27_move_connected),
     ("p28_reattach", p28_reattach),
+    ("p29_clear_effects", p29_clear_effects),
+    ("p30_shadow", p30_shadow),
 ];
 
 /// A slide: its head and the end of its blocks.
@@ -1093,4 +1097,34 @@ fn p28_reattach(d: &Doc, _: &Cx) -> Option<Edit> {
         slide_name(&d.blocks, k)
     );
     Some(geometry_edit("P28 re-attach a connector", what, blocks, k, slide))
+}
+
+/// The first top-level shape whose effects `pick` accepts.
+fn shape_by_effects(d: &Doc, pick: &dyn Fn(Option<&str>) -> bool) -> Option<usize> {
+    (0..d.blocks.len()).find(|&k| {
+        d.blocks[k].head().is_some_and(|h| {
+            matches!(kind(h), HeadKind::Shape { id, .. } if !id.is_empty()) && pick(h.look.effects.as_deref())
+        })
+    })
+}
+
+/// A shape with effects loses them.
+fn p29_clear_effects(d: &Doc, _: &Cx) -> Option<Edit> {
+    let k = shape_by_effects(d, &|e| e.is_some())?;
+    let h = d.blocks[k].head()?;
+    let what = format!(
+        "shape {:?}: no effects (it had {}) on {}",
+        h.label,
+        h.look.effects.as_deref()?,
+        slide_name(&d.blocks, k)
+    );
+    Some(head_edit(d, k, |h| h.look.effects = None, "P29 remove a shape's effects", what))
+}
+
+/// A shape without effects gets PowerPoint's preset shadow.
+fn p30_shadow(d: &Doc, _: &Cx) -> Option<Edit> {
+    let k = shape_by_effects(d, &|e| e.is_none())?;
+    let label = d.blocks[k].head()?.label.clone();
+    let what = format!("shape {label:?}: effects=\"shadow\" on {}", slide_name(&d.blocks, k));
+    Some(head_edit(d, k, |h| h.look.effects = Some("shadow".into()), "P30 give a shape a shadow", what))
 }

@@ -47,6 +47,9 @@ pub struct SlotInfo {
     /// The preset shape it inherits, likewise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub geo: Option<crate::kind::Geo>,
+    /// The effects it inherits, likewise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fx: Option<crate::effects::EffectsXml>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -194,6 +197,7 @@ impl Deck {
                         (a, b) => a.or(b),
                     };
                     let geo = ph.geo.clone().or_else(|| master_ph.and_then(|m| m.geo.clone()));
+                    let fx = ph.fx.clone().or_else(|| master_ph.and_then(|m| m.fx.clone()));
                     slots.push(SlotInfo {
                         name,
                         ty: ph.ty.clone(),
@@ -207,6 +211,7 @@ impl Deck {
                         fill,
                         line,
                         geo,
+                        fx,
                     });
                 }
                 deck.layouts.push(LayoutInfo {
@@ -283,6 +288,8 @@ pub(crate) struct Ph {
     pub line: Option<Ln>,
     /// Its own preset or custom geometry.
     pub geo: Option<crate::kind::Geo>,
+    /// Its own effects, or its style's.
+    pub fx: Option<crate::effects::EffectsXml>,
 }
 
 /// The placeholders of a master's or layout's shape tree, in order.
@@ -315,6 +322,7 @@ pub(crate) fn placeholders(root: &Element, fills: &ThemeFills) -> Vec<Ph> {
                 fill,
                 line,
                 geo: crate::kind::own(sh),
+                fx: crate::effects::own(sh).or_else(|| crate::effects::from_style(sh, fills)),
             })
         })
         .collect()
