@@ -50,3 +50,26 @@ No openly licensed Korean .pptx was found in the two projects searched
 and is labelled synthetic wherever it is reported (CC0-1.0, written for this
 project). Regenerating it gives the same content but not the same bytes (zip
 timestamps); the committed copy is the one measured.
+
+## Audit decks (`audit/`)
+
+Five decks from the pptx canvas audit (2026-09-30), kept apart from the
+twenty-one above so the geometry tests' counts stay theirs: designed real
+decks and two synthetic modern ones, which the pptx tests run through GetPut,
+the edit set and PutGet (`audit_decks_getput_putget_remainder`), and on
+which the audit's coverage tally is measured. `fetch.sh` re-downloads the
+three third-party ones and checks their SHA-256; `make_synth.py` regenerates
+the synthetic ones. Crawled decks the audit also read (from Apache POI's
+crawled-file set) are not committed.
+
+| File | Source | Licence | Slides | What it exercises |
+|---|---|---|---|---|
+| onlyoffice-sample.pptx | [ONLYOFFICE/document-templates](https://github.com/ONLYOFFICE/document-templates) `sample/sample.pptx` at `0a52fb76fa53fddf7d70da28878537cde3d29421` | Apache-2.0 | 7 | a designed template: 210 objects, nested groups, theme fills and outlines from `p:style`, gradients, vertical text |
+| o09_Performance_typical.pptx | [dotnet/Open-XML-SDK](https://github.com/dotnet/Open-XML-SDK) `test/DocumentFormat.OpenXml.Tests.Assets/assets/TestFiles/o09_Performance_typical.pptx` at `431ab05cf160248cc3885a4a766026d4f8243792` | MIT | 11 | a "typical" Office deck: charts, tables, pictures (GIF, TIFF, WMF), pictures in groups, freeforms, a hand-drawn diagram |
+| slide-section-test.pptx | [LibreOffice/core](https://github.com/LibreOffice/core) `sd/qa/unit/data/pptx/slide-section-test.pptx` at `7642fc49b32eaac1e1ab8639df991902fd9a48ff` | MPL-2.0 | 13 | sections; 150 shapes filled and outlined from the theme |
+| synth-modern-pitch.pptx | synthetic: `make_synth.py` (python-pptx 1.0.2) | CC0-1.0 | 8 | a modern pitch deck on Blank layouts: full-bleed photo with an overlay, cropped and masked pictures (ellipse, rounded rectangle), rounded cards with shadows, freeform icons, nested groups, rotated shapes, gradients, connectors, a chart, a table, transitions, an animation |
+| synth-korean-report.pptx | synthetic: `make_synth.py` (python-pptx 1.0.2) | CC0-1.0 | 6 | a Korean report deck (맑은 고딕): process chevrons, an org chart with elbow connectors, a masked photo, a doughnut chart, KPI cards |
+
+Licences: ONLYOFFICE's document-templates repository is Apache-2.0, Open XML
+SDK is MIT, LibreOffice core is MPL-2.0 (its test documents are
+redistributed under it, as the docx corpus's LibreOffice files are).
