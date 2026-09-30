@@ -106,7 +106,10 @@ impl Deck {
                 .and_then(|r| parse(parts, &opc::resolve_target(&mpart, &r.target)).ok())
                 .map(|t| ThemeFonts::of(&t))
                 .unwrap_or_default();
-            let deflt = text::over(&text::levels(pres.child("p:defaultTextStyle"), &fonts), &[text::defaults(&fonts); 9]);
+            let deflt = text::over(
+                &text::levels(pres.child("p:defaultTextStyle"), &fonts),
+                &std::array::from_fn(|_| text::defaults(&fonts)),
+            );
             let text_levels = |n: &str| text::over(&text::levels(styles_of(&master, n), &fonts), &deflt);
             let (title_t, body_t, other_t) =
                 (text_levels("p:titleStyle"), text_levels("p:bodyStyle"), text_levels("p:otherStyle"));

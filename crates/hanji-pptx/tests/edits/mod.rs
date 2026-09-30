@@ -5,12 +5,14 @@
 //! delete an object (a picture, chart, table or group: rule 8), P11 move an
 //! object in its slide's z-order; P12 move a shape, P13 resize a picture,
 //! P14 add a text box under a title, P15 align two objects' left edges
-//! (geometry, §5.3); P9 makes them all in one revision.
+//! (geometry, §5.3); P18 format a word of a shape's text, P19 change a
+//! shape's font (text formatting, §5.3); P9 makes them all in one revision.
 
 use std::collections::HashSet;
 
 use hanji_core::presentation::{geom_of, kind, shape_head, slide_head, slot_head, HeadKind};
 use hanji_core::{Block, Kind, ListItem, Para, Place};
+use hanji_format::inline_style::{self, TextStyle};
 use hanji_format::{Geom, Inline};
 use hanji_pptx::import::SlideInfo;
 use hanji_pptx::DeckShell;
@@ -18,7 +20,7 @@ use hanji_testkit::{
     block_ranges, chars, deleted_span, entries_at, figure_or_word, ident, replace_span, span_of, Cx, Doc, Edit, EditFn,
 };
 
-pub const EDITS: [(&str, EditFn); 14] = [
+pub const EDITS: [(&str, EditFn); 16] = [
     ("p1_title", p1_title),
     ("p2_bullet", p2_bullet),
     ("p3_add_slide", p3_add_slide),
@@ -33,6 +35,8 @@ pub const EDITS: [(&str, EditFn); 14] = [
     ("p13_resize_picture", p13_resize_picture),
     ("p14_add_text_box", p14_add_text_box),
     ("p15_align", p15_align),
+    ("p18_format_word", p18_format_word),
+    ("p19_shape_font", p19_shape_font),
 ];
 
 /// A slide: its head and the end of its blocks.
@@ -146,6 +150,16 @@ fn para(text: &str, item: Option<ListItem>) -> Block {
     Block::Para(Para { style: String::new(), content: Inline::plain(text), item })
 }
 
+/// A new paragraph shows the formatting its runs inherit (§5.3), as a
+/// write reads back.
+fn styled(mut b: Block, under: &hanji_pptx::text::RunStyle) -> Block {
+    if let Block::Para(p) = &mut b {
+        let n = p.content.units.len();
+        hanji_format::inline_style::set_unit_styles(&mut p.content, &vec![under.shown(); n]);
+    }
+    b
+}
+
 /// A new slide at the end, from a layout with a title and a body.
 fn p3_add_slide(d: &Doc, cx: &Cx) -> Option<Edit> {
     let sh = shell(cx);
@@ -159,12 +173,17 @@ fn p3_add_slide(d: &Doc, cx: &Cx) -> Option<Edit> {
     let mut blocks = d.blocks.clone();
     // Written with bare markers, a new slide reads back with each slot's layout box (§5.3).
     let at = |n: &str| layout.slot(n).and_then(|s| s.geom);
-    blocks.extend([slide_head(&layout.name), slot_head("title", at("title")), para("새 슬라이드 제목", None)]);
+    let text = |n: &str, lvl: usize| layout.slot(n).unwrap().text[lvl].clone();
+    blocks.extend([
+        slide_head(&layout.name),
+        slot_head("title", at("title")),
+        styled(para("새 슬라이드 제목", None), &text("title", 0)),
+    ]);
     if has(&layout, "body") {
         blocks.extend([
             slot_head("body", at("body")),
-            para("첫째 항목", item(true, 0)),
-            para("둘째 항목 12", item(false, 1)),
+            styled(para("첫째 항목", item(true, 0)), &text("body", 0)),
+            styled(para("둘째 항목 12", item(false, 1)), &text("body", 1)),
         ]);
     }
     let n = d.blocks.len();
@@ -596,8 +615,11 @@ fn p14_add_text_box(d: &Doc, cx: &Cx) -> Option<Edit> {
         }
         let at = (t + 1..sl.end).find(|&k| d.blocks[k].head().is_some()).unwrap_or(sl.end);
         let bx = Geom { x: g.x, y: top, w: g.w, h: 28 * PT, ..Default::default() }.shown();
+        let Some(HeadKind::Slide { layout }) = d.blocks[sl.head].head().map(kind) else { continue };
+        let sh = shell(cx);
+        let under = &sh.deck.layout(layout)?.other_text[0];
         let mut blocks = d.blocks.clone();
-        blocks.splice(at..at, [shape_head("", "", Some(bx)), para("출처: 편집 12", None)]);
+        blocks.splice(at..at, [shape_head("", "", Some(bx)), styled(para("출처: 편집 12", None), under)]);
         let bmap = (0..d.blocks.len()).map(|k| Some(if k < at { k } else { k + 2 })).collect();
         let what = format!(
             "add a text box '출처: 편집 12' at box {} under the title of {}",
@@ -634,4 +656,92 @@ fn p15_align(d: &Doc, _: &Cx) -> Option<Edit> {
         return Some(geometry_edit("P15 align two objects", what, moved(d, b, to), b, slide));
     }
     None
+}
+
+/// The `<shape>`s with text: (head, its paragraph blocks).
+fn text_shapes(d: &Doc) -> Vec<(usize, Vec<usize>)> {
+    let mut out: Vec<(usize, Vec<usize>)> = vec![];
+    for (k, b) in d.blocks.iter().enumerate() {
+        match b {
+            Block::Head(h) if matches!(kind(h), HeadKind::Shape { .. }) => out.push((k, vec![])),
+            Block::Head(_) => out.push((usize::MAX, vec![])),
+            Block::Para(_) => {
+                if let Some(last) = out.last_mut().filter(|l| l.0 != usize::MAX) {
+                    last.1.push(k);
+                }
+            }
+            _ => {}
+        }
+    }
+    out.retain(|(h, ps)| *h != usize::MAX && !ps.is_empty());
+    out
+}
+
+/// A text-formatting edit of the shape at `head` (its paragraphs `paras`),
+/// made by `f` on each paragraph's per-unit formatting.
+fn format_shape(
+    d: &Doc,
+    head: usize,
+    paras: &[usize],
+    name: &'static str,
+    what: String,
+    f: &dyn Fn(usize, &Inline, &mut [TextStyle]),
+) -> Option<Edit> {
+    let mut blocks = d.blocks.clone();
+    for &bi in paras {
+        let Block::Para(p) = &mut blocks[bi] else { continue };
+        let mut st = inline_style::unit_styles(&p.content);
+        f(bi, &p.content, &mut st);
+        inline_style::set_unit_styles(&mut p.content, &st);
+    }
+    if blocks == d.blocks {
+        return None;
+    }
+    // The exact edit is the smallest differing span of the text.
+    let mut ed = Edit::blocks(name, what, blocks, ident(d.blocks.len()), paras.iter().copied().collect(), true);
+    ed.named = vec![slide_at(&d.blocks, head).2];
+    Some(ed)
+}
+
+/// A word of a shape's text becomes 24 pt coral: `[word]{size=24pt color=#FF7F50}`.
+fn p18_format_word(d: &Doc, _: &Cx) -> Option<Edit> {
+    for (head, paras) in text_shapes(d) {
+        for &bi in &paras {
+            let Block::Para(p) = &d.blocks[bi] else { continue };
+            let cs = chars(&p.content);
+            let words = hanji_testkit::runs_of(&cs, |c| c.is_alphanumeric(), 2);
+            // A word beside other text, so the rest keeps what it shows.
+            let Some(&(s, e)) = words.iter().find(|&&(s, e)| e - s < cs.iter().filter(|c| !c.is_whitespace()).count())
+            else {
+                continue;
+            };
+            let word: String = cs[s..e].iter().collect();
+            let what = format!("shape text: {word:?} → 24 pt, #FF7F50 on {}", slide_name(&d.blocks, bi));
+            let f = |b: usize, _: &Inline, st: &mut [TextStyle]| {
+                if b == bi {
+                    for x in &mut st[s..e] {
+                        x.size = Some(2400);
+                        x.color = Some("#FF7F50".into());
+                    }
+                }
+            };
+            return format_shape(d, head, &paras, "P18 format a word of a shape's text", what, &f);
+        }
+    }
+    None
+}
+
+/// A shape's text takes another font.
+fn p19_shape_font(d: &Doc, _: &Cx) -> Option<Edit> {
+    const FONT: &str = "Noto Sans KR";
+    let (head, paras) = text_shapes(d).into_iter().next()?;
+    let what = format!("shape font → {FONT:?} on {}", slide_name(&d.blocks, head));
+    let f = |_: usize, c: &Inline, st: &mut [TextStyle]| {
+        for (x, u) in st.iter_mut().zip(&c.units) {
+            if inline_style::visible(&u.atom) {
+                x.font = Some(FONT.into());
+            }
+        }
+    };
+    format_shape(d, head, &paras, "P19 change a shape's font", what, &f)
 }

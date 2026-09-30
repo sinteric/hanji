@@ -7,10 +7,10 @@
 
 use crate::ast::*;
 use crate::diag::{quoted, Diagnostic};
+use crate::inline_style::{self as style, TextStyle};
 use crate::names::{Layout, Names};
 use crate::parse::{chars_of, parse_tag, BlockMap, BlockMapKind, ParaMap, Parser, Tag};
 use crate::serialize::{attr, blocks_with, cell_text_with, front_lines, keep_tag};
-use crate::style::{self, TextStyle};
 
 /// Where a head line is: its byte range, and the offset that stands for it
 /// (its line end; for a shape, its `<shape` tag).
@@ -787,7 +787,11 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
         style::normalize(&mut inls);
     }
     if paras.is_empty() && !obj_style.is_empty() {
-        p.err(i, tag.col, "a shape without text has no text formatting: write its text, or leave out font, size and color.");
+        p.err(
+            i,
+            tag.col,
+            "a shape without text has no text formatting: write its text, or leave out font, size and color.",
+        );
         return None;
     }
     let sh = ShapeText { id, name, geom, paras };

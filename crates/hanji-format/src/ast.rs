@@ -390,7 +390,7 @@ pub enum SpanKind {
     Field(String),
     /// A Presentation's text formatting (§5.3): the effective font, size
     /// and colour of the units it covers.
-    Style(crate::style::TextStyle),
+    Style(crate::inline_style::TextStyle),
 }
 
 /// Emphasis flags of one unit.

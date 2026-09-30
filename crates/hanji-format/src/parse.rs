@@ -840,7 +840,7 @@ impl<'a> Parser<'a> {
                             if st.style.is_some() {
                                 fail!(x, "formatted text cannot hold more formatted text: write [a]{{…}}[b]{{…}} side by side; write \\[ for a literal [.");
                             }
-                            match crate::style::parse_braces(&inner) {
+                            match crate::inline_style::parse_braces(&inner) {
                                 Ok(style) => {
                                     st.style = Some((st.units.len(), style, close, resume, col_of(x)));
                                     x += 1;
@@ -948,9 +948,10 @@ impl<'a> Parser<'a> {
                     }
                     x = after;
                 }
-                '{' if self.styles && (x == 0 || src[x - 1].2.is_whitespace()) => match para_braces_at(src, x, stop_at) {
+                '{' if self.styles && (x == 0 || src[x - 1].2.is_whitespace()) => match para_braces_at(src, x, stop_at)
+                {
                     Some((inner, resume)) => {
-                        let style = match crate::style::parse_braces(&inner) {
+                        let style = match crate::inline_style::parse_braces(&inner) {
                             Ok(style) => style,
                             Err(m) => fail!(x, "{m}; write \\{{ for a literal {{."),
                         };
@@ -982,7 +983,11 @@ impl<'a> Parser<'a> {
             }
         }
         if let Some((_, _, _, _, col)) = st.style {
-            self.err(line, col, "this [ is not closed: formatted text is [text]{size=24pt}; write \\[ for a literal [.");
+            self.err(
+                line,
+                col,
+                "this [ is not closed: formatted text is [text]{size=24pt}; write \\[ for a literal [.",
+            );
             return None;
         }
         if let Some((_, _, _, col)) = st.link {
@@ -1004,7 +1009,7 @@ impl<'a> Parser<'a> {
         let mut inline = Inline { units: st.units, spans: st.spans };
         if !st.para_styles.is_empty() {
             // A paragraph's own formatting is beneath its [text]{…}.
-            let mut styles = crate::style::unit_styles(&inline);
+            let mut styles = crate::inline_style::unit_styles(&inline);
             let bounds: Vec<usize> = st.splits.iter().map(|s| s.0).collect();
             for (para, style) in &st.para_styles {
                 let a = if *para == 0 { 0 } else { bounds[para - 1] };
@@ -1013,14 +1018,9 @@ impl<'a> Parser<'a> {
                     *s = s.over(style);
                 }
             }
-            crate::style::set_unit_styles(&mut inline, &styles);
+            crate::inline_style::set_unit_styles(&mut inline, &styles);
         }
-        Some(InlineOut {
-            inline,
-            offsets: st.offsets,
-            stop,
-            splits: st.splits,
-        })
+        Some(InlineOut { inline, offsets: st.offsets, stop, splits: st.splits })
     }
 
     fn keep_tag(&mut self, line: usize, tag: &Tag) -> Option<Keep> {
@@ -1164,9 +1164,9 @@ struct InlineState {
     /// Cell paragraph starts: (unit index, style, source offset).
     splits: Vec<(usize, Option<String>, usize)>,
     /// An open `[text]{…}`: (start unit, its formatting, index of `]`, resume index, col).
-    style: Option<(usize, crate::style::TextStyle, usize, usize, usize)>,
+    style: Option<(usize, crate::inline_style::TextStyle, usize, usize, usize)>,
     /// A paragraph's own `{…}`: (paragraph index, its formatting).
-    para_styles: Vec<(usize, crate::style::TextStyle)>,
+    para_styles: Vec<(usize, crate::inline_style::TextStyle)>,
 }
 
 pub(crate) struct InlineOut {
@@ -1204,11 +1204,17 @@ impl InlineOut {
     }
 }
 
+/// The spans within units `a..b`; formatting spans running past either
+/// end are cut to it.
 fn slice_spans(spans: &[Span], a: usize, b: usize) -> Vec<Span> {
     spans
         .iter()
-        .filter(|s| s.start >= a && s.end <= b)
-        .map(|s| Span { start: s.start - a, end: s.end - a, kind: s.kind.clone() })
+        .filter_map(|s| match s.kind {
+            SpanKind::Style(_) if s.start < b && s.end > a => Some((s.start.max(a), s.end.min(b), s)),
+            _ if s.start >= a && s.end <= b => Some((s.start, s.end, s)),
+            _ => None,
+        })
+        .map(|(x, y, s)| Span { start: x - a, end: y - a, kind: s.kind.clone() })
         .collect()
 }
 

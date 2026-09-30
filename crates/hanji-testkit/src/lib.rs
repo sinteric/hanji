@@ -259,7 +259,18 @@ pub fn replace_span(d: &Doc, path: &[usize], s: usize, e: usize, new: &str, name
     let marks = p.units.get(src).map_or(Marks::NONE, |u| u.marks);
     let ins: Vec<Unit> = new.chars().map(|c| Unit { atom: Atom::Char(c), marks }).collect();
     let k = ins.len();
+    // Formatting spans: the new text takes the formatting of the text it
+    // replaces (or follows).
+    let styled = !p.spans.is_empty() && p.spans.iter().all(|x| matches!(x.kind, hanji_format::SpanKind::Style(_)));
+    let mut styles = styled.then(|| hanji_format::inline_style::unit_styles(p));
+    if let Some(st) = &mut styles {
+        let like = st.get(src).cloned().unwrap_or_default();
+        st.splice(s..e, std::iter::repeat_n(like, k));
+    }
     p.units.splice(s..e, ins);
+    if let Some(st) = styles {
+        hanji_format::inline_style::set_unit_styles(p, &st);
+    }
     let true_ops = HashMap::from([(path.to_vec(), span_ops(n, s, e, k))]);
     Edit {
         name,
@@ -1175,7 +1186,7 @@ fn text_span(fmt: &dyn Format, old_text: &str, new_text: &str, rem: &Remainder, 
         let (a, b) = (at(*s), at(*e));
         let delta = new_text.len() as isize - old_text.len() as isize;
         let nb = (b as isize + delta) as usize;
-        if old_text[..a] == new_text[..a] && old_text[b..] == new_text[nb..] {
+        if new_text.get(..a) == Some(&old_text[..a]) && new_text.get(nb..) == Some(&old_text[b..]) {
             return (a, b, new_text[a..nb].to_string());
         }
     }

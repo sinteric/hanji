@@ -39,6 +39,8 @@ use hanji_package::xml::{canon, fp, is_blank, Element, Node, Scope};
 use crate::deck::{LayoutInfo, SlotInfo};
 use crate::geom::{self, Frame};
 use crate::pml::*;
+use crate::text::{self, RunStyle, ThemeFonts};
+use hanji_format::inline_style::{self as istyle, TextStyle};
 
 /// Where a slide came from, stored on its `Slide` entry.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -100,6 +102,11 @@ pub struct Importer<'a> {
     part: String,
     /// The open list of the slot being read: the `lvl` of each open level.
     list: Option<Vec<u32>>,
+    /// What the text of the shape being read inherits, per level (none for notes).
+    base: Option<[RunStyle; 9]>,
+    fonts: ThemeFonts,
+    /// Each unit's formatting as shown, beside `buf`.
+    ustyle: Vec<TextStyle>,
     _deck: std::marker::PhantomData<&'a ()>,
 }
 
@@ -134,6 +141,9 @@ impl Importer<'_> {
             shapes: vec![],
             part: String::new(),
             list: None,
+            base: None,
+            fonts: ThemeFonts::default(),
+            ustyle: vec![],
             _deck: std::marker::PhantomData,
         }
     }
@@ -222,7 +232,8 @@ impl Importer<'_> {
                     )));
                     let g = geom::own(&el).or(slot.geom);
                     self.blocks.push(slot_head(&slot.name, g));
-                    self.text_shape(&el, &slot.bullets, &k.to_string(), true, g)?;
+                    let t = Some((&slot.text, &layout.fonts));
+                    self.text_shape(&el, &slot.bullets, &k.to_string(), true, g, t)?;
                 }
                 What::KeepSlot(slot) => {
                     used.push(slot.name.clone());
@@ -254,7 +265,8 @@ impl Importer<'_> {
                     let g = geom::own(&el);
                     self.blocks.push(shape_head(&id, &name, g));
                     self.name_shape(id, name);
-                    self.text_shape(&el, &layout.other, &k.to_string(), false, g)?;
+                    let t = Some((&layout.other_text, &layout.fonts));
+                    self.text_shape(&el, &layout.other, &k.to_string(), false, g, t)?;
                 }
                 What::Bare(ref id, ref name) | What::Line(ref id, ref name) | What::Group(ref id, ref name) => {
                     let (id, name) = (id.clone(), name.clone());
@@ -313,7 +325,7 @@ impl Importer<'_> {
             if has_text(&shape) {
                 *el = wrap(ITEM, &[("k", "notes"), ("slot", "notes")], Some(emptied(&shape)));
                 self.blocks.push(slot_head("notes", None));
-                self.text_shape(&shape, &bullets, "notes", true, None)?;
+                self.text_shape(&shape, &bullets, "notes", true, None, None)?;
             } else {
                 *el = wrap(LATENT, &[("slot", "notes")], Some(shape));
             }
@@ -352,6 +364,7 @@ impl Importer<'_> {
     /// paragraphs. Without `lists` (a `<shape>`, whose text has no list
     /// items) a paragraph's bullet stays in the remainder. `g` is the box
     /// the text shows for it.
+    #[allow(clippy::too_many_arguments)]
     fn text_shape(
         &mut self,
         el: &Element,
@@ -359,8 +372,12 @@ impl Importer<'_> {
         k: &str,
         lists: bool,
         g: Option<Geom>,
+        text: Option<(&[RunStyle; 9], &ThemeFonts)>,
     ) -> Result<(), String> {
         let hi = self.blocks.len() - 1;
+        // What its runs inherit (§5.3 text formatting); notes show none.
+        self.base = text.map(|(t, f)| text::base(el, t, f));
+        self.fonts = text.map(|t| t.1.clone()).unwrap_or_default();
         let mut shell = el.clone();
         let tx = shell.child_mut("p:txBody").ok_or("a text shape without p:txBody")?;
         let paras: Vec<Element> = tx.elements().filter(|e| e.is("a:p")).cloned().collect();
@@ -381,13 +398,31 @@ impl Importer<'_> {
         self.entry(Kind::Shape, vec![shell.to_xml()], f, &[hi], None, None, meta);
         self.list = None;
         let bullets = if lists { bullets } else { [Bu::None; 9] };
+        let first = self.blocks.len();
         for p in &paras {
             let bi = self.blocks.len();
             let para = self.para(p, bi, &bullets, lists)?;
             self.blocks.push(Block::Para(para));
         }
         self.list = None;
+        if self.base.is_some() {
+            self.shown_styles(first);
+        }
+        self.base = None;
         Ok(())
+    }
+
+    /// The canonical formatting of the shape's paragraphs from `first` on
+    /// (spaces and breaks take the text's around them, §5.3).
+    fn shown_styles(&mut self, first: usize) {
+        let mut inls: Vec<&mut Inline> = self.blocks[first..]
+            .iter_mut()
+            .filter_map(|b| if let Block::Para(p) = b { Some(&mut p.content) } else { None })
+            .collect();
+        istyle::normalize(&mut inls);
+        for i in inls {
+            i.normalize();
+        }
     }
 
     /// A placeholder entry for `el`; `tag` marks a slide object's.
@@ -407,6 +442,7 @@ impl Importer<'_> {
         let ppr = p.child("a:pPr");
         let end = p.child("a:endParaRPr");
         let lvl: u32 = ppr.and_then(|x| x.get("lvl")).and_then(|v| v.parse().ok()).unwrap_or(0).min(8);
+        let under = self.base.as_ref().map(|b| b[lvl as usize].clone());
         let kind = match bu_of(ppr).filter_lists(lists) {
             Bu::Unset => bullets[lvl as usize],
             b => b,
@@ -436,6 +472,7 @@ impl Importer<'_> {
         let meta = Meta { item, aux: vec![lvl.to_string()], ..Default::default() };
         self.entry(Kind::Ppr, xml, f, &path, None, None, meta);
         self.buf.clear();
+        self.ustyle.clear();
         let mut texts: Vec<(usize, String)> = vec![];
         for c in &p.children {
             let c = match c {
@@ -447,20 +484,24 @@ impl Importer<'_> {
                 "a:pPr" | "a:endParaRPr" => {}
                 "a:r" if run_modellable(c) => {
                     let t = c.text_of(&["a:t"]);
-                    let ix = self.run(c, &path, &t, false);
+                    let ix = self.run(c, &path, &t, false, under.as_ref());
                     texts.push((ix, t));
                 }
                 "a:br" if c.elements().all(|x| x.is("a:rPr")) => {
-                    self.run(c, &path, "", true);
+                    self.run(c, &path, "", true, under.as_ref());
                 }
                 _ => {
                     let pos = self.buf.len();
                     let keep = self.keep_entry(Kind::Keep, c, &path, Some(pos), "", "");
                     self.buf.push(Unit { atom: Atom::Keep(keep), marks: Marks::NONE });
+                    self.ustyle.push(TextStyle::default());
                 }
             }
         }
         let mut content = Inline { units: std::mem::take(&mut self.buf), spans: vec![] };
+        if under.is_some() {
+            istyle::set_unit_styles(&mut content, &std::mem::take(&mut self.ustyle));
+        }
         // Whitespace alone has no line form: the paragraph is empty in the
         // text, and its runs keep their text.
         if !content.units.is_empty()
@@ -472,8 +513,13 @@ impl Importer<'_> {
                 e.meta.aux = vec![t];
             }
             content.units.clear();
+            content.spans.clear();
         }
-        content.normalize();
+        // With formatting shown, marks are canonical once the formatting is
+        // (`shown_styles`): the spans it leaves decide where they can end.
+        if under.is_none() {
+            content.normalize();
+        }
         self.stats.list_items += item.is_some() as usize;
         Ok(Para { style: String::new(), content, item })
     }
@@ -497,14 +543,20 @@ impl Importer<'_> {
     }
 
     /// `a:r` or `a:br` → a `Run` entry and its text; the entry's index.
-    fn run(&mut self, r: &Element, path: &[usize], text: &str, br: bool) -> usize {
+    /// `under`: what the run inherits (its formatting is shown over it).
+    fn run(&mut self, r: &Element, path: &[usize], text: &str, br: bool, under: Option<&RunStyle>) -> usize {
         let rpr = r.child("a:rPr");
+        let shown = under.map(|u| rpr.map_or(RunStyle::default(), |x| RunStyle::of(x, &self.fonts)).over(u).shown());
         let marks = marks_of(rpr);
         let shell = r.shell();
         let mut rest = rpr.cloned();
         if let Some(x) = &mut rest {
             for a in MARK_ATTRS {
                 x.remove_attr(a);
+            }
+            // Formatting the text shows is the text's (§5.3), as the marks are.
+            if under.is_some() {
+                text::without_shown(x);
             }
         }
         let trivial =
@@ -518,6 +570,7 @@ impl Importer<'_> {
             self.buf.extend(text.chars().map(|c| Unit { atom: Atom::Char(c), marks }));
         }
         let end = self.buf.len();
+        self.ustyle.resize(end, shown.clone().unwrap_or_default());
         let meta = Meta { marks, tag: r.name.clone(), ..Default::default() };
         self.entry(Kind::Run, xml, f, path, Some(start), Some(end), meta)
     }
