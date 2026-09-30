@@ -5,7 +5,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use hanji_format::look;
+use hanji_format::look::{self, Linear};
 use hanji_package::xml::{fragment, insert_ordered, Element, Node};
 
 use crate::text;
@@ -118,11 +118,63 @@ pub fn shown(fill: Option<&FillXml>) -> Option<String> {
     let f = fragment(fill?);
     match f.name.as_str() {
         "a:solidFill" => text::color_of(&f),
-        "a:gradFill" => Some("gradient".into()),
+        "a:gradFill" => Some(linear_of(&f).map_or_else(|| "gradient".into(), |l| l.to_string())),
         "a:pattFill" => Some("pattern".into()),
         "a:blipFill" => Some("picture".into()),
         _ => None,
     }
+}
+
+/// A gradient fill as a two-stop linear gradient the text can write: its
+/// two stops at the start and end, colours the text shows without `*`, and
+/// a linear angle in whole degrees; `None` for any other gradient (shown as
+/// `gradient`, kept).
+fn linear_of(g: &Element) -> Option<Linear> {
+    let stops: Vec<&Element> = g.child("a:gsLst")?.elements().filter(|e| e.is("a:gs")).collect();
+    let [a, b] = stops.as_slice() else { return None };
+    if a.get("pos").as_deref() != Some("0") || b.get("pos").as_deref() != Some("100000") {
+        return None;
+    }
+    let ang: i64 = g.child("a:lin")?.get("ang").unwrap_or_else(|| "0".into()).parse().ok()?;
+    if ang % 60_000 != 0 || g.child("a:path").is_some() {
+        return None;
+    }
+    let col = |s: &Element| hanji_format::vocab::Color::parse(&text::color_of(s)?).ok();
+    let l = Linear { angle: (ang / 60_000).rem_euclid(360), from: col(a)?, to: col(b)? };
+    l.is_writable().then_some(l)
+}
+
+/// `g` (a gradient fill, or none) with `want`'s angle and colours, each
+/// changed one written: a stop's colour, the angle; the rest kept.
+fn linear_xml(g: Option<&FillXml>, want: &Linear) -> FillXml {
+    let color = |c: &hanji_format::vocab::Color| {
+        let f = fragment(&text::fill_xml(&c.to_string()));
+        let xml = f.elements().next().map(Element::to_xml).unwrap_or_default();
+        xml
+    };
+    let Some(mut e) = g.map(|g| fragment(g)).filter(|e| linear_of(e).is_some()) else {
+        return format!(
+            "<a:gradFill><a:gsLst><a:gs pos=\"0\">{}</a:gs><a:gs pos=\"100000\">{}</a:gs></a:gsLst><a:lin ang=\"{}\" scaled=\"0\"/></a:gradFill>",
+            color(&want.from),
+            color(&want.to),
+            want.angle * 60_000
+        );
+    };
+    let had = linear_of(&e).expect("linear");
+    if had.angle != want.angle {
+        if let Some(lin) = e.child_mut("a:lin") {
+            lin.set("ang", &(want.angle * 60_000).to_string());
+        }
+    }
+    if let Some(gs) = e.child_mut("a:gsLst") {
+        let mut stops = gs.elements_mut().filter(|x| x.is("a:gs"));
+        for (stop, (h, w)) in [(stops.next(), (&had.from, &want.from)), (stops.next(), (&had.to, &want.to))] {
+            if let (Some(s), true) = (stop, h != w) {
+                s.children = vec![Node::El(fragment(&color(w)))];
+            }
+        }
+    }
+    e.to_xml()
 }
 
 /// `el` (a shape) without its own fill: what its fingerprint holds.
@@ -159,6 +211,10 @@ pub fn write(el: &mut Element, want: Option<&str>, p: Parents) -> Result<(), Str
     } else {
         Some(match want {
             None => "<a:noFill/>".to_string(),
+            Some(w) if Linear::parse(w).is_some_and(|l| l.is_ok_and(|l| l.is_writable())) => {
+                let l = Linear::parse(w).expect("linear").expect("linear");
+                linear_xml(effective(el, p.now, p.theme).as_ref(), &l)
+            }
             Some(w) if look::is_kept_fill(w) => {
                 let then = effective(el, p.then, p.theme);
                 match then.filter(|t| shown(Some(t)).as_deref() == Some(w)) {

@@ -15,7 +15,8 @@
 //! re-attach a connector (connectors, §5.3); P29 remove a shape's effects,
 //! P30 give a shape a shadow (effects, §5.3); P31 draw a custom shape as a
 //! preset (custom geometry, §5.3); P32 turn a group 15° (turned groups,
-//! §5.3); P9 makes them all in one revision.
+//! §5.3); P33 fill a shape with a two-stop linear gradient (§5.3); P9 makes
+//! them all in one revision.
 
 use std::collections::HashSet;
 
@@ -29,7 +30,7 @@ use hanji_testkit::{
     block_ranges, chars, deleted_span, entries_at, figure_or_word, ident, replace_span, span_of, Cx, Doc, Edit, EditFn,
 };
 
-pub const EDITS: [(&str, EditFn); 31] = [
+pub const EDITS: [(&str, EditFn); 32] = [
     ("p1_title", p1_title),
     ("p2_bullet", p2_bullet),
     ("p3_add_slide", p3_add_slide),
@@ -61,6 +62,7 @@ pub const EDITS: [(&str, EditFn); 31] = [
     ("p30_shadow", p30_shadow),
     ("p31_custom_to_preset", p31_custom_to_preset),
     ("p32_turn_group", p32_turn_group),
+    ("p33_gradient", p33_gradient),
 ];
 
 /// A slide: its head and the end of its blocks.
@@ -1199,4 +1201,16 @@ fn p32_turn_group(d: &Doc, _: &Cx) -> Option<Edit> {
         }
     }
     None
+}
+
+/// A shape with a writable fill takes a gradient from accent1 to white, top to bottom.
+fn p33_gradient(d: &Doc, _: &Cx) -> Option<Edit> {
+    const FILL: &str = "linear 90 accent1 #FFFFFF";
+    let k = shape_with(d, &|f| f.is_some_and(|f| !hanji_format::look::is_kept_fill(f) && f != FILL))?;
+    let label = d.blocks[k].head()?.label.clone();
+    let what = format!(
+        "shape {label:?}: fill=\"{FILL}\" (accent 1 at the top to white at the bottom) on {}",
+        slide_name(&d.blocks, k)
+    );
+    Some(look_edit(d, k, Some(FILL), "P33 fill a shape with a gradient", what))
 }

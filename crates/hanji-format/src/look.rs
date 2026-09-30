@@ -190,8 +190,47 @@ pub fn parse_arrow(k: &str, v: &str) -> Result<Option<String>, String> {
     }
 }
 
+/// A two-stop linear gradient, `linear <angle> <from> <to>`: its angle in
+/// whole degrees clockwise from left-to-right (0–359), and the colours at
+/// its start and end.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Linear {
+    pub angle: i64,
+    pub from: vocab::Color,
+    pub to: vocab::Color,
+}
+
+impl Linear {
+    /// `linear 90 accent1 #FFFFFF` → the gradient; `None` for another fill.
+    pub fn parse(v: &str) -> Option<Result<Linear, String>> {
+        let rest = v.trim().strip_prefix("linear")?;
+        let form = "a linear gradient is linear <angle> <from> <to>, such as fill=\"linear 90 accent1 #FFFFFF\": its angle in whole degrees clockwise from left-to-right, and two colours";
+        let parts: Vec<&str> = rest.split_whitespace().collect();
+        let [a, f, t] = parts.as_slice() else { return Some(Err(format!("fill=\"{v}\": {form}."))) };
+        let angle = match a.parse::<i64>() {
+            Ok(n) => n.rem_euclid(360),
+            Err(_) => return Some(Err(format!("fill=\"{v}\": {a} is not an angle; {form}."))),
+        };
+        let col = |c: &str| vocab::Color::parse(c).map_err(|m| format!("fill=\"{v}\": {m}"));
+        Some(col(f).and_then(|from| Ok(Linear { angle, from, to: col(t)? })))
+    }
+
+    pub fn is_writable(&self) -> bool {
+        self.from.is_writable() && self.to.is_writable()
+    }
+}
+
+impl std::fmt::Display for Linear {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "linear {} {} {}", self.angle, self.from, self.to)
+    }
+}
+
 /// A fill as the text writes it → its canonical form; `None` for `none`.
 pub fn parse_fill(v: &str) -> Result<Option<String>, String> {
+    if let Some(l) = Linear::parse(v) {
+        return l.map(|l| Some(l.to_string()));
+    }
     match Fill::parse(v)? {
         Fill::None => Ok(None),
         f => Ok(Some(f.to_string())),
@@ -201,7 +240,10 @@ pub fn parse_fill(v: &str) -> Result<Option<String>, String> {
 /// Whether a canonical fill is one the text shows but cannot write
 /// (a gradient, pattern or picture, or a colour with `*`).
 pub fn is_kept_fill(f: &str) -> bool {
-    Fill::parse(f).is_ok_and(|f| !f.is_writable())
+    match Linear::parse(f) {
+        Some(l) => l.is_ok_and(|l| !l.is_writable()),
+        None => Fill::parse(f).is_ok_and(|f| !f.is_writable()),
+    }
 }
 
 /// The look keys of `attrs` (name, value, column): the look they give,
