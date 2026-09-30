@@ -387,3 +387,45 @@ fn what_cannot_change_is_refused_with_the_reason() {
     let bad = imp.text.replace("<shape id=\"s5\" name=\"출처\"", "<shape id=\"s99\" name=\"출처\"");
     assert!(matches!(PptxEngine.export(&bad, &imp.remainder), Err(EngineError::Invalid(_))));
 }
+
+#[test]
+fn a_changed_number_another_object_shows_takes_its_exact_emu() {
+    // Kit file 40 (txt-font-props.pptx, P15): TextBox 1's left edge is
+    // 2952093 EMU (232.45 pt, shown 232). TextBox 2 written at x 232 lands
+    // exactly on it, not at 232 pt (2946400 EMU); its other numbers keep their own.
+    let pkg = deck("txt-font-props.pptx");
+    let imp = import(&pkg);
+    let s5 = slides(&package::read(&pkg).unwrap())[4].clone();
+    let (text, rem) = exact(
+        &imp.text,
+        &imp.remainder,
+        "name=\"TextBox 2\" box=\"206 255 308 29\"",
+        "name=\"TextBox 2\" box=\"232 255 308 29\"",
+    );
+    let parts = export(&text, &rem);
+    let x = xml(&parts, &s5);
+    let f = xfrm_of(&x, "TextBox 2");
+    assert!(f.contains("<a:off x=\"2952093\" y=\"3244334\"/>"), "{f}");
+    assert!(f.contains("<a:ext cx=\"3917095\" cy=\"369332\"/>"), "{f}");
+    // A new text box as wide as TextBox 1 (255 pt shown, 3239814 EMU) is exactly as wide,
+    // and as tall as the others (29 pt shown, 369332 EMU).
+    let (text, rem) = exact(
+        &text,
+        &rem,
+        "Shape 2 – MSO_LANGUAGE_ID.POLISH</shape>",
+        "Shape 2 – MSO_LANGUAGE_ID.POLISH</shape>\n<shape box=\"232 440 255 29\">new</shape>",
+    );
+    let (parts, _) = export_new(&text, &rem, &[("s5", "TextBox 4")]);
+    let f = xfrm_of(&xml(&parts, &s5), "TextBox 4");
+    assert!(f.contains("<a:off x=\"2952093\" y=\"5588000\"/><a:ext cx=\"3239814\" cy=\"369332\"/>"), "{f}");
+    // TextBox 1 moved in the same edit: its old x is nowhere, and 232 is 232 pt.
+    let (text, rem) = exact(
+        &imp.text,
+        &imp.remainder,
+        "name=\"TextBox 1\" box=\"232 113 255 29\">Shape 0",
+        "name=\"TextBox 1\" box=\"100 113 255 29\">Shape 0",
+    );
+    let (text, rem) = exact(&text, &rem, "box=\"206 255 308 29\"", "box=\"232 255 308 29\"");
+    let f = xfrm_of(&xml(&export(&text, &rem), &s5), "TextBox 2");
+    assert!(f.contains("<a:off x=\"2946400\" y=\"3244334\"/>"), "{f}");
+}

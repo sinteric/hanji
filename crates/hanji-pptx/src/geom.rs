@@ -272,3 +272,136 @@ pub fn without_geometry(el: &Element) -> Element {
     });
     e
 }
+
+/// A top-level object's box for snapping (§5.3): the one stored (exact EMU;
+/// `None` for a new object) and the one the text writes (`None` without one).
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Written {
+    pub stored: Option<Geom>,
+    pub written: Option<Geom>,
+}
+
+fn field(g: &Geom, k: usize) -> i64 {
+    [g.x, g.y, g.w, g.h][k]
+}
+
+fn field_mut(g: &mut Geom, k: usize) -> &mut i64 {
+    match k {
+        0 => &mut g.x,
+        1 => &mut g.y,
+        2 => &mut g.w,
+        _ => &mut g.h,
+    }
+}
+
+/// The stored value of number `k` (x, y, w, h) of `b` when the text leaves it as shown.
+fn kept(b: &Written, k: usize) -> Option<i64> {
+    let (s, w) = (b.stored?, b.written?);
+    let v = field(&s, k);
+    (hanji_format::shown_pt(v) * hanji_format::EMU_PER_PT == field(&w, k)).then_some(v)
+}
+
+/// The box `boxes[n]` writes, snapped (§5.3): a changed number (x, y, w or h)
+/// that another object shows for the same number, left as shown there, takes
+/// that object's exact value. Same number, same position. When several do and
+/// their exact values differ, the nearest in z-order wins, the one beneath on
+/// a tie. A number left as shown is not snapped: it keeps its own exact value.
+pub fn snapped(boxes: &[Written], n: usize) -> Option<Geom> {
+    let b = boxes.get(n)?;
+    let mut w = b.written?;
+    for k in 0..4 {
+        if kept(b, k).is_some() {
+            continue;
+        }
+        let want = field(&w, k);
+        let nearest = (1..boxes.len())
+            .flat_map(|d| [n.checked_sub(d), Some(n + d)])
+            .flatten()
+            .filter_map(|m| boxes.get(m))
+            .filter_map(|o| kept(o, k))
+            .find(|&v| hanji_format::shown_pt(v) * hanji_format::EMU_PER_PT == want);
+        if let Some(v) = nearest {
+            *field_mut(&mut w, k) = v;
+        }
+    }
+    Some(w)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PT: i64 = hanji_format::EMU_PER_PT;
+
+    fn b(x: i64, y: i64, w: i64, h: i64) -> Geom {
+        Geom { x, y, w, h, ..Default::default() }
+    }
+
+    fn kept_as_shown(g: Geom) -> Written {
+        Written { stored: Some(g), written: Some(g.shown()) }
+    }
+
+    #[test]
+    fn a_changed_number_shown_by_another_object_takes_its_exact_value() {
+        // Kit file 40 (txt-font-props, P15): TextBox 1's x is 2952093 EMU
+        // (232.45 pt, shown 232); TextBox 2 is written at x 232.
+        let one = b(2952093, 1_000_000, 3_000_000, 500_000);
+        let two = b(1_000_000, 2_000_000, 3_000_000, 500_000);
+        let boxes =
+            [kept_as_shown(one), Written { stored: Some(two), written: Some(Geom { x: 232 * PT, ..two.shown() }) }];
+        let g = snapped(&boxes, 1).unwrap();
+        assert_eq!(g.x, 2952093);
+        // Its other numbers are its own as shown; place_box keeps them exact.
+        assert_eq!((g.y, g.w, g.h), (two.shown().y, two.shown().w, two.shown().h));
+        // The same for y, w and h, each against the same number only.
+        let other = b(10 * PT, 100 * PT + 3000, 200 * PT + 4000, 50 * PT - 2000);
+        let mine = b(400 * PT, 300 * PT, 20 * PT, 20 * PT);
+        let boxes = [
+            kept_as_shown(other),
+            Written { stored: Some(mine), written: Some(b(400 * PT, 100 * PT, 200 * PT, 50 * PT)) },
+        ];
+        assert_eq!(snapped(&boxes, 1).unwrap(), b(400 * PT, 100 * PT + 3000, 200 * PT + 4000, 50 * PT - 2000));
+        // x never snaps to a y, a w or an h.
+        let boxes = [
+            kept_as_shown(other),
+            Written { stored: Some(mine), written: Some(b(100 * PT, 300 * PT, 20 * PT, 20 * PT)) },
+        ];
+        assert_eq!(snapped(&boxes, 1).unwrap().x, 100 * PT);
+        // A new object (nothing stored) snaps too.
+        let boxes = [kept_as_shown(one), Written { stored: None, written: Some(b(232 * PT, 0, 10 * PT, 10 * PT)) }];
+        assert_eq!(snapped(&boxes, 1).unwrap().x, 2952093);
+    }
+
+    #[test]
+    fn only_numbers_left_as_shown_are_snapped_to() {
+        let one = b(2952093, 0, 100 * PT, 100 * PT);
+        let two = b(0, 200 * PT, 100 * PT, 100 * PT);
+        // TextBox 1 moves away in the same edit: its old x is nowhere, so 232 is 232.
+        let boxes = [
+            Written { stored: Some(one), written: Some(Geom { x: 300 * PT, ..one.shown() }) },
+            Written { stored: Some(two), written: Some(Geom { x: 232 * PT, ..two.shown() }) },
+        ];
+        assert_eq!(snapped(&boxes, 1).unwrap().x, 232 * PT);
+        // A number left as shown keeps its own exact value, never another's.
+        let mine = b(2946400 + 3000, 0, PT, PT);
+        let boxes = [kept_as_shown(one), kept_as_shown(mine)];
+        assert_eq!(snapped(&boxes, 1).unwrap().x, mine.shown().x);
+        // An object without a written box is no anchor.
+        let boxes = [
+            Written { stored: Some(one), written: None },
+            Written { stored: Some(two), written: Some(Geom { x: 232 * PT, ..two.shown() }) },
+        ];
+        assert_eq!(snapped(&boxes, 1).unwrap().x, 232 * PT);
+    }
+
+    #[test]
+    fn the_nearest_in_z_order_wins_and_the_one_beneath_on_a_tie() {
+        let at = |x: i64| kept_as_shown(b(x, 0, PT, PT));
+        let me = Written { stored: Some(b(0, 300 * PT, PT, PT)), written: Some(b(232 * PT, 300 * PT, PT, PT)) };
+        let (far, below, above) = (at(232 * PT - 5000), at(232 * PT + 3000), at(232 * PT + 6000));
+        assert_eq!(snapped(&[far, below, me, at(9 * PT), above], 2).unwrap().x, 232 * PT + 3000);
+        assert_eq!(snapped(&[far, at(9 * PT), me, above], 2).unwrap().x, 232 * PT + 6000);
+        assert_eq!(snapped(&[above, me, below], 1).unwrap().x, 232 * PT + 6000);
+        assert_eq!(snapped(&[me, at(9 * PT), far], 0).unwrap().x, 232 * PT - 5000);
+    }
+}

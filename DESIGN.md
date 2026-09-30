@@ -362,6 +362,11 @@ layout: Two Content
   - A number left as it is shown keeps the exact stored value; a changed number
     is used as written (1 pt = 12,700 EMU). A box whose four numbers are
     unchanged leaves its `a:xfrm` untouched (GetPut, §4).
+  - Same number, same position: a changed (or new) box's x, y, w or h that
+    another box on the slide (a group's own, not its objects') shows for the
+    same number, left as shown there, takes that box's exact EMU: the nearest
+    in z-order, the one beneath on a tie. An edge aligned to a shown value
+    lands exactly on it.
   - *Why points:* round 5 measured points, percent of the slide and a 12 × 12
     grid. Every request given in cm landed in points. Percent's one miss was a
     cm-to-percent conversion on a 16:9 slide, where x and y have different

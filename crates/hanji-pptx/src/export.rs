@@ -348,12 +348,31 @@ impl<'a> Exporter<'a> {
             }
             out_items.push(e);
         }
-        // Geometry (§5.3): each written box against the one the text showed.
+        // Geometry (§5.3): each written box against the one the text showed,
+        // a changed number snapped to another object's that shows the same.
+        let boxes: Vec<geom::Written> = items
+            .iter()
+            .enumerate()
+            .map(|(n, it)| {
+                let e = &out_items[n];
+                let slot = match it.kind {
+                    HeadKind::Slot { name } => layout.slot(name).and_then(|s| s.geom),
+                    _ => None,
+                };
+                let stored = (!created[n]).then(|| shown[n].or(geom::own(e)).or(slot)).flatten();
+                match &self.head(it).place {
+                    Some(Place::Box(g)) => geom::Written { stored, written: Some(*g) },
+                    Some(Place::Group(g)) => geom::Written { stored: geom::own(e), written: g.geom },
+                    _ => geom::Written::default(),
+                }
+            })
+            .collect();
         let mut moved: Vec<(u32, String)> = vec![];
         let mut lines_written: HashSet<u32> = HashSet::new();
         for (n, it) in items.iter().enumerate() {
             let e = &mut out_items[n];
             let head = self.head(it);
+            let snapped = geom::snapped(&boxes, n);
             let what = match (&it.kind, self.blocks.get(it.body.start)) {
                 (HeadKind::Object, Some(Block::Keep(id))) => format!("<keep id=\"{id}\">"),
                 _ => item_label(it),
@@ -369,19 +388,27 @@ impl<'a> Exporter<'a> {
                     }
                 }
                 (HeadKind::Group { .. }, Some(Place::Group(w))) => {
-                    changed = apply_group(e, w, &geom::Frame::SLIDE).map_err(|m| format!("{what}: {m}"))?;
+                    let w = GroupItem { geom: snapped, ..w.clone() };
+                    changed = apply_group(e, &w, &geom::Frame::SLIDE).map_err(|m| format!("{what}: {m}"))?;
                     lines_written.extend(changed.iter().filter(|x| x.1).map(|x| x.0));
                 }
                 (kind, place) => {
                     let written = match place {
-                        Some(Place::Box(g)) => Some(*g),
+                        Some(Place::Box(_)) => snapped,
                         _ => None,
                     };
+                    if created[n] {
+                        // A new text box, made at its box as written.
+                        if let Some(g) = written.filter(|g| Some(*g) != geom::own(e)) {
+                            geom::write(e, &g).map_err(|m| format!("{what}: {m}"))?;
+                        }
+                        continue;
+                    }
                     let slot = match kind {
                         HeadKind::Slot { name } => Some(layout.slot(name).and_then(|s| s.geom)),
                         _ => None,
                     };
-                    if !created[n] && place_box(e, shown[n], written, slot).map_err(|m| format!("{what}: {m}"))? {
+                    if place_box(e, shown[n], written, slot).map_err(|m| format!("{what}: {m}"))? {
                         changed.push((geom::shape_id(e).unwrap_or(0), false));
                     }
                 }
