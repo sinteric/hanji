@@ -530,8 +530,8 @@ layout: Two Content
   `<shape id="s4" name="출처" box="…">text</shape>`, with its text editable;
   `<p/>` starts its next paragraph. Its paragraphs are never list items
   (bullets stay in the remainder). A shape without text is
-  `<shape id="s9" name="Oval 8" box="…"/>`. Its fill is shown (below); its
-  outline and preset geometry stay in the remainder. *Proposed (§10 item 10, round 6 F1):* its
+  `<shape id="s9" name="Oval 8" box="…"/>`. Its fill and outline are shown
+  (below); its preset geometry stays in the remainder. *Proposed (§10 item 10, round 6 F1):* its
   effective formatting follows `box` on the tag, whether the shape sets it
   or takes it from the theme's `p:style` or the layout, like `box` itself:
   `<shape id="s8" name="Card" box="354 130 260 320" fill=accent1 border="2pt solid accent1-50%" size=18pt color=#FFFFFF>…</shape>`;
@@ -545,8 +545,8 @@ layout: Two Content
   (a read of an inherited value, an edit that must keep one) could not be
   done, and one was answered wrong; F1 did all 48, at 1.27× today's text
   against 1.14× on the corpus.
-- **Text formatting** (built: `font`, `size`, `color`; the outline and the
-  paragraph properties are still proposed). Every run of a slot or shape
+- **Text formatting** (built: `font`, `size`, `color`; the paragraph
+  properties are still proposed). Every run of a slot or shape
   shows the font, size and colour it has, from the run's `a:rPr` over what
   it inherits: the shape's list style and `p:style` font, its layout and
   master placeholder, the master's title, body or other text style, the
@@ -593,6 +593,30 @@ layout: Two Content
   - The shape's fingerprint leaves its fill out, as its geometry. Refused:
     writing a kept fill anew, `background=` and other spellings (the key is
     `fill`).
+- **Outline** (built). A slot, shape or line shows its outline as
+  `border="<width>pt <style> <colour>"` after its fill, and a line its
+  arrowheads as `start=` and `end=` (`triangle`, `stealth`, `diamond`,
+  `oval`, `arrow`) at its `from` and `to` ends:
+  `<line id="s8" name="…" from="…" to="…" border="0.75pt solid accent1*" end=arrow/>`.
+  The outline is the object's own `a:ln` over its `p:style` `a:lnRef` into
+  the theme's line styles (the style's `phClr` the reference's colour), over,
+  for a placeholder, its layout's and master's placeholder's; a width nothing
+  sets is PowerPoint's 0.75 pt. Dashes show as §5.1's styles (`dashed`,
+  `dotted`, `dash-dot`, `dash-dot-dot`; `double` for a double line); a
+  gradient or pattern line shows no border and is kept while left so, and
+  `triple`, `thin-thick` and `thick-thin` are shown and kept.
+  - A value left as shown keeps the XML. A changed one writes only the
+    components that changed, in `a:ln`'s schema order, other children kept:
+    a new width is `w`, a new colour the line's fill, a new style
+    `a:prstDash` (or `cmpd`), an arrowhead `a:headEnd`/`a:tailEnd`'s
+    `type`. An outline equal to what the style or layout gives removes the
+    object's own `a:ln`; leaving a style's outline out writes `a:noFill`. A
+    new line is drawn `1pt solid tx1` unless its text says otherwise, and a
+    bare marker takes its layout's outline.
+  - The object's fingerprint leaves its outline out. Refused: a kept colour
+    or style written anew, `outline=`, `stroke=` and other spellings (the key
+    is `border`), `fill=` on a line (its colour is its border's), and
+    arrowheads on a shape or slot.
 - **Pictures** are a line each, `<picture id="s7" name="지도" box="…"
   src="media/image1.png" crop="10 0 5 0" mask="ellipse" alt="…"/>`, in this
   attribute order; `crop`, `mask` and `alt` are left out when the picture has
@@ -633,8 +657,8 @@ layout: Two Content
   on it.
 - **Lines and connectors** are `<line id="s6" name="…" from="x y" to="x y"/>`:
   the two ends, not a box. Writing them rewrites `a:off`, `a:ext` and the flips.
-  Arrowheads, the connector's path and its connection ids stay in the
-  remainder.
+  Its outline and arrowheads are shown (Outline, above); the connector's
+  path and its connection ids stay in the remainder.
   - *Attached connectors.* Moving or resizing an object that a connector is
     attached to (its `stCxn` or `endCxn` names the object) is refused, with the
     connector and the reason named, unless the same edit also rewrites every

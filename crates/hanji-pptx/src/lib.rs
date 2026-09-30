@@ -18,6 +18,7 @@ pub mod fill;
 pub mod geom;
 pub mod import;
 pub mod members;
+pub mod outline;
 pub mod pml;
 pub mod safety;
 pub mod text;
@@ -92,6 +93,9 @@ impl DeckShell {
     }
 }
 
+/// A new line's outline (the line export draws, `export::new_line`).
+pub const NEW_LINE_BORDER: &str = "1pt solid tx1";
+
 /// The Presentation grammar against a pptx remainder.
 pub struct PptxModel;
 
@@ -113,12 +117,17 @@ impl TextModel for PptxModel {
             let Block::Head(h) = b else { continue };
             match hanji_core::presentation::kind(h) {
                 hanji_core::presentation::HeadKind::Slide { layout: l } => layout = shell.deck.layout(l),
+                // A new line is drawn as the write draws it unless its text says otherwise.
+                hanji_core::presentation::HeadKind::Line { id: "", .. } if h.look.border.is_none() => {
+                    h.look.border = Some(NEW_LINE_BORDER.into());
+                }
                 hanji_core::presentation::HeadKind::Slot { name } if h.place.is_none() && name != "notes" => {
                     let slot = layout.and_then(|l| l.slot(name));
                     h.place = slot.and_then(|s| s.geom).map(|g| hanji_core::Place::Box(g.shown()));
                     // …and looks as its layout has it.
                     if h.look.is_empty() {
                         h.look.fill = fill::shown(slot.and_then(|s| s.fill.as_ref()));
+                        h.look.border = slot.and_then(|s| s.line.as_ref()).and_then(|l| l.border());
                     }
                 }
                 _ => {}

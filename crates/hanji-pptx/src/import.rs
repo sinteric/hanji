@@ -46,6 +46,7 @@ use crate::deck::{LayoutInfo, SlotInfo};
 use crate::fill;
 use crate::geom::{self, Frame};
 use crate::members::{self, Styling};
+use crate::outline;
 use crate::pml::*;
 use crate::text::{self, RunStyle, ThemeFonts};
 use hanji_format::inline_style::{self as istyle, TextStyle};
@@ -247,6 +248,7 @@ impl Importer<'_> {
                     let g = geom::own(&el).or(slot.geom);
                     self.blocks.push(slot_head(&slot.name, g));
                     self.show_fill(&el, slot.fill.as_ref(), &layout.fills);
+                    self.show_outline(&el, slot.line.as_ref(), &layout.fills, false);
                     let t = Some((&slot.text, &layout.fonts));
                     self.text_shape(&el, &slot.bullets, &k.to_string(), true, g, t)?;
                 }
@@ -280,6 +282,7 @@ impl Importer<'_> {
                     let g = geom::own(&el);
                     self.blocks.push(shape_head(&id, &name, g));
                     self.show_fill(&el, None, &layout.fills);
+                    self.show_outline(&el, None, &layout.fills, false);
                     self.name_shape(id, name);
                     let t = Some((&layout.other_text, &layout.fonts));
                     self.text_shape(&el, &layout.other, &k.to_string(), false, g, t)?;
@@ -316,6 +319,9 @@ impl Importer<'_> {
                     self.blocks.push(head);
                     if matches!(what, What::Bare(..)) {
                         self.show_fill(&el, None, &layout.fills);
+                    }
+                    if matches!(what, What::Bare(..) | What::Line(..)) {
+                        self.show_outline(&el, None, &layout.fills, matches!(what, What::Line(..)));
                     }
                     self.name_shape(id, name);
                     self.whole(&el, &k.to_string());
@@ -379,6 +385,14 @@ impl Importer<'_> {
     /// A shape without text, a line or a group: its element whole, a `Shape`
     /// entry on the head just pushed.
     /// The head just pushed shows the fill `el` has (§5.3).
+    /// The head just pushed shows the outline `el` draws (§5.3).
+    fn show_outline(&mut self, el: &Element, parent: Option<&outline::Ln>, theme: &fill::ThemeFills, line: bool) {
+        if let Some(Block::Head(h)) = self.blocks.last_mut() {
+            let l = outline::effective(el, parent, theme).look(line);
+            (h.look.border, h.look.start, h.look.end) = (l.border, l.start, l.end);
+        }
+    }
+
     fn show_fill(&mut self, el: &Element, parent: Option<&fill::FillXml>, theme: &fill::ThemeFills) {
         if let Some(Block::Head(h)) = self.blocks.last_mut() {
             h.look.fill = fill::shown(fill::effective(el, parent, theme).as_ref());
@@ -389,7 +403,7 @@ impl Importer<'_> {
         let hi = self.blocks.len() - 1;
         // A shape's fill is the text's (§5.3), as its geometry is.
         let bare = geom::without_geometry(&match el.name.as_str() {
-            "p:sp" => fill::without_fill(el),
+            "p:sp" | "p:cxnSp" => outline::without_outline(&fill::without_fill(el)),
             // A group's shapes' text and fills are the text's too.
             "p:grpSp" => members::without_shown(el),
             _ => el.clone(),
@@ -432,7 +446,7 @@ impl Importer<'_> {
                 pr.children.retain(|n| !matches!(n, Node::El(e) if e.is("p:ph")));
             }
         }
-        let f = self.fp(&[Some(&geom::without_geometry(&fill::without_fill(&fshell)))]);
+        let f = self.fp(&[Some(&geom::without_geometry(&outline::without_outline(&fill::without_fill(&fshell))))]);
         let meta = Meta {
             tag: shell.name.clone(),
             aux: vec![k.to_string(), self.part.clone(), shown(g)],
@@ -706,7 +720,12 @@ fn member(c: &Element, f: &Frame, rels: &Rels, sty: Option<Styling>) -> Option<S
         }),
         "p:cxnSp" => {
             let g = f.out(&geom::own(c)?);
-            SlideItem::Line(LineItem { id: format!("s{id}"), name, ends: geom::ends_of(&g) })
+            SlideItem::Line(LineItem {
+                id: format!("s{id}"),
+                name,
+                ends: geom::ends_of(&g),
+                look: members::line_look(c, sty),
+            })
         }
         "p:grpSp" if group_item(c, f, rels, sty).is_some() => SlideItem::Group(group_item(c, f, rels, sty)?),
         "p:pic" if picture_item(c, f, rels).is_some() => SlideItem::Picture(picture_item(c, f, rels)?),

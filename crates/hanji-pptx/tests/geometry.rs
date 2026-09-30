@@ -135,17 +135,19 @@ fn every_object_shows_its_box_and_getput_keeps_every_xfrm() {
     let s1 = [
         "layout: Blank",
         "<shape id=\"s4\" name=\"TextBox 3\" box=\"72 72 180 29\" font=Calibri size=18pt color=tx1>Learning PPTX</shape>",
-        "<line id=\"s6\" name=\"Straight Connector 5\" from=\"84 144\" to=\"252 144\"/>",
-        "<shape id=\"s7\" name=\"Freeform 6\" box=\"47 211 185 136\" fill=accent1 font=Calibri size=18pt color=lt1>Cloud</shape>",
+        "<line id=\"s6\" name=\"Straight Connector 5\" from=\"84 144\" to=\"252 144\" border=\"0.75pt solid accent1*\"/>",
+        "<shape id=\"s7\" name=\"Freeform 6\" box=\"47 211 185 136\" fill=accent1 border=\"2pt solid accent1*\" font=Calibri size=18pt color=lt1>Cloud</shape>",
         "<picture id=\"s2\" name=\"Picture 1\" box=\"402 78 144 132\" src=\"media/image1.jpg\"/>",
         "<keep id=\"?\" kind=\"table\" summary=\"Table 2: Column1 Column2 Column3 data1 data2 data3\" box=\"300 372 372 96\"/>",
-        "<line id=\"s8\" name=\"Straight Arrow Connector 7\" from=\"468 366\" to=\"468 216\"/>",
-        "<line id=\"s10\" name=\"Elbow Connector 9\" from=\"186 252\" to=\"402 144\"/>",
+        "<line id=\"s8\" name=\"Straight Arrow Connector 7\" from=\"468 366\" to=\"468 216\" border=\"0.75pt solid accent1*\" start=arrow end=arrow/>",
+        "<line id=\"s10\" name=\"Elbow Connector 9\" from=\"186 252\" to=\"402 144\" border=\"0.75pt solid accent1*\" end=arrow/>",
     ]
     .join("\n");
     assert!(keep_ids_out(&imp.text).contains(&s1), "{}", imp.text);
-    assert!(imp.text.contains("<group id=\"g5\" name=\"Group 4\" box=\"120 108 258 152\">\n<shape id=\"s2\" name=\"Rectangle 1\" box=\"120 108 138 60\" fill=accent1/>\n"), "{}", imp.text);
-    assert!(imp.text.contains("<shape id=\"s13\" name=\"Rectangle 12\" box=\"594 72 72 72\" fill=accent1-50%/>"));
+    assert!(imp.text.contains("<group id=\"g5\" name=\"Group 4\" box=\"120 108 258 152\">\n<shape id=\"s2\" name=\"Rectangle 1\" box=\"120 108 138 60\" fill=accent1 border=\"2pt solid accent1*\"/>\n"), "{}", imp.text);
+    assert!(imp.text.contains(
+        "<shape id=\"s13\" name=\"Rectangle 12\" box=\"594 72 72 72\" fill=accent1-50% border=\"2pt solid accent1*\"/>"
+    ));
     assert!(imp.text.starts_with("---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 720 x 540 pt\n---\n"));
     // Every slot shows its box, inherited from the layout or the master.
     let k = import(&deck("korean-deck.pptx"));
@@ -289,7 +291,7 @@ fn lines_move_by_their_ends_and_new_lines_are_drawn() {
     assert!(x.contains("name=\"Straight Connector 10\""), "{x}");
     assert!(
         back.contains(
-            "layout: Blank\n<line id=\"s11\" name=\"Straight Connector 10\" from=\"72 110\" to=\"252 110\"/>"
+            "layout: Blank\n<line id=\"s11\" name=\"Straight Connector 10\" from=\"72 110\" to=\"252 110\" border=\"1pt solid tx1\"/>"
         ),
         "{back}"
     );
@@ -331,7 +333,12 @@ fn groups_move_whole_or_by_their_objects() {
     let g = "<group id=\"g5\" name=\"Group 4\" box=\"120 108 258 152\">";
     let (text, rem) = exact(&imp.text, &imp.remainder, g, "<group id=\"g5\" name=\"Group 4\" box=\"220 108 258 152\">");
     let c = canonical(&text, &rem);
-    assert!(c.contains("<shape id=\"s2\" name=\"Rectangle 1\" box=\"220 108 138 60\" fill=accent1/>"), "{c}");
+    assert!(
+        c.contains(
+            "<shape id=\"s2\" name=\"Rectangle 1\" box=\"220 108 138 60\" fill=accent1 border=\"2pt solid accent1*\"/>"
+        ),
+        "{c}"
+    );
     let parts = export(&text, &rem);
     let x = xml(&parts, &s3);
     let (a, b) = (xfrms(&x), xfrms(&orig));
@@ -362,8 +369,8 @@ fn groups_move_whole_or_by_their_objects() {
     let (text, rem) = exact(
         &imp.text,
         &imp.remainder,
-        "name=\"Oval 2\" box=\"306 150 72 72\" fill=accent1/>",
-        "name=\"Oval 2\" box=\"306 150 72 72\" fill=accent1>text</shape>",
+        "name=\"Oval 2\" box=\"306 150 72 72\" fill=accent1 border=\"2pt solid accent1*\"/>",
+        "name=\"Oval 2\" box=\"306 150 72 72\" fill=accent1 border=\"2pt solid accent1*\">text</shape>",
     );
     let x = xml(&export(&text, &rem), &s3);
     assert!(x.contains("<a:t>text</a:t>"), "{x}");
@@ -464,10 +471,10 @@ fn a_stored_rotation_left_as_shown_keeps_its_exact_value() {
     let s1 = slides(&before)[0].clone();
     let imp = import(&pkg);
     for shown in [
-        "name=\"Minus ninety\" box=\"60 160 200 40\" rot=\"270\" fill=gradient font=Calibri size=18pt color=lt1>",
-        "name=\"Minus fifteen flipped\" box=\"300 160 160 60\" rot=\"345\" flip=\"h\" fill=gradient font=Calibri size=18pt color=lt1>",
-        "name=\"Past a turn\" box=\"500 160 160 60\" rot=\"60\" fill=gradient font=Calibri size=18pt color=lt1>",
-        "name=\"Turned in group\" box=\"80 420 80 80\" rot=\"315\" fill=gradient/>",
+        "name=\"Minus ninety\" box=\"60 160 200 40\" rot=\"270\" fill=gradient border=\"0.75pt solid accent1*\" font=Calibri size=18pt color=lt1>",
+        "name=\"Minus fifteen flipped\" box=\"300 160 160 60\" rot=\"345\" flip=\"h\" fill=gradient border=\"0.75pt solid accent1*\" font=Calibri size=18pt color=lt1>",
+        "name=\"Past a turn\" box=\"500 160 160 60\" rot=\"60\" fill=gradient border=\"0.75pt solid accent1*\" font=Calibri size=18pt color=lt1>",
+        "name=\"Turned in group\" box=\"80 420 80 80\" rot=\"315\" fill=gradient border=\"0.75pt solid accent1*\"/>",
     ] {
         assert!(imp.text.contains(shown), "{shown}\n{}", imp.text);
     }

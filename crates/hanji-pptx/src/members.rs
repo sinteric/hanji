@@ -11,6 +11,7 @@ use hanji_package::xml::{self, Element, Node};
 
 use crate::deck::LayoutInfo;
 use crate::fill::{self, ThemeFills};
+use crate::outline;
 use crate::pml::*;
 use crate::text::{self, RunStyle, ThemeFonts};
 
@@ -36,7 +37,16 @@ fn level(p: &Element) -> usize {
 
 /// The fill a group's shape shows.
 pub fn look(sp: &Element, sty: Option<Styling>) -> Look {
-    Look { fill: sty.and_then(|s| fill::shown(fill::effective(sp, None, s.fills).as_ref())) }
+    let Some(s) = sty else { return Look::default() };
+    Look {
+        fill: fill::shown(fill::effective(sp, None, s.fills).as_ref()),
+        ..outline::effective(sp, None, s.fills).look(false)
+    }
+}
+
+/// The outline and arrowheads a group's line shows.
+pub fn line_look(c: &Element, sty: Option<Styling>) -> Look {
+    sty.map_or_else(Look::default, |s| outline::effective(c, None, s.fills).look(true))
 }
 
 /// One source unit of a paragraph: its atom, marks and the run (`a:rPr`) it
@@ -278,8 +288,9 @@ pub fn without_shown(group: &Element) -> Element {
     let mut g = group.clone();
     for c in g.elements_mut() {
         match c.name.as_str() {
+            "p:cxnSp" => *c = outline::without_outline(c),
             "p:sp" => {
-                *c = fill::without_fill(c);
+                *c = outline::without_outline(&fill::without_fill(c));
                 if let Some(tx) = c.child_mut("p:txBody") {
                     tx.children.retain(|n| !matches!(n, Node::El(e) if e.is("a:p")));
                 }
