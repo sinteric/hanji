@@ -175,6 +175,12 @@ package ─────────────────────► model
     left as written they keep the stored XML, and they may be replaced by a
     writable value. Refused: gradients and patterns as values, diagonal
     cell borders, shadows and other effects, highlight, character spacing.
+  - One spelling: `hanji-format`'s `vocab` module parses every value a
+    text writes and writes it back canonically (lengths in hundredths of a
+    point, `0.34pt`; colours with their tint and opacity; borders; fills;
+    line spacing; flags; `key=value` lists, a value quoted only when it
+    holds a space), so each format's engine maps the same values to its
+    XML.
   - Keep rule, as for `box` (§5.3): a value left as shown keeps the stored
     XML; a changed value writes that property only, as direct formatting.
     The write returns the canonical text (rounded and snapped values shown,
