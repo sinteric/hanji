@@ -78,6 +78,9 @@ pub enum SlideItem {
     Line(LineItem),
     /// `<group id="…" name="…" box="…">`, its objects, `</group>`.
     Group(GroupItem),
+    /// `<picture id="…" name="…" box="…" src="…"/>`: a picture, with its
+    /// image, crop, mask and alternative text; a new one has no id or name.
+    Picture(PictureItem),
 }
 
 /// Where an object is (§5.3): its box in EMU as written (the text shows
@@ -218,6 +221,74 @@ pub struct LineItem {
     pub ends: Ends,
 }
 
+/// A picture (§5.3): where it is, the image it shows (`src`, a part of the
+/// package such as `media/image1.png`, or a file the host hands the write),
+/// its crop, the preset shape it is cut to (`mask`, none for a rectangle)
+/// and its alternative text.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct PictureItem {
+    /// Empty for a new picture (the write gives it an id and a name).
+    pub id: String,
+    pub name: String,
+    pub geom: Option<Geom>,
+    pub src: String,
+    pub crop: Option<Crop>,
+    pub mask: Option<String>,
+    pub alt: Option<String>,
+}
+
+/// How much of the image is cut off at each edge, left, top, right and
+/// bottom, in thousandths of a percent of its size (`a:srcRect`); the text
+/// shows percent. A negative value leaves space beside the image.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Crop {
+    pub l: i64,
+    pub t: i64,
+    pub r: i64,
+    pub b: i64,
+}
+
+/// Thousandths of a percent per percent (`a:srcRect` units).
+pub const PER_PERCENT: i64 = 1_000;
+
+/// A crop value (thousandths of a percent) as the text shows it: percent, at most one decimal.
+pub fn shown_pct(v: i64) -> String {
+    let tenths = (v as f64 / 100.0).round() as i64;
+    let (sign, a) = if tenths < 0 { ("-", -tenths) } else { ("", tenths) };
+    if a % 10 == 0 {
+        format!("{sign}{}", a / 10)
+    } else {
+        format!("{sign}{}.{}", a / 10, a % 10)
+    }
+}
+
+impl Crop {
+    pub fn is_zero(&self) -> bool {
+        (self.l, self.t, self.r, self.b) == (0, 0, 0, 0)
+    }
+
+    fn vals(&self) -> [i64; 4] {
+        [self.l, self.t, self.r, self.b]
+    }
+
+    /// The same crop as `other` as the text shows them.
+    pub fn shows_as(&self, other: &Crop) -> bool {
+        self.vals().iter().zip(other.vals()).all(|(a, b)| shown_pct(*a) == shown_pct(b))
+    }
+
+    /// `written`, each value left as `self` shows it keeping its exact value.
+    pub fn merged(&self, written: &Crop) -> Crop {
+        let k = |s: i64, w: i64| if shown_pct(s) == shown_pct(w) { s } else { w };
+        Crop { l: k(self.l, written.l), t: k(self.t, written.t), r: k(self.r, written.r), b: k(self.b, written.b) }
+    }
+
+    /// As the text shows it: every value rounded to a tenth of a percent.
+    pub fn shown(&self) -> Crop {
+        let r = |v: i64| (v as f64 / 100.0).round() as i64 * 100;
+        Crop { l: r(self.l), t: r(self.t), r: r(self.r), b: r(self.b) }
+    }
+}
+
 /// A group: its box (the box around its objects) and its objects, in slide
 /// coordinates. A member `<keep/>` stands for the member by its shape id.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -237,7 +308,7 @@ impl Presentation {
                     SlideItem::Slot(slot) => normalize_blocks(&mut slot.blocks),
                     SlideItem::Shape(sh) => sh.paras.iter_mut().for_each(Inline::normalize),
                     SlideItem::Group(g) => items(&mut g.items),
-                    SlideItem::Object(_) | SlideItem::Line(_) => {}
+                    SlideItem::Object(_) | SlideItem::Line(_) | SlideItem::Picture(_) => {}
                 }
             }
         }

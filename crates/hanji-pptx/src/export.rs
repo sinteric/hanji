@@ -12,14 +12,16 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use hanji_core::presentation::{geom_of, kind, HeadKind};
 use hanji_core::{Block, Entry, Head, Kind, Para, Part, Place, Remainder};
-use hanji_format::{Atom, Geom, GroupItem, Inline, Marks, SlideItem};
+use hanji_format::{Atom, Crop, Geom, GroupItem, Inline, Marks, PictureItem, SlideItem};
 use hanji_package::opc::{self, Rel};
 use hanji_package::package;
 use hanji_package::xml::{self, fragment, insert_ordered, Element, Node};
 
 use crate::deck::{LayoutInfo, SlotInfo};
 use crate::geom::{self, Frame};
-use crate::import::{group_item, object_geom, shown_of, NotesInfo, SlideInfo, OBJECT_TAG};
+use crate::import::{
+    crop_of, group_item, object_geom, part_of_src, picture_item, shown_of, NotesInfo, Rels, SlideInfo, OBJECT_TAG,
+};
 use crate::pml::*;
 use crate::DeckShell;
 
@@ -59,10 +61,17 @@ fn group(blocks: &[Block]) -> Result<Vec<SlideG<'_>>, String> {
     Ok(out)
 }
 
+/// Files the host hands the write, by the name a picture's `src` gives
+/// them (§5.3: a picture from a file).
+pub type Files = BTreeMap<String, Vec<u8>>;
+
+static NO_FILES: Files = BTreeMap::new();
+
 pub struct Exporter<'a> {
     blocks: &'a [Block],
     shell: &'a DeckShell,
     parts: &'a [Part],
+    files: &'a Files,
     by: HashMap<(usize, Kind), Vec<&'a Entry>>,
     keep: HashMap<&'a str, &'a Entry>,
     slide: HashMap<usize, &'a Entry>,
@@ -76,6 +85,8 @@ struct SlideOut {
     /// Its relationships part, when it changed or is new.
     rels: Option<Vec<u8>>,
     new: bool,
+    /// Image parts made from the host's files: part name, bytes, content type.
+    media: Vec<(String, Vec<u8>, &'static str)>,
     notes: Option<NotesOut>,
 }
 
@@ -92,6 +103,7 @@ impl<'a> Exporter<'a> {
             blocks,
             shell,
             parts: &rem.parts,
+            files: &NO_FILES,
             by: HashMap::new(),
             keep: HashMap::new(),
             slide: HashMap::new(),
@@ -116,6 +128,12 @@ impl<'a> Exporter<'a> {
             ex.by.entry((at, e.kind)).or_default().push(e);
         }
         ex
+    }
+
+    /// The host's files a new picture or a changed `src` may name.
+    pub fn with_files(mut self, files: &'a Files) -> Self {
+        self.files = files;
+        self
     }
 
     fn head(&self, it: &ItemG) -> &'a Head {
@@ -153,6 +171,11 @@ impl<'a> Exporter<'a> {
             }
             if let Some(r) = &o.rels {
                 put(&mut parts, &template, &opc::rels_part(&o.info.part), r.clone());
+            }
+            for (name, data, ct) in &o.media {
+                if put(&mut parts, &template, name, data.clone()) {
+                    added.push((name.clone(), ct.to_string()));
+                }
             }
             if let Some(n) = &o.notes {
                 if put(&mut parts, &template, &n.part, n.xml.clone()) {
@@ -210,6 +233,19 @@ impl<'a> Exporter<'a> {
                 _ => over(own, layout.other),
             }
         };
+        // The slide's relationships: a picture's image is one of them.
+        let mut rels = if new {
+            vec![Rel {
+                id: "rId1".into(),
+                ty: REL_LAYOUT.into(),
+                target: opc::relative_target(&part, &layout.part),
+                external: false,
+            }]
+        } else {
+            opc::rels_of(self.parts, &part)
+        };
+        let mut rels_changed = new;
+        let mut media: Vec<(String, Vec<u8>, &'static str)> = vec![];
         let mut xml_root = skel;
         let tree = xml_root
             .child_mut("p:cSld")
@@ -259,6 +295,17 @@ impl<'a> Exporter<'a> {
                     let Some(Place::Line(ends)) = &head.place else { return Err("a line without its ends".into()) };
                     els[n] = Some(new_line(ends));
                     (fresh[n], created[n]) = (true, true);
+                }
+                HeadKind::Picture { id: "", .. } => {
+                    let Some(Place::Picture(pic)) = &head.place else {
+                        return Err("a picture without its image".into());
+                    };
+                    let g = pic.geom.ok_or("a new picture needs its box")?;
+                    els[n] = Some(new_picture(&g));
+                    (fresh[n], created[n]) = (true, true);
+                }
+                HeadKind::Picture { id, .. } => {
+                    return Err(format!("<picture id=\"{id}\"> is not a picture of this slide's file: keep a picture's id and name as they are, and write a new picture without them"));
                 }
                 HeadKind::Shape { id, .. } => {
                     return Err(format!("<shape id=\"{id}\"> is not a shape of this slide's file: keep a shape's id and name as they are, and write a new text box without them"));
@@ -362,6 +409,7 @@ impl<'a> Exporter<'a> {
                 let stored = (!created[n]).then(|| shown[n].or(object_geom(e)).or(slot)).flatten();
                 match &self.head(it).place {
                     Some(Place::Box(g)) => geom::Written { stored, written: Some(*g) },
+                    Some(Place::Picture(p)) => geom::Written { stored, written: p.geom },
                     Some(Place::Group(g)) => geom::Written { stored: geom::own(e), written: g.geom },
                     _ => geom::Written::default(),
                 }
@@ -389,14 +437,19 @@ impl<'a> Exporter<'a> {
                 }
                 (HeadKind::Group { .. }, Some(Place::Group(w))) => {
                     let w = GroupItem { geom: snapped, ..w.clone() };
-                    changed = apply_group(e, &w, &geom::Frame::SLIDE).map_err(|m| format!("{what}: {m}"))?;
+                    let map = rels_map(&rels, &part);
+                    changed = apply_group(e, &w, &geom::Frame::SLIDE, &map).map_err(|m| format!("{what}: {m}"))?;
                     lines_written.extend(changed.iter().filter(|x| x.1).map(|x| x.0));
                 }
                 (kind, place) => {
                     let written = match place {
-                        Some(Place::Box(_)) => snapped,
+                        Some(Place::Box(_)) | Some(Place::Picture(_)) => snapped,
                         _ => None,
                     };
+                    if let Some(Place::Picture(pic)) = place {
+                        self.picture(e, pic, &part, &mut rels, &mut rels_changed, &mut media, numbers)
+                            .map_err(|m| format!("{what}: {m}"))?;
+                    }
                     if created[n] {
                         // A new text box, made at its box as written.
                         if let Some(g) = written.filter(|g| Some(*g) != geom::own(e)) {
@@ -425,16 +478,7 @@ impl<'a> Exporter<'a> {
         let tree = xml_root.child_mut("p:cSld").and_then(|c| c.child_mut("p:spTree")).unwrap();
         tree.children = tree_children;
         check_timing(&xml_root, &info)?;
-        let mut rels = opc::rels_of(self.parts, &part);
-        let mut rels_changed = new;
-        if new {
-            rels = vec![Rel {
-                id: "rId1".into(),
-                ty: REL_LAYOUT.into(),
-                target: opc::relative_target(&part, &layout.part),
-                external: false,
-            }];
-        } else if relayout {
+        if relayout && !new {
             let r = rels
                 .iter_mut()
                 .find(|r| r.ty == REL_LAYOUT)
@@ -459,7 +503,83 @@ impl<'a> Exporter<'a> {
         } else {
             None
         };
-        Ok(SlideOut { info, xml, rels: rels_data, new, notes })
+        Ok(SlideOut { info, xml, rels: rels_data, new, notes, media })
+    }
+
+    /// A picture's image, crop, mask and alternative text as the text
+    /// writes them (§5.3): each written into its own XML child only where
+    /// it differs from what the element stores.
+    #[allow(clippy::too_many_arguments)]
+    fn picture(
+        &self,
+        e: &mut Element,
+        w: &PictureItem,
+        part: &str,
+        rels: &mut Vec<Rel>,
+        rels_changed: &mut bool,
+        media: &mut Vec<(String, Vec<u8>, &'static str)>,
+        numbers: &mut Numbers,
+    ) -> Result<(), String> {
+        let map = rels_map(rels, part);
+        let st = picture_item(e, &geom::Frame::SLIDE, &map);
+        if st.is_none() && !w.id.is_empty() {
+            return Err("this picture is kept as it is (it is not shown as a <picture/>)".into());
+        }
+        // A new picture starts with no image, crop, mask or alternative text.
+        let st =
+            st.unwrap_or_else(|| PictureItem { src: String::new(), crop: None, mask: None, alt: None, ..w.clone() });
+        if st.src != w.src {
+            let target = self.image_part(&w.src, media, numbers)?;
+            let rel = target_rel(rels, part, &target, rels_changed);
+            let blip =
+                e.child_mut("p:blipFill").and_then(|b| b.child_mut("a:blip")).ok_or("the picture has no a:blip")?;
+            blip.set("r:embed", &rel);
+        }
+        if !w.crop.unwrap_or_default().shows_as(&st.crop.unwrap_or_default()) {
+            let bf = e.child_mut("p:blipFill").ok_or("the picture has no p:blipFill")?;
+            let stored = bf.child("a:srcRect").map(crop_of).unwrap_or_default();
+            let c = stored.merged(&w.crop.unwrap_or_default());
+            set_crop(bf, &c);
+        }
+        if st.mask != w.mask {
+            let sp = e.child_mut("p:spPr").ok_or("the picture has no p:spPr")?;
+            set_preset(sp, w.mask.as_deref().unwrap_or("rect"));
+        }
+        if st.alt != w.alt {
+            let c = c_nv_pr_mut(e).ok_or("the picture has no p:cNvPr")?;
+            match &w.alt {
+                Some(a) => c.set("descr", a),
+                None => {
+                    c.remove_attr("descr");
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// The part a picture's `src` names: one of the package's, else a new
+    /// image part from the host's file of that name.
+    fn image_part(
+        &self,
+        src: &str,
+        media: &mut Vec<(String, Vec<u8>, &'static str)>,
+        numbers: &mut Numbers,
+    ) -> Result<String, String> {
+        let p = part_of_src(src);
+        if self.parts.iter().any(|x| x.name == p) || media.iter().any(|m| m.0 == p) {
+            return Ok(p);
+        }
+        if let Some(done) = numbers.host.get(src) {
+            return Ok(done.clone());
+        }
+        let Some(data) = self.files.get(src) else {
+            return Err(format!("src=\"{src}\" is neither an image of this file (such as media/image1.png, as another picture shows it) nor a file handed to this write: a picture from a file needs the host to hand over the image"));
+        };
+        let (ext, ct) = image_type(data).ok_or_else(|| format!("{src} is not a PNG, JPEG, GIF or BMP image"))?;
+        let name = numbers.next_media(ext);
+        numbers.host.insert(src.to_string(), name.clone());
+        media.push((name.clone(), data.clone(), ct));
+        Ok(name)
     }
 
     /// The `Bkeep` entry of a slot that holds a placeholder's object, or of
@@ -1044,11 +1164,27 @@ fn put(parts: &mut Vec<Part>, template: &Part, name: &str, data: Vec<u8>) -> boo
 /// Part numbers in use; new ones count on from the highest.
 struct Numbers {
     names: BTreeSet<String>,
+    /// The part each host file became, by its name.
+    host: BTreeMap<String, String>,
 }
 
 impl Numbers {
     fn new(names: &BTreeSet<String>) -> Self {
-        Numbers { names: names.clone() }
+        Numbers { names: names.clone(), host: BTreeMap::new() }
+    }
+
+    /// `ppt/media/image7.png`: the next image number of the package.
+    fn next_media(&mut self, ext: &str) -> String {
+        let base = "ppt/media/image";
+        let n = self
+            .names
+            .iter()
+            .filter_map(|p| p.strip_prefix(base)?.split('.').next()?.parse::<u32>().ok())
+            .max()
+            .unwrap_or(0);
+        let name = format!("{base}{}.{ext}", n + 1);
+        self.names.insert(name.clone());
+        name
     }
 
     /// `ppt/slides/slide7.xml` for base `ppt/slides/slide`.
@@ -1227,6 +1363,8 @@ fn item_label(it: &ItemG) -> String {
         HeadKind::Line { id: "", .. } => "the new line".into(),
         HeadKind::Line { id, name } => format!("<line id=\"{id}\" name=\"{name}\">"),
         HeadKind::Group { id, name } => format!("<group id=\"{id}\" name=\"{name}\">"),
+        HeadKind::Picture { id: "", .. } => "the new picture".into(),
+        HeadKind::Picture { id, name } => format!("<picture id=\"{id}\" name=\"{name}\">"),
         HeadKind::Object => "an object's <keep/>".into(),
         HeadKind::Slide { .. } => "the slide".into(),
     }
@@ -1290,6 +1428,7 @@ pub fn sig(items: &[SlideItem]) -> Vec<String> {
                 hanji_format::pres::object_line(&hanji_format::ObjectItem { geom: None, ..o.clone() })
             }
             SlideItem::Line(l) => format!("<line id=\"{}\" name=\"{}\"/>", l.id, l.name),
+            SlideItem::Picture(p) => hanji_format::pres::picture_line(&PictureItem { geom: None, ..p.clone() }),
             SlideItem::Group(g) => {
                 format!("<group id=\"{}\" name=\"{}\">{}</group>", g.id, g.name, sig(&g.items).join(""))
             }
@@ -1305,6 +1444,7 @@ fn member_box(it: &SlideItem) -> Option<Geom> {
         SlideItem::Object(o) => o.geom,
         SlideItem::Line(l) => Some(geom::box_of(&l.ends, 0)),
         SlideItem::Group(g) => g.geom,
+        SlideItem::Picture(p) => p.geom,
         SlideItem::Slot(_) => None,
     }
 }
@@ -1349,8 +1489,8 @@ fn ids_in(el: &Element) -> Vec<(u32, bool)> {
 /// move them, and the group's box follows them; both at once must agree.
 /// Anything else about its objects is refused. The shape ids that moved
 /// (marked when a connector).
-pub fn apply_group(el: &mut Element, w: &GroupItem, parent: &Frame) -> Result<Vec<(u32, bool)>, String> {
-    let st = group_item(el, parent).ok_or("the group's objects are not as they were read")?;
+pub fn apply_group(el: &mut Element, w: &GroupItem, parent: &Frame, rels: &Rels) -> Result<Vec<(u32, bool)>, String> {
+    let st = group_item(el, parent, rels).ok_or("the group's objects are not as they were read")?;
     if sig(&st.items) != sig(&w.items) {
         return Err("a group's objects can be moved and resized here, never added, deleted, reordered, renamed or edited: keep each object's line as it is but for its box, or change the group in PowerPoint".into());
     }
@@ -1366,8 +1506,8 @@ pub fn apply_group(el: &mut Element, w: &GroupItem, parent: &Frame) -> Result<Ve
     if box_changed && !members.is_empty() {
         let mut alone = el.clone();
         let only = GroupItem { items: st.items.clone(), ..w.clone() };
-        if let Ok(ids) = apply_group(&mut alone, &only, parent) {
-            let after = group_item(&alone, parent);
+        if let Ok(ids) = apply_group(&mut alone, &only, parent, rels) {
+            let after = group_item(&alone, parent, rels);
             if after.is_some_and(|a| a.items.iter().zip(&w.items).all(|(x, y)| !member_changed(x, y))) {
                 *el = alone;
                 return Ok(ids);
@@ -1425,7 +1565,7 @@ pub fn apply_group(el: &mut Element, w: &GroupItem, parent: &Frame) -> Result<Ve
     for &m in &members {
         let Node::El(c) = &mut el.children[kids[m]] else { unreachable!() };
         match (&st.items[m], &w.items[m]) {
-            (SlideItem::Group(_), SlideItem::Group(wg)) => moved.extend(apply_group(c, wg, &f)?),
+            (SlideItem::Group(_), SlideItem::Group(wg)) => moved.extend(apply_group(c, wg, &f, rels)?),
             (SlideItem::Line(a), SlideItem::Line(b)) => {
                 let own = geom::own(c).unwrap_or_default();
                 let ends = a.ends.merged(&b.ends);
@@ -1490,7 +1630,11 @@ pub fn apply_group(el: &mut Element, w: &GroupItem, parent: &Frame) -> Result<Ve
 /// Names for new objects, once they have ids: `TextBox 7`, `Straight Connector 8`.
 fn name_new(items: &mut [Element], created: &[bool]) {
     for (e, _) in items.iter_mut().zip(created).filter(|(_, c)| **c) {
-        let base = if e.is("p:cxnSp") { "Straight Connector" } else { "TextBox" };
+        let base = match e.name.as_str() {
+            "p:cxnSp" => "Straight Connector",
+            "p:pic" => "Picture",
+            _ => "TextBox",
+        };
         let id = geom::shape_id(e).unwrap_or(1);
         if let Some(c) = c_nv_pr_mut(e) {
             c.set("name", &format!("{base} {}", id.saturating_sub(1)));
@@ -1551,6 +1695,120 @@ fn new_text_box(g: &Geom) -> Element {
     ));
     geom::write(&mut e, g).expect("a new text box has p:spPr");
     e
+}
+
+/// A new picture at `g`, stretched to its box; its image, id and name are written after.
+fn new_picture(g: &Geom) -> Element {
+    let mut e = fragment(concat!(
+        "<p:pic><p:nvPicPr><p:cNvPr id=\"0\" name=\"Picture\"/><p:cNvPicPr><a:picLocks noChangeAspect=\"1\"/></p:cNvPicPr><p:nvPr/></p:nvPicPr>",
+        "<p:blipFill><a:blip r:embed=\"\"/><a:stretch><a:fillRect/></a:stretch></p:blipFill>",
+        "<p:spPr><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom></p:spPr></p:pic>"
+    ));
+    geom::write(&mut e, g).expect("a new picture has p:spPr");
+    e
+}
+
+/// The slide's relationships as pictures name them.
+fn rels_map(rels: &[Rel], part: &str) -> Rels {
+    rels.iter()
+        .filter(|r| !r.external)
+        .map(|r| (r.id.clone(), crate::import::src_of(&opc::resolve_target(part, &r.target))))
+        .collect()
+}
+
+/// The id of the slide's image relationship to `target`, added when it has none.
+fn target_rel(rels: &mut Vec<Rel>, part: &str, target: &str, changed: &mut bool) -> String {
+    if let Some(r) =
+        rels.iter().find(|r| !r.external && r.ty == REL_IMAGE && opc::resolve_target(part, &r.target) == target)
+    {
+        return r.id.clone();
+    }
+    let id = opc::free_rel_id(rels);
+    rels.push(Rel {
+        id: id.clone(),
+        ty: REL_IMAGE.into(),
+        target: opc::relative_target(part, target),
+        external: false,
+    });
+    *changed = true;
+    id
+}
+
+/// An image's extension and content type from its first bytes.
+fn image_type(d: &[u8]) -> Option<(&'static str, &'static str)> {
+    if d.starts_with(b"\x89PNG\r\n\x1a\n") {
+        Some(("png", "image/png"))
+    } else if d.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        Some(("jpeg", "image/jpeg"))
+    } else if d.starts_with(b"GIF87a") || d.starts_with(b"GIF89a") {
+        Some(("gif", "image/gif"))
+    } else if d.starts_with(b"BM") && d.len() > 26 {
+        Some(("bmp", "image/bmp"))
+    } else {
+        None
+    }
+}
+
+/// `a:srcRect` for a crop (after `a:blip`, as the schema orders
+/// `p:blipFill`); only the values that differ are set, and an empty crop
+/// leaves no `a:srcRect` unless it holds something else.
+fn set_crop(bf: &mut Element, c: &Crop) {
+    if bf.child("a:srcRect").is_none() {
+        if c.is_zero() {
+            return;
+        }
+        let at = bf.children.iter().position(|n| matches!(n, Node::El(e) if e.is("a:blip"))).map_or(0, |k| k + 1);
+        bf.children.insert(at, Node::El(el("a:srcRect")));
+    }
+    let r = bf.child_mut("a:srcRect").unwrap();
+    for (k, v) in [("l", c.l), ("t", c.t), ("r", c.r), ("b", c.b)] {
+        let had = r.get(k).and_then(|x| x.trim().parse::<i64>().ok()).unwrap_or(0);
+        if had != v || (v == 0 && r.get(k).is_some()) {
+            if v == 0 {
+                r.remove_attr(k);
+            } else {
+                r.set(k, &v.to_string());
+            }
+        }
+    }
+    if r.attrs.is_empty() && r.children.is_empty() {
+        bf.children.retain(|n| !matches!(n, Node::El(e) if e.is("a:srcRect")));
+    }
+}
+
+/// The `p:spPr` order (CT_ShapeProperties) around the geometry.
+const SPPR_ORDER: &[&str] = &[
+    "xfrm",
+    "custGeom",
+    "prstGeom",
+    "noFill",
+    "solidFill",
+    "gradFill",
+    "blipFill",
+    "pattFill",
+    "grpFill",
+    "ln",
+    "effectLst",
+    "effectDag",
+    "scene3d",
+    "sp3d",
+    "extLst",
+];
+
+/// The preset shape of `p:spPr`: its `a:prstGeom` with the preset's own
+/// adjustments (an old preset's do not fit a new one).
+fn set_preset(sp: &mut Element, prst: &str) {
+    match sp.child_mut("a:prstGeom") {
+        Some(g) => {
+            g.set("prst", prst);
+            if let Some(av) = g.child_mut("a:avLst") {
+                av.children.clear();
+            }
+        }
+        None => {
+            insert_ordered(sp, fragment(&format!("<a:prstGeom prst=\"{prst}\"><a:avLst/></a:prstGeom>")), SPPR_ORDER)
+        }
+    }
 }
 
 /// A new straight line from `ends`, drawn in the text colour.

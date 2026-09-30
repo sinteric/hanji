@@ -186,7 +186,8 @@ package ─────────────────────► model
 - **Placeholders:** `<keep id="k3" kind="drawing" summary="org chart, 5 boxes"/>`
   (block or inline). The model may move or delete one explicitly, and in a
   Presentation resize it by its box (§5.3); it never alters its content, and
-  never creates one except a picture from a file (§5.3).
+  never creates one. (A Presentation's pictures are not placeholders: they
+  are `<picture/>` lines, §5.3.)
 - **Validator errors are written for the model:** line and column, the
   expected form, and the allowed names (styles, layouts, fields). Every
   error names the characters a reader cannot see or tell from a space by
@@ -419,7 +420,7 @@ layout: Two Content
 - 수도권 21곳
 ::right box="366 126 318 356"::
 - 지방 13곳
-<keep id="k7" kind="picture" summary="지도" box="560 20 124 80"/>
+<picture id="s7" name="지도" box="560 20 124 80" src="media/image1.png" alt="지역별 지도"/>
 <shape id="s4" name="출처" box="36 490 288 29">출처: 내부 집계<p/>2026년 9월</shape>
 <line id="s6" name="화살표" from="330 504" to="366 504"/>
 ```
@@ -516,12 +517,42 @@ layout: Two Content
   (a read of an inherited value, an edit that must keep one) could not be
   done, and one was answered wrong; F1 did all 48, at 1.27× today's text
   against 1.14× on the corpus.
-- **Pictures, charts, tables** and other objects the format does not model are
+- **Pictures** are a line each, `<picture id="s7" name="지도" box="…"
+  src="media/image1.png" crop="10 0 5 0" mask="ellipse" alt="…"/>`, in this
+  attribute order; `crop`, `mask` and `alt` are left out when the picture has
+  none (§6 round 6: an unwritten value is not there).
+  - `src` is the image: a part of the package, named from the presentation's
+    folder (`ppt/media/image1.png` is `media/image1.png`). Another picture's
+    `src` shows the same image: the slide gets a relationship to it (or reuses
+    the one it has), and an image nothing names any more goes with its
+    relationship.
+  - `crop="l t r b"` is `a:srcRect`: the percent of the image cut off at its
+    left, top, right and bottom edges, shown with at most one decimal (a
+    negative value leaves space beside the image). Like a box, a value left as
+    shown keeps the stored thousandths of a percent exactly; a changed one is
+    written as given, an unchanged `crop` leaves `a:srcRect` untouched, and no
+    `crop` removes it. Left and right together, and top and bottom together,
+    stay under 100.
+  - `mask` is the preset shape the picture is cut to (its `a:prstGeom`), one
+    of DrawingML's preset names (`ellipse`, `roundRect`, `hexagon`, …); no
+    `mask` is a rectangle. A new mask takes its preset's own adjustments.
+  - `alt` is the alternative text (`p:cNvPr descr`).
+  - Each of them, changed, is written into its own XML only (`r:embed`,
+    `a:srcRect`, `a:prstGeom`, `descr`), everything else in the picture kept;
+    left as shown, the picture's XML is not touched (GetPut). The picture's
+    id and name never change; its outline, effects and fill stay in the
+    remainder.
+  - A picture the text cannot hold whole stays a `<keep kind="picture"/>`
+    line: one with artistic effects or a duotone, a video or sound shown as
+    a picture, a linked image, one cut to a custom shape, one in
+    `mc:AlternateContent`, and a picture placeholder's picture (its slot's
+    text).
+- **Charts, tables** and other objects the format does not model are
   a `<keep id kind summary box/>` line each (§5.1). They may be moved, resized,
   reordered or deleted, and their `id`, `kind` and `summary` never change;
   the id is made from the object without its geometry, so a moved or resized
   object keeps it. Resizing a table scales its column widths and row heights;
-  a picture keeps its crop. An object stored in more than one form
+  a picture, moved or resized, keeps its crop. An object stored in more than one form
   (`mc:AlternateContent`) is shown with its box and not moved here. Deleting one removes its parts; refused while an animation plays
   on it.
 - **Lines and connectors** are `<line id="s6" name="…" from="x y" to="x y"/>`:
@@ -540,8 +571,8 @@ layout: Two Content
   group's box moves or scales the whole group, and canonical form writes its
   objects' new boxes. Changing its objects moves the group's box with them. A
   group box that disagrees with changed objects is refused. An object in a
-  group is written as at the slide's level, a picture or other object as
-  `<keep id="s12" kind summary box/>` with its shape id. Only the boxes of a
+  group is written as at the slide's level, a picture as `<picture/>`, another
+  object as `<keep id="s12" kind summary box/>` with its shape id. Only the boxes of a
   group's objects change here: their text, names and number stay (refused
   with the reason). A rotated or flipped group is one
   `<keep kind="group" … box/>`. Groups are never created or ungrouped here.
@@ -549,10 +580,14 @@ layout: Two Content
   (`TextBox 4`, `Straight Connector 10`), and the file read back shows them.
   They are:
   - a text box, `<shape box="…">text</shape>`;
-  - a picture from a file, `<keep kind="picture" src="…" box="…"/>`, or, in a
-    picture slot, the slot's marker holding `<keep kind="picture" src="…"/>`,
-    which takes the slot's box (not built yet: the host has to hand the
-    engine the image; refused until then);
+  - a picture, `<picture box="…" src="…"/>` (with `crop`, `mask` and `alt` if
+    wanted), showing an image of the package or a file the host hands the
+    write by that name (the engine's `export_with_files`; the CLI and MCP
+    server do not hand files over yet, so there such a write is refused with
+    the reason). A host's file must be a PNG, JPEG, GIF or BMP image; it
+    becomes a new image part (`media/image5.png`), which the text read back
+    shows as the picture's `src`. A new picture in a picture slot is not
+    built yet;
   - a line, `<line from="…" to="…"/>`.
 
   Nothing else is created: a new `<keep/>` of another kind, a new group or an

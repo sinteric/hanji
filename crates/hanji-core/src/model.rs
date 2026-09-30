@@ -36,6 +36,8 @@ pub enum Place {
     Box(fmt::Geom),
     Line(fmt::Ends),
     Group(fmt::GroupItem),
+    /// A picture: its box, image, crop, mask and alternative text.
+    Picture(fmt::PictureItem),
 }
 
 impl Block {

@@ -32,6 +32,10 @@ pub fn group_key(id: &str) -> String {
     format!("group:{id}")
 }
 
+pub fn picture_key(id: &str) -> String {
+    format!("picture:{id}")
+}
+
 /// What a head stands for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum HeadKind<'a> {
@@ -57,6 +61,12 @@ pub enum HeadKind<'a> {
         id: &'a str,
         name: &'a str,
     },
+    /// A picture, its image, crop, mask and alternative text in its place;
+    /// an empty id is a new one.
+    Picture {
+        id: &'a str,
+        name: &'a str,
+    },
 }
 
 pub fn kind(h: &Head) -> HeadKind<'_> {
@@ -70,6 +80,8 @@ pub fn kind(h: &Head) -> HeadKind<'_> {
         HeadKind::Line { id, name: &h.label }
     } else if let Some(id) = h.key.strip_prefix("group:") {
         HeadKind::Group { id, name: &h.label }
+    } else if let Some(id) = h.key.strip_prefix("picture:") {
+        HeadKind::Picture { id, name: &h.label }
     } else {
         HeadKind::Slide { layout: &h.label }
     }
@@ -99,11 +111,21 @@ pub fn group_head(g: &fmt::GroupItem) -> Block {
     Block::Head(Head { level: 1, key: group_key(&g.id), label: g.name.clone(), place: Some(Place::Group(g.clone())) })
 }
 
+pub fn picture_head(p: &fmt::PictureItem) -> Block {
+    Block::Head(Head {
+        level: 1,
+        key: picture_key(&p.id),
+        label: p.name.clone(),
+        place: Some(Place::Picture(p.clone())),
+    })
+}
+
 /// A head's box, when it has one.
 pub fn geom_of(h: &Head) -> Option<fmt::Geom> {
     match &h.place {
         Some(Place::Box(g)) => Some(*g),
         Some(Place::Group(g)) => g.geom,
+        Some(Place::Picture(p)) => p.geom,
         _ => None,
     }
 }
@@ -165,6 +187,10 @@ pub fn resolve(
                 }
                 fmt::SlideItem::Group(g) => {
                     blocks.push(group_head(g));
+                    vec![]
+                }
+                fmt::SlideItem::Picture(pic) => {
+                    blocks.push(picture_head(pic));
                     vec![]
                 }
             };
@@ -241,6 +267,11 @@ pub fn unresolve(blocks: &[Block], front: fmt::FrontMatter, keep: &dyn Fn(&str) 
             HeadKind::Group { .. } => {
                 if let (Some(s), Some(Place::Group(g))) = (pres.slides.last_mut(), &h.place) {
                     s.items.push(fmt::SlideItem::Group(g.clone()));
+                }
+            }
+            HeadKind::Picture { .. } => {
+                if let (Some(s), Some(Place::Picture(p))) = (pres.slides.last_mut(), &h.place) {
+                    s.items.push(fmt::SlideItem::Picture(p.clone()));
                 }
             }
         }

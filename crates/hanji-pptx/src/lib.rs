@@ -148,13 +148,14 @@ fn canonical_group(g: &fmt::GroupItem, rem: &Remainder) -> Option<fmt::GroupItem
     let mut out: Option<fmt::GroupItem> = None;
     for e in rem.entries.iter().filter(|e| e.kind == hanji_core::Kind::Shape && e.meta.tag == "p:grpSp") {
         let el = xml::fragment(&e.xml[0]);
-        let Some(st) = import::group_item(&el, &frame) else { continue };
+        let rels = import::rels_of(&rem.parts, e.meta.aux.get(1).map_or("", String::as_str));
+        let Some(st) = import::group_item(&el, &frame, &rels) else { continue };
         if st.id != g.id || st.name != g.name || export::sig(&st.items) != export::sig(&g.items) {
             continue;
         }
         let mut after = el.clone();
-        export::apply_group(&mut after, g, &frame).ok()?;
-        let c = shown_group(import::group_item(&after, &frame)?);
+        export::apply_group(&mut after, g, &frame, &rels).ok()?;
+        let c = shown_group(import::group_item(&after, &frame, &rels)?);
         if out.as_ref().is_some_and(|o| *o != c) {
             return None;
         }
@@ -175,6 +176,10 @@ fn shown_group(mut g: fmt::GroupItem) -> fmt::GroupItem {
                 l.ends = fmt::Ends { from: (r(l.ends.from.0), r(l.ends.from.1)), to: (r(l.ends.to.0), r(l.ends.to.1)) }
             }
             fmt::SlideItem::Group(inner) => *inner = shown_group(inner.clone()),
+            fmt::SlideItem::Picture(p) => {
+                p.geom = p.geom.map(|x| x.shown());
+                p.crop = p.crop.map(|c| c.shown());
+            }
             fmt::SlideItem::Slot(_) => {}
         }
     }
@@ -299,6 +304,7 @@ impl PptxEngine {
                 let ni = NotesInfo { part: n.clone(), prolog: nd.prolog.clone(), epilog: nd.epilog.clone() };
                 (ni, &roots[n], deck.notes.as_ref().map_or([Bu::Unset; 9], |m| m.bullets))
             });
+            imp.rels = import::rels_of(&parts, part);
             imp.slide(info, &roots[part], layout, notes).map_err(|e| pkg(format!("{part}: {e}")))?;
         }
         let mut skel = pres_root.clone();
@@ -373,8 +379,28 @@ impl Engine for PptxEngine {
 
 /// The package's parts for resolved blocks placed against `rem`.
 pub fn export_parts(blocks: &[Block], rem: &Remainder) -> Result<Vec<Part>, EngineError> {
+    export_parts_with(blocks, rem, &export::Files::new())
+}
+
+/// [`export_parts`] with the files the host hands the write: a picture's
+/// `src` may name one (§5.3, a picture from a file).
+pub fn export_parts_with(blocks: &[Block], rem: &Remainder, files: &export::Files) -> Result<Vec<Part>, EngineError> {
     let shell = DeckShell::of(rem).map_err(EngineError::Package)?;
-    export::Exporter::new(blocks, rem, &shell).package().map_err(EngineError::Refused)
+    export::Exporter::new(blocks, rem, &shell).with_files(files).package().map_err(EngineError::Refused)
+}
+
+impl PptxEngine {
+    /// [`Engine::export`] with the files the host hands the write, by the
+    /// name a picture's `src` gives them.
+    pub fn export_with_files(
+        &self,
+        text: &str,
+        rem: &Remainder,
+        files: &export::Files,
+    ) -> Result<Vec<u8>, EngineError> {
+        let (blocks, _) = PptxModel.resolve(text, rem, self.capabilities()).map_err(EngineError::Invalid)?;
+        write_package(&export_parts_with(&blocks, rem, files)?)
+    }
 }
 
 pub fn write_package(parts: &[Part]) -> Result<Vec<u8>, EngineError> {
