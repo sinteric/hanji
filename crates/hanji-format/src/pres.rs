@@ -220,7 +220,7 @@ pub(crate) fn geom_of(attrs: &[(String, String, usize)], col: usize) -> Result<O
     let mut g = Geom { x: *x, y: *y, w: *w, h: *h, ..Default::default() };
     if let Some((_, r, rcol)) = get("rot") {
         match parse_num(r) {
-            Some(d) if (-360.0..=360.0).contains(&d) => g.rot = ((d * 60_000.0).round() as i64).rem_euclid(21_600_000),
+            Some(d) if (-360.0..=360.0).contains(&d) => g.rot = ((d * 60_000.0).round() as i64).rem_euclid(FULL_TURN),
             _ => {
                 return Err((
                     *rcol,
@@ -276,8 +276,10 @@ fn split_attrs(
 pub fn geom_attrs(g: &Option<Geom>) -> String {
     let Some(g) = g else { return String::new() };
     let mut out = format!(" box=\"{} {} {} {}\"", pt(g.x), pt(g.y), pt(g.w), pt(g.h));
-    let deg = shown_deg(g.rot);
-    if deg != 0 && deg != 360 {
+    // Within one turn, as the parse reads it back: a file's rot="-5400000"
+    // shows as rot="270" (the stored value stays while it is left so, §5.3).
+    let deg = shown_deg(g.rot).rem_euclid(360);
+    if deg != 0 {
         out.push_str(&format!(" rot=\"{deg}\""));
     }
     let flip = match (g.flip_h, g.flip_v) {

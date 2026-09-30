@@ -1,7 +1,7 @@
 #!/bin/sh
 # Re-downloads the third-party corpus files at pinned commits and checks them against
 # the committed copies' SHA-256. (The files are committed too; this script documents
-# provenance and lets anyone verify it.) korean-deck.pptx is made by make_korean.py.
+# provenance and lets anyone verify it.) korean-deck.pptx is made by make_korean.py, turns-deck.pptx by make_turns.py.
 set -e
 cd "$(dirname "$0")"
 PPTX=https://raw.githubusercontent.com/scanny/python-pptx/278b47b1dedd5b46ee84c286e77cdfb0bf4594be/features/steps/test_files

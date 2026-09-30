@@ -101,11 +101,14 @@ pub fn write(el: &mut Element, g: &Geom) -> Result<(), String> {
     set_int(x, "a:ext", "cx", g.w);
     set_int(x, "a:ext", "cy", g.h);
     let o = old.unwrap_or_default();
-    if o.rot != g.rot || old.is_none() {
-        if g.rot == 0 {
+    // The stored rotation stays when it turns the same way (a file may store
+    // -90° as rot="-5400000"); a changed one is written from 0 up to a full turn.
+    if !hanji_format::same_turn(o.rot, g.rot) || old.is_none() {
+        let rot = g.rot.rem_euclid(hanji_format::FULL_TURN);
+        if rot == 0 {
             x.remove_attr("rot");
         } else {
-            x.set("rot", &g.rot.to_string());
+            x.set("rot", &rot.to_string());
         }
     }
     for (k, want, had) in [("flipH", g.flip_h, o.flip_h), ("flipV", g.flip_v, o.flip_v)] {

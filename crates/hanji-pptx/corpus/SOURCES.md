@@ -1,9 +1,9 @@
 # Corpus sources
 
-Twenty-one files: twenty test decks from two open-source projects, and one
-synthetic Korean deck written for this project. All are committed; `fetch.sh`
+Twenty-two files: twenty test decks from two open-source projects, and two
+synthetic decks written for this project. All are committed; `fetch.sh`
 re-downloads the twenty third-party files at pinned commits and checks their
-SHA-256, and `make_korean.py` regenerates the Korean one.
+SHA-256, and `make_korean.py` and `make_turns.py` regenerate the synthetic ones.
 
 Licence note: as for the docx and hwpx corpora, each file is redistributed
 under the licence of the repository it is test data in. Neither project gives
@@ -40,6 +40,7 @@ were left out, as were its fuzzing cases.
 | EmbeddedVideo.pptx | Apache POI | 1 | an embedded video and its playback animation |
 | 60810.pptx | Apache POI | 28 | sections, SmartArt, media, 17 notes pages, 175 bulleted paragraphs |
 | korean-deck.pptx | synthetic: `make_korean.py` (python-pptx 1.0.2, its default template) | 7 | Korean text with `lang="ko-KR"`: the DESIGN.md §5.3 example grown to seven slides — title, nested bullets with bold, two content, a text box, a table, a picture, a numbered list, a hyperlink and a coloured run, notes |
+| turns-deck.pptx | synthetic: `make_turns.py` (python-pptx 1.0.2, its default template, XML then set by hand; CC0-1.0) | 2 | geometry as other applications store it, which GetPut leaves alone: rotations stored negative (`rot="-5400000"`, as Google Slides writes) and past a full turn, `flipH="true"`, a turned connector, a turned object in a group; a picture in `mc:AlternateContent` at the top of a slide (as a 3D model or ink is stored), its box not whole points |
 
 ## Korean files
 
