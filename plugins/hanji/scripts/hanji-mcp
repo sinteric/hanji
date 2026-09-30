@@ -1,0 +1,88 @@
+#!/bin/sh
+# Starts the hanji MCP server over stdio, for the Claude Code and Codex
+# plugins. stdout belongs to the MCP protocol: everything this script says
+# goes to stderr.
+#
+# Which binary runs, first match wins:
+#   1. $HANJI_MCP_BIN, if set.
+#   2. hanji-mcp on PATH (for example from `cargo install`).
+#   3. The release binary for this platform, downloaded once from the
+#      GitHub release of this plugin's version into
+#      ${XDG_CACHE_HOME:-~/.cache}/hanji/<version>/ and checked against the
+#      release's SHA256SUMS.
+# Arguments are passed through (hanji-mcp [--store DIR]).
+set -eu
+
+version=0.1.0
+repo=sinteric/hanji
+base=${HANJI_MCP_DOWNLOAD_BASE:-https://github.com/$repo/releases/download/v$version}
+
+say() { printf 'hanji-mcp launcher: %s\n' "$*" >&2; }
+
+if [ -n "${HANJI_MCP_BIN:-}" ]; then
+  exec "$HANJI_MCP_BIN" "$@"
+fi
+if command -v hanji-mcp >/dev/null 2>&1; then
+  exec hanji-mcp "$@"
+fi
+
+case "$(uname -s)-$(uname -m)" in
+  Linux-x86_64 | Linux-amd64) target=x86_64-unknown-linux-musl ;;
+  Linux-aarch64 | Linux-arm64) target=aarch64-unknown-linux-musl ;;
+  Darwin-x86_64) target=x86_64-apple-darwin ;;
+  Darwin-arm64 | Darwin-aarch64) target=aarch64-apple-darwin ;;
+  MINGW*-x86_64 | MSYS*-x86_64 | CYGWIN*-x86_64) target=x86_64-pc-windows-msvc exe=.exe ;;
+  *)
+    say "no release binary for $(uname -s) $(uname -m)."
+    say "Install one with: cargo install --locked --git https://github.com/$repo hanji-mcp"
+    exit 1
+    ;;
+esac
+
+dir=${XDG_CACHE_HOME:-$HOME/.cache}/hanji/$version/$target
+bin=$dir/hanji-mcp${exe:-}
+if [ ! -x "$bin" ]; then
+  archive=hanji-$version-$target.tar.gz
+  tmp=$(mktemp -d)
+  trap 'rm -rf "$tmp"' EXIT
+  fetch() {
+    if command -v curl >/dev/null 2>&1; then
+      curl -fsSL --retry 2 -o "$2" "$1"
+    elif command -v wget >/dev/null 2>&1; then
+      wget -q -O "$2" "$1"
+    else
+      say "needs curl or wget to download $1"
+      return 1
+    fi
+  }
+  say "downloading $archive (once) from $base"
+  if ! fetch "$base/$archive" "$tmp/$archive" || ! fetch "$base/SHA256SUMS" "$tmp/SHA256SUMS"; then
+    say "download failed. Install hanji-mcp with:"
+    say "  cargo install --locked --git https://github.com/$repo hanji-mcp"
+    say "or set HANJI_MCP_BIN to a hanji-mcp binary."
+    exit 1
+  fi
+  want=$(awk -v f="$archive" '$2 == f || $2 == "*" f { print $1 }' "$tmp/SHA256SUMS")
+  if command -v sha256sum >/dev/null 2>&1; then
+    got=$(sha256sum "$tmp/$archive" | awk '{ print $1 }')
+  else
+    got=$(shasum -a 256 "$tmp/$archive" | awk '{ print $1 }')
+  fi
+  if [ -z "$want" ] || [ "$want" != "$got" ]; then
+    say "checksum mismatch for $archive (expected ${want:-nothing}, got $got); not running it."
+    exit 1
+  fi
+  tar -xzf "$tmp/$archive" -C "$tmp"
+  mkdir -p "$dir"
+  for f in hanji-mcp${exe:-} hanji${exe:-}; do
+    if [ -f "$tmp/hanji-$version-$target/$f" ]; then
+      mv -f "$tmp/hanji-$version-$target/$f" "$dir/$f.part"
+      chmod +x "$dir/$f.part"
+      mv -f "$dir/$f.part" "$dir/$f"
+    fi
+  done
+  rm -rf "$tmp"
+  trap - EXIT
+  [ -x "$bin" ] || { say "$archive has no hanji-mcp"; exit 1; }
+fi
+exec "$bin" "$@"
