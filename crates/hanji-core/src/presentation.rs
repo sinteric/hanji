@@ -185,7 +185,7 @@ pub fn model_of(
 /// The last block, a head, takes `look`.
 fn set_look(blocks: &mut [Block], look: &fmt::look::Look) {
     if let Some(Block::Head(h)) = blocks.last_mut() {
-        h.look = look.clone();
+        *h.look = look.clone();
     }
 }
 
@@ -227,6 +227,7 @@ pub fn resolve(
                 }
                 fmt::SlideItem::Line(l) => {
                     blocks.push(line_head(&l.id, &l.name, l.ends));
+                    set_look(&mut blocks, &l.look);
                     vec![]
                 }
                 fmt::SlideItem::Group(g) => {
@@ -285,7 +286,7 @@ pub fn unresolve(blocks: &[Block], front: fmt::FrontMatter, keep: &dyn Fn(&str) 
                     s.items.push(fmt::SlideItem::Slot(fmt::Slot {
                         name: name.into(),
                         geom,
-                        look: h.look.clone(),
+                        look: (*h.look).clone(),
                         blocks,
                     }));
                 }
@@ -299,7 +300,7 @@ pub fn unresolve(blocks: &[Block], front: fmt::FrontMatter, keep: &dyn Fn(&str) 
                     })
                     .collect();
                 if let Some(s) = pres.slides.last_mut() {
-                    let sh = fmt::ShapeText { id: id.into(), name: name.into(), geom, look: h.look.clone(), paras };
+                    let sh = fmt::ShapeText { id: id.into(), name: name.into(), geom, look: (*h.look).clone(), paras };
                     s.items.push(fmt::SlideItem::Shape(sh));
                 }
             }
@@ -310,7 +311,12 @@ pub fn unresolve(blocks: &[Block], front: fmt::FrontMatter, keep: &dyn Fn(&str) 
             }
             HeadKind::Line { id, name } => {
                 if let (Some(s), Some(Place::Line(ends))) = (pres.slides.last_mut(), &h.place) {
-                    s.items.push(fmt::SlideItem::Line(fmt::LineItem { id: id.into(), name: name.into(), ends: *ends }));
+                    s.items.push(fmt::SlideItem::Line(fmt::LineItem {
+                        id: id.into(),
+                        name: name.into(),
+                        ends: *ends,
+                        look: (*h.look).clone(),
+                    }));
                 }
             }
             HeadKind::Group { .. } => {

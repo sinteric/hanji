@@ -33,7 +33,8 @@
 //!   under a title, two objects aligned; the picture edits: a picture
 //!   cropped, one cut to an ellipse with new alternative text; text
 //!   formatting: a word made 24 pt coral, a shape's font changed; and fills:
-//!   a shape filled, one's fill cleared; and a group's shape's text edited).
+//!   a shape filled, one's fill cleared; a group's shape's text edited; and
+//!   outlines: a shape outlined dashed, an arrowhead put on a line).
 //! - xlsx: per workbook, GetPut and range operations that change the inputs
 //!   of formulas, whose cached values the export recomputes, and `format`
 //!   operations on named ranges (a header row filled and bold, a column in
@@ -523,11 +524,11 @@ fn pptx(kit: &mut Kit) {
                 name,
                 licence,
                 "pset",
-                "the pptx edit set, one edit after another: text edits, a slide added from a layout, one deleted, one moved, geometry edits (a shape moved, a picture resized, a text box added, two objects aligned), picture edits (a picture cropped, one cut to an ellipse with new alternative text), text formatting (a word made 24 pt coral, a shape's font changed) fills (a shape filled accent2, one's fill cleared) and a group's shape's text edited",
+                "the pptx edit set, one edit after another: text edits, a slide added from a layout, one deleted, one moved, geometry edits (a shape moved, a picture resized, a text box added, two objects aligned), picture edits (a picture cropped, one cut to an ellipse with new alternative text), text formatting (a word made 24 pt coral, a shape's font changed) fills (a shape filled accent2, one's fill cleared), a group's shape's text edited and outlines (a shape outlined 1.5 pt dashed accent2, a triangle arrowhead put on a line's end)",
                 &out,
                 vec![
                     ppt.clone(),
-                    "Shows the edits listed below (slides added, deleted and moved; text changed; objects moved, resized, added and aligned where the listed boxes say, in PowerPoint's cm as each line gives them; a picture cropped as its crop says, the percent cut off its left, top, right and bottom; a picture cut to an ellipse, its alternative text (Format Picture > Alt Text) as listed; the listed word 24 pt coral, the listed shape in Noto Sans KR; the listed shapes filled accent 2 and without fill; the listed text in a group changed, its formatting kept)".into(),
+                    "Shows the edits listed below (slides added, deleted and moved; text changed; objects moved, resized, added and aligned where the listed boxes say, in PowerPoint's cm as each line gives them; a picture cropped as its crop says, the percent cut off its left, top, right and bottom; a picture cut to an ellipse, its alternative text (Format Picture > Alt Text) as listed; the listed word 24 pt coral, the listed shape in Noto Sans KR; the listed shapes filled accent 2 and without fill; the listed text in a group changed, its formatting kept; the listed shape outlined 1.5 pt dashed in accent 2, and the listed line ending in a triangle arrowhead)".into(),
                 ],
                 notes,
             );

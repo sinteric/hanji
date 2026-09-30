@@ -69,9 +69,9 @@ fn every_fill_is_shown_from_where_it_comes() {
     let t = import(&deck("shapes.pptx")).text;
     // A style's fill reference, a shape's own theme colours with Office's tints.
     for want in [
-        "<shape id=\"s2\" name=\"Rectangle 1\" box=\"66 72 72 72\" fill=accent1/>",
-        "<shape id=\"s9\" name=\"Rectangle 8\" box=\"174 72 72 72\" fill=accent1+80%/>",
-        "<shape id=\"s12\" name=\"Rectangle 11\" box=\"468 72 72 72\" fill=accent1-25%/>",
+        "<shape id=\"s2\" name=\"Rectangle 1\" box=\"66 72 72 72\" fill=accent1 border=\"2pt solid accent1*\"/>",
+        "<shape id=\"s9\" name=\"Rectangle 8\" box=\"174 72 72 72\" fill=accent1+80% border=\"2pt solid accent1*\"/>",
+        "<shape id=\"s12\" name=\"Rectangle 11\" box=\"468 72 72 72\" fill=accent1-25% border=\"2pt solid accent1*\"/>",
     ] {
         assert!(t.contains(want), "{want}\n{t}");
     }
@@ -86,8 +86,9 @@ fn a_changed_fill_writes_only_the_fill() {
     let pkg = deck("shapes.pptx");
     let before = package::read(&pkg).unwrap();
     let imp = import(&pkg);
-    let r8 = "name=\"Rectangle 8\" box=\"174 72 72 72\" fill=accent1+80%/>";
-    let (parts, _) = edited(&imp, r8, "name=\"Rectangle 8\" box=\"174 72 72 72\" fill=#FF7F50/>");
+    let r8 = "name=\"Rectangle 8\" box=\"174 72 72 72\" fill=accent1+80% border=\"2pt solid accent1*\"/>";
+    let (parts, _) =
+        edited(&imp, r8, "name=\"Rectangle 8\" box=\"174 72 72 72\" fill=#FF7F50 border=\"2pt solid accent1*\"/>");
     let (a, b) = (slide(&before, 6), slide(&parts, 6));
     assert_eq!(
         sp_pr(&b, "Rectangle 8"),
@@ -98,7 +99,8 @@ fn a_changed_fill_writes_only_the_fill() {
     );
     assert_eq!(b.replace(&sp_pr(&b, "Rectangle 8"), ""), a.replace(&sp_pr(&a, "Rectangle 8"), ""), "only that fill");
     // Taken back to what its style gives: its own fill goes.
-    let (parts, _) = edited(&imp, r8, "name=\"Rectangle 8\" box=\"174 72 72 72\" fill=accent1/>");
+    let (parts, _) =
+        edited(&imp, r8, "name=\"Rectangle 8\" box=\"174 72 72 72\" fill=accent1 border=\"2pt solid accent1*\"/>");
     assert!(!sp_pr(&slide(&parts, 6), "Rectangle 8").contains("Fill"), "{}", sp_pr(&slide(&parts, 6), "Rectangle 8"));
 }
 
@@ -107,8 +109,8 @@ fn a_fill_left_out_is_none_and_written_back_it_is_the_style_s() {
     let pkg = deck("shapes.pptx");
     let before = package::read(&pkg).unwrap();
     let imp = import(&pkg);
-    let r1 = "<shape id=\"s2\" name=\"Rectangle 1\" box=\"66 72 72 72\" fill=accent1/>";
-    let bare = "<shape id=\"s2\" name=\"Rectangle 1\" box=\"66 72 72 72\"/>";
+    let r1 = "<shape id=\"s2\" name=\"Rectangle 1\" box=\"66 72 72 72\" fill=accent1 border=\"2pt solid accent1*\"/>";
+    let bare = "<shape id=\"s2\" name=\"Rectangle 1\" box=\"66 72 72 72\" border=\"2pt solid accent1*\"/>";
     let (parts, imp2) = edited(&imp, r1, bare);
     assert!(sp_pr(&slide(&parts, 6), "Rectangle 1").contains("</a:prstGeom><a:noFill/></p:spPr>"));
     let (parts, _) = edited(&imp2, bare, r1);
@@ -144,12 +146,22 @@ fn what_cannot_be_written_is_refused() {
         Err(EngineError::Refused(m)) => m,
         other => panic!("expected an error, got {:?}", other.map(|_| ())),
     };
-    let r1 = "name=\"Rectangle 1\" box=\"66 72 72 72\" fill=accent1/>";
-    let m = err(imp.text.replace(r1, "name=\"Rectangle 1\" box=\"66 72 72 72\" fill=gradient/>"), &imp.remainder);
+    let r1 = "name=\"Rectangle 1\" box=\"66 72 72 72\" fill=accent1 border=\"2pt solid accent1*\"/>";
+    let m = err(
+        imp.text.replace(r1, "name=\"Rectangle 1\" box=\"66 72 72 72\" fill=gradient border=\"2pt solid accent1*\"/>"),
+        &imp.remainder,
+    );
     assert!(m.contains("fill=gradient") && m.contains("cannot be written"), "{m}");
-    let m = err(imp.text.replace(r1, "name=\"Rectangle 1\" box=\"66 72 72 72\" fill=blue/>"), &imp.remainder);
+    let m = err(
+        imp.text.replace(r1, "name=\"Rectangle 1\" box=\"66 72 72 72\" fill=blue border=\"2pt solid accent1*\"/>"),
+        &imp.remainder,
+    );
     assert!(m.contains("not a fill"), "{m}");
-    let m = err(imp.text.replace(r1, "name=\"Rectangle 1\" box=\"66 72 72 72\" background=accent2/>"), &imp.remainder);
+    let m = err(
+        imp.text
+            .replace(r1, "name=\"Rectangle 1\" box=\"66 72 72 72\" background=accent2 border=\"2pt solid accent1*\"/>"),
+        &imp.remainder,
+    );
     assert!(m.contains("fill="), "{m}");
     // A gradient left as shown is kept.
     let t = import(&deck("turns-deck.pptx"));

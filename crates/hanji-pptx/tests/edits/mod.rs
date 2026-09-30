@@ -9,7 +9,8 @@
 //! give it alternative text (pictures, §5.3); P18 format a word of a shape's
 //! text, P19 change a shape's font (text formatting, §5.3); P20 fill a shape,
 //! P21 clear a shape's fill (§5.3); P22 edit a group's shape's text (§5.3);
-//! P9 makes them all in one revision.
+//! P23 outline a shape, P24 put an arrowhead on a line (§5.3); P9 makes them
+//! all in one revision.
 
 use std::collections::HashSet;
 
@@ -23,7 +24,7 @@ use hanji_testkit::{
     block_ranges, chars, deleted_span, entries_at, figure_or_word, ident, replace_span, span_of, Cx, Doc, Edit, EditFn,
 };
 
-pub const EDITS: [(&str, EditFn); 21] = [
+pub const EDITS: [(&str, EditFn); 23] = [
     ("p1_title", p1_title),
     ("p2_bullet", p2_bullet),
     ("p3_add_slide", p3_add_slide),
@@ -45,6 +46,8 @@ pub const EDITS: [(&str, EditFn); 21] = [
     ("p20_fill_shape", p20_fill_shape),
     ("p21_clear_fill", p21_clear_fill),
     ("p22_group_text", p22_group_text),
+    ("p23_outline_shape", p23_outline_shape),
+    ("p24_arrowhead", p24_arrowhead),
 ];
 
 /// A slide: its head and the end of its blocks.
@@ -896,4 +899,40 @@ fn p22_group_text(d: &Doc, _: &Cx) -> Option<Edit> {
         }
     }
     None
+}
+
+/// A block's head changed by `f`, as one edit.
+fn head_edit(d: &Doc, k: usize, f: impl FnOnce(&mut hanji_core::Head), name: &'static str, what: String) -> Edit {
+    let mut blocks = d.blocks.clone();
+    if let Block::Head(h) = &mut blocks[k] {
+        f(h);
+    }
+    let mut ed = Edit::blocks(name, what, blocks, ident(d.blocks.len()), HashSet::from([k]), true);
+    ed.named = vec![slide_at(&d.blocks, k).2];
+    ed
+}
+
+/// A shape takes a dashed theme-coloured outline.
+fn p23_outline_shape(d: &Doc, _: &Cx) -> Option<Edit> {
+    const BORDER: &str = "1.5pt dashed accent2";
+    let k = (0..d.blocks.len()).find(|&k| {
+        d.blocks[k].head().is_some_and(|h| {
+            matches!(kind(h), HeadKind::Shape { id, .. } if !id.is_empty()) && h.look.border.as_deref() != Some(BORDER)
+        })
+    })?;
+    let label = d.blocks[k].head()?.label.clone();
+    let what = format!("shape {label:?}: border=\"{BORDER}\" on {}", slide_name(&d.blocks, k));
+    Some(head_edit(d, k, |h| h.look.border = Some(BORDER.into()), "P23 outline a shape", what))
+}
+
+/// A line without an arrowhead at its end gets one.
+fn p24_arrowhead(d: &Doc, _: &Cx) -> Option<Edit> {
+    let k = (0..d.blocks.len()).find(|&k| {
+        d.blocks[k].head().is_some_and(|h| {
+            matches!(kind(h), HeadKind::Line { id, .. } if !id.is_empty()) && h.look.end.as_deref() != Some("triangle")
+        })
+    })?;
+    let label = d.blocks[k].head()?.label.clone();
+    let what = format!("line {label:?}: end=triangle on {}", slide_name(&d.blocks, k));
+    Some(head_edit(d, k, |h| h.look.end = Some("triangle".into()), "P24 put an arrowhead on a line", what))
 }

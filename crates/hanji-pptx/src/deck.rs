@@ -9,6 +9,7 @@ use hanji_package::xml::{self, Element};
 use hanji_package::{opc, package};
 
 use crate::fill::{self, FillXml, ThemeFills};
+use crate::outline::{self, Ln};
 use crate::pml::*;
 use crate::text::{self, RunStyle, ThemeFonts};
 
@@ -40,6 +41,9 @@ pub struct SlotInfo {
     /// placeholder's, else its master placeholder's.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fill: Option<FillXml>,
+    /// The outline it inherits, likewise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub line: Option<Ln>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -182,6 +186,10 @@ impl Deck {
                     let bullets = over(ph.lst, over(master_ph.map_or([Bu::Unset; 9], |m| m.lst), base_bu));
                     let geom = ph.geom.or(master_ph.and_then(|m| m.geom));
                     let fill = ph.fill.clone().or_else(|| master_ph.and_then(|m| m.fill.clone()));
+                    let line = match (ph.line.clone(), master_ph.and_then(|m| m.line.clone())) {
+                        (Some(a), Some(b)) => Some(a.over(&b)),
+                        (a, b) => a.or(b),
+                    };
                     slots.push(SlotInfo {
                         name,
                         ty: ph.ty.clone(),
@@ -193,6 +201,7 @@ impl Deck {
                         geom,
                         text,
                         fill,
+                        line,
                     });
                 }
                 deck.layouts.push(LayoutInfo {
@@ -265,6 +274,8 @@ pub(crate) struct Ph {
     pub geom: Option<hanji_format::Geom>,
     /// Its own fill, or its style's.
     pub fill: Option<FillXml>,
+    /// Its own outline over its style's.
+    pub line: Option<Ln>,
 }
 
 /// The placeholders of a master's or layout's shape tree, in order.
@@ -282,7 +293,11 @@ pub(crate) fn placeholders(root: &Element, fills: &ThemeFills) -> Vec<Ph> {
             let lst = levels_of(sh.child("p:txBody").and_then(|t| t.child("a:lstStyle")));
             let name = c_nv_pr(sh).and_then(|c| c.get("name")).unwrap_or_default();
             let fill = fill::own(sh).or_else(|| fill::from_style(sh, fills));
-            Some(Ph { ty, idx, ph: ph.to_xml(), name, x, lst, geom: crate::geom::own(sh), fill })
+            let line = match (outline::own(sh), outline::from_style(sh, fills)) {
+                (Some(a), Some(b)) => Some(a.over(&b)),
+                (a, b) => a.or(b),
+            };
+            Some(Ph { ty, idx, ph: ph.to_xml(), name, x, lst, geom: crate::geom::own(sh), fill, line })
         })
         .collect()
 }

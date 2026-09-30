@@ -42,6 +42,9 @@ pub struct ThemeFills {
     pub fills: Vec<FillXml>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub bg: Vec<FillXml>,
+    /// `a:lnStyleLst`: each line style's `a:ln`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub lines: Vec<String>,
 }
 
 impl ThemeFills {
@@ -50,7 +53,7 @@ impl ThemeFills {
         let list = |n: &str| -> Vec<FillXml> {
             scheme.and_then(|s| s.child(n)).map(|l| l.elements().map(Element::to_xml).collect()).unwrap_or_default()
         };
-        ThemeFills { fills: list("a:fillStyleLst"), bg: list("a:bgFillStyleLst") }
+        ThemeFills { fills: list("a:fillStyleLst"), bg: list("a:bgFillStyleLst"), lines: list("a:lnStyleLst") }
     }
 }
 
@@ -77,7 +80,7 @@ pub fn from_style(el: &Element, theme: &ThemeFills) -> Option<FillXml> {
 }
 
 /// Every `phClr` in `el` becomes `c`, the placeholder's own adjustments after `c`'s.
-fn with_color(el: &mut Element, c: &Element) {
+pub(crate) fn with_color(el: &mut Element, c: &Element) {
     for n in &mut el.children {
         let Node::El(e) = n else { continue };
         if e.is("a:schemeClr") && e.get("val").as_deref() == Some("phClr") {
@@ -190,7 +193,7 @@ mod tests {
                 "<a:solidFill><a:schemeClr val=\"phClr\"/></a:solidFill>".into(),
                 "<a:solidFill><a:schemeClr val=\"phClr\"><a:tint val=\"50000\"/></a:schemeClr></a:solidFill>".into(),
             ],
-            bg: vec![],
+            ..Default::default()
         };
         let sp = |idx: u32| {
             fragment(&format!(

@@ -238,6 +238,8 @@ pub struct LineItem {
     pub id: String,
     pub name: String,
     pub ends: Ends,
+    /// Its outline and arrowheads (§5.3).
+    pub look: crate::look::Look,
 }
 
 /// A picture (§5.3): where it is, the image it shows (`src`, a part of the

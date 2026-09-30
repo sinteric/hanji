@@ -602,6 +602,10 @@ fn slot(
             p.err(i, 1, "::notes:: shows no formatting: speaker notes keep theirs. Write the marker ::notes::.");
             none()
         }
+        Ok((_, look, _)) if look.start.is_some() || look.end.is_some() => {
+            p.err(i, 1, "arrowheads are a line's: <line … start=… end=…/>; a slot has none.");
+            none()
+        }
         Ok(g) => g,
         Err((col, msg)) => {
             p.err(i, col, msg);
@@ -821,11 +825,15 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
         );
         return None;
     }
+    if look.start.is_some() || look.end.is_some() {
+        p.err(i, tag.col, "arrowheads are a line's: <line … start=… end=…/>; a shape has none.");
+        return None;
+    }
     let sh = ShapeText { id, name, geom, look, paras };
     Some((sh, ItemMap { head, blocks }))
 }
 
-const LINE_FORM: &str = "a line is <line id=\"…\" name=\"…\" from=\"x y\" to=\"x y\"/>, its two ends in points, its id and name as they are in the file; a new line is <line from=\"x y\" to=\"x y\"/>";
+const LINE_FORM: &str = "a line is <line id=\"…\" name=\"…\" from=\"x y\" to=\"x y\"/>, its two ends in points, its id and name as they are in the file, with border=\"<width>pt <style> <colour>\" and start= and end= arrowheads (triangle, stealth, diamond, oval, arrow) when it has them; a new line is <line from=\"x y\" to=\"x y\"/>";
 
 /// A `<line …/>` line.
 fn line_item(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Option<(LineItem, ItemMap)> {
@@ -840,13 +848,21 @@ fn line_item(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> 
         p.err(i, col, format!("nothing may follow a line's tag on its line: {form}."));
         return None;
     }
-    let (vals, _) = match split_attrs(&tag, &["id", "name", "from", "to"], false, form) {
+    let split = look::split_look_keys(&tag.attrs).and_then(|(look, rest)| {
+        let (vals, _) = split_attrs_of(&rest, &tag.name, tag.col, &["id", "name", "from", "to"], false, form)?;
+        Ok((vals, look))
+    });
+    let (vals, look) = match split {
         Ok(v) => v,
         Err((col, msg)) => {
             p.err(i, col, msg);
             return None;
         }
     };
+    if look.fill.is_some() {
+        p.err(i, tag.col, format!("a line has no fill; its colour is its border=: {form}."));
+        return None;
+    }
     let point = |k: usize| vals[k].as_deref().map(|v| (v, parse_point(v)));
     let (from, to) = match (point(2), point(3)) {
         (Some((_, Some(f))), Some((_, Some(t)))) => (f, t),
@@ -886,7 +902,7 @@ fn line_item(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> 
         seen.push(key);
     }
     let head = HeadMap { start: at, end: next, mark: at + lead };
-    Some((LineItem { id, name, ends: Ends { from, to } }, ItemMap { head, blocks: vec![] }))
+    Some((LineItem { id, name, ends: Ends { from, to }, look }, ItemMap { head, blocks: vec![] }))
 }
 
 const PICTURE_FORM: &str = "a picture is <picture id=\"…\" name=\"…\" box=\"…\" src=\"…\"/>, its id and name as they are in the file, with crop=\"left top right bottom\" (percent cut off each edge), mask=\"ellipse\" (the preset shape it is cut to) and alt=\"…\" (its alternative text) when it has them; a new picture is <picture box=\"…\" src=\"…\"/>";
@@ -1301,7 +1317,7 @@ pub fn picture_line(pic: &PictureItem) -> String {
 
 pub fn line_line(l: &LineItem) -> String {
     let p = |(x, y): (i64, i64)| format!("{} {}", pt(x), pt(y));
-    let ends = format!("from=\"{}\" to=\"{}\"", p(l.ends.from), p(l.ends.to));
+    let ends = format!("from=\"{}\" to=\"{}\"{}", p(l.ends.from), p(l.ends.to), look_attrs(&l.look));
     if l.id.is_empty() {
         format!("<line {ends}/>")
     } else {
