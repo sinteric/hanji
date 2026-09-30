@@ -102,6 +102,14 @@ fn a_new_slide_comes_from_its_layout() {
     let n = imp.text.len();
     let (text, rem) =
         span_edit(&imp, n, n, "\n---\n\nlayout: Title and Content\n::title::\n새 슬라이드\n::body::\n- 하나\n  - 둘\n");
+    // The new slide's text shows what it inherits from the layout.
+    let shown = canonical(&text, &rem);
+    for want in [
+        "::title box=\"36 22 648 90\" font=Calibri size=44pt color=tx1::\n새 슬라이드\n",
+        "::body box=\"36 126 648 356\" font=Calibri color=tx1::\n- 하나 {size=32pt}\n  - 둘 {size=28pt}\n",
+    ] {
+        assert!(shown.contains(want), "{shown}");
+    }
     let parts = export(&text, &rem);
     let list = slides(&parts);
     assert_eq!(list.len(), 8);
@@ -212,8 +220,8 @@ fn invalid_texts_are_refused_with_what_is_allowed() {
         other => panic!("{other:?}"),
     }
     let bad = imp.text.replace(
-        "::title box=\"36 22 648 90\"::\n분기별 매출",
-        "::title box=\"36 22 648 90\"::\n분기별 매출\n::body::\n표",
+        "::title box=\"36 22 648 90\" font=Calibri size=44pt color=tx1::\n분기별 매출",
+        "::title box=\"36 22 648 90\" font=Calibri size=44pt color=tx1::\n분기별 매출\n::body::\n표",
     );
     match PptxEngine.export(&bad, &imp.remainder) {
         Err(EngineError::Invalid(d)) => assert!(hanji_format::diag::render(&d).contains("body"), "{d:?}"),
@@ -333,7 +341,9 @@ fn objects_are_shown_moved_and_deleted_never_changed() {
     let imp = import(&pkg);
     let (pic, table) = (object_line(&imp.text, "picture"), object_line(&imp.text, "table"));
     assert!(
-        imp.text.contains(&format!("::title box=\"36 22 648 90\"::\n분기별 매출\n{table}{pic}::notes::")),
+        imp.text.contains(&format!(
+            "::title box=\"36 22 648 90\" font=Calibri size=44pt color=tx1::\n분기별 매출\n{table}{pic}::notes::"
+        )),
         "{}",
         imp.text
     );

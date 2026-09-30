@@ -18,6 +18,7 @@ pub mod geom;
 pub mod import;
 pub mod pml;
 pub mod safety;
+pub mod text;
 
 pub use hanji_package::{package, xml};
 
@@ -127,6 +128,7 @@ impl TextModel for PptxModel {
                 }
             }
         }
+        show_inherited(&mut blocks, rem, &shell);
         // A slide paragraph has no list of its own: items in a row are one list.
         for k in 1..blocks.len() {
             let prev_item = matches!(&blocks[k - 1], Block::Para(p) if p.item.is_some());
@@ -162,6 +164,80 @@ fn canonical_group(g: &fmt::GroupItem, rem: &Remainder) -> Option<fmt::GroupItem
         out = Some(c);
     }
     out
+}
+
+/// The text formatting each run inherits, where the text leaves it unsaid
+/// (§5.3), as a write gives it: from the item's `Shape` entry at its head,
+/// or for a new placeholder or text box from its layout. Items without
+/// either keep what the text says. (Read against the remainder of another
+/// revision, an entry may be another item's; the write reads the text
+/// against its own.)
+fn show_inherited(out: &mut [Block], rem: &Remainder, shell: &DeckShell) {
+    use hanji_core::presentation::{kind, HeadKind};
+    use hanji_core::Kind;
+    use hanji_format::inline_style as istyle;
+    let mut shapes: BTreeMap<usize, &hanji_core::Entry> = BTreeMap::new();
+    let mut levels: BTreeMap<usize, u32> = BTreeMap::new();
+    for e in &rem.entries {
+        match (e.kind, e.path.as_slice()) {
+            (Kind::Shape, [b]) if e.xml.first().is_some_and(|x| x.contains("<p:txBody")) => {
+                shapes.insert(*b, e);
+            }
+            (Kind::Ppr, [b]) => {
+                if let Some(l) = e.meta.aux.first().and_then(|v| v.parse().ok()) {
+                    levels.insert(*b, l);
+                }
+            }
+            _ => {}
+        }
+    }
+    let mut layout = None;
+    let mut k = 0;
+    while k < out.len() {
+        let Block::Head(h) = &out[k] else {
+            k += 1;
+            continue;
+        };
+        let hi = k;
+        k += 1;
+        let base = match kind(h) {
+            HeadKind::Slide { layout: l } => {
+                layout = shell.deck.layout(l);
+                continue;
+            }
+            HeadKind::Slot { name } if name != "notes" => layout.and_then(|l| {
+                let t = &l.slot(name)?.text;
+                Some(match shapes.get(&hi) {
+                    Some(e) => text::base(&xml::fragment(&e.xml[0]), t, &l.fonts),
+                    None => t.clone(),
+                })
+            }),
+            HeadKind::Shape { id, .. } => layout.and_then(|l| match shapes.get(&hi) {
+                Some(e) => Some(text::base(&xml::fragment(&e.xml[0]), &l.other_text, &l.fonts)),
+                None if id.is_empty() => Some(l.other_text.clone()),
+                None => None,
+            }),
+            _ => None,
+        };
+        let end = (k..out.len()).find(|&j| matches!(out[j], Block::Head(_))).unwrap_or(out.len());
+        let Some(base) = base else { continue };
+        let mut paras: Vec<&mut fmt::Inline> = vec![];
+        for (bi, b) in out[hi + 1..end].iter_mut().enumerate() {
+            let Block::Para(p) = b else { continue };
+            let lvl =
+                p.item.as_ref().map_or_else(|| levels.get(&(hi + 1 + bi)).copied().unwrap_or(0) as usize, |i| i.level);
+            let under = base[lvl.min(8)].shown();
+            let st: Vec<istyle::TextStyle> = istyle::unit_styles(&p.content)
+                .into_iter()
+                .zip(&p.content.units)
+                .map(|(s, u)| if istyle::visible(&u.atom) { s.over(&under) } else { s })
+                .collect();
+            istyle::set_unit_styles(&mut p.content, &st);
+            paras.push(&mut p.content);
+        }
+        istyle::normalize(&mut paras);
+        k = end;
+    }
 }
 
 /// A group as its text reads: every number rounded as shown.

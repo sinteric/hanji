@@ -22,8 +22,9 @@
 //! - pptx: per deck, GetPut and P9 (title, bullet, notes and shape text
 //!   edits, a slide added from a layout, one deleted, one moved, …, and the
 //!   geometry edits: a shape moved, a picture resized, a text box added
-//!   under a title, two objects aligned; and the picture edits: a picture
-//!   cropped, one cut to an ellipse with new alternative text).
+//!   under a title, two objects aligned; the picture edits: a picture
+//!   cropped, one cut to an ellipse with new alternative text; and text
+//!   formatting: a word made 24 pt coral, a shape's font changed).
 //! - xlsx: per workbook, GetPut and range operations that change the inputs
 //!   of formulas, whose cached values the export recomputes.
 //! - hwpx: per file, GetPut and E10.
@@ -505,11 +506,11 @@ fn pptx(kit: &mut Kit) {
                 name,
                 licence,
                 "pset",
-                "the pptx edit set, one edit after another: text edits, a slide added from a layout, one deleted, one moved, geometry edits (a shape moved, a picture resized, a text box added, two objects aligned) and picture edits (a picture cropped, one cut to an ellipse with new alternative text)",
+                "the pptx edit set, one edit after another: text edits, a slide added from a layout, one deleted, one moved, geometry edits (a shape moved, a picture resized, a text box added, two objects aligned) picture edits (a picture cropped, one cut to an ellipse with new alternative text) and text formatting (a word made 24 pt coral, a shape's font changed)",
                 &out,
                 vec![
                     ppt.clone(),
-                    "Shows the edits listed below (slides added, deleted and moved; text changed; objects moved, resized, added and aligned where the listed boxes say; a picture cropped as its crop says, the percent cut off its left, top, right and bottom; a picture cut to an ellipse, its alternative text (Format Picture > Alt Text) as listed)".into(),
+                    "Shows the edits listed below (slides added, deleted and moved; text changed; objects moved, resized, added and aligned where the listed boxes say; a picture cropped as its crop says, the percent cut off its left, top, right and bottom; a picture cut to an ellipse, its alternative text (Format Picture > Alt Text) as listed; the listed word 24 pt coral, the listed shape in Noto Sans KR)".into(),
                 ],
                 notes,
             );

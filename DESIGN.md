@@ -409,9 +409,9 @@ size: 720 x 540 pt
 ---
 
 layout: Title and Content
-::title box="36 22 648 90"::
+::title box="36 22 648 90" font=Calibri size=44pt color=tx1::
 핵심 지표
-::body box="36 126 648 356"::
+::body box="36 126 648 356" font=Calibri size=32pt color=tx1::
 - 매출 **12% 증가**
 - 신규 고객 34곳
 ::notes::
@@ -523,6 +523,36 @@ layout: Two Content
   (a read of an inherited value, an edit that must keep one) could not be
   done, and one was answered wrong; F1 did all 48, at 1.27× today's text
   against 1.14× on the corpus.
+- **Text formatting** (built: `font`, `size`, `color`; fill, outline and the
+  paragraph properties are still proposed). Every run of a slot or shape
+  shows the font, size and colour it has, from the run's `a:rPr` over what
+  it inherits: the shape's list style and `p:style` font, its layout and
+  master placeholder, the master's title, body or other text style, the
+  presentation's default text style, and last the theme's minor font, 18 pt
+  and `tx1`. What all of an object's shown text shares is on its tag or
+  marker, what a paragraph's shares beyond that ends the paragraph
+  (`{size=32pt}`), and the rest is `[text]{…}` (lifting, as §5.2). Spaces and
+  line breaks carry no formatting of their own in the text: they take the
+  text around them. `font` is the East Asian font where the run has one,
+  else the Latin one; writing it sets `a:latin` (and `a:ea` where the run
+  shows an East Asian font). Colours are §5.1's: a scheme colour's
+  `lumMod`/`lumOff` in whole percents is `accent1+40%`/`accent1-25%`, other
+  adjustments `accent1*`, `a:alpha` `/NN%`; a gradient, pattern or picture
+  fill is shown and kept. Notes show no formatting, nor, until groups' text
+  is editable, do a group's shapes.
+  - A value left as shown keeps the run's XML. A changed one is written on
+    the run's `a:rPr` in schema order, other children kept; a value equal to
+    what the run inherits removes the run's own, so writing a title back at
+    its layout's 44 pt leaves the file as it was. A property left out takes
+    what the run inherits, and the write shows it again.
+  - Changing a slide's layout keeps the formatting the text shows, as it
+    keeps boxes: a run whose size or colour came from the old layout gets it
+    as its own (a kept colour copied as the old layout stores it). To take
+    the new layout's, leave the property out.
+  - A run's fingerprint leaves out what the text shows of it (size, fill,
+    fonts), so a restyled run is found again. Refused: a kept colour
+    (`accent1*`, `gradient`) written where the run does not show it, an
+    unknown key (`colour`), a value outside the grammar.
 - **Pictures** are a line each, `<picture id="s7" name="지도" box="…"
   src="media/image1.png" crop="10 0 5 0" mask="ellipse" alt="…"/>`, in this
   attribute order; `crop`, `mask` and `alt` are left out when the picture has

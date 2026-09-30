@@ -7,6 +7,7 @@ pub mod ast;
 pub mod chars;
 pub mod diag;
 pub mod formula;
+pub mod inline_style;
 pub mod names;
 pub mod ops;
 pub mod parse;
