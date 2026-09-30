@@ -238,6 +238,31 @@ fn a_template_s_reference_is_in_the_front_matter() {
 // ------------------------------------------------------------ refusals
 
 #[test]
+fn a_missing_old_names_invisible_and_private_use_characters() {
+    // Korean government documents: U+2007 FIGURE SPACE after □, and a
+    // Hancom symbol font's private-use U+F076 in a banner. The text keeps
+    // them (PutGet); the error names them where `old` would match.
+    for f in [Format::Hwpx, Format::Docx] {
+        let mut ws = ws();
+        let o = ws.create(DocType::Document, Some(f), None).unwrap();
+        let fmt = format!("{f:?}").to_lowercase();
+        let body = format!(
+            "---\ntype: document\nformat: {fmt}\nschema: 1\n---\n\u{f076}2025년 사업 계획\n\n□\u{2007}추진 배경\n"
+        );
+        ws.write(&o.doc_id, 1, &body).unwrap_or_else(|e| panic!("{f:?}: {e}"));
+        let (rev, t) = text(&ws, &o.doc_id);
+        assert!(t.contains("\u{f076}2025년 사업 계획\n") && t.contains("□\u{2007}추진 배경\n"), "{f:?}: {t}");
+        let e = ws.edit(&o.doc_id, rev, &one("□ 추진 배경", "□ 추진 경과")).unwrap_err();
+        assert_eq!(e.code, Code::NoMatch);
+        assert!(e.message.contains("\"□⟨U+2007 FIGURE SPACE⟩추진 배경\""), "{f:?}: {}", e.message);
+        let e = ws.edit(&o.doc_id, rev, &one(" 2025년 사업 계획\n", "2026년 사업 계획\n")).unwrap_err();
+        assert!(e.message.contains("⟨U+F076 private use⟩"), "{f:?}: {}", e.message);
+        // Written with the characters, the edit applies.
+        ws.edit(&o.doc_id, rev, &one("□\u{2007}추진 배경", "□\u{2007}추진 경과")).unwrap_or_else(|e| panic!("{e}"));
+    }
+}
+
+#[test]
 fn a_stale_revision_is_refused() {
     let mut ws = ws();
     let o = open(&mut ws, "prototype/remainder/corpus/korean-report.docx");

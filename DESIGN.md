@@ -188,7 +188,13 @@ package ─────────────────────► model
   Presentation resize it by its box (§5.3); it never alters its content, and
   never creates one except a picture from a file (§5.3).
 - **Validator errors are written for the model:** line and column, the
-  expected form, and the allowed names (styles, layouts, fields).
+  expected form, and the allowed names (styles, layouts, fields). Every
+  error names the characters a reader cannot see or tell from a space by
+  code point, as `⟨U+2007 FIGURE SPACE⟩` or `⟨U+F076 private use⟩`
+  (whitespace variants, invisible and format characters, private use,
+  controls), and an `old` that misses only by them is told where it would
+  match. The text keeps them as they are: marking them in the read view
+  would change the text edits match against (GetPut).
 - **Front matter** names the type, home format, template and schema version.
   Every file carries its schema version; migrations are part of the toolchain
   from day one.
@@ -954,7 +960,7 @@ v0.7.3; "lossless … regarding content", not formatting).
 |---|---|
 | Rule 1 (preserve) | GetPut on a real corpus per engine: import → export with no edit is XML-equivalent per part |
 | PutGet | After each fluency-test edit, re-import shows exactly the written text |
-| Validity | Every export opens in Word / PowerPoint / Excel / Hancom with no repair prompt; schema validation alone is not enough (a schema-valid file Word rejected: office_oxide #208) |
+| Validity | Every export opens in Word / PowerPoint / Excel / Hancom with no repair prompt; schema validation alone is not enough (a schema-valid file Word rejected: office_oxide #208). Checked by hand for the office-kit in all four, 2026-09-29/30 (§11) |
 | Rule 5 (fidelity) | Per-page SSIM of our preview against the native application's own PDF export — Word, PowerPoint, Excel, Hancom — not against LibreOffice |
 | Presentation geometry | GetPut per object on the pptx corpus: every `a:xfrm` (and every absent one) unchanged after import → export; PutGet after box, z-order, group and new-object edits; the office-kit shows moved, resized and added objects where the text puts them, in PowerPoint |
 | Rule 8 (the model sees it) | Per corpus deck, every object on a slide appears in the text: slots, shapes with or without text, lines, groups and their objects, `<keep/>` lines |
@@ -979,7 +985,10 @@ v0.7.3; "lossless … regarding content", not formatting).
    hwpx track changes and drops them on save without a loss report, so hwpx
    stays on direct changes. Gate for the option: docx GetPut passes, the file
    opens in Word with no repair prompt, and accept/reject give back the edited
-   and previous text across the corpus.
+   and previous text across the corpus. Built (#16); checked by hand in Word
+   on 2026-09-29 for the office-kit (§9, kit v2): all 19 docx files, the
+   tracked ones included, open with no repair prompt, and Accept All / Reject
+   All give the edited and the original text.
 3. ~~The remainder's storage shape and anchor granularity (block, run range,
    shape, cell range)~~ — decided by
    [prototype/remainder/REMAINDER.md](prototype/remainder/REMAINDER.md): a flat
@@ -1053,18 +1062,33 @@ v0.7.3; "lossless … regarding content", not formatting).
     against 50/52) for 6% less text; theme colours stay names, and the
     xlsx `format` operation landed 25/25 per model (part D). Open: Hancom
     files stay at 2.2× today's text (cell borders, fonts and sizes set on
-    every paragraph and cell, which no style factors); the text must escape
-    look-alike and private-use characters (round 6's only invalid answers,
-    and part C's only misses), a hanji-format follow-up, after which F2s
-    could be retried. The kit's formatting reader is its own, not the
+    every paragraph and cell, which no style factors); look-alike and
+    private-use characters caused round 6's only invalid answers and part
+    C's only misses: validator errors now name them by code point (§4,
+    #31), as round 6's fix round did for U+2007 but not U+F076, and F2s
+    could be retried against that. The kit's formatting reader is its own, not the
     engines'.
 
 ## 11. Blind spots
 
-- No library above has been opened in real Office or Hancom by this project;
-  every defect and fidelity statement comes from project docs and issue
-  trackers. This check is deliberately deferred until the build produces
-  exports (2026-09-28).
+- Real apps: only the office-kit (§9) has been opened in Word, PowerPoint,
+  Excel and Hancom Office, by hand on 2026-09-29 and 2026-09-30; every kit
+  file now opens with no repair prompt and passes its checks. Found on the
+  way:
+  - docx: none; all 19 files passed in Word (kit v2).
+  - pptx (18 files): 37 and 40 hit the kit's slide-delete span bug (#21);
+    28 and 31 failed as expected; on v4, 40 missed an align by 0.45 pt (the
+    snap rule, #25). All passed on v6.
+  - xlsx: 61 recalculated a binary-search XLOOKUP unlike Excel and showed
+    stale labels, 55 showed stale labels (both #26).
+  - hwpx: 64 raised a repair prompt in Hancom (a stale `linesegarray`
+    textpos after a first-paragraph insert, #27); 73 lost a list level
+    (#28). v6 passed, and on 2026-09-30 so did 73 in v7 (with #28's
+    moved-item indent fix).
+
+  Beyond the kit, the engines' corpora and every other library above are
+  unchecked in real apps; their defect and fidelity statements still come
+  from project docs and issue trackers.
 - The fluency list in §6 is still mostly a model's self-report: six rounds
   ran on two Claude models only, 12–48 tasks per cell, one run per prompt.
   Round 6's formatting was read and checked by its kit, not by the engines,

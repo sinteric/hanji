@@ -49,9 +49,9 @@ pub enum EngineError {
 impl std::fmt::Display for EngineError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EngineError::Package(m) => write!(f, "package: {m}"),
+            EngineError::Package(m) => write!(f, "package: {}", hanji_format::chars::name_in(m)),
             EngineError::Invalid(d) => write!(f, "{}", hanji_format::diag::render(d)),
-            EngineError::Refused(m) => write!(f, "refused: {m}"),
+            EngineError::Refused(m) => write!(f, "refused: {}", hanji_format::chars::name_in(m)),
             EngineError::Unsupported(m) => write!(f, "unsupported: {m}"),
         }
     }
