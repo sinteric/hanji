@@ -101,8 +101,10 @@ pub fn plan_lists(
         pending.retain(|&bi| {
             let it = item(bi).unwrap();
             let (lo, hi) = list_of(bi);
+            // The nearest item at its own level first: another level may use
+            // another numbering or bullet (hwpx: one per level).
             let mut near: Vec<usize> = (lo..hi).filter(|k| assigned.contains_key(k)).collect();
-            near.sort_by_key(|&k| (k.abs_diff(bi), k));
+            near.sort_by_key(|&k| (item(k).unwrap().level != it.level, k.abs_diff(bi), k));
             let pick = near.iter().find_map(|&k| {
                 let (num, ilvl) = assigned[&k];
                 let sib = item(k).unwrap();

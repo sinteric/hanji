@@ -775,3 +775,119 @@ fn a_formula_written_over_a_shared_one_keeps_the_others() {
     let w = XlsxEngine::window(&a.remainder, &WindowOf::Table { name: "T".into(), rows: None }).unwrap();
     assert!(w.contains("| 5 | 4 | 12 |"), "{w}");
 }
+
+/// The corpus workbook's `name`, imported, with `ops` applied: the report,
+/// and the export's cell values over `range` and its `workbook.xml`.
+fn applied(name: &str, ops: &str, sheet: &str, range: &str) -> (hanji_xlsx::calc::Recalc, String, String) {
+    let bytes = std::fs::read(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("corpus").join(name)).unwrap();
+    let imp = XlsxEngine.import(&bytes, &ImportOptions::default()).unwrap();
+    let a = XlsxEngine::apply(&imp.text, &imp.remainder, ops).unwrap();
+    let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
+    let again = XlsxEngine.import(&out, &ImportOptions::default()).unwrap();
+    let w =
+        XlsxEngine::window(&again.remainder, &WindowOf::Range { sheet: sheet.into(), range: range.into() }).unwrap();
+    let wb = package::read(&out).unwrap().into_iter().find(|p| p.name == "xl/workbook.xml").unwrap().data;
+    (a.report.recalc, w, String::from_utf8(wb).unwrap())
+}
+
+/// XLOOKUP with a binary search (search mode 2) over a column that is not
+/// sorted (numbers and text) lands where the bisection does, and IronCalc
+/// bisects differently from Excel: the formula keeps its cached value (0.22,
+/// as Excel had it) and is left to Excel, which recalculates on open. The
+/// array formula's whole area is named as left.
+#[test]
+fn a_binary_search_over_unsorted_data_is_left_to_the_application() {
+    let (rc, w, wb) = applied(
+        "xlookup.xlsx",
+        r#"[{"op": "set", "range": "Sheet2!E2", "values": [[250000]]}, {"op": "set", "range": "Sheet1!B2", "values": [[4390]]}]"#,
+        "Sheet2",
+        "E2:F2",
+    );
+    assert!(w.contains("| 2 | 250000 | 0.22 |"), "{w}");
+    assert!(rc.left.iter().any(|l| l.starts_with("Sheet2!F2 (a lookup that bisects")), "{rc:?}");
+    assert!(rc.left.iter().any(|l| l.starts_with("Sheet1!C2:D2 (volatile or array formula)")), "{rc:?}");
+    assert_eq!(rc.written, 0, "{rc:?}");
+    assert!(wb.contains("fullCalcOnLoad=\"1\""), "{wb}");
+}
+
+/// A formula reading a defined name that is itself a formula
+/// (`SUM(tblExpenses[Amount])`) keeps its cached value: IronCalc evaluates
+/// names that are references only. The report names the name.
+#[test]
+fn a_name_that_is_a_formula_is_left_to_the_application() {
+    let (rc, w, wb) = applied(
+        "simple-monthly-budget.xlsx",
+        r#"[{"op": "set", "range": "Simple Monthly Budget!C5", "values": [[3200]]},
+            {"op": "set", "range": "Simple Monthly Budget!C11", "values": [[950]]}]"#,
+        "Simple Monthly Budget",
+        "E9:G9",
+    );
+    assert!(w.contains("| 9 | $3,750 | $2,336 | $1,414 |"), "{w}");
+    let names: Vec<&String> = rc.left.iter().filter(|l| l.contains("reads the defined name Total")).collect();
+    assert_eq!(names.len(), 5, "{rc:?}");
+    assert!(wb.contains("fullCalcOnLoad=\"1\""), "{wb}");
+}
+
+/// Approximate matches (VLOOKUP, HLOOKUP, MATCH, LOOKUP, XLOOKUP/XMATCH
+/// with search mode ±2) are computed when their vector is strictly sorted
+/// as they search, and left to the application when an edit unsorts it; an
+/// exact match is computed either way.
+#[test]
+fn approximate_matches_are_computed_over_sorted_data_only() {
+    use common::fixture::{build, Col, SheetSpec, TableSpec, V};
+    let t = TableSpec {
+        name: "T".into(),
+        col: 0,
+        row: 1,
+        cols: vec![
+            Col { name: "k".into(), format: "0".into(), formula: None },
+            Col { name: "v".into(), format: "0".into(), formula: None },
+        ],
+        rows: (1..=4).map(|k| vec![V::Num(10.0 * k as f64), V::Num(k as f64)]).collect(),
+    };
+    let mut parts = package::read(&build(&[SheetSpec { name: "S".into(), tables: vec![t] }])).unwrap();
+    // Keys 10, 20, 30, 40 in A2:A5; values 1–4 in B2:B5; the key looked up in D1.
+    let formulas = [
+        ("E1", "VLOOKUP(D1,A2:B5,2)"),
+        ("F1", "MATCH(D1,A2:A5)"),
+        ("G1", "LOOKUP(D1,A2:A5,B2:B5)"),
+        ("H1", "_xlfn.XLOOKUP(D1,A2:A5,B2:B5,0,-1,2)"),
+        ("I1", "VLOOKUP(D1,A2:B5,2,FALSE)"),
+        ("J1", "MATCH(D1,T[k],1)"),
+    ];
+    for p in parts.iter_mut() {
+        if p.name == "xl/worksheets/sheet1.xml" {
+            let mut s = String::from_utf8(p.data.clone()).unwrap();
+            let at = s.find("</row>").unwrap();
+            let mut cells = "<c r=\"D1\"><v>25</v></c>".to_string();
+            for (r, f) in formulas {
+                cells.push_str(&format!("<c r=\"{r}\"><f>{f}</f><v>99</v></c>"));
+            }
+            s.insert_str(at, &cells);
+            s = s.replace("<dimension ref=\"A1:B5\"/>", "<dimension ref=\"A1:J5\"/>");
+            p.data = s.into_bytes();
+        }
+    }
+    let pkg = package::write(&parts).unwrap();
+    let imp = XlsxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    let window = |ops: &str| {
+        let a = XlsxEngine::apply(&imp.text, &imp.remainder, ops).unwrap();
+        let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
+        let again = XlsxEngine.import(&out, &ImportOptions::default()).unwrap();
+        let w = XlsxEngine::window(&again.remainder, &WindowOf::Range { sheet: "S".into(), range: "D1:J1".into() })
+            .unwrap();
+        (a.report.recalc, w)
+    };
+    // Sorted: every formula computed (35 → key 30, row 3; exact 35 is #N/A).
+    let (rc, w) = window(r#"[{"op": "set", "range": "S!D1", "values": [[35]]}]"#);
+    assert!(rc.left.is_empty(), "{rc:?}");
+    assert!(w.contains("| 1 | 35 | 3 | 3 | 3 | 3 | #N/A | 3 |"), "{w}");
+    // 50 in A3 unsorts the keys (10, 50, 30, 40): the approximate matches
+    // keep their cached 99; the exact one is computed (30 is in A4).
+    let (rc, w) = window(
+        r#"[{"op": "set", "range": "S!A3", "values": [[50]]}, {"op": "set", "range": "S!D1", "values": [[30]]}]"#,
+    );
+    assert_eq!(rc.left.len(), 5, "{rc:?}");
+    assert!(rc.left.iter().all(|l| l.contains("a lookup that bisects")), "{rc:?}");
+    assert!(w.contains("| 1 | 30 | 99 | 99 | 99 | 99 | 3 | 99 |"), "{w}");
+}

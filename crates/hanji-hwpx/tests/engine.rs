@@ -341,6 +341,98 @@ fn bullets_and_numbers_are_list_items() {
     assert_eq!(import(&out).text, r.text, "PutGet");
 }
 
+/// A package with `body` and a second bullet: shape 2 is bullet 1 at the
+/// margin, shape 4 bullet 2 one level down, indented.
+fn nested_lists(body: &[String]) -> Vec<u8> {
+    // Shape 4: a second bullet one level down, indented.
+    let nested = r#"<hh:paraPr id="4"><hh:align horizontal="JUSTIFY"/><hh:heading type="BULLET" idRef="2" level="1"/><hh:margin><hc:left value="2000" unit="HWPUNIT"/></hh:margin></hh:paraPr>"#;
+    let mut parts = package::read(&hwpx(body)).unwrap();
+    let h = parts.iter_mut().find(|p| p.name == "Contents/header.xml").unwrap();
+    h.data = String::from_utf8(std::mem::take(&mut h.data))
+        .unwrap()
+        .replace(
+            r#"<hh:bullets itemCnt="1"><hh:bullet id="1" char="-"/>"#,
+            r#"<hh:bullets itemCnt="2"><hh:bullet id="1" char="-"/><hh:bullet id="2" char="o"/>"#,
+        )
+        .replace(r#"<hh:paraProperties itemCnt="4">"#, r#"<hh:paraProperties itemCnt="5">"#)
+        .replace("</hh:paraProperties>", &format!("{nested}</hh:paraProperties>"))
+        .into_bytes();
+    package::write(&parts).unwrap()
+}
+
+/// A new item takes the shape of an item at its own level: a level's shape
+/// holds its indent and bullet, which Hancom shows (the kit's 73: the first
+/// half of a split nested item took the outer item's shape with only its
+/// heading level changed, and Hancom showed it at the outer level).
+#[test]
+fn a_new_nested_item_takes_the_shape_of_its_level() {
+    let body = [
+        p_in(0, 2, &[(0, "상위")]),
+        p_in(0, 4, &[(0, "짧게 그리고 아주 길게 이어지는 문장")]),
+        p_in(0, 2, &[(0, "다음 상위")]),
+    ];
+    let pkg = nested_lists(&body);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("- 상위\n  - 짧게 그리고 아주 길게 이어지는 문장\n- 다음 상위\n"), "{}", imp.text);
+    // Split the nested item: the longer half keeps the paragraph, so the first half is the new
+    // one, between the outer item and it. Both are nested items in shape 4; no shape is added.
+    let split = imp.text.replace("짧게 그리고", "짧게\n  - 그리고");
+    let r = rewrite(&imp.remainder, &imp.text, &split, CAPS).unwrap();
+    let out = export(&r.text, &r.remainder);
+    let sec = section(&out);
+    for t in ["짧게", "그리고 아주 길게 이어지는 문장"] {
+        let root = xml::parse(sec.as_bytes()).unwrap().root;
+        let p = root.elements().find(|p| p.is("hp:p") && p.text_of(&["hp:t"]) == t).unwrap().clone();
+        assert_eq!(p.get("paraPrIDRef").as_deref(), Some("4"), "{t}: {sec}");
+    }
+    let parts = package::read(&out).unwrap();
+    assert_eq!(
+        package::get(&parts, "Contents/header.xml"),
+        package::get(&package::read(&pkg).unwrap(), "Contents/header.xml")
+    );
+    assert_eq!(import(&out).text, r.text, "PutGet");
+    save("engine-lists", "ORIGINAL", &pkg);
+    save("engine-lists", "split-nested", &out);
+}
+
+/// An item the text moves to another level takes that level's shape from an
+/// item there, bullet and indent (the kit's 73: E4 moved a level-3 item out
+/// to head a list; only its heading level changed, and Hancom showed it at
+/// its old indent).
+#[test]
+fn an_item_moved_to_another_level_takes_that_levels_shape() {
+    let body = [
+        p_in(0, 2, &[(0, "상위")]),
+        p_in(0, 4, &[(0, "하위")]),
+        p_in(0, 4, &[(0, "하위 둘")]),
+        p_in(0, 2, &[(0, "다음 상위")]),
+        p("본문"),
+        p_in(0, 2, &[(0, "끝 항목")]),
+    ];
+    let pkg = nested_lists(&body);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("- 상위\n  - 하위\n  - 하위 둘\n- 다음 상위\n\n본문\n\n- 끝 항목\n"), "{}", imp.text);
+    let shape = |out: &[u8], t: &str| {
+        let root = xml::parse(section(out).as_bytes()).unwrap().root;
+        let p = root.elements().find(|p| p.is("hp:p") && p.text_of(&["hp:t"]) == t).unwrap().get("paraPrIDRef");
+        p
+    };
+    let header = |pkg: &[u8]| package::get(&package::read(pkg).unwrap(), "Contents/header.xml").unwrap().to_vec();
+    // The nested item moves out to the margin, into the list after "본문"; "다음 상위" moves
+    // under "상위".
+    let moved = imp
+        .text
+        .replace("  - 하위\n  - 하위 둘\n- 다음 상위\n", "  - 하위 둘\n  - 다음 상위\n")
+        .replace("\n- 끝 항목\n", "\n- 하위\n- 끝 항목\n");
+    let r = rewrite(&imp.remainder, &imp.text, &moved, CAPS).unwrap();
+    let out = export(&r.text, &r.remainder);
+    assert_eq!(shape(&out, "하위").as_deref(), Some("2"), "{}", section(&out));
+    assert_eq!(shape(&out, "다음 상위").as_deref(), Some("4"), "{}", section(&out));
+    assert_eq!(header(&out), header(&pkg));
+    assert_eq!(import(&out).text, r.text, "PutGet");
+    save("engine-lists", "moved-levels", &out);
+}
+
 #[test]
 fn adjacent_lists_of_another_kind_or_definition_stay_separate() {
     // A bullet list right before a numbered one: two lists, as in docx (§5.2).
@@ -453,6 +545,64 @@ fn a_section_whose_paragraphs_all_went_keeps_its_settings() {
     assert!(sec1.contains("<hp:secPr") && !sec1.contains('다'), "{sec1}");
     // The section keeps one empty paragraph for its settings, which the text then shows.
     assert_eq!(import(&out).text, format!("{}\n<p/>\n", r.text));
+}
+
+/// The top-level paragraphs of a section part.
+fn top_paras(sec: &str) -> Vec<xml::Element> {
+    xml::parse(sec.as_bytes()).unwrap().root.elements().filter(|e| e.is("hp:p")).cloned().collect()
+}
+
+/// A paragraph's layout cache counts the section's start run (`hp:secPr`,
+/// `hp:colPr`: 16 characters) when it holds it. A paragraph put before the
+/// first one takes the run, and the old first paragraph's cache pointed
+/// past its end (Hancom's repair prompt on the kit's fdi e10): that cache
+/// goes, and every other stays.
+#[test]
+fn a_layout_cache_past_the_paragraph_end_is_not_written() {
+    // secPr 8 + colPr 8 + pageNum 8: the second line starts at 24, on "abc".
+    let first = r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="0"><hp:ctrl><hp:pageNum pos="BOTTOM_CENTER" formatType="DIGIT" sideChar="-"/></hp:ctrl><hp:t>abc</hp:t></hp:run><hp:linesegarray><hp:lineseg textpos="0"/><hp:lineseg textpos="24"/></hp:linesegarray></hp:p>"#;
+    let pkg = hwpx(&[first.into(), p("둘째"), p("셋째")]);
+    assert_eq!(hanji_hwpx::layout_problems(&pkg).unwrap(), Vec::<String>::new());
+    let imp = import(&pkg);
+    // GetPut keeps every cache.
+    assert_eq!(section(&export(&imp.text, &imp.remainder)), section(&pkg));
+    let lines = |p: &xml::Element| p.child("hp:linesegarray").is_some();
+
+    // A new paragraph before the first takes the start run; "abc" gives it up.
+    let r = rewrite(&imp.remainder, &imp.text, &imp.text.replacen("abc", "새 첫 문단\n\nabc", 1), CAPS).unwrap();
+    let out = export(&r.text, &r.remainder);
+    let sec = section(&out);
+    let ps = top_paras(&sec);
+    assert!(!ps[0].descendants("hp:secPr").is_empty(), "{sec}");
+    assert_eq!(ps[1].text_of(&["hp:t"]), "abc");
+    assert!(!lines(&ps[1]) && lines(&ps[2]) && lines(&ps[3]), "{sec}");
+    assert_eq!(hanji_hwpx::layout_problems(&out).unwrap(), Vec::<String>::new());
+    save("engine-section-start", "ORIGINAL", &pkg);
+    save("engine-section-start", "new-first", &out);
+
+    // Without the start run, "abc"'s own cache is the fault the check reports.
+    let mut stale = xml::parse(first.as_bytes()).unwrap().root;
+    assert!(hanji_hwpx::owpml::stale_layout(&stale).unwrap().contains("starts at 24"));
+    hanji_hwpx::owpml::drop_stale_layouts(&mut stale);
+    assert!(!lines(&stale));
+}
+
+/// The layout check: a line past the paragraph's end (the characters, then
+/// the end mark) is stale; controls and objects count 8, a line break 1.
+#[test]
+fn a_layout_cache_past_the_paragraph_end_is_stale() {
+    use hanji_hwpx::owpml::{char_count, stale_layout};
+    let para = |inner: &str, pos: &[usize]| {
+        let lines: String = pos.iter().map(|t| format!(r#"<hp:lineseg textpos="{t}"/>"#)).collect();
+        let x = format!(r#"<hp:p {NS}>{inner}<hp:linesegarray>{lines}</hp:linesegarray></hp:p>"#);
+        xml::parse(x.as_bytes()).unwrap().root
+    };
+    let inner = r#"<hp:run><hp:ctrl><hp:colPr/></hp:ctrl><hp:tbl/><hp:t>a&amp;b<hp:tab/>c<hp:lineBreak/>d<hp:markpenBegin/>😀</hp:t></hp:run>"#;
+    // colPr 8, tbl 8, "a&b" 3, tab 8, "c" 1, line break 1, "d" 1, 😀 2 (UTF-16).
+    assert_eq!(char_count(&para(inner, &[0])), 32);
+    assert!(stale_layout(&para(inner, &[0, 20, 33])).is_none());
+    assert!(stale_layout(&para(inner, &[0, 34])).unwrap().contains("starts at 34"));
+    assert!(stale_layout(&para("<hp:run/>", &[0])).is_none());
 }
 
 // ---------------------------------------------------------------- §10.2 tracked changes

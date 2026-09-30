@@ -708,24 +708,35 @@ fn xlsx(kit: &mut Kit) {
             }
         };
         let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
+        let left = left_cells(&a.report.recalc.left);
         let mut notes = vec![format!("Operations: `{}`", ops.split_whitespace().collect::<Vec<_>>().join(" "))];
         notes.push(
-            "Values the export holds (formula results as computed by hanji). A formula cell left blank here had \
-             no cached value in the source; Excel computes it when it opens the file."
+            "Values the export holds: formula results as computed by hanji, except the cells hanji left to Excel \
+             (listed below, if any). A formula cell left blank here had no cached value in the source; Excel \
+             computes it when it opens the file."
                 .into(),
         );
+        if !left.is_empty() {
+            let each: Vec<String> = left.iter().map(|(sheet, r, why)| format!("{sheet}!{r} ({why})")).collect();
+            notes.push(format!(
+                "Left to Excel ({LEFT}): {}. hanji did not compute these; the export keeps their old cached values \
+                 and asks Excel to recalculate the workbook when it opens it. The windows show them as `{STALE}`, \
+                 not as results.",
+                each.join("; ")
+            ));
+        }
         // The values before and after, window by window, and the structure text.
         let (mut before, mut after) = (String::new(), String::new());
         for (sheet, range) in *shows {
             let of = WindowOf::Range { sheet: sheet.to_string(), range: range.to_string() };
             match XlsxEngine::window(&a.remainder, &of) {
-                Ok(w) => notes.push(format!("```\n{}\n```", w.trim_end())),
+                Ok(w) => notes.push(format!("```\n{}\n```", mark_left(&w, sheet, &left).trim_end())),
                 Err(e) => notes.push(format!("({sheet}!{range}: {e})")),
             }
-            for (rem, out) in [(&imp.remainder, &mut before), (&a.remainder, &mut after)] {
-                out.push_str(&XlsxEngine::window(rem, &of).unwrap_or_default());
-                out.push('\n');
-            }
+            before.push_str(&XlsxEngine::window(&imp.remainder, &of).unwrap_or_default());
+            before.push('\n');
+            after.push_str(&mark_left(&XlsxEngine::window(&a.remainder, &of).unwrap_or_default(), sheet, &left));
+            after.push('\n');
         }
         before.push_str(&imp.text);
         after.push_str(&a.text);
@@ -738,7 +749,14 @@ fn xlsx(kit: &mut Kit) {
             &out,
             vec![
                 excel.clone(),
-                "Formula results show the new values without pressing F9 (compare the values listed below)".into(),
+                if left.is_empty() {
+                    "Formula results show the new values without pressing F9 (compare the values listed below)".into()
+                } else {
+                    format!(
+                        "Formula results show the new values without pressing F9 (compare the values listed below; \
+                         Excel computes the cells marked `{STALE}` when it opens the file)"
+                    )
+                },
             ],
             notes,
         );
@@ -747,6 +765,69 @@ fn xlsx(kit: &mut Kit) {
             "Cell values and model text, before and after (unified diff; the row windows above, then the structure)",
         );
     }
+}
+
+/// How the kit describes a cell the recalculator left to Excel.
+const LEFT: &str = "stale here; Excel recomputes on open";
+
+/// What a window shows in place of such a cell's stale cached value.
+const STALE: &str = "(Excel recomputes)";
+
+/// The cells the recalculator left (`Sheet!A1 (why)`, `Sheet!C2:D2 (why)`):
+/// sheet, cells, why.
+fn left_cells(left: &[String]) -> Vec<(String, hanji_core::cells::CellRange, String)> {
+    let mut out = vec![];
+    for l in left {
+        // The sheet name may hold `!` and ` (`: the cells are the first
+        // `!A1 (` or `!A1:B2 (` after it.
+        let found = l.match_indices('!').find_map(|(k, _)| {
+            let (cells, why) = l[k + 1..].split_once(" (")?;
+            let r = hanji_core::cells::CellRange::parse(cells)?;
+            Some((l[..k].to_string(), r, why.strip_suffix(')').unwrap_or(why).to_string()))
+        });
+        if let Some(f) = found {
+            out.push(f);
+        }
+    }
+    out
+}
+
+/// A window (`<data>` pipe table) with the cells left to Excel on `sheet`
+/// shown as `STALE`, not as their stale cached values.
+fn mark_left(window: &str, sheet: &str, left: &[(String, hanji_core::cells::CellRange, String)]) -> String {
+    use hanji_core::cells::{col_index, CellRef};
+    use hanji_format::sheet::split_pipe_row;
+    let areas: Vec<_> = left.iter().filter(|(s, _, _)| s == sheet).map(|(_, r, _)| *r).collect();
+    if areas.is_empty() {
+        return window.to_string();
+    }
+    let mut cols: Vec<Option<u32>> = vec![];
+    let mut out = String::new();
+    for line in window.lines() {
+        let mut line = line.to_string();
+        if let Some(cells) = split_pipe_row(&line) {
+            if cells.first().is_some_and(|c| c == "row") {
+                cols = cells.iter().map(|c| col_index(c)).collect();
+            } else if let Ok(row) = cells.first().map_or("", |c| c.as_str()).parse::<u32>() {
+                let mut cells = cells;
+                let mut hit = false;
+                for (k, c) in cells.iter_mut().enumerate().skip(1) {
+                    let Some(Some(col)) = cols.get(k) else { continue };
+                    if areas.iter().any(|a| a.contains(CellRef::new(*col, row))) {
+                        *c = STALE.to_string();
+                        hit = true;
+                    }
+                }
+                if hit {
+                    let each: Vec<String> = cells.iter().map(|c| c.replace('|', "\\|")).collect();
+                    line = format!("| {} |", each.join(" | "));
+                }
+            }
+        }
+        out.push_str(&line);
+        out.push('\n');
+    }
+    out
 }
 
 // ---------------------------------------------------------------- hwpx
@@ -762,6 +843,12 @@ const HWPX: &[(&str, &str)] = &[
     ("basic-table-01.hwpx", "MIT (rhwp test data)"),
 ];
 
+/// No layout cache past its paragraph's end: Hancom asks to repair such a file, and rhwp does not see it.
+fn hwpx_layout_ok(name: &str, variant: &str, pkg: &[u8]) {
+    let problems = hanji_hwpx::layout_problems(pkg).unwrap();
+    assert!(problems.is_empty(), "{name} {variant}: {problems:#?}");
+}
+
 fn hwpx(kit: &mut Kit) {
     let hancom = "Opens in Hancom Office without an error".to_string();
     for (name, licence) in HWPX {
@@ -769,6 +856,7 @@ fn hwpx(kit: &mut Kit) {
         let imp = HwpxEngine.import(&bytes, &ImportOptions::default()).unwrap();
         let (text, rem) = (imp.text, imp.remainder);
         let getput = HwpxEngine.export(&text, &rem).unwrap();
+        hwpx_layout_ok(name, "getput", &getput);
         kit.original("hwpx", name, licence, &bytes);
         kit.add(
             "hwpx",
@@ -788,6 +876,7 @@ fn hwpx(kit: &mut Kit) {
         match hanji_core::rewrite(&rem, &text, &e10.new_text, CAPS) {
             Ok(r) => {
                 let out = HwpxEngine.export(&r.text, &r.remainder).unwrap();
+                hwpx_layout_ok(name, "e10", &out);
                 kit.add(
                     "hwpx",
                     name,

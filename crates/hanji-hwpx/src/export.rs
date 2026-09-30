@@ -286,7 +286,10 @@ impl<'a> Exporter<'a> {
     // ------------------------------------------------------------ paragraph
 
     /// The paragraph shape a new list item starts from: that of the nearest
-    /// item of its text list that has one.
+    /// item of its text list at its level that has one, else of the nearest
+    /// item. A level's shape holds its indent (`hh:margin`) and bullet, which
+    /// Hancom shows; a shape from another level with only the heading level
+    /// changed shows the item at that other level.
     fn list_template(&self, blocks: &[Block], bi: usize) -> Option<&'a Entry> {
         let item = |k: usize| match &blocks[k] {
             Block::Para(p) => p.item,
@@ -294,9 +297,34 @@ impl<'a> Exporter<'a> {
         };
         let lo = (0..=bi).rev().take_while(|&k| item(k).is_some()).last().unwrap_or(bi);
         let hi = (bi..blocks.len()).take_while(|&k| item(k).is_some()).last().unwrap_or(bi);
+        let level = item(bi).map(|i| i.level);
         let mut near: Vec<usize> = (lo..=hi).filter(|&k| k != bi).collect();
-        near.sort_by_key(|&k| (k.abs_diff(bi), k));
+        near.sort_by_key(|&k| (item(k).map(|i| i.level) != level, k.abs_diff(bi), k));
         near.into_iter().find_map(|k| self.at(&[k], Kind::Ppr).first().copied())
+    }
+
+    /// The paragraph shape for a list item whose level the text changed (an
+    /// item moved under another, or out to the margin): that of the nearest
+    /// item at its new level, of its kind, that is still at the level it
+    /// had in the file; one in its own text list first, then anywhere. The
+    /// shape holds the level's indent and bullet: with only its heading
+    /// level changed, Hancom shows the item where it was.
+    fn level_template(&self, blocks: &[Block], bi: usize) -> Option<&'a Entry> {
+        let item = |k: usize| match &blocks[k] {
+            Block::Para(p) => p.item,
+            _ => None,
+        };
+        let it = item(bi)?;
+        let lo = (0..=bi).rev().take_while(|&k| item(k).is_some()).last().unwrap_or(bi);
+        let hi = (bi..blocks.len()).take_while(|&k| item(k).is_some()).last().unwrap_or(bi);
+        let mut near: Vec<usize> = (0..blocks.len())
+            .filter(|&k| k != bi && item(k).is_some_and(|i| i.level == it.level && i.ordered == it.ordered))
+            .collect();
+        near.sort_by_key(|&k| (!(lo..=hi).contains(&k), k.abs_diff(bi), k));
+        near.into_iter().find_map(|k| {
+            let e = self.at(&[k], Kind::Ppr).first().copied()?;
+            e.meta.item.is_some_and(|was| was.level == it.level && was.ordered == it.ordered).then_some(e)
+        })
     }
 
     /// `hp:p` with its runs. `style: None` keeps the style the remainder has.
@@ -341,10 +369,25 @@ impl<'a> Exporter<'a> {
                 ppr = now.para_pr;
             }
         }
-        if let Some((bi, _)) = list {
+        if let Some((bi, blocks)) = list {
+            // An item at a new level takes that level's shape from an item there.
+            let now_item = match &blocks[bi] {
+                Block::Para(p) => p.item,
+                _ => None,
+            };
+            let moved = pp
+                .and_then(|e| e.meta.item)
+                .zip(now_item)
+                .filter(|(was, now)| was.level != now.level)
+                .and_then(|_| self.level_template(blocks, bi));
+            let level_ppr = moved.and_then(|t| num_attr(&fragment(&t.xml[0]), "paraPrIDRef"));
             match self.lists.get(&bi) {
+                // A bullet takes the level's shape as it is, bullet and all.
+                Some(ListPlan::Set { .. }) if level_ppr.is_some() && now_item.is_some_and(|i| !i.ordered) => {
+                    ppr = level_ppr.unwrap()
+                }
                 Some(ListPlan::Set { num, ilvl }) => {
-                    ppr = self.header.para_pr_with(ppr, Some(list_heading(*num, *ilvl)))?
+                    ppr = self.header.para_pr_with(level_ppr.unwrap_or(ppr), Some(list_heading(*num, *ilvl)))?
                 }
                 Some(ListPlan::Strip) => ppr = self.header.para_pr_with(ppr, None)?,
                 Some(ListPlan::Keep) | None => {}
