@@ -13,6 +13,7 @@ pub mod parse;
 pub mod pres;
 pub mod serialize;
 pub mod sheet;
+pub mod vocab;
 
 pub use ast::*;
 pub use diag::Diagnostic;
