@@ -286,7 +286,10 @@ impl<'a> Exporter<'a> {
     // ------------------------------------------------------------ paragraph
 
     /// The paragraph shape a new list item starts from: that of the nearest
-    /// item of its text list that has one.
+    /// item of its text list at its level that has one, else of the nearest
+    /// item. A level's shape holds its indent (`hh:margin`) and bullet, which
+    /// Hancom shows; a shape from another level with only the heading level
+    /// changed shows the item at that other level.
     fn list_template(&self, blocks: &[Block], bi: usize) -> Option<&'a Entry> {
         let item = |k: usize| match &blocks[k] {
             Block::Para(p) => p.item,
@@ -294,8 +297,9 @@ impl<'a> Exporter<'a> {
         };
         let lo = (0..=bi).rev().take_while(|&k| item(k).is_some()).last().unwrap_or(bi);
         let hi = (bi..blocks.len()).take_while(|&k| item(k).is_some()).last().unwrap_or(bi);
+        let level = item(bi).map(|i| i.level);
         let mut near: Vec<usize> = (lo..=hi).filter(|&k| k != bi).collect();
-        near.sort_by_key(|&k| (k.abs_diff(bi), k));
+        near.sort_by_key(|&k| (item(k).map(|i| i.level) != level, k.abs_diff(bi), k));
         near.into_iter().find_map(|k| self.at(&[k], Kind::Ppr).first().copied())
     }
 
