@@ -474,6 +474,19 @@ fn exact_alignment(
         }
     }
     let ops = pairs_to_ops(&pairs, &old_stream.text, &new_stream.text);
+    // Inside the span, a stretch the ops keep equal (the same text restyled)
+    // pairs its paragraphs' positions too, so they keep their entries. (A
+    // head the span cuts stays unpaired: see `cut_heads`.)
+    let paired: HashSet<usize> = pairs.iter().map(|p| p.0).collect();
+    let para_at = |st: &Stream, g: usize| st.locate(g).is_some_and(|p| matches!(ob.get(p.0[0]), Some(Block::Para(_))));
+    let new_para_at = |g: usize| new_stream.locate(g).is_some_and(|p| matches!(nb.get(p.0[0]), Some(Block::Para(_))));
+    let kept: Vec<(usize, usize)> = ops
+        .iter()
+        .filter(|o| o.tag == Tag::Equal)
+        .flat_map(|o| (0..o.i2 - o.i1).map(move |t| (o.i1 + t, o.j1 + t)))
+        .filter(|&(k, n)| !paired.contains(&k) && para_at(&old_stream, k) && new_para_at(n))
+        .collect();
+    let pairs: Vec<(usize, usize)> = pairs.iter().copied().chain(kept).collect();
     // A paragraph follows its mark; one whose mark went follows its first surviving unit.
     let loc = |st: &Stream, g: usize| st.locate(g).map(|p| p.0[0]);
     let mut owner_of_new: HashMap<usize, usize> = HashMap::new();

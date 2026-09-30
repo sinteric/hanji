@@ -27,19 +27,32 @@ pub(crate) fn front_lines(f: &FrontMatter) -> Vec<String> {
 
 /// Blocks, a blank line between them.
 pub(crate) fn blocks(out: &mut Vec<String>, blocks: &[Block]) {
+    blocks_with(out, blocks, false, &[]);
+}
+
+/// [`blocks`]; `pres`: a Presentation slot's text (§5.3), whose `[text]{…}`
+/// is formatting, each of its lines ending in `ends[block][line]` (a
+/// paragraph's own formatting, ` {…}`) when there is one.
+pub(crate) fn blocks_with(out: &mut Vec<String>, blocks: &[Block], pres: bool, ends: &[Vec<String>]) {
     for (k, b) in blocks.iter().enumerate() {
         // Consecutive empty paragraphs are consecutive lines; a blank line
         // separates the group from other blocks.
         if k > 0 && !(is_empty_para(b) && is_empty_para(&blocks[k - 1])) {
             out.push(String::new());
         }
-        block(out, b);
+        let from = out.len();
+        block(out, b, pres);
+        if let Some(e) = ends.get(k) {
+            for (l, end) in out[from..].iter_mut().zip(e) {
+                l.push_str(end);
+            }
+        }
     }
 }
 
-fn block(out: &mut Vec<String>, b: &Block) {
+fn block(out: &mut Vec<String>, b: &Block, pres: bool) {
     match b {
-        Block::Para(p) => out.push(para_line(p)),
+        Block::Para(p) => out.push(para_line_with(p, pres)),
         Block::Table(t) => {
             if let Some(s) = &t.style {
                 out.push(format!("{{style=\"{}\"}}", attr(s)));
@@ -76,7 +89,7 @@ fn block(out: &mut Vec<String>, b: &Block) {
             for it in items {
                 widths.truncate(it.level);
                 let indent: usize = widths.iter().sum();
-                let body = serialize_inline(&it.content);
+                let body = serialize_inline_with(&it.content, pres);
                 let line = if body.is_empty() { it.marker().to_string() } else { format!("{} {body}", it.marker()) };
                 out.push(format!("{}{line}", " ".repeat(indent)));
                 widths.push(it.marker().len() + 1);
@@ -106,19 +119,28 @@ fn p_tag(style: Option<&str>) -> String {
 /// one. A leading plain `<p/>` is written only where it is needed (an empty
 /// first paragraph followed by others).
 pub(crate) fn cell_text(ps: &[CellPara]) -> String {
+    cell_text_with(ps, false, &[])
+}
+
+/// [`cell_text`]; `pres`: a Presentation shape's text, each paragraph
+/// ending in `ends[paragraph]` (its own formatting, ` {…}`).
+pub(crate) fn cell_text_with(ps: &[CellPara], pres: bool, ends: &[String]) -> String {
     let mut s = String::new();
     for (k, p) in ps.iter().enumerate() {
         let lead_needed = k > 0 || p.style.is_some() || (p.content.is_empty() && ps.len() > 1);
         if lead_needed {
             s.push_str(&p_tag(p.style.as_deref()));
         }
-        s.push_str(&serialize_inline(&p.content));
+        s.push_str(&serialize_inline_with(&p.content, pres));
+        if let Some(e) = ends.get(k) {
+            s.push_str(e);
+        }
     }
     s
 }
 
-pub(crate) fn para_line(p: &Para) -> String {
-    let body = serialize_inline(&p.content);
+fn para_line_with(p: &Para, pres: bool) -> String {
+    let body = serialize_inline_with(&p.content, pres);
     match &p.style {
         ParaStyle::Heading(n) => {
             let hashes = "#".repeat(*n as usize);
@@ -166,9 +188,22 @@ fn escape_line_start(mut s: String) -> String {
 }
 
 pub fn serialize_inline(inl: &Inline) -> String {
-    let mut out = Out { dollar: dollar_escapes(inl), ..Out::default() };
+    serialize_inline_with(inl, false)
+}
+
+/// [`serialize_inline`]; `pres`: a Presentation's slot or shape text, where
+/// a style span is `[text]{…}` (§5.3).
+pub fn serialize_inline_with(inl: &Inline, pres: bool) -> String {
+    let mut out = Out { dollar: dollar_escapes(inl), pres, ..Out::default() };
     for (a, b, span) in inl.segments() {
         match span.map(|s| &s.kind) {
+            Some(SpanKind::Style(st)) => {
+                out.s.push('[');
+                run(&mut out, &inl.units, a, b, true);
+                out.s.push_str("]{");
+                out.s.push_str(&st.attrs());
+                out.s.push('}');
+            }
             Some(SpanKind::Link(url)) => {
                 out.s.push('[');
                 run(&mut out, &inl.units, a, b, true);
@@ -223,6 +258,8 @@ struct Out {
     dollar: Vec<bool>,
     /// Byte index of a trailing unescaped literal `~`, if any.
     bare_tilde: Option<usize>,
+    /// A Presentation's text: `]{` and ` {` would read as formatting.
+    pres: bool,
 }
 
 impl Out {
@@ -291,7 +328,8 @@ fn unit(out: &mut Out, units: &[Unit], i: usize, in_link: bool) {
             }
             '[' if in_link || next_char == Some('^') => out.text("\\["),
             '^' if in_link && out.s.ends_with('[') => out.text("\\^"),
-            ']' if in_link || next_char == Some('(') => out.text("\\]"),
+            ']' if in_link || next_char == Some('(') || (out.pres && next_char == Some('{')) => out.text("\\]"),
+            '{' if out.pres && out.s.chars().last().is_none_or(char::is_whitespace) => out.text("\\{"),
             '$' if out.dollar[i] => out.text("\\$"),
             c => {
                 let mut b = [0u8; 4];

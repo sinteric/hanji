@@ -9,6 +9,7 @@ use hanji_package::xml::{self, Element};
 use hanji_package::{opc, package};
 
 use crate::pml::*;
+use crate::text::{self, RunStyle, ThemeFonts};
 
 /// One slot of a layout: a placeholder.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -29,6 +30,11 @@ pub struct SlotInfo {
     /// placeholder's own, else its master placeholder's.
     #[serde(default)]
     pub geom: Option<hanji_format::Geom>,
+    /// Per level, the text formatting the slot's runs inherit: the layout's
+    /// list style over the master placeholder's over the master text style
+    /// over the presentation's default text style.
+    #[serde(default)]
+    pub text: [RunStyle; 9],
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -39,6 +45,13 @@ pub struct LayoutInfo {
     pub slots: Vec<SlotInfo>,
     /// Bullets of text in shapes that are not placeholders (the master's `p:otherStyle`).
     pub other: [Bu; 9],
+    /// Per level, the text formatting of shapes that are not placeholders:
+    /// the master's `p:otherStyle` over the presentation's default text style.
+    #[serde(default)]
+    pub other_text: [RunStyle; 9],
+    /// The fonts of the master's theme.
+    #[serde(default)]
+    pub fonts: ThemeFonts,
 }
 
 /// The notes master: what a notes page's text inherits, and what a new notes page is made from.
@@ -87,6 +100,16 @@ impl Deck {
         for id in ids {
             let Some(mpart) = opc::target_of(parts, pres_part, &id) else { continue };
             let master = parse(parts, &mpart)?;
+            let fonts = opc::rels_of(parts, &mpart)
+                .into_iter()
+                .find(|r| r.short_type() == "theme" && !r.external)
+                .and_then(|r| parse(parts, &opc::resolve_target(&mpart, &r.target)).ok())
+                .map(|t| ThemeFonts::of(&t))
+                .unwrap_or_default();
+            let deflt = text::over(&text::levels(pres.child("p:defaultTextStyle"), &fonts), &[text::defaults(&fonts); 9]);
+            let text_levels = |n: &str| text::over(&text::levels(styles_of(&master, n), &fonts), &deflt);
+            let (title_t, body_t, other_t) =
+                (text_levels("p:titleStyle"), text_levels("p:bodyStyle"), text_levels("p:otherStyle"));
             let layouts: Vec<String> = master
                 .child("p:sldLayoutIdLst")
                 .map(|l| l.elements().filter_map(|e| e.get("r:id")).collect())
@@ -96,6 +119,7 @@ impl Deck {
             let (title, body, other) =
                 (text_style("p:titleStyle"), text_style("p:bodyStyle"), text_style("p:otherStyle"));
             let mphs = placeholders(&master);
+            let mtexts = placeholder_texts(&master, &fonts);
             for lid in layouts {
                 let Some(lpart) = opc::target_of(parts, &mpart, &lid) else { continue };
                 let layout = parse(parts, &lpart)?;
@@ -104,6 +128,7 @@ impl Deck {
                 let name = unique(&base, |n| deck.layout(n).is_some());
                 let mut slots = vec![];
                 let phs = placeholders(&layout);
+                let ltexts = placeholder_texts(&layout, &fonts);
                 let body_like: Vec<usize> = (0..phs.len()).filter(|&k| is_body_type(&phs[k].ty)).collect();
                 let mut body_names: Vec<String> = match body_like.len() {
                     1 => vec!["body".into()],
@@ -118,18 +143,26 @@ impl Deck {
                     n => (1..=n).map(|k| if k == 1 { "body".into() } else { format!("body{k}") }).collect(),
                 };
                 body_names.reverse();
-                for ph in &phs {
+                for (pk, ph) in phs.iter().enumerate() {
                     let base = match slot_of_type(&ph.ty) {
                         Some(n) => n.to_string(),
                         None => body_names.pop().unwrap_or_else(|| "body".into()),
                     };
                     let name = unique(&base, |n| slots.iter().any(|s: &SlotInfo| s.name == n));
                     let class = class_of_type(&ph.ty);
-                    let master_ph = mphs.iter().find(|m| match class {
+                    let master_k = mphs.iter().position(|m| match class {
                         TextClass::Title => class_of_type(&m.ty) == TextClass::Title,
                         TextClass::Other => m.ty == ph.ty,
                         _ => is_body_type(&m.ty),
                     });
+                    let master_ph = master_k.map(|k| &mphs[k]);
+                    let base_t = match class {
+                        TextClass::Title => &title_t,
+                        TextClass::Other => &other_t,
+                        _ => &body_t,
+                    };
+                    let under = master_k.map_or(base_t.clone(), |k| text::over(&mtexts[k], base_t));
+                    let text = text::over(&ltexts[pk], &under);
                     let base_bu = match class {
                         TextClass::Title => title,
                         TextClass::Other => other,
@@ -146,9 +179,17 @@ impl Deck {
                         class,
                         bullets,
                         geom,
+                        text,
                     });
                 }
-                deck.layouts.push(LayoutInfo { name, part: lpart, slots, other });
+                deck.layouts.push(LayoutInfo {
+                    name,
+                    part: lpart,
+                    slots,
+                    other,
+                    other_text: other_t.clone(),
+                    fonts: fonts.clone(),
+                });
             }
         }
         let nm = pres.child("p:notesMasterIdLst").and_then(|l| l.elements().next()).and_then(|e| e.get("r:id"));
@@ -179,6 +220,20 @@ fn unique(base: &str, taken: impl Fn(&str) -> bool) -> String {
         })
         .find(|n| !taken(n))
         .unwrap()
+}
+
+fn styles_of<'e>(master: &'e Element, name: &str) -> Option<&'e Element> {
+    master.child("p:txStyles").and_then(|s| s.child(name))
+}
+
+/// Per placeholder of a master's or layout's shape tree (in the order of
+/// [`placeholders`]), the text formatting its list style sets.
+fn placeholder_texts(root: &Element, fonts: &ThemeFonts) -> Vec<[RunStyle; 9]> {
+    let Some(tree) = root.child("p:cSld").and_then(|c| c.child("p:spTree")) else { return vec![] };
+    tree.elements()
+        .filter(|sh| placeholder(sh).is_some())
+        .map(|sh| text::levels(sh.child("p:txBody").and_then(|t| t.child("a:lstStyle")), fonts))
+        .collect()
 }
 
 fn parse(parts: &[Part], name: &str) -> Result<Element, String> {

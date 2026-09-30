@@ -143,6 +143,9 @@ pub(crate) struct Parser<'a> {
     /// (§5.3), which lands in `object_geom`.
     pub(crate) object_line: bool,
     pub(crate) object_geom: Option<crate::ast::Geom>,
+    /// Parsing a Presentation's slot or shape text: `[text]{…}` is text
+    /// formatting, and so is `{…}` at a paragraph's end (§5.3).
+    pub(crate) styles: bool,
 }
 
 /// `720 x 540 pt` → width and height in EMU.
@@ -175,6 +178,7 @@ impl<'a> Parser<'a> {
             stop,
             object_line: false,
             object_geom: None,
+            styles: false,
         }
     }
 
@@ -720,6 +724,15 @@ impl<'a> Parser<'a> {
             }};
         }
         while x < n {
+            if st.style.as_ref().is_some_and(|s| s.2 == x) {
+                let (start, style, _, resume, _) = st.style.take().unwrap();
+                if st.units.len() == start {
+                    fail!(x, "[]{{…}} holds no text: formatted text is [text]{{size=24pt}}.");
+                }
+                st.spans.push(Span { start, end: st.units.len(), kind: SpanKind::Style(style) });
+                x = resume;
+                continue;
+            }
             if st.link_close == Some(x) {
                 let (start, url, resume, _) = st.link.take().unwrap();
                 if st.units.len() == start {
@@ -822,6 +835,21 @@ impl<'a> Parser<'a> {
                         x = end + 1;
                         continue;
                     }
+                    if self.styles && link_at(src, x).is_none() {
+                        if let Some((close, inner, resume)) = style_span_at(src, x) {
+                            if st.style.is_some() {
+                                fail!(x, "formatted text cannot hold more formatted text: write [a]{{…}}[b]{{…}} side by side; write \\[ for a literal [.");
+                            }
+                            match crate::style::parse_braces(&inner) {
+                                Ok(style) => {
+                                    st.style = Some((st.units.len(), style, close, resume, col_of(x)));
+                                    x += 1;
+                                    continue;
+                                }
+                                Err(m) => fail!(close + 1, "{m}; write \\[ for a literal [."),
+                            }
+                        }
+                    }
                     match link_at(src, x) {
                         Some((close, url, resume)) if st.link.is_none() && st.field.is_none() => {
                             st.link = Some((st.units.len(), url, resume, col_of(x)));
@@ -920,11 +948,42 @@ impl<'a> Parser<'a> {
                     }
                     x = after;
                 }
+                '{' if self.styles && (x == 0 || src[x - 1].2.is_whitespace()) => match para_braces_at(src, x, stop_at) {
+                    Some((inner, resume)) => {
+                        let style = match crate::style::parse_braces(&inner) {
+                            Ok(style) => style,
+                            Err(m) => fail!(x, "{m}; write \\{{ for a literal {{."),
+                        };
+                        if st.style.is_some() || st.link.is_some() || st.field.is_some() {
+                            fail!(x, "a paragraph's formatting {{…}} comes after its text, outside [ ] and links.");
+                        }
+                        let para = st.splits.len();
+                        if st.para_styles.iter().any(|p| p.0 == para) {
+                            fail!(x, "a paragraph has one {{…}}, at its end.");
+                        }
+                        // The space before the braces separates them from the text.
+                        let from = st.splits.last().map_or(0, |s| s.0);
+                        if st.units.len() > from && st.units.last().is_some_and(|u| u.atom == Atom::Char(' ')) {
+                            st.units.pop();
+                            st.offsets.pop();
+                        }
+                        st.para_styles.push((para, style));
+                        x = resume;
+                    }
+                    None => {
+                        st.push(off, Atom::Char(c));
+                        x += 1;
+                    }
+                },
                 _ => {
                     st.push(off, Atom::Char(c));
                     x += 1;
                 }
             }
+        }
+        if let Some((_, _, _, _, col)) = st.style {
+            self.err(line, col, "this [ is not closed: formatted text is [text]{size=24pt}; write \\[ for a literal [.");
+            return None;
         }
         if let Some((_, _, _, col)) = st.link {
             self.err(line, col, "this link is not closed: a link is [text](url).");
@@ -942,8 +1001,22 @@ impl<'a> Parser<'a> {
             }
         }
         st.spans.sort_by_key(|s| s.start);
+        let mut inline = Inline { units: st.units, spans: st.spans };
+        if !st.para_styles.is_empty() {
+            // A paragraph's own formatting is beneath its [text]{…}.
+            let mut styles = crate::style::unit_styles(&inline);
+            let bounds: Vec<usize> = st.splits.iter().map(|s| s.0).collect();
+            for (para, style) in &st.para_styles {
+                let a = if *para == 0 { 0 } else { bounds[para - 1] };
+                let b = bounds.get(*para).copied().unwrap_or(styles.len());
+                for s in &mut styles[a..b] {
+                    *s = s.over(style);
+                }
+            }
+            crate::style::set_unit_styles(&mut inline, &styles);
+        }
         Some(InlineOut {
-            inline: Inline { units: st.units, spans: st.spans },
+            inline,
             offsets: st.offsets,
             stop,
             splits: st.splits,
@@ -1090,6 +1163,10 @@ struct InlineState {
     field: Option<(usize, String, usize)>,
     /// Cell paragraph starts: (unit index, style, source offset).
     splits: Vec<(usize, Option<String>, usize)>,
+    /// An open `[text]{…}`: (start unit, its formatting, index of `]`, resume index, col).
+    style: Option<(usize, crate::style::TextStyle, usize, usize, usize)>,
+    /// A paragraph's own `{…}`: (paragraph index, its formatting).
+    para_styles: Vec<(usize, crate::style::TextStyle)>,
 }
 
 pub(crate) struct InlineOut {
@@ -1326,6 +1403,53 @@ fn link_at(src: &[Src], x: usize) -> Option<(usize, String, usize)> {
     None
 }
 
+/// `[text]{…}` starting at `[`: (index of `]`, the inside of the braces,
+/// index after `}`). The text runs to the first unescaped `]`, with no `[`
+/// or `<p/>` before it.
+fn style_span_at(src: &[Src], x: usize) -> Option<(usize, String, usize)> {
+    let mut y = x + 1;
+    while y < src.len() {
+        match src[y].2 {
+            '\\' => y += 2,
+            '[' => return None,
+            ']' => break,
+            '<' if p_tag_at(src, y) => return None,
+            '<' => y = parse_tag(src, y).map_or(y + 1, |t| t.1),
+            _ => y += 1,
+        }
+    }
+    if y >= src.len() || src.get(y + 1).map(|s| s.2) != Some('{') {
+        return None;
+    }
+    let close = (y + 2..src.len()).find(|&k| src[k].2 == '}')?;
+    Some((y, src[y + 2..close].iter().map(|s| s.2).collect(), close + 1))
+}
+
+/// `{…}` at `x` that ends its paragraph: nothing but spaces follows it up
+/// to the end, a `<p/>`, or the tag that ends the text (`</shape>`): the
+/// inside of the braces and the index after them.
+fn para_braces_at(src: &[Src], x: usize, stop_at: Option<&str>) -> Option<(String, usize)> {
+    let close = (x + 1..src.len()).find(|&k| src[k].2 == '}' || src[k].2 == '{')?;
+    if src[close].2 != '}' {
+        return None;
+    }
+    let mut y = close + 1;
+    while y < src.len() && src[y].2.is_whitespace() {
+        y += 1;
+    }
+    let ends = y >= src.len()
+        || p_tag_at(src, y)
+        || parse_tag(src, y).is_some_and(|(t, _)| t.closing && Some(t.name.as_str()) == stop_at);
+    ends.then(|| (src[x + 1..close].iter().map(|s| s.2).collect(), y))
+}
+
+/// `a=v b="w w"` (values bare or quoted) → (name, decoded value, column
+/// from 1); `None` if malformed.
+pub(crate) fn loose_attrs(s: &str) -> Option<Vec<(String, String, usize)>> {
+    let src: Vec<Src> = s.char_indices().enumerate().map(|(k, (b, c))| (b, k + 1, c)).collect();
+    parse_attrs(&src)
+}
+
 pub(crate) struct Tag {
     pub name: String,
     pub closing: bool,
@@ -1411,7 +1535,17 @@ pub(crate) fn parse_attrs(src: &[Src]) -> Option<Vec<(String, String, usize)>> {
         }
         let q = src.get(y)?.2;
         if q != '"' && q != '\'' {
-            return None;
+            // A bare value runs to the next space (§5.3: size=24pt).
+            let vstart = y;
+            while y < src.len() && !src[y].2.is_whitespace() && !matches!(src[y].2, '"' | '\'' | '<' | '>') {
+                y += 1;
+            }
+            if y == vstart {
+                return None;
+            }
+            let raw: String = src[vstart..y].iter().map(|s| s.2).collect();
+            out.push((name.to_ascii_lowercase(), decode_attr(&raw), src[start].1));
+            continue;
         }
         let vstart = y + 1;
         let vend = (vstart..src.len()).find(|&k| src[k].2 == q)?;

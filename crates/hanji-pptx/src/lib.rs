@@ -18,6 +18,7 @@ pub mod geom;
 pub mod import;
 pub mod pml;
 pub mod safety;
+pub mod text;
 
 pub use hanji_package::{package, xml};
 

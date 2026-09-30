@@ -9,7 +9,8 @@ use crate::ast::*;
 use crate::diag::{quoted, Diagnostic};
 use crate::names::{Layout, Names};
 use crate::parse::{chars_of, parse_tag, BlockMap, BlockMapKind, ParaMap, Parser, Tag};
-use crate::serialize::{attr, blocks, cell_text, front_lines, keep_tag};
+use crate::serialize::{attr, blocks_with, cell_text_with, front_lines, keep_tag};
+use crate::style::{self, TextStyle};
 
 /// Where a head line is: its byte range, and the offset that stands for it
 /// (its line end; for a shape, its `<shape` tag).
@@ -255,9 +256,34 @@ fn split_attrs(
     geometry: bool,
     form: &str,
 ) -> Result<(Vec<Option<String>>, Option<Geom>), (usize, String)> {
+    split_attrs_of(&tag.attrs, &tag.name, tag.col, named, geometry, form)
+}
+
+/// [`split_attrs`] of a tag's text formatting too (§5.3): the style its
+/// `font`, `size` and `color` give.
+#[allow(clippy::type_complexity)]
+fn split_styled_attrs(
+    tag: &Tag,
+    named: &[&str],
+    form: &str,
+) -> Result<(Vec<Option<String>>, Option<Geom>, TextStyle), (usize, String)> {
+    let (st, rest) = style::split_text_keys(&tag.attrs)?;
+    let (vals, geom) = split_attrs_of(&rest, &tag.name, tag.col, named, true, form)?;
+    Ok((vals, geom, st))
+}
+
+#[allow(clippy::type_complexity)]
+fn split_attrs_of(
+    attrs: &[(String, String, usize)],
+    tag_name: &str,
+    tag_col: usize,
+    named: &[&str],
+    geometry: bool,
+    form: &str,
+) -> Result<(Vec<Option<String>>, Option<Geom>), (usize, String)> {
     let mut vals: Vec<Option<String>> = vec![None; named.len()];
     let mut geo = vec![];
-    for (k, v, col) in &tag.attrs {
+    for (k, v, col) in attrs {
         if let Some(n) = named.iter().position(|x| x == k) {
             if vals[n].is_some() {
                 return Err((*col, format!("{k}=\"…\" is written twice: {form}.")));
@@ -266,10 +292,10 @@ fn split_attrs(
         } else if geometry && matches!(k.as_str(), "box" | "rot" | "flip") {
             geo.push((k.clone(), v.clone(), *col));
         } else {
-            return Err((*col, format!("<{}> has no attribute \"{k}\": {form}.", tag.name)));
+            return Err((*col, format!("<{tag_name}> has no attribute \"{k}\": {form}.")));
         }
     }
-    Ok((vals, geom_of(&geo, tag.col)?))
+    Ok((vals, geom_of(&geo, tag_col)?))
 }
 
 /// ` box="…"`, and ` rot="…"` and ` flip="…"` when set.
@@ -299,38 +325,13 @@ pub fn geom_attrs(g: &Option<Geom>) -> String {
 type Attrs = Vec<(String, String, usize)>;
 
 fn marker_attrs(src: &str, col0: usize) -> Result<Attrs, (usize, String)> {
-    let mut out = vec![];
-    let cs: Vec<(usize, char)> = src.char_indices().collect();
-    let mut k = 0;
-    let col = |k: usize| col0 + k;
-    while k < cs.len() {
-        if cs[k].1.is_whitespace() {
-            k += 1;
-            continue;
-        }
-        let start = k;
-        while k < cs.len() && (cs[k].1.is_ascii_alphanumeric() || cs[k].1 == '-') {
-            k += 1;
-        }
-        let key: String = cs[start..k].iter().map(|c| c.1).collect();
-        if key.is_empty() || cs.get(k).map(|c| c.1) != Some('=') || cs.get(k + 1).map(|c| c.1) != Some('"') {
-            return Err((
-                col(start),
-                format!("a slot marker's attributes are written key=\"value\", such as ::title {BOX_FORM}::."),
-            ));
-        }
-        k += 2;
-        let vstart = k;
-        while k < cs.len() && cs[k].1 != '"' {
-            k += 1;
-        }
-        if k >= cs.len() {
-            return Err((col(vstart), "a quoted attribute value is not closed by \".".to_string()));
-        }
-        out.push((key, cs[vstart..k].iter().map(|c| c.1).collect(), col(start)));
-        k += 1;
+    match crate::parse::loose_attrs(src) {
+        Some(a) => Ok(a.into_iter().map(|(k, v, c)| (k, v, col0 + c - 1)).collect()),
+        None => Err((
+            col0,
+            format!("a slot marker's attributes are written key=\"value\" or key=value, such as ::title {BOX_FORM} size=24pt::."),
+        )),
     }
-    Ok(out)
 }
 
 /// A line holding one `<keep …/>` tag and nothing else: the tag's id.
@@ -554,26 +555,30 @@ fn slot(
         let line = &p.lines[i];
         let lead = line.indent();
         let col0 = line.text[..lead].chars().count() + 2 + inner[..at].chars().count() + 1;
-        match marker_attrs(&inner[at..], col0) {
-            Ok(attrs) => match attrs.iter().find(|a| !matches!(a.0.as_str(), "box" | "rot" | "flip")) {
+        match marker_attrs(&inner[at..], col0).and_then(|a| style::split_text_keys(&a)) {
+            Ok((st, attrs)) => match attrs.iter().find(|a| !matches!(a.0.as_str(), "box" | "rot" | "flip")) {
                 Some((k, _, col)) => Err((
                     *col,
-                    format!("a slot marker has no attribute \"{k}\"; it is ::{name}:: or ::{name} {BOX_FORM}::."),
+                    format!("a slot marker has no attribute \"{k}\"; it is ::{name}:: or ::{name} {BOX_FORM}::, with the text's font, size and color after the box."),
                 )),
-                None => geom_of(&attrs, col0),
+                None => geom_of(&attrs, col0).map(|g| (g, st)),
             },
             Err(e) => Err(e),
         }
     };
-    let geom = match geom {
-        Ok(Some(_)) if name == "notes" => {
+    let (geom, obj_style) = match geom {
+        Ok((Some(_), _)) if name == "notes" => {
             p.err(i, 1, "::notes:: has no box: speaker notes are not on the slide. Write the marker ::notes::.");
-            None
+            (None, TextStyle::default())
+        }
+        Ok((_, st)) if name == "notes" && !st.is_empty() => {
+            p.err(i, 1, "::notes:: shows no formatting: speaker notes keep theirs. Write the marker ::notes::.");
+            (None, TextStyle::default())
         }
         Ok(g) => g,
         Err((col, msg)) => {
             p.err(i, col, msg);
-            None
+            (None, TextStyle::default())
         }
     };
     if !valid_slot_name(name) {
@@ -609,6 +614,7 @@ fn slot(
     let head = HeadMap { start: line.at, end: line.next, mark: line.end };
     let (mut bl, mut bm) = (vec![], vec![]);
     p.stop = end;
+    p.styles = name != "notes";
     let mut j = i + 1;
     while j < end {
         let before_block = p.errors.len();
@@ -628,9 +634,14 @@ fn slot(
         }
     }
     p.stop = p.lines.len();
+    p.styles = false;
     if p.errors.len() > before {
         return None;
     }
+    // The marker's formatting is beneath each paragraph's (§5.3).
+    let mut inls = slot_inlines(&mut bl);
+    style::fold_under(&mut inls, &obj_style);
+    style::normalize(&mut inls);
     if bl.is_empty() {
         p.err(i, 1, format!("::{name}:: has no text. An unfilled slot is left out: delete this marker line, or write the slot's text after it."));
         return None;
@@ -665,7 +676,7 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
         p.err(i, lead + 1, format!("expected {form}."));
         return None;
     };
-    let (vals, geom) = match split_attrs(&tag, &["id", "name"], true, form) {
+    let (vals, geom, obj_style) = match split_styled_attrs(&tag, &["id", "name"], form) {
         Ok(v) => v,
         Err((col, msg)) => {
             p.err(i, col, msg);
@@ -697,8 +708,10 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
         (vec![], vec![], next)
     } else {
         p.in_cell = true;
+        p.styles = true;
         let out = p.inline_full(i, &src[after..], Some("shape"));
         p.in_cell = false;
+        p.styles = false;
         let out = out?;
         let Some(stop) = out.stop else {
             p.err(
@@ -767,7 +780,17 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
             kind: BlockMapKind::Para(m),
         })
         .collect();
-    let sh = ShapeText { id, name, geom, paras: paras.into_iter().map(|x| x.content).collect() };
+    let mut paras: Vec<Inline> = paras.into_iter().map(|x| x.content).collect();
+    {
+        let mut inls: Vec<&mut Inline> = paras.iter_mut().collect();
+        style::fold_under(&mut inls, &obj_style);
+        style::normalize(&mut inls);
+    }
+    if paras.is_empty() && !obj_style.is_empty() {
+        p.err(i, tag.col, "a shape without text has no text formatting: write its text, or leave out font, size and color.");
+        return None;
+    }
+    let sh = ShapeText { id, name, geom, paras };
     Some((sh, ItemMap { head, blocks }))
 }
 
@@ -981,9 +1004,14 @@ fn item_lines(out: &mut Vec<String>, items: &[SlideItem]) {
     for it in items {
         match it {
             SlideItem::Slot(sl) => {
-                out.push(format!("::{}{}::", sl.name, geom_attrs(&sl.geom)));
+                // Lifting (§5.3): what all its text shares on the marker, a
+                // paragraph's own at its line's end, the rest in [text]{…}.
+                let mut bl = sl.blocks.clone();
+                let (obj, ends) = lifted(&mut bl);
+                let st = if obj.is_empty() { String::new() } else { format!(" {}", obj.attrs()) };
+                out.push(format!("::{}{}{st}::", sl.name, geom_attrs(&sl.geom)));
                 let from = out.len();
-                blocks(out, &sl.blocks);
+                blocks_with(out, &bl, true, &ends);
                 for l in &mut out[from..] {
                     escape_slot_line(l);
                 }
@@ -1019,15 +1047,75 @@ fn escape_slot_line(l: &mut String) {
 }
 
 pub fn shape_line(sh: &ShapeText) -> String {
-    let g = geom_attrs(&sh.geom);
-    let ps: Vec<CellPara> = sh.paras.iter().map(|c| CellPara { style: None, content: c.clone() }).collect();
+    let refs: Vec<&Inline> = sh.paras.iter().collect();
+    let (obj, own, stated) = style::lift(&refs);
+    let mut g = geom_attrs(&sh.geom);
+    if !obj.is_empty() {
+        g.push(' ');
+        g.push_str(&obj.attrs());
+    }
+    let ps: Vec<CellPara> = stated.into_iter().map(|c| CellPara { style: None, content: c }).collect();
+    let ends: Vec<String> =
+        own.iter().map(|o| if o.is_empty() { String::new() } else { format!(" {{{}}}", o.attrs()) }).collect();
+    let text = cell_text_with(&ps, true, &ends);
     match (sh.id.is_empty(), sh.paras.is_empty()) {
-        (true, _) => format!("<shape{g}>{}</shape>", cell_text(&ps)),
+        (true, _) => format!("<shape{g}>{text}</shape>"),
         (false, true) => format!("<shape id=\"{}\" name=\"{}\"{g}/>", attr(&sh.id), attr(&sh.name)),
-        (false, false) => {
-            format!("<shape id=\"{}\" name=\"{}\"{g}>{}</shape>", attr(&sh.id), attr(&sh.name), cell_text(&ps))
+        (false, false) => format!("<shape id=\"{}\" name=\"{}\"{g}>{text}</shape>", attr(&sh.id), attr(&sh.name)),
+    }
+}
+
+/// The inlines of a slot's paragraphs and list items, in order.
+fn slot_inlines(bl: &mut [Block]) -> Vec<&mut Inline> {
+    let mut out = vec![];
+    for b in bl.iter_mut() {
+        match b {
+            Block::Para(p) => out.push(&mut p.content),
+            Block::List(items) => out.extend(items.iter_mut().map(|it| &mut it.content)),
+            _ => {}
         }
     }
+    out
+}
+
+/// A slot's blocks lifted in place (see [`style::lift`]): what its marker
+/// states, and what each block's lines end with.
+fn lifted(bl: &mut [Block]) -> (TextStyle, Vec<Vec<String>>) {
+    let refs: Vec<Inline> = {
+        let mut v = vec![];
+        for b in bl.iter() {
+            match b {
+                Block::Para(p) => v.push(p.content.clone()),
+                Block::List(items) => v.extend(items.iter().map(|it| it.content.clone())),
+                _ => {}
+            }
+        }
+        v
+    };
+    let (obj, own, stated) = style::lift(&refs.iter().collect::<Vec<_>>());
+    let end = |o: &TextStyle| if o.is_empty() { String::new() } else { format!(" {{{}}}", o.attrs()) };
+    let mut k = 0;
+    let mut ends = vec![];
+    for b in bl.iter_mut() {
+        match b {
+            Block::Para(p) => {
+                p.content = stated[k].clone();
+                ends.push(vec![end(&own[k])]);
+                k += 1;
+            }
+            Block::List(items) => {
+                let mut e = vec![];
+                for it in items.iter_mut() {
+                    it.content = stated[k].clone();
+                    e.push(end(&own[k]));
+                    k += 1;
+                }
+                ends.push(e);
+            }
+            _ => ends.push(vec![]),
+        }
+    }
+    (obj, ends)
 }
 
 pub fn object_line(o: &ObjectItem) -> String {
