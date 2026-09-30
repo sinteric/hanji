@@ -1,0 +1,56 @@
+{
+ "answers": [
+  {
+   "task_id": "pp-q1",
+   "text": "ANSWER: Connector 6 has no border written on its tag, so its outline comes from the theme's line style. This file doesn't show that style, so its width, line style and colour can't be read here."
+  },
+  {
+   "task_id": "pp-q2",
+   "text": "ANSWER: Oval 2; Oval 4; Oval 7; Oval 10"
+  },
+  {
+   "task_id": "pp-e1",
+   "edits": [
+    {
+     "old": "<shape id=\"s8\" name=\"Rounded Rectangle 7\" box=\"354 130 260 320\" fill=#FFFFFF border=none/>",
+     "new": "<shape id=\"s8\" name=\"Rounded Rectangle 7\" box=\"354 130 260 320\" fill=accent2 border=none/>"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e2",
+   "edits": [
+    {
+     "old": "<shape id=\"s13\" name=\"Rounded Rectangle 12\" box=\"644 130 260 320\" fill=#FFFFFF border=none/>",
+     "new": "<shape id=\"s13\" name=\"Rounded Rectangle 12\" box=\"644 130 260 320\" fill=#FFFFFF border=\"2pt solid #101B3A\"/>"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e3",
+   "edits": [
+    {
+     "old": "Battery cost down 60% in 5 years",
+     "new": "Battery cost down [60%]{size=24pt color=#FF6B5B} in 5 years"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e4",
+   "text": "REFUSE: The connectors take their colour and line style from the theme, which this file doesn't show, so a border with only the width changed can't be written without guessing those values."
+  },
+  {
+   "task_id": "pp-e5",
+   "edits": [
+    {
+     "old": "Series A · 2026",
+     "new": "Series B · 2026"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e6",
+   "text": "REFUSE: This file format can't express shadows or other effects."
+  }
+ ]
+}

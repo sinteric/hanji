@@ -1,0 +1,48 @@
+{
+ "answers": [
+  {
+   "text": "ANSWER: Pentagon 2; Chevron 4; Chevron 6",
+   "task_id": "pp-q2"
+  },
+  {
+   "edits": [
+    {
+     "old": "<shape id=\"s4\" name=\"Rounded Rectangle 3\" box=\"265 150 205 150\" fill=#E5E7EB border=none>**+12%** {size=36pt color=#2563EB}<p/>전년 대비 {size=16pt color=#111827}</shape>\n",
+     "new": "<shape id=\"s4\" name=\"Rounded Rectangle 3\" box=\"265 150 205 150\" fill=accent2 border=none>**+12%** {size=36pt color=#2563EB}<p/>전년 대비 {size=16pt color=#111827}</shape>\n"
+    }
+   ],
+   "task_id": "pp-e1"
+  },
+  {
+   "edits": [
+    {
+     "old": "<shape id=\"s5\" name=\"Oval 4\" box=\"455 250 50 50\" fill=#2563EB border=none size=14pt color=#FFFFFF>VS</shape>\n",
+     "new": "<shape id=\"s5\" name=\"Oval 4\" box=\"455 250 50 50\" fill=#2563EB border=\"2pt solid #1F3864\" size=14pt color=#FFFFFF>VS</shape>\n"
+    }
+   ],
+   "task_id": "pp-e2"
+  },
+  {
+   "edits": [
+    {
+     "old": "<shape id=\"s8\" name=\"Rectangular Callout 7\" box=\"560 330 240 80\" fill=#FEF3C7 border=\"1.5pt solid #F59E0B\" size=16pt color=#111827>10월 착수 예정</shape>\n",
+     "new": "<shape id=\"s8\" name=\"Rectangular Callout 7\" box=\"560 330 240 80\" fill=#FEF3C7 border=\"1.5pt solid #F59E0B\" size=16pt color=#111827>[10월]{size=24pt color=#FF7F50} 착수 예정</shape>\n"
+    }
+   ],
+   "task_id": "pp-e3"
+  },
+  {
+   "edits": [
+    {
+     "old": "- 신규 4곳\n",
+     "new": "- 신규 5곳\n"
+    }
+   ],
+   "task_id": "pp-e5"
+  },
+  {
+   "text": "REFUSE: this format cannot express it.",
+   "task_id": "pp-e6"
+  }
+ ]
+}

@@ -1,0 +1,69 @@
+{
+ "answers": [
+  {
+   "task_id": "pp-q1",
+   "text": "ANSWER: border=\"2pt solid accent1\""
+  },
+  {
+   "task_id": "pp-q2",
+   "text": "ANSWER: Oval 2; Oval 4; Oval 7; Oval 10"
+  },
+  {
+   "task_id": "pp-e1",
+   "edits": [
+    {
+     "old": "name=\"Rounded Rectangle 7\" box=\"354 130 260 320\" fill=#FFFFFF",
+     "new": "name=\"Rounded Rectangle 7\" box=\"354 130 260 320\" fill=accent2"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e2",
+   "edits": [
+    {
+     "old": "name=\"Rounded Rectangle 12\" box=\"644 130 260 320\" fill=#FFFFFF border=none/>",
+     "new": "name=\"Rounded Rectangle 12\" box=\"644 130 260 320\" fill=#FFFFFF border=\"2pt solid #101B3A\"/>"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e3",
+   "edits": [
+    {
+     "old": "Battery cost down 60% in 5 years",
+     "new": "Battery cost down [60%]{size=24pt color=#FF6B5B} in 5 years"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e4",
+   "edits": [
+    {
+     "old": "from=\"172 256\" to=\"300 256\" border=\"2pt solid accent1\"",
+     "new": "from=\"172 256\" to=\"300 256\" border=\"3pt solid accent1\""
+    },
+    {
+     "old": "from=\"372 256\" to=\"500 256\" border=\"2pt solid accent1\"",
+     "new": "from=\"372 256\" to=\"500 256\" border=\"3pt solid accent1\""
+    },
+    {
+     "old": "from=\"572 256\" to=\"700 256\" border=\"2pt solid accent1\"",
+     "new": "from=\"572 256\" to=\"700 256\" border=\"3pt solid accent1\""
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e5",
+   "edits": [
+    {
+     "old": "Series A · 2026",
+     "new": "Series B · 2026"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e6",
+   "text": "REFUSE: Shadows and other effects cannot be expressed in this file format."
+  }
+ ]
+}

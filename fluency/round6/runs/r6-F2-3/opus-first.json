@@ -1,0 +1,128 @@
+{
+ "answers": [
+  {
+   "task_id": "kr-q1",
+   "text": "ANSWER: fill=#EEEEEE"
+  },
+  {
+   "task_id": "kr-q2",
+   "text": "ANSWER: 21곳이 수도권; 부산; 대구"
+  },
+  {
+   "task_id": "kr-q3",
+   "text": "ANSWER: indent-left=28.35pt"
+  },
+  {
+   "task_id": "kr-q4",
+   "text": "ANSWER: size=14pt"
+  },
+  {
+   "task_id": "kr-e1",
+   "edits": [
+    {
+     "old": "<div style=\"Note\">신규 고객 34곳 중 21곳이 수도권.</div>",
+     "new": "<div style=\"Note\">신규 고객 34곳 중 21곳이 수도권.</div> {fill=#DDEBF7}"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e2",
+   "edits": [
+    {
+     "old": "| 합계 || 215 |",
+     "new": "| 합계 || 215 | {border-bottom=\"1.5pt solid #FF0000\"}"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e6",
+   "edits": [
+    {
+     "old": "[15% 성장]{size=14pt color=#1F4E79}",
+     "new": "[16% 성장]{size=14pt color=#1F4E79}"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e9",
+   "text": "REFUSE: This format cannot write a new pattern fill; an existing pattern can only be kept as written or replaced with a colour."
+  },
+  {
+   "task_id": "kr-e3",
+   "edits": [
+    {
+     "old": "| 지역 | 지점 | 매출 |",
+     "new": "| **지역** | **지점** | **매출** | {fill=#D9D9D9}"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e4",
+   "edits": [
+    {
+     "old": "# 3분기 영업 보고",
+     "new": "# [3분기 영업 보고]{color=#C00000}"
+    },
+    {
+     "old": "## 지역별 현황",
+     "new": "## [지역별 현황]{color=#C00000}"
+    },
+    {
+     "old": "## 향후 계획",
+     "new": "## [향후 계획]{color=#C00000}"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e5",
+   "edits": [
+    {
+     "old": "<style name=\"Heading 2\" size=13pt bold/>",
+     "new": "<style name=\"Heading 2\" size=13pt bold color=#1F3864/>"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e7",
+   "edits": [
+    {
+     "old": "[대구]{color=#C00000}에 지점을 연다.\n",
+     "new": "[대구]{color=#C00000}에 지점을 연다.\n\n| 도시 | 개점 | {fill=#D9D9D9}\n|---|---|\n| 부산 | 10월 |\n| 대구 | 11월 |\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e8",
+   "edits": [
+    {
+     "old": "[21곳이 수도권]{color=#C00000}이다.",
+     "new": "[21곳이 수도권]{color=#C00000}이다. {first-line=10pt}"
+    },
+    {
+     "old": "summary=\"comment: 지방 수치 재확인 필요\"/>",
+     "new": "summary=\"comment: 지방 수치 재확인 필요\"/> {first-line=10pt}"
+    },
+    {
+     "old": "아래 표는 지점별 매출을 정리한 것이다.",
+     "new": "아래 표는 지점별 매출을 정리한 것이다. {first-line=10pt}"
+    },
+    {
+     "old": "/>성장했다.",
+     "new": "/>성장했다. {first-line=10pt}"
+    },
+    {
+     "old": "에 지점을 연다.",
+     "new": "에 지점을 연다. {first-line=10pt}"
+    },
+    {
+     "old": "부록: 지점 목록",
+     "new": "부록: 지점 목록 {first-line=10pt}"
+    },
+    {
+     "old": "인천 송도.",
+     "new": "인천 송도. {first-line=10pt}"
+    }
+   ]
+  }
+ ]
+}

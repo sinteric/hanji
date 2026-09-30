@@ -1,0 +1,362 @@
+[
+ {
+  "unit_id": "r6-F1-1",
+  "part": "a",
+  "candidate": "F1",
+  "seed": 1,
+  "file_chars": 6235,
+  "prompt_chars": 12679,
+  "max_line": 472,
+  "tasks": [
+   "fn-q1",
+   "fn-q2",
+   "fn-q3",
+   "fn-q4",
+   "fn-e1",
+   "fn-e2",
+   "fn-e6",
+   "fn-e9"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6-F1-1",
+  "part": "b",
+  "candidate": "F1",
+  "seed": 1,
+  "file_chars": 6235,
+  "prompt_chars": 12285,
+  "max_line": 472,
+  "tasks": [
+   "fn-e3",
+   "fn-e4",
+   "fn-e5",
+   "fn-e7",
+   "fn-e8"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6-F2-1",
+  "part": "a",
+  "candidate": "F2",
+  "seed": 1,
+  "file_chars": 4664,
+  "prompt_chars": 11287,
+  "max_line": 619,
+  "tasks": [
+   "fn-q1",
+   "fn-q2",
+   "fn-q3",
+   "fn-q4",
+   "fn-e1",
+   "fn-e2",
+   "fn-e6",
+   "fn-e9"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6-F2-1",
+  "part": "b",
+  "candidate": "F2",
+  "seed": 1,
+  "file_chars": 4664,
+  "prompt_chars": 10893,
+  "max_line": 619,
+  "tasks": [
+   "fn-e3",
+   "fn-e4",
+   "fn-e5",
+   "fn-e7",
+   "fn-e8"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6-F3-1",
+  "part": "a",
+  "candidate": "F3",
+  "seed": 1,
+  "file_chars": 3552,
+  "prompt_chars": 9520,
+  "max_line": 679,
+  "tasks": [
+   "fn-q1",
+   "fn-q2",
+   "fn-q3",
+   "fn-q4",
+   "fn-e1",
+   "fn-e2",
+   "fn-e6",
+   "fn-e9"
+  ],
+  "unreachable": [
+   "fn-q1",
+   "fn-q2",
+   "fn-e1",
+   "fn-e2"
+  ]
+ },
+ {
+  "unit_id": "r6-F3-1",
+  "part": "b",
+  "candidate": "F3",
+  "seed": 1,
+  "file_chars": 3552,
+  "prompt_chars": 9126,
+  "max_line": 679,
+  "tasks": [
+   "fn-e3",
+   "fn-e4",
+   "fn-e5",
+   "fn-e7",
+   "fn-e8"
+  ],
+  "unreachable": [
+   "fn-e3",
+   "fn-e7"
+  ]
+ },
+ {
+  "unit_id": "r6-F1-2",
+  "part": "a",
+  "candidate": "F1",
+  "seed": 2,
+  "file_chars": 81536,
+  "prompt_chars": 88005,
+  "max_line": 1928,
+  "tasks": [
+   "mel-q1",
+   "mel-q2",
+   "mel-q3",
+   "mel-q4",
+   "mel-e1",
+   "mel-e2",
+   "mel-e6",
+   "mel-e9"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6-F1-2",
+  "part": "b",
+  "candidate": "F1",
+  "seed": 2,
+  "file_chars": 81536,
+  "prompt_chars": 87652,
+  "max_line": 1928,
+  "tasks": [
+   "mel-e3",
+   "mel-e4",
+   "mel-e5",
+   "mel-e7",
+   "mel-e8"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6-F2-2",
+  "part": "a",
+  "candidate": "F2",
+  "seed": 2,
+  "file_chars": 84442,
+  "prompt_chars": 91090,
+  "max_line": 1928,
+  "tasks": [
+   "mel-q1",
+   "mel-q2",
+   "mel-q3",
+   "mel-q4",
+   "mel-e1",
+   "mel-e2",
+   "mel-e6",
+   "mel-e9"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6-F2-2",
+  "part": "b",
+  "candidate": "F2",
+  "seed": 2,
+  "file_chars": 84442,
+  "prompt_chars": 90737,
+  "max_line": 1928,
+  "tasks": [
+   "mel-e3",
+   "mel-e4",
+   "mel-e5",
+   "mel-e7",
+   "mel-e8"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6-F3-2",
+  "part": "a",
+  "candidate": "F3",
+  "seed": 2,
+  "file_chars": 34062,
+  "prompt_chars": 40055,
+  "max_line": 710,
+  "tasks": [
+   "mel-q1",
+   "mel-q2",
+   "mel-q3",
+   "mel-q4",
+   "mel-e1",
+   "mel-e2",
+   "mel-e6",
+   "mel-e9"
+  ],
+  "unreachable": [
+   "mel-q1",
+   "mel-q2",
+   "mel-q4",
+   "mel-e1",
+   "mel-e2"
+  ]
+ },
+ {
+  "unit_id": "r6-F3-2",
+  "part": "b",
+  "candidate": "F3",
+  "seed": 2,
+  "file_chars": 34062,
+  "prompt_chars": 39702,
+  "max_line": 710,
+  "tasks": [
+   "mel-e3",
+   "mel-e4",
+   "mel-e5",
+   "mel-e7",
+   "mel-e8"
+  ],
+  "unreachable": [
+   "mel-e3",
+   "mel-e4",
+   "mel-e7",
+   "mel-e8"
+  ]
+ },
+ {
+  "unit_id": "r6-F1-3",
+  "part": "a",
+  "candidate": "F1",
+  "seed": 3,
+  "file_chars": 978,
+  "prompt_chars": 7280,
+  "max_line": 472,
+  "tasks": [
+   "kr-q1",
+   "kr-q2",
+   "kr-q3",
+   "kr-q4",
+   "kr-e1",
+   "kr-e2",
+   "kr-e6",
+   "kr-e9"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6-F1-3",
+  "part": "b",
+  "candidate": "F1",
+  "seed": 3,
+  "file_chars": 978,
+  "prompt_chars": 7049,
+  "max_line": 472,
+  "tasks": [
+   "kr-e3",
+   "kr-e4",
+   "kr-e5",
+   "kr-e7",
+   "kr-e8"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6-F2-3",
+  "part": "a",
+  "candidate": "F2",
+  "seed": 3,
+  "file_chars": 1058,
+  "prompt_chars": 7539,
+  "max_line": 619,
+  "tasks": [
+   "kr-q1",
+   "kr-q2",
+   "kr-q3",
+   "kr-q4",
+   "kr-e1",
+   "kr-e2",
+   "kr-e6",
+   "kr-e9"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6-F2-3",
+  "part": "b",
+  "candidate": "F2",
+  "seed": 3,
+  "file_chars": 1058,
+  "prompt_chars": 7308,
+  "max_line": 619,
+  "tasks": [
+   "kr-e3",
+   "kr-e4",
+   "kr-e5",
+   "kr-e7",
+   "kr-e8"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6-F3-3",
+  "part": "a",
+  "candidate": "F3",
+  "seed": 3,
+  "file_chars": 980,
+  "prompt_chars": 6806,
+  "max_line": 679,
+  "tasks": [
+   "kr-q1",
+   "kr-q2",
+   "kr-q3",
+   "kr-q4",
+   "kr-e1",
+   "kr-e2",
+   "kr-e6",
+   "kr-e9"
+  ],
+  "unreachable": [
+   "kr-q2",
+   "kr-q4",
+   "kr-e2"
+  ]
+ },
+ {
+  "unit_id": "r6-F3-3",
+  "part": "b",
+  "candidate": "F3",
+  "seed": 3,
+  "file_chars": 980,
+  "prompt_chars": 6575,
+  "max_line": 679,
+  "tasks": [
+   "kr-e3",
+   "kr-e4",
+   "kr-e5",
+   "kr-e7",
+   "kr-e8"
+  ],
+  "unreachable": [
+   "kr-e3",
+   "kr-e7",
+   "kr-e8"
+  ]
+ }
+]

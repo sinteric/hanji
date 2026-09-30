@@ -12,7 +12,10 @@ decision of §10.7) has its own kit in [round2/](round2/README.md); its results 
 [round2/RESULTS.md](round2/RESULTS.md). Round 3 (multi-paragraph table cells and empty paragraphs, §10.8) has its
 own kit in [round3/](round3/README.md); its results are in [round3/RESULTS.md](round3/RESULTS.md). Round 4
 (spreadsheet cell data: the read view and the write shape, §10.6) has its own kit in [round4/](round4/README.md);
-its results are in [round4/RESULTS.md](round4/RESULTS.md).
+its results are in [round4/RESULTS.md](round4/RESULTS.md). Round 5 (Presentation geometry, §10.9) is in
+[round5/](round5/README.md). Round 6 (direct formatting per kind of file, §10 item 10, proposed) is in
+[round6/](round6/README.md), with the candidates on real corpus samples in [round6/CANDIDATES.md](round6/CANDIDATES.md)
+and the results in [round6/RESULTS.md](round6/RESULTS.md).
 
 | decision | A | B |
 |---|---|---|

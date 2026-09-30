@@ -1,0 +1,56 @@
+{
+ "answers": [
+  {
+   "task_id": "pp-q1",
+   "text": "ANSWER: The file does not say. The connectors set no border of their own, so width, style and colour come from the theme's line style, which isn't shown here."
+  },
+  {
+   "task_id": "pp-q2",
+   "text": "ANSWER: Pentagon 2; Chevron 4; Chevron 6"
+  },
+  {
+   "task_id": "pp-e1",
+   "edits": [
+    {
+     "old": "name=\"Rounded Rectangle 3\" box=\"265 150 205 150\" fill=#E5E7EB",
+     "new": "name=\"Rounded Rectangle 3\" box=\"265 150 205 150\" fill=accent2"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e2",
+   "edits": [
+    {
+     "old": "box=\"455 250 50 50\" fill=#2563EB border=none",
+     "new": "box=\"455 250 50 50\" fill=#2563EB border=\"2pt solid #000080\""
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e3",
+   "edits": [
+    {
+     "old": ">10월 착수 예정<",
+     "new": ">[10월]{size=24pt color=#FF6B5B} 착수 예정<"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e4",
+   "text": "REFUSE: The connectors' colour and line style come from the theme and aren't written in the file, so a 3pt border can't be written without changing or guessing them."
+  },
+  {
+   "task_id": "pp-e5",
+   "edits": [
+    {
+     "old": "신규 4곳",
+     "new": "신규 5곳"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e6",
+   "text": "REFUSE: Gradient fills cannot be written or changed in this format; they can only be replaced by a solid colour."
+  }
+ ]
+}

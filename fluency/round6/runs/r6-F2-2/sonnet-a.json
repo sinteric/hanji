@@ -1,0 +1,51 @@
+{
+ "answers": [
+  {
+   "task_id": "mel-q1",
+   "text": "ANSWER: fill=#E9F1FE"
+  },
+  {
+   "task_id": "mel-q2",
+   "text": "ANSWER: 구  분; 2025 예산 (A); 2026년 예산 (B); 증  감 (B-A); (B-A)/A"
+  },
+  {
+   "task_id": "mel-q3",
+   "text": "ANSWER: align=center line-spacing=130%"
+  },
+  {
+   "task_id": "mel-q4",
+   "text": "ANSWER: first-line=-58.96pt"
+  },
+  {
+   "task_id": "mel-e1",
+   "edits": [
+    {
+     "old": "{fill=#F2F2F2 border=\"0.34pt solid #000000\"}  **기금형",
+     "new": "{fill=#DFE6F7 border=\"0.34pt solid #000000\"}  **기금형"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e2",
+   "edits": [
+    {
+     "old": "{fill=#F2F2F2 border=\"0.34pt solid #000000\"}  **기금형",
+     "new": "{fill=#F2F2F2 border=\"0.34pt solid #000000\" border-bottom=\"0.34pt solid #FF0000\"}  **기금형"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e6",
+   "edits": [
+    {
+     "old": "’25~’26년, 1,200명",
+     "new": "’25~’26년, 1,300명"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e9",
+   "text": "REFUSE: The banner's fill is a gradient, which can be kept as written or replaced by a solid colour but cannot be written or changed, so a red-to-blue gradient cannot be expressed."
+  }
+ ]
+}

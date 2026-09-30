@@ -1,0 +1,332 @@
+{
+ "answers": [
+  {
+   "task_id": "mel-q1",
+   "text": "ANSWER: fill=#E9F1FE"
+  },
+  {
+   "task_id": "mel-q2",
+   "text": "ANSWER: 구  분; 2025 예산 (A); 2026년 예산 (B); 증  감 (B-A); (B-A)/A"
+  },
+  {
+   "task_id": "mel-q3",
+   "text": "ANSWER: align=center line-spacing=130%"
+  },
+  {
+   "task_id": "mel-q4",
+   "text": "ANSWER: first-line=-58.96pt"
+  },
+  {
+   "task_id": "mel-e1",
+   "edits": [
+    {
+     "old": "| {fill=#F2F2F2 border=\"0.34pt solid #000000\"}  **기금형 퇴직연금 활성화** 및 **1년 미만 퇴직급여** 관련 **노사 이견** {line-spacing=120% font=함초롬바탕 size=15pt}<p/>   \\*  (기금형) ① 영리형(노반대vs사도입) ②지배구조(노노동자vs사전문가) ③원금보장(노필요vs사반대)<br/>(1년 미만) <사> 실질적 임금 상승 효과(비용부담) vs <노> 1년미만, 특고·플랫폼 등 도입 필요 {first-line=-58.16pt space-before=10pt line-spacing=120% font=\"맑은 고딕\" size=12pt}<p/>[⇒ 퇴직연금 기능강화를 위한 **노사정TF**]{size=15pt}[(’25.10월~)]{size=13pt}[를 통해 **공감대 및 합의안 도출, 중요과제**는 사회적 대화로 **지속 논의**]{size=15pt} {first-line=-44.24pt space-before=20pt line-spacing=120% font=함초롬바탕} |\n",
+     "new": "| {fill=#DDEBF7 border=\"0.34pt solid #000000\"}  **기금형 퇴직연금 활성화** 및 **1년 미만 퇴직급여** 관련 **노사 이견** {line-spacing=120% font=함초롬바탕 size=15pt}<p/>   \\*  (기금형) ① 영리형(노반대vs사도입) ②지배구조(노노동자vs사전문가) ③원금보장(노필요vs사반대)<br/>(1년 미만) <사> 실질적 임금 상승 효과(비용부담) vs <노> 1년미만, 특고·플랫폼 등 도입 필요 {first-line=-58.16pt space-before=10pt line-spacing=120% font=\"맑은 고딕\" size=12pt}<p/>[⇒ 퇴직연금 기능강화를 위한 **노사정TF**]{size=15pt}[(’25.10월~)]{size=13pt}[를 통해 **공감대 및 합의안 도출, 중요과제**는 사회적 대화로 **지속 논의**]{size=15pt} {first-line=-44.24pt space-before=20pt line-spacing=120% font=함초롬바탕} |\n"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e2",
+   "edits": [
+    {
+     "old": "| {fill=#F2F2F2 border=\"0.34pt solid #000000\"}  **기금형 퇴직연금 활성화** 및 **1년 미만 퇴직급여** 관련 **노사 이견** {line-spacing=120% font=함초롬바탕 size=15pt}<p/>   \\*  (기금형) ① 영리형(노반대vs사도입) ②지배구조(노노동자vs사전문가) ③원금보장(노필요vs사반대)<br/>(1년 미만) <사> 실질적 임금 상승 효과(비용부담) vs <노> 1년미만, 특고·플랫폼 등 도입 필요 {first-line=-58.16pt space-before=10pt line-spacing=120% font=\"맑은 고딕\" size=12pt}<p/>[⇒ 퇴직연금 기능강화를 위한 **노사정TF**]{size=15pt}[(’25.10월~)]{size=13pt}[를 통해 **공감대 및 합의안 도출, 중요과제**는 사회적 대화로 **지속 논의**]{size=15pt} {first-line=-44.24pt space-before=20pt line-spacing=120% font=함초롬바탕} |\n",
+     "new": "| {fill=#F2F2F2 border-top=\"0.34pt solid #000000\" border-right=\"0.34pt solid #000000\" border-bottom=\"0.34pt solid #FF0000\" border-left=\"0.34pt solid #000000\"}  **기금형 퇴직연금 활성화** 및 **1년 미만 퇴직급여** 관련 **노사 이견** {line-spacing=120% font=함초롬바탕 size=15pt}<p/>   \\*  (기금형) ① 영리형(노반대vs사도입) ②지배구조(노노동자vs사전문가) ③원금보장(노필요vs사반대)<br/>(1년 미만) <사> 실질적 임금 상승 효과(비용부담) vs <노> 1년미만, 특고·플랫폼 등 도입 필요 {first-line=-58.16pt space-before=10pt line-spacing=120% font=\"맑은 고딕\" size=12pt}<p/>[⇒ 퇴직연금 기능강화를 위한 **노사정TF**]{size=15pt}[(’25.10월~)]{size=13pt}[를 통해 **공감대 및 합의안 도출, 중요과제**는 사회적 대화로 **지속 논의**]{size=15pt} {first-line=-44.24pt space-before=20pt line-spacing=120% font=함초롬바탕} |\n"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e3",
+   "edits": [
+    {
+     "old": "| **1분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **2분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **3분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **4분기** {align=center first-line=0pt line-spacing=110% size=13pt} | {fill=#DFE6F7}\n",
+     "new": "| **1분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **2분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **3분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **4분기** {align=center first-line=0pt line-spacing=110% size=13pt} | {fill=#D9D9D9}\n"
+    },
+    {
+     "old": "{border=\"0.34pt solid #000000\" first-line=-10.08pt line-spacing=140% font=\"맑은 고딕\" size=12pt}\n| **1분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **2분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **3분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **4분기** {align=center first-line=0pt line-spacing=160% size=13pt} | {fill=#DFE6F7}\n",
+     "new": "{border=\"0.34pt solid #000000\" first-line=-10.08pt line-spacing=140% font=\"맑은 고딕\" size=12pt}\n| **1분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **2분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **3분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **4분기** {align=center first-line=0pt line-spacing=160% size=13pt} | {fill=#D9D9D9}\n"
+    },
+    {
+     "old": "| **1분기** {align=center size=13pt} | **2분기** {align=center size=13pt} | **3분기** {align=center size=13pt} | **4분기** {align=center size=13pt} | {fill=#DFE6F7}\n",
+     "new": "| **1분기** {align=center size=13pt} | **2분기** {align=center size=13pt} | **3분기** {align=center size=13pt} | **4분기** {align=center size=13pt} | {fill=#D9D9D9}\n"
+    },
+    {
+     "old": "\n{border=\"0.34pt solid #000000\" line-spacing=130% font=\"맑은 고딕\" size=12pt}\n| **1분기** {align=center line-spacing=160% size=13pt} | **2분기** {align=center line-spacing=160% size=13pt} | **3분기** {align=center line-spacing=160% size=13pt} | **4분기** {align=center line-spacing=160% size=13pt} | {fill=#DFE6F7}\n|---|---|---|---|\n| · 노조법 시행령 개정(2월),<br/>가이드라인 마련 및<br/>상생협력모델 구축(1월) {first-line=-10.96pt space-before=6pt}<p/>· 주요 권역별 노동위·<br/>지방청 공동워크숍(1월~) {first-line=-10.16pt space-before=10pt}<p/>· 공공부문 초기업교섭<br/>모델 개발(3월) {first-line=-9.16pt space-before=10pt}<p/>· 공무직위원회법 제정<br/>지원(1월~) {first-line=-9.16pt space-before=10pt} | · 동일가치노동 동일임금<br/>로드맵 마련(6월) {first-line=-6.96pt space-before=6pt}<p/>· 공공부문 비정규직 처우<br/>개선 대책 마련(4월) {first-line=-6pt space-before=10pt} | · 공무직위원회 구성,<br/>운영 지원(7월~) {first-line=-11.24pt space-before=6pt}<p/>· 임금정보 실태조사 확대<br/>(3.3만 → 6.6만개소) <br/>(7월~) {first-line=-6pt space-before=10pt} | · 임금직업정보시스템을<br/>통해 임금정보 제공<br/>(12월) {first-line=-7.92pt space-before=6pt}<p/>· 공공부문 우수사례<br/>확산(11월~) {first-line=-11.28pt space-before=10pt} | {valign=top}\n",
+     "new": "\n{border=\"0.34pt solid #000000\" line-spacing=130% font=\"맑은 고딕\" size=12pt}\n| **1분기** {align=center line-spacing=160% size=13pt} | **2분기** {align=center line-spacing=160% size=13pt} | **3분기** {align=center line-spacing=160% size=13pt} | **4분기** {align=center line-spacing=160% size=13pt} | {fill=#D9D9D9}\n|---|---|---|---|\n| · 노조법 시행령 개정(2월),<br/>가이드라인 마련 및<br/>상생협력모델 구축(1월) {first-line=-10.96pt space-before=6pt}<p/>· 주요 권역별 노동위·<br/>지방청 공동워크숍(1월~) {first-line=-10.16pt space-before=10pt}<p/>· 공공부문 초기업교섭<br/>모델 개발(3월) {first-line=-9.16pt space-before=10pt}<p/>· 공무직위원회법 제정<br/>지원(1월~) {first-line=-9.16pt space-before=10pt} | · 동일가치노동 동일임금<br/>로드맵 마련(6월) {first-line=-6.96pt space-before=6pt}<p/>· 공공부문 비정규직 처우<br/>개선 대책 마련(4월) {first-line=-6pt space-before=10pt} | · 공무직위원회 구성,<br/>운영 지원(7월~) {first-line=-11.24pt space-before=6pt}<p/>· 임금정보 실태조사 확대<br/>(3.3만 → 6.6만개소) <br/>(7월~) {first-line=-6pt space-before=10pt} | · 임금직업정보시스템을<br/>통해 임금정보 제공<br/>(12월) {first-line=-7.92pt space-before=6pt}<p/>· 공공부문 우수사례<br/>확산(11월~) {first-line=-11.28pt space-before=10pt} | {valign=top}\n"
+    },
+    {
+     "old": "| **1분기** {align=center line-spacing=110% size=13pt} | **2분기** {align=center line-spacing=110% size=13pt} | **3분기** {align=center line-spacing=110% size=13pt} | **4분기** {align=center line-spacing=110% size=13pt} | {fill=#DFE6F7 border-top=\"0.34pt solid #000000\"}\n",
+     "new": "| **1분기** {align=center line-spacing=110% size=13pt} | **2분기** {align=center line-spacing=110% size=13pt} | **3분기** {align=center line-spacing=110% size=13pt} | **4분기** {align=center line-spacing=110% size=13pt} | {fill=#D9D9D9 border-top=\"0.34pt solid #000000\"}\n"
+    },
+    {
+     "old": "| **1분기** {align=center space-before=0pt size=13pt} | **2분기** {align=center space-before=0pt size=13pt} | **3분기** {align=center space-before=0pt size=13pt} | **4분기** {align=center space-before=0pt size=13pt} | {fill=#DFE6F7 border-top=\"0.34pt solid #000000\"}\n",
+     "new": "| **1분기** {align=center space-before=0pt size=13pt} | **2분기** {align=center space-before=0pt size=13pt} | **3분기** {align=center space-before=0pt size=13pt} | **4분기** {align=center space-before=0pt size=13pt} | {fill=#D9D9D9 border-top=\"0.34pt solid #000000\"}\n"
+    },
+    {
+     "old": "{border=\"0.34pt solid #000000\" align=left line-spacing=140% font=\"맑은 고딕\" size=12pt}\n| **1분기** {align=center line-spacing=160% size=13pt} | **2분기** {align=center line-spacing=160% size=13pt} | **3분기** {align=center line-spacing=160% size=13pt} | **4분기** {align=center line-spacing=160% size=13pt} | {fill=#DFE6F7}\n",
+     "new": "{border=\"0.34pt solid #000000\" align=left line-spacing=140% font=\"맑은 고딕\" size=12pt}\n| **1분기** {align=center line-spacing=160% size=13pt} | **2분기** {align=center line-spacing=160% size=13pt} | **3분기** {align=center line-spacing=160% size=13pt} | **4분기** {align=center line-spacing=160% size=13pt} | {fill=#D9D9D9}\n"
+    },
+    {
+     "old": "| **1분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **2분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **3분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **4분기** {align=center first-line=0pt line-spacing=110% size=13pt} | {fill=#DFE6F7 border-top=\"0.34pt solid #000000\"}\n",
+     "new": "| **1분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **2분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **3분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **4분기** {align=center first-line=0pt line-spacing=110% size=13pt} | {fill=#D9D9D9 border-top=\"0.34pt solid #000000\"}\n"
+    },
+    {
+     "old": "| **1분기** {align=center space-before=0pt line-spacing=160% size=13pt} | **2분기** {align=center space-before=0pt line-spacing=160% size=13pt} | **3분기** {align=center space-before=0pt line-spacing=160% size=13pt} | **4분기** {align=center space-before=0pt line-spacing=160% size=13pt} | {fill=#DFE6F7}\n",
+     "new": "| **1분기** {align=center space-before=0pt line-spacing=160% size=13pt} | **2분기** {align=center space-before=0pt line-spacing=160% size=13pt} | **3분기** {align=center space-before=0pt line-spacing=160% size=13pt} | **4분기** {align=center space-before=0pt line-spacing=160% size=13pt} | {fill=#D9D9D9}\n"
+    },
+    {
+     "old": "| **1분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **2분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **3분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **4분기** {align=center first-line=0pt line-spacing=160% size=13pt} | {fill=#DFE6F7}\n",
+     "new": "| **1분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **2분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **3분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **4분기** {align=center first-line=0pt line-spacing=160% size=13pt} | {fill=#D9D9D9}\n"
+    },
+    {
+     "old": "| **1분기** {align=center line-spacing=160% size=13pt} | **2분기** {align=center line-spacing=160% size=13pt} | **3분기** {align=center line-spacing=160% size=13pt} | **4분기** {align=center line-spacing=160% size=13pt} | {fill=#DFE6F7}\n",
+     "new": "| **1분기** {align=center line-spacing=160% size=13pt} | **2분기** {align=center line-spacing=160% size=13pt} | **3분기** {align=center line-spacing=160% size=13pt} | **4분기** {align=center line-spacing=160% size=13pt} | {fill=#D9D9D9}\n"
+    },
+    {
+     "old": "| **1분기** {align=center first-line=0pt space-before=0pt line-spacing=160% size=13pt} | **2분기** {align=center first-line=0pt space-before=0pt line-spacing=160% size=13pt} | **3분기** {align=center first-line=0pt space-before=0pt line-spacing=160% size=13pt} | **4분기** {align=center first-line=0pt space-before=0pt line-spacing=160% size=13pt} | {fill=#DFE6F7}\n",
+     "new": "| **1분기** {align=center first-line=0pt space-before=0pt line-spacing=160% size=13pt} | **2분기** {align=center first-line=0pt space-before=0pt line-spacing=160% size=13pt} | **3분기** {align=center first-line=0pt space-before=0pt line-spacing=160% size=13pt} | **4분기** {align=center first-line=0pt space-before=0pt line-spacing=160% size=13pt} | {fill=#D9D9D9}\n"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e4",
+   "edits": [
+    {
+     "old": "**1. ’25년 성과: 노동과 생명을 존중하는 정책기조로 전환** {space-before=30pt line-spacing=162% font=함초롬바탕 size=16pt color=#0000FF}\n",
+     "new": "**1. ’25년 성과: 노동과 생명을 존중하는 정책기조로 전환** {space-before=30pt line-spacing=162% font=함초롬바탕 size=18pt color=#C00000}\n"
+    },
+    {
+     "old": "**2. 정책 보완점** {first-line=-58.96pt space-before=30pt line-spacing=172% font=함초롬바탕 size=16pt color=#0000FF}\n",
+     "new": "**2. 정책 보완점** {first-line=-58.96pt space-before=30pt line-spacing=172% font=함초롬바탕 size=18pt color=#C00000}\n"
+    },
+    {
+     "old": "**1. 추진방향** {space-before=24pt line-spacing=130% font=함초롬바탕 size=16pt color=#0000FF}\n",
+     "new": "**1. 추진방향** {space-before=24pt line-spacing=130% font=함초롬바탕 size=18pt color=#C00000}\n"
+    },
+    {
+     "old": "**2. 추진전략** {first-line=-44.76pt line-spacing=170% font=함초롬바탕 size=16pt color=#0000FF}\n",
+     "new": "**2. 추진전략** {first-line=-44.76pt line-spacing=170% font=함초롬바탕 size=18pt color=#C00000}\n"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e5",
+   "edits": [
+    {
+     "old": "{border-right=\"0.43pt solid #000000\" border-left=\"0.43pt solid #000000\" align=center line-spacing=130% font=\"맑은 고딕\"}\n| {border-left=\"0.34pt solid #000000\"}           **직급별** {align=justify line-spacing=70%}<p/>**구 분** {align=justify first-line=-62.4pt line-spacing=70%} ||| **계** {line-spacing=70%} | **정무직** {line-spacing=70%} | **고공단** {line-spacing=70%} | **3․4급** {line-spacing=70%} | **4급** {line-spacing=70%} | **4․5급** {line-spacing=70%} | **5급** {line-spacing=70%} | **6급이하** {line-spacing=70%} | {border-right=\"0.34pt solid #000000\"} **기타\\*** {line-spacing=70%} | {fill=#FFFFCC border-top=\"0.34pt solid #000000\" border-bottom=\"1.42pt double #000000\"}\n|---|---|---|---|---|---|---|---|---|---|---|---|\n| {border-bottom=none border-left=\"0.34pt solid #000000\"} **합계** || 정 원 | <p style=\"바탕글 사본2\"/>8,491 | <p style=\"바탕글 사본2\"/>4 | <p style=\"바탕글 사본2\"/>51 | <p style=\"바탕글 사본2\"/>16 | <p style=\"바탕글 사본2\"/>91 | <p style=\"바탕글 사본2\"/>78 | <p style=\"바탕글 사본2\"/>651 | <p style=\"바탕글 사본2\"/>7,427 | {border-right=\"0.34pt solid #000000\"} <p style=\"바탕글 사본2\"/>173 | {border-top=\"1.42pt double #000000\" border-bottom=\"0.34pt dashed #000000\"}\n| ^^ || 현 원 | <p style=\"바탕글 사본2\"/>8,667 | <p style=\"바탕글 사본2\"/>3 | <p style=\"바탕글 사본2\"/>41 | <p style=\"바탕글 사본2\"/>16 | <p style=\"바탕글 사본2\"/>113 | <p style=\"바탕글 사본2\"/>55 | <p style=\"바탕글 사본2\"/>659 | <p style=\"바탕글 사본2\"/>7,625 | {border-right=\"0.34pt solid #000000\"} <p style=\"바탕글 사본2\"/>155 | {border-top=\"0.34pt dashed #000000\" border-bottom=\"0.43pt solid #000000\"}\n| {border-top=none border-bottom=none border-left=\"0.34pt solid #000000\"} | {border-bottom=\"0.43pt solid #000000\"} **본부** | 정 원 | <p style=\"표가운데\"/>658 | <p style=\"표가운데\"/>3 | <p style=\"표가운데\"/>22 | <p style=\"표가운데\"/>10 | <p style=\"표가운데\"/>42 | <p style=\"표가운데\"/>31 | <p style=\"표가운데\"/>250 | <p style=\"표가운데\"/>271 | {border-right=\"0.34pt solid #000000\"} <p style=\"표가운데\"/>29 | {border-top=\"0.43pt solid #000000\" border-bottom=\"0.34pt dashed #000000\"}\n| ^^ | ^^ | 현 원 | <p style=\"표가운데\"/>773 | <p style=\"표가운데\"/>3 | <p style=\"표가운데\"/>18 | <p style=\"표가운데\"/>10 | <p style=\"표가운데\"/>51 | <p style=\"표가운데\"/>27 | <p style=\"표가운데\"/>236 | <p style=\"표가운데\"/>408 | {border-right=\"0.34pt solid #000000\"} <p style=\"표가운데\"/>20 | {border-top=\"0.34pt dashed #000000\" border-bottom=\"0.43pt solid #000000\"}\n| {border-top=none border-bottom=none border-left=\"0.34pt solid #000000\"} | {border-bottom=\"0.34pt solid #000000\"} **소속**<p/>**기관** | 정 원 | <p style=\"표가운데\"/>7,833 | <p style=\"표가운데\"/>1 | <p style=\"표가운데\"/>29 | <p style=\"표가운데\"/>6 | <p style=\"표가운데\"/>49 | <p style=\"표가운데\"/>47 | <p style=\"표가운데\"/>401 | <p style=\"표가운데\"/>7,156 | {border-right=\"0.34pt solid #000000\"} <p style=\"표가운데\"/>144 | {border-top=\"0.43pt solid #000000\" border-bottom=\"0.34pt dashed #000000\"}\n| ^^ | ^^ | 현 원 | <p style=\"표가운데\"/>7,850 | <p style=\"표가운데\"/>- | <p style=\"표가운데\"/>23 | <p style=\"표가운데\"/>5 | <p style=\"표가운데\"/>52 | <p style=\"표가운데\"/>23 | <p style=\"표가운데\"/>409 | <p style=\"표가운데\"/>7,203 | {border-right=\"0.34pt solid #000000\"} <p style=\"표가운데\"/>135 | {border-top=\"0.34pt dashed #000000\" border-bottom=\"0.34pt solid #000000\"}\n| {border-top=none border-left=\"0.34pt solid #000000\"} | **기타\\*\\*** | 현 원 | <p style=\"표가운데\"/>44 | <p style=\"표가운데\"/>- | <p style=\"표가운데\"/>- | <p style=\"표가운데\"/>1 | <p style=\"표가운데\"/>10 | <p style=\"표가운데\"/>5 | <p style=\"표가운데\"/>14 | <p style=\"표가운데\"/>14 | {border-right=\"0.34pt solid #000000\"} <p style=\"표가운데\"/>- | {border-top=\"0.34pt solid #000000\" border-bottom=\"0.34pt solid #000000\"}\n",
+     "new": "{border-right=\"0.43pt solid #000000\" border-left=\"0.43pt solid #000000\" align=center line-spacing=130% font=\"맑은 고딕\" color=#1F3864}\n| {border-left=\"0.34pt solid #000000\"}           **직급별** {align=justify line-spacing=70% color=#000000}<p/>**구 분** {align=justify first-line=-62.4pt line-spacing=70% color=#000000} ||| **계** {line-spacing=70% color=#000000} | **정무직** {line-spacing=70% color=#000000} | **고공단** {line-spacing=70% color=#000000} | **3․4급** {line-spacing=70% color=#000000} | **4급** {line-spacing=70% color=#000000} | **4․5급** {line-spacing=70% color=#000000} | **5급** {line-spacing=70% color=#000000} | **6급이하** {line-spacing=70% color=#000000} | {border-right=\"0.34pt solid #000000\"} **기타\\*** {line-spacing=70% color=#000000} | {fill=#FFFFCC border-top=\"0.34pt solid #000000\" border-bottom=\"1.42pt double #000000\"}\n|---|---|---|---|---|---|---|---|---|---|---|---|\n| {border-bottom=none border-left=\"0.34pt solid #000000\"} **합계** {color=#000000} || 정 원 {color=#000000} | <p style=\"바탕글 사본2\"/>8,491 {color=#000000} | <p style=\"바탕글 사본2\"/>4 {color=#000000} | <p style=\"바탕글 사본2\"/>51 {color=#000000} | <p style=\"바탕글 사본2\"/>16 {color=#000000} | <p style=\"바탕글 사본2\"/>91 {color=#000000} | <p style=\"바탕글 사본2\"/>78 {color=#000000} | <p style=\"바탕글 사본2\"/>651 {color=#000000} | <p style=\"바탕글 사본2\"/>7,427 {color=#000000} | {border-right=\"0.34pt solid #000000\"} <p style=\"바탕글 사본2\"/>173 {color=#000000} | {border-top=\"1.42pt double #000000\" border-bottom=\"0.34pt dashed #000000\"}\n| ^^ || 현 원 {color=#000000} | <p style=\"바탕글 사본2\"/>8,667 {color=#000000} | <p style=\"바탕글 사본2\"/>3 {color=#000000} | <p style=\"바탕글 사본2\"/>41 {color=#000000} | <p style=\"바탕글 사본2\"/>16 {color=#000000} | <p style=\"바탕글 사본2\"/>113 {color=#000000} | <p style=\"바탕글 사본2\"/>55 {color=#000000} | <p style=\"바탕글 사본2\"/>659 {color=#000000} | <p style=\"바탕글 사본2\"/>7,625 {color=#000000} | {border-right=\"0.34pt solid #000000\"} <p style=\"바탕글 사본2\"/>155 {color=#000000} | {border-top=\"0.34pt dashed #000000\" border-bottom=\"0.43pt solid #000000\"}\n| {border-top=none border-bottom=none border-left=\"0.34pt solid #000000\"} | {border-bottom=\"0.43pt solid #000000\"} **본부** {color=#000000} | 정 원 {color=#000000} | <p style=\"표가운데\"/>658 | <p style=\"표가운데\"/>3 | <p style=\"표가운데\"/>22 | <p style=\"표가운데\"/>10 | <p style=\"표가운데\"/>42 | <p style=\"표가운데\"/>31 | <p style=\"표가운데\"/>250 | <p style=\"표가운데\"/>271 | {border-right=\"0.34pt solid #000000\"} <p style=\"표가운데\"/>29 | {border-top=\"0.43pt solid #000000\" border-bottom=\"0.34pt dashed #000000\"}\n| ^^ | ^^ | 현 원 {color=#000000} | <p style=\"표가운데\"/>773 | <p style=\"표가운데\"/>3 | <p style=\"표가운데\"/>18 | <p style=\"표가운데\"/>10 | <p style=\"표가운데\"/>51 | <p style=\"표가운데\"/>27 | <p style=\"표가운데\"/>236 | <p style=\"표가운데\"/>408 | {border-right=\"0.34pt solid #000000\"} <p style=\"표가운데\"/>20 | {border-top=\"0.34pt dashed #000000\" border-bottom=\"0.43pt solid #000000\"}\n| {border-top=none border-bottom=none border-left=\"0.34pt solid #000000\"} | {border-bottom=\"0.34pt solid #000000\"} **소속** {color=#000000}<p/>**기관** {color=#000000} | 정 원 {color=#000000} | <p style=\"표가운데\"/>7,833 | <p style=\"표가운데\"/>1 | <p style=\"표가운데\"/>29 | <p style=\"표가운데\"/>6 | <p style=\"표가운데\"/>49 | <p style=\"표가운데\"/>47 | <p style=\"표가운데\"/>401 | <p style=\"표가운데\"/>7,156 | {border-right=\"0.34pt solid #000000\"} <p style=\"표가운데\"/>144 | {border-top=\"0.43pt solid #000000\" border-bottom=\"0.34pt dashed #000000\"}\n| ^^ | ^^ | 현 원 {color=#000000} | <p style=\"표가운데\"/>7,850 | <p style=\"표가운데\"/>- | <p style=\"표가운데\"/>23 | <p style=\"표가운데\"/>5 | <p style=\"표가운데\"/>52 | <p style=\"표가운데\"/>23 | <p style=\"표가운데\"/>409 | <p style=\"표가운데\"/>7,203 | {border-right=\"0.34pt solid #000000\"} <p style=\"표가운데\"/>135 | {border-top=\"0.34pt dashed #000000\" border-bottom=\"0.34pt solid #000000\"}\n| {border-top=none border-left=\"0.34pt solid #000000\"} | **기타\\*\\*** {color=#000000} | 현 원 {color=#000000} | <p style=\"표가운데\"/>44 | <p style=\"표가운데\"/>- | <p style=\"표가운데\"/>- | <p style=\"표가운데\"/>1 | <p style=\"표가운데\"/>10 | <p style=\"표가운데\"/>5 | <p style=\"표가운데\"/>14 | <p style=\"표가운데\"/>14 | {border-right=\"0.34pt solid #000000\"} <p style=\"표가운데\"/>- | {border-top=\"0.34pt solid #000000\" border-bottom=\"0.34pt solid #000000\"}\n"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e6",
+   "edits": [
+    {
+     "old": " [ㅇ  **(현장 밀착관리)** 산업안전 **컨트롤타워 차관급 격상**, **감독관 증원**]{size=15pt}[(’25~’26년, 1,200명)]{size=13pt}[과 **안전한 일터 프로젝트**]{size=15pt}[(2.2만개소)]{size=13pt} [등 통한 **현장 밀착관리**]{size=15pt} {first-line=-58.96pt space-before=20pt line-spacing=162% font=함초롬바탕}\n",
+     "new": " [ㅇ  **(현장 밀착관리)** 산업안전 **컨트롤타워 차관급 격상**, **감독관 증원**]{size=15pt}[(’25~’26년, 1,300명)]{size=13pt}[과 **안전한 일터 프로젝트**]{size=15pt}[(2.2만개소)]{size=13pt} [등 통한 **현장 밀착관리**]{size=15pt} {first-line=-58.96pt space-before=20pt line-spacing=162% font=함초롬바탕}\n"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e7",
+   "edits": [
+    {
+     "old": "[□  **(미래세대 청년 고용 불안)**]{size=15pt} [**20·30 쉬었음 청년 70만**, 현 상황 지속시 **숙련·자산형성 부족** 등으로 **노동시장 활력 저하** 및 **경쟁력 약화 우려**]{size=15pt}[(국가부양부담↑)]{size=13pt} {first-line=-44pt space-before=20pt line-spacing=172% font=함초롬바탕}\n",
+     "new": "[□  **(미래세대 청년 고용 불안)**]{size=15pt} [**20·30 쉬었음 청년 70만**, 현 상황 지속시 **숙련·자산형성 부족** 등으로 **노동시장 활력 저하** 및 **경쟁력 약화 우려**]{size=15pt}[(국가부양부담↑)]{size=13pt} {first-line=-44pt space-before=20pt line-spacing=172% font=함초롬바탕}\n\n| **구분** | **내용** | {fill=#D9D9D9}\n|---|---|\n| 청년 | 일자리 첫걸음 보장제 |\n"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e8",
+   "edits": [
+    {
+     "old": "□  **노동자의 생명과 안전 지키기: 중견·대기업**의 **산업재해 감축 추세**\\* {space-before=24pt line-spacing=162% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **노동자의 생명과 안전 지키기: 중견·대기업**의 **산업재해 감축 추세**\\* {first-line=10pt space-before=24pt line-spacing=162% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "[□  **기본이 지켜지는 일터: 임금체불 청산율 88.3%로 역대 최고**]{size=15pt}[**(’25.9월 기준)**]{size=13pt} {first-line=-58.96pt space-before=24pt line-spacing=162% font=함초롬바탕}\n",
+     "new": "[□  **기본이 지켜지는 일터: 임금체불 청산율 88.3%로 역대 최고**]{size=15pt}[**(’25.9월 기준)**]{size=13pt} {first-line=10pt space-before=24pt line-spacing=162% font=함초롬바탕}\n"
+    },
+    {
+     "old": "□  **상생과 연대의 기반 조성** {space-before=24pt line-spacing=162% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **상생과 연대의 기반 조성** {first-line=10pt space-before=24pt line-spacing=162% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **미래대응 일자리 기반 확충** {first-line=-59.08pt space-before=24pt line-spacing=172% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **미래대응 일자리 기반 확충** {first-line=10pt space-before=24pt line-spacing=172% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **(중소‧영세사업장 산재 위험 가중)** 떨어짐･끼임 등 **재래형 사고** 지속, **기후변화·일하는 방식 다양화** 등에 따른 새로운 산재 **위험요인 대두** {first-line=-43.84pt space-before=20pt line-spacing=172% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **(중소‧영세사업장 산재 위험 가중)** 떨어짐･끼임 등 **재래형 사고** 지속, **기후변화·일하는 방식 다양화** 등에 따른 새로운 산재 **위험요인 대두** {first-line=10pt space-before=20pt line-spacing=172% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **(임금체불 절대액 증가)** **피해노동자 감소 추세**에도 **경제규모 확대, 임금총액 증가** 등으로 **체불액은 지속 증가**, 특히 소규모사업장에 집중 {first-line=-43.68pt space-before=20pt line-spacing=172% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **(임금체불 절대액 증가)** **피해노동자 감소 추세**에도 **경제규모 확대, 임금총액 증가** 등으로 **체불액은 지속 증가**, 특히 소규모사업장에 집중 {first-line=10pt space-before=20pt line-spacing=172% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **(노동보호 사각지대 확대)** 플랫폼 등 **일하는 방식이 변화**함에 따라 기존 노동법으로 **보호받지 못하는 새로운 형태의 노동** 증가 {first-line=-44pt space-before=20pt line-spacing=172% font=함초롬바탕 size=15pt}\n\n[□  **(미래세대 청년 고용 불안)**]{size=15pt} [**20·30 쉬었음 청년 70만**, 현 상황 지속시 **숙련·자산형성 부족** 등으로 **노동시장 활력 저하** 및 **경쟁력 약화 우려**]{size=15pt}[(국가부양부담↑)]{size=13pt} {first-line=-44pt space-before=20pt line-spacing=172% font=함초롬바탕}\n",
+     "new": "□  **(노동보호 사각지대 확대)** 플랫폼 등 **일하는 방식이 변화**함에 따라 기존 노동법으로 **보호받지 못하는 새로운 형태의 노동** 증가 {first-line=10pt space-before=20pt line-spacing=172% font=함초롬바탕 size=15pt}\n\n[□  **(미래세대 청년 고용 불안)**]{size=15pt} [**20·30 쉬었음 청년 70만**, 현 상황 지속시 **숙련·자산형성 부족** 등으로 **노동시장 활력 저하** 및 **경쟁력 약화 우려**]{size=15pt}[(국가부양부담↑)]{size=13pt} {first-line=10pt space-before=20pt line-spacing=172% font=함초롬바탕}\n"
+    },
+    {
+     "old": "□  **노동시장 격차 해소** {first-line=-58.96pt space-before=30pt line-spacing=130% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **노동시장 격차 해소** {first-line=10pt space-before=30pt line-spacing=130% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **노동있는 산업 대전환** {first-line=-58.96pt space-before=30pt line-spacing=130% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **노동있는 산업 대전환** {first-line=10pt space-before=30pt line-spacing=130% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **노동이 존중받는 일터** {first-line=-58.96pt space-before=30pt line-spacing=130% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **노동이 존중받는 일터** {first-line=10pt space-before=30pt line-spacing=130% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **추진배경** {first-line=-67.7pt space-before=30pt line-spacing=109% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **추진배경** {first-line=10pt space-before=30pt line-spacing=109% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **주요내용** {first-line=-67.7pt space-before=30pt line-spacing=109% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **주요내용** {first-line=10pt space-before=30pt line-spacing=109% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **이행계획(’26년)** {first-line=-250.8pt space-before=30pt line-spacing=109% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **이행계획(’26년)** {first-line=10pt space-before=30pt line-spacing=109% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **추진배경** {first-line=-250.8pt space-before=24pt line-spacing=144% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **추진배경** {first-line=10pt space-before=24pt line-spacing=144% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "[□  **주요내용: OECD 평균 수준**]{size=15pt}[(1,700시간대)]{size=13pt}[을 목표로 **실노동시간 단축 본격 추진**]{size=15pt} {first-line=-250.8pt space-before=24pt line-spacing=144% font=함초롬바탕}\n",
+     "new": "[□  **주요내용: OECD 평균 수준**]{size=15pt}[(1,700시간대)]{size=13pt}[을 목표로 **실노동시간 단축 본격 추진**]{size=15pt} {first-line=10pt space-before=24pt line-spacing=144% font=함초롬바탕}\n"
+    },
+    {
+     "old": "□ **이행계획(’26년)** {first-line=-250.8pt space-before=24pt line-spacing=144% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=144% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **추진배경** {first-line=-250.8pt space-before=24pt line-spacing=128% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **추진배경** {first-line=10pt space-before=24pt line-spacing=128% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **주요내용** {first-line=-250.8pt space-before=24pt line-spacing=128% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **주요내용** {first-line=10pt space-before=24pt line-spacing=128% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **이행계획(’26년)** {first-line=-250.8pt space-before=20pt line-spacing=128% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **이행계획(’26년)** {first-line=10pt space-before=20pt line-spacing=128% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **추진배경** {first-line=-61.52pt space-before=24pt line-spacing=155% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **추진배경** {first-line=10pt space-before=24pt line-spacing=155% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **주요내용**  {first-line=-250.8pt space-before=24pt line-spacing=155% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **주요내용**  {first-line=10pt space-before=24pt line-spacing=155% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **이행계획(’26년)** {first-line=-61.52pt space-before=20pt line-spacing=155% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **이행계획(’26년)** {first-line=10pt space-before=20pt line-spacing=155% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **추진배경** {align=left first-line=-44.96pt space-before=24pt line-spacing=138% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **추진배경** {align=left first-line=10pt space-before=24pt line-spacing=138% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **주요내용: 대상별 지원체계 구축** {align=left first-line=-67.7pt space-before=24pt line-spacing=138% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **주요내용: 대상별 지원체계 구축** {align=left first-line=10pt space-before=24pt line-spacing=138% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **이행계획(’26년)** {first-line=-250.8pt space-before=24pt line-spacing=138% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=138% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **추진배경** {align=left first-line=-44.96pt space-before=24pt line-spacing=107% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **추진배경** {align=left first-line=10pt space-before=24pt line-spacing=107% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **주요내용** {align=left first-line=-67.7pt space-before=24pt line-spacing=107% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **주요내용** {align=left first-line=10pt space-before=24pt line-spacing=107% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **이행계획(’26년)** {first-line=-58.96pt space-before=24pt line-spacing=107% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=107% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **추진배경** {first-line=-250.8pt space-before=24pt line-spacing=153% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **추진배경** {first-line=10pt space-before=24pt line-spacing=153% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **주요내용** {first-line=-250.8pt space-before=24pt line-spacing=153% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **주요내용** {first-line=10pt space-before=24pt line-spacing=153% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **이행계획(’26년)** {first-line=-250.8pt space-before=24pt line-spacing=153% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=153% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **추진배경** {align=left first-line=-67.7pt space-before=24pt line-spacing=145% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **추진배경** {align=left first-line=10pt space-before=24pt line-spacing=145% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **주요내용** {align=left first-line=-67.7pt space-before=24pt line-spacing=145% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **주요내용** {align=left first-line=10pt space-before=24pt line-spacing=145% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **이행계획(’26년)** {align=left first-line=-67.7pt space-before=24pt line-spacing=145% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **이행계획(’26년)** {align=left first-line=10pt space-before=24pt line-spacing=145% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **추진배경** {first-line=-250.8pt space-before=24pt line-spacing=140% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **추진배경** {first-line=10pt space-before=24pt line-spacing=140% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **주요내용** {first-line=-250.8pt space-before=24pt line-spacing=140% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **주요내용** {first-line=10pt space-before=24pt line-spacing=140% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **이행계획(’26년)** {first-line=-61.52pt space-before=20pt line-spacing=140% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **이행계획(’26년)** {first-line=10pt space-before=20pt line-spacing=140% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **추진배경** {first-line=-250.8pt space-before=24pt line-spacing=123% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **추진배경** {first-line=10pt space-before=24pt line-spacing=123% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **주요내용** {first-line=-61.4pt space-before=24pt line-spacing=123% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **주요내용** {first-line=10pt space-before=24pt line-spacing=123% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **이행계획(’26년)** {first-line=-250.8pt space-before=24pt line-spacing=123% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=123% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **추진배경** {first-line=-250.8pt space-before=24pt line-spacing=139% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **추진배경** {first-line=10pt space-before=24pt line-spacing=139% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **주요내용** {first-line=-250.8pt space-before=24pt line-spacing=139% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **주요내용** {first-line=10pt space-before=24pt line-spacing=139% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **이행계획(’26년)** {first-line=-250.8pt space-before=24pt line-spacing=139% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=139% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **추진 배경** {space-before=24pt line-spacing=165% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **추진 배경** {first-line=10pt space-before=24pt line-spacing=165% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **주요 내용** {space-before=24pt line-spacing=165% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **주요 내용** {first-line=10pt space-before=24pt line-spacing=165% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **이행계획(’26년)** {space-before=24pt line-spacing=165% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=165% font=함초롬바탕 size=15pt}\n"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e9",
+   "text": "REFUSE: this format cannot express it."
+  }
+ ]
+}

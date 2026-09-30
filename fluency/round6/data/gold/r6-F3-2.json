@@ -1,0 +1,66 @@
+{
+ "answers": [
+  {
+   "task_id": "mel-q1",
+   "text": "REFUSE: that formatting is not shown in this file."
+  },
+  {
+   "task_id": "mel-q2",
+   "text": "REFUSE: that formatting is not shown in this file."
+  },
+  {
+   "task_id": "mel-q3",
+   "text": "ANSWER: align=center line-spacing=130%"
+  },
+  {
+   "task_id": "mel-q4",
+   "text": "REFUSE: that formatting is not shown in this file."
+  },
+  {
+   "task_id": "mel-e1",
+   "text": "REFUSE: direct formatting cannot be written here."
+  },
+  {
+   "task_id": "mel-e2",
+   "text": "REFUSE: direct formatting cannot be written here."
+  },
+  {
+   "task_id": "mel-e3",
+   "text": "REFUSE: direct formatting cannot be written here."
+  },
+  {
+   "task_id": "mel-e4",
+   "text": "REFUSE: direct formatting cannot be written here."
+  },
+  {
+   "task_id": "mel-e5",
+   "edits": [
+    {
+     "old": "<style name=\"표가운데\" align=center line-spacing=130% font=-윤명조120/>\n",
+     "new": "<style name=\"표가운데\" align=center line-spacing=130% font=-윤명조120 color=#1F3864/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e6",
+   "edits": [
+    {
+     "old": " ㅇ  **(현장 밀착관리)** 산업안전 **컨트롤타워 차관급 격상**, **감독관 증원**(’25~’26년, 1,200명)과 **안전한 일터 프로젝트**(2.2만개소) 등 통한 **현장 밀착관리**\n",
+     "new": " ㅇ  **(현장 밀착관리)** 산업안전 **컨트롤타워 차관급 격상**, **감독관 증원**(’25~’26년, 1,300명)과 **안전한 일터 프로젝트**(2.2만개소) 등 통한 **현장 밀착관리**\n"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e7",
+   "text": "REFUSE: direct formatting cannot be written here."
+  },
+  {
+   "task_id": "mel-e8",
+   "text": "REFUSE: direct formatting cannot be written here."
+  },
+  {
+   "task_id": "mel-e9",
+   "text": "REFUSE: this format cannot express it."
+  }
+ ]
+}

@@ -1,0 +1,57 @@
+{
+ "unit_id": "r6p-F2o-3",
+ "candidate": "F2o",
+ "seed": 3,
+ "name": "onlyoffice-sample",
+ "format": "pptx",
+ "unreachable": [
+  "pp-q1",
+  "pp-e4"
+ ],
+ "q2": [
+  "s253550464",
+  "s1717326992"
+ ],
+ "tasks": [
+  {
+   "task_id": "pp-q1",
+   "kind": "read",
+   "text": "On slide 1, what is the fill of the shape s780022854? Answer `ANSWER: fill=<colour>`."
+  },
+  {
+   "task_id": "pp-q2",
+   "kind": "read",
+   "text": "On slide 1, which shapes inside the group g752157556 have a 1.5pt outline? Answer `ANSWER: <id>; <id>` with the shape ids."
+  },
+  {
+   "task_id": "pp-e1",
+   "kind": "edit",
+   "text": "On slide 2, change the fill of the shape s304069585 to accent2."
+  },
+  {
+   "task_id": "pp-e2",
+   "kind": "edit",
+   "text": "On slide 3, give the shape \"Slide text\" a 2pt navy outline."
+  },
+  {
+   "task_id": "pp-e3",
+   "kind": "edit",
+   "text": "In the slide 3 title \"What are presentations in editors?\", make \"editors\" 24pt and coral."
+  },
+  {
+   "task_id": "pp-e4",
+   "kind": "edit",
+   "text": "On slide 1, make the two small lines s721421238 and s918234874 twice as thick, keeping their colour and line style."
+  },
+  {
+   "task_id": "pp-e5",
+   "kind": "edit",
+   "text": "On slide 1, change \"Presentation Editor\" to \"Presentation Studio\", keeping its formatting exactly as it is."
+  },
+  {
+   "task_id": "pp-e6",
+   "kind": "refuse",
+   "text": "On slide 2, give the shape \"Slide title\" a soft drop shadow."
+  }
+ ]
+}

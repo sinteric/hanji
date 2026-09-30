@@ -1,0 +1,41 @@
+{
+ "answers": [
+  {
+   "task_id": "mel-q1",
+   "text": "REFUSE: The banner's fill is direct cell formatting, which is not shown in this text and cannot be read."
+  },
+  {
+   "task_id": "mel-q2",
+   "text": "REFUSE: Cell borders are direct formatting, which is not shown in this text, so I can't tell which cells have a double bottom border."
+  },
+  {
+   "task_id": "mel-q3",
+   "text": "ANSWER: align=center line-spacing=130%"
+  },
+  {
+   "task_id": "mel-q4",
+   "text": "ANSWER: first-line=0pt"
+  },
+  {
+   "task_id": "mel-e1",
+   "text": "REFUSE: The banner's fill is direct cell formatting, which cannot be changed in this format."
+  },
+  {
+   "task_id": "mel-e2",
+   "text": "REFUSE: The banner's border is direct cell formatting, which cannot be changed in this format."
+  },
+  {
+   "task_id": "mel-e6",
+   "edits": [
+    {
+     "old": "1,200명",
+     "new": "1,300명"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e9",
+   "text": "REFUSE: A gradient cannot be expressed in this format, and the banner's fill is direct formatting that can't be edited."
+  }
+ ]
+}

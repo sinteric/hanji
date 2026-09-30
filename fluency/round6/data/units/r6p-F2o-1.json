@@ -1,0 +1,54 @@
+{
+ "unit_id": "r6p-F2o-1",
+ "candidate": "F2o",
+ "seed": 1,
+ "name": "synth-modern-pitch",
+ "format": "pptx",
+ "unreachable": [
+  "pp-q1",
+  "pp-e4"
+ ],
+ "q2": null,
+ "tasks": [
+  {
+   "task_id": "pp-q1",
+   "kind": "read",
+   "text": "On the Agenda slide, what is the outline (width, line style and colour) of the connector \"Connector 6\"? Answer `ANSWER: border=\"<width> <style> <colour>\"`."
+  },
+  {
+   "task_id": "pp-q2",
+   "kind": "read",
+   "text": "On the Agenda slide, which shapes are filled accent1? Answer `ANSWER: <name>; <name>`."
+  },
+  {
+   "task_id": "pp-e1",
+   "kind": "edit",
+   "text": "Change the fill of Card 2's background, \"Rounded Rectangle 7\", to accent2."
+  },
+  {
+   "task_id": "pp-e2",
+   "kind": "edit",
+   "text": "Give Card 3's background, \"Rounded Rectangle 12\", a 2pt navy outline."
+  },
+  {
+   "task_id": "pp-e3",
+   "kind": "edit",
+   "text": "In the text \"Battery cost down 60% in 5 years\", make \"60%\" 24pt and coral."
+  },
+  {
+   "task_id": "pp-e4",
+   "kind": "edit",
+   "text": "Make the three connectors on the Agenda slide 3pt wide, keeping their colour and line style."
+  },
+  {
+   "task_id": "pp-e5",
+   "kind": "edit",
+   "text": "Change \"Series A · 2026\" to \"Series B · 2026\", keeping its formatting exactly as it is."
+  },
+  {
+   "task_id": "pp-e6",
+   "kind": "refuse",
+   "text": "Give Card 1's background, \"Rounded Rectangle 2\", a soft drop shadow."
+  }
+ ]
+}

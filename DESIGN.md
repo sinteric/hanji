@@ -1,7 +1,7 @@
 ---
 status: draft
 date: 2026-09-29
-measured: library and project facts below were checked 2026-09-28/29 against crates.io, npm, PyPI, GitHub and project docs; the §5 syntax choices were measured by fluency rounds 1–4 (2026-09-28, two Claude models) and the Presentation geometry by round 5 (2026-09-29, the same models); the remainder anchoring (§10.3) by the remainder prototype (2026-09-28, 13 docx); nothing here has yet been opened in real Office by this project
+measured: library and project facts below were checked 2026-09-28/29 against crates.io, npm, PyPI, GitHub and project docs; the §5 syntax choices were measured by fluency rounds 1–4 (2026-09-28, two Claude models) and the Presentation geometry by round 5 (2026-09-29, the same models); direct formatting (§10 item 10, proposed) by round 6 (2026-09-30, the same models); the remainder anchoring (§10.3) by the remainder prototype (2026-09-28, 13 docx); nothing here has yet been opened in real Office by this project
 ---
 
 # hanji — office documents for LLM agents (design)
@@ -155,7 +155,34 @@ package ─────────────────────► model
 - **Formatting by name only** — the file's own paragraph/character/table
   styles, slide layouts, cell styles and number formats. Direct formatting
   (a colour, a font size) is remainder: preserved for people, not edited by
-  the model.
+  the model. *Proposed replacement (§10 item 10, round 6):* formatting is
+  named styles plus a small fixed vocabulary of direct properties, one for
+  all four formats, written as `key=value` attributes (not CSS):
+  - paragraph `align`, `indent-left`, `indent-right`, `first-line` (negative
+    is a hanging indent), `space-before`, `space-after`, `line-spacing`
+    (`160%`, `14pt`, `"at-least 14pt"`); text `font`, `size`, `color`,
+    `bold`, `italic`, `underline`, `strike` (in running text the marks
+    `**`, `*`, `<u>`, `~~`); box `fill`, `border` or `border-top`/`-right`/
+    `-bottom`/`-left` (`"<width>pt <style> <colour>"`, style solid, dashed,
+    dotted, double, dash-dot, dash-dot-dot, or `none`), `valign`; xlsx
+    `indent` in levels.
+  - Lengths in points with `pt`, at most two decimals. Colours `#RRGGBB` or
+    theme names `tx1 bg1 tx2 bg2 accent1`…`accent6 hlink`, kept as names:
+    `accent1+40%` lighter, `accent1-25%` darker (Office's presets),
+    `accent1*` any other transform, `/55%` opacity.
+  - Shown and kept, not writable: `fill=gradient|pattern|picture`, border
+    styles `triple`, `thin-thick`, `thick-thin`, `wave`, `3d`, and `accent1*`;
+    left as written they keep the stored XML, and they may be replaced by a
+    writable value. Refused: gradients and patterns as values, diagonal
+    cell borders, shadows and other effects, highlight, character spacing.
+  - Keep rule, as for `box` (§5.3): a value left as shown keeps the stored
+    XML; a changed value writes that property only, as direct formatting.
+    The write returns the canonical text (rounded and snapped values shown,
+    §5.2 lifting re-applied).
+  - Per kind (owner, 2026-09-30): flow documents show named styles and the
+    direct properties that differ from them (§5.2); Presentations show
+    every object's effective formatting inline (§5.3); Spreadsheets show
+    formatted ranges (§5.4).
 - **Placeholders:** `<keep id="k3" kind="drawing" summary="org chart, 5 boxes"/>`
   (block or inline). The model may move or delete one explicitly, and in a
   Presentation resize it by its box (§5.3); it never alters its content, and
@@ -299,6 +326,40 @@ schema: 1
   table style, the one a new table gets (docx: the file's default table
   style, or Table Grid when that draws no borders, as Word's Normal Table
   does); a line naming it is written as no line.
+- **Formatting (proposed, §10 item 10, round 6 F2).** After the front matter,
+  one line per style the text uses, the default first:
+  `<style name="바탕글" align=justify line-spacing=160% font=함초롬바탕 size=10pt color=#000000/>`,
+  then `<style name="개요 3" indent-left=20pt space-before=5pt size=15pt/>`.
+  The default line is complete (a property it leaves out is 0pt, none or
+  off); every other line holds what differs from the default style. Direct
+  formatting is written where it applies and holds only what differs from
+  the element's style:
+  - a paragraph (heading, list item, `<div>`, plain line): ` {…}` at the end
+    of its line, `- 항목 {style="개요 3" first-line=10pt}`; a list item names
+    its style there. A property left out is the style's.
+  - a run: `[15% 성장]{size=14pt color=#1F4E79}`.
+  - a cell: `{…}` at the very start of the cell; each cell paragraph ends in
+    its own `{…}`: `| {fill=#FFF0C3 border-bottom="2.83pt solid #7F7F7F"} **3D 프린팅 기술의 미래와 전망** {align=center size=20pt} |`.
+  - a row: ` {…}` after its last `|`; the table: the `{style="Name" …}`
+    line before the header row.
+  - Canonical form lifts what is shared: a property every run of a paragraph
+    has is on the paragraph; a value more than half of a row's cells (or of
+    a table's cells and cell paragraphs) have is on the row (or table) line,
+    and a cell writes only what differs. Adjacent equal runs merge. Empty
+    paragraphs show no formatting.
+  - Changing a style line changes every paragraph in that style that does not
+    set the property itself; the returned text shows them unchanged.
+    Creating a style is refused for now.
+  - docx: `w:pPr`/`w:rPr` children, `w:tcPr` `w:shd`/`w:tcBorders`,
+    `w:tblBorders`, styles through `basedOn`, docDefaults and the table
+    style. hwpx: `paraPr` (margins from the `HwpUnitChar` branch, both
+    branches written), `charPr`, `borderFill`; a changed value adds a shape
+    to `header.xml`, cloned from the element's and changed in one field.
+  - *Why F2:* round 6 tied F1 (every element shows its effective
+    formatting) on every direct task, and only F2 could change a style (6/6,
+    one line against every paragraph); F2's style lookups landed 10/10, on an
+    84k-char file too; F3 (styles only) could not do 21 of 39 tasks and
+    misread hidden formatting as the style's.
 - Headers, footers and section setup come from the template or the remainder
   at first; exposing their text is a later extension.
 - Tracked changes and comments (`<ins>`, `<del>`, `<comment>`) are read-only
@@ -416,7 +477,20 @@ layout: Two Content
   `<p/>` starts its next paragraph. Its paragraphs are never list items
   (bullets stay in the remainder). A shape without text is
   `<shape id="s9" name="Oval 8" box="…"/>`. Its outline, fill and preset
-  geometry stay in the remainder.
+  geometry stay in the remainder. *Proposed (§10 item 10, round 6 F1):* its
+  effective formatting follows `box` on the tag, whether the shape sets it
+  or takes it from the theme's `p:style` or the layout, like `box` itself:
+  `<shape id="s8" name="Card" box="354 130 260 320" fill=accent1 border="2pt solid accent1-50%" size=18pt color=#FFFFFF>…</shape>`;
+  a slot's on its marker (`::title box="…" size=44pt color=tx1::`), a line's
+  outline as `border` on `<line/>`. A paragraph's own properties end its
+  paragraph (`{…}` before `<p/>` or `</shape>`, or at the end of a slot
+  line); a run's are `[text]{…}`. A property left out is not there (no
+  fill, no outline). A changed value writes `spPr`/`a:ln`/`a:rPr` on the
+  object and keeps its `p:style`. *Why:* round 6 measured showing only what
+  the object sets (the pptx canvas audit's proposal): a quarter of the tasks
+  (a read of an inherited value, an edit that must keep one) could not be
+  done, and one was answered wrong; F1 did all 48, at 1.27× today's text
+  against 1.14× on the corpus.
 - **Pictures, charts, tables** and other objects the format does not model are
   a `<keep id kind summary box/>` line each (§5.1). They may be moved, resized,
   reordered or deleted, and their `id`, `kind` and `summary` never change;
@@ -494,6 +568,16 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
   <keep id="k1" kind="data-validation" summary="B2:B1201"/>
   </sheet>
   ```
+
+  *Proposed (§10 item 10):* formatted cells are `<format range="E4:H4"
+  fill=bg2-10% border-top="2.25pt solid bg1" bold/>` lines in the sheet
+  block, one per rectangle of cells with the same effective formatting that
+  is not Normal's, `style="Name"` on ranges in a named cell style; they are
+  written by a `format` range operation
+  (`{"op": "format", "range": "매출!A1:D1", "set": {"fill": "#D9D9D9", "bold": true}}`).
+  Excel border styles show as widths (thin 0.75pt, medium 1.5pt, thick
+  2.25pt, double, hair) and a written width snaps to the nearest one.
+  Not measured by fluency.
 
   `range` on `<sheet>` is the used range, tables included. A column's type
   is `text`, `number`, `date` or `mixed` (cells of more than one kind, or
@@ -740,6 +824,43 @@ rotation.
   one run per prompt, and geometry checked in the kit's model, not yet in
   hanji-pptx or PowerPoint.
 
+**Round 6 results (2026-09-30)** — kit in [fluency/round6/](fluency/round6/),
+candidates in [fluency/round6/CANDIDATES.md](fluency/round6/CANDIDATES.md),
+details in [fluency/round6/RESULTS.md](fluency/round6/RESULTS.md). Same two
+models, blind, each prompt read from its own file with Read as the only tool,
+one fix round. It proposes §10 item 10, direct formatting, per kind. Part A,
+flow documents (3 candidates × 3 seeds × 13 tasks: footnote-01.hwpx, the
+1,717-paragraph mel-001.hwpx, korean-report.docx): F1, effective formatting on
+every element; F2, a style section plus only what differs from the style; F3,
+the style section only. Part B, Presentations (2 candidates × 3 decks × 8
+tasks: the pptx canvas audit's two synthetic decks and the ONLYOFFICE sample):
+F1, effective formatting inline; F2o, only what the object sets itself.
+
+| Part | Opus landed | Sonnet landed | Opus chars | Sonnet chars | Proposed |
+|---|---|---|---|---|---|
+| A: F1 / F2 / F3 | 35/37 / 37/39 / 18/18 (+21 impossible, 2 misread) | 35/37 / 37/39 / 18/18 (+21, 2 misread) | 19,475 / 13,137 / 4,522 | 16,037 / 19,097 / 4,140 | F2 for docx and hwpx |
+| B: F1 / F2o | 24/24 / 18/18 (+6 impossible) | 24/24 / 18/18 (+6, 1 misread) | 3,183 / 2,976 | 2,855 / 2,618 | F1 for pptx |
+
+- Landed is after the fix round, of the tasks the candidate's text can do.
+  F1 and F2 tie on direct tasks with the same misses: an `old` that missed
+  look-alike characters on mel-001 (U+2007 figure spaces, fixed once the
+  error named them; a private-use U+F076, not named, not fixed). Only F2 can
+  change a style (6/6; one line of 162 chars against every paragraph,
+  1,264–3,616); under F1 both models refused 4 of the 6 style edits,
+  correctly. F2's reads through a style line landed 10/10, on the 84k-char
+  file too.
+- The errors that matter are reads of formatting the text does not hold:
+  F3 answered a paragraph's first-line indent and a run's size from the
+  style (4 answers, no validator can catch them); F2o once gave `fill=none`
+  for a shape filled accent1 by its theme style.
+- Size on the corpus, over today's text: hwpx F1 2.13×, F2 2.16×, F3 1.04×
+  (Hancom keeps formatting on each paragraph and cell, so F2 cannot factor
+  it); docx 1.40×, 1.38×, 1.12×; pptx F1 1.27×, F2o 1.14×; xlsx F1 range
+  lines 2.48× (2.04× without one outlier, median 1.00). Row and table
+  lifting took fdi-2025q2.hwpx from 4.4× to 2.0×.
+- Limits: formatting read, written and checked by the kit, not the engines
+  or Office; no large docx; xlsx not run; one run per prompt.
+
 ## 7. Engines (surveyed 2026-09-28)
 
 Engines work only at import, export and preview. Every engine is behind this
@@ -798,6 +919,7 @@ v0.7.3; "lossless … regarding content", not formatting).
 | Rule 5 (fidelity) | Per-page SSIM of our preview against the native application's own PDF export — Word, PowerPoint, Excel, Hancom — not against LibreOffice |
 | Presentation geometry | GetPut per object on the pptx corpus: every `a:xfrm` (and every absent one) unchanged after import → export; PutGet after box, z-order, group and new-object edits; the office-kit shows moved, resized and added objects where the text puts them, in PowerPoint |
 | Rule 8 (the model sees it) | Per corpus deck, every object on a slide appears in the text: slots, shapes with or without text, lines, groups and their objects, `<keep/>` lines |
+| Direct formatting (proposed, §10 item 10) | GetPut per element on every corpus file: a formatting value left as shown leaves its `pPr`/`rPr`/`tcPr`, `paraPrIDRef`/`charPrIDRef`/`borderFillIDRef`, `spPr`/`p:style` and cell `s` untouched (the kit holds this on the text for 28 of 29 flow files); PutGet after fill, border, colour, size, indent and style-line edits, the returned text canonical (lifting, snapped widths); each vocabulary value opens as written in Word, Hancom, PowerPoint and Excel (the office-kit) |
 | Rule 2 (fluency) | §6 |
 
 ## 10. Open decisions
@@ -880,14 +1002,28 @@ v0.7.3; "lossless … regarding content", not formatting).
    rotated groups (kept whole), pictures from a file, and cm as a view or
    input over points (the unit Korean PowerPoint shows; not measured).
 
+10. **Direct formatting (proposed, 2026-09-30)** — by §6 round 6, per kind:
+    flow documents F2 (a style section plus visible direct overrides,
+    §5.2), Presentations F1 (effective formatting inline on every object,
+    §5.3), Spreadsheets range lines and a `format` operation (§5.4); one
+    vocabulary for all four (§5.1). Replaces "formatting by name only" when
+    accepted. Open: the size of Hancom files (2.1× today's text: cell
+    borders, fonts and sizes set on every paragraph and cell, which no style
+    factors); whether new styles can be created; xlsx not measured; the
+    text must escape look-alike and private-use characters (round 6's only
+    invalid answers), a hanji-format follow-up. The kit's formatting reader
+    is its own, not the engines'.
+
 ## 11. Blind spots
 
 - No library above has been opened in real Office or Hancom by this project;
   every defect and fidelity statement comes from project docs and issue
   trackers. This check is deliberately deferred until the build produces
   exports (2026-09-28).
-- The fluency list in §6 is still mostly a model's self-report: five rounds
+- The fluency list in §6 is still mostly a model's self-report: six rounds
   ran on two Claude models only, 12–48 tasks per cell, one run per prompt.
+  Round 6's formatting was read and checked by its kit, not by the engines,
+  on three flow seeds (two hwpx, one small docx) and three decks.
   Round 5 put three of its four candidates at the ceiling on small decks, so
   the §5.3 geometry rests on design (a slide that reads on its own), and its geometry was checked in the
   kit's model (`deck.py`), not in hanji-pptx or PowerPoint. No round asked

@@ -1,0 +1,80 @@
+{
+ "answers": [
+  {
+   "task_id": "fn-q1",
+   "text": "REFUSE: The banner's fill is direct cell formatting, which this format keeps but does not show, so it can't be read here."
+  },
+  {
+   "task_id": "fn-q2",
+   "text": "REFUSE: Cell borders are direct cell formatting, which this format keeps but does not show, so they can't be read here."
+  },
+  {
+   "task_id": "fn-q3",
+   "text": "ANSWER: indent-left=20pt first-line=0pt"
+  },
+  {
+   "task_id": "fn-q4",
+   "text": "ANSWER: size=14pt"
+  },
+  {
+   "task_id": "fn-e1",
+   "text": "REFUSE: A cell's fill is direct formatting, which this format can't show or change, and table cells have no style of their own to edit."
+  },
+  {
+   "task_id": "fn-e2",
+   "text": "REFUSE: A cell's borders are direct formatting, which this format can't show or change, and table cells have no style of their own to edit."
+  },
+  {
+   "task_id": "fn-e6",
+   "edits": [
+    {
+     "old": "  - 시제품 제작 시간과 비용 절감 및 이를 통한 제품 혁신의 가속화 {style=\"개요 3\"}",
+     "new": "  - 시제품 제작 기간과 비용 절감 및 이를 통한 제품 혁신의 가속화 {style=\"개요 3\"}"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e9",
+   "text": "REFUSE: This format can't express a gradient fill."
+  },
+  {
+   "task_id": "fn-e3",
+   "text": "REFUSE: A cell's fill is direct formatting that this format cannot show or change, so the grey fill on the first-row cells can't be applied."
+  },
+  {
+   "task_id": "fn-e4",
+   "edits": [
+    {
+     "old": "<style name=\"개요 2\" indent-left=10pt space-before=5pt font=휴먼명조 size=15pt bold/>",
+     "new": "<style name=\"개요 2\" indent-left=10pt space-before=5pt font=휴먼명조 size=16pt color=#C00000 bold/>"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e5",
+   "edits": [
+    {
+     "old": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt/>",
+     "new": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt color=#1F3864/>"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e7",
+   "text": "REFUSE: Tables and cells have no formatting of their own in this format, so a new table's header cells can't be given a grey fill."
+  },
+  {
+   "task_id": "fn-e8",
+   "edits": [
+    {
+     "old": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt/>",
+     "new": "<style name=\"개요 3\" indent-left=20pt first-line=10pt space-before=5pt font=휴먼명조 size=15pt/>"
+    },
+    {
+     "old": "<style name=\"개요 4\" indent-left=30pt space-before=3pt font=휴먼명조 size=14pt/>",
+     "new": "<style name=\"개요 4\" indent-left=30pt first-line=10pt space-before=3pt font=휴먼명조 size=14pt/>"
+    }
+   ]
+  }
+ ]
+}

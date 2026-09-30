@@ -1,0 +1,48 @@
+{
+ "answers": [
+  {
+   "text": "ANSWER: s253550464; s1717326992",
+   "task_id": "pp-q2"
+  },
+  {
+   "edits": [
+    {
+     "old": "<shape id=\"s304069585\" name=\"\" box=\"305 390 105 63\" fill=bg1-5% border=\"1.5pt solid accent6\"/>\n",
+     "new": "<shape id=\"s304069585\" name=\"\" box=\"305 390 105 63\" fill=accent2 border=\"1.5pt solid accent6\"/>\n"
+    }
+   ],
+   "task_id": "pp-e1"
+  },
+  {
+   "edits": [
+    {
+     "old": "<shape id=\"s95144368\" name=\"Slide text\" box=\"120 180 414 332\" first-line=-22.68pt line-spacing=115% font=Arial size=16pt>**Presentations in editors** are a collection of slides that include text, images, graphics, animations, and videos, which help convey the key points of a report or lecture. They can be used for educational purposes, business meetings, conferences, or any other events where a visual representation of information is required.</shape>\n",
+     "new": "<shape id=\"s95144368\" name=\"Slide text\" box=\"120 180 414 332\" border=\"2pt solid #1F3864\" first-line=-22.68pt line-spacing=115% font=Arial size=16pt>**Presentations in editors** are a collection of slides that include text, images, graphics, animations, and videos, which help convey the key points of a report or lecture. They can be used for educational purposes, business meetings, conferences, or any other events where a visual representation of information is required.</shape>\n"
+    }
+   ],
+   "task_id": "pp-e2"
+  },
+  {
+   "edits": [
+    {
+     "old": "***What are presentations <br/>in editors?***\n",
+     "new": "***What are presentations <br/>in [editors]{size=24pt color=#FF7F50}?***\n"
+    }
+   ],
+   "task_id": "pp-e3"
+  },
+  {
+   "edits": [
+    {
+     "old": "<shape id=\"s1179962678\" name=\"Title 1\" box=\"132 125 531 146\" font=\"Times New Roman\" size=120pt color=accent6+80%>***Presentation Editor***</shape>\n",
+     "new": "<shape id=\"s1179962678\" name=\"Title 1\" box=\"132 125 531 146\" font=\"Times New Roman\" size=120pt color=accent6+80%>***Presentation Studio***</shape>\n"
+    }
+   ],
+   "task_id": "pp-e5"
+  },
+  {
+   "text": "REFUSE: this format cannot express it.",
+   "task_id": "pp-e6"
+  }
+ ]
+}

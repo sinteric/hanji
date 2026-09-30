@@ -1,0 +1,38 @@
+{
+ "answers": [
+  {
+   "task_id": "kr-e3",
+   "text": "REFUSE: A cell's fill is direct formatting that this format cannot show or change, so the header cells can't be given a grey fill."
+  },
+  {
+   "task_id": "kr-e4",
+   "edits": [
+    {
+     "old": "<style name=\"Heading 1\" size=16pt bold/>",
+     "new": "<style name=\"Heading 1\" size=16pt bold color=#C00000/>"
+    },
+    {
+     "old": "<style name=\"Heading 2\" size=13pt bold/>",
+     "new": "<style name=\"Heading 2\" size=13pt bold color=#C00000/>"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e5",
+   "edits": [
+    {
+     "old": "<style name=\"Heading 2\" size=13pt bold/>",
+     "new": "<style name=\"Heading 2\" size=13pt bold color=#1F3864/>"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e7",
+   "text": "REFUSE: Tables and cells have no formatting of their own here, so a grey fill on the new header cells can't be expressed."
+  },
+  {
+   "task_id": "kr-e8",
+   "text": "REFUSE: The body paragraphs share the default style Normal with the table's cell paragraphs, and new styles and per-paragraph formatting aren't available, so the body can't be indented without also indenting the table."
+  }
+ ]
+}

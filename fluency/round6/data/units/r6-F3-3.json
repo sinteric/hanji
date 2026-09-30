@@ -1,0 +1,83 @@
+{
+ "unit_id": "r6-F3-3",
+ "candidate": "F3",
+ "seed": 3,
+ "name": "korean-report",
+ "format": "docx",
+ "file": "---\ntype: document\nformat: docx\nschema: 1\n---\n\n<style name=\"Normal\" line-spacing=100% font=\"Noto Sans CJK KR\" size=12pt color=#000000/>\n<style name=\"Heading 1\" size=16pt bold/>\n<style name=\"Note\" fill=#EEEEEE/>\n<style name=\"Heading 2\" size=13pt bold/>\n<style name=\"Block Quotation\" indent-left=28.35pt/>\n\n# 3분기 영업 보고\n\n매출은 전년 대비 **12%** 증가했다.<keep id=\"khc1l\" kind=\"footnote\" summary=\"footnote: 내부 집계 기준.\"/> 신규 고객은 34곳이며, 그중 21곳이 수도권이다.\n\n<div style=\"Note\">신규 고객 34곳 중 21곳이 수도권.</div>\n\n지방 지점의 매출은 1,204억 원으로 15% 성장했다.<keep id=\"ku25a\" kind=\"comment\" summary=\"comment: 지방 수치 재확인 필요\"/>\n\n## 지역별 현황\n\n아래 표는 지점별 매출을 정리한 것이다.\n\n<keep id=\"kml28\" kind=\"drawing\" summary=\"조직도, 상자 5개\"/>\n\n| 지역 | 지점 | 매출 |\n|---|---|---|\n| 서울 | 강남 | 120 |\n| ^^ | 종로 | 95 |\n| 합계 || 215 |\n\n강남 지점은 *전년 대비* <keep id=\"k83hu\" kind=\"tracked-insert\" summary=\"ins by 김민지: 8%\"/>성장했다.\n\n## 향후 계획\n\n4분기에는 부산과 대구에 지점을 연다.\n\n<div style=\"Block Quotation\">“고객이 있는 곳에 지점이 있어야 한다.” — 영업본부장</div>\n\n부록: 지점 목록\n\n서울 강남, 서울 종로, 경기 분당, 인천 송도.\n",
+ "unreachable": [
+  "kr-q2",
+  "kr-q4",
+  "kr-e2",
+  "kr-e3",
+  "kr-e7",
+  "kr-e8"
+ ],
+ "tasks": [
+  {
+   "task_id": "kr-q1",
+   "kind": "read",
+   "text": "What colour is the shading (fill) of the note paragraph \"신규 고객 34곳 중 21곳이 수도권.\"? Answer `ANSWER: fill=<colour>`."
+  },
+  {
+   "task_id": "kr-q2",
+   "kind": "read",
+   "text": "Which words or phrases in the file are coloured #C00000? Answer `ANSWER: <text>; <text>`."
+  },
+  {
+   "task_id": "kr-q3",
+   "kind": "read",
+   "text": "What is the left indent of the quotation \"“고객이 있는 곳에 지점이 있어야 한다.”…\"? Answer `ANSWER: indent-left=<pt>`."
+  },
+  {
+   "task_id": "kr-q4",
+   "kind": "read",
+   "text": "What is the font size of the text \"15% 성장\"? Answer `ANSWER: size=<pt>`."
+  },
+  {
+   "task_id": "kr-e1",
+   "kind": "edit",
+   "text": "Change the shading (fill) of the note paragraph \"신규 고객 34곳 중 21곳이 수도권.\" to light blue."
+  },
+  {
+   "task_id": "kr-e2",
+   "kind": "edit",
+   "text": "Give the cells of the table's last row (합계 | 215) a red bottom border, 1.5pt solid."
+  },
+  {
+   "task_id": "kr-e3",
+   "kind": "edit",
+   "text": "Make the cells of the table's header row (지역 | 지점 | 매출) bold with a grey fill (#D9D9D9)."
+  },
+  {
+   "task_id": "kr-e4",
+   "kind": "edit",
+   "text": "Make every heading (the # and ## lines) dark red (#C00000)."
+  },
+  {
+   "task_id": "kr-e5",
+   "kind": "edit",
+   "text": "Change the style Heading 2 so that all Heading 2 paragraphs turn navy (#1F3864)."
+  },
+  {
+   "task_id": "kr-e6",
+   "kind": "edit",
+   "text": "Change \"15% 성장\" to \"16% 성장\". Change nothing else: its formatting must stay exactly as it is."
+  },
+  {
+   "task_id": "kr-e7",
+   "kind": "edit",
+   "text": "After the paragraph \"4분기에는 부산과 대구에 지점을 연다.\", add a table with a header row 도시 | 개점 whose cells have a grey fill (#D9D9D9), and two rows 부산 | 10월 and 대구 | 11월."
+  },
+  {
+   "task_id": "kr-e8",
+   "kind": "edit",
+   "text": "Indent the first line of every body paragraph by 10pt: the plain paragraphs of the text, not the headings, the note, the quotation or the table."
+  },
+  {
+   "task_id": "kr-e9",
+   "kind": "refuse",
+   "text": "Fill the header row of the table with a diagonal-stripe pattern."
+  }
+ ]
+}

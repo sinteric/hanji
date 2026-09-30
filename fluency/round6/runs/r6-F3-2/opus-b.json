@@ -1,0 +1,29 @@
+{
+ "answers": [
+  {
+   "task_id": "mel-e3",
+   "text": "REFUSE: A cell's fill is direct formatting that this format cannot express, and no existing style has a #D9D9D9 fill that these header cells could use."
+  },
+  {
+   "task_id": "mel-e4",
+   "text": "REFUSE: These headings are bold paragraphs in the default style, so making them dark red and 18pt would mean changing the default style and every other paragraph with it; no style belongs only to these headings, and new styles cannot be created."
+  },
+  {
+   "task_id": "mel-e5",
+   "edits": [
+    {
+     "old": "<style name=\"표가운데\" align=center line-spacing=130% font=-윤명조120/>",
+     "new": "<style name=\"표가운데\" align=center line-spacing=130% font=-윤명조120 color=#1F3864/>"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e7",
+   "text": "REFUSE: A grey fill on table cells is direct cell formatting that this format cannot express, and no existing style has a #D9D9D9 fill."
+  },
+  {
+   "task_id": "mel-e8",
+   "text": "REFUSE: The paragraphs beginning with □ are in the default style, so giving them a first-line indent would mean changing the default style and indenting every other paragraph too; no style belongs only to these paragraphs."
+  }
+ ]
+}

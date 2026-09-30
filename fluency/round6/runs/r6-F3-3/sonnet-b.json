@@ -1,0 +1,38 @@
+{
+ "answers": [
+  {
+   "task_id": "kr-e3",
+   "text": "REFUSE: A cell's grey fill is direct formatting that cannot be read or changed in this format, so the header row cannot be given the fill."
+  },
+  {
+   "task_id": "kr-e4",
+   "edits": [
+    {
+     "old": "<style name=\"Heading 1\" size=16pt bold/>",
+     "new": "<style name=\"Heading 1\" size=16pt color=#C00000 bold/>"
+    },
+    {
+     "old": "<style name=\"Heading 2\" size=13pt bold/>",
+     "new": "<style name=\"Heading 2\" size=13pt color=#C00000 bold/>"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e5",
+   "edits": [
+    {
+     "old": "<style name=\"Heading 2\" size=13pt bold/>",
+     "new": "<style name=\"Heading 2\" size=13pt color=#1F3864 bold/>"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e7",
+   "text": "REFUSE: Cell fill is direct formatting that cannot be set in this format, so the new table's cells cannot get the grey fill."
+  },
+  {
+   "task_id": "kr-e8",
+   "text": "REFUSE: Body paragraphs and table cells share the Normal style and new styles cannot be created, so the first-line indent cannot be limited to the plain body paragraphs."
+  }
+ ]
+}

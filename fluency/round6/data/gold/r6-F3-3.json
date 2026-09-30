@@ -1,0 +1,76 @@
+{
+ "answers": [
+  {
+   "task_id": "kr-q1",
+   "text": "ANSWER: fill=#EEEEEE"
+  },
+  {
+   "task_id": "kr-q2",
+   "text": "REFUSE: that formatting is not shown in this file."
+  },
+  {
+   "task_id": "kr-q3",
+   "text": "ANSWER: indent-left=28.35pt"
+  },
+  {
+   "task_id": "kr-q4",
+   "text": "REFUSE: that formatting is not shown in this file."
+  },
+  {
+   "task_id": "kr-e1",
+   "edits": [
+    {
+     "old": "<style name=\"Note\" fill=#EEEEEE/>\n",
+     "new": "<style name=\"Note\" fill=#DDEBF7/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e2",
+   "text": "REFUSE: direct formatting cannot be written here."
+  },
+  {
+   "task_id": "kr-e3",
+   "text": "REFUSE: direct formatting cannot be written here."
+  },
+  {
+   "task_id": "kr-e4",
+   "edits": [
+    {
+     "old": "<style name=\"Heading 1\" size=16pt bold/>\n<style name=\"Note\" fill=#EEEEEE/>\n<style name=\"Heading 2\" size=13pt bold/>\n",
+     "new": "<style name=\"Heading 1\" size=16pt color=#C00000 bold/>\n<style name=\"Note\" fill=#EEEEEE/>\n<style name=\"Heading 2\" size=13pt color=#C00000 bold/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e5",
+   "edits": [
+    {
+     "old": "<style name=\"Heading 2\" size=13pt bold/>\n",
+     "new": "<style name=\"Heading 2\" size=13pt color=#1F3864 bold/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e6",
+   "edits": [
+    {
+     "old": "지방 지점의 매출은 1,204억 원으로 15% 성장했다.<keep id=\"ku25a\" kind=\"comment\" summary=\"comment: 지방 수치 재확인 필요\"/>\n",
+     "new": "지방 지점의 매출은 1,204억 원으로 16% 성장했다.<keep id=\"ku25a\" kind=\"comment\" summary=\"comment: 지방 수치 재확인 필요\"/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e7",
+   "text": "REFUSE: direct formatting cannot be written here."
+  },
+  {
+   "task_id": "kr-e8",
+   "text": "REFUSE: direct formatting cannot be written here."
+  },
+  {
+   "task_id": "kr-e9",
+   "text": "REFUSE: this format cannot express it."
+  }
+ ]
+}

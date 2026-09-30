@@ -1,0 +1,894 @@
+[
+ {
+  "file": "basic-table-01.hwpx",
+  "format": "hwpx",
+  "today": 127,
+  "F1": 248,
+  "getput_F1": true,
+  "F2": 248,
+  "getput_F2": true,
+  "F3": 216,
+  "getput_F3": true,
+  "blocks": 2,
+  "matched": 2
+ },
+ {
+  "file": "eq-002.hwpx",
+  "format": "hwpx",
+  "today": 1463,
+  "F1": 1813,
+  "getput_F1": true,
+  "F2": 1705,
+  "getput_F2": true,
+  "F3": 1705,
+  "getput_F3": true,
+  "blocks": 7,
+  "matched": 7
+ },
+ {
+  "file": "fdi-2025q2.hwpx",
+  "format": "hwpx",
+  "today": 38163,
+  "F1": 74969,
+  "getput_F1": true,
+  "F2": 76801,
+  "getput_F2": true,
+  "F3": 38386,
+  "getput_F3": true,
+  "blocks": 131,
+  "matched": 131
+ },
+ {
+  "file": "field-multipara-clickhere.hwpx",
+  "format": "hwpx",
+  "today": 890,
+  "F1": 1486,
+  "getput_F1": true,
+  "F2": 1486,
+  "getput_F2": true,
+  "F3": 979,
+  "getput_F3": true,
+  "blocks": 17,
+  "matched": 17
+ },
+ {
+  "file": "footnote-01.hwpx",
+  "format": "hwpx",
+  "today": 2708,
+  "F1": 6235,
+  "getput_F1": true,
+  "F2": 4664,
+  "getput_F2": true,
+  "F3": 3552,
+  "getput_F3": true,
+  "blocks": 40,
+  "matched": 40
+ },
+ {
+  "file": "footnote-tbox-01.hwpx",
+  "format": "hwpx",
+  "today": 201,
+  "F1": 290,
+  "getput_F1": true,
+  "F2": 290,
+  "getput_F2": true,
+  "F3": 290,
+  "getput_F3": true,
+  "blocks": 4,
+  "matched": 4
+ },
+ {
+  "file": "form-01.hwpx",
+  "format": "hwpx",
+  "today": 382,
+  "F1": 487,
+  "getput_F1": true,
+  "F2": 487,
+  "getput_F2": true,
+  "F3": 471,
+  "getput_F3": true,
+  "blocks": 8,
+  "matched": 8
+ },
+ {
+  "file": "hcar-001.hwpx",
+  "format": "hwpx",
+  "today": 4764,
+  "F1": 10716,
+  "getput_F1": true,
+  "F2": 10716,
+  "getput_F2": true,
+  "F3": 4853,
+  "getput_F3": true,
+  "blocks": 12,
+  "matched": 12
+ },
+ {
+  "file": "hy-002.hwpx",
+  "format": "hwpx",
+  "today": 2444,
+  "F1": 5205,
+  "getput_F1": true,
+  "F2": 5205,
+  "getput_F2": true,
+  "F3": 2533,
+  "getput_F3": true,
+  "blocks": 30,
+  "matched": 30
+ },
+ {
+  "file": "issue1535_coanchored_float_exclusion.hwpx",
+  "format": "hwpx",
+  "today": 928,
+  "F1": 1032,
+  "getput_F1": true,
+  "F2": 1032,
+  "getput_F2": true,
+  "F3": 1017,
+  "getput_F3": true,
+  "blocks": 33,
+  "matched": 33
+ },
+ {
+  "file": "issue1948_cross_para_fieldend.hwpx",
+  "format": "hwpx",
+  "today": 916,
+  "F1": 1641,
+  "getput_F1": true,
+  "F2": 1641,
+  "getput_F2": true,
+  "F3": 1005,
+  "getput_F3": true,
+  "blocks": 11,
+  "matched": 11
+ },
+ {
+  "file": "landscape-001.hwpx",
+  "format": "hwpx",
+  "today": 889,
+  "F1": 2728,
+  "getput_F1": true,
+  "F2": 2754,
+  "getput_F2": true,
+  "F3": 1040,
+  "getput_F3": true,
+  "blocks": 1,
+  "matched": 1
+ },
+ {
+  "file": "mel-001.hwpx",
+  "format": "hwpx",
+  "today": 32752,
+  "F1": 81536,
+  "getput_F1": true,
+  "F2": 84442,
+  "getput_F2": true,
+  "F3": 34062,
+  "getput_F3": true,
+  "blocks": 293,
+  "matched": 293
+ },
+ {
+  "file": "para-001.hwpx",
+  "format": "hwpx",
+  "today": 4387,
+  "F1": 4495,
+  "getput_F1": true,
+  "F2": 4495,
+  "getput_F2": true,
+  "F3": 4476,
+  "getput_F3": true,
+  "blocks": 41,
+  "matched": 41
+ },
+ {
+  "file": "table-text.hwpx",
+  "format": "hwpx",
+  "today": 452,
+  "F1": 1611,
+  "getput_F1": true,
+  "F2": 1817,
+  "getput_F2": true,
+  "F3": 674,
+  "getput_F3": true,
+  "blocks": 1,
+  "matched": 1
+ },
+ {
+  "file": "tb-img-03.hwpx",
+  "format": "hwpx",
+  "today": 163,
+  "F1": 284,
+  "getput_F1": true,
+  "F2": 284,
+  "getput_F2": true,
+  "F3": 252,
+  "getput_F3": true,
+  "blocks": 2,
+  "matched": 2
+ },
+ {
+  "file": "Bug54849.docx",
+  "format": "docx",
+  "today": 912,
+  "F1": 1009,
+  "getput_F1": true,
+  "F2": 1009,
+  "getput_F2": true,
+  "F3": 1009,
+  "getput_F3": true,
+  "blocks": 8,
+  "matched": 8
+ },
+ {
+  "file": "WordWithAttachments.docx",
+  "format": "docx",
+  "today": 1580,
+  "F1": 2006,
+  "getput_F1": true,
+  "F2": 2006,
+  "getput_F2": true,
+  "F3": 1670,
+  "getput_F3": true,
+  "blocks": 28,
+  "matched": 28
+ },
+ {
+  "file": "delins.docx",
+  "format": "docx",
+  "today": 2374,
+  "F1": 3295,
+  "getput_F1": true,
+  "F2": 3295,
+  "getput_F2": true,
+  "F3": 2471,
+  "getput_F3": true,
+  "blocks": 21,
+  "matched": 12
+ },
+ {
+  "file": "docx4j-tables.docx",
+  "format": "docx",
+  "today": 1961,
+  "F1": 3723,
+  "getput_F1": true,
+  "F2": 3723,
+  "getput_F2": true,
+  "F3": 2056,
+  "getput_F3": true,
+  "blocks": 37,
+  "matched": 37
+ },
+ {
+  "file": "fdo76098.docx",
+  "format": "docx",
+  "today": 1516,
+  "F1": 2858,
+  "getput_F1": true,
+  "F2": 2719,
+  "getput_F2": true,
+  "F3": 1919,
+  "getput_F3": true,
+  "blocks": 35,
+  "matched": 35
+ },
+ {
+  "file": "form_footnotes.docx",
+  "format": "docx",
+  "today": 12597,
+  "F1": 17141,
+  "getput_F1": true,
+  "F2": 17299,
+  "getput_F2": false,
+  "F3": 13018,
+  "getput_F3": false,
+  "blocks": 18,
+  "matched": 18
+ },
+ {
+  "file": "korean-report.docx",
+  "format": "docx",
+  "today": 721,
+  "F1": 978,
+  "getput_F1": true,
+  "F2": 1058,
+  "getput_F2": true,
+  "F3": 980,
+  "getput_F3": true,
+  "blocks": 13,
+  "matched": 13
+ },
+ {
+  "file": "loadAndSave.docx",
+  "format": "docx",
+  "today": 1037,
+  "F1": 1435,
+  "getput_F1": true,
+  "F2": 1351,
+  "getput_F2": true,
+  "F3": 1290,
+  "getput_F3": true,
+  "blocks": 27,
+  "matched": 27
+ },
+ {
+  "file": "sample-docx.docx",
+  "format": "docx",
+  "today": 1991,
+  "F1": 3358,
+  "getput_F1": true,
+  "F2": 3100,
+  "getput_F2": true,
+  "F3": 2455,
+  "getput_F3": true,
+  "blocks": 60,
+  "matched": 60
+ },
+ {
+  "file": "tdf124637_sectionMargin.docx",
+  "format": "docx",
+  "today": 1301,
+  "F1": 1950,
+  "getput_F1": true,
+  "F2": 1711,
+  "getput_F2": true,
+  "F3": 1711,
+  "getput_F3": true,
+  "blocks": 29,
+  "matched": 29
+ },
+ {
+  "file": "tdf154481.docx",
+  "format": "docx",
+  "today": 2760,
+  "F1": 3672,
+  "getput_F1": true,
+  "F2": 3629,
+  "getput_F2": true,
+  "F3": 3216,
+  "getput_F3": true,
+  "blocks": 42,
+  "matched": 41
+ },
+ {
+  "file": "testWORD_2006ml.docx",
+  "format": "docx",
+  "today": 5231,
+  "F1": 5883,
+  "getput_F1": true,
+  "F2": 5995,
+  "getput_F2": true,
+  "F3": 5889,
+  "getput_F3": true,
+  "blocks": 90,
+  "matched": 82
+ },
+ {
+  "file": "testWORD_various.docx",
+  "format": "docx",
+  "today": 1048,
+  "F1": 1629,
+  "getput_F1": true,
+  "F2": 1597,
+  "getput_F2": true,
+  "F3": 1423,
+  "getput_F3": true,
+  "blocks": 43,
+  "matched": 43
+ },
+ {
+  "file": "45545_Comment.pptx",
+  "format": "pptx",
+  "today": 4366,
+  "F1": 5993,
+  "F2": 5589,
+  "F2o": 5403,
+  "F3": 4552
+ },
+ {
+  "file": "60810.pptx",
+  "format": "pptx",
+  "today": 27089,
+  "F1": 32212,
+  "F2": 30533,
+  "F2o": 30174,
+  "F3": 27402
+ },
+ {
+  "file": "EmbeddedVideo.pptx",
+  "format": "pptx",
+  "today": 189,
+  "F1": 189,
+  "F2": 407,
+  "F2o": 189,
+  "F3": 407
+ },
+ {
+  "file": "SampleShow.pptx",
+  "format": "pptx",
+  "today": 597,
+  "F1": 879,
+  "F2": 812,
+  "F2o": 644,
+  "F3": 765
+ },
+ {
+  "file": "ext-rels.pptx",
+  "format": "pptx",
+  "today": 204,
+  "F1": 204,
+  "F2": 382,
+  "F2o": 214,
+  "F3": 372
+ },
+ {
+  "file": "korean-deck.pptx",
+  "format": "pptx",
+  "today": 1247,
+  "F1": 1951,
+  "F2": 1425,
+  "F2o": 1257,
+  "F3": 1415
+ },
+ {
+  "file": "layouts.pptx",
+  "format": "pptx",
+  "today": 2311,
+  "F1": 3729,
+  "F2": 2619,
+  "F2o": 2451,
+  "F3": 2479
+ },
+ {
+  "file": "ph-populated-placeholders.pptx",
+  "format": "pptx",
+  "today": 926,
+  "F1": 1106,
+  "F2": 1094,
+  "F2o": 926,
+  "F3": 1094
+ },
+ {
+  "file": "ph-unpopulated-placeholders.pptx",
+  "format": "pptx",
+  "today": 323,
+  "F1": 323,
+  "F2": 491,
+  "F2o": 323,
+  "F3": 491
+ },
+ {
+  "file": "prs-notes.pptx",
+  "format": "pptx",
+  "today": 101,
+  "F1": 101,
+  "F2": 269,
+  "F2o": 101,
+  "F3": 269
+ },
+ {
+  "file": "shapes.pptx",
+  "format": "pptx",
+  "today": 1747,
+  "F1": 2457,
+  "F2": 2394,
+  "F2o": 1903,
+  "F3": 2059
+ },
+ {
+  "file": "shp-access-ole-object.pptx",
+  "format": "pptx",
+  "today": 85,
+  "F1": 85,
+  "F2": 253,
+  "F2o": 85,
+  "F3": 253
+ },
+ {
+  "file": "shp-groupshape.pptx",
+  "format": "pptx",
+  "today": 382,
+  "F1": 554,
+  "F2": 681,
+  "F2o": 382,
+  "F3": 625
+ },
+ {
+  "file": "shp-shapes.pptx",
+  "format": "pptx",
+  "today": 959,
+  "F1": 1271,
+  "F2": 1349,
+  "F2o": 969,
+  "F3": 1270
+ },
+ {
+  "file": "sld-notes.pptx",
+  "format": "pptx",
+  "today": 121,
+  "F1": 121,
+  "F2": 289,
+  "F2o": 121,
+  "F3": 289
+ },
+ {
+  "file": "tbl-cell.pptx",
+  "format": "pptx",
+  "today": 530,
+  "F1": 530,
+  "F2": 698,
+  "F2o": 530,
+  "F3": 698
+ },
+ {
+  "file": "txt-font-props.pptx",
+  "format": "pptx",
+  "today": 1092,
+  "F1": 1115,
+  "F2": 1383,
+  "F2o": 1215,
+  "F3": 1260
+ },
+ {
+  "file": "txt-text.pptx",
+  "format": "pptx",
+  "today": 433,
+  "F1": 433,
+  "F2": 621,
+  "F2o": 453,
+  "F3": 601
+ },
+ {
+  "file": "with_japanese.pptx",
+  "format": "pptx",
+  "today": 1170,
+  "F1": 2411,
+  "F2": 2645,
+  "F2o": 2477,
+  "F3": 1338
+ },
+ {
+  "file": "50867_with_table.xlsx",
+  "format": "xlsx",
+  "today": 407,
+  "F1": 407,
+  "F2": 473,
+  "F3": 432
+ },
+ {
+  "file": "54084-Greek-beyond-BMP.xlsx",
+  "format": "xlsx",
+  "today": 229,
+  "F1": 229,
+  "F2": 286,
+  "F3": 286
+ },
+ {
+  "file": "57893-many-merges.xlsx",
+  "format": "xlsx",
+  "today": 625,
+  "F1": 25100,
+  "F2": 25157,
+  "F3": 682
+ },
+ {
+  "file": "DataValidations-49244.xlsx",
+  "format": "xlsx",
+  "today": 1289,
+  "F1": 1755,
+  "F2": 1812,
+  "F3": 1346
+ },
+ {
+  "file": "DateFormatTests.xlsx",
+  "format": "xlsx",
+  "today": 1911,
+  "F1": 2315,
+  "F2": 2376,
+  "F3": 1972
+ },
+ {
+  "file": "ExcelPivotTableSample.xlsx",
+  "format": "xlsx",
+  "today": 1156,
+  "F1": 1228,
+  "F2": 1617,
+  "F3": 1466
+ },
+ {
+  "file": "ExcelTables.xlsx",
+  "format": "xlsx",
+  "today": 413,
+  "F1": 413,
+  "F2": 522,
+  "F3": 439
+ },
+ {
+  "file": "GeneralFormatTests.xlsx",
+  "format": "xlsx",
+  "today": 1363,
+  "F1": 2499,
+  "F2": 2560,
+  "F3": 1424
+ },
+ {
+  "file": "InlineStrings.xlsx",
+  "format": "xlsx",
+  "today": 468,
+  "F1": 468,
+  "F2": 653,
+  "F3": 653
+ },
+ {
+  "file": "SampleSS.xlsx",
+  "format": "xlsx",
+  "today": 642,
+  "F1": 728,
+  "F2": 785,
+  "F3": 699
+ },
+ {
+  "file": "SimpleWithComments.xlsx",
+  "format": "xlsx",
+  "today": 326,
+  "F1": 326,
+  "F2": 385,
+  "F3": 385
+ },
+ {
+  "file": "StructuredReferences.xlsx",
+  "format": "xlsx",
+  "today": 639,
+  "F1": 639,
+  "F2": 696,
+  "F3": 696
+ },
+ {
+  "file": "Tables.xlsx",
+  "format": "xlsx",
+  "today": 24610,
+  "F1": 74715,
+  "F2": 74774,
+  "F3": 24669
+ },
+ {
+  "file": "WithChart.xlsx",
+  "format": "xlsx",
+  "today": 370,
+  "F1": 370,
+  "F2": 427,
+  "F3": 427
+ },
+ {
+  "file": "WithConditionalFormatting.xlsx",
+  "format": "xlsx",
+  "today": 398,
+  "F1": 398,
+  "F2": 455,
+  "F3": 455
+ },
+ {
+  "file": "WithDrawing.xlsx",
+  "format": "xlsx",
+  "today": 524,
+  "F1": 524,
+  "F2": 581,
+  "F3": 581
+ },
+ {
+  "file": "WithTable.xlsx",
+  "format": "xlsx",
+  "today": 349,
+  "F1": 349,
+  "F2": 415,
+  "F3": 374
+ },
+ {
+  "file": "WithThreeCharts.xlsx",
+  "format": "xlsx",
+  "today": 694,
+  "F1": 694,
+  "F2": 751,
+  "F3": 751
+ },
+ {
+  "file": "WithVariousData.xlsx",
+  "format": "xlsx",
+  "today": 699,
+  "F1": 743,
+  "F2": 869,
+  "F3": 855
+ },
+ {
+  "file": "korean-sales-lo.xlsx",
+  "format": "xlsx",
+  "today": 3198,
+  "F1": 3670,
+  "F2": 4028,
+  "F3": 3556
+ },
+ {
+  "file": "korean-sales.xlsx",
+  "format": "xlsx",
+  "today": 2969,
+  "F1": 3039,
+  "F2": 3096,
+  "F3": 3026
+ },
+ {
+  "file": "link-external-workbook-b.xlsx",
+  "format": "xlsx",
+  "today": 118,
+  "F1": 118,
+  "F2": 119,
+  "F3": 119
+ },
+ {
+  "file": "rx_array_formula01.xlsx",
+  "format": "xlsx",
+  "today": 183,
+  "F1": 183,
+  "F2": 240,
+  "F3": 240
+ },
+ {
+  "file": "rx_autofilter01.xlsx",
+  "format": "xlsx",
+  "today": 917,
+  "F1": 917,
+  "F2": 974,
+  "F3": 974
+ },
+ {
+  "file": "rx_chart_bar01.xlsx",
+  "format": "xlsx",
+  "today": 353,
+  "F1": 353,
+  "F2": 410,
+  "F3": 410
+ },
+ {
+  "file": "rx_comment01.xlsx",
+  "format": "xlsx",
+  "today": 186,
+  "F1": 186,
+  "F2": 243,
+  "F3": 243
+ },
+ {
+  "file": "rx_cond_format01.xlsx",
+  "format": "xlsx",
+  "today": 216,
+  "F1": 216,
+  "F2": 273,
+  "F3": 273
+ },
+ {
+  "file": "rx_data_validation01.xlsx",
+  "format": "xlsx",
+  "today": 88,
+  "F1": 88,
+  "F2": 145,
+  "F3": 145
+ },
+ {
+  "file": "rx_defined_name01.xlsx",
+  "format": "xlsx",
+  "today": 208,
+  "F1": 208,
+  "F2": 265,
+  "F3": 265
+ },
+ {
+  "file": "rx_dynamic_array01.xlsx",
+  "format": "xlsx",
+  "today": 156,
+  "F1": 156,
+  "F2": 213,
+  "F3": 213
+ },
+ {
+  "file": "rx_hyperlink01.xlsx",
+  "format": "xlsx",
+  "today": 187,
+  "F1": 187,
+  "F2": 244,
+  "F3": 244
+ },
+ {
+  "file": "rx_image01.xlsx",
+  "format": "xlsx",
+  "today": 91,
+  "F1": 91,
+  "F2": 148,
+  "F3": 148
+ },
+ {
+  "file": "rx_merge_range01.xlsx",
+  "format": "xlsx",
+  "today": 203,
+  "F1": 241,
+  "F2": 298,
+  "F3": 260
+ },
+ {
+  "file": "rx_rich_string01.xlsx",
+  "format": "xlsx",
+  "today": 153,
+  "F1": 208,
+  "F2": 265,
+  "F3": 210
+ },
+ {
+  "file": "rx_table01.xlsx",
+  "format": "xlsx",
+  "today": 565,
+  "F1": 565,
+  "F2": 622,
+  "F3": 622
+ },
+ {
+  "file": "rx_table05.xlsx",
+  "format": "xlsx",
+  "today": 744,
+  "F1": 744,
+  "F2": 801,
+  "F3": 801
+ },
+ {
+  "file": "rx_table14.xlsx",
+  "format": "xlsx",
+  "today": 586,
+  "F1": 586,
+  "F2": 643,
+  "F3": 643
+ },
+ {
+  "file": "shared_formulas.xlsx",
+  "format": "xlsx",
+  "today": 863,
+  "F1": 890,
+  "F2": 949,
+  "F3": 922
+ },
+ {
+  "file": "sharedhyperlink.xlsx",
+  "format": "xlsx",
+  "today": 321,
+  "F1": 414,
+  "F2": 520,
+  "F3": 520
+ },
+ {
+  "file": "simple-monthly-budget.xlsx",
+  "format": "xlsx",
+  "today": 1479,
+  "F1": 3399,
+  "F2": 3483,
+  "F3": 2319
+ },
+ {
+  "file": "table-sample.xlsx",
+  "format": "xlsx",
+  "today": 618,
+  "F1": 618,
+  "F2": 791,
+  "F3": 709
+ },
+ {
+  "file": "unicodeSheetName.xlsx",
+  "format": "xlsx",
+  "today": 205,
+  "F1": 205,
+  "F2": 262,
+  "F3": 262
+ },
+ {
+  "file": "xlookup.xlsx",
+  "format": "xlsx",
+  "today": 1882,
+  "F1": 1882,
+  "F2": 1939,
+  "F3": 1939
+ }
+]

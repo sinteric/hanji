@@ -1,0 +1,43 @@
+{
+ "answers": [
+  {
+   "task_id": "fn-e3",
+   "text": "REFUSE: A cell's fill is direct formatting that this format cannot show or change, so the grey fill on the first-row cells can't be applied."
+  },
+  {
+   "task_id": "fn-e4",
+   "edits": [
+    {
+     "old": "<style name=\"개요 2\" indent-left=10pt space-before=5pt font=휴먼명조 size=15pt bold/>",
+     "new": "<style name=\"개요 2\" indent-left=10pt space-before=5pt font=휴먼명조 size=16pt color=#C00000 bold/>"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e5",
+   "edits": [
+    {
+     "old": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt/>",
+     "new": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt color=#1F3864/>"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e7",
+   "text": "REFUSE: Tables and cells have no formatting of their own in this format, so a new table's header cells can't be given a grey fill."
+  },
+  {
+   "task_id": "fn-e8",
+   "edits": [
+    {
+     "old": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt/>",
+     "new": "<style name=\"개요 3\" indent-left=20pt first-line=10pt space-before=5pt font=휴먼명조 size=15pt/>"
+    },
+    {
+     "old": "<style name=\"개요 4\" indent-left=30pt space-before=3pt font=휴먼명조 size=14pt/>",
+     "new": "<style name=\"개요 4\" indent-left=30pt first-line=10pt space-before=3pt font=휴먼명조 size=14pt/>"
+    }
+   ]
+  }
+ ]
+}
