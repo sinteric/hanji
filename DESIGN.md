@@ -652,8 +652,10 @@ layout: Two Content
   preset is the object's own `a:prstGeom`, else, for a placeholder, its
   layout's and master's placeholder's. A rectangle, and a straight line
   (`line`, `straightConnector1`), show no kind; adjustments left out are
-  the preset's own. Custom geometry (`a:custGeom`) shows no kind and is
-  kept; guides that are formulas rather than values are kept and not shown.
+  the preset's own. Custom geometry (`a:custGeom`) shows as
+  `kind="custom"`: its paths are kept as the file has them, and a preset
+  written in its place replaces them. Guides that are formulas rather than
+  values are kept and not shown.
   - A kind and adjustments left as shown keep the XML. A changed kind
     writes `a:prstGeom`'s `prst` and the adjustments the text gives (none:
     the new preset's own); changed adjustments rewrite `a:avLst`. A kind
@@ -663,7 +665,8 @@ layout: Two Content
     marker takes its layout's.
   - The object's fingerprint leaves its preset out. Refused: a kind that is
     not a DrawingML preset (with the nearest names), adjustments that are
-    not numbers or `name=number` pairs, a kind on custom geometry, and
+    not numbers or `name=number` pairs, `kind="custom"` on a shape that is
+    not custom (it cannot be written anew), `adj` on custom geometry, and
     `shape=`, `preset=` and other spellings (the key is `kind`).
 - **Effects** (built). A slot, shape or line shows what it draws beyond its
   fill and outline as a summary, `effects="…"`, last on its tag: the names

@@ -80,9 +80,9 @@ fn every_preset_is_shown_and_a_rectangle_is_none() {
         // A connector: bent is shown, straight is not.
         "from=\"186 252\" to=\"s2.1\" kind=\"bentConnector3\" border=",
         "from=\"468 366\" to=\"468 216\" border=",
-        // A rectangle and custom geometry show no kind.
+        // A rectangle shows no kind; custom geometry is custom.
         "name=\"Rectangle 8\" box=\"174 72 72 72\" fill=",
-        "name=\"Freeform 6\" box=\"47 211 185 136\" fill=",
+        "name=\"Freeform 6\" box=\"47 211 185 136\" kind=\"custom\" fill=",
     ] {
         assert!(t.contains(want), "{want}\n{t}");
     }
@@ -144,9 +144,10 @@ fn what_cannot_be_written_is_refused() {
         Err(EngineError::Refused(m)) => m,
         other => panic!("expected an error, got {:?}", other.map(|_| ())),
     };
-    let ff = "name=\"Freeform 6\" box=\"47 211 185 136\" fill=";
-    let m = err(imp.text.replace(ff, &ff.replace("fill=", "kind=\"ellipse\" fill=")), &imp.remainder);
-    assert!(m.contains("Freeform 6") && m.contains("custom geometry"), "{m}");
+    // Custom geometry is not written anew.
+    let r8 = "name=\"Rectangle 8\" box=\"174 72 72 72\" fill=";
+    let m = err(imp.text.replace(r8, &r8.replace("fill=", "kind=\"custom\" fill=")), &imp.remainder);
+    assert!(m.contains("Rectangle 8") && m.contains("cannot be written anew"), "{m}");
     let oval = "box=\"306 150 72 72\" kind=\"ellipse\"";
     let m = err(imp.text.replace(oval, "box=\"306 150 72 72\" kind=\"circle\""), &imp.remainder);
     assert!(m.contains("not a preset shape") && m.contains("ellipse"), "{m}");
@@ -154,4 +155,21 @@ fn what_cannot_be_written_is_refused() {
     assert!(m.contains("kind="), "{m}");
     let m = err(imp.text.replace(oval, &format!("{oval} adj=\"25%\"")), &imp.remainder);
     assert!(m.contains("adjustments"), "{m}");
+}
+
+#[test]
+fn custom_geometry_is_kept_and_a_preset_may_take_its_place() {
+    let pkg = deck("shapes.pptx");
+    let imp = import(&pkg);
+    let ff = "name=\"Freeform 6\" box=\"47 211 185 136\" kind=\"custom\"";
+    // Moved, it keeps its path.
+    let (parts, _) = edited(&imp, ff, &ff.replace("47 211", "47 311"));
+    let (a, b) = (sp_pr(&package::read(&pkg).unwrap(), "Freeform 6"), sp_pr(&parts, "Freeform 6"));
+    let path = |x: &str| x[x.find("<a:custGeom>").unwrap()..x.find("</a:custGeom>").unwrap()].to_string();
+    assert_eq!(path(&b), path(&a));
+    // A preset in its place.
+    let (parts, back) = edited(&imp, ff, &ff.replace("custom", "cloud"));
+    let sp = sp_pr(&parts, "Freeform 6");
+    assert!(!sp.contains("custGeom") && sp.contains("<a:prstGeom prst=\"cloud\"><a:avLst/></a:prstGeom>"), "{sp}");
+    assert!(back.text.contains(&ff.replace("custom", "cloud")));
 }

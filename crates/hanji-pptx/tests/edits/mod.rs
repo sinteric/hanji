@@ -13,8 +13,8 @@
 //! shape a rounded rectangle, P26 bend a straight line or straighten a bent one
 //! (preset shapes, §5.3); P27 move an object a connector is attached to, P28
 //! re-attach a connector (connectors, §5.3); P29 remove a shape's effects,
-//! P30 give a shape a shadow (effects, §5.3); P9 makes them all in one
-//! revision.
+//! P30 give a shape a shadow (effects, §5.3); P31 draw a custom shape as a
+//! preset (custom geometry, §5.3); P9 makes them all in one revision.
 
 use std::collections::HashSet;
 
@@ -28,7 +28,7 @@ use hanji_testkit::{
     block_ranges, chars, deleted_span, entries_at, figure_or_word, ident, replace_span, span_of, Cx, Doc, Edit, EditFn,
 };
 
-pub const EDITS: [(&str, EditFn); 29] = [
+pub const EDITS: [(&str, EditFn); 30] = [
     ("p1_title", p1_title),
     ("p2_bullet", p2_bullet),
     ("p3_add_slide", p3_add_slide),
@@ -58,6 +58,7 @@ pub const EDITS: [(&str, EditFn); 29] = [
     ("p28_reattach", p28_reattach),
     ("p29_clear_effects", p29_clear_effects),
     ("p30_shadow", p30_shadow),
+    ("p31_custom_to_preset", p31_custom_to_preset),
 ];
 
 /// A slide: its head and the end of its blocks.
@@ -954,7 +955,7 @@ fn p25_round_corners(d: &Doc, _: &Cx) -> Option<Edit> {
     let k = (0..d.blocks.len()).find(|&k| {
         d.blocks[k].head().is_some_and(|h| {
             matches!(kind(h), HeadKind::Shape { id, .. } if !id.is_empty())
-                && h.look.kind.as_deref().is_some_and(|k| k != "roundRect")
+                && h.look.kind.as_deref().is_some_and(|k| k != "roundRect" && k != "custom")
         })
     })?;
     let label = d.blocks[k].head()?.label.clone();
@@ -1127,4 +1128,21 @@ fn p30_shadow(d: &Doc, _: &Cx) -> Option<Edit> {
     let label = d.blocks[k].head()?.label.clone();
     let what = format!("shape {label:?}: effects=\"shadow\" on {}", slide_name(&d.blocks, k));
     Some(head_edit(d, k, |h| h.look.effects = Some("shadow".into()), "P30 give a shape a shadow", what))
+}
+
+/// A shape drawn with custom geometry becomes an ellipse.
+fn p31_custom_to_preset(d: &Doc, _: &Cx) -> Option<Edit> {
+    let k = (0..d.blocks.len()).find(|&k| {
+        d.blocks[k].head().is_some_and(|h| {
+            matches!(kind(h), HeadKind::Shape { id, .. } if !id.is_empty()) && h.look.kind.as_deref() == Some("custom")
+        })
+    })?;
+    let label = d.blocks[k].head()?.label.clone();
+    let what =
+        format!("shape {label:?}: kind=\"ellipse\" in place of its custom geometry on {}", slide_name(&d.blocks, k));
+    let f = |h: &mut hanji_core::Head| {
+        h.look.kind = Some("ellipse".into());
+        h.look.adj = None;
+    };
+    Some(head_edit(d, k, f, "P31 draw a custom shape as a preset", what))
 }

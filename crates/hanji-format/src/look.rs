@@ -102,10 +102,14 @@ pub fn parse_effects(v: &str) -> Result<Option<String>, String> {
     Ok(Some(out.join(" ")))
 }
 
-/// A preset shape as the text writes it: one of DrawingML's names.
+/// The kind custom geometry shows (kept as the file has it).
+pub const CUSTOM: &str = "custom";
+
+/// A preset shape as the text writes it: one of DrawingML's names, or
+/// `custom`.
 pub fn parse_kind(v: &str) -> Result<String, String> {
     let v = v.trim();
-    if crate::presets::is_preset(v) {
+    if crate::presets::is_preset(v) || v == CUSTOM {
         return Ok(v.to_string());
     }
     let near = crate::presets::near_presets(v);

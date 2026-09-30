@@ -136,7 +136,7 @@ fn every_object_shows_its_box_and_getput_keeps_every_xfrm() {
         "layout: Blank",
         "<shape id=\"s4\" name=\"TextBox 3\" box=\"72 72 180 29\" font=Calibri size=18pt color=tx1>Learning PPTX</shape>",
         "<line id=\"s6\" name=\"Straight Connector 5\" from=\"84 144\" to=\"252 144\" border=\"0.75pt solid accent1*\"/>",
-        "<shape id=\"s7\" name=\"Freeform 6\" box=\"47 211 185 136\" fill=accent1 border=\"2pt solid accent1*\" font=Calibri size=18pt color=lt1>Cloud</shape>",
+        "<shape id=\"s7\" name=\"Freeform 6\" box=\"47 211 185 136\" kind=\"custom\" fill=accent1 border=\"2pt solid accent1*\" font=Calibri size=18pt color=lt1>Cloud</shape>",
         "<picture id=\"s2\" name=\"Picture 1\" box=\"402 78 144 132\" src=\"media/image1.jpg\"/>",
         "<keep id=\"?\" kind=\"table\" summary=\"Table 2: Column1 Column2 Column3 data1 data2 data3\" box=\"300 372 372 96\"/>",
         "<line id=\"s8\" name=\"Straight Arrow Connector 7\" from=\"468 366\" to=\"468 216\" border=\"0.75pt solid accent1*\" start=arrow end=arrow/>",
