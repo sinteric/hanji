@@ -179,4 +179,7 @@ impl Format for Hwpx {
             .iter()
             .any(|t| xml.contains(t))
     }
+    fn complete(&self, blocks: &mut [Block], rem: &mut Remainder) {
+        HwpxEngine::complete(blocks, rem);
+    }
 }

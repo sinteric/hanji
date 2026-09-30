@@ -41,7 +41,10 @@
 //!   of formulas, whose cached values the export recomputes, and `format`
 //!   operations on named ranges (a header row filled and bold, a column in
 //!   a theme colour, a range filled, an outline).
-//! - hwpx: per file, GetPut and E10.
+//! - hwpx: per file, GetPut and E10 (every scripted edit in one revision,
+//!   with the formatting edits F1–F4 and two of round 6's footnote-01
+//!   tasks: a banner's fill changed to light blue, and a 10 pt first-line
+//!   indent on the body paragraphs, the list items below the top level).
 
 mod formats;
 #[path = "../../../crates/hanji-pptx/tests/edits/mod.rs"]
@@ -56,7 +59,7 @@ use hanji_docx::{DocxEngine, ExportOptions, History, Reviewer};
 use hanji_format::sheet::WindowOf;
 use hanji_hwpx::HwpxEngine;
 use hanji_pptx::PptxEngine;
-use hanji_testkit::{edit_jobs, Cx, Doc, Edit, Format, CAPS};
+use hanji_testkit::{edit_jobs, Cx, Doc, Edit, EditFn, Format, CAPS};
 use hanji_xlsx::XlsxEngine;
 
 use formats::{Docx, Hwpx, Pptx};
@@ -933,6 +936,108 @@ const HWPX: &[(&str, &str)] = &[
     ("basic-table-01.hwpx", "MIT (rhwp test data)"),
 ];
 
+/// The hwpx E10 set: E1–E9, the formatting edits F1–F4, and two of round
+/// 6's footnote-01 tasks (fn-e1, fn-e8) as edits any file may take.
+const HWPX_EDITS: [(&str, EditFn); 15] = {
+    let f = hanji_testkit::FORMATTED_EDITS;
+    [
+        f[0],
+        f[1],
+        f[2],
+        f[3],
+        f[4],
+        f[5],
+        f[6],
+        f[7],
+        f[8],
+        f[9],
+        f[10],
+        f[11],
+        f[12],
+        ("k1_banner_fill", banner_fill),
+        ("k2_body_first_line", body_first_line),
+    ]
+};
+
+/// A banner (a table of one text cell with a fill; the last one) filled light blue.
+fn banner_fill(d: &Doc, _: &Cx) -> Option<Edit> {
+    use hanji_format::{Cell, Key};
+    fn one(b: &Block) -> Option<(&Vec<hanji_format::CellPara>, hanji_format::Value)> {
+        match b {
+            Block::Table(t) if t.rows.len() == 1 && t.rows[0].len() == 1 => match &t.rows[0][0] {
+                Cell::Text(ps) => {
+                    t.boxes.first().and_then(|r| r.first()).and_then(|x| x.get(Key::Fill)).map(|f| (ps, f.clone()))
+                }
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+    let i = (0..d.blocks.len()).rev().find(|&i| one(&d.blocks[i]).is_some())?;
+    let (ps, was) = one(&d.blocks[i]).unwrap();
+    let text: String = ps.iter().map(|p| p.content.text()).collect::<Vec<_>>().join(" ");
+    let fill = Key::Fill.parse(Some("#DDEBF7")).unwrap();
+    let mut blocks = d.blocks.clone();
+    let Block::Table(t) = &mut blocks[i] else { unreachable!() };
+    t.boxes[0][0].set(Key::Fill, fill);
+    let mut ed = Edit::blocks(
+        "K1 banner fill",
+        format!("fill {was} → #DDEBF7 on the banner {:?} (block {i}, a one-cell table)", text.trim()),
+        blocks,
+        hanji_testkit::ident(d.blocks.len()),
+        std::collections::HashSet::from([i]),
+        true,
+    );
+    ed.named = vec![i];
+    Some(ed)
+}
+
+/// A 10 pt first-line indent on the body paragraphs: every list item below
+/// the top level (round 6's fn-e8: the second- and third-level items).
+fn body_first_line(d: &Doc, _: &Cx) -> Option<Edit> {
+    use hanji_format::Key;
+    let body = |b: &Block| matches!(b, Block::Para(p) if p.item.is_some_and(|i| i.level >= 1) && hanji_format::styled::shows(&p.content));
+    let at: Vec<usize> = (0..d.blocks.len()).filter(|&i| body(&d.blocks[i])).collect();
+    if at.is_empty() {
+        return None;
+    }
+    let indent = Key::FirstLine.parse(Some("10pt")).unwrap();
+    let mut blocks = d.blocks.clone();
+    for &i in &at {
+        if let Block::Para(p) = &mut blocks[i] {
+            p.props.set(Key::FirstLine, indent.clone());
+        }
+    }
+    // The paragraphs as ranges of blocks, each named by its first and last.
+    let mut ranges: Vec<(usize, usize)> = vec![];
+    for &i in &at {
+        match ranges.last_mut() {
+            Some(r) if r.1 + 1 == i => r.1 = i,
+            _ => ranges.push((i, i)),
+        }
+    }
+    let named: Vec<String> = ranges
+        .iter()
+        .map(|&(a, b)| {
+            if a == b {
+                hanji_testkit::quote(d, a)
+            } else {
+                format!("{} to {}", hanji_testkit::quote(d, a), hanji_testkit::quote(d, b))
+            }
+        })
+        .collect();
+    let mut ed = Edit::blocks(
+        "K2 body first-line indent",
+        format!("first-line=10pt on the {} list items below the top level: {}", at.len(), named.join(", ")),
+        blocks,
+        hanji_testkit::ident(d.blocks.len()),
+        at.iter().copied().collect(),
+        true,
+    );
+    ed.named = at;
+    Some(ed)
+}
+
 /// No layout cache past its paragraph's end: Hancom asks to repair such a file, and rhwp does not see it.
 fn hwpx_layout_ok(name: &str, variant: &str, pkg: &[u8]) {
     let problems = hanji_hwpx::layout_problems(pkg).unwrap();
@@ -961,23 +1066,30 @@ fn hwpx(kit: &mut Kit) {
         let (blocks, _, _, _) = HwpxEngine::split(&bytes, &ImportOptions::default()).unwrap();
         let d = Doc { blocks, entries: rem.entries.clone() };
         let cx = Cx { fmt: &Hwpx, rem: &rem };
-        let jobs = edit_jobs(&Hwpx, &d, &cx, &text, &hanji_testkit::EDITS, "E10", None);
+        let jobs = edit_jobs(&Hwpx, &d, &cx, &text, &HWPX_EDITS, "E10", None);
         let e10 = jobs.last().unwrap();
         match hanji_core::rewrite(&rem, &text, &e10.new_text, CAPS) {
             Ok(r) => {
-                let out = HwpxEngine.export(&r.text, &r.remainder).unwrap();
+                // The text as the store returns it (§5.2: a new table's look, widths as Hancom's).
+                let (_, mut blocks) = hanji_core::model_of(&r.text, &r.remainder, CAPS).unwrap();
+                let mut done = r.remainder.clone();
+                HwpxEngine::complete(&mut blocks, &mut done);
+                let new_text = HwpxEngine::text_of(&blocks, &done, None);
+                let out = HwpxEngine.export(&new_text, &done).unwrap();
                 hwpx_layout_ok(name, "e10", &out);
+                let back = HwpxEngine.import(&out, &ImportOptions::default()).unwrap();
+                assert_eq!(back.text, new_text, "{name} e10: PutGet");
                 kit.add(
                     "hwpx",
                     name,
                     licence,
                     "e10",
-                    "every scripted edit (E1–E9) in one revision",
+                    "every scripted edit (E1–E9, the formatting edits F1–F4, a banner's fill and a first-line indent on the body paragraphs) in one revision",
                     &out,
                     vec![hancom.clone(), "Shows the edits listed below".into()],
                     e10.what.split("; ").map(String::from).collect(),
                 );
-                kit.edits(&text_diff(&text, &r.text), TEXT_DIFF);
+                kit.edits(&text_diff(&text, &new_text), TEXT_DIFF);
             }
             Err(e) => println!("  {name} E10: refused: {}", e.to_string().lines().next().unwrap_or("")),
         }
