@@ -6,7 +6,7 @@
 use std::path::PathBuf;
 
 use hanji_core::{Block, Engine, EngineError, Entry, ImportOptions, ImportReport, Kind, Remainder};
-use hanji_hwpx::owpml::section_number;
+use hanji_hwpx::owpml::{layout_problems, section_number};
 use hanji_hwpx::{export_sections, write_package, xml, HwpxEngine};
 use hanji_testkit::{Format, Out};
 
@@ -36,8 +36,17 @@ impl Format for Hwpx {
     }
     fn export_blocks(&self, blocks: &[Block], rem: &Remainder) -> Result<(Vec<u8>, bool), EngineError> {
         let out = export_sections(blocks, rem)?;
-        let well_formed = out.sections.iter().all(|(_, d)| xml::parse(d).is_ok())
-            && out.header.as_deref().is_none_or(|h| xml::parse(h).is_ok());
+        // Well-formed, and no layout cache past its paragraph's end (Hancom's repair prompt).
+        let valid = |(name, d): &(String, Vec<u8>)| {
+            xml::parse(d).is_ok_and(|x| {
+                let problems = layout_problems(&x.root);
+                for p in &problems {
+                    eprintln!("{name}: {p}");
+                }
+                problems.is_empty()
+            })
+        };
+        let well_formed = out.sections.iter().all(valid) && out.header.as_deref().is_none_or(|h| xml::parse(h).is_ok());
         Ok((write_package(rem, out)?, well_formed))
     }
     fn is_split_part(&self, name: &str) -> bool {
@@ -102,5 +111,15 @@ fn a_new_table_can_be_added_to_every_file() {
         assert_eq!(back.text, r.text, "{name}: PutGet");
         out.save(&name, "ORIGINAL", &pkg);
         out.save(&name, "new-table", &bytes);
+    }
+}
+
+/// The layout check (`layout_problems`, which the corpus run applies to
+/// every export) flags no cache Hancom wrote: every corpus file passes it.
+#[test]
+fn the_layout_check_passes_every_corpus_file() {
+    for (name, pkg) in corpus() {
+        let problems = hanji_hwpx::layout_problems(&pkg).unwrap();
+        assert!(problems.is_empty(), "{name}: {problems:?}");
     }
 }

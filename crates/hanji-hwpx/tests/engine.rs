@@ -455,6 +455,64 @@ fn a_section_whose_paragraphs_all_went_keeps_its_settings() {
     assert_eq!(import(&out).text, format!("{}\n<p/>\n", r.text));
 }
 
+/// The top-level paragraphs of a section part.
+fn top_paras(sec: &str) -> Vec<xml::Element> {
+    xml::parse(sec.as_bytes()).unwrap().root.elements().filter(|e| e.is("hp:p")).cloned().collect()
+}
+
+/// A paragraph's layout cache counts the section's start run (`hp:secPr`,
+/// `hp:colPr`: 16 characters) when it holds it. A paragraph put before the
+/// first one takes the run, and the old first paragraph's cache pointed
+/// past its end (Hancom's repair prompt on the kit's fdi e10): that cache
+/// goes, and every other stays.
+#[test]
+fn a_layout_cache_past_the_paragraph_end_is_not_written() {
+    // secPr 8 + colPr 8 + pageNum 8: the second line starts at 24, on "abc".
+    let first = r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="0"><hp:ctrl><hp:pageNum pos="BOTTOM_CENTER" formatType="DIGIT" sideChar="-"/></hp:ctrl><hp:t>abc</hp:t></hp:run><hp:linesegarray><hp:lineseg textpos="0"/><hp:lineseg textpos="24"/></hp:linesegarray></hp:p>"#;
+    let pkg = hwpx(&[first.into(), p("둘째"), p("셋째")]);
+    assert_eq!(hanji_hwpx::layout_problems(&pkg).unwrap(), Vec::<String>::new());
+    let imp = import(&pkg);
+    // GetPut keeps every cache.
+    assert_eq!(section(&export(&imp.text, &imp.remainder)), section(&pkg));
+    let lines = |p: &xml::Element| p.child("hp:linesegarray").is_some();
+
+    // A new paragraph before the first takes the start run; "abc" gives it up.
+    let r = rewrite(&imp.remainder, &imp.text, &imp.text.replacen("abc", "새 첫 문단\n\nabc", 1), CAPS).unwrap();
+    let out = export(&r.text, &r.remainder);
+    let sec = section(&out);
+    let ps = top_paras(&sec);
+    assert!(!ps[0].descendants("hp:secPr").is_empty(), "{sec}");
+    assert_eq!(ps[1].text_of(&["hp:t"]), "abc");
+    assert!(!lines(&ps[1]) && lines(&ps[2]) && lines(&ps[3]), "{sec}");
+    assert_eq!(hanji_hwpx::layout_problems(&out).unwrap(), Vec::<String>::new());
+    save("engine-section-start", "ORIGINAL", &pkg);
+    save("engine-section-start", "new-first", &out);
+
+    // Without the start run, "abc"'s own cache is the fault the check reports.
+    let mut stale = xml::parse(first.as_bytes()).unwrap().root;
+    assert!(hanji_hwpx::owpml::stale_layout(&stale).unwrap().contains("starts at 24"));
+    hanji_hwpx::owpml::drop_stale_layouts(&mut stale);
+    assert!(!lines(&stale));
+}
+
+/// The layout check: a line past the paragraph's end (the characters, then
+/// the end mark) is stale; controls and objects count 8, a line break 1.
+#[test]
+fn a_layout_cache_past_the_paragraph_end_is_stale() {
+    use hanji_hwpx::owpml::{char_count, stale_layout};
+    let para = |inner: &str, pos: &[usize]| {
+        let lines: String = pos.iter().map(|t| format!(r#"<hp:lineseg textpos="{t}"/>"#)).collect();
+        let x = format!(r#"<hp:p {NS}>{inner}<hp:linesegarray>{lines}</hp:linesegarray></hp:p>"#);
+        xml::parse(x.as_bytes()).unwrap().root
+    };
+    let inner = r#"<hp:run><hp:ctrl><hp:colPr/></hp:ctrl><hp:tbl/><hp:t>a&amp;b<hp:tab/>c<hp:lineBreak/>d<hp:markpenBegin/>😀</hp:t></hp:run>"#;
+    // colPr 8, tbl 8, "a&b" 3, tab 8, "c" 1, line break 1, "d" 1, 😀 2 (UTF-16).
+    assert_eq!(char_count(&para(inner, &[0])), 32);
+    assert!(stale_layout(&para(inner, &[0, 20, 33])).is_none());
+    assert!(stale_layout(&para(inner, &[0, 34])).unwrap().contains("starts at 34"));
+    assert!(stale_layout(&para("<hp:run/>", &[0])).is_none());
+}
+
 // ---------------------------------------------------------------- §10.2 tracked changes
 
 const TRACKED: &str = r##"<hh:trackChanges itemCnt="2"><hh:trackChange type="Delete" date="2026-09-28T00:00:00Z" authorID="1" hide="0" id="1"/><hh:trackChange type="Insert" date="2026-09-28T00:00:00Z" authorID="1" hide="0" id="2"/></hh:trackChanges><hh:trackChangeAuthors itemCnt="1"><hh:trackChangeAuthor name="김검토" mark="1" color="#FF0000" id="1"/></hh:trackChangeAuthors>"##;
