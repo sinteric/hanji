@@ -18,7 +18,7 @@ schema: 1
 (`type` is document, presentation or spreadsheet; `format` is docx or hwpx, pptx, xlsx; an optional `template:` line.)
 Canonical form: one paragraph per line (no hard wraps), a blank line between blocks, no table padding, `1.` for every numbered item. hanji stores text in this form; read again after an edit that reports `canonicalized`.
 Inline: **bold**, *italic*, ~~strike~~, <u>underline</u>, <br/> (a line break inside a paragraph).
-A docx text shows its formatting (below). In hwpx and pptx, formatting is by the file's own style and layout names only: no colours, fonts or sizes; if no style fits a request, say so, do not invent one.
+docx, pptx and xlsx texts show their formatting (below). In hwpx, formatting is by the file's own style names only: no colours, fonts or sizes; if no style fits a request, say so, do not invent one.
 <keep id="k3" kind="drawing" summary="…"/> stands for something the text does not model (a picture, chart, footnote, comment, merged cells, …). Leave it as it is; you may move it or delete its line, never create or change one.
 
 Document (docx, hwpx)
@@ -63,6 +63,7 @@ Formatting comes from named styles, listed once at the top; each paragraph, cell
 Presentation (pptx)
 Slides are separated by a line `---`. Each slide's first line is `layout: Name` (a layout of the file). Then slot markers on their own lines, each followed by its text: ::title::, ::subtitle::, ::body::, ::left:: and ::right:: (two content areas), ::notes:: (last), and the others the layout has. Only the layout's slots; leave an unfilled slot out; an empty marker is an error. Slots hold paragraphs, - / 1. items and <p/>; no headings, styles or tables.
 <shape id="s4" name="출처">text<p/>more</shape> is an existing text shape: edit its text, delete its line to delete it; never create one.
+Text shows its font, size and color: what an object's text shares on its marker or tag (::title font=Calibri size=44pt color=tx1::), a paragraph's own at its end (- 매출 증가 {size=28pt}), a run's as [text]{size=24pt color=#FF7F50}. Change a value to restyle; leave one out to take what the layout gives. Colours: #RRGGBB, a theme name (tx1, accent1…), accent1+40% lighter, accent1-25% darker, /50% opacity; a value with * (accent1*) or gradient is kept as the file has it.
 <picture id="s7" name="Picture 6" box="x y w h" src="media/image1.png" crop="10 0 5 0" mask="ellipse" alt="…"/> is a picture (box in points from the slide's top-left corner): change its box, crop (percent cut off the left, top, right and bottom), mask (a preset shape such as ellipse or roundRect; none is a rectangle) or alt (its alternative text); src may name another picture's image. Keep its id and name.
 layout: Title and Content
 ::title::
@@ -94,3 +95,7 @@ Cells are written by range operations, a JSON list applied in order, all or noth
 [{"op": "set", "range": "매출!B73", "values": [[18420000]]},
  {"op": "append_rows", "table": "Sales", "rows": [{"월": "2026-08", "매출": 12400000}]}]
 Numbers are JSON numbers; dates are "YYYY-MM-DD" text (read as dates in date columns); IDs with leading zeros are text. A value that starts with = is stored as text: formulas are written only as a column's formula or with fill_formula, using structured references ([@매출], Sales[매출]). At most 50 new rows per call.
+Formatting (xlsx) is shown as read-only lines. `<format default font=Calibri size=11pt color=tx1/>` after the front matter is the Normal style: every cell has it unless a range line says otherwise, and a key it leaves out is none, off, general alignment, bottom or indent 0. In a sheet, `<format range="B4:C7" fill=#D9D9D9 bold/>` gives every cell of that rectangle what it writes beyond the default (style="Name": the cells' named cell style); a cell is in at most one line. Keys: fill (a colour or none), border-top/-right/-bottom/-left (`"<width>pt <style> <colour>"`, style solid, dashed, dotted, double, dash-dot or dash-dot-dot, or none), align (general, left, center, right, justify, distribute), valign (top, middle, bottom), indent (levels), font, size, color, bold, italic, underline, strike. Colours are #RRGGBB or a theme colour by name (tx1, bg1, tx2, bg2, accent1 … accent6, hlink), `+N%` lighter, `-N%` darker. Excel's border widths are hair 0.25pt (dotted), thin 0.75pt, medium 1.5pt, thick 2.25pt; double is 2.25pt; a written width snaps to the nearest.
+Formatting is written by format {range, set}: every cell of the range takes the keys `set` writes (flags true/false, size and indent as numbers) and keeps the rest; `border` sets all four sides of every cell, `outline` the outer edges of the range; at most 100000 cells.
+[{"op": "format", "range": "매출!A1:D1", "set": {"fill": "accent2+80%", "bold": true, "border-bottom": "0.75pt solid #000000"}}]
+fill=gradient and fill=pattern are shown but cannot be written, and nothing else can be said: no gradient, pattern, diagonal line, shadow or conditional format.

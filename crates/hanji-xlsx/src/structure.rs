@@ -10,7 +10,12 @@ use hanji_format::sheet::{SheetItem, Spreadsheet, TableDecl};
 
 /// Whether two structures are the same (front matter aside).
 pub fn same(a: &Spreadsheet, b: &Spreadsheet) -> bool {
-    a.sheets == b.sheets
+    a.sheets == b.sheets && a.default_format == b.default_format
+}
+
+/// The refusal for a format line the text changed: they are read-only.
+fn format_refusal(what: &str) -> String {
+    format!("{what}; the format lines show the cells' formatting and are read-only — keep them as they are, and change formatting with the format operation: {{\"op\": \"format\", \"range\": \"Sheet!A1:D1\", \"set\": {{\"fill\": \"#D9D9D9\", \"bold\": true}}}}")
 }
 
 fn spec(c: &hanji_format::sheet::ColumnDecl) -> ColumnSpec {
@@ -30,6 +35,9 @@ fn tables(items: &[SheetItem]) -> Vec<&TableDecl> {
 pub fn reconcile(new: &Spreadsheet, old: &Spreadsheet) -> Result<(Vec<RangeOp>, Vec<String>), String> {
     let mut ops = vec![];
     let mut drops = vec![];
+    if new.default_format != old.default_format {
+        return Err(format_refusal("the line <format default …/> is not the workbook's"));
+    }
     if new.sheets.len() < old.sheets.len() {
         let gone: Vec<&str> = old
             .sheets
@@ -44,6 +52,9 @@ pub fn reconcile(new: &Spreadsheet, old: &Spreadsheet) -> Result<(Vec<RangeOp>, 
     }
     for (k, ns) in new.sheets.iter().enumerate() {
         let Some(os) = old.sheets.get(k) else {
+            if !ns.formats.is_empty() {
+                return Err(format_refusal(&format!("new sheet {} has format lines", ns.name)));
+            }
             ops.push(RangeOp::AddSheet { name: ns.name.clone() });
             for t in tables(&ns.items) {
                 ops.push(new_table(&ns.name, t)?);
@@ -58,6 +69,18 @@ pub fn reconcile(new: &Spreadsheet, old: &Spreadsheet) -> Result<(Vec<RangeOp>, 
                 "sheet {} is written as {}; renaming or reordering sheets is not supported yet — keep the sheets as the file has them, in order, and add new ones at the end",
                 os.name, ns.name
             ));
+        }
+        if ns.formats != os.formats {
+            let changed = ns
+                .formats
+                .iter()
+                .find(|f| !os.formats.contains(f))
+                .map(|f| f.line())
+                .or_else(|| {
+                    os.formats.iter().find(|f| !ns.formats.contains(f)).map(|f| format!("{} is missing", f.line()))
+                })
+                .unwrap_or_else(|| "the format lines are in another order".into());
+            return Err(format_refusal(&format!("sheet {}: {changed}", ns.name)));
         }
         let (nt, ot) = (tables(&ns.items), tables(&os.items));
         for t in &ot {

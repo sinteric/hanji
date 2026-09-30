@@ -134,9 +134,9 @@ fn every_object_shows_its_box_and_getput_keeps_every_xfrm() {
     let imp = import(&deck("shapes.pptx"));
     let s1 = [
         "layout: Blank",
-        "<shape id=\"s4\" name=\"TextBox 3\" box=\"72 72 180 29\">Learning PPTX</shape>",
+        "<shape id=\"s4\" name=\"TextBox 3\" box=\"72 72 180 29\" font=Calibri size=18pt color=tx1>Learning PPTX</shape>",
         "<line id=\"s6\" name=\"Straight Connector 5\" from=\"84 144\" to=\"252 144\"/>",
-        "<shape id=\"s7\" name=\"Freeform 6\" box=\"47 211 185 136\">Cloud</shape>",
+        "<shape id=\"s7\" name=\"Freeform 6\" box=\"47 211 185 136\" font=Calibri size=18pt color=lt1>Cloud</shape>",
         "<picture id=\"s2\" name=\"Picture 1\" box=\"402 78 144 132\" src=\"media/image1.jpg\"/>",
         "<keep id=\"?\" kind=\"table\" summary=\"Table 2: Column1 Column2 Column3 data1 data2 data3\" box=\"300 372 372 96\"/>",
         "<line id=\"s8\" name=\"Straight Arrow Connector 7\" from=\"468 366\" to=\"468 216\"/>",
@@ -149,8 +149,12 @@ fn every_object_shows_its_box_and_getput_keeps_every_xfrm() {
     assert!(imp.text.starts_with("---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 720 x 540 pt\n---\n"));
     // Every slot shows its box, inherited from the layout or the master.
     let k = import(&deck("korean-deck.pptx"));
-    assert!(k.text.contains("layout: Title Slide\n::title box=\"54 168 612 116\"::\n"), "{}", k.text);
-    assert!(k.text.contains("::body box=\"36 126 648 356\"::\n"));
+    assert!(
+        k.text.contains("layout: Title Slide\n::title box=\"54 168 612 116\" font=Calibri size=44pt color=tx1::\n"),
+        "{}",
+        k.text
+    );
+    assert!(k.text.contains("::body box=\"36 126 648 356\" font=Calibri color=tx1::\n"));
 }
 
 #[test]
@@ -159,7 +163,12 @@ fn a_box_left_as_shown_keeps_its_exact_emu() {
     let before = package::read(&deck("korean-deck.pptx")).unwrap();
     let s3 = slides(&before)[2].clone();
     // x changes; y (475.2 pt, shown 475) keeps its stored EMU.
-    let (text, rem) = exact(&imp.text, &imp.remainder, "box=\"36 475 288 29\">출처", "box=\"396 475 288 29\">출처");
+    let (text, rem) = exact(
+        &imp.text,
+        &imp.remainder,
+        "box=\"36 475 288 29\" font=Calibri size=18pt color=tx1>출처",
+        "box=\"396 475 288 29\" font=Calibri size=18pt color=tx1>출처",
+    );
     let parts = export(&text, &rem);
     assert_eq!(
         xfrm_of(&xml(&parts, &s3), "출처"),
@@ -169,8 +178,13 @@ fn a_box_left_as_shown_keeps_its_exact_emu() {
     // the other numbers the master's exact ones (y 274638 EMU shows as 22 pt).
     let s2 = slides(&before)[1].clone();
     assert!(!xml(&before, &s2).contains("<a:xfrm"));
-    let old = "::title box=\"36 22 648 90\"::\n핵심 지표";
-    let (text, rem) = exact(&imp.text, &imp.remainder, old, "::title box=\"36 22 648 60\"::\n핵심 지표");
+    let old = "::title box=\"36 22 648 90\" font=Calibri size=44pt color=tx1::\n핵심 지표";
+    let (text, rem) = exact(
+        &imp.text,
+        &imp.remainder,
+        old,
+        "::title box=\"36 22 648 60\" font=Calibri size=44pt color=tx1::\n핵심 지표",
+    );
     let parts = export(&text, &rem);
     assert_eq!(
         xfrms(&xml(&parts, &s2)),
@@ -179,7 +193,12 @@ fn a_box_left_as_shown_keeps_its_exact_emu() {
     // Written back at the layout's box, or without a box, the slot sits where its layout puts it again.
     let imp2 = import(&PptxEngine.export(&text, &rem).unwrap());
     for back in [old, "::title::\n핵심 지표"] {
-        let (t2, r2) = exact(&imp2.text, &imp2.remainder, "::title box=\"36 22 648 60\"::\n핵심 지표", back);
+        let (t2, r2) = exact(
+            &imp2.text,
+            &imp2.remainder,
+            "::title box=\"36 22 648 60\" font=Calibri size=44pt color=tx1::\n핵심 지표",
+            back,
+        );
         let parts = export(&t2, &r2);
         assert!(!xml(&parts, &s2).contains("<a:xfrm"), "{back}");
     }
@@ -200,8 +219,8 @@ fn objects_move_resize_align_and_a_text_box_is_added() {
     let (text, rem) = exact(
         &text,
         &rem,
-        "::title box=\"36 22 648 90\"::\n분기별 매출\n",
-        "::title box=\"36 22 648 90\"::\n분기별 매출\n<shape box=\"36 112 648 28\">단위: 억 원</shape>\n",
+        "::title box=\"36 22 648 90\" font=Calibri size=44pt color=tx1::\n분기별 매출\n",
+        "::title box=\"36 22 648 90\" font=Calibri size=44pt color=tx1::\n분기별 매출\n<shape box=\"36 112 648 28\">단위: 억 원</shape>\n",
     );
     let (parts, back) = export_new(&text, &rem, &[("s5", "TextBox 4")]);
     let x = xml(&parts, &s4);
@@ -213,7 +232,7 @@ fn objects_move_resize_align_and_a_text_box_is_added() {
     // The text read back shows the new box's id and name, after the title, before the table.
     assert!(
         back.contains(
-            "분기별 매출\n<shape id=\"s5\" name=\"TextBox 4\" box=\"36 112 648 28\">단위: 억 원</shape>\n<keep id=\""
+            "분기별 매출\n<shape id=\"s5\" name=\"TextBox 4\" box=\"36 112 648 28\" font=Calibri size=18pt color=tx1>단위: 억 원</shape>\n<keep id=\""
         ),
         "{back}"
     );
@@ -365,12 +384,14 @@ fn a_layout_change_keeps_each_slot_where_its_box_says() {
     assert_eq!(xfrms(&x).len(), 2, "{x}");
     // Bare markers put them where the new layout does.
     let t2 = text
-        .replace("::title box=\"57 347 612 107\"::\n부록", "::title::\n부록")
-        .replace("::body box=\"57 229 612 118\"::", "::body::");
+        .replace("::title box=\"57 347 612 107\" font=Calibri size=40pt color=tx1::\n부록", "::title::\n부록")
+        .replace("::body box=\"57 229 612 118\" font=Calibri size=20pt color=tx1*::", "::body::");
     let r = rewrite_in(&PptxModel, &rem, &text, &t2, CAPS).unwrap_or_else(|e| panic!("{e}"));
     let parts = export(&r.text, &r.remainder);
     assert!(xfrms(&xml(&parts, &slides(&parts)[5])).is_empty());
-    assert!(canonical(&t2, &r.remainder).contains("::title box=\"36 22 648 90\"::\n부록"));
+    assert!(
+        canonical(&t2, &r.remainder).contains("::title box=\"36 22 648 90\" font=Calibri size=44pt color=tx1::\n부록")
+    );
 }
 
 #[test]
@@ -423,8 +444,8 @@ fn a_changed_number_another_object_shows_takes_its_exact_emu() {
     let (text, rem) = exact(
         &imp.text,
         &imp.remainder,
-        "name=\"TextBox 1\" box=\"232 113 255 29\">Shape 0",
-        "name=\"TextBox 1\" box=\"100 113 255 29\">Shape 0",
+        "name=\"TextBox 1\" box=\"232 113 255 29\" font=Calibri size=18pt color=tx1>Shape 0",
+        "name=\"TextBox 1\" box=\"100 113 255 29\" font=Calibri size=18pt color=tx1>Shape 0",
     );
     let (text, rem) = exact(&text, &rem, "box=\"206 255 308 29\"", "box=\"232 255 308 29\"");
     let f = xfrm_of(&xml(&export(&text, &rem), &s5), "TextBox 2");
@@ -440,9 +461,9 @@ fn a_stored_rotation_left_as_shown_keeps_its_exact_value() {
     let s1 = slides(&before)[0].clone();
     let imp = import(&pkg);
     for shown in [
-        "name=\"Minus ninety\" box=\"60 160 200 40\" rot=\"270\">",
-        "name=\"Minus fifteen flipped\" box=\"300 160 160 60\" rot=\"345\" flip=\"h\">",
-        "name=\"Past a turn\" box=\"500 160 160 60\" rot=\"60\">",
+        "name=\"Minus ninety\" box=\"60 160 200 40\" rot=\"270\" font=Calibri size=18pt color=lt1>",
+        "name=\"Minus fifteen flipped\" box=\"300 160 160 60\" rot=\"345\" flip=\"h\" font=Calibri size=18pt color=lt1>",
+        "name=\"Past a turn\" box=\"500 160 160 60\" rot=\"60\" font=Calibri size=18pt color=lt1>",
         "name=\"Turned in group\" box=\"80 420 80 80\" rot=\"315\"/>",
     ] {
         assert!(imp.text.contains(shown), "{shown}\n{}", imp.text);
@@ -454,7 +475,7 @@ fn a_stored_rotation_left_as_shown_keeps_its_exact_value() {
         assert_eq!(package::get(&parts, &p.name), Some(&p.data[..]), "{} changed", p.name);
     }
     // The same turn written another way (-90 for 270, -300 for 60): still unchanged.
-    let (text, rem) = exact(&imp.text, &imp.remainder, "rot=\"270\">rot", "rot=\"-90\">rot");
+    let (text, rem) = exact(&imp.text, &imp.remainder, "rot=\"270\" font=", "rot=\"-90\" font=");
     let (text, rem) = exact(&text, &rem, "rot=\"60\"", "rot=\"-300\"");
     let out = PptxEngine.export(&text, &rem).unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(xml(&package::read(&out).unwrap(), &s1), xml(&before, &s1));
@@ -465,7 +486,7 @@ fn a_stored_rotation_left_as_shown_keeps_its_exact_value() {
     assert!(xfrm_of(&x, "Past a turn").starts_with("<a:xfrm rot=\"25200000\">"));
     // A changed rotation is written from 0 up to a full turn; a changed flip
     // goes, an unchanged one stays as the file writes it.
-    let (text, rem) = exact(&imp.text, &imp.remainder, "rot=\"270\">rot", "rot=\"90\">rot");
+    let (text, rem) = exact(&imp.text, &imp.remainder, "rot=\"270\" font=", "rot=\"90\" font=");
     let (text, rem) = exact(&text, &rem, "rot=\"60\"", "rot=\"-30\"");
     let (text, rem) = exact(&text, &rem, "rot=\"345\" flip=\"h\"", "rot=\"345\"");
     let x = xml(&export(&text, &rem), &s1);

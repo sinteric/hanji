@@ -35,10 +35,6 @@ pub(crate) fn front_lines(f: &FrontMatter) -> Vec<String> {
 }
 
 /// Blocks, a blank line between them.
-pub(crate) fn blocks(out: &mut Vec<String>, blocks: &[Block]) {
-    blocks_in(out, blocks, &StyleTable::default())
-}
-
 fn blocks_in(out: &mut Vec<String>, blocks: &[Block], st: &StyleTable) {
     for (k, b) in blocks.iter().enumerate() {
         // Consecutive empty paragraphs are consecutive lines; a blank line
@@ -47,6 +43,48 @@ fn blocks_in(out: &mut Vec<String>, blocks: &[Block], st: &StyleTable) {
             out.push(String::new());
         }
         block(out, b, st);
+    }
+}
+
+/// [`blocks`]; `pres`: a Presentation slot's text (§5.3), whose `[text]{…}`
+/// is formatting, each of its lines ending in `ends[block][line]` (a
+/// paragraph's own formatting, ` {…}`) when there is one.
+pub(crate) fn blocks_with(out: &mut Vec<String>, blocks: &[Block], pres: bool, ends: &[Vec<String>]) {
+    let st = StyleTable::default();
+    for (k, b) in blocks.iter().enumerate() {
+        if k > 0 && !(is_empty_para(b) && is_empty_para(&blocks[k - 1])) {
+            out.push(String::new());
+        }
+        let from = out.len();
+        if pres {
+            block_pres(out, b);
+        } else {
+            block(out, b, &st);
+        }
+        if let Some(e) = ends.get(k) {
+            for (l, end) in out[from..].iter_mut().zip(e) {
+                l.push_str(end);
+            }
+        }
+    }
+}
+
+/// A Presentation slot's block: its text's formatting is `[text]{…}` spans.
+fn block_pres(out: &mut Vec<String>, b: &Block) {
+    match b {
+        Block::Para(p) => out.push(para_body(p, serialize_inline_with(&p.content, true))),
+        Block::List(items) => {
+            let mut widths: Vec<usize> = vec![];
+            for it in items {
+                widths.truncate(it.level);
+                let indent: usize = widths.iter().sum();
+                let body = serialize_inline_with(&it.content, true);
+                let line = if body.is_empty() { it.marker().to_string() } else { format!("{} {body}", it.marker()) };
+                out.push(format!("{}{line}", " ".repeat(indent)));
+                widths.push(it.marker().len() + 1);
+            }
+        }
+        other => block(out, other, &StyleTable::default()),
     }
 }
 
@@ -99,6 +137,26 @@ fn p_tag(style: Option<&str>) -> String {
 /// first paragraph followed by others).
 pub(crate) fn cell_text(ps: &[CellPara]) -> String {
     cell_text_in(ps, &StyleTable::default(), &Props::new())
+}
+
+/// [`cell_text`]; `pres`: a Presentation shape's text, each paragraph
+/// ending in `ends[paragraph]` (its own formatting, ` {…}`).
+pub(crate) fn cell_text_with(ps: &[CellPara], pres: bool, ends: &[String]) -> String {
+    if !pres {
+        return cell_text(ps);
+    }
+    let mut s = String::new();
+    for (k, p) in ps.iter().enumerate() {
+        let lead_needed = k > 0 || p.style.is_some() || (p.content.is_empty() && ps.len() > 1);
+        if lead_needed {
+            s.push_str(&p_tag(p.style.as_deref()));
+        }
+        s.push_str(&serialize_inline_with(&p.content, true));
+        if let Some(e) = ends.get(k) {
+            s.push_str(e);
+        }
+    }
+    s
 }
 
 /// [`cell_text`] with each paragraph's `{…}`: what differs from its style
@@ -330,16 +388,33 @@ fn escape_line_start(mut s: String) -> String {
 }
 
 pub fn serialize_inline(inl: &Inline) -> String {
-    inline_spans(inl, &|u| u.props.clone())
+    serialize_inline_with(inl, false)
+}
+
+/// [`serialize_inline`]; `pres`: a Presentation's slot or shape text, where
+/// a style span is `[text]{…}` (§5.3).
+pub fn serialize_inline_with(inl: &Inline, pres: bool) -> String {
+    inline_spans_with(inl, &|u| u.props.clone(), pres)
 }
 
 /// Inline text, a unit's `want` (its text keys beyond what the paragraph
 /// states) written as `[text]{…}`.
 fn inline_spans(inl: &Inline, want: &dyn Fn(&Unit) -> Props) -> String {
-    let mut out = Out { dollar: dollar_escapes(inl), ..Out::default() };
+    inline_spans_with(inl, want, false)
+}
+
+fn inline_spans_with(inl: &Inline, want: &dyn Fn(&Unit) -> Props, pres: bool) -> String {
+    let mut out = Out { dollar: dollar_escapes(inl), pres, ..Out::default() };
     for (a, b, span) in inl.segments() {
         let spans = prop_spans(&inl.units, a, b, want);
         match span.map(|s| &s.kind) {
+            Some(SpanKind::Style(st)) => {
+                out.s.push('[');
+                run(&mut out, &inl.units, a, b, true, &spans);
+                out.s.push_str("]{");
+                out.s.push_str(&st.attrs());
+                out.s.push('}');
+            }
             Some(SpanKind::Link(url)) => {
                 out.s.push('[');
                 run(&mut out, &inl.units, a, b, true, &spans);
@@ -425,6 +500,8 @@ struct Out {
     dollar: Vec<bool>,
     /// Byte index of a trailing unescaped literal `~`, if any.
     bare_tilde: Option<usize>,
+    /// A Presentation's text: `]{` and ` {` would read as formatting.
+    pres: bool,
 }
 
 impl Out {
@@ -506,9 +583,11 @@ fn unit(out: &mut Out, units: &[Unit], i: usize, in_link: bool) {
             }
             '[' if in_link || next_char == Some('^') => out.text("\\["),
             '^' if in_link && out.s.ends_with('[') => out.text("\\^"),
-            ']' if in_link || next_char == Some('(') => out.text("\\]"),
+            ']' if in_link || next_char == Some('(') || (out.pres && next_char == Some('{')) => out.text("\\]"),
             '$' if out.dollar[i] => out.text("\\$"),
-            '{' => out.text("\\{"),
+            // A Document escapes every `{`; a Presentation's text, one that
+            // could open a paragraph's formatting.
+            '{' if !out.pres || out.s.chars().last().is_none_or(char::is_whitespace) => out.text("\\{"),
             c => {
                 let mut b = [0u8; 4];
                 out.text(c.encode_utf8(&mut b));

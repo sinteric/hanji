@@ -18,6 +18,7 @@
 pub mod book;
 pub mod calc;
 pub mod drawing;
+pub mod format;
 pub mod model;
 pub mod numfmt;
 pub mod ops;

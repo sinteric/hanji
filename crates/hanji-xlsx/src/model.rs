@@ -5,8 +5,9 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use hanji_core::cells::{parse_sqref, CellRange};
+use hanji_core::cells::{parse_sqref, CellRange, CellRef};
 use hanji_core::{Entry, KeepIds, Kind, Meta};
+use hanji_format::cellfmt::{self, CellFormat, FormatLine};
 use hanji_format::formula;
 use hanji_format::sheet::{format_kind, ColumnDecl, FormatKind, SheetDecl, SheetItem, Spreadsheet, TableDecl};
 use hanji_format::{FrontMatter, Keep};
@@ -272,11 +273,17 @@ pub fn structure(book: &mut Book, template: Option<&str>) -> Result<Spreadsheet,
         }
     }
     let keeps = keeps(book);
+    let normal = book.styles.normal_format();
+    let shown = book.styles.part.is_some();
     let mut sheets = vec![];
     for (i, s) in book.sheets.iter().enumerate() {
         let mut items = vec![];
         let mut range = None;
+        let mut formats = vec![];
         if s.kind == SheetKind::Work {
+            if shown {
+                formats = format_lines(book, i, &normal);
+            }
             let st = book.store(i);
             range = st.used().map(|(c0, r0, c1, r1)| {
                 CellRange::new(hanji_core::cells::CellRef::new(c0, r0), hanji_core::cells::CellRef::new(c1, r1))
@@ -287,9 +294,43 @@ pub fn structure(book: &mut Book, template: Option<&str>) -> Result<Spreadsheet,
             }
         }
         items.extend(keeps.iter().filter(|(k, _)| *k == i).map(|(_, k)| SheetItem::Keep(k.clone())));
-        sheets.push(SheetDecl { name: s.name.clone(), range, items });
+        sheets.push(SheetDecl { name: s.name.clone(), range, formats, items });
     }
-    Ok(Spreadsheet { front: FrontMatter::spreadsheet("xlsx", template), sheets })
+    let default_format = shown.then(|| normal.diff(&CellFormat::implicit()));
+    Ok(Spreadsheet { front: FrontMatter::spreadsheet("xlsx", template), default_format, sheets })
+}
+
+/// Sheet `i`'s formatted cells (§5.4): one line per rectangle of cells with
+/// the same formatting beyond Normal's and the same named style.
+fn format_lines(book: &Book, i: usize, normal: &CellFormat) -> Vec<FormatLine> {
+    let styles = &book.styles;
+    let mut seen: HashMap<u32, Option<(Option<String>, CellFormat)>> = HashMap::new();
+    let mut shown = |s: u32| -> Option<(Option<String>, CellFormat)> {
+        seen.entry(s)
+            .or_insert_with(|| {
+                let f = styles.cell_format(s).diff(normal);
+                let name = styles.style_name(s);
+                (!f.is_empty() || name.is_some()).then_some((name, f))
+            })
+            .clone()
+    };
+    // Style 0 is usually Normal's: then only rows with a cell style are read.
+    let all = shown(0).is_some();
+    let mut cells: Vec<(u32, u32, (Option<String>, CellFormat))> = vec![];
+    let pre = |row: &[u8]| all || crate::store::holds(row, b" s=\"");
+    book.store(i).for_each_cell_if(&pre, &mut |r, c| {
+        if let Some(v) = shown(c.style()) {
+            cells.push((r, c.col, v));
+        }
+    });
+    cellfmt::rectangles(&cells)
+        .into_iter()
+        .map(|(r1, c1, r2, c2, (style, format))| FormatLine {
+            range: CellRange::new(CellRef::new(c1, r1), CellRef::new(c2, r2)).to_string(),
+            style,
+            format,
+        })
+        .collect()
 }
 
 /// Placeholder entries for `rem.entries` (so the text's keeps can be checked).

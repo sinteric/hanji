@@ -515,6 +515,9 @@ pub struct Span {
 pub enum SpanKind {
     Link(String),
     Field(String),
+    /// A Presentation's text formatting (§5.3): the effective font, size
+    /// and colour of the units it covers.
+    Style(crate::inline_style::TextStyle),
 }
 
 /// Emphasis flags of one unit.

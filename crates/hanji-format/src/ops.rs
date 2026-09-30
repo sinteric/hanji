@@ -1,5 +1,6 @@
 //! Range operations (DESIGN.md §5.4, §6 round 4 write shape A): the JSON
-//! list of operations from a closed set of ten through which a model writes
+//! list of operations from a closed set (ten for cell data, and `format`
+//! for cell formatting, round 6 part D) through which a model writes
 //! cell data, applied in order. [`parse_ops`] reads the list and checks each
 //! operation's shape; [`check_ops`] checks names, types, formats and
 //! formulas against the workbook's structure, following the list as it
@@ -10,12 +11,14 @@ use std::fmt;
 
 use serde_json::Value as Json;
 
+use crate::cellfmt::{self, CellFormat};
 use crate::diag::quoted;
 use crate::formula::{self, FormulaProblem};
 use crate::sheet::{format_kind, sheet_name_problem, table_name_problem, type_fits_format, FormatKind, Spreadsheet};
 use crate::sheet::{ColumnDecl, SheetDecl, SheetItem, TableDecl};
+use crate::vocab::{Border, Color, Fill};
 
-/// The ten operations, with their required and optional keys.
+/// The operations, with their required and optional keys.
 pub const OPS: &[(&str, &[&str], &[&str])] = &[
     ("set", &["range", "values"], &[]),
     ("append_rows", &["table", "rows"], &[]),
@@ -27,7 +30,11 @@ pub const OPS: &[(&str, &[&str], &[&str])] = &[
     ("sort", &["table", "keys"], &[]),
     ("add_table", &["sheet", "name", "anchor", "columns"], &["rows"]),
     ("add_sheet", &["name"], &[]),
+    ("format", &["range", "set"], &[]),
 ];
+
+/// At most this many cells get their formatting from one `format` operation.
+pub const MAX_FORMAT_CELLS: u64 = 100_000;
 
 /// No answer adds more rows than this (§5.4: the model never types bulk rows).
 pub const MAX_NEW_ROWS: usize = 50;
@@ -73,16 +80,60 @@ pub struct SortKey {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum RangeOp {
-    Set { range: String, values: Vec<Vec<Value>> },
-    AppendRows { table: String, rows: Vec<Row> },
-    InsertRows { table: String, before: u32, rows: Vec<Row> },
-    DeleteRows { table: String, first: u32, last: u32 },
-    FillFormula { table: String, column: String, formula: String },
-    SetType { table: String, column: String, ty: String, format: Option<String> },
-    AddColumn { table: String, column: ColumnSpec },
-    Sort { table: String, keys: Vec<SortKey> },
-    AddTable { sheet: String, name: String, anchor: String, columns: Vec<ColumnSpec>, rows: Vec<Row> },
-    AddSheet { name: String },
+    Set {
+        range: String,
+        values: Vec<Vec<Value>>,
+    },
+    AppendRows {
+        table: String,
+        rows: Vec<Row>,
+    },
+    InsertRows {
+        table: String,
+        before: u32,
+        rows: Vec<Row>,
+    },
+    DeleteRows {
+        table: String,
+        first: u32,
+        last: u32,
+    },
+    FillFormula {
+        table: String,
+        column: String,
+        formula: String,
+    },
+    SetType {
+        table: String,
+        column: String,
+        ty: String,
+        format: Option<String>,
+    },
+    AddColumn {
+        table: String,
+        column: ColumnSpec,
+    },
+    Sort {
+        table: String,
+        keys: Vec<SortKey>,
+    },
+    AddTable {
+        sheet: String,
+        name: String,
+        anchor: String,
+        columns: Vec<ColumnSpec>,
+        rows: Vec<Row>,
+    },
+    AddSheet {
+        name: String,
+    },
+    /// Every cell of `range` takes the values `set` writes; `outline` sets
+    /// the outer edges of the range.
+    Format {
+        range: String,
+        set: Box<CellFormat>,
+        outline: Option<Border>,
+    },
 }
 
 impl RangeOp {
@@ -98,6 +149,7 @@ impl RangeOp {
             RangeOp::Sort { .. } => "sort",
             RangeOp::AddTable { .. } => "add_table",
             RangeOp::AddSheet { .. } => "add_sheet",
+            RangeOp::Format { .. } => "format",
         }
     }
 
@@ -266,6 +318,11 @@ fn one_op(k: usize, item: &Json) -> Result<RangeOp, OpError> {
             }
             RangeOp::Set { range, values }
         }
+        "format" => {
+            let range = s("range")?;
+            let (set, outline) = format_set(&cx, o.get("set"))?;
+            RangeOp::Format { range, set: Box::new(set), outline }
+        }
         "append_rows" => RangeOp::AppendRows { table: s("table")?, rows: rows(&cx, o.get("rows"))? },
         "insert_rows" => {
             let before = row_number(&cx, "before", o.get("before"))?;
@@ -400,6 +457,96 @@ fn sort_keys(cx: &Ctx, v: Option<&Json>) -> Result<Vec<SortKey>, OpError> {
             }
         })
         .collect()
+}
+
+/// A `format` operation's `set`: the cell keys of the vocabulary, flags as
+/// `true`/`false`, `size` and `indent` as numbers or text, `border` for all
+/// four sides of every cell and `outline` for the outer edges of the range.
+fn format_set(cx: &Ctx, v: Option<&Json>) -> Result<(CellFormat, Option<Border>), OpError> {
+    let form = "is an object of formatting keys, such as {\"fill\": \"#D9D9D9\", \"bold\": true, \"border-bottom\": \"0.75pt solid #000000\"}";
+    let Some(Json::Object(o)) = v else { return Err(cx.err("set", format!("{form}."))) };
+    if o.is_empty() {
+        return Err(cx.err("set", format!("{form}; it sets at least one key.")));
+    }
+    let mut f = CellFormat::default();
+    let mut outline = None;
+    for (k, v) in o {
+        let text = match v {
+            Json::Bool(b) if vocab_flag(k) => {
+                if *b {
+                    None
+                } else {
+                    Some("no".to_string())
+                }
+            }
+            Json::Bool(_) => {
+                return Err(cx.err(
+                    "set",
+                    format!("{k}: true and false are for bold, italic, underline and strike; {k} takes a value."),
+                ))
+            }
+            Json::Number(n) if k == "size" => Some(format!("{n}pt")),
+            Json::Number(n) if k == "indent" => Some(n.to_string()),
+            Json::String(s) if vocab_flag(k) => match s.as_str() {
+                "true" | "yes" | "on" => None,
+                "false" | "no" | "off" => Some("no".into()),
+                _ => return Err(cx.err("set", format!("{k}: true or false, not {s:?}."))),
+            },
+            Json::String(s) => Some(s.clone()),
+            _ => {
+                return Err(cx.err("set", format!("{k}: a text value such as \"#D9D9D9\" or \"0.75pt solid #000000\".")))
+            }
+        };
+        if k == "outline" {
+            let b =
+                Border::parse(text.as_deref().unwrap_or("")).map_err(|m| cx.err("set", format!("outline: {m}.")))?;
+            outline = Some(b);
+            continue;
+        }
+        f.set(k, text.as_deref()).map_err(|m| cx.err("set", format!("{m}.")))?;
+    }
+    writable(cx, &f, outline.as_ref())?;
+    Ok((f, outline))
+}
+
+fn vocab_flag(k: &str) -> bool {
+    crate::vocab::FLAGS.contains(&k)
+}
+
+/// A `format` operation writes only values a workbook holds.
+fn writable(cx: &Ctx, f: &CellFormat, outline: Option<&Border>) -> Result<(), OpError> {
+    let color = |key: &str, c: &Color| -> Result<(), OpError> {
+        if c.alpha.is_some() {
+            return Err(cx.err(
+                "set",
+                format!("{key}: {c}: a workbook has no transparent colours; write the colour without /NN%."),
+            ));
+        }
+        if !c.is_writable() {
+            return Err(cx.err("set", format!("{key}: {c} is a theme colour with another transform, kept as the file has it; write a colour such as accent1+40% or #1F4E79.")));
+        }
+        Ok(())
+    };
+    if let Some(fill) = &f.fill {
+        match fill {
+            Fill::None => {}
+            Fill::Color(c) => color("fill", c)?,
+            other => return Err(cx.err("set", format!("fill={other} is shown but cannot be written: a workbook's gradients and patterns are kept as the file has them; write a colour or none."))),
+        }
+    }
+    let sides = f.borders.iter().enumerate().filter_map(|(k, b)| b.as_ref().map(|b| (cellfmt::SIDES[k], b)));
+    for (key, b) in sides.chain(outline.map(|b| ("outline", b))) {
+        if let Border::Line { style, color: c, .. } = b {
+            if !crate::vocab::BORDER_STYLES.contains(&style.as_str()) {
+                return Err(cx.err("set", format!("{key}: a workbook has no {style} border; write solid, dashed, dotted, double, dash-dot or dash-dot-dot.")));
+            }
+            color(key, c)?;
+        }
+    }
+    if let Some(c) = &f.color {
+        color("color", c)?;
+    }
+    Ok(())
 }
 
 /// A cell address `Sheet!D70` / `'My sheet'!D70:E71` split into sheet and cells.
@@ -939,7 +1086,29 @@ fn check_one(cx: &Ctx, op: &RangeOp, st: &mut Spreadsheet, formats: &Formats) ->
             if st.sheet(name).is_some() {
                 return Err(cx.err("name", format!("there is already a sheet \"{name}\".")));
             }
-            st.sheets.push(SheetDecl { name: name.clone(), range: None, items: vec![] });
+            st.sheets.push(SheetDecl { name: name.clone(), range: None, formats: vec![], items: vec![] });
+        }
+        RangeOp::Format { range, .. } => {
+            let form = "is Sheet!Cell or Sheet!First:Last, such as \"매출!A1\" or \"매출!A1:D1\"";
+            let (sheet, cells) =
+                split_range(range).ok_or_else(|| cx.err("range", format!("{form}, not {range:?}.")))?;
+            if st.sheet(&sheet).is_none() {
+                return Err(cx.err(
+                    "range",
+                    format!(
+                        "there is no sheet \"{sheet}\". Sheets: {}.",
+                        names_of(st.sheets.iter().map(|s| s.name.as_str()))
+                    ),
+                ));
+            }
+            let (c0, r0, c1, r1) = area(&cells).ok_or_else(|| cx.err("range", format!("{form}, not {range:?}.")))?;
+            if c1 < c0 || r1 < r0 {
+                return Err(cx.err("range", format!("{range} runs backwards; the first cell is the top-left one.")));
+            }
+            let n = (c1 - c0 + 1) as u64 * (r1 - r0 + 1) as u64;
+            if n > MAX_FORMAT_CELLS {
+                return Err(cx.err("range", format!("{range} is {n} cells; one format operation formats at most {MAX_FORMAT_CELLS}: format the cells that hold data, such as the sheet's used range.")));
+            }
         }
     }
     Ok(())

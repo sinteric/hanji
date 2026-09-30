@@ -23,7 +23,9 @@ use crate::import::{
     crop_of, group_item, object_geom, part_of_src, picture_item, shown_of, NotesInfo, Rels, SlideInfo, OBJECT_TAG,
 };
 use crate::pml::*;
+use crate::text::{self, RunStyle, ThemeFonts};
 use crate::DeckShell;
+use hanji_format::inline_style::{self as istyle, TextStyle};
 
 fn el(name: &str) -> Element {
     Element::new(name)
@@ -372,7 +374,26 @@ impl<'a> Exporter<'a> {
             if text && self.keep_slot(it)?.is_none() {
                 let bullets = bullets_of(it, &e);
                 let lists = matches!(it.kind, HeadKind::Slot { .. });
-                let paras = self.paras(it, &bullets, &part, lists)?;
+                // What its runs inherit (§5.3 text formatting).
+                let inherited = match it.kind {
+                    HeadKind::Slot { name } => layout.slot(name).map(|x| &x.text),
+                    _ => Some(&layout.other_text),
+                };
+                let base = inherited.map(|t| text::base(&e, t, &layout.fonts));
+                // What they inherited from the layout the slide had, when it changes.
+                let before = self.shell.deck.layouts.iter().find(|l| l.part == info.layout).map(|old| {
+                    let t = match it.kind {
+                        HeadKind::Slot { name } => old.slot(name).map_or(&old.other_text, |x| &x.text),
+                        _ => &old.other_text,
+                    };
+                    text::base(&e, t, &old.fonts)
+                });
+                let inherit = base.as_ref().map(|now| Inherit {
+                    now,
+                    then: before.as_ref().unwrap_or(now),
+                    fonts: &layout.fonts,
+                });
+                let paras = self.paras(it, &bullets, &part, lists, inherit)?;
                 if e.child("p:txBody").is_none() && !paras.is_empty() {
                     if !e.is("p:sp") {
                         return Err("only a shape can hold text".into());
@@ -623,7 +644,14 @@ impl<'a> Exporter<'a> {
     /// The `a:p` elements of an item's paragraphs. Without `lists` (a
     /// `<shape>`, whose text has no list items) each paragraph keeps its
     /// bullet and level as they are.
-    fn paras(&self, it: &ItemG, bullets: &[Bu; 9], part: &str, lists: bool) -> Result<Vec<Element>, String> {
+    fn paras(
+        &self,
+        it: &ItemG,
+        bullets: &[Bu; 9],
+        part: &str,
+        lists: bool,
+        base: Option<Inherit>,
+    ) -> Result<Vec<Element>, String> {
         let mut out = vec![];
         // Text level → lvl of the open items (as import reads them back).
         let mut open: Vec<u32> = vec![];
@@ -642,7 +670,7 @@ impl<'a> Exporter<'a> {
             }
             let stored_lvl: u32 = ppr_e.and_then(|e| e.meta.aux.first()).and_then(|v| v.parse().ok()).unwrap_or(0);
             if !lists {
-                out.push(self.para(p, bi, ppr_e, None, bullets, &lang, part)?);
+                out.push(self.para(p, bi, ppr_e, None, bullets, &lang, part, base)?);
                 continue;
             }
             let lvl = match p.item {
@@ -672,7 +700,7 @@ impl<'a> Exporter<'a> {
                     l
                 }
             };
-            out.push(self.para(p, bi, ppr_e, Some(lvl), bullets, &lang, part)?);
+            out.push(self.para(p, bi, ppr_e, Some(lvl), bullets, &lang, part, base)?);
         }
         Ok(out)
     }
@@ -699,6 +727,7 @@ impl<'a> Exporter<'a> {
         bullets: &[Bu; 9],
         lang: &str,
         part: &str,
+        base: Option<Inherit>,
     ) -> Result<Element, String> {
         let (mut pel, mut ppr, end) = match ppr_e {
             Some(e) => {
@@ -730,14 +759,24 @@ impl<'a> Exporter<'a> {
         if let Some(x) = ppr {
             pel.children.push(Node::El(x));
         }
-        self.runs(&mut pel, &p.content, bi, lang, part)?;
+        let stored_lvl: u32 = ppr_e.and_then(|e| e.meta.aux.first()).and_then(|v| v.parse().ok()).unwrap_or(0);
+        let under = base.map(|b| b.at(lvl.unwrap_or(stored_lvl).min(8) as usize));
+        self.runs(&mut pel, &p.content, bi, lang, part, under)?;
         if let Some(x) = end {
             pel.children.push(Node::El(x));
         }
         Ok(pel)
     }
 
-    fn runs(&self, pel: &mut Element, c: &Inline, bi: usize, lang: &str, part: &str) -> Result<(), String> {
+    fn runs(
+        &self,
+        pel: &mut Element,
+        c: &Inline,
+        bi: usize,
+        lang: &str,
+        part: &str,
+        under: Option<Under>,
+    ) -> Result<(), String> {
         let n = c.units.len();
         let runs = self.at(bi, Kind::Run);
         let mut owner: Vec<Option<&Entry>> = vec![None; n];
@@ -752,7 +791,10 @@ impl<'a> Exporter<'a> {
                 *slot = Some(r);
             }
         }
-        let eff = c.written_marks(&|k| owner[k].map_or(Marks::NONE, |o| o.meta.marks));
+        // Marks as the text states them: formatting spans split them where
+        // the text writes their brackets (§5.3), each on shown text.
+        let as_written = istyle::lift(&[c]).2.remove(0);
+        let eff = as_written.written_marks(&|k| owner[k].map_or(Marks::NONE, |o| o.meta.marks));
         let mut keeps: BTreeMap<usize, &Entry> = BTreeMap::new();
         for (k, u) in c.units.iter().enumerate() {
             if let Atom::Keep(kp) = &u.atom {
@@ -769,7 +811,25 @@ impl<'a> Exporter<'a> {
             }
         }
         let zat: HashSet<usize> = zruns.iter().map(|z| z.start.unwrap_or(0)).collect();
-        let key = |k: usize| (owner[k].map(|o| o.id), eff[k]);
+        // The formatting each unit's run is written with (§5.3): what the
+        // text states for shown text; a space or break in a run with shown
+        // text goes with that text, one of a new run with what it shows, and
+        // one of a run with no shown text keeps the run's (`None`).
+        let want = istyle::unit_styles(c);
+        let wanted: Vec<Option<TextStyle>> = (0..n)
+            .map(|k| {
+                if under.is_none() || istyle::visible(&c.units[k].atom) {
+                    return Some(want[k].clone());
+                }
+                let Some(o) = owner[k] else { return Some(want[k].clone()) };
+                let mine = |j: &usize| owner[*j].is_some_and(|x| x.id == o.id);
+                let shows = |j: &usize| istyle::visible(&c.units[*j].atom);
+                let prev = (0..k).rev().take_while(mine).find(shows);
+                let next = (k + 1..n).take_while(mine).find(shows);
+                prev.or(next).map(|j| want[j].clone())
+            })
+            .collect();
+        let key = |k: usize| (owner[k].map(|o| o.id), eff[k], &wanted[k]);
         let mut segs: Vec<(usize, usize)> = vec![];
         let mut k = 0;
         while k < n {
@@ -819,7 +879,7 @@ impl<'a> Exporter<'a> {
                     pel.children.push(Node::El(r));
                 }
                 It::Keep(e) => pel.children.push(Node::El(fragment(&e.xml[0]))),
-                It::Seg(a, b) => self.seg(pel, c, &eff, a, b, owner[a], lang),
+                It::Seg(a, b) => self.seg(pel, c, &eff, a, b, owner[a], lang, under.zip(wanted[a].as_ref()))?,
             }
         }
         Ok(())
@@ -827,7 +887,19 @@ impl<'a> Exporter<'a> {
 
     /// Units `a..b` of one run: `a:r` elements, and `a:br` for line breaks.
     #[allow(clippy::too_many_arguments)]
-    fn seg(&self, pel: &mut Element, c: &Inline, eff: &[Marks], a: usize, b: usize, own: Option<&Entry>, lang: &str) {
+    /// `style`: what the run inherits and the formatting the text writes for it.
+    #[allow(clippy::too_many_arguments)]
+    fn seg(
+        &self,
+        pel: &mut Element,
+        c: &Inline,
+        eff: &[Marks],
+        a: usize,
+        b: usize,
+        own: Option<&Entry>,
+        lang: &str,
+        style: Option<(Under, &TextStyle)>,
+    ) -> Result<(), String> {
         let text: String =
             c.units[a..b].iter().filter_map(|u| if let Atom::Char(ch) = u.atom { Some(ch) } else { None }).collect();
         let (shell, rpr) = match own {
@@ -846,10 +918,36 @@ impl<'a> Exporter<'a> {
                 (el("a:r"), Some(r))
             }
         };
-        let rpr = rpr.map(|mut r| {
+        let mut rpr = rpr.map(|mut r| {
             set_marks(&mut r, eff[a]);
             r
         });
+        // Text formatting (§5.3): what the text states and the run does not
+        // show where it now stands is written; the rest stays as it is.
+        if let Some((u, want)) = style {
+            // What the text leaves unsaid, the run inherits.
+            let mut want = want.over(&u.now.shown());
+            let own = rpr.as_ref().map_or_else(RunStyle::default, |r| RunStyle::of(r, u.fonts));
+            let had = own.over(u.now).shown();
+            // A colour kept as the file stores it (`*`, a gradient…) is not
+            // written from the text: one the run showed under the slide's old
+            // layout is copied from there.
+            let then = own.over(u.then);
+            let mut pin = None;
+            if want.color.as_ref().is_some_and(|c| text::is_kept(c)) && want.color == then.color {
+                if want.color != had.color {
+                    pin = then.fill.clone();
+                }
+                want.color = had.color.clone();
+            }
+            if had != want || pin.is_some() {
+                let r = rpr.get_or_insert_with(|| el("a:rPr").with_attr("lang", lang));
+                text::write(r, &want, &had, u.now)?;
+                if let Some(f) = pin {
+                    text::set_fill(r, &f);
+                }
+            }
+        }
         let mut buf = String::new();
         let flush = |buf: &mut String, pel: &mut Element| {
             if buf.is_empty() {
@@ -880,6 +978,7 @@ impl<'a> Exporter<'a> {
             }
         }
         flush(&mut buf, pel);
+        Ok(())
     }
 
     // ------------------------------------------------------------ notes
@@ -946,7 +1045,7 @@ impl<'a> Exporter<'a> {
                 levels_of(body.child("p:txBody").and_then(|t| t.child("a:lstStyle"))),
                 self.shell.deck.notes.as_ref().map_or([Bu::Unset; 9], |n| n.bullets),
             );
-            let paras = self.paras(it, &bullets, &info.part, true)?;
+            let paras = self.paras(it, &bullets, &info.part, true, None)?;
             let tx = body.child_mut("p:txBody").ok_or("the notes placeholder has no p:txBody")?;
             tx.children.retain(|x| !matches!(x, Node::El(p) if p.is("a:p")));
             tx.children.extend(paras.into_iter().map(Node::El));
@@ -1687,6 +1786,29 @@ fn check_connectors(
 
 /// A new text box (§5.3): `txBox`, no fill, the master's `otherStyle`; its
 /// id, name and paragraphs are written after.
+/// What a text item's runs inherit, by level (§5.3 text formatting): where
+/// the slide now stands, and under the layout it had.
+#[derive(Clone, Copy)]
+struct Inherit<'a> {
+    now: &'a [RunStyle; 9],
+    then: &'a [RunStyle; 9],
+    fonts: &'a ThemeFonts,
+}
+
+impl<'a> Inherit<'a> {
+    fn at(self, lvl: usize) -> Under<'a> {
+        Under { now: &self.now[lvl], then: &self.then[lvl], fonts: self.fonts }
+    }
+}
+
+/// [`Inherit`] at one paragraph level.
+#[derive(Clone, Copy)]
+struct Under<'a> {
+    now: &'a RunStyle,
+    then: &'a RunStyle,
+    fonts: &'a ThemeFonts,
+}
+
 fn new_text_box(g: &Geom) -> Element {
     let mut e = fragment(concat!(
         "<p:sp><p:nvSpPr><p:cNvPr id=\"0\" name=\"TextBox\"/><p:cNvSpPr txBox=\"1\"/><p:nvPr/></p:nvSpPr>",

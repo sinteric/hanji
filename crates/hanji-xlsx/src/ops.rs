@@ -260,7 +260,92 @@ fn apply_op(book: &mut Book, op: &RangeOp, cx: &mut Ctx) -> Result<(), String> {
             add_table(book, sheet, name, anchor, columns, rows, cx)
         }
         RangeOp::AddSheet { name } => add_sheet(book, name),
+        RangeOp::Format { range, set, outline } => op_format(book, range, set, outline.as_ref()),
     }
+}
+
+/// `format` (§5.4): every cell of the range takes the values `set` writes,
+/// the outer edges of the range `outline`; each cell keeps what else its
+/// style has. Cells the range holds that the sheet has not are made.
+fn op_format(
+    book: &mut Book,
+    range: &str,
+    set: &hanji_format::cellfmt::CellFormat,
+    outline: Option<&hanji_format::vocab::Border>,
+) -> Result<(), String> {
+    let (sheet, cells) = hanji_format::ops::split_range(range).ok_or("bad range")?;
+    let i = sheet_of(book, &sheet)?;
+    if book.sheets[i].kind != SheetKind::Work {
+        return Err(format!("sheet {sheet} is a chart sheet; it has no cells"));
+    }
+    let r = CellRange::parse(&cells).ok_or("bad range")?;
+    book.load_store(i)?;
+    let (c0, r0, c1, r1) = (r.first.col, r.first.row, r.last.col, r.last.row);
+    // The sides of the outline a cell is on: top, right, bottom, left.
+    let edges = |row: u32, col: u32| -> u8 {
+        if outline.is_none() {
+            return 0;
+        }
+        (row == r0) as u8 | ((col == c1) as u8) << 1 | ((row == r1) as u8) << 2 | ((col == c0) as u8) << 3
+    };
+    let mut wanted: std::collections::BTreeSet<(u32, u8)> = Default::default();
+    let mut present: HashMap<(u32, u32), u32> = HashMap::new();
+    book.store(i).for_each_row_in(r0, r1, &mut |row| {
+        for c in row.cells.iter().filter(|c| (c0..=c1).contains(&c.col)) {
+            present.insert((row.r, c.col), c.style());
+        }
+    });
+    let styles_of_new = |row: &crate::store::Row| {
+        if row.get("customFormat") == Some("1") {
+            row.get("s").and_then(|s| s.parse().ok()).unwrap_or(0)
+        } else {
+            0
+        }
+    };
+    let mut row_style: HashMap<u32, u32> = HashMap::new();
+    book.store(i).for_each_row_in(r0, r1, &mut |row| {
+        row_style.insert(row.r, styles_of_new(row));
+    });
+    for row in r0..=r1 {
+        for col in c0..=c1 {
+            let s = present.get(&(row, col)).copied().unwrap_or_else(|| row_style.get(&row).copied().unwrap_or(0));
+            wanted.insert((s, edges(row, col)));
+        }
+    }
+    let mut to: HashMap<(u32, u8), u32> = HashMap::new();
+    for (s, mask) in wanted {
+        let mut want = set.clone();
+        if let Some(b) = outline {
+            for k in 0..4 {
+                if mask & (1 << k) != 0 {
+                    want.borders[k] = Some(b.clone());
+                }
+            }
+        }
+        to.insert((s, mask), book.styles.with_cell_format(s, &want)?);
+    }
+    if to.iter().all(|((s, _), n)| s == n) {
+        return Ok(());
+    }
+    let rows: Vec<u32> = (r0..=r1).collect();
+    book.store_mut(i)?.edit_rows(&rows, &mut |row| {
+        let rr = row.r;
+        let new_style = styles_of_new(row);
+        for col in c0..=c1 {
+            let s = row.cell(col).map_or(new_style, |c| c.style());
+            let Some(&n) = to.get(&(s, edges(rr, col))) else { continue };
+            if n == s {
+                continue;
+            }
+            let cell = row.cell_mut(col);
+            if n == 0 {
+                cell.remove("s");
+            } else {
+                cell.set("s", &n.to_string());
+            }
+        }
+    });
+    Ok(())
 }
 
 /// What a cell becomes.
