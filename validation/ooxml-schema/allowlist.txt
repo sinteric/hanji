@@ -1,0 +1,18 @@
+# Known deviations from the transitional schemas in files hanji did not write, each with the
+# reason it is accepted. Kit exports of these files carry the same deviations (GetPut keeps what
+# it does not edit), so each file glob also matches the kit's file names (NN-…-slug-variant.ext).
+# Globs match the file's base name, case-insensitively.
+#
+# file-glob | part-glob | message-regex | reason
+
+# docx
+*korean-report*.docx | word/document.xml | pStyle': This element is not expected | LibreOffice 24.2 (make_korean.sh) writes w:sectPr first in a paragraph's w:pPr; Word opens the file and its kit exports without repair (kit v8)
+*korean-report*.docx | word/numbering.xml | numFmt': This element is not expected | LibreOffice 24.2 writes w:pStyle before w:numFmt in w:lvl; Word opens the file and its kit exports without repair (kit v8)
+*.docx | customXml/item*.xml | bibliography\}Sources', attribute 'Version' | Word writes a Version attribute on the bibliography's b:Sources, which the schema does not declare; Word reads it back
+*.docx | word/*.xml | \{urn:schemas-microsoft-com:vml\}\w+', attribute '(\{urn:schemas-microsoft-com:office:office\}gfxdata|ID)' | VML is legacy markup kept for compatibility, and its schemas lack attributes Word writes (o:gfxdata, ID); Word reads them
+
+# pptx
+60810.pptx | ppt/notesSlides/*.xml | attribute 'pitchFamily': \[facet 'enumeration'\] The value '127' | Apache POI bug 60810's test deck: pitchFamily="127" on the notes' a:ea and a:cs fonts, outside the schema's list of values
+*o09*performance*typical*.pptx | ppt/slides/slide1.xml | sndTgt', attribute 'builtIn' | Open XML SDK's "typical" deck, written by PowerPoint 2007: builtIn on a sound target, an ECMA-376 1st edition attribute the later transitional schema dropped
+*onlyoffice-sample*.pptx | ppt/charts/chart1.xml | showCatName': This element is not expected | ONLYOFFICE 8.3 writes a chart's c:dLbls children in alphabetical order, not schema order; PowerPoint opens the deck and its kit exports without repair (kit v8, files 47-49)
+*onlyoffice-sample*.pptx | ppt/embeddings/*.xlsx!docProps/app.xml | docPropsVTypes\}vector': Missing child element | ONLYOFFICE writes empty vt:vector lists in the chart workbook's app.xml; PowerPoint opens the deck and its kit exports without repair (kit v8, files 47-49)

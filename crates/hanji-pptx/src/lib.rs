@@ -17,6 +17,7 @@ pub mod export;
 pub mod fill;
 pub mod geom;
 pub mod import;
+pub mod members;
 pub mod pml;
 pub mod safety;
 pub mod text;
@@ -125,10 +126,14 @@ impl TextModel for PptxModel {
         }
         // A group written with a new box, or with objects moved, reads back
         // with its objects and its box where the write puts them (§5.3).
+        let mut layout = None;
         for b in &mut blocks {
             let Block::Head(h) = b else { continue };
+            if let hanji_core::presentation::HeadKind::Slide { layout: l } = hanji_core::presentation::kind(h) {
+                layout = shell.deck.layout(l);
+            }
             if let Some(hanji_core::Place::Group(g)) = &h.place {
-                if let Some(c) = canonical_group(g, rem) {
+                if let Some(c) = canonical_group(g, rem, layout.map(members::Styling::of)) {
                     h.place = Some(hanji_core::Place::Group(c));
                 }
             }
@@ -150,19 +155,19 @@ impl TextModel for PptxModel {
 /// The group `g` as the write leaves it: its stored element (the one group
 /// of the file with its id, name and objects) with `g` applied, read back.
 /// `None` when no group or more than one matches, or the write refuses it.
-fn canonical_group(g: &fmt::GroupItem, rem: &Remainder) -> Option<fmt::GroupItem> {
+fn canonical_group(g: &fmt::GroupItem, rem: &Remainder, sty: Option<members::Styling>) -> Option<fmt::GroupItem> {
     let frame = geom::Frame::SLIDE;
     let mut out: Option<fmt::GroupItem> = None;
     for e in rem.entries.iter().filter(|e| e.kind == hanji_core::Kind::Shape && e.meta.tag == "p:grpSp") {
         let el = xml::fragment(&e.xml[0]);
         let rels = import::rels_of(&rem.parts, e.meta.aux.get(1).map_or("", String::as_str));
-        let Some(st) = import::group_item(&el, &frame, &rels) else { continue };
+        let Some(st) = import::group_item(&el, &frame, &rels, sty) else { continue };
         if st.id != g.id || st.name != g.name || export::sig(&st.items) != export::sig(&g.items) {
             continue;
         }
         let mut after = el.clone();
-        export::apply_group(&mut after, g, &frame, &rels).ok()?;
-        let c = shown_group(import::group_item(&after, &frame, &rels)?);
+        export::apply_group(&mut after, g, &frame, &rels, sty).ok()?;
+        let c = shown_group(import::group_item(&after, &frame, &rels, sty)?);
         if out.as_ref().is_some_and(|o| *o != c) {
             return None;
         }

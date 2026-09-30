@@ -560,8 +560,8 @@ layout: Two Content
   shows an East Asian font). Colours are §5.1's: a scheme colour's
   `lumMod`/`lumOff` in whole percents is `accent1+40%`/`accent1-25%`, other
   adjustments `accent1*`, `a:alpha` `/NN%`; a gradient, pattern or picture
-  fill is shown and kept. Notes show no formatting, nor, until groups' text
-  is editable, do a group's shapes.
+  fill is shown and kept. Notes show no formatting. A group's shapes show
+  theirs as a slide shape does (see Groups).
   - A value left as shown keeps the run's XML. A changed one is written on
     the run's `a:rPr` in schema order, other children kept; a value equal to
     what the run inherits removes the run's own, so writing a title back at
@@ -592,7 +592,7 @@ layout: Two Content
     text shows (a kept one copied from the old layout).
   - The shape's fingerprint leaves its fill out, as its geometry. Refused:
     writing a kept fill anew, `background=` and other spellings (the key is
-    `fill`), and a fill on a group's objects (not shown yet).
+    `fill`).
 - **Pictures** are a line each, `<picture id="s7" name="지도" box="…"
   src="media/image1.png" crop="10 0 5 0" mask="ellipse" alt="…"/>`, in this
   attribute order; `crop`, `mask` and `alt` are left out when the picture has
@@ -648,9 +648,17 @@ layout: Two Content
   objects' new boxes. Changing its objects moves the group's box with them. A
   group box that disagrees with changed objects is refused. An object in a
   group is written as at the slide's level, a picture as `<picture/>`, another
-  object as `<keep id="s12" kind summary box/>` with its shape id. Only the boxes of a
-  group's objects change here: their text, names and number stay (refused
-  with the reason). A rotated or flipped group is one
+  object as `<keep id="s12" kind summary box/>` with its shape id. A group's
+  shapes show their text, text formatting and fill as a slide's shapes do,
+  inheriting as shapes that are not placeholders, and all three may change:
+  an unchanged paragraph keeps its XML; a changed one keeps its `a:pPr` and
+  `a:endParaRPr`, and each character takes the run of the old character it
+  aligns with (a character-level diff), marks and formatting set where the
+  text changes them; paragraphs added follow the last one. A paragraph
+  holding what the text does not show (a field) is refused. The group's
+  fingerprint leaves its shapes' paragraphs and fills out. Otherwise only
+  the boxes of a group's objects change here: their names and number stay
+  (refused with the reason). A rotated or flipped group is one
   `<keep kind="group" … box/>`. Groups are never created or ungrouped here.
 - **New objects** are written without `id`; the export gives ids and names
   (`TextBox 4`, `Straight Connector 10`), and the file read back shows them.
@@ -1104,7 +1112,7 @@ v0.7.3; "lossless … regarding content", not formatting).
 |---|---|
 | Rule 1 (preserve) | GetPut on a real corpus per engine: import → export with no edit is XML-equivalent per part |
 | PutGet | After each fluency-test edit, re-import shows exactly the written text |
-| Validity | Every export opens in Word / PowerPoint / Excel / Hancom with no repair prompt; schema validation alone is not enough (a schema-valid file Word rejected: office_oxide #208). Checked by hand for the office-kit in all four, 2026-09-29/30 (§11) |
+| Validity | Every export opens in Word / PowerPoint / Excel / Hancom with no repair prompt; schema validation alone is not enough (a schema-valid file Word rejected: office_oxide #208). Checked by hand for the office-kit in all four, 2026-09-29/30 (§11). CI validates every corpus source and kit file against the ISO/IEC 29500 transitional schemas plus the rules outside them that Office enforces (`validation/ooxml-schema`): necessary, not sufficient, and it caught the synthetic pitch deck PowerPoint repaired (kit v8, 44–46) |
 | Rule 5 (fidelity) | Per-page SSIM of our preview against the native application's own PDF export — Word, PowerPoint, Excel, Hancom — not against LibreOffice |
 | Presentation geometry | GetPut per object on the pptx corpus: every `a:xfrm` (and every absent one) unchanged after import → export; PutGet after box, z-order, group and new-object edits; the office-kit shows moved, resized and added objects where the text puts them, in PowerPoint |
 | Rule 8 (the model sees it) | Per corpus deck, every object on a slide appears in the text: slots, shapes with or without text, lines, groups and their objects, `<keep/>` lines |

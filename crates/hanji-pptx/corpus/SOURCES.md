@@ -59,7 +59,10 @@ decks and two synthetic modern ones, which the pptx tests run through GetPut,
 the edit set and PutGet (`audit_decks_getput_putget_remainder`), and on
 which the audit's coverage tally is measured. `fetch.sh` re-downloads the
 three third-party ones and checks their SHA-256; `make_synth.py` regenerates
-the synthetic ones. Crawled decks the audit also read (from Apache POI's
+the synthetic ones. The synthetic decks pass the transitional-schema check
+(`validation/ooxml-schema`). The pitch deck was regenerated on 2026-09-30:
+its first version had an empty animation list on slide 3 and negative chart
+axis ids, and PowerPoint repaired it on opening. Crawled decks the audit also read (from Apache POI's
 crawled-file set) are not committed.
 
 | File | Source | Licence | Slides | What it exercises |

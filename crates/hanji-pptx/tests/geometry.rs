@@ -144,7 +144,7 @@ fn every_object_shows_its_box_and_getput_keeps_every_xfrm() {
     ]
     .join("\n");
     assert!(keep_ids_out(&imp.text).contains(&s1), "{}", imp.text);
-    assert!(imp.text.contains("<group id=\"g5\" name=\"Group 4\" box=\"120 108 258 152\">\n<shape id=\"s2\" name=\"Rectangle 1\" box=\"120 108 138 60\"/>\n"), "{}", imp.text);
+    assert!(imp.text.contains("<group id=\"g5\" name=\"Group 4\" box=\"120 108 258 152\">\n<shape id=\"s2\" name=\"Rectangle 1\" box=\"120 108 138 60\" fill=accent1/>\n"), "{}", imp.text);
     assert!(imp.text.contains("<shape id=\"s13\" name=\"Rectangle 12\" box=\"594 72 72 72\" fill=accent1-50%/>"));
     assert!(imp.text.starts_with("---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 720 x 540 pt\n---\n"));
     // Every slot shows its box, inherited from the layout or the master.
@@ -331,7 +331,7 @@ fn groups_move_whole_or_by_their_objects() {
     let g = "<group id=\"g5\" name=\"Group 4\" box=\"120 108 258 152\">";
     let (text, rem) = exact(&imp.text, &imp.remainder, g, "<group id=\"g5\" name=\"Group 4\" box=\"220 108 258 152\">");
     let c = canonical(&text, &rem);
-    assert!(c.contains("<shape id=\"s2\" name=\"Rectangle 1\" box=\"220 108 138 60\"/>"), "{c}");
+    assert!(c.contains("<shape id=\"s2\" name=\"Rectangle 1\" box=\"220 108 138 60\" fill=accent1/>"), "{c}");
     let parts = export(&text, &rem);
     let x = xml(&parts, &s3);
     let (a, b) = (xfrms(&x), xfrms(&orig));
@@ -342,8 +342,8 @@ fn groups_move_whole_or_by_their_objects() {
     let (text, rem) = exact(
         &imp.text,
         &imp.remainder,
-        "name=\"Oval 2\" box=\"306 150 72 72\"",
-        "name=\"Oval 2\" box=\"406 150 72 72\"",
+        "name=\"Oval 2\" box=\"306 150 72 72\" fill",
+        "name=\"Oval 2\" box=\"406 150 72 72\" fill",
     );
     let c = canonical(&text, &rem);
     assert!(c.contains("<group id=\"g5\" name=\"Group 4\" box=\"120 108 358 152\">"), "{c}");
@@ -358,16 +358,19 @@ fn groups_move_whole_or_by_their_objects() {
         Err(EngineError::Refused(m)) => assert!(m.contains("both changed and disagree"), "{m}"),
         other => panic!("expected a refusal, got {:?}", other.map(|_| ())),
     }
-    // Its objects' text, or which objects it has, never change here.
+    // Its objects' text is written (§5.3); which objects it has, and their names, never change here.
     let (text, rem) = exact(
         &imp.text,
         &imp.remainder,
-        "name=\"Oval 2\" box=\"306 150 72 72\"/>",
-        "name=\"Oval 2\" box=\"306 150 72 72\">text</shape>",
+        "name=\"Oval 2\" box=\"306 150 72 72\" fill=accent1/>",
+        "name=\"Oval 2\" box=\"306 150 72 72\" fill=accent1>text</shape>",
     );
+    let x = xml(&export(&text, &rem), &s3);
+    assert!(x.contains("<a:t>text</a:t>"), "{x}");
+    let (text, rem) = exact(&imp.text, &imp.remainder, "name=\"Oval 2\"", "name=\"Oval 3\"");
     match PptxEngine.export(&text, &rem) {
         Err(EngineError::Refused(m)) => {
-            assert!(m.contains("never added, deleted, reordered, renamed or edited"), "{m}")
+            assert!(m.contains("never added, deleted, reordered, renamed"), "{m}")
         }
         other => panic!("expected a refusal, got {:?}", other.map(|_| ())),
     }
@@ -464,7 +467,7 @@ fn a_stored_rotation_left_as_shown_keeps_its_exact_value() {
         "name=\"Minus ninety\" box=\"60 160 200 40\" rot=\"270\" fill=gradient font=Calibri size=18pt color=lt1>",
         "name=\"Minus fifteen flipped\" box=\"300 160 160 60\" rot=\"345\" flip=\"h\" fill=gradient font=Calibri size=18pt color=lt1>",
         "name=\"Past a turn\" box=\"500 160 160 60\" rot=\"60\" fill=gradient font=Calibri size=18pt color=lt1>",
-        "name=\"Turned in group\" box=\"80 420 80 80\" rot=\"315\"/>",
+        "name=\"Turned in group\" box=\"80 420 80 80\" rot=\"315\" fill=gradient/>",
     ] {
         assert!(imp.text.contains(shown), "{shown}\n{}", imp.text);
     }

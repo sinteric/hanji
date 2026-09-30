@@ -45,6 +45,7 @@ use hanji_package::xml::{canon, fp, is_blank, Element, Node, Scope};
 use crate::deck::{LayoutInfo, SlotInfo};
 use crate::fill;
 use crate::geom::{self, Frame};
+use crate::members::{self, Styling};
 use crate::pml::*;
 use crate::text::{self, RunStyle, ThemeFonts};
 use hanji_format::inline_style::{self as istyle, TextStyle};
@@ -307,7 +308,8 @@ impl Importer<'_> {
                         }
                         _ => {
                             self.stats.groups += 1;
-                            let g = group_item(&el, &Frame::SLIDE, &self.rels).ok_or("a group that cannot be shown")?;
+                            let g = group_item(&el, &Frame::SLIDE, &self.rels, Some(Styling::of(layout)))
+                                .ok_or("a group that cannot be shown")?;
                             group_head(&g)
                         }
                     };
@@ -386,7 +388,12 @@ impl Importer<'_> {
     fn whole(&mut self, el: &Element, k: &str) {
         let hi = self.blocks.len() - 1;
         // A shape's fill is the text's (§5.3), as its geometry is.
-        let bare = geom::without_geometry(&if el.is("p:sp") { fill::without_fill(el) } else { el.clone() });
+        let bare = geom::without_geometry(&match el.name.as_str() {
+            "p:sp" => fill::without_fill(el),
+            // A group's shapes' text and fills are the text's too.
+            "p:grpSp" => members::without_shown(el),
+            _ => el.clone(),
+        });
         let f = self.fp(&[Some(&if el.is("p:pic") { unmodelled_picture(&bare) } else { bare })]);
         let meta = Meta {
             tag: el.name.clone(),
@@ -632,7 +639,7 @@ fn what<'s>(el: &Element, layout: &'s LayoutInfo, used: &[String], rels: &Rels) 
     let name = || c_nv_pr(el).and_then(|c| c.get("name")).unwrap_or_default();
     match (text, id) {
         (true, Some(id)) => What::Shape(format!("s{id}"), name()),
-        (_, Some(id)) if el.is("p:grpSp") && group_item(el, &Frame::SLIDE, rels).is_some() => {
+        (_, Some(id)) if el.is("p:grpSp") && group_item(el, &Frame::SLIDE, rels, None).is_some() => {
             What::Group(format!("g{id}"), name())
         }
         _ if el.is("p:pic") && picture_item(el, &Frame::SLIDE, rels).is_some() => {
@@ -667,7 +674,7 @@ pub fn object_geom(el: &Element) -> Option<Geom> {
 /// coordinates, through `parent` (the frame the group sits in). `None` for
 /// a rotated or flipped group, or one with an object the text cannot show:
 /// it is one `<keep/>`.
-pub fn group_item(el: &Element, parent: &Frame, rels: &Rels) -> Option<GroupItem> {
+pub fn group_item(el: &Element, parent: &Frame, rels: &Rels, sty: Option<Styling>) -> Option<GroupItem> {
     let id = geom::shape_id(el)?;
     let name = c_nv_pr(el)?.get("name").unwrap_or_default();
     let own = geom::own(el)?;
@@ -679,14 +686,14 @@ pub fn group_item(el: &Element, parent: &Frame, rels: &Rels) -> Option<GroupItem
     for c in el.elements() {
         match c.name.as_str() {
             "p:nvGrpSpPr" | "p:grpSpPr" | "p:extLst" => {}
-            _ => items.push(member(c, &f, rels)?),
+            _ => items.push(member(c, &f, rels, sty)?),
         }
     }
     (!items.is_empty()).then(|| GroupItem { id: format!("g{id}"), name, geom: Some(parent.out(&own)), items })
 }
 
 /// One object of a group, in slide coordinates through `f`.
-fn member(c: &Element, f: &Frame, rels: &Rels) -> Option<SlideItem> {
+fn member(c: &Element, f: &Frame, rels: &Rels, sty: Option<Styling>) -> Option<SlideItem> {
     let id = geom::shape_id(c)?;
     let name = c_nv_pr(c).and_then(|x| x.get("name")).unwrap_or_default();
     Some(match c.name.as_str() {
@@ -694,14 +701,14 @@ fn member(c: &Element, f: &Frame, rels: &Rels) -> Option<SlideItem> {
             id: format!("s{id}"),
             name,
             geom: geom::own(c).map(|g| f.out(&g)),
-            look: Default::default(),
-            paras: member_paras(c),
+            look: members::look(c, sty),
+            paras: members::paras(c, sty),
         }),
         "p:cxnSp" => {
             let g = f.out(&geom::own(c)?);
             SlideItem::Line(LineItem { id: format!("s{id}"), name, ends: geom::ends_of(&g) })
         }
-        "p:grpSp" if group_item(c, f, rels).is_some() => SlideItem::Group(group_item(c, f, rels)?),
+        "p:grpSp" if group_item(c, f, rels, sty).is_some() => SlideItem::Group(group_item(c, f, rels, sty)?),
         "p:pic" if picture_item(c, f, rels).is_some() => SlideItem::Picture(picture_item(c, f, rels)?),
         _ if is_object(c) => SlideItem::Object(ObjectItem {
             keep: Keep { id: format!("s{id}"), kind: keep_kind(c), summary: summary(c) },
@@ -824,36 +831,6 @@ fn unmodelled_picture(el: &Element) -> Element {
 pub fn crop_of(r: &Element) -> Crop {
     let v = |k: &str| r.get(k).and_then(|x| x.trim().parse().ok()).unwrap_or(0);
     Crop { l: v("l"), t: v("t"), r: v("r"), b: v("b") }
-}
-
-/// A group member's paragraphs as the text shows them (read only): runs
-/// and fields as their text with their marks, line breaks; none when it
-/// has no text.
-fn member_paras(sp: &Element) -> Vec<Inline> {
-    let Some(tx) = sp.child("p:txBody").filter(|_| has_text(sp)) else { return vec![] };
-    tx.elements()
-        .filter(|p| p.is("a:p"))
-        .map(|p| {
-            let mut units = vec![];
-            for c in p.elements() {
-                match c.name.as_str() {
-                    "a:r" | "a:fld" => {
-                        let m = marks_of(c.child("a:rPr"));
-                        let t = c.text_of(&["a:t"]);
-                        units.extend(t.chars().filter(|ch| *ch as u32 >= 0x20).map(|ch| Unit::new(Atom::Char(ch), m)));
-                    }
-                    "a:br" => units.push(Unit::new(Atom::Break, Marks::NONE)),
-                    _ => {}
-                }
-            }
-            if units.iter().all(|u| matches!(u.atom, Atom::Char(c) if c.is_whitespace())) {
-                units.clear();
-            }
-            let mut i = Inline { units, spans: vec![] };
-            i.normalize();
-            i
-        })
-        .collect()
 }
 
 /// A picture, graphic frame (chart, table, SmartArt, OLE object), group,
