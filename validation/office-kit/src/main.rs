@@ -27,7 +27,7 @@
 //!   under a title, two objects aligned; the picture edits: a picture
 //!   cropped, one cut to an ellipse with new alternative text; text
 //!   formatting: a word made 24 pt coral, a shape's font changed; and fills:
-//!   a shape filled, one's fill cleared).
+//!   a shape filled, one's fill cleared; and a group's shape's text edited).
 //! - xlsx: per workbook, GetPut and range operations that change the inputs
 //!   of formulas, whose cached values the export recomputes, and `format`
 //!   operations on named ranges (a header row filled and bold, a column in
@@ -512,11 +512,11 @@ fn pptx(kit: &mut Kit) {
                 name,
                 licence,
                 "pset",
-                "the pptx edit set, one edit after another: text edits, a slide added from a layout, one deleted, one moved, geometry edits (a shape moved, a picture resized, a text box added, two objects aligned), picture edits (a picture cropped, one cut to an ellipse with new alternative text), text formatting (a word made 24 pt coral, a shape's font changed) and fills (a shape filled accent2, one's fill cleared)",
+                "the pptx edit set, one edit after another: text edits, a slide added from a layout, one deleted, one moved, geometry edits (a shape moved, a picture resized, a text box added, two objects aligned), picture edits (a picture cropped, one cut to an ellipse with new alternative text), text formatting (a word made 24 pt coral, a shape's font changed) fills (a shape filled accent2, one's fill cleared) and a group's shape's text edited",
                 &out,
                 vec![
                     ppt.clone(),
-                    "Shows the edits listed below (slides added, deleted and moved; text changed; objects moved, resized, added and aligned where the listed boxes say; a picture cropped as its crop says, the percent cut off its left, top, right and bottom; a picture cut to an ellipse, its alternative text (Format Picture > Alt Text) as listed; the listed word 24 pt coral, the listed shape in Noto Sans KR; the listed shapes filled accent 2 and without fill)".into(),
+                    "Shows the edits listed below (slides added, deleted and moved; text changed; objects moved, resized, added and aligned where the listed boxes say; a picture cropped as its crop says, the percent cut off its left, top, right and bottom; a picture cut to an ellipse, its alternative text (Format Picture > Alt Text) as listed; the listed word 24 pt coral, the listed shape in Noto Sans KR; the listed shapes filled accent 2 and without fill; the listed text in a group changed, its formatting kept)".into(),
                 ],
                 notes,
             );
