@@ -4,7 +4,7 @@
 
 use hanji_core::{Block, Engine, EngineError, Entry, ImportOptions, ImportReport, Kind, Remainder, TextModel};
 use hanji_docx::{export_document, DocxEngine};
-use hanji_hwpx::owpml::section_number;
+use hanji_hwpx::owpml::{layout_problems, section_number};
 use hanji_hwpx::{export_sections, HwpxEngine};
 use hanji_package::xml;
 use hanji_pptx::{export_parts, PptxEngine, PptxModel};
@@ -154,8 +154,10 @@ impl Format for Hwpx {
     }
     fn export_blocks(&self, blocks: &[Block], rem: &Remainder) -> Result<(Vec<u8>, bool), EngineError> {
         let out = export_sections(blocks, rem)?;
-        let well_formed = out.sections.iter().all(|(_, d)| xml::parse(d).is_ok())
-            && out.header.as_deref().is_none_or(|h| xml::parse(h).is_ok());
+        // Well-formed, and no layout cache past its paragraph's end (Hancom's repair prompt).
+        let well_formed =
+            out.sections.iter().all(|(_, d)| xml::parse(d).is_ok_and(|x| layout_problems(&x.root).is_empty()))
+                && out.header.as_deref().is_none_or(|h| xml::parse(h).is_ok());
         Ok((hanji_hwpx::write_package(rem, out)?, well_formed))
     }
     fn is_split_part(&self, name: &str) -> bool {

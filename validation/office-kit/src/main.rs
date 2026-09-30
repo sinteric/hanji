@@ -843,6 +843,12 @@ const HWPX: &[(&str, &str)] = &[
     ("basic-table-01.hwpx", "MIT (rhwp test data)"),
 ];
 
+/// No layout cache past its paragraph's end: Hancom asks to repair such a file, and rhwp does not see it.
+fn hwpx_layout_ok(name: &str, variant: &str, pkg: &[u8]) {
+    let problems = hanji_hwpx::layout_problems(pkg).unwrap();
+    assert!(problems.is_empty(), "{name} {variant}: {problems:#?}");
+}
+
 fn hwpx(kit: &mut Kit) {
     let hancom = "Opens in Hancom Office without an error".to_string();
     for (name, licence) in HWPX {
@@ -850,6 +856,7 @@ fn hwpx(kit: &mut Kit) {
         let imp = HwpxEngine.import(&bytes, &ImportOptions::default()).unwrap();
         let (text, rem) = (imp.text, imp.remainder);
         let getput = HwpxEngine.export(&text, &rem).unwrap();
+        hwpx_layout_ok(name, "getput", &getput);
         kit.original("hwpx", name, licence, &bytes);
         kit.add(
             "hwpx",
@@ -869,6 +876,7 @@ fn hwpx(kit: &mut Kit) {
         match hanji_core::rewrite(&rem, &text, &e10.new_text, CAPS) {
             Ok(r) => {
                 let out = HwpxEngine.export(&r.text, &r.remainder).unwrap();
+                hwpx_layout_ok(name, "e10", &out);
                 kit.add(
                     "hwpx",
                     name,

@@ -186,6 +186,20 @@ pub fn write_package(rem: &Remainder, out: Exported) -> Result<Vec<u8>, EngineEr
     package::write(&parts).map_err(EngineError::Package)
 }
 
+/// Every paragraph of a package whose layout cache points past its end
+/// ([`owpml::stale_layout`]), by section part: the check the corpus test
+/// and the Office kit run on every hwpx export (rhwp lays the paragraphs
+/// out again and does not see it; Hancom asks to repair the file).
+pub fn layout_problems(package: &[u8]) -> Result<Vec<String>, String> {
+    let parts = package::read(package)?;
+    let mut out = vec![];
+    for name in section_parts(&parts) {
+        let d = xml::parse(package::get(&parts, &name).unwrap()).map_err(|e| format!("{name}: {e}"))?;
+        out.extend(owpml::layout_problems(&d.root).into_iter().map(|p| format!("{name}: {p}")));
+    }
+    Ok(out)
+}
+
 /// The section parts (and header) for resolved blocks placed against `rem`.
 pub fn export_sections(blocks: &[Block], rem: &Remainder) -> Result<Exported, EngineError> {
     let refused = EngineError::Refused;
@@ -218,8 +232,16 @@ pub fn export_sections(blocks: &[Block], rem: &Remainder) -> Result<Exported, En
     for ((s, paras), name) in body.into_iter().zip(names) {
         let mut x = s.prolog.clone();
         x.push_str(&s.root_open);
-        for p in &paras {
-            xml::write_element(p, &mut x);
+        for mut p in paras {
+            // Never a layout cache that points past its paragraph: Hancom
+            // asks to repair such a file. A cache counts the section's start
+            // run (`hp:secPr` and its controls) in the paragraph that held
+            // it; when an edit puts another paragraph first, the run moves
+            // there and the old first paragraph's lines can start past its
+            // end. Without its cache Hancom lays the paragraph out again. A
+            // cache still inside its paragraph stays: Hancom opens those.
+            owpml::drop_stale_layouts(&mut p);
+            xml::write_element(&p, &mut x);
         }
         x.push_str(&format!("</{}>", s.root_name));
         x.push_str(&s.epilog);
