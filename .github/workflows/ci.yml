@@ -25,3 +25,29 @@ jobs:
         run: cargo test --target wasm32-wasip1 --workspace --exclude hanji-cli --exclude hanji-mcp
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: wasmtime run --dir=${{ github.workspace }}
+
+  # Every corpus source and every Office check kit file against the ISO/IEC 29500 transitional
+  # schemas, with the rules outside them that Office enforces (validation/ooxml-schema).
+  ooxml-schema:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: validation/office-kit
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install lxml==6.0.2
+      - uses: actions/cache@v4
+        with:
+          path: validation/ooxml-schema/xsd
+          key: ooxml-xsd-${{ hashFiles('validation/ooxml-schema/SHA256SUMS') }}
+      - run: validation/ooxml-schema/fetch.sh
+      - name: corpus sources
+        run: python3 validation/ooxml-schema/validate.py -q crates/hanji-pptx/corpus crates/hanji-xlsx/corpus prototype/remainder/corpus
+      - name: build the Office check kit
+        run: cargo run --release --manifest-path validation/office-kit/Cargo.toml
+      - name: kit files
+        run: python3 validation/ooxml-schema/validate.py -q target/office-kit

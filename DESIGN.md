@@ -1112,7 +1112,7 @@ v0.7.3; "lossless … regarding content", not formatting).
 |---|---|
 | Rule 1 (preserve) | GetPut on a real corpus per engine: import → export with no edit is XML-equivalent per part |
 | PutGet | After each fluency-test edit, re-import shows exactly the written text |
-| Validity | Every export opens in Word / PowerPoint / Excel / Hancom with no repair prompt; schema validation alone is not enough (a schema-valid file Word rejected: office_oxide #208). Checked by hand for the office-kit in all four, 2026-09-29/30 (§11) |
+| Validity | Every export opens in Word / PowerPoint / Excel / Hancom with no repair prompt; schema validation alone is not enough (a schema-valid file Word rejected: office_oxide #208). Checked by hand for the office-kit in all four, 2026-09-29/30 (§11). CI validates every corpus source and kit file against the ISO/IEC 29500 transitional schemas plus the rules outside them that Office enforces (`validation/ooxml-schema`): necessary, not sufficient, and it caught the synthetic pitch deck PowerPoint repaired (kit v8, 44–46) |
 | Rule 5 (fidelity) | Per-page SSIM of our preview against the native application's own PDF export — Word, PowerPoint, Excel, Hancom — not against LibreOffice |
 | Presentation geometry | GetPut per object on the pptx corpus: every `a:xfrm` (and every absent one) unchanged after import → export; PutGet after box, z-order, group and new-object edits; the office-kit shows moved, resized and added objects where the text puts them, in PowerPoint |
 | Rule 8 (the model sees it) | Per corpus deck, every object on a slide appears in the text: slots, shapes with or without text, lines, groups and their objects, `<keep/>` lines |
