@@ -1405,7 +1405,8 @@ fn export_and_check(
     // What the write returns: the text, completed as the store completes it.
     let mut blocks = new_blocks.to_vec();
     cx.fmt.complete(&mut blocks, &mut r2);
-    let returned = if blocks == new_blocks { new_text.to_string() } else { cx.fmt.text_of(&blocks, &r2) };
+    let same = blocks == new_blocks && r2.styles == *styles;
+    let returned = if same { new_text.to_string() } else { cx.fmt.text_of(&blocks, &r2) };
     let (pkg, well_formed) = cx.fmt.export_blocks(&blocks, &r2).unwrap_or_else(|e| panic!("{name} {out_name}: {e}"));
     out.save(name, out_name, &pkg);
     let (rb, rr, _, _) = cx.fmt.split(&pkg, &RAW).unwrap();

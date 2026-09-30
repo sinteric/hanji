@@ -132,11 +132,14 @@ impl Format {
     }
 
     /// A new revision's blocks with what its text could not show filled in
-    /// from the remainder (docx: a paragraph that had no text keeps its
-    /// formatting when it gets some, §5.2).
+    /// from the remainder (§5.2: a paragraph that had no text keeps its
+    /// formatting when it gets some; hwpx: a new table's look, a new or
+    /// moved list item's level indent, values as Hancom holds them).
     pub fn complete(self, blocks: &mut [Block], rem: &mut Remainder) {
-        if self == Format::Docx {
-            DocxEngine::complete(blocks, rem);
+        match self {
+            Format::Docx => DocxEngine::complete(blocks, rem),
+            Format::Hwpx => HwpxEngine::complete(blocks, rem),
+            Format::Pptx | Format::Xlsx => {}
         }
     }
 

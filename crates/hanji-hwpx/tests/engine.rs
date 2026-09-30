@@ -6,7 +6,7 @@ use hanji_core::{edit, rewrite, Capabilities, Engine, EngineError, ImportOptions
 use hanji_hwpx::{package, xml, HwpxEngine};
 
 const CAPS: Capabilities =
-    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: false };
+    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: true };
 const NS: &str = r#"xmlns:hp="http://www.hancom.co.kr/hwpml/2011/paragraph" xmlns:hs="http://www.hancom.co.kr/hwpml/2011/section" xmlns:hh="http://www.hancom.co.kr/hwpml/2011/head" xmlns:hc="http://www.hancom.co.kr/hwpml/2011/core""#;
 
 fn part(name: &str, data: &str) -> Part {
@@ -136,6 +136,22 @@ fn save(dir: &str, what: &str, pkg: &[u8]) {
     std::fs::write(d.join(format!("{what}.hwpx")), pkg).unwrap();
 }
 
+/// `pkg` with its `header.xml` changed by `f`.
+fn with_header(pkg: &[u8], f: impl Fn(&str) -> String) -> Vec<u8> {
+    let mut parts = package::read(pkg).unwrap();
+    let h = parts.iter_mut().find(|p| p.name == "Contents/header.xml").unwrap();
+    h.data = f(std::str::from_utf8(&h.data).unwrap()).into_bytes();
+    package::write(&parts).unwrap()
+}
+
+/// A rewritten text as the store returns it: completed by the engine (§5.2).
+fn completed(text: &str, rem: &hanji_core::Remainder) -> (String, hanji_core::Remainder) {
+    let (_, mut blocks) = hanji_core::model_of(text, rem, CAPS).unwrap();
+    let mut rem = rem.clone();
+    HwpxEngine::complete(&mut blocks, &mut rem);
+    (HwpxEngine::text_of(&blocks, &rem, None), rem)
+}
+
 fn section(pkg: &[u8]) -> String {
     String::from_utf8(package::get(&package::read(pkg).unwrap(), "Contents/section0.xml").unwrap().to_vec()).unwrap()
 }
@@ -167,7 +183,10 @@ fn styles_headings_marks_tables_and_breaks_map_onto_the_model() {
     ];
     let pkg = hwpx(&body);
     let imp = import(&pkg);
-    let want = "# 3분기 보고\n\n매출은 **12%** 증가했다.\n\n<div style=\"본문\">빨간 글자</div>\n\n<p/>\n\n첫 줄<br/>둘째 줄\t탭\n\n| 지역 | 매출 |\n|---|---|\n| 서울 | 120 |\n| ^^ | 95 |\n| 합계 ||\n\n| 비고 |\n|---|\n| 부산<p/>해운대 |\n\n<pagebreak/>\n\n다음 쪽\n";
+    // The style section (§5.2): the default style's line complete, the others what differ.
+    let styles = "<style name=\"바탕글\" align=justify line-spacing=160% size=10pt color=#000000/>\n<style name=\"개요 1\" bold/>\n<style name=\"본문\"/>\n";
+    assert!(imp.text.contains(styles), "{}", imp.text);
+    let want = "# 3분기 보고\n\n매출은 **12%** 증가했다.\n\n<div style=\"본문\">빨간 글자</div> {color=#FF0000}\n\n<p/>\n\n첫 줄<br/>둘째 줄\t탭\n\n{valign=middle}\n| 지역 | 매출 |\n|---|---|\n| 서울 | 120 |\n| ^^ | 95 |\n| 합계 ||\n\n{valign=middle}\n| 비고 |\n|---|\n| 부산<p/>해운대 |\n\n<pagebreak/>\n\n다음 쪽\n";
     assert!(imp.text.ends_with(want), "{}", imp.text);
     // GetPut: the section comes back canonically equal, the header byte-equal.
     let out = export(&imp.text, &imp.remainder);
@@ -175,7 +194,7 @@ fn styles_headings_marks_tables_and_breaks_map_onto_the_model() {
     let hdr = |p: &[u8]| package::get(&package::read(p).unwrap(), "Contents/header.xml").unwrap().to_vec();
     assert_eq!(hdr(&out), hdr(&pkg));
     // hwpx has no table styles: the validator says so.
-    let bad = imp.text.replace("| 비고 |", "{style=\"Grid\"}\n| 비고 |");
+    let bad = imp.text.replace("{valign=middle}\n| 비고 |", "{style=\"Grid\" valign=middle}\n| 비고 |");
     match HwpxEngine.export(&bad, &imp.remainder) {
         Err(EngineError::Invalid(d)) => assert!(d[0].to_string().contains("table style"), "{}", d[0]),
         other => panic!("{other:?}"),
@@ -223,6 +242,8 @@ fn joining_paragraphs_keeps_the_runs_the_join_rewrites_around() {
     // the join it is not. The exact span then covers the paragraph mark, the
     // escape and the units between them, which are the same on both sides.
     let pkg = hwpx(&[p("1부."), p_in(0, 0, &[(2, "  "), (2, " 2."), (0, " 나")])]);
+    // Character shape 2 differs from 0 in what the text does not show (a shade).
+    let pkg = with_header(&pkg, |h| h.replace("#FF0000\"><hh:fontRef", "#000000\" shadeColor=\"#FFFF00\"><hh:fontRef"));
     let imp = import(&pkg);
     assert!(imp.text.contains("1부.\n\n   2\\. 나"), "{}", imp.text);
     let r = edit(&imp.remainder, &imp.text, "1부.\n\n   2\\.", "1부.   2.", CAPS).unwrap();
@@ -262,7 +283,11 @@ fn side_by_side_tables_are_separate_blocks_in_one_paragraph() {
     let (blocks, _, _, stats) = HwpxEngine::split(&pkg, &ImportOptions::default()).unwrap();
     assert_eq!((blocks.len(), stats.side_by_side), (4, 1));
     let imp = import(&pkg);
-    assert!(imp.text.contains("| 담당 부서 | 기획과 |\n|---|---|\n\n| 담당자 | 홍길동 |\n|---|---|\n"), "{}", imp.text);
+    assert!(
+        imp.text.contains("| 담당 부서 | 기획과 |\n|---|---|\n\n{valign=middle}\n| 담당자 | 홍길동 |\n|---|---|\n"),
+        "{}",
+        imp.text
+    );
     let out = export(&imp.text, &imp.remainder);
     assert_eq!(canon(&out), canon(&pkg), "GetPut writes both tables back into their paragraph");
     // An edit in the second table keeps them together.
@@ -273,8 +298,8 @@ fn side_by_side_tables_are_separate_blocks_in_one_paragraph() {
     // Moving the second table after 뒤 gives it a paragraph of its own.
     let moved = imp
         .text
-        .replace("\n\n| 담당자 | 홍길동 |\n|---|---|\n", "\n")
-        .replace("\n뒤\n", "\n뒤\n\n| 담당자 | 홍길동 |\n|---|---|\n");
+        .replace("\n\n{valign=middle}\n| 담당자 | 홍길동 |\n|---|---|\n", "\n")
+        .replace("\n뒤\n", "\n뒤\n\n{valign=middle}\n| 담당자 | 홍길동 |\n|---|---|\n");
     let r = rewrite(&imp.remainder, &imp.text, &moved, CAPS).unwrap();
     let out = export(&r.text, &r.remainder);
     let sec = section(&out);
@@ -284,7 +309,7 @@ fn side_by_side_tables_are_separate_blocks_in_one_paragraph() {
     );
     assert_eq!(import(&out).text, r.text, "PutGet");
     // Deleting the first table leaves the second in the shared paragraph.
-    let gone = imp.text.replace("| 담당 부서 | 기획과 |\n|---|---|\n\n", "");
+    let gone = imp.text.replace("{valign=middle}\n| 담당 부서 | 기획과 |\n|---|---|\n\n", "");
     let r = rewrite(&imp.remainder, &imp.text, &gone, CAPS).unwrap();
     let out = export(&r.text, &r.remainder);
     assert_eq!(section(&out).matches("<hp:tbl ").count(), 1);
@@ -374,12 +399,19 @@ fn a_new_nested_item_takes_the_shape_of_its_level() {
     ];
     let pkg = nested_lists(&body);
     let imp = import(&pkg);
-    assert!(imp.text.contains("- 상위\n  - 짧게 그리고 아주 길게 이어지는 문장\n- 다음 상위\n"), "{}", imp.text);
+    assert!(
+        imp.text.contains("- 상위\n  - 짧게 그리고 아주 길게 이어지는 문장 {indent-left=10pt}\n- 다음 상위\n"),
+        "{}",
+        imp.text
+    );
     // Split the nested item: the longer half keeps the paragraph, so the first half is the new
     // one, between the outer item and it. Both are nested items in shape 4; no shape is added.
+    // The new one takes its level's indent, and the returned text shows it.
     let split = imp.text.replace("짧게 그리고", "짧게\n  - 그리고");
     let r = rewrite(&imp.remainder, &imp.text, &split, CAPS).unwrap();
-    let out = export(&r.text, &r.remainder);
+    let (text, rem) = completed(&r.text, &r.remainder);
+    assert!(text.contains("  - 짧게 {indent-left=10pt}\n  - 그리고"), "{text}");
+    let out = export(&text, &rem);
     let sec = section(&out);
     for t in ["짧게", "그리고 아주 길게 이어지는 문장"] {
         let root = xml::parse(sec.as_bytes()).unwrap().root;
@@ -391,7 +423,7 @@ fn a_new_nested_item_takes_the_shape_of_its_level() {
         package::get(&parts, "Contents/header.xml"),
         package::get(&package::read(&pkg).unwrap(), "Contents/header.xml")
     );
-    assert_eq!(import(&out).text, r.text, "PutGet");
+    assert_eq!(import(&out).text, text, "PutGet");
     save("engine-lists", "ORIGINAL", &pkg);
     save("engine-lists", "split-nested", &out);
 }
@@ -412,7 +444,8 @@ fn an_item_moved_to_another_level_takes_that_levels_shape() {
     ];
     let pkg = nested_lists(&body);
     let imp = import(&pkg);
-    assert!(imp.text.contains("- 상위\n  - 하위\n  - 하위 둘\n- 다음 상위\n\n본문\n\n- 끝 항목\n"), "{}", imp.text);
+    let nested = "  - 하위 {indent-left=10pt}\n  - 하위 둘 {indent-left=10pt}\n";
+    assert!(imp.text.contains(&format!("- 상위\n{nested}- 다음 상위\n\n본문\n\n- 끝 항목\n")), "{}", imp.text);
     let shape = |out: &[u8], t: &str| {
         let root = xml::parse(section(out).as_bytes()).unwrap().root;
         let p = root.elements().find(|p| p.is("hp:p") && p.text_of(&["hp:t"]) == t).unwrap().get("paraPrIDRef");
@@ -420,17 +453,19 @@ fn an_item_moved_to_another_level_takes_that_levels_shape() {
     };
     let header = |pkg: &[u8]| package::get(&package::read(pkg).unwrap(), "Contents/header.xml").unwrap().to_vec();
     // The nested item moves out to the margin, into the list after "본문"; "다음 상위" moves
-    // under "상위".
+    // under "상위". Each takes its new level's indent (the moved line carries its old one).
     let moved = imp
         .text
-        .replace("  - 하위\n  - 하위 둘\n- 다음 상위\n", "  - 하위 둘\n  - 다음 상위\n")
-        .replace("\n- 끝 항목\n", "\n- 하위\n- 끝 항목\n");
+        .replace(&format!("{nested}- 다음 상위\n"), "  - 하위 둘 {indent-left=10pt}\n  - 다음 상위\n")
+        .replace("\n- 끝 항목\n", "\n- 하위 {indent-left=10pt}\n- 끝 항목\n");
     let r = rewrite(&imp.remainder, &imp.text, &moved, CAPS).unwrap();
-    let out = export(&r.text, &r.remainder);
+    let (text, rem) = completed(&r.text, &r.remainder);
+    assert!(text.contains("  - 다음 상위 {indent-left=10pt}\n") && text.contains("\n- 하위\n- 끝 항목\n"), "{text}");
+    let out = export(&text, &rem);
     assert_eq!(shape(&out, "하위").as_deref(), Some("2"), "{}", section(&out));
     assert_eq!(shape(&out, "다음 상위").as_deref(), Some("4"), "{}", section(&out));
     assert_eq!(header(&out), header(&pkg));
-    assert_eq!(import(&out).text, r.text, "PutGet");
+    assert_eq!(import(&out).text, text, "PutGet");
     save("engine-lists", "moved-levels", &out);
 }
 
@@ -477,8 +512,11 @@ fn a_new_table_in_a_file_without_one_takes_the_default_look() {
         let imp = import(&pkg);
         let r =
             rewrite(&imp.remainder, &imp.text, &imp.text.replace("\n뒤\n", &format!("\n{table}\n뒤\n")), CAPS).unwrap();
-        let out = export(&r.text, &r.remainder);
-        assert_eq!(import(&out).text, r.text, "PutGet");
+        // The new table takes the default look, and the returned text shows it.
+        let (text, rem) = completed(&r.text, &r.remainder);
+        assert!(text.contains("{border=\"0.34pt solid #000000\" valign=middle}\n| 지역 |"), "{text}");
+        let out = export(&text, &rem);
+        assert_eq!(import(&out).text, text, "PutGet");
         save("engine-new-table", "ORIGINAL", &pkg);
         let hdr = |p: &[u8]| package::get(&package::read(p).unwrap(), "Contents/header.xml").unwrap().to_vec();
         (String::from_utf8(hdr(&out)).unwrap(), hdr(&pkg) == hdr(&out), out)

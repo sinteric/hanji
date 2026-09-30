@@ -1,8 +1,9 @@
 //! The hwpx engine (OWPML, KS X 6101): splits `Contents/section*.xml` into
 //! model text and remainder entries at the XML level, and puts them back.
 //! Every other part is copied through byte for byte, except `header.xml`
-//! when the text needs a character or paragraph shape the file does not
-//! have yet. No I/O: package bytes in, package bytes out.
+//! when the text needs a shape, border fill, font or style the file does
+//! not have yet, or its style section changed a style (§5.2). No I/O:
+//! package bytes in, package bytes out.
 //!
 //! rhwp is not on the import/export path: it parses into its own document
 //! model and writes the package from it, which drops what that model does
@@ -10,6 +11,7 @@
 //! the section XML as written. rhwp validates exports in the tests.
 
 pub mod export;
+pub mod format;
 pub mod header;
 pub mod import;
 pub mod owpml;
@@ -116,7 +118,8 @@ impl HwpxEngine {
                 start_run: start.map(|s| s.0.to_xml()),
             });
         }
-        let split = imp.finish(blocks);
+        let mut split = imp.finish(blocks);
+        hanji_core::model::mark_shown(&mut split.styles, &split.blocks);
         let namespaces = sections[0]
             .1
             .root
@@ -149,7 +152,7 @@ impl Engine for HwpxEngine {
     }
 
     fn capabilities(&self) -> Capabilities {
-        Capabilities::default()
+        Capabilities { formatting: true, ..Default::default() }
     }
 
     fn import(&self, package: &[u8], opts: &ImportOptions) -> Result<Imported, EngineError> {
@@ -160,7 +163,178 @@ impl Engine for HwpxEngine {
 
     fn export(&self, text: &str, rem: &Remainder) -> Result<Vec<u8>, EngineError> {
         let (_, blocks) = hanji_core::model_of(text, rem, self.capabilities()).map_err(EngineError::Invalid)?;
-        write_package(rem, export_sections(&blocks, rem)?)
+        // The style section as the text has it.
+        let mut rem = rem.clone();
+        hanji_core::TextModel::restyle(&hanji_core::DocumentModel, text, &mut rem, self.capabilities());
+        write_package(&rem, export_sections(&blocks, &rem)?)
+    }
+}
+
+impl HwpxEngine {
+    /// A new revision's blocks with what its text could not show (§5.2): a
+    /// paragraph that had no text, and has now without writing its own
+    /// `{…}`, keeps the formatting it had, and the text shows it from now
+    /// on; a new table whose text gives its cells no box takes the look of
+    /// the file's first table cell (Hancom's, solid 0.12 mm lines and
+    /// centred, in a file without one); and values as hwpx holds them
+    /// (border widths snapped to Hancom's, line spacing in whole percents).
+    /// `rem`'s entries stop marking a paragraph whose text shows it.
+    pub fn complete(blocks: &mut [Block], rem: &mut Remainder) {
+        use hanji_format::{styled, Cell, Inline, Props};
+        if !rem.styles.formatting {
+            return;
+        }
+        for s in &mut rem.styles.paragraph {
+            format::snap_props(&mut s.props);
+        }
+        let Ok(header) = Header::read(package::get(&rem.parts, HEADER_PART)) else { return };
+        let f = export::Fmt::new(&rem.styles);
+        // A new table's cells, as export draws them.
+        let look = match rem.entries.iter().find(|e| e.kind == Kind::Tc) {
+            Some(e) => header.cell_box(&xml::fragment(&e.xml[0]), &xml::fragment(&e.xml[1])),
+            None => {
+                let mut p = Props::new();
+                let line = hanji_format::Key::BorderTop.parse(Some("0.34pt solid #000000")).unwrap();
+                for k in hanji_format::Key::SIDES {
+                    p.set(k, line.clone());
+                }
+                p.set(hanji_format::Key::Valign, hanji_format::Value::Choice("middle".into()));
+                p
+            }
+        }
+        .diff(&styled::box_default());
+        for (bi, b) in blocks.iter_mut().enumerate() {
+            let Block::Table(t) = b else { continue };
+            let new = !rem.entries.iter().any(|e| e.kind == Kind::Tbl && e.path == [bi] && e.meta.tag.is_empty());
+            if new && t.boxes.iter().flatten().all(Props::is_empty) {
+                t.boxes = t
+                    .rows
+                    .iter()
+                    .map(|r| {
+                        r.iter().map(|c| if matches!(c, Cell::Text(_)) { look.clone() } else { Props::new() }).collect()
+                    })
+                    .collect();
+            }
+        }
+        let mut fill = |path: Vec<usize>, style: &str, content: &mut Inline, props: &mut Props| {
+            format::snap_props(props);
+            for u in &mut content.units {
+                format::snap_props(&mut u.props);
+            }
+            if !styled::shows(content) {
+                return;
+            }
+            let Some(e) = rem.entries.iter_mut().find(|e| e.kind == Kind::Ppr && e.path == path && e.meta.unshown)
+            else {
+                return;
+            };
+            e.meta.unshown = false;
+            if !props.is_empty() {
+                return;
+            }
+            let x = xml::fragment(&e.xml[0]);
+            let sid = e.meta.style.clone().unwrap_or_else(|| "0".into());
+            let style = if style.is_empty() {
+                rem.styles.paragraph_name(&sid).unwrap_or(&rem.styles.default_paragraph).to_string()
+            } else {
+                style.to_string()
+            };
+            let ppr = x
+                .get("paraPrIDRef")
+                .and_then(|v| v.parse().ok())
+                .or_else(|| sid.parse().ok().and_then(|id| header.style(id)).map(|st| st.para_pr));
+            if let Some(ppr) = ppr {
+                let base = f.of(&style);
+                *props = header.para_values(ppr).only(&styled::PARA_OWN).diff(base);
+            }
+        };
+        for (bi, b) in blocks.iter_mut().enumerate() {
+            match b {
+                Block::Para(p) => fill(vec![bi], &p.style, &mut p.content, &mut p.props),
+                Block::Table(t) => {
+                    for bx in t.boxes.iter_mut().flatten() {
+                        format::snap_props(bx);
+                    }
+                    for (ri, row) in t.rows.iter_mut().enumerate() {
+                        for (ci, c) in row.iter_mut().enumerate() {
+                            if let Cell::Text(ps) = c {
+                                for (k, p) in ps.iter_mut().enumerate() {
+                                    let style = p.style.clone().unwrap_or_default();
+                                    fill(vec![bi, ri, ci, k], &style, &mut p.content, &mut p.props);
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        Self::level_indents(blocks, rem, &header, &f);
+    }
+
+    /// A new list item, or one the text moved to another level, takes its
+    /// level's indent (§5.2) from the nearest item at that level, of its
+    /// kind, that is where it was (in its own list first), as export takes
+    /// its shape; unless its text writes an indent of its own.
+    fn level_indents(blocks: &mut [Block], rem: &Remainder, header: &Header, f: &export::Fmt) {
+        let ind = import::LIST_INDENT;
+        let own = |bi: usize| rem.entries.iter().find(|e| e.kind == Kind::Ppr && e.path == [bi]);
+        fn item_of(b: &Block) -> Option<(hanji_core::ListItem, &hanji_core::Para)> {
+            match b {
+                Block::Para(p) => p.item.map(|i| (i, p)),
+                _ => None,
+            }
+        }
+        let style_of = |p: &hanji_core::Para| {
+            if p.style.is_empty() {
+                rem.styles.item_style().to_string()
+            } else {
+                p.style.clone()
+            }
+        };
+        let stable = |k: usize| {
+            item_of(&blocks[k])
+                .is_some_and(|(i, _)| own(k).and_then(|e| e.meta.item).is_some_and(|w| w.level == i.level))
+        };
+        let mut fixes = vec![];
+        for bi in 0..blocks.len() {
+            let Some((it, p)) = item_of(&blocks[bi]) else { continue };
+            let e = own(bi);
+            let moved = e.and_then(|e| e.meta.item).is_some_and(|w| w.level != it.level);
+            if e.is_some() && !moved {
+                continue;
+            }
+            let base = f.of(&style_of(p)).only(&ind);
+            if let Some(e) = e {
+                // Moved: an indent it had is carried, not written.
+                let x = xml::fragment(&e.xml[0]);
+                let ppr = x.get("paraPrIDRef").and_then(|v| v.parse().ok());
+                let had = ppr.map(|id| header.para_values(id).only(&ind).diff(&base)).unwrap_or_default();
+                if p.props.only(&ind) != had {
+                    continue;
+                }
+            } else if !p.props.only(&ind).is_empty() {
+                continue;
+            }
+            let lo = (0..=bi).rev().take_while(|&k| item_of(&blocks[k]).is_some()).last().unwrap_or(bi);
+            let hi = (bi..blocks.len()).take_while(|&k| item_of(&blocks[k]).is_some()).last().unwrap_or(bi);
+            let mut near: Vec<usize> = (0..blocks.len())
+                .filter(|&k| {
+                    k != bi
+                        && stable(k)
+                        && item_of(&blocks[k]).is_some_and(|(i, _)| i.level == it.level && i.ordered == it.ordered)
+                })
+                .collect();
+            near.sort_by_key(|&k| (!(lo..=hi).contains(&k), k.abs_diff(bi), k));
+            let Some((_, q)) = near.first().and_then(|&k| item_of(&blocks[k])) else { continue };
+            let eff = f.of(&style_of(q)).only(&ind).overlay(&q.props.only(&ind));
+            fixes.push((bi, eff.diff(&base)));
+        }
+        for (bi, want) in fixes {
+            if let Block::Para(p) = &mut blocks[bi] {
+                p.props = p.props.without(&ind).overlay(&want);
+            }
+        }
     }
 }
 
@@ -210,7 +384,15 @@ pub fn export_sections(blocks: &[Block], rem: &Remainder) -> Result<Exported, En
     let mut header = Header::read(package::get(&rem.parts, HEADER_PART)).map_err(EngineError::Package)?;
     let lists = hanji_core::plan_lists(blocks, &rem.entries, &mut header).map_err(refused)?;
     tracked_groups_intact(blocks, rem).map_err(refused)?;
-    let mut ex = export::Exporter::new(&rem.styles, header, &shell, &rem.entries, lists);
+    // The style section (§5.2): changed styles point at new shapes, new ones are written.
+    let mut styles = rem.styles.clone();
+    if styles.formatting {
+        header.write_styles(&mut styles).map_err(refused)?;
+    }
+    let mut ex = export::Exporter::new(&styles, header, &shell, &rem.entries, lists);
+    if styles.formatting {
+        ex = ex.formatted(export::Fmt::new(&styles));
+    }
     let body = ex.body(blocks).map_err(refused)?;
     // Every tracked change the file had is still referred to (§10.2: never dropped).
     let mut seen = BTreeSet::new();

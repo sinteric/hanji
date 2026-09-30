@@ -1,7 +1,8 @@
 //! §9 on the hwpx corpus (`corpus/`, see its SOURCES.md) through the shared
-//! harness (hanji-testkit): GetPut, the scripted edits E1–E10 with PutGet
-//! and remainder outcomes against the oracle, and validity. Set
-//! HANJI_REPORT=1 to print per-file numbers.
+//! harness (hanji-testkit): GetPut, the scripted edits E1–E9 and the
+//! formatting edits F1–F4, then all in one (E10), with PutGet and
+//! remainder outcomes against the oracle, and validity. Set HANJI_REPORT=1
+//! to print per-file numbers.
 
 use std::path::PathBuf;
 
@@ -68,6 +69,9 @@ impl Format for Hwpx {
             .iter()
             .any(|t| xml.contains(t))
     }
+    fn complete(&self, blocks: &mut [Block], rem: &mut Remainder) {
+        HwpxEngine::complete(blocks, rem);
+    }
 }
 
 pub fn corpus() -> Vec<(String, Vec<u8>)> {
@@ -79,9 +83,11 @@ fn corpus_getput_putget_remainder() {
     let files = corpus();
     assert!(files.len() >= 10, "the corpus has {} files", files.len());
     let out = Out { dir: PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("hwpx-corpus-out"), ext: "hwpx" };
-    let sum = hanji_testkit::run_corpus(&Hwpx, &files, &out);
+    let sum = hanji_testkit::run_corpus_with(&Hwpx, &files, &out, &hanji_testkit::FORMATTED_EDITS, "E10");
     assert!(sum.failures.is_empty(), "{}", sum.failures.join("\n"));
     assert_eq!(sum.getput_ok, files.len());
+    // An exact-span edit loses no entry of the blocks it touches.
+    assert_eq!(sum.touched["exact"][2], 0, "{:?}", sum.touched);
 }
 
 #[test]
@@ -106,9 +112,14 @@ fn a_new_table_can_be_added_to_every_file() {
         let imp = HwpxEngine.import(&pkg, &ImportOptions::default()).unwrap();
         let new = format!("{}\n| 새 표 | 값 |\n|---|---|\n| 가 | 1 |\n", imp.text);
         let r = hanji_core::rewrite(&imp.remainder, &imp.text, &new, caps).unwrap_or_else(|e| panic!("{name}: {e:?}"));
-        let bytes = HwpxEngine.export(&r.text, &r.remainder).unwrap_or_else(|e| panic!("{name}: {e}"));
+        // As the store returns it: the new table shows the look it takes.
+        let (_, mut blocks) = hanji_core::model_of(&r.text, &r.remainder, caps).unwrap();
+        let mut rem = r.remainder.clone();
+        HwpxEngine::complete(&mut blocks, &mut rem);
+        let text = HwpxEngine::text_of(&blocks, &rem, None);
+        let bytes = HwpxEngine.export(&text, &rem).unwrap_or_else(|e| panic!("{name}: {e}"));
         let back = HwpxEngine.import(&bytes, &ImportOptions::default()).unwrap();
-        assert_eq!(back.text, r.text, "{name}: PutGet");
+        assert_eq!(back.text, text, "{name}: PutGet");
         out.save(&name, "ORIGINAL", &pkg);
         out.save(&name, "new-table", &bytes);
     }
