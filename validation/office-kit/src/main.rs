@@ -22,8 +22,9 @@
 //! - pptx: per deck, GetPut and P9 (title, bullet, notes and shape text
 //!   edits, a slide added from a layout, one deleted, one moved, …, and the
 //!   geometry edits: a shape moved, a picture resized, a text box added
-//!   under a title, two objects aligned; and text formatting: a word made
-//!   24 pt coral, a shape's font changed).
+//!   under a title, two objects aligned; the picture edits: a picture
+//!   cropped, one cut to an ellipse with new alternative text; and text
+//!   formatting: a word made 24 pt coral, a shape's font changed).
 //! - xlsx: per workbook, GetPut and range operations that change the inputs
 //!   of formulas, whose cached values the export recomputes.
 //! - hwpx: per file, GetPut and E10.
@@ -445,6 +446,8 @@ const PPTX: &[(&str, &str)] = &[
     ("shapes.pptx", "Apache-2.0 (Apache POI test data)"),
     ("txt-font-props.pptx", "MIT (python-pptx test data)"),
     ("with_japanese.pptx", "Apache-2.0 (Apache POI test data)"),
+    ("audit/synth-modern-pitch.pptx", "CC0-1.0, synthetic (written for this project's canvas audit with python-pptx)"),
+    ("audit/onlyoffice-sample.pptx", "Apache-2.0 (ONLYOFFICE document-templates)"),
 ];
 
 fn pptx(kit: &mut Kit) {
@@ -503,11 +506,11 @@ fn pptx(kit: &mut Kit) {
                 name,
                 licence,
                 "pset",
-                "the pptx edit set, one edit after another: text edits, a slide added from a layout, one deleted, one moved, geometry edits (a shape moved, a picture resized, a text box added, two objects aligned) and text formatting (a word made 24 pt coral, a shape's font changed)",
+                "the pptx edit set, one edit after another: text edits, a slide added from a layout, one deleted, one moved, geometry edits (a shape moved, a picture resized, a text box added, two objects aligned) picture edits (a picture cropped, one cut to an ellipse with new alternative text) and text formatting (a word made 24 pt coral, a shape's font changed)",
                 &out,
                 vec![
                     ppt.clone(),
-                    "Shows the edits listed below (slides added, deleted and moved; text changed; objects moved, resized, added and aligned where the listed boxes say; the listed word 24 pt coral, the listed shape in Noto Sans KR)".into(),
+                    "Shows the edits listed below (slides added, deleted and moved; text changed; objects moved, resized, added and aligned where the listed boxes say; a picture cropped as its crop says, the percent cut off its left, top, right and bottom; a picture cut to an ellipse, its alternative text (Format Picture > Alt Text) as listed; the listed word 24 pt coral, the listed shape in Noto Sans KR)".into(),
                 ],
                 notes,
             );
@@ -953,7 +956,7 @@ fn checklist(kit: &Kit, commit: &str) -> (String, String) {
     (md, csv)
 }
 
-const HOW_TO_CHECK_A_DECK: &str = "hanji's text of a deck holds each slide's layout, and every object on it in z-order with its position and size in points (`box=\"x y w h\"` from the slide's top-left corner, 72 pt = 1 inch = 2.54 cm): the slots (title, body, …) and shapes with their text, lines and connectors by their two ends, groups with their objects, and a `<keep/>` line for each object it does not model (a picture, table or chart). The design (fonts, colours, fills, the theme, masters and layouts, transitions, animations) stays in the remainder, which the export writes back unchanged. So, comparing a `pset` export with its `original`: a slide no edit touched must look exactly like its original slide (the **Slide order** line says which original slide each one is); an edited slide may differ only in the text, order, layout, positions and sizes its edits list, and an object an edit moved or resized must sit at the box it names (a new text box under a title: just below it, as wide as it). Anything else, such as an object moved that no edit names, a lost picture, a connector come loose or a changed font, is a fail: note the slide.";
+const HOW_TO_CHECK_A_DECK: &str = "hanji's text of a deck holds each slide's layout, and every object on it in z-order with its position and size in points (`box=\"x y w h\"` from the slide's top-left corner, 72 pt = 1 inch = 2.54 cm): the slots (title, body, …) and shapes with their text, lines and connectors by their two ends, groups with their objects, pictures as `<picture/>` lines with their image, crop (percent cut off each edge), mask (the shape they are cut to) and alternative text, and a `<keep/>` line for each object it does not model (a table or chart). The design (fonts, colours, fills, the theme, masters and layouts, transitions, animations) stays in the remainder, which the export writes back unchanged. So, comparing a `pset` export with its `original`: a slide no edit touched must look exactly like its original slide (the **Slide order** line says which original slide each one is); an edited slide may differ only in the text, order, layout, positions and sizes its edits list, and an object an edit moved or resized must sit at the box it names (a new text box under a title: just below it, as wide as it). Anything else, such as an object moved that no edit names, a lost picture, a connector come loose or a changed font, is a fail: note the slide.";
 
 fn zip_dir(dir: &Path, names: &[String], out: &Path) {
     let f = std::fs::File::create(out).unwrap();

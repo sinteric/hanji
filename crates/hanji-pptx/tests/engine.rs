@@ -325,10 +325,13 @@ fn a_deleted_slide_leaves_the_outline_view_settings() {
     assert!(package::get(&out, &second).is_none());
 }
 
-/// The `<keep/>` line of the slide object whose kind is `kind`.
+/// The `<keep/>` line of the slide object whose kind is `kind`, or the first `<picture/>` line.
 fn object_line(text: &str, kind: &str) -> String {
-    text.lines().find(|l| l.starts_with("<keep ") && l.contains(&format!("kind=\"{kind}\""))).unwrap().to_string()
-        + "\n"
+    let line = |l: &&str| match kind {
+        "picture" if l.starts_with("<picture ") => true,
+        _ => l.starts_with("<keep ") && l.contains(&format!("kind=\"{kind}\"")),
+    };
+    text.lines().find(line).unwrap().to_string() + "\n"
 }
 
 #[test]
@@ -361,11 +364,14 @@ fn objects_are_shown_moved_and_deleted_never_changed() {
     assert!(package::get(&parts, "ppt/media/image1.png").is_none(), "the picture only it used goes");
     assert!(xml(&parts, &s4).contains("<p:graphicFrame>"), "the table stays");
     // An object cannot be altered, created, or moved to another slide (its picture is this slide's).
-    let altered = imp.text.replace(&pic, &pic.replace("summary=\"", "summary=\"x"));
+    let altered = imp.text.replace(&table, &table.replace("summary=\"", "summary=\"x"));
     assert!(matches!(PptxEngine.export(&altered, &imp.remainder), Err(EngineError::Invalid(_))));
+    let renamed = imp.text.replace(&pic, &pic.replace("name=\"", "name=\"x"));
+    assert!(matches!(PptxEngine.export(&renamed, &imp.remainder), Err(EngineError::Invalid(_))));
     let onto_first =
         imp.text.replacen(&pic, "", 1).replacen("::notes::\n인사말", &format!("{pic}::notes::\n인사말"), 1);
-    match PptxEngine.export(&onto_first, &imp.remainder) {
+    let r = rewrite_in(&PptxModel, &imp.remainder, &imp.text, &onto_first, CAPS).unwrap_or_else(|e| panic!("{e:?}"));
+    match PptxEngine.export(&r.text, &r.remainder) {
         Err(EngineError::Refused(m)) => assert!(m.contains("cannot move"), "{m}"),
         other => panic!("expected a refusal, got {:?}", other.map(|_| ())),
     }

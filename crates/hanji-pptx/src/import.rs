@@ -7,13 +7,15 @@
 //! - The slide part and its notes page: a [`Kind::Slide`] entry each on the
 //!   slide head, holding the part as it is but for the modelled shapes, which
 //!   are stand-ins (`hanji-item`). Transitions and animations stay there.
-//! - A picture, chart, table or other object that is not a layout
-//!   placeholder, and a rotated or flipped group: an `object` head and its
+//! - A chart, table or other object that is not a layout placeholder, a
+//!   picture the text cannot hold (see [`picture_item`]), and a rotated or
+//!   flipped group: an `object` head and its
 //!   `<keep/>` line (rule 8; a `Bkeep` entry tagged `object`), in z-order
 //!   among the slots and shapes.
-//! - A shape without text, a connector (`<line/>`) and a group (`<group>`,
-//!   its objects in its head's place): a head and a [`Kind::Shape`] entry
-//!   holding the element whole.
+//! - A shape without text, a connector (`<line/>`), a picture (`<picture/>`,
+//!   its image, crop, mask and alternative text in its head's place) and a
+//!   group (`<group>`, its objects in its head's place): a head and a
+//!   [`Kind::Shape`] entry holding the element whole.
 //! - Every head but the slide's and the notes' carries its geometry (§5.3):
 //!   a slot its own box, else the one it inherits from its layout.
 //! - A placeholder with text: a slot (`::title::`); its element without its
@@ -30,9 +32,13 @@
 
 use serde::{Deserialize, Serialize};
 
-use hanji_core::presentation::{group_head, line_head, object_head, shape_head, slide_head, slot_head};
+use std::collections::BTreeMap;
+
+use hanji_core::presentation::{group_head, line_head, object_head, picture_head, shape_head, slide_head, slot_head};
 use hanji_core::{Block, Entry, KeepIds, Kind, ListItem, Meta, Para};
-use hanji_format::{Atom, Geom, GroupItem, Inline, Keep, LineItem, Marks, ObjectItem, ShapeText, SlideItem, Unit};
+use hanji_format::{
+    Atom, Crop, Geom, GroupItem, Inline, Keep, LineItem, Marks, ObjectItem, PictureItem, ShapeText, SlideItem, Unit,
+};
 use hanji_package::clip;
 use hanji_package::xml::{canon, fp, is_blank, Element, Node, Scope};
 
@@ -82,6 +88,8 @@ pub struct Stats {
     pub kept: usize,
     /// Shapes without text, lines and groups shown with their geometry.
     pub bare: usize,
+    /// Pictures shown as `<picture/>`.
+    pub pictures: usize,
     pub lines: usize,
     pub groups: usize,
     pub list_items: usize,
@@ -107,6 +115,8 @@ pub struct Importer<'a> {
     fonts: ThemeFonts,
     /// Each unit's formatting as shown, beside `buf`.
     ustyle: Vec<TextStyle>,
+    /// The relationships of the slide being read: id → the `src` its target is.
+    pub rels: Rels,
     _deck: std::marker::PhantomData<&'a ()>,
 }
 
@@ -120,6 +130,7 @@ enum What<'s> {
     Bare(String, String),
     Line(String, String),
     Group(String, String),
+    Picture(PictureItem),
     Object,
     Other,
 }
@@ -144,6 +155,7 @@ impl Importer<'_> {
             base: None,
             fonts: ThemeFonts::default(),
             ustyle: vec![],
+            rels: Rels::new(),
             _deck: std::marker::PhantomData,
         }
     }
@@ -207,7 +219,7 @@ impl Importer<'_> {
                 tree.children.push(n);
                 continue;
             };
-            let what = what(&el, layout, &used);
+            let what = what(&el, layout, &used, &self.rels);
             match what {
                 What::Other => {
                     if !el.is("p:nvGrpSpPr") && !el.is("p:grpSpPr") && !el.is("p:extLst") {
@@ -268,6 +280,14 @@ impl Importer<'_> {
                     let t = Some((&layout.other_text, &layout.fonts));
                     self.text_shape(&el, &layout.other, &k.to_string(), false, g, t)?;
                 }
+                What::Picture(pic) => {
+                    k += 1;
+                    self.stats.pictures += 1;
+                    tree.children.push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
+                    self.blocks.push(picture_head(&pic));
+                    self.name_shape(pic.id, pic.name);
+                    self.whole(&el, &k.to_string());
+                }
                 What::Bare(ref id, ref name) | What::Line(ref id, ref name) | What::Group(ref id, ref name) => {
                     let (id, name) = (id.clone(), name.clone());
                     k += 1;
@@ -284,7 +304,8 @@ impl Importer<'_> {
                         }
                         _ => {
                             self.stats.groups += 1;
-                            group_head(&group_item(&el, &Frame::SLIDE).ok_or("a group that cannot be shown")?)
+                            let g = group_item(&el, &Frame::SLIDE, &self.rels).ok_or("a group that cannot be shown")?;
+                            group_head(&g)
                         }
                     };
                     self.blocks.push(head);
@@ -351,7 +372,8 @@ impl Importer<'_> {
     /// entry on the head just pushed.
     fn whole(&mut self, el: &Element, k: &str) {
         let hi = self.blocks.len() - 1;
-        let f = self.fp(&[Some(&geom::without_geometry(el))]);
+        let bare = geom::without_geometry(el);
+        let f = self.fp(&[Some(&if el.is("p:pic") { unmodelled_picture(&bare) } else { bare })]);
         let meta = Meta {
             tag: el.name.clone(),
             aux: vec![k.to_string(), self.part.clone(), shown(geom::own(el))],
@@ -579,7 +601,7 @@ impl Importer<'_> {
 /// What a shape-tree child is: a slot (placeholder of the layout with text,
 /// or holding its object), a latent placeholder, a shape with text, or
 /// something the text does not show.
-fn what<'s>(el: &Element, layout: &'s LayoutInfo, used: &[String]) -> What<'s> {
+fn what<'s>(el: &Element, layout: &'s LayoutInfo, used: &[String], rels: &Rels) -> What<'s> {
     let ph = placeholder(el);
     let text = el.is("p:sp") && has_text(el);
     if let Some((ty, idx, _)) = &ph {
@@ -596,8 +618,11 @@ fn what<'s>(el: &Element, layout: &'s LayoutInfo, used: &[String]) -> What<'s> {
     let name = || c_nv_pr(el).and_then(|c| c.get("name")).unwrap_or_default();
     match (text, id) {
         (true, Some(id)) => What::Shape(format!("s{id}"), name()),
-        (_, Some(id)) if el.is("p:grpSp") && group_item(el, &Frame::SLIDE).is_some() => {
+        (_, Some(id)) if el.is("p:grpSp") && group_item(el, &Frame::SLIDE, rels).is_some() => {
             What::Group(format!("g{id}"), name())
+        }
+        _ if el.is("p:pic") && picture_item(el, &Frame::SLIDE, rels).is_some() => {
+            What::Picture(picture_item(el, &Frame::SLIDE, rels).unwrap())
         }
         _ if is_object(el) => What::Object,
         (false, Some(id)) if el.is("p:sp") && ph.is_none() => What::Bare(format!("s{id}"), name()),
@@ -628,7 +653,7 @@ pub fn object_geom(el: &Element) -> Option<Geom> {
 /// coordinates, through `parent` (the frame the group sits in). `None` for
 /// a rotated or flipped group, or one with an object the text cannot show:
 /// it is one `<keep/>`.
-pub fn group_item(el: &Element, parent: &Frame) -> Option<GroupItem> {
+pub fn group_item(el: &Element, parent: &Frame, rels: &Rels) -> Option<GroupItem> {
     let id = geom::shape_id(el)?;
     let name = c_nv_pr(el)?.get("name").unwrap_or_default();
     let own = geom::own(el)?;
@@ -640,14 +665,14 @@ pub fn group_item(el: &Element, parent: &Frame) -> Option<GroupItem> {
     for c in el.elements() {
         match c.name.as_str() {
             "p:nvGrpSpPr" | "p:grpSpPr" | "p:extLst" => {}
-            _ => items.push(member(c, &f)?),
+            _ => items.push(member(c, &f, rels)?),
         }
     }
     (!items.is_empty()).then(|| GroupItem { id: format!("g{id}"), name, geom: Some(parent.out(&own)), items })
 }
 
 /// One object of a group, in slide coordinates through `f`.
-fn member(c: &Element, f: &Frame) -> Option<SlideItem> {
+fn member(c: &Element, f: &Frame, rels: &Rels) -> Option<SlideItem> {
     let id = geom::shape_id(c)?;
     let name = c_nv_pr(c).and_then(|x| x.get("name")).unwrap_or_default();
     Some(match c.name.as_str() {
@@ -661,13 +686,129 @@ fn member(c: &Element, f: &Frame) -> Option<SlideItem> {
             let g = f.out(&geom::own(c)?);
             SlideItem::Line(LineItem { id: format!("s{id}"), name, ends: geom::ends_of(&g) })
         }
-        "p:grpSp" if group_item(c, f).is_some() => SlideItem::Group(group_item(c, f)?),
+        "p:grpSp" if group_item(c, f, rels).is_some() => SlideItem::Group(group_item(c, f, rels)?),
+        "p:pic" if picture_item(c, f, rels).is_some() => SlideItem::Picture(picture_item(c, f, rels)?),
         _ if is_object(c) => SlideItem::Object(ObjectItem {
             keep: Keep { id: format!("s{id}"), kind: keep_kind(c), summary: summary(c) },
             geom: object_geom(c).map(|g| f.out(&g)),
         }),
         _ => return None,
     })
+}
+
+/// A slide's relationships as pictures name them: relationship id → the
+/// `src` of its target (see [`src_of`]).
+pub type Rels = BTreeMap<String, String>;
+
+/// The relationships of `part` in `parts`: id → `src` (internal targets only).
+pub fn rels_of(parts: &[hanji_core::Part], part: &str) -> Rels {
+    hanji_package::opc::rels_of(parts, part)
+        .into_iter()
+        .filter(|r| !r.external)
+        .map(|r| (r.id, src_of(&hanji_package::opc::resolve_target(part, &r.target))))
+        .collect()
+}
+
+/// A picture's `src`: its image part, from the presentation's folder
+/// (`media/image1.png` for `ppt/media/image1.png`).
+pub fn src_of(part: &str) -> String {
+    match part.strip_prefix("ppt/") {
+        Some(rest) => rest.to_string(),
+        None => format!("/{part}"),
+    }
+}
+
+/// The package part a `src` names.
+pub fn part_of_src(src: &str) -> String {
+    match src.strip_prefix('/') {
+        Some(rest) => rest.to_string(),
+        None => format!("ppt/{src}"),
+    }
+}
+
+/// Artistic effects (`a14:imgProps`) are stored in this extension of `a:blip`.
+const ARTISTIC_EFFECTS: &str = "{BEBA8EAE-BF5A-486C-A8C5-ECC9F3942E4B}";
+
+/// A picture as the text shows it (§5.3), in slide coordinates through `f`:
+/// its box, image, crop, mask and alternative text. `None` for one the text
+/// keeps whole (`<keep/>`): media (a video or sound shown as a picture), a
+/// linked image, a picture with artistic effects or a duotone, one cut to
+/// a custom shape, or one without a box or an image in the package.
+pub fn picture_item(el: &Element, f: &Frame, rels: &Rels) -> Option<PictureItem> {
+    if !el.is("p:pic") {
+        return None;
+    }
+    let nv = el.child("p:nvPicPr")?;
+    let mut media = false;
+    if let Some(pr) = nv.child("p:nvPr") {
+        pr.walk(&mut |e| {
+            media |= matches!(e.local(), "videoFile" | "audioFile" | "quickTimeFile" | "wavAudioFile" | "media")
+        });
+    }
+    if media {
+        return None;
+    }
+    let bf = el.child("p:blipFill")?;
+    let blip = bf.child("a:blip")?;
+    if blip.get("r:link").is_some() || blip.child("a:duotone").is_some() {
+        return None;
+    }
+    let mut artistic = false;
+    blip.walk(&mut |e| artistic |= e.is("a:ext") && e.get("uri").as_deref() == Some(ARTISTIC_EFFECTS));
+    if artistic {
+        return None;
+    }
+    let src = rels.get(&blip.get("r:embed")?)?.clone();
+    let sppr = el.child("p:spPr")?;
+    if sppr.child("a:custGeom").is_some() {
+        return None;
+    }
+    let mask = sppr.child("a:prstGeom").and_then(|g| g.get("prst")).filter(|m| m != "rect");
+    let geom = geom::own(el).map(|g| f.out(&g))?;
+    let id = geom::shape_id(el)?;
+    let c = c_nv_pr(el)?;
+    let crop = bf.child("a:srcRect").map(crop_of).filter(|c| !c.is_zero());
+    Some(PictureItem {
+        id: format!("s{id}"),
+        name: c.get("name").unwrap_or_default(),
+        geom: Some(geom),
+        src,
+        crop,
+        mask,
+        alt: c.get("descr").filter(|d| !d.is_empty()),
+    })
+}
+
+/// A picture without what the text shows of it (its image, crop, mask and
+/// alternative text): what its entry's fingerprint is made from.
+fn unmodelled_picture(el: &Element) -> Element {
+    let mut e = el.clone();
+    if let Some(c) = c_nv_pr_mut(&mut e) {
+        c.remove_attr("descr");
+    }
+    if let Some(bf) = e.child_mut("p:blipFill") {
+        if let Some(b) = bf.child_mut("a:blip") {
+            b.remove_attr("r:embed");
+        }
+        if let Some(r) = bf.child_mut("a:srcRect") {
+            for k in ["l", "t", "r", "b"] {
+                r.remove_attr(k);
+            }
+        }
+        bf.children
+            .retain(|n| !matches!(n, Node::El(x) if x.is("a:srcRect") && x.attrs.is_empty() && !x.has_elements()));
+    }
+    if let Some(g) = e.child_mut("p:spPr").and_then(|s| s.child_mut("a:prstGeom")) {
+        g.remove_attr("prst");
+        g.children.clear();
+    }
+    e
+}
+
+/// The crop an `a:srcRect` stores.
+pub fn crop_of(r: &Element) -> Crop {
+    let v = |k: &str| r.get(k).and_then(|x| x.trim().parse().ok()).unwrap_or(0);
+    Crop { l: v("l"), t: v("t"), r: v("r"), b: v("b") }
 }
 
 /// A group member's paragraphs as the text shows them (read only): runs

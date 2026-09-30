@@ -1034,7 +1034,7 @@ impl<'a> Parser<'a> {
                 "summary" => summary = Some(v.clone()),
                 "box" | "rot" | "flip" if self.object_line => geo.push((k.clone(), v.clone(), *col)),
                 "src" => {
-                    self.err(line, *col, "a picture from a file cannot be added yet (DESIGN.md §5.3): add it in PowerPoint, or leave a text box where it goes.");
+                    self.err(line, *col, "a picture is its own line, <picture box=\"x y w h\" src=\"…\"/>, not a <keep/> (DESIGN.md §5.3).");
                     return None;
                 }
                 other => {
@@ -1562,7 +1562,13 @@ pub(crate) fn parse_attrs(src: &[Src]) -> Option<Vec<(String, String, usize)>> {
 }
 
 pub(crate) fn decode_attr(s: &str) -> String {
-    s.replace("&quot;", "\"").replace("&apos;", "'").replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+    s.replace("&quot;", "\"")
+        .replace("&apos;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&#10;", "\n")
+        .replace("&#13;", "\r")
+        .replace("&amp;", "&")
 }
 
 pub(crate) fn looks_like_css(v: &str) -> bool {
