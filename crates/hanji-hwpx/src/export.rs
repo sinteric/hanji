@@ -5,11 +5,12 @@
 use std::collections::{BTreeMap, HashMap};
 
 use hanji_core::{Block, Entry, Kind, ListPlan, StyleSet};
-use hanji_format::{Atom, Cell, Inline, Marks};
+use hanji_format::styled::{self, StyleTable};
+use hanji_format::{Atom, Cell, Inline, Key, Marks, Props, Value};
 use hanji_package::xml::{assemble, escape_text, fragment, Element, Node};
 
-use crate::header::{list_heading, Header, Style};
-use crate::import::{dims, layout_key};
+use crate::header::{list_heading, list_num, Header, Style};
+use crate::import::{char_key, dims, layout_key};
 use crate::owpml::char_element;
 use crate::{PackageShell, SectionShell};
 
@@ -26,6 +27,37 @@ pub struct Exporter<'a> {
     /// The first table of the file, for a new table's properties.
     table_template: Option<&'a Entry>,
     cell_template: Option<&'a Entry>,
+    /// Formatting (§5.2), where the file shows it.
+    fmt: Option<Fmt>,
+}
+
+/// Each paragraph style's values as the text's style section says.
+pub struct Fmt {
+    values: HashMap<String, Props>,
+    default: Props,
+}
+
+impl Fmt {
+    pub fn new(styles: &StyleSet) -> Fmt {
+        let table = StyleTable { default: Some(styles.default_paragraph.clone()), lines: styles.lines() };
+        let values = styles.paragraph.iter().map(|d| (d.name.clone(), table.values(Some(&d.name)))).collect();
+        Fmt { values, default: table.default_values() }
+    }
+
+    /// The values of paragraph style `style`.
+    pub fn of(&self, style: &str) -> &Props {
+        self.values.get(style).unwrap_or(&self.default)
+    }
+}
+
+/// The flags of a set of values.
+fn flags_of(p: &Props) -> Marks {
+    let on = |k: Key| p.get(k).and_then(Value::flag).unwrap_or(false);
+    Marks::NONE
+        .with(Marks::BOLD, on(Key::Bold))
+        .with(Marks::ITALIC, on(Key::Italic))
+        .with(Marks::UNDERLINE, on(Key::Underline))
+        .with(Marks::STRIKE, on(Key::Strike))
 }
 
 fn node(e: Element) -> Node {
@@ -86,6 +118,7 @@ impl<'a> Exporter<'a> {
             anchors: HashMap::new(),
             table_template: None,
             cell_template: None,
+            fmt: None,
         };
         for e in entries {
             match e.kind {
@@ -106,6 +139,12 @@ impl<'a> Exporter<'a> {
             }
         }
         ex
+    }
+
+    /// Write formatting (§5.2) against `fmt`.
+    pub fn formatted(mut self, fmt: Fmt) -> Self {
+        self.fmt = Some(fmt);
+        self
     }
 
     fn at(&self, path: &[usize], kind: Kind) -> Vec<&'a Entry> {
@@ -161,9 +200,10 @@ impl<'a> Exporter<'a> {
                     1
                 }
                 Block::Para(p) => {
-                    // A list item keeps the paragraph style the remainder has.
-                    let style = p.item.is_none().then_some(p.style.as_str());
-                    let pel = self.para(&p.content, style, &[bi], Some((bi, blocks)))?;
+                    // A list item keeps the paragraph style the remainder
+                    // has, unless the text shows formatting (and its style).
+                    let style = (p.item.is_none() || self.fmt.is_some()).then_some(p.style.as_str());
+                    let pel = self.para(&p.content, style, Some(&p.props), &[bi], Some((bi, blocks)))?;
                     self.emit(&mut out, pel);
                     1
                 }
@@ -328,11 +368,13 @@ impl<'a> Exporter<'a> {
     }
 
     /// `hp:p` with its runs. `style: None` keeps the style the remainder has.
-    /// `list`: the block index and blocks of a top-level paragraph.
+    /// `props`: what the paragraph sets beyond its style (§5.2). `list`: the
+    /// block index and blocks of a top-level paragraph.
     fn para(
         &mut self,
         content: &Inline,
         style: Option<&str>,
+        props: Option<&Props>,
         path: &[usize],
         list: Option<(usize, &[Block])>,
     ) -> Result<Element, String> {
@@ -349,7 +391,10 @@ impl<'a> Exporter<'a> {
                     e.meta.style.as_deref().and_then(|s| s.parse().ok()).map(|id| self.header.style_or_missing(id));
                 let own = pp.is_some();
                 let lines = e.xml.get(1).filter(|_| own).map(|x| fragment(x));
-                let layout = own.then(|| (e.meta.aux[2].clone(), e.meta.aux[3].parse::<usize>().unwrap_or(usize::MAX)));
+                let layout = own.then(|| {
+                    let at = e.meta.aux[3].parse::<usize>().unwrap_or(usize::MAX);
+                    (e.meta.aux[2].clone(), at, e.meta.aux.get(4).cloned())
+                });
                 (p, old, lines, layout)
             }
             None => {
@@ -366,7 +411,13 @@ impl<'a> Exporter<'a> {
         if old_style.as_ref().map(|s| s.id) != Some(now.id) {
             p.set("styleIDRef", &now.id.to_string());
             if old_style.as_ref().is_none_or(|s| s.para_pr == ppr) {
+                // A list item restyled keeps its list: the heading its shape had.
+                let is_item = list.is_some_and(|(bi, b)| matches!(&b[bi], Block::Para(x) if x.item.is_some()));
+                let heading = self.header.heading(ppr).filter(|h| is_item && list_num(*h).is_some());
                 ppr = now.para_pr;
+                if heading.is_some() {
+                    ppr = self.header.para_pr_with(ppr, heading)?;
+                }
             }
         }
         if let Some((bi, blocks)) = list {
@@ -393,22 +444,34 @@ impl<'a> Exporter<'a> {
                 Some(ListPlan::Keep) | None => {}
             }
         }
+        // What the paragraph sets (§5.2): its style's values and its own. A
+        // paragraph that had no text keeps what it had until the text says.
+        let unshown = props.is_some_and(Props::is_empty) && pp.is_some_and(|e| e.meta.unshown);
+        if let (Some(f), Some(want), false) = (&self.fmt, props, unshown) {
+            let base = f.of(&now.name).only(&styled::PARA_OWN);
+            let cur = base.overlay(&self.header.para_values(ppr));
+            let target = base.overlay(want);
+            ppr = self.header.para_pr_set(ppr, &target.diff(&cur))?;
+        }
         if p.attr("paraPrIDRef").is_some() || ppr != now.para_pr {
             p.set("paraPrIDRef", &ppr.to_string());
         }
-        self.runs(&mut p, content, path, &now, old_style.as_ref())?;
+        let unit_cp = self.runs(&mut p, content, path, &now, old_style.as_ref())?;
         if pp.is_none() && p.child("hp:run").is_none() {
             // A paragraph holds at least one run.
             p.children.push(node(empty_run(now.char_pr)));
         }
-        if let (Some(l), Some((k, at))) = (lines, layout) {
-            if layout_key(now.id, ppr, content) == k {
+        if let (Some(l), Some((k, at, ck))) = (lines, layout) {
+            let same_chars = ck.is_none_or(|ck| char_key(&unit_cp) == ck);
+            if layout_key(now.id, ppr, content) == k && same_chars {
                 p.children.insert(at.min(p.children.len()), node(l));
             }
         }
         Ok(p)
     }
 
+    /// A paragraph's runs, in `pel`; the character shape of each unit
+    /// (`u32::MAX` outside a run).
     fn runs(
         &mut self,
         pel: &mut Element,
@@ -416,7 +479,7 @@ impl<'a> Exporter<'a> {
         path: &[usize],
         style: &Style,
         old_style: Option<&Style>,
-    ) -> Result<(), String> {
+    ) -> Result<Vec<u32>, String> {
         let n = p.units.len();
         let runs = self.at(path, Kind::Run);
         let mut owner: Vec<Option<&Entry>> = vec![None; n];
@@ -443,7 +506,50 @@ impl<'a> Exporter<'a> {
             }
         }
         let bounds: std::collections::HashSet<usize> = zruns.iter().map(|z| z.start.unwrap()).collect();
-        let key = |c: usize| (owner[c].map(|o| o.id), eff[c]);
+        // Text properties as exported (§5.2): a unit the text states none for
+        // (a space, an atom) takes what the rest of its run takes when that
+        // agrees (it keeps what its run had when the run has nothing else);
+        // a new one takes its neighbours' when they agree.
+        let style_values = self.fmt.as_ref().map(|f| f.of(&style.name).clone());
+        let text_base = style_values.as_ref().map(|v| v.only(&Key::TEXT));
+        let stored = |o: &Entry| -> Props {
+            let Some(b) = &text_base else { return Props::new() };
+            let cp = self.base_char_pr(&fragment(&o.xml[0]), style, old_style);
+            self.header.char_values(cp).only(&Key::TEXT).diff(b)
+        };
+        let want: Vec<Props> = match &text_base {
+            None => vec![Props::new(); n],
+            Some(_) => {
+                let takes: Vec<Option<&Props>> = p.units.iter().map(|u| u.takes_props().then_some(&u.props)).collect();
+                let mut mates: HashMap<u64, Option<Option<&Props>>> = HashMap::new();
+                for c in 0..n {
+                    if let (Some(pr), Some(o)) = (takes[c], owner[c]) {
+                        let m = mates.entry(o.id).or_insert(Some(Some(pr)));
+                        if *m != Some(Some(pr)) {
+                            *m = Some(None);
+                        }
+                    }
+                }
+                (0..n)
+                    .map(|c| match (takes[c], owner[c]) {
+                        (Some(pr), _) => pr.clone(),
+                        (None, Some(o)) => match mates.get(&o.id) {
+                            Some(Some(Some(pr))) => (*pr).clone(),
+                            _ => stored(o),
+                        },
+                        (None, None) => {
+                            let prev = takes[..c].iter().rev().find_map(|x| *x);
+                            let next = takes[c + 1..].iter().find_map(|x| *x);
+                            match (prev, next) {
+                                (Some(a), _) | (None, Some(a)) => a.clone(),
+                                _ => Props::new(),
+                            }
+                        }
+                    })
+                    .collect()
+            }
+        };
+        let key = |c: usize| (owner[c].map(|o| o.id), eff[c], &want[c]);
         let mut segs: Vec<(usize, usize, Option<&Entry>)> = vec![];
         let mut c = 0;
         while c < n {
@@ -506,6 +612,7 @@ impl<'a> Exporter<'a> {
         let mut tabs: HashMap<u64, usize> = HashMap::new();
         let none: Vec<&Entry> = vec![];
         let mut out = vec![];
+        let mut unit_cp = vec![u32::MAX; n];
         for (_, _, _, it) in items {
             match it {
                 It::Pkeep(k) => out.extend(k.xml.iter().map(|x| node(fragment(x)))),
@@ -533,8 +640,23 @@ impl<'a> Exporter<'a> {
                     };
                     let base = self.base_char_pr(&r, style, old_style);
                     let sflags = self.header.flags(style.char_pr);
-                    let want = Marks(eff[a].0 | (sflags.0 & self.header.flags(base).0));
-                    let cp = self.header.char_pr_with(base, want)?;
+                    let bflags = self.header.flags(base);
+                    // A flag of the style that the text cannot state (a mark
+                    // is what a run adds) stays as the run has it; one the
+                    // style section added to the style is on.
+                    let marks = match &style_values {
+                        None => Marks(eff[a].0 | (sflags.0 & bflags.0)),
+                        Some(v) => {
+                            let now = flags_of(v);
+                            Marks(eff[a].0 | (now.0 & sflags.0 & bflags.0) | (now.0 & !sflags.0))
+                        }
+                    };
+                    let mut cp = self.header.char_pr_with(base, marks)?;
+                    if let Some(tb) = &text_base {
+                        let cur = tb.overlay(&self.header.char_values(cp).only(&Key::TEXT));
+                        cp = self.header.char_pr_set(cp, &tb.overlay(&want[a]).diff(&cur))?;
+                    }
+                    unit_cp[a..b].fill(cp);
                     self.set_char_pr(&mut r, cp, old_style, style);
                     let ms = at.get(&Target::Seg(si)).unwrap_or(&none);
                     self.fill_run(&mut r, p, a, b, ms, own, &mut tabs)?;
@@ -543,7 +665,7 @@ impl<'a> Exporter<'a> {
             }
         }
         pel.children.extend(out);
-        Ok(())
+        Ok(unit_cp)
     }
 
     /// The character shape a run starts from: its own, or, when its
@@ -783,10 +905,26 @@ impl<'a> Exporter<'a> {
                 };
                 let mut tc = fragment(&xml[0]);
                 let mut sub = fragment(&xml[1]);
+                if self.fmt.is_some() {
+                    // The cell's box (§5.2): its border fill and vertical alignment.
+                    let full = self.header.cell_box(&tc, &sub);
+                    let want = t.boxes.get(ri).and_then(|r| r.get(ci)).cloned().unwrap_or_default();
+                    let target = styled::box_default().overlay(&want);
+                    let delta = target.diff(&full);
+                    if let Some(v) = delta.get(Key::Valign).and_then(Value::choice) {
+                        crate::format::set_valign(&mut sub, v);
+                    }
+                    let lines = delta.without(&[Key::Valign]);
+                    if !lines.is_empty() {
+                        let bf = self.header.cell_border_fill(&tc, &lines)?;
+                        tc.set("borderFillIDRef", &bf.to_string());
+                    }
+                }
                 let styles = self.styles;
                 for (k, p) in ps.iter().enumerate() {
                     let style = p.style.as_deref().unwrap_or(&styles.default_paragraph);
-                    sub.children.push(node(self.para(&p.content, Some(style), &[bi, ri, ci, k], None)?));
+                    let props = Some(&p.props);
+                    sub.children.push(node(self.para(&p.content, Some(style), props, &[bi, ri, ci, k], None)?));
                 }
                 if !self.at(&[bi, ri, ci, ps.len()], Kind::Bmarker).is_empty() {
                     return Err("a marker between cell paragraphs cannot be written to hwpx".into());

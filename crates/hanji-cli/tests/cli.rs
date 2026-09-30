@@ -137,10 +137,15 @@ fn a_new_document_from_the_blank_package() {
     let text = "---\ntype: document\nformat: hwpx\nschema: 1\n---\n# 제목\n\n본문.\n";
     std::fs::write(env.dir.join("t.md"), text).unwrap();
     env.ok(&["write", "document", "--rev", "1", "t.md"]);
-    assert_eq!(env.read("document"), text);
+    // The stored text shows the styles it uses (§5.2): the default's line, then 개요 1's.
+    let styled = text.replace(
+        "---\n# 제목",
+        "---\n<style name=\"바탕글\" align=justify line-spacing=160% font=함초롬바탕 size=10pt color=#000000/>\n<style name=\"개요 1\" indent-left=10pt/>\n\n# 제목",
+    );
+    assert_eq!(env.read("document"), styled);
     env.ok(&["export", "document", &env.path("new.hwpx")]);
     let back = env.ok(&["open", &env.path("new.hwpx")]);
-    assert_eq!(env.read(back["doc_id"].as_str().unwrap()), text);
+    assert_eq!(env.read(back["doc_id"].as_str().unwrap()), styled);
     let e = env.err(&["new", "presentation", "--format", "docx"]);
     assert_eq!(e["code"], "bad_request");
 }

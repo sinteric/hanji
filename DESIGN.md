@@ -401,9 +401,34 @@ schema: 1
     A tracked-changes export (§10.2) writes paragraph and run property
     changes as `w:pPrChange`/`w:rPrChange` and refuses a style line or cell
     box change. A remainder fingerprint leaves out what the text shows.
-    hwpx: `paraPr` (margins from the `HwpUnitChar` branch, both
-    branches written), `charPr`, `borderFill`; a changed value adds a shape
-    to `header.xml`, cloned from the element's and changed in one field.
+  - hwpx (built, 2026-09-30): the default style's line is style 0's
+    (바탕글) `paraPr` and `charPr`; another style's is what its shapes set
+    beyond it. A paragraph shows what its `paraPr` sets beyond its style's
+    (`hh:align`, the margins and line spacing of the `HwpUnitChar` branch of
+    `hp:switch`, in HWPUNIT; the default branch, and a shape without the
+    switch, hold twice those lengths, and both branches are written; the
+    fill and borders of its `hh:border` border fill); a run, its `charPr`'s
+    height, `textColor` and Hangul font face (a written font sets each
+    language that had the same face, and is added to the fonts of a
+    language that lacks it); a cell, its `tc` border fill and its
+    `subList vertAlign` (unset is centred). A list item shows its indent
+    too, and names its style; a new item, or one the text moves to another
+    level, takes its level's indent from an item there unless its text
+    writes one (the returned text shows it). A strikeout `shape="3D"` is
+    none, as Hancom writes it. A value left as shown keeps its shape id
+    and XML; a changed one points the element at a copy of its own shape
+    changed in that field only, reused when `header.xml` already has an
+    equal one, and a paragraph whose shapes change drops its layout cache
+    (`hp:linesegarray`, #27), whose key now covers each unit's `charPr`. A
+    changed style line points that `hh:style` at such copies, and each of
+    its paragraphs changes with it; a new style is an `hh:style` whose
+    shapes copy the default style's. A border width snaps to Hancom's
+    (0.1–5 mm) and a percent line spacing to whole percents; a new table
+    whose text gives its cells no box takes the file's first cell's look
+    (Hancom's, solid 0.12 mm, in a file without a table); both show in the
+    returned text. hwpx has no theme colours, opacity or table styles:
+    those are refused. The remainder fingerprint of a shape leaves out what
+    the text shows, and a table's paragraph its layout cache.
   - *Why F2:* round 6 tied F1 (every element shows its effective
     formatting) on every direct task, and only F2 could change a style (6/6,
     one line against every paragraph); F2's style lookups landed 10/10, on an
@@ -1202,7 +1227,7 @@ v0.7.3; "lossless … regarding content", not formatting).
    rotated groups (kept whole), pictures from a file, and cm as a view or
    input over points (the unit Korean PowerPoint shows; not measured).
 
-10. **Direct formatting (proposed, 2026-09-30; docx built, §5.2; xlsx built, §5.4)** — by §6 round 6, per kind:
+10. **Direct formatting (proposed, 2026-09-30; docx and hwpx built, §5.2; xlsx built, §5.4)** — by §6 round 6, per kind:
     flow documents F2 (a style section plus visible direct overrides,
     §5.2), Presentations F1 (effective formatting inline on every object,
     §5.3), Spreadsheets range lines and a `format` operation (§5.4); one

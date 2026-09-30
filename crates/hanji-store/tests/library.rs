@@ -213,8 +213,15 @@ fn new_files_from_the_blank_packages() {
                 let bare: String = t.split_inclusive('\n').filter(|l| !l.starts_with("<style ")).collect();
                 assert_eq!(bare.replacen("---\n\n", "---\n", 1), body);
             } else {
-                assert!(!c.canonicalized, "{f:?}: the text was written canonical:\n{}", text(&ws, &o.doc_id).1);
-                assert_eq!(text(&ws, &o.doc_id).1, body);
+                // An hwpx text's canonical form adds the style lines too, and
+                // the look a new table takes (Hancom's, in a file without one).
+                let t = text(&ws, &o.doc_id).1;
+                assert!(c.canonicalized && t.contains("\n<style name=\"바탕글\" "), "{t}");
+                let look = "{border=\"0.34pt solid #000000\" valign=middle}\n";
+                assert!(t.contains(&format!("{look}| 지역 | 매출 |")), "{t}");
+                let bare: String =
+                    t.split_inclusive('\n').filter(|l| !l.starts_with("<style ") && *l != look).collect();
+                assert_eq!(bare.replacen("---\n\n", "---\n", 1), body);
             }
         }
         // Nothing to surface: exports without acknowledging.

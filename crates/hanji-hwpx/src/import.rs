@@ -2,10 +2,11 @@
 //! Entry kinds are those of `hanji_core::remainder::Kind`; what each OWPML
 //! element becomes is listed on [`Importer`].
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 use hanji_core::{Block, Entry, KeepIds, Kind, ListDefs, ListItem, Meta, Para, StyleDef, StyleSet, Table};
-use hanji_format::{Atom, Cell, CellPara, Inline, Keep, Marks, Unit};
+use hanji_format::styled::{self, StyleTable};
+use hanji_format::{Atom, Cell, CellPara, Inline, Keep, Key, Marks, Props, Unit};
 use hanji_package::clip;
 use hanji_package::xml::{canon, fp, is_blank, unescape, Element, Node, Scope};
 
@@ -38,9 +39,11 @@ pub struct Stats {
 /// Section content → blocks and entries:
 ///
 /// - `hp:p`: a paragraph (`Ppr`: its shell and `hp:linesegarray`). A
-///   `pageBreak="1"` paragraph is `<pagebreak/>` then the paragraph.
+///   `pageBreak="1"` paragraph is `<pagebreak/>` then the paragraph. It
+///   shows what its `hh:paraPr` sets beyond its style's (§5.2).
 /// - `hp:run`: `Run` (its shell; bold, italic, underline and strikeout come
-///   from its `hh:charPr`). Its `hp:t` text is the paragraph's text.
+///   from its `hh:charPr`, and the font, size and colour it sets beyond the
+///   paragraph style's). Its `hp:t` text is the paragraph's text.
 /// - `hp:ctrl` for columns, header, footer, page numbers, bookmarks and
 ///   field begin/end: a durable `Marker` in its run.
 /// - Objects in a run (tables in text, pictures, shapes, equations, form
@@ -69,7 +72,19 @@ pub struct Importer<'a> {
     tracked_group: u64,
     tracked_ids: BTreeSet<String>,
     next_group: u64,
+    /// Each paragraph style's values (§5.2), by name.
+    values: HashMap<String, Props>,
+    table: StyleTable,
+    /// The open paragraph's style's text values.
+    text_base: Props,
+    /// The character shape of each unit of the open paragraph (`u32::MAX`
+    /// outside a run), for its layout cache's key.
+    unit_cp: Vec<u32>,
 }
+
+/// A list item's indent: its level's, which a new item, or one the text
+/// moved to another level, takes from an item at that level (§5.2).
+pub const LIST_INDENT: [Key; 2] = [Key::IndentLeft, Key::FirstLine];
 
 /// Import-time checkpoint, so tables that turn out not to be pipe tables
 /// can be kept whole instead.
@@ -77,10 +92,16 @@ struct Mark(usize, u64, u64);
 
 impl<'a> Importer<'a> {
     pub fn new(header: &'a Header) -> Self {
+        let styles = header.style_set();
+        let table = StyleTable { default: Some(styles.default_paragraph.clone()), lines: styles.lines() };
         Importer {
             scope: Scope::new(),
             header,
-            styles: header.style_set(),
+            styles,
+            values: HashMap::new(),
+            table,
+            text_base: Props::new(),
+            unit_cp: vec![],
             entries: vec![],
             next_id: 1,
             next_seq: 1000,
@@ -134,6 +155,16 @@ impl<'a> Importer<'a> {
         let s = self.next_seq;
         self.next_seq += 1000;
         s
+    }
+
+    /// The values of paragraph style `name` (§5.2).
+    fn style_values(&mut self, name: &str) -> Props {
+        if let Some(v) = self.values.get(name) {
+            return v.clone();
+        }
+        let v = self.table.values(Some(name));
+        self.values.insert(name.to_string(), v.clone());
+        v
     }
 
     fn fp(&self, els: &[Option<&Element>]) -> String {
@@ -390,8 +421,11 @@ impl<'a> Importer<'a> {
                         *c = Element::new("hp:tbl");
                     }
                 }
+                // Its fingerprint leaves out the page break (a block of the
+                // text) and the layout cache (export may drop it).
                 let mut shown = anchor.clone();
                 shown.remove_attr("pageBreak");
+                shown.children.retain(|n| !matches!(n, Node::El(e) if e.is("hp:linesegarray")));
                 let f = self.fp(&[Some(&shown)]);
                 ("hwpx:anchor", vec![anchor.to_xml()], f)
             } else {
@@ -418,6 +452,7 @@ impl<'a> Importer<'a> {
         let meta = Meta { aux: vec![rows_n.to_string(), cols_n.to_string()], ..Default::default() };
         self.entry(Kind::Tbl, xml, f, &[bi], None, None, meta);
         let mut rows: Vec<Vec<Option<Cell>>> = vec![vec![None; cols_n]; rows_n];
+        let mut boxes: Vec<Vec<Props>> = vec![vec![Props::new(); cols_n]; rows_n];
         for (ri, tr) in tbl.elements().filter(|e| e.is("hp:tr")).enumerate() {
             let trs = tr.shell();
             let f = self.fp(&[Some(&trs)]);
@@ -430,7 +465,12 @@ impl<'a> Importer<'a> {
                 let tcs = tc.shell();
                 let xml =
                     [tcs.to_xml(), sub_shell.to_xml()].into_iter().chain(rest.iter().map(|e| e.to_xml())).collect();
-                let kept: Vec<Option<&Element>> = [Some(&tcs), Some(&sub_shell)]
+                // The fingerprint leaves out what the text shows: the cell's box.
+                let mut tcs_rest = tcs.clone();
+                tcs_rest.remove_attr("borderFillIDRef");
+                let mut sub_rest = sub_shell.clone();
+                sub_rest.remove_attr("vertAlign");
+                let kept: Vec<Option<&Element>> = [Some(&tcs_rest), Some(&sub_rest)]
                     .into_iter()
                     .chain(rest.iter().filter(|e| !e.is("hp:cellAddr") && !e.is("hp:cellSpan")).map(|e| Some(*e)))
                     .collect();
@@ -441,9 +481,10 @@ impl<'a> Importer<'a> {
                     let k = paras.len();
                     let para = self.para(p, &[bi, r, c, k])?;
                     let style = (para.style != self.styles.default_paragraph).then_some(para.style);
-                    paras.push(CellPara { props: Default::default(), style, content: para.content });
+                    paras.push(CellPara { props: para.props, style, content: para.content });
                 }
                 rows[r][c] = Some(Cell::Text(paras));
+                boxes[r][c] = self.header.cell_box(tc, sub).diff(&styled::box_default());
                 for (y, row) in rows.iter_mut().enumerate().skip(r).take(rs) {
                     for (x, slot) in row.iter_mut().enumerate().skip(c).take(cs) {
                         if (y, x) != (r, c) {
@@ -455,7 +496,10 @@ impl<'a> Importer<'a> {
         }
         let rows: Vec<Vec<Cell>> =
             rows.into_iter().map(|r| r.into_iter().map(|c| c.expect("covered")).collect()).collect();
-        Ok(Some(Table { boxes: vec![], style: None, rows }))
+        if boxes.iter().flatten().all(Props::is_empty) {
+            boxes.clear();
+        }
+        Ok(Some(Table { boxes, style: None, rows }))
     }
 
     // ------------------------------------------------------------ paragraphs
@@ -482,23 +526,31 @@ impl<'a> Importer<'a> {
             rest.remove_attr("pageBreak");
         }
         rest.attrs.retain(|a| a.1 != "0");
-        let f = if ppr == style.para_pr && rest.attrs.is_empty() {
-            String::new()
-        } else {
-            format!("{}|{}", canon(&rest, &self.scope), self.header.para_rest(ppr))
-        };
-        let xml = std::iter::once(shell.to_xml()).chain(lines.map(|x| x.to_xml())).collect();
         // A list paragraph at the top level is a list item; a heading keeps
         // its numbering in the remainder, and so does a cell paragraph.
         let is_heading = self.styles.heading_level(&style.name).is_some();
         let item = (top && !is_heading).then(|| self.list_item(ppr)).flatten();
+        // The fingerprint leaves out what the text shows (§5.2).
+        let hidden = |id: u32| self.header.para_rest_hidden(id);
+        let f = if hidden(ppr) == hidden(style.para_pr) && rest.attrs.is_empty() {
+            String::new()
+        } else {
+            format!("{}|{}", canon(&rest, &self.scope), hidden(ppr))
+        };
+        let xml = std::iter::once(shell.to_xml()).chain(lines.map(|x| x.to_xml())).collect();
         let aux = match item {
             Some((_, num, lvl)) => vec![num.to_string(), lvl.to_string()],
             None => vec![String::new(), String::new()],
         };
         let meta = Meta { style: Some(sid.to_string()), item: item.map(|i| i.0), aux, ..Default::default() };
         let pidx = self.entry(Kind::Ppr, xml, f, path, None, None, meta);
+        // What the paragraph sets beyond its style (§5.2).
+        let name = self.styles.paragraph_name(&sid.to_string()).unwrap_or(&style.name).to_string();
+        let base = self.style_values(&name);
+        let props = self.header.para_values(ppr).only(&styled::PARA_OWN).diff(&base);
+        self.text_base = base.only(&Key::TEXT);
         self.buf.clear();
+        self.unit_cp.clear();
         for c in &p.children {
             match c {
                 Node::El(e) if e.is("hp:run") => self.run(e, path, &style)?,
@@ -507,6 +559,7 @@ impl<'a> Importer<'a> {
                     let pos = self.buf.len();
                     let keep = self.keep_entry(Kind::Keep, e, path, Some(pos), None, &keep_kind(&e.name));
                     self.buf.push(Unit::new(Atom::Keep(keep), Marks::NONE));
+                    self.unit_cp.push(u32::MAX);
                 }
                 n if is_blank(n) => {}
                 _ => return Err("text or a comment directly inside <hp:p> is not supported yet".into()),
@@ -516,12 +569,13 @@ impl<'a> Importer<'a> {
         content.normalize();
         // The layout cache, and where it sits among the paragraph's children.
         let lines_at = p.elements().position(|e| e.is("hp:linesegarray")).unwrap_or(0);
-        self.entries[pidx].meta.aux.extend([layout_key(sid, ppr, &content), lines_at.to_string()]);
+        let key = layout_key(sid, ppr, &content);
+        self.entries[pidx].meta.aux.extend([key, lines_at.to_string(), char_key(&self.unit_cp)]);
+        // A paragraph without text shows none of it, and keeps it (§5.2).
+        self.entries[pidx].meta.unshown = !styled::shows(&content) && !props.is_empty();
         self.stats.list_items += item.is_some() as usize;
         let item = item.map(|i| i.0);
-        // A list item's style is not in the text; it stays in the remainder.
-        let style = if item.is_some() { String::new() } else { style.name };
-        Ok(Para::new(style, content, item))
+        Ok(Para { style: name, content, item, props })
     }
 
     /// The list item a paragraph shape makes: the item, its list and level.
@@ -551,6 +605,7 @@ impl<'a> Importer<'a> {
     fn run(&mut self, r: &Element, path: &[usize], style: &Style) -> Result<(), String> {
         let cp = r.get("charPrIDRef").and_then(|v| v.parse::<u32>().ok()).unwrap_or(style.char_pr);
         let marks = Marks(self.header.flags(cp).0 & !self.header.flags(style.char_pr).0);
+        let text_props = self.header.char_values(cp).only(&Key::TEXT).diff(&self.text_base);
         let shell = r.shell();
         let mut rest = shell.clone();
         rest.remove_attr("charPrIDRef");
@@ -648,6 +703,12 @@ impl<'a> Importer<'a> {
             prev_t = is_t;
         }
         let end = self.buf.len();
+        for u in &mut self.buf[start..end] {
+            if u.takes_props() {
+                u.props = text_props.clone();
+            }
+        }
+        self.unit_cp.resize(end, cp);
         let e = &mut self.entries[idx];
         e.end = Some(end);
         e.meta.aux = tabs;
@@ -802,8 +863,15 @@ pub fn table_reason(tbl: &Element) -> Option<String> {
 }
 
 /// What the layout cache (`hp:linesegarray`) of a paragraph was computed
+/// for: its character shapes, unit by unit ([`layout_key`] is the rest).
+pub fn char_key(unit_cp: &[u32]) -> String {
+    let bytes = unit_cp.iter().flat_map(|c| c.to_le_bytes());
+    format!("{:016x}", hanji_core::remainder::fnv1a(bytes))
+}
+
+/// What the layout cache (`hp:linesegarray`) of a paragraph was computed
 /// for: its style, paragraph shape, text and marks. Export drops the cache
-/// when any of them changed.
+/// when any of them, or its character shapes ([`char_key`]), changed.
 pub fn layout_key(style: u32, para_pr: u32, content: &Inline) -> String {
     let units = content.units.iter().flat_map(|u| [hanji_core::model::key(&u.atom) as u64, u.marks.0 as u64]);
     let values = [style as u64, para_pr as u64].into_iter().chain(units);
