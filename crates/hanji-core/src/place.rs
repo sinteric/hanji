@@ -762,16 +762,21 @@ impl<'a> Placer<'a> {
     /// every identical block carries the same entries (then any pairing is right).
     fn refuse_ambiguous(&mut self) {
         type Sig = Vec<(Kind, String, Vec<usize>, Option<usize>, Option<usize>)>;
-        // Entries that make one of the identical blocks different from the others.
+        // Entries that make one of the identical blocks different from the
+        // others: by their fingerprint, or by their XML where they hold
+        // properties the text cannot show (an empty paragraph's, §5.2).
         let carried = |e: &Entry, i: usize| {
-            e.path.first() == Some(&i) && !e.fp.is_empty() && !matches!(e.kind, Kind::Keep | Kind::Bkeep)
+            e.path.first() == Some(&i)
+                && (!e.fp.is_empty() || e.meta.unshown)
+                && !matches!(e.kind, Kind::Keep | Kind::Bkeep)
         };
+        let id = |e: &Entry| if e.meta.unshown { e.xml.concat() } else { e.fp.clone() };
         let sig = |p: &Placer, i: usize| -> Sig {
             let mut v: Vec<_> = p
                 .entries
                 .iter()
                 .filter(|e| carried(e, i))
-                .map(|e| (e.kind, e.fp.clone(), e.path[1..].to_vec(), e.start, e.end))
+                .map(|e| (e.kind, id(e), e.path[1..].to_vec(), e.start, e.end))
                 .collect();
             v.sort();
             v
@@ -921,9 +926,7 @@ impl<'a> Placer<'a> {
             (0..olds.len()).map(|k| (k < news.len()).then_some(k)).collect()
         } else {
             let as_blocks = |xs: &[Inline]| -> Vec<Block> {
-                xs.iter()
-                    .map(|x| Block::Para(crate::model::Para { style: String::new(), content: x.clone(), item: None }))
-                    .collect()
+                xs.iter().map(|x| Block::Para(crate::model::Para::new(String::new(), x.clone(), None))).collect()
             };
             align(&as_blocks(olds), &as_blocks(news))
         };

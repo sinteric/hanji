@@ -1,4 +1,4 @@
-use crate::ast::Keep;
+use crate::ast::{Keep, StyleLine};
 
 /// Names a file allows. `None` skips that check.
 #[derive(Clone, Debug, Default)]
@@ -17,6 +17,13 @@ pub struct Names {
     /// a `<keep/>` line of one of these is the object, not a slot's text.
     /// `None`: a `<keep/>` line outside a slot is an object.
     pub objects: Option<Vec<String>>,
+    /// A flow document's paragraph styles as style lines (§5.2), the default
+    /// style's first: the values of a style the text uses without a line.
+    pub style_lines: Option<Vec<StyleLine>>,
+    /// The paragraph styles `#` to `######` stand for.
+    pub headings: [Option<String>; 6],
+    /// The style of a list item that names none; `None`: the default style.
+    pub item_style: Option<String>,
 }
 
 /// A slide layout: its name and the slots its placeholders give, in order.

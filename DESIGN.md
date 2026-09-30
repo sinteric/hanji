@@ -349,7 +349,9 @@ schema: 1
   the element's style:
   - a paragraph (heading, list item, `<div>`, plain line): ` {…}` at the end
     of its line, `- 항목 {style="개요 3" first-line=10pt}`; a list item names
-    its style there. A property left out is the style's.
+    its style there, unless it is in the file's list style (docx: List
+    Paragraph, the style Word gives a new item; elsewhere the default
+    style). A property left out is the style's.
   - a run: `[15% 성장]{size=14pt color=#1F4E79}`.
   - a cell: `{…}` at the very start of the cell; each cell paragraph ends in
     its own `{…}`: `| {fill=#FFF0C3 border-bottom="2.83pt solid #7F7F7F"} **3D 프린팅 기술의 미래와 전망** {align=center size=20pt} |`.
@@ -377,9 +379,29 @@ schema: 1
     resolve defaults, style and override), and landed one answer fewer
     (49/52 against 50/52 after one fix round, a look-alike space in `old`),
     so it did not meet the bar of correctness at least F2's (round 6 part C).
-  - docx: `w:pPr`/`w:rPr` children, `w:tcPr` `w:shd`/`w:tcBorders`,
-    `w:tblBorders`, styles through `basedOn`, docDefaults and the table
-    style. hwpx: `paraPr` (margins from the `HwpUnitChar` branch, both
+  - docx (built, 2026-09-30): the default style's line is docDefaults with
+    the default paragraph style over it; another style's values follow
+    `basedOn`, theme fonts and colours by name (`themeTint`/`themeShade` as
+    `+N%`/`-N%`). A paragraph shows its `w:pPr` (`w:jc`, `w:ind`,
+    `w:spacing`, `w:shd`, `w:pBdr`) and a run its `w:rPr` (`w:rFonts`,
+    `w:sz`, `w:color`, the marks) as they differ from the paragraph's
+    style; character styles stay in the remainder, unshown. A cell shows
+    its `w:tcPr` `w:shd`/`w:tcBorders`/`w:vAlign` only: what the table
+    style or `w:tblBorders` draws is the table style's, not the cell's. An
+    empty paragraph keeps its stored `w:pPr` (the text cannot show it) and
+    shows it once it has text. A value left as shown keeps its XML; a
+    changed one rewrites only its child, in schema order, keeping unknown
+    attributes and siblings; a value Word cannot hold (`/NN%` opacity,
+    `line-spacing` as a gap) is refused. A changed style line rewrites that
+    `w:style` so its values are the line's, and a new one is a
+    `w:customStyle` `w:style` based on the default style, its id from the
+    name's ASCII letters and digits. The line of a style the text does not
+    use is not shown; changing it (a line with other values, compared in
+    canonical form) is refused, so a style is used first and then changed.
+    A tracked-changes export (§10.2) writes paragraph and run property
+    changes as `w:pPrChange`/`w:rPrChange` and refuses a style line or cell
+    box change. A remainder fingerprint leaves out what the text shows.
+    hwpx: `paraPr` (margins from the `HwpUnitChar` branch, both
     branches written), `charPr`, `borderFill`; a changed value adds a shape
     to `header.xml`, cloned from the element's and changed in one field.
   - *Why F2:* round 6 tied F1 (every element shows its effective
@@ -1154,7 +1176,7 @@ v0.7.3; "lossless … regarding content", not formatting).
    rotated groups (kept whole), pictures from a file, and cm as a view or
    input over points (the unit Korean PowerPoint shows; not measured).
 
-10. **Direct formatting (proposed, 2026-09-30; xlsx built, §5.4)** — by §6 round 6, per kind:
+10. **Direct formatting (proposed, 2026-09-30; docx built, §5.2; xlsx built, §5.4)** — by §6 round 6, per kind:
     flow documents F2 (a style section plus visible direct overrides,
     §5.2), Presentations F1 (effective formatting inline on every object,
     §5.3), Spreadsheets range lines and a `format` operation (§5.4); one

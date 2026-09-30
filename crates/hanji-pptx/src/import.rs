@@ -515,7 +515,7 @@ impl Importer<'_> {
                 _ => {
                     let pos = self.buf.len();
                     let keep = self.keep_entry(Kind::Keep, c, &path, Some(pos), "", "");
-                    self.buf.push(Unit { atom: Atom::Keep(keep), marks: Marks::NONE });
+                    self.buf.push(Unit::new(Atom::Keep(keep), Marks::NONE));
                     self.ustyle.push(TextStyle::default());
                 }
             }
@@ -543,7 +543,7 @@ impl Importer<'_> {
             content.normalize();
         }
         self.stats.list_items += item.is_some() as usize;
-        Ok(Para { style: String::new(), content, item })
+        Ok(Para::new(String::new(), content, item))
     }
 
     /// The list item a paragraph at `lvl` is: levels nest by `lvl` within
@@ -587,9 +587,9 @@ impl Importer<'_> {
         let xml = std::iter::once(shell.to_xml()).chain(rpr.map(Element::to_xml)).collect();
         let start = self.buf.len();
         if br {
-            self.buf.push(Unit { atom: Atom::Break, marks });
+            self.buf.push(Unit::new(Atom::Break, marks));
         } else {
-            self.buf.extend(text.chars().map(|c| Unit { atom: Atom::Char(c), marks }));
+            self.buf.extend(text.chars().map(|c| Unit::new(Atom::Char(c), marks)));
         }
         let end = self.buf.len();
         self.ustyle.resize(end, shown.clone().unwrap_or_default());
@@ -825,11 +825,9 @@ fn member_paras(sp: &Element) -> Vec<Inline> {
                     "a:r" | "a:fld" => {
                         let m = marks_of(c.child("a:rPr"));
                         let t = c.text_of(&["a:t"]);
-                        units.extend(
-                            t.chars().filter(|ch| *ch as u32 >= 0x20).map(|ch| Unit { atom: Atom::Char(ch), marks: m }),
-                        );
+                        units.extend(t.chars().filter(|ch| *ch as u32 >= 0x20).map(|ch| Unit::new(Atom::Char(ch), m)));
                     }
-                    "a:br" => units.push(Unit { atom: Atom::Break, marks: Marks::NONE }),
+                    "a:br" => units.push(Unit::new(Atom::Break, Marks::NONE)),
                     _ => {}
                 }
             }

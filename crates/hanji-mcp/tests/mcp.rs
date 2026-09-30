@@ -241,13 +241,13 @@ fn refusals_are_errors_with_the_reason() {
     assert_eq!((e["code"].as_str(), e["head"].as_u64()), (Some("stale_revision"), Some(2)));
     let r = s.call("hanji_edit", json!({"doc_id": d, "revision": 2, "old": "수도권", "new": "x"}));
     assert!(
-        r.error && r.blocks[0].starts_with("ambiguous_match: the old text occurs 2 times (lines 8, 10)"),
+        r.error && r.blocks[0].starts_with("ambiguous_match: the old text occurs 2 times (lines 14, 16)"),
         "{}",
         r.blocks[0]
     );
     let e = s.err("hanji_edit", json!({"doc_id": d, "revision": 2, "edits": [{"old": "4분기부터", "new": "4분기부터는"}, {"old": "<div style=\"Note\">", "new": "<div style=\"Callout\">"}]}));
     assert_eq!((e["code"].as_str(), e["edit"].as_u64()), (Some("invalid"), Some(2)));
-    assert_eq!((e["diagnostics"][0]["line"].as_u64(), e["diagnostics"][0]["col"].as_u64()), (Some(10), Some(6)));
+    assert_eq!((e["diagnostics"][0]["line"].as_u64(), e["diagnostics"][0]["col"].as_u64()), (Some(16), Some(6)));
     let e = s.err("hanji_export", json!({"doc_id": d, "path": s.path("x.docx")}));
     assert_eq!(e["code"], "surfaced_not_acknowledged");
     assert_eq!(e["surfaced"][0]["kind"], "comment");

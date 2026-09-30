@@ -4,6 +4,8 @@
 use crate::ast::*;
 use crate::diag::{quoted, Diagnostic};
 use crate::names::Names;
+use crate::props;
+use crate::styled::{self, StyleTable};
 use crate::SCHEMA_VERSION;
 
 /// Byte positions of every block and unit in the source text; used to
@@ -53,7 +55,9 @@ pub fn parse(text: &str) -> Result<Document, Vec<Diagnostic>> {
 /// Parse and check names (styles, fields, placeholders) against `names`.
 pub fn parse_with(text: &str, names: &Names) -> Result<Parsed, Vec<Diagnostic>> {
     let mut p = Parser::new(text, names);
+    p.flow = true;
     let (front, first) = p.front_matter("document");
+    let (styles, first) = p.style_section(first);
     let mut blocks = vec![];
     let mut map = SourceMap::default();
     let mut i = first;
@@ -74,7 +78,7 @@ pub fn parse_with(text: &str, names: &Names) -> Result<Parsed, Vec<Diagnostic>> 
     if !p.errors.is_empty() {
         return Err(p.errors);
     }
-    let mut doc = Document { front: front.unwrap(), blocks };
+    let mut doc = Document { front: front.unwrap(), styles, blocks };
     doc.normalize();
     Ok(Parsed { doc, map })
 }
@@ -143,9 +147,20 @@ pub(crate) struct Parser<'a> {
     /// (§5.3), which lands in `object_geom`.
     pub(crate) object_line: bool,
     pub(crate) object_geom: Option<crate::ast::Geom>,
+    /// The style section's values: the file's lines, the text's over them.
+    pub(crate) styles: StyleTable,
+    /// Paragraph styles a `style="…"` may name: the file's and the text's new ones.
+    para_styles: Option<Vec<String>>,
+    /// Parsing a list item's line: its `{…}` may name a style.
+    item_line: bool,
+    /// Where the first `{…}` or `[text]{…}` was written (line, column).
+    pub(crate) formatted: Option<(usize, usize)>,
     /// Parsing a Presentation's slot or shape text: `[text]{…}` is text
     /// formatting, and so is `{…}` at a paragraph's end (§5.3).
-    pub(crate) styles: bool,
+    pub(crate) text_styles: bool,
+    /// Parsing a flow Document (§5.2): `{…}` and `[text]{…}` are its
+    /// formatting; elsewhere, outside `text_styles`, they are text.
+    flow: bool,
 }
 
 /// `720 x 540 pt` → width and height in EMU.
@@ -178,7 +193,15 @@ impl<'a> Parser<'a> {
             stop,
             object_line: false,
             object_geom: None,
-            styles: false,
+            styles: StyleTable {
+                default: names.style_lines.as_ref().and_then(|l| l.first()).map(|l| l.name.clone()),
+                lines: names.style_lines.clone().unwrap_or_default(),
+            },
+            para_styles: names.paragraph_styles.clone(),
+            item_line: false,
+            formatted: None,
+            text_styles: false,
+            flow: false,
         }
     }
 
@@ -302,6 +325,97 @@ impl<'a> Parser<'a> {
         (None, self.lines.len())
     }
 
+    // ------------------------------------------------------------ style section
+
+    /// The style lines right after the front matter (§5.2): the lines, in
+    /// canonical form, and the first line after them.
+    fn style_section(&mut self, first: usize) -> (Vec<StyleLine>, usize) {
+        let mut out: Vec<(usize, StyleLine)> = vec![];
+        let mut i = first;
+        let mut next = first;
+        while i < self.lines.len() {
+            let t = self.lines[i].text.trim();
+            if t.is_empty() {
+                i += 1;
+                continue;
+            }
+            if !is_style_line(t) {
+                break;
+            }
+            if let Some(l) = self.style_line(i) {
+                if let Some((j, _)) = out.iter().find(|(_, x)| x.name == l.name) {
+                    self.err(i, 1, format!("style \"{}\" already has a line (line {}): a style has one line; change that one, or give a new style a name no style has.", l.name, j + 1));
+                } else {
+                    out.push((i, l));
+                }
+            }
+            i += 1;
+            next = i;
+        }
+        if self.styles.default.is_none() {
+            self.styles.default = out.first().map(|(_, l)| l.name.clone());
+        }
+        for (_, l) in &out {
+            match self.styles.lines.iter_mut().find(|x| x.name == l.name) {
+                Some(x) => x.props = l.props.clone(),
+                None => self.styles.lines.push(l.clone()),
+            }
+        }
+        let table = self.styles.clone();
+        let lines: Vec<StyleLine> =
+            out.into_iter().map(|(_, l)| StyleLine { props: table.canonical(&l), name: l.name }).collect();
+        for l in &lines {
+            if let Some(p) = self.para_styles.as_mut().filter(|p| !p.contains(&l.name)) {
+                p.push(l.name.clone());
+            }
+            if let Some(x) = self.styles.lines.iter_mut().find(|x| x.name == l.name) {
+                x.props = l.props.clone();
+            }
+        }
+        (lines, next)
+    }
+
+    /// `<style name="Name" key=value …/>`.
+    fn style_line(&mut self, i: usize) -> Option<StyleLine> {
+        let line = &self.lines[i];
+        let lead = line.indent();
+        let t = line.text.trim();
+        let form = "a style line is <style name=\"Name\" key=value …/>, with the style's paragraph and text properties";
+        let Some(inner) = t.strip_prefix("<style").and_then(|r| r.strip_suffix("/>")) else {
+            self.err(i, lead + 1, format!("{form}; it ends with />."));
+            return None;
+        };
+        let at = lead + "<style".chars().count();
+        let (props, others) = match props::parse_list(inner, &["name"]) {
+            Ok(x) => x,
+            Err((c, m)) => {
+                self.err(i, at + c, format!("{m}. {}", cap_first(form)));
+                return None;
+            }
+        };
+        let Some((_, Some(name), _)) = others.into_iter().next() else {
+            self.err(i, lead + 1, format!("the style line has no name: {form}."));
+            return None;
+        };
+        if let Some(k) = props.keys().find(|k| !styled::STYLE_KEYS.contains(k)) {
+            self.err(
+                i,
+                lead + 1,
+                format!(
+                    "{k} is a cell's or a spreadsheet's property; {form}: paragraph layout, fill, borders and text."
+                ),
+            );
+            return None;
+        }
+        if let Some(allowed) = &self.names.table_styles {
+            if allowed.contains(&name) && !self.names.paragraph_styles.as_ref().is_some_and(|p| p.contains(&name)) {
+                self.err(i, lead + 1, format!("\"{name}\" is a table style; style lines are paragraph styles (a table names its style on its {{style=\"Name\"}} line)."));
+                return None;
+            }
+        }
+        Some(StyleLine { name, props })
+    }
+
     // ------------------------------------------------------------ blocks
 
     /// Parse the block starting at line `i`: (block, map, next line). `None`
@@ -314,6 +428,10 @@ impl<'a> Parser<'a> {
             return None;
         }
         let (at, next) = (line.at, line.next);
+        if is_style_line(trimmed) {
+            self.err(i, 1, "style lines come right after the front matter, before the first paragraph or table: move this line up there.");
+            return Some((Block::PageBreak, dummy(at), i + 1));
+        }
         if trimmed.starts_with('{') {
             return self.styled_table(i);
         }
@@ -342,8 +460,10 @@ impl<'a> Parser<'a> {
         if let Some(level) = heading_level(text) {
             let from = (level as usize + 1).min(text.len());
             let src = chars_of(&self.lines[i], from);
-            let (content, units) = self.inline(i, &src, None)?.0;
-            return para(Block::Para(Para { style: ParaStyle::Heading(level), content }), units);
+            let out = self.inline_full(i, &src, None)?;
+            let style = self.names.headings[level as usize - 1].clone();
+            let (content, units, props, _) = self.own(i, out, style.as_deref())?;
+            return para(Block::Para(Para { style: ParaStyle::Heading(level), content, props }), units);
         }
         if text.starts_with("[^") {
             if let Some(close) = text.find("]:") {
@@ -355,7 +475,12 @@ impl<'a> Parser<'a> {
                     }
                     self.defs.push((i, 1, label.to_string()));
                     let src = chars_of(&self.lines[i], from);
-                    let (content, units) = self.inline(i, &src, None)?.0;
+                    let out = self.inline_full(i, &src, None)?;
+                    if let Some(t) = out.trailing.first() {
+                        self.err(i, t.col, "a footnote's text shows no formatting.");
+                        return None;
+                    }
+                    let (content, units) = (out.inline, out.offsets);
                     return para(Block::FootnoteDef(FootnoteDef { label: label.into(), content }), units);
                 }
             }
@@ -368,8 +493,89 @@ impl<'a> Parser<'a> {
             return Some((Block::PageBreak, dummy(at), i + 1));
         }
         let src = chars_of(&self.lines[i], 0);
-        let (content, units) = self.inline(i, &src, None)?.0;
-        para(Block::Para(Para { style: ParaStyle::Plain, content }), units)
+        let out = self.inline_full(i, &src, None)?;
+        let (content, units, props, _) = self.own(i, out, None)?;
+        para(Block::Para(Para { style: ParaStyle::Plain, content, props }), units)
+    }
+
+    /// A paragraph's own `{…}` (the last of `out`'s, which is at its end)
+    /// resolved against its style (`None`: the default style, or the one a
+    /// list item names there): its content with the text keys and marks on
+    /// the units, their offsets, the paragraph's own keys, and the style
+    /// a list item names. Everything is what differs from the style.
+    #[allow(clippy::type_complexity)]
+    fn own(
+        &mut self,
+        line: usize,
+        out: InlineOut,
+        style: Option<&str>,
+    ) -> Option<(Inline, Vec<usize>, Props, Option<String>)> {
+        let InlineOut { mut inline, offsets, trailing, .. } = out;
+        let (own, named, col) = match trailing.into_iter().last() {
+            Some(t) => (t.props, t.style, t.col),
+            None => (Props::new(), None, 1),
+        };
+        if let Some(n) = &named {
+            if let Some(allowed) = &self.para_styles {
+                if let Some(msg) = style_problem(n, "paragraph", allowed, self.names.table_styles.as_deref()) {
+                    self.err(line, col, msg);
+                    return None;
+                }
+            }
+        }
+        let style = named.as_deref().or(style);
+        let props = self.apply_own(line, col, &mut inline, &own, style)?;
+        Some((inline, offsets, props, named))
+    }
+
+    /// Puts `own`'s text keys and flags on `inline`'s units (a span's own
+    /// win) and gives the paragraph keys, both as they differ from `style`.
+    fn apply_own(
+        &mut self,
+        line: usize,
+        col: usize,
+        inline: &mut Inline,
+        own: &Props,
+        style: Option<&str>,
+    ) -> Option<Props> {
+        if let Some(k) = own.keys().find(|k| !styled::PARA_OWN.contains(k) && !Key::TEXT.contains(k) && !k.is_flag()) {
+            let msg = match k {
+                Key::Valign => "valign is a cell's: write it in the {…} at the start of the cell".to_string(),
+                _ => format!("{k} is a spreadsheet's property"),
+            };
+            self.err(line, col, format!("{msg}; a paragraph's {{…}} holds its layout ({}), fill, borders and text properties (font, size, color).", Key::PARA.map(|k| k.name()).join(", ")));
+            return None;
+        }
+        if !own.is_empty() && !styled::shows(inline) {
+            self.err(
+                line,
+                col,
+                "a paragraph without text shows no formatting: its {…} can be written once it has text.",
+            );
+            return None;
+        }
+        let mut marks = Marks::NONE;
+        for (k, v) in own.iter() {
+            if let Some(m) = flag_mark(k) {
+                if v.flag() == Some(false) {
+                    self.err(line, col, format!("{k}=no cannot be written: text is {k} by its marks ({}); leave them out for text that is not {k}.", mark_form(k)));
+                    return None;
+                }
+                marks = Marks(marks.0 | m.0);
+            }
+        }
+        let base = self.styles.values(style);
+        let text = base.only(&Key::TEXT);
+        let own_text = own.only(&Key::TEXT);
+        for u in &mut inline.units {
+            if !u.takes_props() {
+                u.props = Props::new();
+                continue;
+            }
+            u.props = own_text.overlay(&u.props).diff(&text);
+            u.marks = Marks(u.marks.0 | marks.0);
+        }
+        Some(own.only(&styled::PARA_OWN).diff(&base))
     }
 
     /// Consecutive list item lines from line `i`. An item nests under the one
@@ -404,8 +610,12 @@ impl<'a> Parser<'a> {
             widths.push(m.width);
             let (line_start, line_next, mark) = (line.at, line.next, line.end);
             let src = chars_of(&self.lines[j], m.content);
-            if let Some(((content, units), _)) = self.inline(j, &src, None) {
-                items.push(Item { ordered: m.ordered, level, content });
+            self.item_line = true;
+            let out = self.inline_full(j, &src, None);
+            self.item_line = false;
+            let item_style = self.names.item_style.clone();
+            if let Some((content, units, props, style)) = out.and_then(|o| self.own(j, o, item_style.as_deref())) {
+                items.push(Item { ordered: m.ordered, level, content, style, props });
                 maps.push((line_start, line_next, ParaMap { units, mark }));
             }
             j += 1;
@@ -439,10 +649,10 @@ impl<'a> Parser<'a> {
             }
         };
         if tag.attrs.is_empty() {
-            return Some(Para { style: ParaStyle::Plain, content: Inline::default() });
+            return Some(Para { style: ParaStyle::Plain, content: Inline::default(), props: Props::new() });
         }
         let style = self.style_attr(i, &tag, "p", "paragraph")?;
-        Some(Para { style: ParaStyle::Named(style), content: Inline::default() })
+        Some(Para { style: ParaStyle::Named(style), content: Inline::default(), props: Props::new() })
     }
 
     fn div(&mut self, i: usize) -> Option<(Para, Vec<usize>)> {
@@ -457,7 +667,8 @@ impl<'a> Parser<'a> {
             return None;
         }
         let style = self.style_attr(i, &tag, "div", "paragraph")?;
-        let ((content, units), end) = self.inline(i, &src[after..], Some("div"))?;
+        let out = self.inline_full(i, &src[after..], Some("div"))?;
+        let end = out.stop;
         let Some(end) = end else {
             self.err(
                 i,
@@ -466,15 +677,29 @@ impl<'a> Parser<'a> {
             );
             return None;
         };
-        if let Some(extra) = src[after + end..].iter().find(|c| !c.2.is_whitespace()) {
-            self.err(i, extra.1, format!("nothing may follow </div> on its line: {form}."));
-            return None;
+        let rest = &src[after + end..];
+        let mut out = out;
+        if let Some(k) = rest.iter().position(|c| !c.2.is_whitespace()) {
+            let close = brace_group(rest, k).filter(|&c| k > 0 && rest[c + 1..].iter().all(|x| x.2.is_whitespace()));
+            let Some(close) = close else {
+                self.err(i, rest[k].1, format!("nothing but the paragraph's {{…}} may follow </div> on its line: {form}, then {{key=value …}} after a space."));
+                return None;
+            };
+            let inner: String = rest[k + 1..close].iter().map(|s| s.2).collect();
+            match props::parse_list(&inner, &[]) {
+                Ok((props, _)) => out.trailing.push(Trailing { splits: 0, props, style: None, col: rest[k].1 }),
+                Err((c, m)) => {
+                    self.err(i, rest.get(k + c).map_or(rest[k].1, |s| s.1), trailing_form(&m));
+                    return None;
+                }
+            }
         }
-        if content.is_empty() {
+        if out.inline.is_empty() {
             self.err(i, 1, format!("an empty paragraph is <p style=\"{style}\"/>, not an empty <div>."));
             return None;
         }
-        Some((Para { style: ParaStyle::Named(style), content }, units))
+        let (content, units, props, _) = self.own(i, out, Some(&style))?;
+        Some((Para { style: ParaStyle::Named(style), content, props }, units))
     }
 
     /// Checks the single `style="Name"` attribute of a div or table style line.
@@ -494,7 +719,7 @@ impl<'a> Parser<'a> {
             self.err(i, tag.col, format!("{elem} needs style=\"Name\" with one {kind} style of this file: {form}."));
             return None;
         };
-        let allowed = if kind == "paragraph" { &self.names.paragraph_styles } else { &self.names.table_styles };
+        let allowed = if kind == "paragraph" { &self.para_styles } else { &self.names.table_styles };
         if let Some(allowed) = allowed {
             let other = if kind == "paragraph" { &self.names.table_styles } else { &self.names.paragraph_styles };
             if let Some(msg) = style_problem(&v, kind, allowed, other.as_deref()) {
@@ -509,57 +734,97 @@ impl<'a> Parser<'a> {
     fn styled_table(&mut self, i: usize) -> Option<(Block, BlockMap, usize)> {
         let line = &self.lines[i];
         let (at, trimmed) = (line.at, line.text.trim());
-        let form = "A table style line is exactly {style=\"Name\"}, directly before the header row of the table.";
+        let form = "A table line is {style=\"Name\" key=value …}, directly before the header row of the table: the table style, and what most of its cells and cell paragraphs have.";
         let lead = line.indent();
         if !trimmed.ends_with('}') {
-            self.err(i, lead + 1, format!("{form} The braces hold only style=\"Name\"."));
+            self.err(i, lead + 1, format!("{form} It ends with }}."));
             return Some((Block::PageBreak, dummy(at), i + 1));
         }
-        // Reuse the tag attribute parser on `{…}` by treating the braces as a tag.
         let src = chars_of(&Line { text: line.text.trim_end(), ..*line }, lead);
-        let inner: Vec<Src> = src[1..src.len() - 1].to_vec();
-        let attrs = parse_attrs(&inner);
-        let style = match attrs {
-            Some(attrs) if !attrs.is_empty() => {
-                let tag = Tag { name: "table".into(), closing: false, self_closing: false, attrs, col: lead + 1 };
-                self.style_attr(i, &tag, "a table style line", "table")
-            }
-            _ => {
-                self.err(i, lead + 1, format!("the braces hold only style=\"Name\". {form}"));
-                None
+        let inner: String = src[1..src.len() - 1].iter().map(|s| s.2).collect();
+        let (props, others) = match props::parse_list(&inner, &["style"]) {
+            Ok(x) => x,
+            Err((c, m)) => {
+                self.err(i, src.get(c).map_or(lead + 1, |s| s.1), format!("{m}. {form}"));
+                return Some((Block::PageBreak, dummy(at), i + 1));
             }
         };
+        if let Some(k) = props.keys().find(|k| !Key::BOX.contains(k) && !styled::TABLE_PARA.contains(k)) {
+            self.err(i, lead + 1, format!("{k} cannot be on a table line: it holds the cells' fill, borders and valign, and the cell paragraphs' layout, font, size and color. {form}"));
+            return Some((Block::PageBreak, dummy(at), i + 1));
+        }
+        let mut style = None;
+        if let Some((_, v, col)) = others.into_iter().next() {
+            let v = v.unwrap_or_default();
+            let tag = Tag {
+                name: "table".into(),
+                closing: false,
+                self_closing: false,
+                attrs: vec![("style".into(), v, lead + col)],
+                col: lead + 1,
+            };
+            style = self.style_attr(i, &tag, "a table style line", "table");
+            if style.is_none() {
+                return Some((Block::PageBreak, dummy(at), i + 1));
+            }
+        } else if props.is_empty() {
+            self.err(i, lead + 1, format!("the braces are empty. {form}"));
+            return Some((Block::PageBreak, dummy(at), i + 1));
+        }
         let next_is_table =
             i + 1 < self.stop && self.lines.get(i + 1).is_some_and(|l| l.text.trim_start().starts_with('|'));
         if !next_is_table {
-            self.err(i, lead + 1, "a {style=\"Name\"} line must be directly followed by the header row of its table, with no blank line or other text between.");
+            self.err(i, lead + 1, "a table line {…} must be directly followed by the header row of its table, with no blank line or other text between.");
             return Some((Block::PageBreak, dummy(at), i + 1));
         }
-        let (t, cells, j) = self.table(i + 1, style)?;
+        let (t, cells, j) = self.table_with(i + 1, style, props)?;
         let end = self.lines[j - 1].next;
         Some((Block::Table(t), BlockMap { start: at, end, kind: BlockMapKind::Table(cells) }, j))
     }
 
     #[allow(clippy::type_complexity)]
     fn table(&mut self, i: usize, style: Option<String>) -> Option<(Table, Vec<Vec<Option<Vec<ParaMap>>>>, usize)> {
+        self.table_with(i, style, Props::new())
+    }
+
+    /// A pipe table, with its table line's properties.
+    #[allow(clippy::type_complexity)]
+    fn table_with(
+        &mut self,
+        i: usize,
+        style: Option<String>,
+        line_props: Props,
+    ) -> Option<(Table, Vec<Vec<Option<Vec<ParaMap>>>>, usize)> {
         let mut j = i;
         while j < self.stop && self.lines[j].text.trim_start().starts_with('|') {
             j += 1;
         }
         let before = self.errors.len();
         let mut raw_rows: Vec<(usize, Vec<RawCell>)> = vec![];
+        let mut row_props: Vec<Props> = vec![];
         for k in i..j {
-            if let Some(cells) = self.split_row(k) {
+            if let Some((cells, rp)) = self.split_row(k) {
                 raw_rows.push((k, cells));
+                row_props.push(rp);
             }
         }
+        let empty = |style| Table { style, rows: vec![], boxes: vec![] };
         if self.errors.len() > before {
-            return Some((Table { style, rows: vec![] }, vec![], j));
+            return Some((empty(style), vec![], j));
         }
         if raw_rows.len() < 2 {
             self.err(i, 1, "a pipe table needs a header row, then a delimiter row such as |---|---|.");
-            return Some((Table { style, rows: vec![] }, vec![], j));
+            return Some((empty(style), vec![], j));
         }
+        if !row_props[1].is_empty() {
+            self.err(
+                raw_rows[1].0,
+                1,
+                "the delimiter row |---| holds no formatting; a row's {…} goes after the last | of a row of cells.",
+            );
+            return Some((empty(style), vec![], j));
+        }
+        row_props.remove(1);
         let width = raw_rows[0].1.len();
         let (dline, delim) = &raw_rows[1];
         for c in delim {
@@ -567,7 +832,7 @@ impl<'a> Parser<'a> {
             let t = t.trim();
             if t.contains(':') && t.trim_matches(':').chars().all(|c| c == '-') && !t.is_empty() {
                 self.err(*dline, c.col, "column alignment is direct formatting and cannot be written; the delimiter row is one --- per column, such as |---|---|.");
-                return Some((Table { style, rows: vec![] }, vec![], j));
+                return Some((empty(style), vec![], j));
             }
             if t.is_empty() || !t.chars().all(|c| c == '-') {
                 self.err(
@@ -575,7 +840,7 @@ impl<'a> Parser<'a> {
                     c.col,
                     "the second line of a table is the delimiter row, with one --- per column, such as |---|---|---|.",
                 );
-                return Some((Table { style, rows: vec![] }, vec![], j));
+                return Some((empty(style), vec![], j));
             }
         }
         if delim.len() != width {
@@ -595,13 +860,18 @@ impl<'a> Parser<'a> {
             }
         }
         if self.errors.len() > before {
-            return Some((Table { style, rows: vec![] }, vec![], j));
+            return Some((empty(style), vec![], j));
         }
         let mut rows = vec![];
         let mut maps = vec![];
+        let mut boxes = vec![];
+        let table_box = line_props.only(&Key::BOX);
+        let table_para = line_props.only(&styled::TABLE_PARA);
         for (r, (ln, cells)) in body.iter().enumerate() {
             let mut row = vec![];
             let mut mrow = vec![];
+            let mut brow = vec![];
+            let row_box = styled::box_default().overlay(&table_box).overlay(&row_props[r]);
             for (c, cell) in cells.iter().enumerate() {
                 let text: String = cell.chars.iter().map(|s| s.2).collect();
                 if cell.chars.is_empty() {
@@ -610,6 +880,7 @@ impl<'a> Parser<'a> {
                     }
                     row.push(Cell::Left);
                     mrow.push(None);
+                    brow.push(Props::new());
                 } else if text.trim() == "^^" {
                     if r == 0 {
                         self.err(*ln, cell.col, "^^ in the header row: there is no cell above to merge into.");
@@ -617,6 +888,7 @@ impl<'a> Parser<'a> {
                     let at = cell.chars.iter().find(|s| s.2 == '^').map_or(cell.close, |s| s.0);
                     row.push(Cell::Up);
                     mrow.push(Some(vec![ParaMap { units: vec![], mark: at }]));
+                    brow.push(Props::new());
                 } else {
                     let mut src: &[Src] = &cell.chars;
                     if src.first().is_some_and(|s| s.2 == ' ') {
@@ -625,16 +897,57 @@ impl<'a> Parser<'a> {
                     if src.last().is_some_and(|s| s.2 == ' ') {
                         src = &src[..src.len() - 1];
                     }
+                    let mut own_box = Props::new();
+                    if src.first().is_some_and(|s| s.2 == '{') {
+                        let Some(close) = brace_group(src, 0) else {
+                            self.err(*ln, src[0].1, "a cell's {…} is not closed by }; a cell's own formatting is {fill=#D9D9D9 …} at the very start of the cell.");
+                            continue;
+                        };
+                        let inner: String = src[1..close].iter().map(|s| s.2).collect();
+                        match props::parse_list(&inner, &[]) {
+                            Ok((p, _)) => {
+                                if let Some(k) = p.keys().find(|k| !Key::BOX.contains(k)) {
+                                    self.err(*ln, src[0].1, format!("{k} is a paragraph's: in a cell, write it in the {{…}} at the end of the cell's paragraph; the {{…}} at the start of a cell holds its fill, borders and valign."));
+                                    continue;
+                                }
+                                own_box = p;
+                            }
+                            Err((c, m)) => {
+                                self.err(*ln, src.get(c).map_or(src[0].1, |s| s.1), format!("{m}. A cell's own formatting is {{fill=#D9D9D9 …}} at the very start of the cell."));
+                                continue;
+                            }
+                        }
+                        src = &src[close + 1..];
+                        if src.first().is_some_and(|s| s.2 == ' ') {
+                            src = &src[1..];
+                        }
+                    }
                     self.in_cell = true;
                     let out = self.inline_full(*ln, src, None);
                     self.in_cell = false;
-                    let (paras, pmaps) = out.map(|o| o.cell_paras(cell.close)).unwrap_or_default();
+                    let Some(out) = out else { continue };
+                    let (mut paras, pmaps, owns) = out.cell_paras(cell.close);
+                    for (p, (own, col)) in paras.iter_mut().zip(owns) {
+                        if !styled::shows(&p.content) {
+                            if !own.is_empty() {
+                                self.err(*ln, col, "a paragraph without text shows no formatting: its {…} can be written once it has text.");
+                            }
+                            p.content.units.iter_mut().for_each(|u| u.props = Props::new());
+                            continue;
+                        }
+                        let own = table_para.overlay(&own);
+                        if let Some(pp) = self.apply_own(*ln, col, &mut p.content, &own, p.style.as_deref()) {
+                            p.props = pp;
+                        }
+                    }
                     row.push(Cell::Text(paras));
                     mrow.push(Some(pmaps));
+                    brow.push(row_box.overlay(&own_box).diff(&styled::box_default()));
                 }
             }
             rows.push(row);
             maps.push(mrow);
+            boxes.push(brow);
         }
         if self.errors.len() == before {
             if let Some((r, c)) = merge_problem(&rows) {
@@ -653,19 +966,58 @@ impl<'a> Parser<'a> {
                         {
                             rows[r][c] = Cell::Left;
                             maps[r][c] = None;
+                            boxes[r][c] = Props::new();
                         }
                     }
                 }
             }
         }
-        Some((Table { style, rows }, maps, j))
+        if boxes.iter().flatten().all(Props::is_empty) {
+            boxes.clear();
+        }
+        Some((Table { style, rows, boxes }, maps, j))
     }
 
-    fn split_row(&mut self, k: usize) -> Option<Vec<RawCell>> {
+    /// A row's cells, and the `{…}` after its last `|`.
+    fn split_row(&mut self, k: usize) -> Option<(Vec<RawCell>, Props)> {
         let line = &self.lines[k];
         let lead = line.indent();
         let body = line.text.trim_end();
-        let src = chars_of(&Line { text: body, at: line.at, end: line.end, next: line.next }, lead);
+        let mut src = chars_of(&Line { text: body, at: line.at, end: line.end, next: line.next }, lead);
+        let mut row_props = Props::new();
+        if src.last().is_some_and(|s| s.2 == '}') {
+            let open = (0..src.len()).rev().find(|&j| {
+                src[j].2 == '{'
+                    && brace_group(&src, j) == Some(src.len() - 1)
+                    && j > 0
+                    && src[j - 1].2.is_whitespace()
+                    && src[..j].iter().rev().find(|s| !s.2.is_whitespace()).is_some_and(|s| s.2 == '|')
+            });
+            if let Some(j) = open {
+                let inner: String = src[j + 1..src.len() - 1].iter().map(|s| s.2).collect();
+                match props::parse_list(&inner, &[]) {
+                    Ok((p, _)) => {
+                        if let Some(key) = p.keys().find(|x| !Key::BOX.contains(x)) {
+                            self.err(k, src[j].1, format!("{key} cannot be on a row: a row's {{…}} holds its cells' fill, borders and valign; a paragraph's {key} goes at the end of the paragraph in its cell."));
+                            return None;
+                        }
+                        row_props = p;
+                    }
+                    Err((c, m)) => {
+                        self.err(
+                            k,
+                            src.get(j + c).map_or(src[j].1, |s| s.1),
+                            format!("{m}. A row's own formatting is {{…}} after its last |."),
+                        );
+                        return None;
+                    }
+                }
+                src.truncate(j);
+                while src.last().is_some_and(|s| s.2.is_whitespace()) {
+                    src.pop();
+                }
+            }
+        }
         let n = src.len();
         let escaped_end = n >= 2 && src[n - 2].2 == '\\' && src[n - 1].2 == '|';
         if n < 2 || src[n - 1].2 != '|' || escaped_end {
@@ -694,23 +1046,13 @@ impl<'a> Parser<'a> {
             cur.push(ch);
             x += 1;
         }
-        Some(cells)
+        Some((cells, row_props))
     }
 
     // ------------------------------------------------------------ inline
 
-    /// Parse inline content. With `stop_at` (`div`), stops at that closing
-    /// tag and returns the index after it in `src`.
-    #[allow(clippy::type_complexity)]
-    fn inline(
-        &mut self,
-        line: usize,
-        src: &[Src],
-        stop_at: Option<&str>,
-    ) -> Option<((Inline, Vec<usize>), Option<usize>)> {
-        self.inline_full(line, src, stop_at).map(|o| ((o.inline, o.offsets), o.stop))
-    }
-
+    /// Parse inline content. With `stop_at` (`div`, `shape`), stops at that
+    /// closing tag and says where (`stop`, the index after it in `src`).
     pub(crate) fn inline_full(&mut self, line: usize, src: &[Src], stop_at: Option<&str>) -> Option<InlineOut> {
         let mut st = InlineState::default();
         let n = src.len();
@@ -724,6 +1066,23 @@ impl<'a> Parser<'a> {
             }};
         }
         while x < n {
+            if st.span.as_ref().is_some_and(|s| s.1 == x) {
+                let (start, _, resume, props, marks) = st.span.take().unwrap();
+                if st.units.len() == start {
+                    fail!(
+                        x,
+                        "[]{{…}} holds no text: a stretch of text with its own properties is [text]{{size=14pt}}."
+                    );
+                }
+                for u in &mut st.units[start..] {
+                    for (k, v) in props.iter() {
+                        u.props.set(k, v.clone());
+                    }
+                    u.marks = Marks(u.marks.0 | marks.0);
+                }
+                x = resume;
+                continue;
+            }
             if st.style.as_ref().is_some_and(|s| s.2 == x) {
                 let (start, style, _, resume, _) = st.style.take().unwrap();
                 if st.units.len() == start {
@@ -835,7 +1194,26 @@ impl<'a> Parser<'a> {
                         x = end + 1;
                         continue;
                     }
-                    if self.styles && link_at(src, x).is_none() {
+                    if self.flow {
+                        if let Some((close, bclose)) = span_at(src, x) {
+                            if st.span.is_some() {
+                                fail!(x, "a [text]{{…}} cannot be inside another one.");
+                            }
+                            let inner: String = src[close + 2..bclose].iter().map(|s| s.2).collect();
+                            let (props, marks) = match span_props(&inner) {
+                                Ok(p) => p,
+                                Err((c, m)) => {
+                                    self.err(line, src.get(close + 1 + c).map_or(col_of(close), |s| s.1), m);
+                                    return None;
+                                }
+                            };
+                            st.span = Some((st.units.len(), close, bclose + 1, props, marks));
+                            self.formatted = self.formatted.or(Some((line, col_of(x))));
+                            x += 1;
+                            continue;
+                        }
+                    }
+                    if self.text_styles && link_at(src, x).is_none() {
                         if let Some((close, inner, resume)) = style_span_at(src, x) {
                             if st.style.is_some() {
                                 fail!(x, "formatted text cannot hold more formatted text: write [a]{{…}}[b]{{…}} side by side; write \\[ for a literal [.");
@@ -948,34 +1326,78 @@ impl<'a> Parser<'a> {
                     }
                     x = after;
                 }
-                '{' if self.styles && (x == 0 || src[x - 1].2.is_whitespace()) => match para_braces_at(src, x, stop_at)
-                {
-                    Some((inner, resume)) => {
-                        let style = match crate::inline_style::parse_braces(&inner) {
-                            Ok(style) => style,
-                            Err(m) => fail!(x, "{m}; write \\{{ for a literal {{."),
-                        };
-                        if st.style.is_some() || st.link.is_some() || st.field.is_some() {
-                            fail!(x, "a paragraph's formatting {{…}} comes after its text, outside [ ] and links.");
+                '{' if self.text_styles && (x == 0 || src[x - 1].2.is_whitespace()) => {
+                    match para_braces_at(src, x, stop_at) {
+                        Some((inner, resume)) => {
+                            let style = match crate::inline_style::parse_braces(&inner) {
+                                Ok(style) => style,
+                                Err(m) => fail!(x, "{m}; write \\{{ for a literal {{."),
+                            };
+                            if st.style.is_some() || st.link.is_some() || st.field.is_some() {
+                                fail!(x, "a paragraph's formatting {{…}} comes after its text, outside [ ] and links.");
+                            }
+                            let para = st.splits.len();
+                            if st.para_styles.iter().any(|p| p.0 == para) {
+                                fail!(x, "a paragraph has one {{…}}, at its end.");
+                            }
+                            // The space before the braces separates them from the text.
+                            let from = st.splits.last().map_or(0, |s| s.0);
+                            if st.units.len() > from && st.units.last().is_some_and(|u| u.atom == Atom::Char(' ')) {
+                                st.units.pop();
+                                st.offsets.pop();
+                            }
+                            st.para_styles.push((para, style));
+                            x = resume;
                         }
-                        let para = st.splits.len();
-                        if st.para_styles.iter().any(|p| p.0 == para) {
-                            fail!(x, "a paragraph has one {{…}}, at its end.");
+                        None => {
+                            st.push(off, Atom::Char(c));
+                            x += 1;
                         }
-                        // The space before the braces separates them from the text.
-                        let from = st.splits.last().map_or(0, |s| s.0);
-                        if st.units.len() > from && st.units.last().is_some_and(|u| u.atom == Atom::Char(' ')) {
-                            st.units.pop();
-                            st.offsets.pop();
-                        }
-                        st.para_styles.push((para, style));
-                        x = resume;
                     }
-                    None => {
-                        st.push(off, Atom::Char(c));
-                        x += 1;
+                }
+                '{' if self.flow => {
+                    let lead_ok = x == 0 || src[x - 1].2.is_whitespace();
+                    if let Some(close) = brace_group(src, x) {
+                        let mut y = close + 1;
+                        while y < n && src[y].2.is_whitespace() {
+                            y += 1;
+                        }
+                        let inner: String = src[x + 1..close].iter().map(|s| s.2).collect();
+                        let extra: &[&str] = if self.item_line { &["style"] } else { &[] };
+                        let parsed = props::parse_list(&inner, extra);
+                        let ends = y == n || (self.in_cell && p_tag_at(src, y));
+                        if ends && lead_ok {
+                            let (props, others) = match parsed {
+                                Ok(p) => p,
+                                Err((c, m)) => {
+                                    self.err(line, src.get(x + c).map_or(col_of(x), |s| s.1), trailing_form(&m));
+                                    return None;
+                                }
+                            };
+                            if x > 0 && st.offsets.last() == Some(&src[x - 1].0) {
+                                st.units.pop();
+                                st.offsets.pop();
+                            }
+                            let style = others.into_iter().next().and_then(|o| o.1);
+                            st.trailing.push(Trailing { splits: st.splits.len(), props, style, col: col_of(x) });
+                            self.formatted = self.formatted.or(Some((line, col_of(x))));
+                            x = y;
+                            continue;
+                        }
+                        if stop_at == Some("div") && parse_tag(src, y).is_some_and(|t| t.0.closing && t.0.name == "div")
+                        {
+                            fail!(
+                                x,
+                                "a <div>'s {{…}} goes after </div>: <div style=\"Name\">text</div> {{align=center}}."
+                            );
+                        }
+                        if parsed.is_ok_and(|(p, o)| !p.is_empty() && o.is_empty()) {
+                            fail!(x, "a paragraph's {{…}} goes at the end of its line (in a table cell, at the end of the cell's paragraph), after a space; for part of the text write [text]{{size=14pt}}. A literal {{ is written \\{{.");
+                        }
                     }
-                },
+                    st.push(off, Atom::Char('{'));
+                    x += 1;
+                }
                 _ => {
                     st.push(off, Atom::Char(c));
                     x += 1;
@@ -1020,7 +1442,7 @@ impl<'a> Parser<'a> {
             }
             crate::inline_style::set_unit_styles(&mut inline, &styles);
         }
-        Some(InlineOut { inline, offsets: st.offsets, stop, splits: st.splits })
+        Some(InlineOut { inline, offsets: st.offsets, stop, splits: st.splits, trailing: st.trailing })
     }
 
     fn keep_tag(&mut self, line: usize, tag: &Tag) -> Option<Keep> {
@@ -1163,10 +1585,26 @@ struct InlineState {
     field: Option<(usize, String, usize)>,
     /// Cell paragraph starts: (unit index, style, source offset).
     splits: Vec<(usize, Option<String>, usize)>,
+    /// An open `[text]{…}`: (first unit, index of its `]`, index after its
+    /// `}`, its properties, the marks it turns on).
+    span: Option<(usize, usize, usize, Props, Marks)>,
+    /// Paragraphs' own `{…}`: (paragraph, properties, other names, column).
+    trailing: Vec<Trailing>,
     /// An open `[text]{…}`: (start unit, its formatting, index of `]`, resume index, col).
     style: Option<(usize, crate::inline_style::TextStyle, usize, usize, usize)>,
     /// A paragraph's own `{…}`: (paragraph index, its formatting).
     para_styles: Vec<(usize, crate::inline_style::TextStyle)>,
+}
+
+/// A paragraph's `{…}` at the end of its line (or cell paragraph).
+#[derive(Clone, Debug)]
+pub(crate) struct Trailing {
+    /// Which paragraph of the inline it ends: the number of `<p/>` splits before it.
+    pub(crate) splits: usize,
+    pub(crate) props: Props,
+    /// `style="…"` (a list item's).
+    pub(crate) style: Option<String>,
+    pub(crate) col: usize,
 }
 
 pub(crate) struct InlineOut {
@@ -1174,14 +1612,17 @@ pub(crate) struct InlineOut {
     pub(crate) offsets: Vec<usize>,
     pub(crate) stop: Option<usize>,
     pub(crate) splits: Vec<(usize, Option<String>, usize)>,
+    pub(crate) trailing: Vec<Trailing>,
 }
 
 impl InlineOut {
     /// A cell's paragraphs: the text starts the first, each `<p/>` another;
     /// a tag written first starts the first paragraph itself.
-    pub(crate) fn cell_paras(self, close: usize) -> (Vec<CellPara>, Vec<ParaMap>) {
+    #[allow(clippy::type_complexity)]
+    pub(crate) fn cell_paras(self, close: usize) -> (Vec<CellPara>, Vec<ParaMap>, Vec<(Props, usize)>) {
         let (mut paras, mut maps) = (vec![], vec![]);
         let (mut style, mut from) = (None, 0);
+        let lead = self.splits.first().is_some_and(|s| s.0 == 0);
         for (k, (at, st, off)) in self.splits.into_iter().enumerate() {
             if k == 0 && at == 0 {
                 style = st;
@@ -1191,16 +1632,24 @@ impl InlineOut {
                 units: self.inline.units[from..at].to_vec(),
                 spans: slice_spans(&self.inline.spans, from, at),
             };
-            paras.push(CellPara { style: std::mem::replace(&mut style, st), content });
+            paras.push(CellPara { style: std::mem::replace(&mut style, st), content, props: Props::new() });
             maps.push(ParaMap { units: self.offsets[from..at].to_vec(), mark: off });
             from = at;
         }
         let n = self.inline.units.len();
         let content =
             Inline { units: self.inline.units[from..].to_vec(), spans: slice_spans(&self.inline.spans, from, n) };
-        paras.push(CellPara { style, content });
+        paras.push(CellPara { style, content, props: Props::new() });
         maps.push(ParaMap { units: self.offsets[from..].to_vec(), mark: close });
-        (paras, maps)
+        // A paragraph's `{…}` comes before the split that ends it.
+        let mut owns: Vec<(Props, usize)> = vec![(Props::new(), 1); paras.len()];
+        for t in self.trailing {
+            let k = if lead { t.splits.saturating_sub(1) } else { t.splits };
+            if let Some(o) = owns.get_mut(k) {
+                *o = (t.props, t.col);
+            }
+        }
+        (paras, maps, owns)
     }
 }
 
@@ -1220,7 +1669,7 @@ fn slice_spans(spans: &[Span], a: usize, b: usize) -> Vec<Span> {
 
 impl InlineState {
     fn push(&mut self, off: usize, atom: Atom) {
-        self.units.push(Unit { atom, marks: self.marks });
+        self.units.push(Unit::new(atom, self.marks));
         self.offsets.push(off);
     }
 }
@@ -1249,6 +1698,16 @@ pub(crate) fn delim(m: Marks) -> &'static str {
 
 fn mark_index(m: Marks) -> usize {
     Marks::ALL.iter().position(|&x| x == m).unwrap()
+}
+
+/// A line of the style section.
+fn is_style_line(t: &str) -> bool {
+    t.starts_with("<style") && t[6..].starts_with([' ', '/', '>'])
+}
+
+fn cap_first(s: &str) -> String {
+    let mut c = s.chars();
+    c.next().map_or(String::new(), |f| f.to_uppercase().chain(c).collect())
 }
 
 fn strip_comment(v: &str) -> &str {
@@ -1360,6 +1819,104 @@ fn p_tag_at(src: &[Src], y: usize) -> bool {
         && src.get(y + 2).is_some_and(|s| matches!(s.2, '/' | ' ' | '>'))
 }
 
+/// `{…}` at `src[x]`: the index of its `}` (quoted values may hold braces);
+/// `None` when it does not close first.
+pub(crate) fn brace_group(src: &[Src], x: usize) -> Option<usize> {
+    if src.get(x)?.2 != '{' {
+        return None;
+    }
+    let mut quote = None;
+    for (y, s) in src.iter().enumerate().skip(x + 1) {
+        match (quote, s.2) {
+            (Some(q), c) if c == q => quote = None,
+            (Some(_), _) => {}
+            (None, c @ ('"' | '\'')) => quote = Some(c),
+            (None, '}') => return Some(y),
+            (None, '{') => return None,
+            _ => {}
+        }
+    }
+    None
+}
+
+/// `[text]{…}` at `src[x]`: (index of its `]`, index of its `}`). The text
+/// may hold links, marks, tags and math, but no other `[`.
+fn span_at(src: &[Src], x: usize) -> Option<(usize, usize)> {
+    let mut y = x + 1;
+    while y < src.len() {
+        match src[y].2 {
+            '\\' => y += 2,
+            '[' if src.get(y + 1).map(|s| s.2) == Some('^') => {
+                y = (y..src.len()).find(|&k| src[k].2 == ']').map_or(src.len(), |k| k + 1);
+            }
+            '[' => y = link_at(src, y)?.2,
+            ']' => {
+                return (src.get(y + 1).map(|s| s.2) == Some('{'))
+                    .then(|| brace_group(src, y + 1))
+                    .flatten()
+                    .map(|b| (y, b))
+            }
+            '<' if p_tag_at(src, y) => return None,
+            '<' if parse_tag(src, y).is_some_and(|t| t.0.name == "math" && !t.0.closing) => {
+                let after = parse_tag(src, y).unwrap().1;
+                y = math_tag_end(src, after).map_or(after, |m| m.1);
+            }
+            '<' => y = parse_tag(src, y).map_or(y + 1, |t| t.1),
+            '$' => {
+                let opens = src.get(y + 1).is_some_and(|s| !s.2.is_whitespace() && s.2 != '$');
+                y = if opens { math_close(src, y + 1).map_or(y + 1, |k| k + 1) } else { y + 1 };
+            }
+            _ => y += 1,
+        }
+    }
+    None
+}
+
+/// A `[text]{…}`'s properties: text keys, and flags turned on as marks.
+fn span_props(inner: &str) -> Result<(Props, Marks), (usize, String)> {
+    let (p, _) = props::parse_list(inner, &[])?;
+    let mut marks = Marks::NONE;
+    let mut out = Props::new();
+    for (k, v) in p.iter() {
+        if let Some(m) = flag_mark(k) {
+            if v.flag() == Some(false) {
+                return Err((1, format!("{k}=no cannot be written: text is {k} by its marks ({}); leave them out for text that is not {k}.", mark_form(k))));
+            }
+            marks = Marks(marks.0 | m.0);
+        } else if Key::TEXT.contains(&k) {
+            out.set(k, v.clone());
+        } else {
+            return Err((1, format!("{k} is not a property of a stretch of text; [text]{{…}} holds font, size and color (a paragraph's {k} goes in the {{…}} at the end of its line)")));
+        }
+    }
+    Ok((out, marks))
+}
+
+/// The mark a flag is in running text.
+pub(crate) fn flag_mark(k: Key) -> Option<Marks> {
+    match k {
+        Key::Bold => Some(Marks::BOLD),
+        Key::Italic => Some(Marks::ITALIC),
+        Key::Underline => Some(Marks::UNDERLINE),
+        Key::Strike => Some(Marks::STRIKE),
+        _ => None,
+    }
+}
+
+fn mark_form(k: Key) -> &'static str {
+    match k {
+        Key::Bold => "**text**",
+        Key::Italic => "*text*",
+        Key::Underline => "<u>text</u>",
+        _ => "~~text~~",
+    }
+}
+
+/// An error in a paragraph's `{…}`, with its form.
+fn trailing_form(m: &str) -> String {
+    format!("{m}. A paragraph's own formatting is {{key=value …}} at the end of its line, after a space: # Title {{align=center}}")
+}
+
 /// A link starting at `[`: (index of `]`, url, index after `)`). The
 /// link text runs to the first unescaped `]`; a `[` before it makes this
 /// `[` literal (the later one may open the link).
@@ -1372,7 +1929,7 @@ fn link_at(src: &[Src], x: usize) -> Option<(usize, String, usize)> {
             '[' if src.get(y + 1).map(|s| s.2) == Some('^') => {
                 y = (y..src.len()).find(|&k| src[k].2 == ']').map_or(src.len(), |k| k + 1);
             }
-            '[' => return None,
+            '[' => y = span_at(src, y)?.1 + 1,
             ']' => break,
             '<' if p_tag_at(src, y) => return None,
             '<' if parse_tag(src, y).is_some_and(|t| t.0.name == "math" && !t.0.closing) => {

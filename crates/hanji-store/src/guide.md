@@ -18,7 +18,7 @@ schema: 1
 (`type` is document, presentation or spreadsheet; `format` is docx or hwpx, pptx, xlsx; an optional `template:` line.)
 Canonical form: one paragraph per line (no hard wraps), a blank line between blocks, no table padding, `1.` for every numbered item. hanji stores text in this form; read again after an edit that reports `canonicalized`.
 Inline: **bold**, *italic*, ~~strike~~, <u>underline</u>, <br/> (a line break inside a paragraph).
-Formatting is by the file's own style and layout names only: no colours, fonts or sizes. If no style fits a request, say so; do not invent one.
+docx, pptx and xlsx texts show their formatting (below). In hwpx, formatting is by the file's own style names only: no colours, fonts or sizes; if no style fits a request, say so, do not invent one.
 <keep id="k3" kind="drawing" summary="…"/> stands for something the text does not model (a picture, chart, footnote, comment, merged cells, …). Leave it as it is; you may move it or delete its line, never create or change one.
 
 Document (docx, hwpx)
@@ -34,6 +34,31 @@ Document (docx, hwpx)
   | 합계 || 215 |
   `^^` as the whole cell: merged into the cell above. `||` (no space between the pipes): the cell to the left extends into this column; `|||` spans three. Text goes in the top-left cell of a merge only. In a cell, <p/> starts another paragraph. A line {style="Name"} right before the header row sets the table style; without it a table has the file's default.
 - <pagebreak/> on its own line.
+
+Formatting (docx)
+Formatting comes from named styles, listed once at the top; each paragraph, cell and stretch of text shows only what differs from its style.
+- Style lines: after the front matter, one line `<style name="Name" …/>` per style the text uses. The first is the default style: its line is complete, and a property it leaves out is 0pt, none or off (`align` left). Every other line holds only what differs from the default style. A heading's style is its level's, a `<div>` names its style, a list item without `style="Name"` in its `{…}` is in the file's list style (List Paragraph), any other paragraph is in the default style. Change a style line to change every paragraph in that style that does not set the property itself.
+- Paragraph: `{…}` at the end of its line (after `</div>`, or `- item {style="Name" first-line=10pt}`) holds what differs from its style.
+- Text: `[text]{…}` gives that stretch the text properties written (font, size, color); the rest of the paragraph has the paragraph's. Bold, italic, underline and strike are the marks `**`, `*`, `<u>`, `~~`. A literal `{` in text is `\{`; in `[text]`, `[` and `]` are `\[`, `\]`.
+- Cell: `{…}` at the very start of a cell holds its fill, borders and valign; each cell paragraph ends in its own `{…}`. `{…}` after a row's last `|` applies to every cell of the row; the line `{…}` just before the header row applies to every cell and cell paragraph of the table (it may hold `style="Name"`). A cell's own value wins over its row's, a row's over the table line's.
+- Vocabulary: `key=value` pairs separated by spaces, a value with a space quoted; lengths in points (`12pt`); colours `#RRGGBB` or a theme colour by name (accent1, tx1, …, with `+N%` lighter or `-N%` darker). Paragraph: align (left, center, right, justify, distribute), indent-left, indent-right, first-line (negative: a hanging indent), space-before, space-after, line-spacing (`115%`, `14pt` exact, `"at-least 14pt"`), fill, border-top/-right/-bottom/-left. Text: font, size, color. Cell: fill, border (all four sides) or border-top/…, valign (top, middle, bottom). A border is `"<width>pt <style> <colour>"` (solid, dashed, dotted, double) or none.
+- `fill=gradient`, `fill=pattern`, `fill=picture` and other border styles are kept while left as written; they can be replaced, not written. What the vocabulary cannot say (a gradient, a pattern, a shadow, a diagonal line) is refused with the reason.
+- A new style is a new style line with a name no style has (a name that is already a style is refused); it holds what differs from the default style. A paragraph takes it like any style: `<div style="Name">…</div>`, a list item's `style="Name"`, `<p style="Name"/>` in a cell. The line of a style the text does not use is not shown: give a paragraph that style first to change it.
+<style name="Normal" line-spacing=115% font=Calibri size=11pt color=#000000/>
+<style name="Heading 1" space-before=12pt size=16pt color=accent1 bold/>
+<style name="Callout" fill=#FFF2CC border-left="2.25pt solid #C00000" indent-left=10pt/>
+
+# 개요
+
+본문 문단입니다. [강조]{color=#C00000} 부분이 있습니다. {first-line=10pt}
+
+<div style="Callout">잠정치입니다.</div>
+
+{border="0.5pt solid #000000"}
+| 구분 {align=center} | 내용 {align=center} | {fill=#D9D9D9}
+|---|---|
+| {fill=#FFF2CC} 서울 | 120 |
+| 합계 | 215 | {border-top="1.5pt double #000000"}
 
 Presentation (pptx)
 Slides are separated by a line `---`. Each slide's first line is `layout: Name` (a layout of the file). Then slot markers on their own lines, each followed by its text: ::title::, ::subtitle::, ::body::, ::left:: and ::right:: (two content areas), ::notes:: (last), and the others the layout has. Only the layout's slots; leave an unfilled slot out; an empty marker is an error. Slots hold paragraphs, - / 1. items and <p/>; no headings, styles or tables.

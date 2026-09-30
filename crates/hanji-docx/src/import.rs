@@ -5,7 +5,10 @@
 use std::collections::HashMap;
 
 use hanji_core::{Block, Entry, KeepIds, Kind, ListItem, Meta, Para, StyleDef, StyleSet, Table};
-use hanji_format::{Atom, Cell, CellPara, Inline, Keep, Marks, Unit};
+use hanji_format::styled;
+use hanji_format::{Atom, Cell, CellPara, Inline, Keep, Key, Marks, Props, Unit};
+
+use crate::format;
 
 use crate::numbering::{num_pr, Numbering};
 use crate::ooxml::*;
@@ -47,6 +50,11 @@ pub struct Importer<'a> {
     /// The list the previous block belonged to: the numId of its items at
     /// the margin, whether they are numbered, and the ilvl of each open level.
     list: Option<(u32, bool, Vec<u32>)>,
+    fmt: &'a format::Styles,
+    /// Each paragraph style's values, by id.
+    values: HashMap<String, Props>,
+    /// The text properties of the paragraph being read's style.
+    text_base: Props,
 }
 
 /// Import-time checkpoint, so a table that turns out not to be a pipe
@@ -60,6 +68,7 @@ impl<'a> Importer<'a> {
         default_table: Option<String>,
         notes: &'a HashMap<(String, String), String>,
         numbering: &'a Numbering,
+        fmt: &'a format::Styles,
     ) -> Self {
         Importer {
             scope,
@@ -75,7 +84,20 @@ impl<'a> Importer<'a> {
             inherited: vec![],
             numbering,
             list: None,
+            fmt,
+            values: HashMap::new(),
+            text_base: Props::new(),
         }
+    }
+
+    /// The values of paragraph style `id` (§5.2).
+    fn style_values(&mut self, id: &str) -> Props {
+        if let Some(v) = self.values.get(id) {
+            return v.clone();
+        }
+        let v = self.fmt.values(id);
+        self.values.insert(id.to_string(), v.clone());
+        v
     }
 
     fn checkpoint(&self) -> Mark {
@@ -375,6 +397,7 @@ impl<'a> Importer<'a> {
         self.entry(Kind::Tbl, xml, fpv, &[bi], None, None, Meta { style: style_id.clone(), ..Default::default() });
         let style = style_id.and_then(|id| self.styles.table_style_name(&id));
         let mut rows = vec![];
+        let mut boxes: Vec<Vec<Props>> = vec![];
         for el in tbl.elements() {
             if MARKERS.contains(&el.name.as_str()) {
                 // A marker between rows (or after the last): before row `rows.len()`.
@@ -392,6 +415,7 @@ impl<'a> Importer<'a> {
             let xml = std::iter::once(self.frag(&trs)).chain(rhead.iter().map(|e| self.frag(e))).collect();
             self.entry(Kind::Tr, xml, fpv, &[bi, ri], None, None, Meta::default());
             let mut row = vec![];
+            let mut brow = vec![];
             for tc in tr.elements() {
                 if MARKERS.contains(&tc.name.as_str()) {
                     // A marker between cells (or after the last): before grid column `row.len()`.
@@ -405,7 +429,13 @@ impl<'a> Importer<'a> {
                 let tcpr = tc.child("w:tcPr");
                 let tcs = tc.shell();
                 let xml = std::iter::once(self.frag(&tcs)).chain(tcpr.map(|t| self.frag(t))).collect();
-                let f = self.fp(&[Some(&tcs), tcpr]);
+                let mut rest = tcpr.cloned();
+                if let Some(x) = &mut rest {
+                    for n in format::SHOWN_TCPR {
+                        remove_child(x, n);
+                    }
+                }
+                let f = self.fp(&[Some(&tcs), rest.as_ref()]);
                 self.entry(Kind::Tc, xml, f, &[bi, ri, gc], None, None, Meta::default());
                 let mut paras = vec![];
                 for e in tc.elements().filter(|e| !e.is("w:tcPr")) {
@@ -413,7 +443,7 @@ impl<'a> Importer<'a> {
                     if e.is("w:p") {
                         let para = self.para(e, &[bi, ri, gc, k])?;
                         let style = (para.style != self.styles.default_paragraph).then_some(para.style);
-                        paras.push(CellPara { style, content: para.content });
+                        paras.push(CellPara { props: para.props, style, content: para.content });
                     } else {
                         // A marker between a cell's paragraphs: before paragraph k.
                         self.bmarker(e, &[bi, ri, gc, k]);
@@ -422,17 +452,24 @@ impl<'a> Importer<'a> {
                 let span = grid_span(tcpr);
                 if v_merged(tcpr) {
                     row.push(Cell::Up);
+                    brow.push(Props::new());
                 } else {
                     if !paras.iter().all(|p| cell_writable(&p.content)) {
                         return Ok(None);
                     }
                     row.push(Cell::Text(paras));
+                    brow.push(tcpr.map(format::tcpr_props).unwrap_or_default().diff(&styled::box_default()));
                 }
                 row.extend((1..span).map(|_| Cell::Left));
+                brow.extend((1..span).map(|_| Props::new()));
             }
             rows.push(row);
+            boxes.push(brow);
         }
-        Ok(Some(Table { style, rows }))
+        if boxes.iter().flatten().all(Props::is_empty) {
+            boxes.clear();
+        }
+        Ok(Some(Table { style, rows, boxes }))
     }
 
     // ------------------------------------------------------------ paragraphs
@@ -448,14 +485,18 @@ impl<'a> Importer<'a> {
             Some(n) => n.to_string(),
             None => {
                 // A style id missing from styles.xml: keep it by id.
-                self.styles.paragraph.push(StyleDef { id: sid.clone(), name: sid.clone() });
+                self.styles.paragraph.push(StyleDef::new(sid.clone(), sid.clone()));
                 sid.clone()
             }
         };
         let shell = p.shell();
+        // The fingerprint leaves out what the text shows (§5.2); an empty
+        // paragraph's properties it cannot show are marked `unshown`.
         let mut rest = ppr.cloned();
         if let Some(r) = &mut rest {
-            remove_child(r, "w:pStyle");
+            for n in std::iter::once("w:pStyle").chain(format::SHOWN_PPR) {
+                remove_child(r, n);
+            }
         }
         let rest = rest.filter(|r| !r.children.is_empty() || !r.attrs.is_empty());
         let f = if shell.attrs.is_empty() && rest.is_none() {
@@ -475,18 +516,23 @@ impl<'a> Importer<'a> {
             aux: item.as_ref().map(|i| i.1.to_vec()).unwrap_or_default(),
             ..Default::default()
         };
-        self.entry(Kind::Ppr, xml, f, path, None, None, meta);
+        let ppr_at = self.entry(Kind::Ppr, xml, f, path, None, None, meta);
+        // What the paragraph sets beyond its style (§5.2).
+        let base = self.style_values(&sid);
+        let size = base.get(Key::Size).and_then(|v| v.length()).unwrap_or(1000);
+        let props = ppr.map(|x| format::ppr_props(x, size)).unwrap_or_default().only(&styled::PARA_OWN).diff(&base);
+        self.text_base = base.only(&Key::TEXT);
         self.buf.clear();
         let page_break_only = sid == default_id && is_page_break_para(p);
         self.walk(p, path, page_break_only)?;
         self.inherited.truncate(saved);
         let mut content = Inline { units: std::mem::take(&mut self.buf), spans: vec![] };
         content.normalize();
+        // A paragraph without text shows none of it, and keeps it (§5.2).
+        self.entries[ppr_at].meta.unshown = !styled::shows(&content) && !props.is_empty();
         let item = item.map(|i| i.0);
         self.stats.list_items += item.is_some() as usize;
-        // A list item's style is not in the text; it stays in the remainder.
-        let style = if item.is_some() { String::new() } else { style };
-        Ok(Para { style, content, item })
+        Ok(Para { style, content, item, props })
     }
 
     /// The list item a paragraph is, from its own `w:numPr` or its style's,
@@ -535,7 +581,7 @@ impl<'a> Importer<'a> {
     }
 
     fn push(&mut self, atom: Atom, marks: Marks) {
-        self.buf.push(Unit { atom, marks });
+        self.buf.push(Unit::new(atom, marks));
     }
 
     fn pos(&self) -> usize {
@@ -620,7 +666,7 @@ impl<'a> Importer<'a> {
         let shell = r.shell();
         let mut rest = rpr.cloned();
         if let Some(x) = &mut rest {
-            for n in ["w:b", "w:i", "w:strike", "w:u"] {
+            for n in format::SHOWN_RPR {
                 remove_child(x, n);
             }
         }
@@ -630,6 +676,9 @@ impl<'a> Importer<'a> {
         let xml = std::iter::once(self.frag(&shell)).chain(rpr.map(|x| self.frag(x))).collect();
         let start = self.pos();
         let idx = self.entry(Kind::Run, xml, f, path, Some(start), None, Meta { marks, ..Default::default() });
+        let text_props = rpr
+            .map(|x| format::rpr_props(x, &self.fmt.theme).only(&Key::TEXT).diff(&self.text_base))
+            .unwrap_or_default();
         let run_id = self.entries[idx].id;
         let mut aux = vec![];
         for n in &r.children {
@@ -670,6 +719,13 @@ impl<'a> Importer<'a> {
             }
         }
         let end = self.pos();
+        if !text_props.is_empty() {
+            for u in &mut self.buf[start..end] {
+                if u.takes_props() {
+                    u.props = text_props.clone();
+                }
+            }
+        }
         let e = &mut self.entries[idx];
         e.end = Some(end);
         e.meta.aux = aux;

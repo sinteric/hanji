@@ -6,7 +6,8 @@ use hanji_core::{Capabilities, Engine, EngineError, ImportOptions, Imported, Par
 use hanji_package::{opc, package};
 use hanji_pptx::{PptxEngine, PptxModel};
 
-const CAPS: Capabilities = Capabilities { links: false, fields: false, footnotes: false, math: false };
+const CAPS: Capabilities =
+    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: false };
 
 fn deck(name: &str) -> Vec<u8> {
     std::fs::read(format!("{}/corpus/{name}", env!("CARGO_MANIFEST_DIR"))).unwrap()

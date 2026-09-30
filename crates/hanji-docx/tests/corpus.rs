@@ -57,6 +57,9 @@ impl Format for Docx {
     fn is_drawing(&self, xml: &str) -> bool {
         xml.contains("drawing") || xml.contains("pict")
     }
+    fn complete(&self, blocks: &mut [Block], rem: &mut Remainder) {
+        DocxEngine::complete(blocks, rem);
+    }
 }
 
 fn corpus() -> Vec<(String, Vec<u8>)> {
@@ -71,13 +74,17 @@ fn out_dir() -> PathBuf {
 #[test]
 fn corpus_getput_putget_remainder() {
     let files = corpus();
-    let sum = hanji_testkit::run_corpus(&Docx, &files, &Out { dir: out_dir(), ext: "docx" });
+    // E1–E9 and the formatting edits F1–F4 (§5.2), then all in one (E10).
+    let out = Out { dir: out_dir(), ext: "docx" };
+    let sum = hanji_testkit::run_corpus_with(&Docx, &files, &out, &hanji_testkit::FORMATTED_EDITS, "E10");
     #[cfg(not(target_os = "wasi"))]
     if std::env::var("HANJI_SOFFICE").is_ok() {
         soffice();
     }
     assert!(sum.failures.is_empty(), "{}", sum.failures.join("\n"));
     assert_eq!(sum.getput_ok, files.len());
+    // An exact-span edit loses no entry of the blocks it touches.
+    assert_eq!(sum.touched["exact"][2], 0, "{:?}", sum.touched);
 }
 
 /// Pages of a PDF: its `/Type /Page` objects (not `/Pages`).
@@ -274,7 +281,7 @@ fn corpus_tracked_changes() {
             if short == "E10" {
                 // The same edits one at a time, each an exact span where it is local.
                 let steps = edit_chain(&text, &rem, true);
-                if steps.last().is_some_and(|r| r.text == new_text) {
+                if steps.last().is_some_and(|r| Docx.text_of(&r.new, &r.remainder) == new_text) {
                     designs.push(("steps", steps));
                 } else {
                     failures.push(format!("{name}: the edits one at a time do not give E10's text"));
@@ -324,7 +331,8 @@ fn corpus_tracked_changes() {
                 } else {
                     failures.push(format!("{name} {tag}: not well-formed"));
                 }
-                for (accept, want, k, what) in [(true, &r.text, 2, "accepted"), (false, &text, 3, "rejected")] {
+                let edited = Docx.text_of(&r.new, &r.remainder);
+                for (accept, want, k, what) in [(true, &edited, 2, "accepted"), (false, &text, 3, "rejected")] {
                     let got = review::resolve(&pkg, AUTHOR, accept).and_then(|p| {
                         out.save(name, &format!("{tag}.{what}"), &p);
                         let left = review::count(&p, AUTHOR);
@@ -403,12 +411,12 @@ fn edit_chain(text: &str, rem: &Remainder, with_move: bool) -> Vec<hanji_core::R
         let Some(ed) = f(&d, &Cx { fmt: &Docx, rem: &rem }) else { continue };
         let new_text = Docx.text_of(&ed.blocks, &rem);
         let r = if ed.local {
-            let (a, b, repl) = hanji_testkit::differing_span(&text, &new_text);
+            let (a, b, repl) = hanji_testkit::edit_span(&text, &new_text);
             hanji_core::reanchor_span(&rem, &text, a, b, &repl, CAPS).unwrap()
         } else {
             hanji_core::reanchor_rewrite(&rem, &text, &new_text, CAPS).unwrap()
         };
-        assert_eq!(r.text, new_text);
+        assert_eq!(Docx.text_of(&r.new, &r.remainder), new_text);
         (text, rem) = (r.text.clone(), r.remainder.clone());
         out.push(r);
     }

@@ -16,7 +16,9 @@
 //! SOURCES.md), or of hanji-store's blank package.
 //!
 //! - docx: per source, GetPut (no edit), E10 (every scripted edit in one
-//!   revision), and tracked changes: the scripted edits one at a time, as
+//!   revision, with the formatting edits F1–F4: a first-line indent on body
+//!   paragraphs, a heading style restyled, a new style given to a
+//!   paragraph, a table's header row filled), and tracked changes: the scripted edits one at a time, as
 //!   many as the tracked export writes (it refuses some, with the reason);
 //!   and two new documents from hanji-store's blank docx.
 //! - pptx: per deck, GetPut and P9 (title, bullet, notes and shape text
@@ -259,7 +261,7 @@ const DOCX: &[(&str, &str)] = &[
 /// replaced by "105").
 fn step(fmt: &dyn Format, rem: &Remainder, text: &str, new_text: &str, ed: &Edit) -> Option<hanji_core::Reanchored> {
     let r = if ed.local {
-        let (a, b, repl) = ed.span.clone().unwrap_or_else(|| hanji_testkit::differing_span(text, new_text));
+        let (a, b, repl) = ed.span.clone().unwrap_or_else(|| hanji_testkit::edit_span(text, new_text));
         hanji_core::reanchor_span_in(fmt.model(), rem, text, a, b, &repl, CAPS).ok()?
     } else {
         hanji_core::reanchor_rewrite_in(fmt.model(), rem, text, new_text, CAPS).ok()?
@@ -292,7 +294,7 @@ fn docx(kit: &mut Kit) {
         let (blocks, _, _, _) = DocxEngine::split(&bytes, &opts).unwrap();
         let d = Doc { blocks, entries: rem.entries.clone() };
         let cx = Cx { fmt: &Docx, rem: &rem };
-        let jobs = edit_jobs(&Docx, &d, &cx, &text, &hanji_testkit::EDITS, "E10", None);
+        let jobs = edit_jobs(&Docx, &d, &cx, &text, &hanji_testkit::FORMATTED_EDITS, "E10", None);
         let e10 = jobs.last().unwrap();
         match hanji_core::rewrite(&rem, &text, &e10.new_text, CAPS) {
             Ok(r) => {
@@ -303,7 +305,7 @@ fn docx(kit: &mut Kit) {
                     name,
                     licence,
                     "e10",
-                    "every scripted edit (E1–E9) in one revision, as direct changes",
+                    "every scripted edit (E1–E9, and the formatting edits F1–F4) in one revision, as direct changes",
                     &out,
                     vec![word.clone(), "Shows the edits listed below".into()],
                     notes,
@@ -370,7 +372,8 @@ fn docx(kit: &mut Kit) {
         let r = hanji_core::rewrite(&imp.remainder, &imp.text, &text, CAPS).unwrap_or_else(|e| panic!("{source}: {e}"));
         let out = DocxEngine.export(&r.text, &r.remainder).unwrap_or_else(|e| panic!("{source}: {e}"));
         let again = DocxEngine.import(&out, &ImportOptions::default()).unwrap();
-        assert_eq!(again.text, r.text, "{source}: PutGet");
+        // The canonical text adds the style lines of the styles it uses (§5.2).
+        assert_eq!(again.text, DocxEngine::text_of(&r.new, &r.remainder, None), "{source}: PutGet");
         kit.add(
             "docx",
             source,

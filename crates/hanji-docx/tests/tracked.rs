@@ -8,7 +8,8 @@ use hanji_core::{edit, reanchor_rewrite, Capabilities, Engine, EngineError, Impo
 use hanji_docx::{package, DocxEngine, ExportOptions, History, Reviewer};
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-const CAPS: Capabilities = Capabilities { links: false, fields: false, footnotes: false, math: false };
+const CAPS: Capabilities =
+    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: true };
 const AUTHOR: &str = "hanji";
 
 const STYLES: &str = r#"<?xml version="1.0" encoding="UTF-8"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/></w:style><w:style w:type="paragraph" w:styleId="Note"><w:name w:val="Note"/></w:style><w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/></w:style></w:styles>"#;
@@ -58,7 +59,10 @@ fn run(body: &str, edits: &[(&str, &str)]) -> Result<String, EngineError> {
     for (old, new) in edits {
         let r = edit(&rem, &t, old, new, CAPS).unwrap_or_else(|e| panic!("{e}"));
         h.push(&r)?;
-        (t, rem) = (r.text, r.remainder);
+        // The text as the store returns it: canonical, with the style
+        // lines of the styles it now uses.
+        t = DocxEngine::text_of(&r.new, &r.remainder, None);
+        rem = r.remainder;
     }
     let out = DocxEngine.export_with(&t, &rem, &tracked(), Some(&h))?;
     assert!(review::count(&out, AUTHOR) > 0);

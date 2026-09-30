@@ -24,7 +24,7 @@ pub fn read(data: Option<&[u8]>) -> (StyleSet, Option<String>) {
                     if default && default_p.is_none() {
                         default_p = Some(name.clone());
                     }
-                    s.paragraph.push(StyleDef { id, name });
+                    s.paragraph.push(StyleDef::new(id, name));
                 }
                 Some("table") => {
                     if default && default_t.is_none() {
@@ -32,7 +32,7 @@ pub fn read(data: Option<&[u8]>) -> (StyleSet, Option<String>) {
                     }
                     let based = st.child("w:basedOn").and_then(|b| b.get("w:val"));
                     tables.insert(id.clone(), (draws_borders(st), based));
-                    s.table.push(StyleDef { id, name });
+                    s.table.push(StyleDef::new(id, name));
                 }
                 _ => {}
             }
@@ -40,7 +40,7 @@ pub fn read(data: Option<&[u8]>) -> (StyleSet, Option<String>) {
     }
     let default_p = default_p.unwrap_or_else(|| {
         if !s.paragraph.iter().any(|p| p.id == "Normal") {
-            s.paragraph.push(StyleDef { id: "Normal".into(), name: "Normal".into() });
+            s.paragraph.push(StyleDef::new("Normal", "Normal"));
         }
         s.paragraph_name("Normal").unwrap().to_string()
     });

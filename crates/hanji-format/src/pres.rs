@@ -381,7 +381,7 @@ fn object(p: &mut Parser, i: usize) -> Option<(ObjectItem, ItemMap)> {
     let geom = p.object_geom.take();
     let (b, m, _) = parsed?;
     let keep = match b {
-        Block::Para(Para { style: ParaStyle::Plain, content }) if content.units.len() == 1 => {
+        Block::Para(Para { style: ParaStyle::Plain, content, .. }) if content.units.len() == 1 => {
             match &content.units[0].atom {
                 Atom::Keep(k) => k.clone(),
                 _ => return None,
@@ -625,7 +625,7 @@ fn slot(
     let head = HeadMap { start: line.at, end: line.next, mark: line.end };
     let (mut bl, mut bm) = (vec![], vec![]);
     p.stop = end;
-    p.styles = name != "notes";
+    p.text_styles = name != "notes";
     let mut j = i + 1;
     while j < end {
         let before_block = p.errors.len();
@@ -645,7 +645,7 @@ fn slot(
         }
     }
     p.stop = p.lines.len();
-    p.styles = false;
+    p.text_styles = false;
     if p.errors.len() > before {
         return None;
     }
@@ -719,10 +719,10 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
         (vec![], vec![], next)
     } else {
         p.in_cell = true;
-        p.styles = true;
+        p.text_styles = true;
         let out = p.inline_full(i, &src[after..], Some("shape"));
         p.in_cell = false;
-        p.styles = false;
+        p.text_styles = false;
         let out = out?;
         let Some(stop) = out.stop else {
             p.err(
@@ -738,7 +738,7 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
             return None;
         }
         let close = (after..stop).rev().find(|&k| src[k].2 == '<').map_or(at, |k| src[k].0);
-        let (paras, pmaps) = out.cell_paras(close);
+        let (paras, pmaps, _) = out.cell_paras(close);
         if paras.iter().any(|x| x.style.is_some()) {
             p.err(i, lead + 1, "a slide has no paragraph styles: a shape's paragraphs are started by <p/> alone.");
             return None;
@@ -1191,7 +1191,8 @@ pub fn shape_line(sh: &ShapeText) -> String {
         g.push(' ');
         g.push_str(&obj.attrs());
     }
-    let ps: Vec<CellPara> = stated.into_iter().map(|c| CellPara { style: None, content: c }).collect();
+    let ps: Vec<CellPara> =
+        stated.into_iter().map(|c| CellPara { style: None, content: c, props: Default::default() }).collect();
     let ends: Vec<String> =
         own.iter().map(|o| if o.is_empty() { String::new() } else { format!(" {{{}}}", o.attrs()) }).collect();
     let text = cell_text_with(&ps, true, &ends);

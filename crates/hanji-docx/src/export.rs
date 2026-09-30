@@ -4,7 +4,10 @@
 use std::collections::{BTreeMap, HashMap};
 
 use hanji_core::{Block, Entry, Kind, ListPlan, StyleSet};
-use hanji_format::{Atom, Cell, Inline, Marks};
+use hanji_format::styled::{self, StyleTable};
+use hanji_format::{Atom, Cell, Inline, Key, Marks, Props};
+
+use crate::format::{self, Theme};
 
 use crate::numbering::Numbering;
 use crate::ooxml::*;
@@ -21,6 +24,28 @@ pub struct Exporter<'a> {
     /// A tracked-change export (§10.2): what each unit, paragraph mark and
     /// row is against the imported revision.
     track: Option<&'a Track>,
+    /// Formatting (§5.2), where the file shows it.
+    fmt: Option<Fmt>,
+}
+
+/// What export writes formatting against: the theme, and each paragraph
+/// style's values as the text's style section says.
+pub struct Fmt {
+    pub theme: Theme,
+    pub values: HashMap<String, Props>,
+    default: Props,
+}
+
+impl Fmt {
+    pub fn new(styles: &StyleSet, theme: Theme) -> Fmt {
+        let table = StyleTable { default: Some(styles.default_paragraph.clone()), lines: styles.lines() };
+        let values = styles.paragraph.iter().map(|d| (d.name.clone(), table.values(Some(&d.name)))).collect();
+        Fmt { theme, values, default: table.default_values() }
+    }
+
+    fn of(&self, style: &str) -> &Props {
+        self.values.get(style).unwrap_or(&self.default)
+    }
 }
 
 fn el(name: &str) -> Element {
@@ -38,8 +63,16 @@ impl<'a> Exporter<'a> {
         numbering: &'a Numbering,
         lists: HashMap<usize, ListPlan>,
     ) -> Self {
-        let mut ex =
-            Exporter { styles, by: HashMap::new(), keep: HashMap::new(), tail: vec![], numbering, lists, track: None };
+        let mut ex = Exporter {
+            styles,
+            by: HashMap::new(),
+            keep: HashMap::new(),
+            tail: vec![],
+            numbering,
+            lists,
+            track: None,
+            fmt: None,
+        };
         for e in entries {
             match e.kind {
                 Kind::Tail => ex.tail.push(e),
@@ -50,6 +83,33 @@ impl<'a> Exporter<'a> {
             }
         }
         ex
+    }
+
+    /// Write formatting (§5.2) against `fmt`.
+    pub fn formatted(mut self, fmt: Fmt) -> Self {
+        self.fmt = Some(fmt);
+        self
+    }
+
+    /// Whether the text states the properties of the paragraph at `path`:
+    /// it has text (in a tracked export, its paragraph in the current text).
+    fn stated(&self, content: &Inline, path: &[usize]) -> bool {
+        match self.track {
+            Some(t) => t.stated.contains(path),
+            None => styled::shows(content),
+        }
+    }
+
+    /// The name of the style a paragraph at `path` is written in.
+    fn style_at(&self, style: Option<&str>, path: &[usize]) -> String {
+        match style {
+            Some(s) if !s.is_empty() => s.to_string(),
+            _ => {
+                let id = self.at(path, Kind::Ppr).first().and_then(|e| e.meta.style.clone());
+                let id = id.unwrap_or_else(|| self.styles.default_paragraph_id().to_string());
+                self.styles.paragraph_name(&id).unwrap_or(&self.styles.default_paragraph).to_string()
+            }
+        }
     }
 
     /// Write revisions as `track` says (a merged model of the imported and
@@ -76,9 +136,11 @@ impl<'a> Exporter<'a> {
             out.extend(holder.children);
             match b {
                 Block::Para(p) => {
-                    // A list item keeps the paragraph style the remainder has.
-                    let style = p.item.is_none().then_some(p.style.as_str());
-                    let mut pel = self.para(&p.content, style, &[bi])?;
+                    // A list item keeps the paragraph style the remainder has,
+                    // unless the text shows styles.
+                    let style = (p.item.is_none() || !p.style.is_empty()).then_some(p.style.as_str());
+                    let props = self.stated(&p.content, &[bi]).then_some(&p.props);
+                    let mut pel = self.para(&p.content, style, &[bi], props)?;
                     if let Some(plan) = self.lists.get(&bi) {
                         self.apply_list(&mut pel, *plan, bi);
                     }
@@ -108,7 +170,32 @@ impl<'a> Exporter<'a> {
 
     /// `w:p` with its properties. `style: None` (a table cell) keeps the
     /// style the remainder has.
-    fn ppr(&self, style: Option<&str>, path: &[usize]) -> Result<Element, String> {
+    fn ppr(&self, style: Option<&str>, path: &[usize], props: Option<&Props>) -> Result<Element, String> {
+        let mut pel = self.ppr_style(style, path)?;
+        let (Some(f), Some(want)) = (&self.fmt, props) else { return Ok(pel) };
+        // A paragraph that had no text keeps what it had until the text says.
+        if want.is_empty() && self.at(path, Kind::Ppr).first().is_some_and(|e| e.meta.unshown) {
+            return Ok(pel);
+        }
+        let base = f.of(&self.style_at(style, path)).clone();
+        let size = base.get(Key::Size).and_then(|v| v.length()).unwrap_or(1000);
+        let stored = pel.child("w:pPr").map(|x| format::ppr_props(x, size)).unwrap_or_default();
+        let shown = stored.only(&styled::PARA_OWN).diff(&base);
+        if shown == *want {
+            return Ok(pel);
+        }
+        if pel.child("w:pPr").is_none() {
+            pel.children.insert(0, node(el("w:pPr")));
+        }
+        let ppr = pel.child_mut("w:pPr").unwrap();
+        format::apply(ppr, &shown, want, format::set_ppr, &f.theme)?;
+        if ppr.children.is_empty() && ppr.attrs.is_empty() {
+            remove_child(&mut pel, "w:pPr");
+        }
+        Ok(pel)
+    }
+
+    fn ppr_style(&self, style: Option<&str>, path: &[usize]) -> Result<Element, String> {
         let pp = self.at(path, Kind::Ppr);
         let want_id = match style {
             Some(s) => {
@@ -153,8 +240,10 @@ impl<'a> Exporter<'a> {
         }
         if pel.child("w:pPr").is_none() {
             let mut ppr = el("w:pPr");
-            // A new item: Word's own list paragraph style, where the file has it.
-            if let (Some(s), true) = (&self.numbering.list_paragraph, self.at(&[bi], Kind::Ppr).is_empty()) {
+            // A new item: Word's own list paragraph style, where the file has
+            // it (where the text shows formatting, it names the item's style).
+            let new = self.at(&[bi], Kind::Ppr).is_empty() && !self.styles.formatting;
+            if let (Some(s), true) = (&self.numbering.list_paragraph, new) {
                 ppr.children.push(node(el("w:pStyle").with_attr("w:val", s)));
             }
             pel.children.insert(0, node(ppr));
@@ -186,8 +275,8 @@ impl<'a> Exporter<'a> {
         }
     }
 
-    fn para(&self, p: &Inline, style: Option<&str>, path: &[usize]) -> Result<Element, String> {
-        let mut pel = self.ppr(style, path)?;
+    fn para(&self, p: &Inline, style: Option<&str>, path: &[usize], props: Option<&Props>) -> Result<Element, String> {
+        let mut pel = self.ppr(style, path, props)?;
         let n = p.units.len();
         let runs = self.at(path, Kind::Run);
         let mut owner: Vec<Option<&Entry>> = vec![None; n];
@@ -228,7 +317,49 @@ impl<'a> Exporter<'a> {
             bounds.insert(w.start.unwrap());
             bounds.insert(w.end.unwrap());
         }
-        let key = |c: usize| (owner[c].map(|o| o.id), eff[c], revs.map(|r| (r[c].st, &r[c].old_rpr)));
+        // Text properties as exported: a unit the text states none for (a
+        // space, an atom) takes what the rest of its run takes when that
+        // agrees (it keeps what its run had when the run has nothing else);
+        // a new one takes its neighbours' when they agree.
+        let text_base = self.fmt.as_ref().map(|f| f.of(&self.style_at(style, path)).only(&Key::TEXT));
+        let stored = |o: &Entry| -> Props {
+            let (Some(f), Some(b)) = (&self.fmt, &text_base) else { return Props::new() };
+            o.xml.get(1).map(|x| format::rpr_props(&fragment(x), &f.theme).only(&Key::TEXT).diff(b)).unwrap_or_default()
+        };
+        let want: Vec<Props> = match &text_base {
+            None => vec![Props::new(); n],
+            Some(_) => {
+                let takes: Vec<Option<&Props>> = p.units.iter().map(|u| u.takes_props().then_some(&u.props)).collect();
+                let mut mates: HashMap<u64, Option<Option<&Props>>> = HashMap::new();
+                for c in 0..n {
+                    if let (Some(pr), Some(o)) = (takes[c], owner[c]) {
+                        let m = mates.entry(o.id).or_insert(Some(Some(pr)));
+                        if *m != Some(Some(pr)) {
+                            *m = Some(None);
+                        }
+                    }
+                }
+                (0..n)
+                    .map(|c| match (takes[c], owner[c]) {
+                        (Some(pr), _) => pr.clone(),
+                        (None, Some(o)) => match mates.get(&o.id) {
+                            Some(Some(Some(pr))) => (*pr).clone(),
+                            _ => stored(o),
+                        },
+                        (None, None) => {
+                            let prev = takes[..c].iter().rev().find_map(|x| *x);
+                            let next = takes[c + 1..].iter().find_map(|x| *x);
+                            match (prev, next) {
+                                (Some(a), Some(b)) if a == b => a.clone(),
+                                (Some(a), _) | (None, Some(a)) => a.clone(),
+                                _ => Props::new(),
+                            }
+                        }
+                    })
+                    .collect()
+            }
+        };
+        let key = |c: usize| (owner[c].map(|o| o.id), eff[c], revs.map(|r| (r[c].st, &r[c].old_rpr)), &want[c]);
         let mut segs: Vec<(usize, usize, Option<&Entry>)> = vec![];
         let mut c = 0;
         while c < n {
@@ -323,6 +454,20 @@ impl<'a> Exporter<'a> {
                 It::Seg(si) => {
                     let mut r =
                         self.run_el(p, &eff, segs[si], rm_at.get(&Target::Seg(si)).map(Vec::as_slice).unwrap_or(&[]))?;
+                    if let Some(f) = &self.fmt {
+                        let (a, _, own) = segs[si];
+                        let shown = own.map(&stored).unwrap_or_default();
+                        if shown != want[a] {
+                            if r.child("w:rPr").is_none() {
+                                r.children.insert(0, node(el("w:rPr")));
+                            }
+                            let rpr = r.child_mut("w:rPr").unwrap();
+                            format::apply(rpr, &shown, &want[a], format::set_rpr, &f.theme)?;
+                            if rpr.children.is_empty() && rpr.attrs.is_empty() {
+                                remove_child(&mut r, "w:rPr");
+                            }
+                        }
+                    }
                     if let (Some(t), Some(revs)) = (self.track, revs) {
                         r = t.run(r, &revs[segs[si].0]);
                     }
@@ -466,7 +611,17 @@ impl<'a> Exporter<'a> {
                     None => (el("w:tc"), None),
                 };
                 let below_up = t.rows.get(ri + 1).and_then(|r| r.get(ci)) == Some(&Cell::Up);
-                if let Some(x) = merge_props(tcpr, span, *cell == Cell::Up, below_up) {
+                let mut tcpr = merge_props(tcpr, span, *cell == Cell::Up, below_up);
+                if let (Some(f), Cell::Text(_)) = (&self.fmt, cell) {
+                    let shown = tcpr.as_ref().map(format::tcpr_props).unwrap_or_default().diff(&styled::box_default());
+                    let want = t.boxes.get(ri).and_then(|r| r.get(ci)).cloned().unwrap_or_default();
+                    if shown != want {
+                        let mut x = tcpr.take().unwrap_or_else(|| el("w:tcPr"));
+                        format::apply(&mut x, &shown, &want, format::set_tcpr, &f.theme)?;
+                        tcpr = (!x.children.is_empty() || !x.attrs.is_empty()).then_some(x);
+                    }
+                }
+                if let Some(x) = tcpr {
                     tc.children.push(node(x));
                 }
                 let n_paras = match cell {
@@ -474,7 +629,8 @@ impl<'a> Exporter<'a> {
                         for (k, p) in ps.iter().enumerate() {
                             self.bmarkers(&mut tc, &[bi, ri, ci, k]);
                             let style = p.style.as_deref().unwrap_or(&self.styles.default_paragraph);
-                            let mut pel = self.para(&p.content, Some(style), &[bi, ri, ci, k])?;
+                            let props = self.stated(&p.content, &[bi, ri, ci, k]).then_some(&p.props);
+                            let mut pel = self.para(&p.content, Some(style), &[bi, ri, ci, k], props)?;
                             if let Some(t) = self.track {
                                 t.mark(&mut pel, &[bi, ri, ci, k])?;
                             }
@@ -493,7 +649,7 @@ impl<'a> Exporter<'a> {
                             .unwrap_or(1);
                         for k in 0..n {
                             self.bmarkers(&mut tc, &[bi, ri, ci, k]);
-                            tc.children.push(node(self.para(&Inline::default(), None, &[bi, ri, ci, k])?));
+                            tc.children.push(node(self.para(&Inline::default(), None, &[bi, ri, ci, k], None)?));
                         }
                         n
                     }

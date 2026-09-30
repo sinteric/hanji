@@ -172,7 +172,11 @@ pub fn resolve(
                 fmt::SlideItem::Shape(sh) => {
                     blocks.push(shape_head(&sh.id, &sh.name, sh.geom));
                     let para = |c: &fmt::Inline| {
-                        fmt::Block::Para(fmt::Para { style: fmt::ParaStyle::Plain, content: c.clone() })
+                        fmt::Block::Para(fmt::Para {
+                            props: Default::default(),
+                            style: fmt::ParaStyle::Plain,
+                            content: c.clone(),
+                        })
                     };
                     sh.paras.iter().map(para).collect()
                 }
@@ -200,7 +204,7 @@ pub fn resolve(
             }
             // The item's blocks resolve as a document body would.
             let doc = fmt::Parsed {
-                doc: fmt::Document { front: parsed.pres.front.clone(), blocks: body },
+                doc: fmt::Document { styles: vec![], front: parsed.pres.front.clone(), blocks: body },
                 map: fmt::SourceMap { blocks: im.blocks.clone() },
             };
             match model::resolve(&doc, text, &styles, caps, is_block_keep) {

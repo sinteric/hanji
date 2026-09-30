@@ -6,10 +6,25 @@
 
 use std::fmt;
 
+pub use crate::props::{Key, Props, Value};
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Document {
     pub front: FrontMatter,
+    /// The style section (§5.2): one line per paragraph style the text
+    /// uses, the default style first. Empty where the file's formatting is
+    /// not shown.
+    pub styles: Vec<StyleLine>,
     pub blocks: Vec<Block>,
+}
+
+/// `<style name="Name" …/>`: the default style's line holds every property
+/// (one it leaves out is 0pt, none, off or `align=left`); any other holds
+/// what differs from the default style.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct StyleLine {
+    pub name: String,
+    pub props: Props,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -339,6 +354,10 @@ pub struct Item {
     pub ordered: bool,
     pub level: usize,
     pub content: Inline,
+    /// `style="Name"` in the item's `{…}`; `None` where the text names none.
+    pub style: Option<String>,
+    /// The paragraph's own properties (§5.2), as for [`Para::props`].
+    pub props: Props,
 }
 
 impl Item {
@@ -356,6 +375,10 @@ impl Item {
 pub struct Para {
     pub style: ParaStyle,
     pub content: Inline,
+    /// What the paragraph sets beyond its style: paragraph keys, and its
+    /// shading and borders (` {…}` at the end of its line). Text keys are on
+    /// the units.
+    pub props: Props,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -374,7 +397,22 @@ pub struct Table {
     pub style: Option<String>,
     /// Every row has one cell per column; row 0 is the header row.
     pub rows: Vec<Vec<Cell>>,
+    /// Each cell's own box properties (fill, borders, valign), by row and
+    /// column like `rows`; empty for `^^` and `||` cells. Empty altogether
+    /// when no cell has any. Row and table lines are a way of writing them
+    /// (lifting, §5.2).
+    pub boxes: Vec<Vec<Props>>,
 }
+
+impl Table {
+    /// The box properties of the cell at `r`, `c`.
+    pub fn box_at(&self, r: usize, c: usize) -> &Props {
+        self.boxes.get(r).and_then(|row| row.get(c)).unwrap_or(&NO_PROPS)
+    }
+}
+
+/// An empty property set.
+pub static NO_PROPS: Props = Props(std::collections::BTreeMap::new());
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum Cell {
@@ -389,7 +427,7 @@ pub enum Cell {
 impl Cell {
     /// A cell of one default-style paragraph.
     pub fn text(content: Inline) -> Cell {
-        Cell::Text(vec![CellPara { style: None, content }])
+        Cell::Text(vec![CellPara { style: None, content, props: Props::default() }])
     }
 }
 
@@ -398,6 +436,8 @@ impl Cell {
 pub struct CellPara {
     pub style: Option<String>,
     pub content: Inline,
+    /// As [`Para::props`].
+    pub props: Props,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -417,6 +457,22 @@ pub struct Inline {
 pub struct Unit {
     pub atom: Atom,
     pub marks: Marks,
+    /// Text properties beyond the paragraph's style (font, size, color):
+    /// what `[text]{…}` and a paragraph's `{…}` state. Always empty on a
+    /// space or an atom, whose run the text cannot state (they take their
+    /// neighbours' on export).
+    pub props: Props,
+}
+
+impl Unit {
+    pub fn new(atom: Atom, marks: Marks) -> Unit {
+        Unit { atom, marks, props: Props::default() }
+    }
+
+    /// A character the text states text properties for: not a space.
+    pub fn takes_props(&self) -> bool {
+        matches!(self.atom, Atom::Char(c) if !c.is_whitespace())
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -505,7 +561,7 @@ impl Inline {
         Inline {
             units: text
                 .chars()
-                .map(|c| Unit { atom: if c == '\n' { Atom::Break } else { Atom::Char(c) }, marks: Marks::NONE })
+                .map(|c| Unit::new(if c == '\n' { Atom::Break } else { Atom::Char(c) }, Marks::NONE))
                 .collect(),
             spans: vec![],
         }
@@ -557,6 +613,12 @@ impl Inline {
     /// starts or ends on a space (`**fox **` is not emphasis), so boundary
     /// spaces go outside.
     pub fn normalize(&mut self) {
+        // Spaces and atoms state no text properties (their neighbours' apply).
+        for u in &mut self.units {
+            if !u.takes_props() && !u.props.is_empty() {
+                u.props = Props::default();
+            }
+        }
         let segs: Vec<(usize, usize)> = self.segments().iter().map(|s| (s.0, s.1)).collect();
         for (a, b) in segs {
             for m in Marks::ALL {
@@ -650,6 +712,10 @@ pub(crate) fn normalize_blocks(blocks: &mut [Block]) {
                     p.content.units.clear();
                 }
                 p.content.normalize();
+                // A paragraph without text shows no formatting (§5.2).
+                if !crate::styled::shows(&p.content) {
+                    p.props = Props::default();
+                }
                 if p.style == ParaStyle::Plain && p.content.spans.is_empty() && p.content.units.len() == 1 {
                     let u = &p.content.units[0];
                     match &u.atom {
@@ -665,6 +731,9 @@ pub(crate) fn normalize_blocks(blocks: &mut [Block]) {
                         if let Cell::Text(ps) = c {
                             for p in ps {
                                 p.content.normalize();
+                                if !crate::styled::shows(&p.content) {
+                                    p.props = Props::default();
+                                }
                             }
                         }
                     }
@@ -678,6 +747,9 @@ pub(crate) fn normalize_blocks(blocks: &mut [Block]) {
                     it.level = it.level.min(prev.map_or(0, |p| p + 1));
                     prev = Some(it.level);
                     it.content.normalize();
+                    if !crate::styled::shows(&it.content) {
+                        it.props = Props::default();
+                    }
                 }
             }
             Block::Keep(_) | Block::PageBreak => {}
