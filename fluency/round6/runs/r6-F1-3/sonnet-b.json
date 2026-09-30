@@ -1,0 +1,76 @@
+{
+ "answers": [
+  {
+   "task_id": "kr-e3",
+   "edits": [
+    {
+     "old": "| 지역 | 지점 | 매출 |",
+     "new": "| {fill=#D9D9D9} **지역** | {fill=#D9D9D9} **지점** | {fill=#D9D9D9} **매출** |"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e4",
+   "edits": [
+    {
+     "old": "# 3분기 영업 보고 {size=16pt bold}",
+     "new": "# 3분기 영업 보고 {size=16pt bold color=#C00000}"
+    },
+    {
+     "old": "## 지역별 현황 {size=13pt bold}",
+     "new": "## 지역별 현황 {size=13pt bold color=#C00000}"
+    },
+    {
+     "old": "## 향후 계획 {size=13pt bold}",
+     "new": "## 향후 계획 {size=13pt bold color=#C00000}"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e5",
+   "text": "REFUSE: The file format has no style definitions that can be edited (only the default line and per-paragraph formatting), so the Heading 2 style itself cannot be changed."
+  },
+  {
+   "task_id": "kr-e7",
+   "edits": [
+    {
+     "old": "4분기에는 [부산]{color=#C00000}과 [대구]{color=#C00000}에 지점을 연다.",
+     "new": "4분기에는 [부산]{color=#C00000}과 [대구]{color=#C00000}에 지점을 연다.\n\n| {fill=#D9D9D9} 도시 | {fill=#D9D9D9} 개점 |\n|---|---|\n| 부산 | 10월 |\n| 대구 | 11월 |"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e8",
+   "edits": [
+    {
+     "old": "수도권]{color=#C00000}이다.",
+     "new": "수도권]{color=#C00000}이다. {first-line=10pt}"
+    },
+    {
+     "old": "summary=\"comment: 지방 수치 재확인 필요\"/>",
+     "new": "summary=\"comment: 지방 수치 재확인 필요\"/> {first-line=10pt}"
+    },
+    {
+     "old": "정리한 것이다.",
+     "new": "정리한 것이다. {first-line=10pt}"
+    },
+    {
+     "old": "summary=\"ins by 김민지: 8%\"/>성장했다.",
+     "new": "summary=\"ins by 김민지: 8%\"/>성장했다. {first-line=10pt}"
+    },
+    {
+     "old": "에 지점을 연다.",
+     "new": "에 지점을 연다. {first-line=10pt}"
+    },
+    {
+     "old": "부록: 지점 목록",
+     "new": "부록: 지점 목록 {first-line=10pt}"
+    },
+    {
+     "old": "서울 강남, 서울 종로, 경기 분당, 인천 송도.",
+     "new": "서울 강남, 서울 종로, 경기 분당, 인천 송도. {first-line=10pt}"
+    }
+   ]
+  }
+ ]
+}

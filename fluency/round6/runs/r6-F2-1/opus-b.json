@@ -1,0 +1,85 @@
+{
+ "answers": [
+  {
+   "task_id": "fn-e3",
+   "edits": [
+    {
+     "old": "| {fill=#E3F8FF border-top=\"0.34pt solid #000000\" border-bottom=\"2.83pt solid #7F7F7F\"} 3D 프린팅 기술의 등장과 {align=center font=HY견명조 size=18pt}<p/>기술 발전에 따른 문제점과 정부의 대처 방안 {align=center font=HY견명조 size=20pt} |",
+     "new": "| {fill=#D9D9D9 border-top=\"0.34pt solid #000000\" border-bottom=\"2.83pt solid #7F7F7F\"} **3D 프린팅 기술의 등장과** {align=center font=HY견명조 size=18pt}<p/>**기술 발전에 따른 문제점과 정부의 대처 방안** {align=center font=HY견명조 size=20pt} |"
+    },
+    {
+     "old": "| {fill=#F2F2F2 border-top=\"0.28pt solid #999999\" border-right=\"0.28pt solid #999999\"} **Ⅰ** {align=center} |  | {border-left=none} 3D 프린팅 기술의 등장 |",
+     "new": "| {fill=#D9D9D9 border-top=\"0.28pt solid #999999\" border-right=\"0.28pt solid #999999\"} **Ⅰ** {align=center} | {fill=#D9D9D9} | {border-left=none fill=#D9D9D9} **3D 프린팅 기술의 등장** |"
+    },
+    {
+     "old": "| {fill=#F2F2F2 border-top=\"0.28pt solid #999999\" border-right=\"0.28pt solid #999999\"} **Ⅱ** {align=center} |  | {border-left=none} 기술발전에 따른 예상되는 사회적 변화<keep id=\"kurr4\" kind=\"footnote\" summary=\"footnote: 표안의 각주\"/>와 문제점 {indent-left=-1pt} |",
+     "new": "| {fill=#D9D9D9 border-top=\"0.28pt solid #999999\" border-right=\"0.28pt solid #999999\"} **Ⅱ** {align=center} | {fill=#D9D9D9} | {border-left=none fill=#D9D9D9} **기술발전에 따른 예상되는 사회적 변화<keep id=\"kurr4\" kind=\"footnote\" summary=\"footnote: 표안의 각주\"/>와 문제점** {indent-left=-1pt} |"
+    },
+    {
+     "old": "| {fill=#FFF0C3 border-top=",
+     "new": "| {fill=#D9D9D9 border-top="
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e4",
+   "edits": [
+    {
+     "old": "- 개념 {style=\"개요 2\" space-before=25pt space-after=5pt line-spacing=170%}",
+     "new": "- 개념 {style=\"개요 2\" space-before=25pt space-after=5pt line-spacing=170% size=16pt color=#C00000}"
+    },
+    {
+     "old": "기술의 장점 {style=\"개요 2\" space-before=25pt space-after=5pt line-spacing=170%}",
+     "new": "기술의 장점 {style=\"개요 2\" space-before=25pt space-after=5pt line-spacing=170% size=16pt color=#C00000}"
+    },
+    {
+     "old": "- 사회적 변화 예상 {style=\"개요 2\" space-before=15pt space-after=5pt}",
+     "new": "- 사회적 변화 예상 {style=\"개요 2\" space-before=15pt space-after=5pt size=16pt color=#C00000}"
+    },
+    {
+     "old": "- 문제점 분석 {style=\"개요 2\" space-before=15pt space-after=10pt}",
+     "new": "- 문제점 분석 {style=\"개요 2\" space-before=15pt space-after=10pt size=16pt color=#C00000}"
+    },
+    {
+     "old": "summary=\"footnote: 여기서의 기대효과\"/> {style=\"개요 2\" space-before=15pt space-after=10pt}",
+     "new": "summary=\"footnote: 여기서의 기대효과\"/> {style=\"개요 2\" space-before=15pt space-after=10pt size=16pt color=#C00000}"
+    },
+    {
+     "old": "- 제도적 대처 방안 {style=\"개요 2\" space-before=15pt space-after=10pt}",
+     "new": "- 제도적 대처 방안 {style=\"개요 2\" space-before=15pt space-after=10pt size=16pt color=#C00000}"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e5",
+   "edits": [
+    {
+     "old": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt/>",
+     "new": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt color=#1F3864/>"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e7",
+   "edits": [
+    {
+     "old": "올바른 이용 홍보가 필요 {style=\"개요 4\"}",
+     "new": "올바른 이용 홍보가 필요 {style=\"개요 4\"}\n\n| {fill=#D9D9D9} 구분 | {fill=#D9D9D9} 내용 |\n|---|---|\n| 교육 | 교육과정 신설 |"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e8",
+   "edits": [
+    {
+     "old": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt/>",
+     "new": "<style name=\"개요 3\" indent-left=20pt first-line=10pt space-before=5pt font=휴먼명조 size=15pt/>"
+    },
+    {
+     "old": "<style name=\"개요 4\" indent-left=30pt space-before=3pt font=휴먼명조 size=14pt/>",
+     "new": "<style name=\"개요 4\" indent-left=30pt first-line=10pt space-before=3pt font=휴먼명조 size=14pt/>"
+    }
+   ]
+  }
+ ]
+}

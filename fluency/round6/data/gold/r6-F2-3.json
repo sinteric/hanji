@@ -1,0 +1,116 @@
+{
+ "answers": [
+  {
+   "task_id": "kr-q1",
+   "text": "ANSWER: fill=#EEEEEE"
+  },
+  {
+   "task_id": "kr-q2",
+   "text": "ANSWER: 21곳이 수도권; 부산; 대구"
+  },
+  {
+   "task_id": "kr-q3",
+   "text": "ANSWER: indent-left=28.35pt"
+  },
+  {
+   "task_id": "kr-q4",
+   "text": "ANSWER: size=14pt"
+  },
+  {
+   "task_id": "kr-e1",
+   "edits": [
+    {
+     "old": "<style name=\"Note\" fill=#EEEEEE/>\n",
+     "new": "<style name=\"Note\" fill=#DDEBF7/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e2",
+   "edits": [
+    {
+     "old": "| 합계 || 215 |\n",
+     "new": "| 합계 || 215 | {border-bottom=\"1.5pt solid #FF0000\"}\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e3",
+   "edits": [
+    {
+     "old": "| 지역 | 지점 | 매출 |\n",
+     "new": "| **지역** | **지점** | **매출** | {fill=#D9D9D9}\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e4",
+   "edits": [
+    {
+     "old": "<style name=\"Heading 1\" size=16pt bold/>\n<style name=\"Note\" fill=#EEEEEE/>\n<style name=\"Heading 2\" size=13pt bold/>\n",
+     "new": "<style name=\"Heading 1\" size=16pt color=#C00000 bold/>\n<style name=\"Note\" fill=#EEEEEE/>\n<style name=\"Heading 2\" size=13pt color=#C00000 bold/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e5",
+   "edits": [
+    {
+     "old": "<style name=\"Heading 2\" size=13pt bold/>\n",
+     "new": "<style name=\"Heading 2\" size=13pt color=#1F3864 bold/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e6",
+   "edits": [
+    {
+     "old": "지방 지점의 매출은 1,204억 원으로 [15% 성장]{size=14pt color=#1F4E79}했다.<keep id=\"ku25a\" kind=\"comment\" summary=\"comment: 지방 수치 재확인 필요\"/>\n",
+     "new": "지방 지점의 매출은 1,204억 원으로 [16% 성장]{size=14pt color=#1F4E79}했다.<keep id=\"ku25a\" kind=\"comment\" summary=\"comment: 지방 수치 재확인 필요\"/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e7",
+   "edits": [
+    {
+     "old": "\n<div style=\"Block Quotation\">“고객이 있는 곳에 지점이 있어야 한다.” — 영업본부장</div>\n",
+     "new": "\n| **도시** | **개점** | {fill=#D9D9D9}\n|---|---|\n| 부산 | 10월 |\n| 대구 | 11월 |\n\n<div style=\"Block Quotation\">“고객이 있는 곳에 지점이 있어야 한다.” — 영업본부장</div>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e8",
+   "edits": [
+    {
+     "old": "매출은 전년 대비 **12%** 증가했다.<keep id=\"khc1l\" kind=\"footnote\" summary=\"footnote: 내부 집계 기준.\"/> 신규 고객은 34곳이며, 그중 [21곳이 수도권]{color=#C00000}이다.\n",
+     "new": "매출은 전년 대비 **12%** 증가했다.<keep id=\"khc1l\" kind=\"footnote\" summary=\"footnote: 내부 집계 기준.\"/> 신규 고객은 34곳이며, 그중 [21곳이 수도권]{color=#C00000}이다. {first-line=10pt}\n"
+    },
+    {
+     "old": "지방 지점의 매출은 1,204억 원으로 [15% 성장]{size=14pt color=#1F4E79}했다.<keep id=\"ku25a\" kind=\"comment\" summary=\"comment: 지방 수치 재확인 필요\"/>\n",
+     "new": "지방 지점의 매출은 1,204억 원으로 [15% 성장]{size=14pt color=#1F4E79}했다.<keep id=\"ku25a\" kind=\"comment\" summary=\"comment: 지방 수치 재확인 필요\"/> {first-line=10pt}\n"
+    },
+    {
+     "old": "아래 표는 지점별 매출을 정리한 것이다.\n",
+     "new": "아래 표는 지점별 매출을 정리한 것이다. {first-line=10pt}\n"
+    },
+    {
+     "old": "강남 지점은 *전년 대비* <keep id=\"k83hu\" kind=\"tracked-insert\" summary=\"ins by 김민지: 8%\"/>성장했다.\n",
+     "new": "강남 지점은 *전년 대비* <keep id=\"k83hu\" kind=\"tracked-insert\" summary=\"ins by 김민지: 8%\"/>성장했다. {first-line=10pt}\n"
+    },
+    {
+     "old": "4분기에는 [부산]{color=#C00000}과 [대구]{color=#C00000}에 지점을 연다.\n",
+     "new": "4분기에는 [부산]{color=#C00000}과 [대구]{color=#C00000}에 지점을 연다. {first-line=10pt}\n"
+    },
+    {
+     "old": "부록: 지점 목록\n\n서울 강남, 서울 종로, 경기 분당, 인천 송도.\n",
+     "new": "부록: 지점 목록 {first-line=10pt}\n\n서울 강남, 서울 종로, 경기 분당, 인천 송도. {first-line=10pt}\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e9",
+   "text": "REFUSE: this format cannot express it."
+  }
+ ]
+}

@@ -1,0 +1,56 @@
+{
+ "answers": [
+  {
+   "task_id": "pp-q1",
+   "text": "ANSWER: The file doesn't write an outline on the three connectors (Connector 4, 6 and 8). Their width, style and colour come from the theme's shape style, so this file doesn't show what they are."
+  },
+  {
+   "task_id": "pp-q2",
+   "text": "ANSWER: Pentagon 2; Chevron 4; Chevron 6"
+  },
+  {
+   "task_id": "pp-e1",
+   "edits": [
+    {
+     "old": "<shape id=\"s4\" name=\"Rounded Rectangle 3\" box=\"265 150 205 150\" fill=#E5E7EB",
+     "new": "<shape id=\"s4\" name=\"Rounded Rectangle 3\" box=\"265 150 205 150\" fill=accent2"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e2",
+   "edits": [
+    {
+     "old": "box=\"455 250 50 50\" fill=#2563EB border=none",
+     "new": "box=\"455 250 50 50\" fill=#2563EB border=\"2pt solid #000080\""
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e3",
+   "edits": [
+    {
+     "old": ">10월 착수 예정</shape>",
+     "new": ">[10월]{size=24pt color=#FF7F50} 착수 예정</shape>"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e4",
+   "text": "REFUSE: The connectors take their colour and line style from the theme, and a border here must be written with its width, style and colour together, so I can't set only a 3pt width while keeping the inherited colour and style."
+  },
+  {
+   "task_id": "pp-e5",
+   "edits": [
+    {
+     "old": "- 신규 4곳",
+     "new": "- 신규 5곳"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e6",
+   "text": "REFUSE: This format can keep a gradient fill or replace it with a single colour, but it can't write or change a gradient's colours."
+  }
+ ]
+}

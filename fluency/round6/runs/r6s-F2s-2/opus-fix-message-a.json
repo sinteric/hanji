@@ -1,0 +1,4 @@
+{
+ "message": "Read the file prompt.md in the current directory: it holds a task prompt, then the answer you gave, then the validator's errors for it. Read only that file, all of it. Reply with a corrected JSON object for the whole prompt, and nothing else.",
+ "errors": "- `mel-e1`: edit 1: the \"old\" text does not occur in the file. It must be copied exactly from the file as it is after the earlier edits (same spaces, line breaks and characters). The closest line is line 655: `| {fill=#F2F2F2 border=\"0.34pt solid #000000\"} \\u2007**기금형 퇴직연금 활성화** 및 **1년 미만 퇴직급여** 관련 **노사 이견** {first-line=0pt line-spacing=120% font=함초롬바탕}<p/>   \\*\\u2007\\u2007(기금형)\\u2007①\\u2007영리형(노반대vs사도입) ②지배구조(노노동자vs사전문가) ③원금보장(노필`. That line holds U+2007, which looks like a space but is not one: copy it as it is (in JSON, \\u2007)."
+}

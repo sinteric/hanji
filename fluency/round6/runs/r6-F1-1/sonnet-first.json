@@ -1,0 +1,316 @@
+{
+ "answers": [
+  {
+   "task_id": "fn-q1",
+   "text": "ANSWER: fill=#FFF0C3"
+  },
+  {
+   "task_id": "fn-q2",
+   "text": "ANSWER: 3D 프린팅 기술의 등장과 기술 발전에 따른 문제점과 정부의 대처 방안; 3D 프린팅 기술의 미래와 전망"
+  },
+  {
+   "task_id": "fn-q3",
+   "text": "ANSWER: indent-left=20pt first-line=0pt"
+  },
+  {
+   "task_id": "fn-q4",
+   "text": "ANSWER: size=14pt"
+  },
+  {
+   "task_id": "fn-e1",
+   "edits": [
+    {
+     "old": "{fill=#FFF0C3 border-top",
+     "new": "{fill=#ADD8E6 border-top"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e2",
+   "edits": [
+    {
+     "old": "{fill=#FFF0C3 border-top=\"0.34pt solid #000000\" border-bottom=\"2.83pt solid #7F7F7F\"}",
+     "new": "{fill=#FFF0C3 border-top=\"0.34pt solid #000000\" border-bottom=\"2.83pt solid #FF0000\"}"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e6",
+   "edits": [
+    {
+     "old": "시제품 제작 시간과 비용",
+     "new": "시제품 제작 기간과 비용"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e9",
+   "text": "REFUSE: Gradient fills cannot be written or changed in this format; they can only be kept as they are or replaced by a solid colour."
+  },
+  {
+   "task_id": "fn-e3",
+   "edits": [
+    {
+     "old": "| {fill=#E3F8FF border-top=\"0.34pt solid #000000\" border-bottom=\"2.83pt solid #7F7F7F\"} 3D 프린팅 기술의 등장과 {align=center font=HY견명조 size=18pt}<p/>기술 발전에 따른 문제점과 정부의 대처 방안 {align=center font=HY견명조 size=20pt} |",
+     "new": "| {fill=#D9D9D9 border-top=\"0.34pt solid #000000\" border-bottom=\"2.83pt solid #7F7F7F\"} **3D 프린팅 기술의 등장과** {align=center font=HY견명조 size=18pt}<p/>**기술 발전에 따른 문제점과 정부의 대처 방안** {align=center font=HY견명조 size=20pt} |"
+    },
+    {
+     "old": "| {fill=#F2F2F2 border-top=\"0.28pt solid #999999\" border-right=\"0.28pt solid #999999\"} **Ⅰ** {align=center} |  | {border-left=none} 3D 프린팅 기술의 등장 |",
+     "new": "| {fill=#D9D9D9 border-top=\"0.28pt solid #999999\" border-right=\"0.28pt solid #999999\"} **Ⅰ** {align=center} | {fill=#D9D9D9} | {fill=#D9D9D9 border-left=none} **3D 프린팅 기술의 등장** |"
+    },
+    {
+     "old": "| {fill=#F2F2F2 border-top=\"0.28pt solid #999999\" border-right=\"0.28pt solid #999999\"} **Ⅱ** {align=center} |  | {border-left=none} 기술발전에 따른 예상되는 사회적 변화<keep id=\"kurr4\" kind=\"footnote\" summary=\"footnote: 표안의 각주\"/>와 문제점 {indent-left=-1pt} |",
+     "new": "| {fill=#D9D9D9 border-top=\"0.28pt solid #999999\" border-right=\"0.28pt solid #999999\"} **Ⅱ** {align=center} | {fill=#D9D9D9} | {fill=#D9D9D9 border-left=none} **기술발전에 따른 예상되는 사회적 변화<keep id=\"kurr4\" kind=\"footnote\" summary=\"footnote: 표안의 각주\"/>와 문제점** {indent-left=-1pt} |"
+    },
+    {
+     "old": "| {fill=#FFF0C3 border-top=",
+     "new": "| {fill=#D9D9D9 border-top="
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e4",
+   "edits": [
+    {
+     "old": "- 개념 {style=\"개요 2\" indent-left=10pt space-before=25pt space-after=5pt line-spacing=170% font=휴먼명조 size=15pt bold}",
+     "new": "- 개념 {style=\"개요 2\" indent-left=10pt space-before=25pt space-after=5pt line-spacing=170% font=휴먼명조 size=16pt color=#C00000 bold}"
+    },
+    {
+     "old": "기술의 장점 {style=\"개요 2\" indent-left=10pt space-before=25pt space-after=5pt line-spacing=170% font=휴먼명조 size=15pt bold}",
+     "new": "기술의 장점 {style=\"개요 2\" indent-left=10pt space-before=25pt space-after=5pt line-spacing=170% font=휴먼명조 size=16pt color=#C00000 bold}"
+    },
+    {
+     "old": "- 사회적 변화 예상 {style=\"개요 2\" indent-left=10pt space-before=15pt space-after=5pt font=휴먼명조 size=15pt bold}",
+     "new": "- 사회적 변화 예상 {style=\"개요 2\" indent-left=10pt space-before=15pt space-after=5pt font=휴먼명조 size=16pt color=#C00000 bold}"
+    },
+    {
+     "old": "- 문제점 분석 {style=\"개요 2\" indent-left=10pt space-before=15pt space-after=10pt font=휴먼명조 size=15pt bold}",
+     "new": "- 문제점 분석 {style=\"개요 2\" indent-left=10pt space-before=15pt space-after=10pt font=휴먼명조 size=16pt color=#C00000 bold}"
+    },
+    {
+     "old": "summary=\"footnote: 여기서의 기대효과\"/> {style=\"개요 2\" indent-left=10pt space-before=15pt space-after=10pt font=휴먼명조 size=15pt bold}",
+     "new": "summary=\"footnote: 여기서의 기대효과\"/> {style=\"개요 2\" indent-left=10pt space-before=15pt space-after=10pt font=휴먼명조 size=16pt color=#C00000 bold}"
+    },
+    {
+     "old": "- 제도적 대처 방안 {style=\"개요 2\" indent-left=10pt space-before=15pt space-after=10pt font=휴먼명조 size=15pt bold}",
+     "new": "- 제도적 대처 방안 {style=\"개요 2\" indent-left=10pt space-before=15pt space-after=10pt font=휴먼명조 size=16pt color=#C00000 bold}"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e5",
+   "edits": [
+    {
+     "old": "자유롭게 찍어내는 기술 {style=\"개요 3\" ",
+     "new": "자유롭게 찍어내는 기술 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "자동차 부속품까지 출력 {style=\"개요 3\" ",
+     "new": "자동차 부속품까지 출력 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "본격 상용화 {style=\"개요 3\" ",
+     "new": "본격 상용화 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "관련 산업에도 도입 {style=\"개요 3\" ",
+     "new": "관련 산업에도 도입 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "다품종 소량 생산이 가능 {style=\"개요 3\" ",
+     "new": "다품종 소량 생산이 가능 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "한 번에 인쇄 가능 {style=\"개요 3\" ",
+     "new": "한 번에 인쇄 가능 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "제품 혁신의 가속화 {style=\"개요 3\" ",
+     "new": "제품 혁신의 가속화 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "생산성 향상 {style=\"개요 3\" ",
+     "new": "생산성 향상 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "최대한 활용 {style=\"개요 3\" ",
+     "new": "최대한 활용 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "수명 연장 {style=\"개요 3\" ",
+     "new": "수명 연장 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "인프라 부족 {style=\"개요 3\" ",
+     "new": "인프라 부족 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "인재양성 체계 등 미흡 {style=\"개요 3\" ",
+     "new": "인재양성 체계 등 미흡 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "위험성이 제기 {style=\"개요 3\" ",
+     "new": "위험성이 제기 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "기대되고 있음 {style=\"개요 3\" ",
+     "new": "기대되고 있음 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "대중화 될 것으로 전망 {style=\"개요 3\" ",
+     "new": "대중화 될 것으로 전망 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "저작권 보호 제도 마련 시급 {style=\"개요 3\" ",
+     "new": "저작권 보호 제도 마련 시급 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "바이오메디컬 적용 규정 도입 {style=\"개요 3\" ",
+     "new": "바이오메디컬 적용 규정 도입 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "선제적인 제도정비 {style=\"개요 3\" ",
+     "new": "선제적인 제도정비 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "범정부 차원의 노력 {style=\"개요 3\" ",
+     "new": "범정부 차원의 노력 {style=\"개요 3\" color=#1F3864 "
+    },
+    {
+     "old": "기술 수용성 확산 {style=\"개요 3\" ",
+     "new": "기술 수용성 확산 {style=\"개요 3\" color=#1F3864 "
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e7",
+   "edits": [
+    {
+     "old": "올바른 이용 홍보가 필요 {style=\"개요 4\" indent-left=30pt space-before=3pt font=휴먼명조 size=14pt}",
+     "new": "올바른 이용 홍보가 필요 {style=\"개요 4\" indent-left=30pt space-before=3pt font=휴먼명조 size=14pt}\n\n| {fill=#D9D9D9} 구분 | {fill=#D9D9D9} 내용 |\n|---|---|\n| 교육 | 교육과정 신설 |"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e8",
+   "edits": [
+    {
+     "old": "자유롭게 찍어내는 기술 {style=\"개요 3\" ",
+     "new": "자유롭게 찍어내는 기술 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "자동차 부속품까지 출력 {style=\"개요 3\" ",
+     "new": "자동차 부속품까지 출력 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "본격 상용화 {style=\"개요 3\" ",
+     "new": "본격 상용화 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "관련 산업에도 도입 {style=\"개요 3\" ",
+     "new": "관련 산업에도 도입 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "다품종 소량 생산이 가능 {style=\"개요 3\" ",
+     "new": "다품종 소량 생산이 가능 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "한 번에 인쇄 가능 {style=\"개요 3\" ",
+     "new": "한 번에 인쇄 가능 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "제품 혁신의 가속화 {style=\"개요 3\" ",
+     "new": "제품 혁신의 가속화 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "생산성 향상 {style=\"개요 3\" ",
+     "new": "생산성 향상 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "최대한 활용 {style=\"개요 3\" ",
+     "new": "최대한 활용 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "수명 연장 {style=\"개요 3\" ",
+     "new": "수명 연장 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "인프라 부족 {style=\"개요 3\" ",
+     "new": "인프라 부족 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "인재양성 체계 등 미흡 {style=\"개요 3\" ",
+     "new": "인재양성 체계 등 미흡 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "위험성이 제기 {style=\"개요 3\" ",
+     "new": "위험성이 제기 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "기대되고 있음 {style=\"개요 3\" ",
+     "new": "기대되고 있음 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "대중화 될 것으로 전망 {style=\"개요 3\" ",
+     "new": "대중화 될 것으로 전망 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "저작권 보호 제도 마련 시급 {style=\"개요 3\" ",
+     "new": "저작권 보호 제도 마련 시급 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "바이오메디컬 적용 규정 도입 {style=\"개요 3\" ",
+     "new": "바이오메디컬 적용 규정 도입 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "선제적인 제도정비 {style=\"개요 3\" ",
+     "new": "선제적인 제도정비 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "범정부 차원의 노력 {style=\"개요 3\" ",
+     "new": "범정부 차원의 노력 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "기술 수용성 확산 {style=\"개요 3\" ",
+     "new": "기술 수용성 확산 {style=\"개요 3\" first-line=10pt "
+    },
+    {
+     "old": "무궁무진하다고 볼 수 있음 {style=\"개요 4\" ",
+     "new": "무궁무진하다고 볼 수 있음 {style=\"개요 4\" first-line=10pt "
+    },
+    {
+     "old": "활용 사례가 확인 {style=\"개요 4\" ",
+     "new": "활용 사례가 확인 {style=\"개요 4\" first-line=10pt "
+    },
+    {
+     "old": "인력수급 불균형 우려 {style=\"개요 4\" ",
+     "new": "인력수급 불균형 우려 {style=\"개요 4\" first-line=10pt "
+    },
+    {
+     "old": "자체제작으로 조립 {style=\"개요 4\" ",
+     "new": "자체제작으로 조립 {style=\"개요 4\" first-line=10pt "
+    },
+    {
+     "old": "대량 생산할 수 있다고 이미 예상 {style=\"개요 4\" ",
+     "new": "대량 생산할 수 있다고 이미 예상 {style=\"개요 4\" first-line=10pt "
+    },
+    {
+     "old": "가짜 의약품 유통의 우려 {style=\"개요 4\" ",
+     "new": "가짜 의약품 유통의 우려 {style=\"개요 4\" first-line=10pt "
+    },
+    {
+     "old": "사용될 수도 있을 것으로 기대 {style=\"개요 4\" ",
+     "new": "사용될 수도 있을 것으로 기대 {style=\"개요 4\" first-line=10pt "
+    },
+    {
+     "old": "액세서리 제작에 사용 {style=\"개요 4\" ",
+     "new": "액세서리 제작에 사용 {style=\"개요 4\" first-line=10pt "
+    },
+    {
+     "old": "올바른 이용 홍보가 필요 {style=\"개요 4\" ",
+     "new": "올바른 이용 홍보가 필요 {style=\"개요 4\" first-line=10pt "
+    }
+   ]
+  }
+ ]
+}

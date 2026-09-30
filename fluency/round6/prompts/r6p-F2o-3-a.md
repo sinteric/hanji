@@ -1,0 +1,378 @@
+You work with office files stored as plain text. Below are the syntax documentation, the file itself, and 8 tasks. Do each task on its own: every edit task starts from the file exactly as shown, not from the result of another task.
+
+## Syntax documentation
+
+A presentation file is plain text. It begins with a front matter block between two `---` lines; keep it as it is. `size` in the front matter is the slide's width and height in points. Slides follow, separated by a line holding only `---`. The first line of every slide is `layout: Name`.
+
+### Objects
+
+A slide is a list of objects written back to front: an object written later is drawn on top. Every object shows where it is: `box="x y w h"` is its left edge, top edge, width and height in points from the slide's top-left corner; `rot` turns it, `flip` mirrors it. Leave ids, names and boxes as they are.
+
+- **Slots** are the layout's placeholders: a marker line `::title box="…"::`, then the slot's text, one line per paragraph (`- ` for a bullet), up to the next object or `---`.
+- **Shapes** are one line each, `<shape id="s4" name="…" box="…">text</shape>`, or `<shape … />` without text; `<p/>` starts the shape's next paragraph.
+- **Lines and connectors** are `<line id="…" name="…" from="x y" to="x y"/>`.
+- **Groups**: a `<group …>` line, the group's objects, then `</group>`.
+- **Pictures, charts, tables** are `<keep …/>` lines: kept for you, never changed here.
+- Text: `**bold**`, `*italic*`, `<u>underline</u>`, `<br/>` a line break. Speaker notes follow `::notes::`.
+
+### Formatting
+
+An object shows the formatting it sets itself, on its tag (a shape, a line) or its slot marker. What it takes from elsewhere, the theme's shape style or the layout's text styles, is not written here: a property that is not written comes from there, and may be none.
+
+- Text properties the object sets for all of its text are on its tag or marker; a paragraph's own are in `{…}` at its end (before `<p/>` or `</shape>` in a shape, at the end of the line in a slot); `[text]{…}` gives a stretch of text its own `size`, `color` or `font`.
+- To change how an object looks, write the property on its tag: the object then sets it itself.
+
+Example: `<shape id="s3" name="Card" box="64 130 260 320" fill=accent1 border="2pt solid accent1-50%" size=18pt color=#FFFFFF>**Cities** {size=24pt}<p/>Low-emission [zones]{color=#FF6B5B} in 40 cities</shape>`
+
+### The vocabulary
+
+`key=value` pairs separated by spaces, on the object's tag or slot marker; a value with a space is quoted. Lengths are points (`12pt`).
+
+- colours: `#RRGGBB`, or a theme colour `accent1` … `accent6`, `tx1`, `bg1`, `tx2`, `bg2`, `hlink`; `accent1+40%` is 40% lighter and `accent1-25%` 25% darker; `accent1*` is the theme colour with another adjustment the file keeps while it is left as written; `/55%` after a colour is its opacity
+- shape and line: `fill` (a colour, or `none`), `border` (the outline: `"<width>pt <style> <colour>"` with style solid, dashed, dotted or double, or `none`)
+- text: `font`, `size`, `color`, `bold`; paragraph: `align` (left, center, right, justify), `indent-left`, `first-line`, `space-before`, `space-after`, `line-spacing` (`90%`, `14pt`)
+- `fill=gradient`, `fill=pattern` and `fill=picture` are kept as they are while left as written, and can be replaced by a colour; they cannot be written or changed. Shadows, glow, 3-D and other effects cannot be expressed.
+
+## The file
+
+The file is between the two lines `=== FILE START ===` and `=== FILE END ===` (they are not part of it).
+
+=== FILE START ===
+---
+type: presentation
+format: pptx
+schema: 1
+size: 960 x 540 pt
+---
+
+layout: Title Slide
+<shape id="s1904685559" name="" box="386 84 543 401" fill=gradient border=none/>
+<group id="g1810913471" name="" box="366 239 249 151">
+<shape id="s1992006533" name="" box="366 239 249 151" flip="v" fill=bg1 border="1.5pt solid accent6"/>
+<group id="g1111335215" name="" box="400 265 181 93">
+<shape id="s336794263" name="" box="523 267 47 4" fill=accent6 border="1.5pt solid accent6"/>
+<group id="g1149616486" name="" box="400 281 181 77">
+<shape id="s32081372" name="" box="400 338 181 6" fill=bg1 border="1.5pt solid accent6"/>
+<shape id="s897019578" name="" box="400 352 181 6" fill=bg1 border="1.5pt solid accent6"/>
+<shape id="s1502643301" name="" box="511 281 70 6" fill=bg1 border="1.5pt solid accent6"/>
+<shape id="s1500776328" name="" box="511 295 70 6" fill=bg1 border="1.5pt solid accent6"/>
+<shape id="s442631269" name="" box="511 310 70 6" fill=bg1 border="1.5pt solid accent6"/>
+<shape id="s473192179" name="" box="511 324 70 6" fill=bg1 border="1.5pt solid accent6"/>
+</group>
+<group id="g752157556" name="" box="402 265 95 60">
+<shape id="s940207804" name="" box="403 265 93 60" fill=accent6 border="2.25pt solid bg1"/>
+<shape id="s1230639027" name="" box="464 275 13 13" fill=bg1 border="1pt solid bg1"/>
+<group id="g875112572" name="" box="402 288 95 37">
+<shape id="s253550464" name="" box="450 302 47 23" fill=gradient border="1.5pt solid bg1"/>
+<shape id="s1717326992" name="" box="402 288 74 37" fill=gradient border="1.5pt solid bg1"/>
+</group>
+</group>
+</group>
+</group>
+::subtitle box="120 284 339 130" font=Arial size=24pt color=tx1::
+*For reference*
+<shape id="s1258998494" name="" box="768 29 165 41" fill=bg1-5% border="1.5pt solid accent5+40%" align=right font=Arial color=tx1>*Here you can find*  {size=11pt}<p/>*Your Logo* {size=14pt}</shape>
+<shape id="s1926208811" name="" box="20 0 32 541" flip="v" fill=none align=center font=Arial size=18pt color=bg1>The text can be arranged vertically</shape>
+<group id="g57714008" name="" box="522 140 359 218">
+<group id="g1355025106" name="" box="522 140 359 218">
+<group id="g2134142624" name="" box="522 140 359 218">
+<shape id="s948349435" name="" box="522 140 359 218" flip="v" fill=bg1 border="1.5pt solid accent6"/>
+<shape id="s1023040739" name="" box="848 323 30 33" flip="v" fill=accent6 border="1.5pt solid accent6"/>
+<shape id="s2025581244" name="" box="522 140 359 33" fill=gradient border="1.5pt solid accent6"/>
+</group>
+<group id="g198523357" name="" box="571 189 261 137">
+<shape id="s1024564268" name="" box="571 196 56 14" flip="hv" fill=bg1 border="1.5pt solid accent6"/>
+<shape id="s2027172525" name="" box="571 299 261 8" flip="hv" fill=bg1 border="1.5pt solid accent6"/>
+<shape id="s195585110" name="" box="571 319 261 8" flip="hv" fill=bg1 border="1.5pt solid accent6"/>
+<shape id="s405098392" name="" box="571 222 56 8" flip="hv" fill=bg1 border="1.5pt solid accent6"/>
+<shape id="s1901229649" name="" box="571 241 56 8" flip="hv" fill=bg1 border="1.5pt solid accent6"/>
+<shape id="s2074781782" name="" box="571 260 56 8" flip="hv" fill=bg1 border="1.5pt solid accent6"/>
+<shape id="s1078997327" name="" box="571 280 261 8" flip="hv" fill=bg1 border="1.5pt solid accent6"/>
+<group id="g645573312" name="" box="747 189 83 83">
+<shape id="s553203565" name="" box="747 189 83 83" fill=accent6 border="1.5pt solid accent6"/>
+<shape id="s1014599651" name="" box="747 189 83 83" fill=bg2 border="1.5pt solid accent6"/>
+<shape id="s1237266594" name="" box="747 189 83 83" fill=bg1 border="1.5pt solid accent6"/>
+</group>
+<group id="g1377868251" name="" box="648 189 83 83">
+<shape id="s2073622253" name="" box="648 189 83 83" fill=accent6 border="1.5pt solid accent6"/>
+<shape id="s258860029" name="" box="648 189 83 83" fill=bg2 border="1.5pt solid accent6"/>
+<shape id="s2084740660" name="" box="648 189 83 83" fill=bg1 border="1.5pt solid accent6"/>
+</group>
+</group>
+</group>
+<shape id="s2130307519" name="" box="565 142 206 29" fill=none font=Arial size=18pt>*Presentation*</shape>
+</group>
+<shape id="s1696527000" name="" box="120 29 287 24" fill=none font=Arial size=14pt color=tx1>*Presentation Editor*</shape>
+<group id="g1926874903" name="" box="499 164 370 367">
+<group id="g1811855888" name="" box="499 266 370 264">
+<shape id="s297252578" name="" box="542 297 320 234" flip="v" fill=accent4 border="2.25pt solid accent6"/>
+<shape id="s765850676" name="" box="656 266 94 68" fill=accent4-25%/60% border=none/>
+<shape id="s1434620451" name="" box="568 414 272 24" fill=accent2 border="1pt solid accent6"/>
+<group id="g243004206" name="" box="586 416 231 20">
+<shape id="s302103826" name="" box="597 421 204 0" border="0.5pt solid bg1"/>
+<group id="g518409206" name="" box="586 416 231 20">
+<shape id="s237079948" name="" box="586 428 231 0" border="0.5pt solid bg1"/>
+<shape id="s1521959894" name="" box="704 416 0 20" flip="h" border="0.5pt solid bg1"/>
+<group id="g71708457" name="" box="590 416 101 20">
+<shape id="s79109009" name="" box="662 416 4 20" flip="h" border="0.5pt solid bg1"/>
+<shape id="s1194881492" name="" box="648 416 5 20" flip="h" border="0.5pt solid bg1"/>
+<shape id="s1149504911" name="" box="676 416 3 20" flip="h" border="0.5pt solid bg1"/>
+<shape id="s1757023223" name="" box="690 416 2 20" flip="h" border="0.5pt solid bg1"/>
+<shape id="s579080393" name="" box="634 416 6 20" flip="h" border="0.5pt solid bg1"/>
+<shape id="s1852297264" name="" box="619 416 7 20" flip="h" border="0.5pt solid bg1"/>
+<shape id="s710475703" name="" box="605 416 8 20" flip="h" border="0.5pt solid bg1"/>
+<shape id="s1815290793" name="" box="590 416 9 20" flip="h" border="0.5pt solid bg1"/>
+</group>
+<keep id="s756064367" kind="group" summary="" box="714 416 101 20" rot="180"/>
+</group>
+</group>
+<group id="g737124357" name="" box="656 276 94 39">
+<shape id="s1312106455" name="" box="656 276 47 39" fill=bg1 border="1.5pt solid accent6"/>
+<shape id="s425244847" name="" box="702 276 47 39" flip="h" fill=bg1 border="1.5pt solid accent6"/>
+</group>
+<shape id="s397279386" name="" box="568 438 272 7" fill=accent2 border="1pt solid accent6"/>
+<shape id="s721421238" name="" box="636 402 0 0" flip="h"/>
+<shape id="s918234874" name="" box="657 436 0 0" flip="v"/>
+<shape id="s277512000" name="" box="730 362 139 63" rot="14" fill=#F7B1A3 border="1.5pt solid accent6"/>
+<group id="g1700823751" name="" box="707 361 134 73">
+<shape id="s554119478" name="" box="707 361 134 73" flip="h" fill=#FEC3B6 border="1.5pt solid accent6"/>
+<group id="g599378138" name="" box="749 383 56 45">
+<shape id="s780022854" name="" box="783 383 14 45" flip="h" border="1.5pt solid accent6"/>
+<shape id="s1872604109" name="" box="764 383 14 45" flip="h" border="1.5pt solid accent6"/>
+<shape id="s753617182" name="" box="800 385 5 12" flip="h" border="1.5pt solid accent6"/>
+<shape id="s1411955254" name="" box="749 394 5 12" flip="h" border="1.5pt solid accent6"/>
+</group>
+</group>
+<group id="g430375614" name="" box="533 361 167 73">
+<shape id="s1040375124" name="" box="533 361 145 63" rot="351" fill=#F7B1A3 border="1.5pt solid accent6"/>
+<group id="g931742327" name="" box="566 362 134 73">
+<shape id="s2024936906" name="" box="566 362 134 73" fill=#FEC3B6 border="1.5pt solid accent6"/>
+<group id="g2071311923" name="" box="603 383 55 45">
+<group id="g181704332" name="" box="603 383 41 45">
+<shape id="s698072455" name="" box="629 383 14 45" border="1.5pt solid accent6"/>
+<shape id="s1285475017" name="" box="610 383 14 45" border="1.5pt solid accent6"/>
+<shape id="s1833904386" name="" box="603 384 5 12" border="1.5pt solid accent6"/>
+</group>
+<shape id="s987598161" name="" box="653 396 5 12" border="1.5pt solid accent6"/>
+</group>
+</group>
+</group>
+<group id="g1621818658" name="" box="556 303 294 113">
+<shape id="s692369280" name="" box="556 303 68 113" border="1.5pt solid accent6"/>
+<shape id="s464659584" name="" box="781 303 68 113" rot="180" flip="v" border="1.5pt solid accent6"/>
+<shape id="s19649981" name="" box="702 306 0 108" flip="v" border="1.5pt solid accent6"/>
+</group>
+<shape id="s1070331813" name="" box="499 436 67 10" fill=accent6 border="1pt solid accent6"/>
+<group id="g862833330" name="" box="502 403 59 41">
+<shape id="s797652844" name="" box="516 403 45 14" fill=accent2 border="1pt solid accent6"/>
+<shape id="s917755110" name="" box="519 409 38 14" fill=bg1 border="1pt solid accent6"/>
+<shape id="s1881292003" name="" box="502 412 20 17" rot="27" fill=accent2 border="1pt solid accent6"/>
+<shape id="s176982345" name="" box="521 405 34 46" rot="270" fill=accent2 border="1pt solid accent6"/>
+</group>
+</group>
+<group id="g298860932" name="" box="626 164 136 140">
+<group id="g1789168272" name="" box="626 164 136 140">
+<group id="g372786650" name="" box="626 164 136 140">
+<group id="g1397463647" name="" box="626 164 136 140">
+<group id="g1873714261" name="" box="626 164 136 129">
+<shape id="s1863375066" name="" box="626 164 136 129" fill=#222A35 border="0.2pt solid #222A35"/>
+<group id="g937302294" name="" box="672 235 61 38">
+<shape id="s496840750" name="" box="722 235 8 15" rot="11" flip="h" fill=#FEC3B6 border="1pt solid #222A35"/>
+<shape id="s1601007046" name="" box="673 238 8 15" rot="335" fill=#FEC3B6 border="1pt solid #222A35"/>
+<shape id="s474916825" name="" box="672 249 8 24" rot="11" flip="h" border="2.25pt solid accent4"/>
+<shape id="s1137647027" name="" box="725 245 8 24" rot="342" border="2.25pt solid accent4"/>
+</group>
+</group>
+<shape id="s952861307" name="" box="680 259 45 45" rot="270" fill=#FEC3B6 border=none/>
+</group>
+<shape id="s411529525" name="" box="677 210 49 60" fill=#FEC3B6 border="1.5pt solid #222A35"/>
+</group>
+<shape id="s394767060" name="" box="681 215 16 4" rot="336" flip="v" fill=#222A35 border=none/>
+<shape id="s1426291658" name="" box="702 216 16 4" rot="22" flip="v" fill=#222A35 border=none/>
+</group>
+<group id="g955068993" name="" box="676 216 44 34">
+<shape id="s706985576" name="" box="695 220 6 23" border="2.25pt solid #222A35"/>
+<shape id="s1160656752" name="" box="689 243 23 8" border="2.25pt solid #222A35"/>
+<shape id="s1002344769" name="" box="687 226 3 8" rot="16" flip="h" fill=#222A35 border=none/>
+<shape id="s812736763" name="" box="708 225 3 8" rot="345" fill=#222A35 border=none/>
+<shape id="s1672247369" name="" box="676 217 18 21" rot="16" fill=none border="2.25pt solid accent6"/>
+<shape id="s319436635" name="" box="703 216 18 21" fill=none border="2.25pt solid accent6"/>
+<shape id="s234360025" name="" box="694 224 9 2" border="2.25pt solid accent6"/>
+</group>
+</group>
+</group>
+<shape id="s287763068" name="" box="655 440 72 72" fill=gradient border=none/>
+<shape id="s457112450" name="" box="868 147 72 72" fill=gradient border=none/>
+<shape id="s653345678" name="" box="727 93 41 41" flip="h" fill=gradient border=none/>
+<shape id="s1526405804" name="" box="120 479 802 34" fill=none font=Arial size=11pt color=bg1-50%>*All graphic elements and images in this presentation were created within this document.*  <p/>*Give it a try yourself!*</shape>
+<shape id="s1179962678" name="Title 1" box="132 125 531 146" font="Times New Roman" size=120pt color=accent6+80%>***Presentation Editor***</shape>
+::title box="120 113 445 146" font="Times New Roman" size=80pt color=tx1::
+***Presentation Editor***
+::number box="678 501 216 29"::
+<keep id="kau0q" kind="field" summary="slidenum:"/>
+
+---
+
+layout: Title and Content
+<shape id="s205476553" name="" box="863 147 72 72" fill=gradient border=none/>
+<shape id="s1384889788" name="" box="655 440 72 72" fill=gradient border=none/>
+<shape id="s665473102" name="" box="727 93 41 41" flip="h" fill=gradient border=none/>
+::title box="120 55 571 118" font=Arial size=32pt::
+***What are <br/>presentation editors?***
+::body box="126 180 470 332" first-line=-22.68pt space-before=9.99pt line-spacing=115% font=Arial size=16pt::
+- **Presentation editors** are specialized programs designed for creating and editing slides, which are used to present information in a clear and visually appealing format. The main goal of these tools is to facilitate the communication of ideas and data to an audience.
+<shape id="s712128092" name="Slide title" box="612 109 301 301" rot="180" font="Times New Roman" size=18pt>**What are**<p/> **presentation**<p/> **editors?**</shape>
+<group id="g1016387225" name="" box="143 372 428 116">
+<line id="s1817062154" name="" from="357 274" to="357 702" border="1.5pt solid accent6"/>
+<group id="g474396542" name="" box="297 372 119 115">
+<group id="g1926126240" name="" box="297 382 119 80">
+<shape id="s304069585" name="" box="305 390 105 63" fill=bg1-5% border="1.5pt solid accent6"/>
+<group id="g2012897872" name="" box="297 382 119 80">
+<shape id="s905726343" name="" box="297 382 119 8" fill=bg1-5% border="1.5pt solid accent6"/>
+<shape id="s1929072708" name="" box="297 453 119 8" fill=bg1-5% border="1.5pt solid accent6"/>
+</group>
+</group>
+<group id="g310762383" name="" box="324 372 66 115">
+<shape id="s515281582" name="" box="333 372 47 10" fill=bg1-5% border="1.5pt solid accent6"/>
+<group id="g732377807" name="" box="324 462 66 25">
+<shape id="s457336533" name="" box="324 462 33 25" fill=bg1-5% border="1.5pt solid accent6"/>
+<shape id="s2128995429" name="" box="357 462 33 25" flip="h" fill=bg1-5% border="1.5pt solid accent6"/>
+</group>
+</group>
+<group id="g103367793" name="" box="309 396 92 51">
+<group id="g167711585" name="" box="309 396 51 51">
+<shape id="s2088299765" name="" box="313 400 43 43" fill=none border="2.25pt solid accent6"/>
+<shape id="s1219238493" name="" box="309 396 51 51" flip="h" fill=gradient border="2.25pt solid accent6"/>
+</group>
+<shape id="s1766008602" name="" box="380 437 21 3" fill=gradient border="1pt solid accent6"/>
+<group id="g1475907028" name="" box="366 401 36 27">
+<shape id="s1449001382" name="" box="366 401 36 3" fill=gradient border="1pt solid accent6"/>
+<shape id="s349378041" name="" box="366 409 36 3" fill=gradient border="1pt solid accent6"/>
+<shape id="s1413446831" name="" box="366 417 36 3" fill=gradient border="1pt solid accent6"/>
+<shape id="s483264790" name="" box="366 425 36 3" fill=gradient border="1pt solid accent6"/>
+</group>
+</group>
+</group>
+</group>
+::number box="678 501 216 29"::
+<keep id="k3vmc" kind="field" summary="slidenum:"/>
+
+---
+
+layout: Title and Content
+<shape id="s1178571438" name="" box="863 147 72 72" fill=gradient border=none/>
+<shape id="s1809128175" name="" box="655 440 72 72" fill=gradient border=none/>
+<shape id="s312156958" name="" box="723 99 41 41" flip="h" fill=gradient border=none/>
+::title box="120 55 599 118" font=Arial size=32pt::
+***What are presentations <br/>in editors?***
+<shape id="s95144368" name="Slide text" box="120 180 414 332" first-line=-22.68pt line-spacing=115% font=Arial size=16pt>**Presentations in editors** are a collection of slides that include text, images, graphics, animations, and videos, which help convey the key points of a report or lecture. They can be used for educational purposes, business meetings, conferences, or any other events where a visual representation of information is required.</shape>
+<keep id="ks1qd" kind="group" summary="" box="648 122 249 151" rot="347"/>
+<keep id="kgik5" kind="group" summary="" box="560 226 249 151" rot="5"/>
+<keep id="kfnjg" kind="group" summary="" box="652 326 249 151" rot="10"/>
+::number box="678 501 216 29"::
+<keep id="kmpbj" kind="field" summary="slidenum:"/>
+
+---
+
+layout: Title and Content
+<keep id="kpffc" kind="chart" summary="" box="585 134 340 362"/>
+<shape id="s1733131693" name="" box="863 147 72 72" fill=gradient border=none/>
+<shape id="s814589393" name="" box="655 440 72 72" fill=gradient border=none/>
+<shape id="s2018701444" name="" box="727 93 41 41" flip="h" fill=gradient border=none/>
+::body box="120 180 446 349" line-spacing=115% font=Arial size=16pt::
+**Presentation editors are used by a wide range of people, including:** {space-after=14.17pt color=accent6}
+
+- **Teachers and students:** for creating educational materials, lectures, and seminars.   {indent-left=56.69pt first-line=-22.68pt space-before=5.64pt color=tx1}
+- **Business professionals:** for presenting reports, plans, and strategies at meetings and conferences.   {indent-left=56.69pt first-line=-22.68pt space-before=5.64pt color=tx1}
+- **Marketers and advertisers:** for presenting marketing and advertising campaigns.   {indent-left=56.69pt first-line=-22.68pt space-before=5.64pt color=tx1}
+- **Researchers:** for presenting research results and scientific data.   {indent-left=56.69pt first-line=-22.68pt space-before=5.64pt color=tx1}
+- **Event organizers:** for reviewing event programs or instructions. {indent-left=56.69pt first-line=-22.68pt space-before=5.64pt color=tx1}
+::title box="120 55 631 118" font=Arial size=32pt::
+***Who uses <br/>presentation editors?***
+<group id="g1009018959" name="" box="731 440 171 17">
+<shape id="s1991158579" name="" box="731 440 22 17" fill=none font="Open Sans" size=8pt color=accent6>**%**</shape>
+<shape id="s1569723838" name="" box="768 440 22 17" fill=none font="Open Sans" size=8pt color=accent6>**%**</shape>
+<shape id="s15734069" name="" box="805 440 22 17" fill=none font="Open Sans" size=8pt color=accent6>**%**</shape>
+<shape id="s1409046712" name="" box="843 440 22 17" fill=none font="Open Sans" size=8pt color=accent6>**%**</shape>
+<shape id="s2083619230" name="" box="880 440 22 17" fill=none font="Open Sans" size=8pt color=accent6>**%**</shape>
+</group>
+::number box="678 501 216 29"::
+<keep id="klv9l" kind="field" summary="slidenum:"/>
+
+---
+
+layout: Title and Content
+<shape id="s806371168" name="" box="863 147 72 72" fill=gradient border=none/>
+<shape id="s54478299" name="" box="655 440 72 72" fill=gradient border=none/>
+<shape id="s1426731807" name="" box="727 93 41 41" flip="h" fill=gradient border=none/>
+::body box="120 180 779 305" line-spacing=115% font=Arial size=16pt::
+**The goals of use include:** {space-after=17pt color=accent6}
+
+- **Education and learning:** enhancing understanding and retention of information.   {indent-left=56.69pt first-line=-22.68pt space-before=5.65pt color=tx1}
+- **Communication of ideas:** clearly and effectively presenting complex concepts.   {indent-left=56.69pt first-line=-22.68pt space-before=5.65pt color=tx1}
+- **Persuasion and influence:** supporting arguments with visual elements for impact.   {indent-left=56.69pt first-line=-22.68pt space-before=5.65pt color=tx1}
+- **Data visualization:** visually presenting statistics and analytics.   {indent-left=56.69pt first-line=-22.68pt space-before=5.65pt color=tx1}
+::title box="120 55 628 118" font=Arial size=32pt::
+***What are <br/>presentation editors used for?***
+::number box="678 501 216 29"::
+<keep id="kcu84" kind="field" summary="slidenum:"/>
+
+---
+
+layout: Title and Content
+<shape id="s1860110730" name="" box="863 147 72 72" fill=gradient border=none/>
+<shape id="s636699406" name="" box="655 440 72 72" fill=gradient border=none/>
+<shape id="s2092855397" name="" box="727 93 41 41" flip="h" fill=gradient border=none/>
+::title box="120 55 648 118" font=Arial size=32pt::
+***Data on the use of presentation editors   in the form of a table***
+<keep id="k2s90" kind="table" summary=": Users % Purposes of use Impact on information perception Additional features T…" box="124 171 641 174"/>
+::number box="678 501 216 29"::
+<keep id="k7dea" kind="field" summary="slidenum:"/>
+
+---
+
+layout: Title and Content
+<shape id="s1317481724" name="" box="863 147 72 72" fill=gradient border=none/>
+<shape id="s392074442" name="" box="655 440 72 72" fill=gradient border=none/>
+<shape id="s1962532734" name="" box="727 93 41 41" flip="h" fill=gradient border=none/>
+::body box="120 180 694 120" indent-left=56.69pt first-line=-28.35pt space-before=9.99pt line-spacing=115% font=Arial size=20pt color=bg1::
+- Presentation editors play a crucial role in modern communication, as they allow the creation of effective and memorable presentations that can significantly enhance the understanding and perception of the information being presented.
+<shape id="s1458983660" name="" box="409 409 143 38" fill=none align=center font=Arial size=26pt color=bg1>*Thank you!*</shape>
+::title box="120 84 624 89" font=Arial size=32pt color=bg1::
+***Conclusion:***
+<line id="s1010713477" name="" from="480 -29" to="480 731" border="1.5pt solid accent6"/>
+::number box="678 501 216 29"::
+<keep id="krqc1" kind="field" summary="slidenum:"/>
+
+=== FILE END ===
+
+## Tasks
+
+1. `pp-q1` (read): On slide 1, what is the fill of the shape s780022854? Answer `ANSWER: fill=<colour>`.
+2. `pp-q2` (read): On slide 1, which shapes inside the group g752157556 have a 1.5pt outline? Answer `ANSWER: <id>; <id>` with the shape ids.
+3. `pp-e1` (edit): On slide 2, change the fill of the shape s304069585 to accent2.
+4. `pp-e2` (edit): On slide 3, give the shape "Slide text" a 2pt navy outline.
+5. `pp-e3` (edit): In the slide 3 title "What are presentations in editors?", make "editors" 24pt and coral.
+6. `pp-e4` (edit): On slide 1, make the two small lines s721421238 and s918234874 twice as thick, keeping their colour and line style.
+7. `pp-e5` (edit): On slide 1, change "Presentation Editor" to "Presentation Studio", keeping its formatting exactly as it is.
+8. `pp-e6` (edit): On slide 2, give the shape "Slide title" a soft drop shadow.
+
+## Rules
+
+- Read tasks: answer in the form the task asks for, starting with `ANSWER:`.
+- Edit tasks: answer with exact text edits. Each edit is `{"old": "...", "new": "..."}`: `old` is copied exactly from the file (same spaces and characters) and occurs exactly once in it, and `new` replaces it. Edits apply in order. Change only what the task asks for; every other line must stay exactly as it is.
+- If a task cannot be done in this file format, do not edit: answer `REFUSE: <one sentence why>`.
+
+## Answer format
+
+Reply with one JSON object and nothing else:
+
+```
+{"answers": [
+  {"task_id": "…", "text": "ANSWER: …"},
+  {"task_id": "…", "edits": [{"old": "…", "new": "…"}]},
+  {"task_id": "…", "text": "REFUSE: …"}
+]}
+```
+
+One entry per task, in the order of the tasks.

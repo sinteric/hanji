@@ -1,0 +1,54 @@
+{
+ "unit_id": "r6p-F2o-2",
+ "candidate": "F2o",
+ "seed": 2,
+ "name": "synth-korean-report",
+ "format": "pptx",
+ "unreachable": [
+  "pp-q1",
+  "pp-e4"
+ ],
+ "q2": null,
+ "tasks": [
+  {
+   "task_id": "pp-q1",
+   "kind": "read",
+   "text": "On the 조직 구성 slide, what is the outline (width, line style and colour) of the connectors? Answer `ANSWER: border=\"<width> <style> <colour>\"`."
+  },
+  {
+   "task_id": "pp-q2",
+   "kind": "read",
+   "text": "On the 추진 절차 slide, which shapes are filled accent2? Answer `ANSWER: <name>; <name>`."
+  },
+  {
+   "task_id": "pp-e1",
+   "kind": "edit",
+   "text": "Change the fill of the card \"Rounded Rectangle 3\" (+12%) to accent2."
+  },
+  {
+   "task_id": "pp-e2",
+   "kind": "edit",
+   "text": "Give the shape \"Oval 4\" (VS) a 2pt navy outline."
+  },
+  {
+   "task_id": "pp-e3",
+   "kind": "edit",
+   "text": "In \"10월 착수 예정\", make \"10월\" 24pt and coral."
+  },
+  {
+   "task_id": "pp-e4",
+   "kind": "edit",
+   "text": "Make the three connectors on the 조직 구성 slide 3pt wide, keeping their colour and line style."
+  },
+  {
+   "task_id": "pp-e5",
+   "kind": "edit",
+   "text": "Change \"신규 4곳\" to \"신규 5곳\", keeping its formatting exactly as it is."
+  },
+  {
+   "task_id": "pp-e6",
+   "kind": "refuse",
+   "text": "Make the gradient of the left panel on the first slide run from navy to teal."
+  }
+ ]
+}

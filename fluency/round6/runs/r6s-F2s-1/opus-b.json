@@ -1,0 +1,43 @@
+{
+ "answers": [
+  {
+   "task_id": "fn-e5",
+   "edits": [
+    {
+     "old": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt/>",
+     "new": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt color=#1F3864/>"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e8",
+   "edits": [
+    {
+     "old": "<style name=\"개요 3\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt/>",
+     "new": "<style name=\"개요 3\" indent-left=20pt first-line=10pt space-before=5pt font=휴먼명조 size=15pt/>"
+    },
+    {
+     "old": "<style name=\"개요 4\" indent-left=30pt space-before=3pt font=휴먼명조 size=14pt/>",
+     "new": "<style name=\"개요 4\" indent-left=30pt first-line=10pt space-before=3pt font=휴먼명조 size=14pt/>"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e10",
+   "edits": [
+    {
+     "old": "<style name=\"개요 4\" indent-left=30pt space-before=3pt font=휴먼명조 size=14pt/>",
+     "new": "<style name=\"개요 4\" indent-left=30pt space-before=3pt font=휴먼명조 size=14pt/>\n<style name=\"개요 3 강조\" indent-left=20pt space-before=5pt font=휴먼명조 size=15pt color=#C00000/>"
+    },
+    {
+     "old": "체험‧활용할 수 있는 장비 등의 인프라 부족 {style=\"개요 3\"}",
+     "new": "체험‧활용할 수 있는 장비 등의 인프라 부족 {style=\"개요 3 강조\"}"
+    },
+    {
+     "old": "관련 교육, 인재양성 체계 등 미흡 {style=\"개요 3\"}",
+     "new": "관련 교육, 인재양성 체계 등 미흡 {style=\"개요 3 강조\"}"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,48 @@
+{
+ "answers": [
+  {
+   "text": "ANSWER: Oval 2; Oval 4; Oval 7; Oval 10",
+   "task_id": "pp-q2"
+  },
+  {
+   "edits": [
+    {
+     "old": "<shape id=\"s8\" name=\"Rounded Rectangle 7\" box=\"354 130 260 320\" fill=#FFFFFF border=none/>\n",
+     "new": "<shape id=\"s8\" name=\"Rounded Rectangle 7\" box=\"354 130 260 320\" fill=accent2 border=none/>\n"
+    }
+   ],
+   "task_id": "pp-e1"
+  },
+  {
+   "edits": [
+    {
+     "old": "<shape id=\"s13\" name=\"Rounded Rectangle 12\" box=\"644 130 260 320\" fill=#FFFFFF border=none/>\n",
+     "new": "<shape id=\"s13\" name=\"Rounded Rectangle 12\" box=\"644 130 260 320\" fill=#FFFFFF border=\"2pt solid #1F3864\"/>\n"
+    }
+   ],
+   "task_id": "pp-e2"
+  },
+  {
+   "edits": [
+    {
+     "old": "<shape id=\"s11\" name=\"TextBox 10\" box=\"378 260 212 120\" fill=none font=Pretendard size=16pt color=#555555>Battery cost down 60% in 5 years</shape>\n",
+     "new": "<shape id=\"s11\" name=\"TextBox 10\" box=\"378 260 212 120\" fill=none font=Pretendard size=16pt color=#555555>Battery cost down [60%]{size=24pt color=#FF7F50} in 5 years</shape>\n"
+    }
+   ],
+   "task_id": "pp-e3"
+  },
+  {
+   "edits": [
+    {
+     "old": "<shape id=\"s5\" name=\"TextBox 4\" box=\"64 290 600 40\" fill=none font=Pretendard size=22pt color=#CFE8FF>Series A · 2026</shape>\n",
+     "new": "<shape id=\"s5\" name=\"TextBox 4\" box=\"64 290 600 40\" fill=none font=Pretendard size=22pt color=#CFE8FF>Series B · 2026</shape>\n"
+    }
+   ],
+   "task_id": "pp-e5"
+  },
+  {
+   "text": "REFUSE: this format cannot express it.",
+   "task_id": "pp-e6"
+  }
+ ]
+}

@@ -1,0 +1,59 @@
+{
+ "answers": [
+  {
+   "task_id": "mel-q3",
+   "text": "ANSWER: align=center line-spacing=130%"
+  },
+  {
+   "task_id": "mel-q4",
+   "text": "ANSWER: first-line=-58.96pt"
+  },
+  {
+   "task_id": "mel-q5",
+   "text": "ANSWER: line-spacing=162% font=함초롬바탕"
+  },
+  {
+   "task_id": "mel-q6",
+   "text": "ANSWER: first-line=-58.96pt space-before=24pt line-spacing=162%"
+  },
+  {
+   "task_id": "mel-q7",
+   "text": "ANSWER: line-spacing=100%"
+  },
+  {
+   "task_id": "mel-e1",
+   "edits": [
+    {
+     "old": "{fill=#F2F2F2 border=\"0.34pt solid #000000\"}  **기금형",
+     "new": "{fill=#DFE6F7 border=\"0.34pt solid #000000\"}  **기금형"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e6",
+   "edits": [
+    {
+     "old": "’26년, 1,200명",
+     "new": "’26년, 1,300명"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-n1",
+   "text": "ANSWER: unchanged"
+  },
+  {
+   "task_id": "mel-e12",
+   "edits": [
+    {
+     "old": "상임위 의결 등)]{size=13pt} {first-line=-58.96pt space-before=20pt",
+     "new": "상임위 의결 등)]{size=13pt} {first-line=-58.96pt space-before=12pt"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e11",
+   "text": "REFUSE: A style named \"표가운데\" already exists in the file, and a new style cannot reuse an existing style name."
+  }
+ ]
+}

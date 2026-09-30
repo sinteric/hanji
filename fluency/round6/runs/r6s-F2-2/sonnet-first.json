@@ -1,0 +1,286 @@
+{
+ "answers": [
+  {
+   "task_id": "mel-q3",
+   "text": "ANSWER: align=center line-spacing=130%"
+  },
+  {
+   "task_id": "mel-q4",
+   "text": "ANSWER: first-line=-58.96pt"
+  },
+  {
+   "task_id": "mel-q5",
+   "text": "ANSWER: line-spacing=162% font=함초롬바탕"
+  },
+  {
+   "task_id": "mel-q6",
+   "text": "ANSWER: first-line=-58.96pt space-before=24pt line-spacing=162%"
+  },
+  {
+   "task_id": "mel-q7",
+   "text": "ANSWER: line-spacing=100%"
+  },
+  {
+   "task_id": "mel-e1",
+   "edits": [
+    {
+     "old": "{fill=#F2F2F2 border=\"0.34pt solid #000000\"}  **기금형",
+     "new": "{fill=#DFE6F7 border=\"0.34pt solid #000000\"}  **기금형"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e6",
+   "edits": [
+    {
+     "old": "’26년, 1,200명",
+     "new": "’26년, 1,300명"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-n1",
+   "text": "ANSWER: unchanged"
+  },
+  {
+   "task_id": "mel-e12",
+   "edits": [
+    {
+     "old": "상임위 의결 등)]{size=13pt} {first-line=-58.96pt space-before=20pt",
+     "new": "상임위 의결 등)]{size=13pt} {first-line=-58.96pt space-before=12pt"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e11",
+   "text": "REFUSE: A style named \"표가운데\" already exists in the file, and a new style cannot reuse an existing style name."
+  },
+  {
+   "task_id": "mel-e5",
+   "edits": [
+    {
+     "old": "<style name=\"표가운데\" align=center line-spacing=130% font=-윤명조120/>",
+     "new": "<style name=\"표가운데\" align=center line-spacing=130% font=-윤명조120 color=#1F3864/>"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e8",
+   "edits": [
+    {
+     "old": "**산업재해 감축 추세**\\* {space-before=24pt",
+     "new": "**산업재해 감축 추세**\\* {first-line=10pt space-before=24pt"
+    },
+    {
+     "old": "**(’25.9월 기준)**]{size=13pt} {first-line=-58.96pt",
+     "new": "**(’25.9월 기준)**]{size=13pt} {first-line=10pt"
+    },
+    {
+     "old": "**상생과 연대의 기반 조성** {space-before=24pt",
+     "new": "**상생과 연대의 기반 조성** {first-line=10pt space-before=24pt"
+    },
+    {
+     "old": "**미래대응 일자리 기반 확충** {first-line=-59.08pt",
+     "new": "**미래대응 일자리 기반 확충** {first-line=10pt"
+    },
+    {
+     "old": "**위험요인 대두** {first-line=-43.84pt",
+     "new": "**위험요인 대두** {first-line=10pt"
+    },
+    {
+     "old": "특히 소규모사업장에 집중 {first-line=-43.68pt",
+     "new": "특히 소규모사업장에 집중 {first-line=10pt"
+    },
+    {
+     "old": "새로운 형태의 노동** 증가 {first-line=-44pt",
+     "new": "새로운 형태의 노동** 증가 {first-line=10pt"
+    },
+    {
+     "old": "(국가부양부담↑)]{size=13pt} {first-line=-44pt",
+     "new": "(국가부양부담↑)]{size=13pt} {first-line=10pt"
+    },
+    {
+     "old": "**노동시장 격차 해소** {first-line=-58.96pt",
+     "new": "**노동시장 격차 해소** {first-line=10pt"
+    },
+    {
+     "old": "**노동있는 산업 대전환** {first-line=-58.96pt",
+     "new": "**노동있는 산업 대전환** {first-line=10pt"
+    },
+    {
+     "old": "**노동이 존중받는 일터** {first-line=-58.96pt",
+     "new": "**노동이 존중받는 일터** {first-line=10pt"
+    },
+    {
+     "old": "**추진배경** {first-line=-67.7pt space-before=30pt",
+     "new": "**추진배경** {first-line=10pt space-before=30pt"
+    },
+    {
+     "old": "**주요내용** {first-line=-67.7pt space-before=30pt",
+     "new": "**주요내용** {first-line=10pt space-before=30pt"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-250.8pt space-before=30pt",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=30pt"
+    },
+    {
+     "old": "**추진배경** {first-line=-250.8pt space-before=24pt line-spacing=144%",
+     "new": "**추진배경** {first-line=10pt space-before=24pt line-spacing=144%"
+    },
+    {
+     "old": "본격 추진**]{size=15pt} {first-line=-250.8pt",
+     "new": "본격 추진**]{size=15pt} {first-line=10pt"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-250.8pt space-before=24pt line-spacing=144%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=144%"
+    },
+    {
+     "old": "**추진배경** {first-line=-250.8pt space-before=24pt line-spacing=128%",
+     "new": "**추진배경** {first-line=10pt space-before=24pt line-spacing=128%"
+    },
+    {
+     "old": "**주요내용** {first-line=-250.8pt space-before=24pt line-spacing=128%",
+     "new": "**주요내용** {first-line=10pt space-before=24pt line-spacing=128%"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-250.8pt space-before=20pt line-spacing=128%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=20pt line-spacing=128%"
+    },
+    {
+     "old": "**추진배경** {first-line=-61.52pt space-before=24pt",
+     "new": "**추진배경** {first-line=10pt space-before=24pt"
+    },
+    {
+     "old": "**주요내용**  {first-line=-250.8pt",
+     "new": "**주요내용**  {first-line=10pt"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-61.52pt space-before=20pt line-spacing=155%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=20pt line-spacing=155%"
+    },
+    {
+     "old": "**추진배경** {align=left first-line=-44.96pt space-before=24pt line-spacing=138%",
+     "new": "**추진배경** {align=left first-line=10pt space-before=24pt line-spacing=138%"
+    },
+    {
+     "old": "**주요내용: 대상별 지원체계 구축** {align=left first-line=-67.7pt",
+     "new": "**주요내용: 대상별 지원체계 구축** {align=left first-line=10pt"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-250.8pt space-before=24pt line-spacing=138%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=138%"
+    },
+    {
+     "old": "**추진배경** {align=left first-line=-44.96pt space-before=24pt line-spacing=107%",
+     "new": "**추진배경** {align=left first-line=10pt space-before=24pt line-spacing=107%"
+    },
+    {
+     "old": "**주요내용** {align=left first-line=-67.7pt space-before=24pt line-spacing=107%",
+     "new": "**주요내용** {align=left first-line=10pt space-before=24pt line-spacing=107%"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-58.96pt space-before=24pt line-spacing=107%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=107%"
+    },
+    {
+     "old": "**추진배경** {first-line=-250.8pt space-before=24pt line-spacing=153%",
+     "new": "**추진배경** {first-line=10pt space-before=24pt line-spacing=153%"
+    },
+    {
+     "old": "**주요내용** {first-line=-250.8pt space-before=24pt line-spacing=153%",
+     "new": "**주요내용** {first-line=10pt space-before=24pt line-spacing=153%"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-250.8pt space-before=24pt line-spacing=153%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=153%"
+    },
+    {
+     "old": "**추진배경** {align=left first-line=-67.7pt space-before=24pt line-spacing=145%",
+     "new": "**추진배경** {align=left first-line=10pt space-before=24pt line-spacing=145%"
+    },
+    {
+     "old": "**주요내용** {align=left first-line=-67.7pt space-before=24pt line-spacing=145%",
+     "new": "**주요내용** {align=left first-line=10pt space-before=24pt line-spacing=145%"
+    },
+    {
+     "old": "**이행계획(’26년)** {align=left first-line=-67.7pt space-before=24pt line-spacing=145%",
+     "new": "**이행계획(’26년)** {align=left first-line=10pt space-before=24pt line-spacing=145%"
+    },
+    {
+     "old": "**추진배경** {first-line=-250.8pt space-before=24pt line-spacing=140%",
+     "new": "**추진배경** {first-line=10pt space-before=24pt line-spacing=140%"
+    },
+    {
+     "old": "**주요내용** {first-line=-250.8pt space-before=24pt line-spacing=140%",
+     "new": "**주요내용** {first-line=10pt space-before=24pt line-spacing=140%"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-61.52pt space-before=20pt line-spacing=140%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=20pt line-spacing=140%"
+    },
+    {
+     "old": "**추진배경** {first-line=-250.8pt space-before=24pt line-spacing=123%",
+     "new": "**추진배경** {first-line=10pt space-before=24pt line-spacing=123%"
+    },
+    {
+     "old": "**주요내용** {first-line=-61.4pt",
+     "new": "**주요내용** {first-line=10pt"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-250.8pt space-before=24pt line-spacing=123%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=123%"
+    },
+    {
+     "old": "**추진배경** {first-line=-250.8pt space-before=24pt line-spacing=139%",
+     "new": "**추진배경** {first-line=10pt space-before=24pt line-spacing=139%"
+    },
+    {
+     "old": "**주요내용** {first-line=-250.8pt space-before=24pt line-spacing=139%",
+     "new": "**주요내용** {first-line=10pt space-before=24pt line-spacing=139%"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-250.8pt space-before=24pt line-spacing=139%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=139%"
+    },
+    {
+     "old": "**추진 배경** {space-before=24pt",
+     "new": "**추진 배경** {first-line=10pt space-before=24pt"
+    },
+    {
+     "old": "**주요 내용** {space-before=24pt",
+     "new": "**주요 내용** {first-line=10pt space-before=24pt"
+    },
+    {
+     "old": "**이행계획(’26년)** {space-before=24pt line-spacing=165%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=165%"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e10",
+   "edits": [
+    {
+     "old": "<style name=\"선그리기\" font=한양신명조/>",
+     "new": "<style name=\"선그리기\" font=한양신명조/>\n<style name=\"강조 문단\" color=#C00000/>"
+    },
+    {
+     "old": " [ㅇ  **(근본 대책)**",
+     "new": "<div style=\"강조 문단\"> [ㅇ  **(근본 대책)**"
+    },
+    {
+     "old": "(’25.11월 4개 법안 국회 상임위 의결 등)]{size=13pt} {first-line",
+     "new": "(’25.11월 4개 법안 국회 상임위 의결 등)]{size=13pt}</div> {first-line"
+    },
+    {
+     "old": " [ㅇ  **(현장 밀착관리)**",
+     "new": "<div style=\"강조 문단\"> [ㅇ  **(현장 밀착관리)**"
+    },
+    {
+     "old": "등 통한 **현장 밀착관리**]{size=15pt} {first-line",
+     "new": "등 통한 **현장 밀착관리**]{size=15pt}</div> {first-line"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,46 @@
+{
+ "answers": [
+  {
+   "task_id": "kr-q1",
+   "text": "ANSWER: fill=#EEEEEE"
+  },
+  {
+   "task_id": "kr-q2",
+   "text": "REFUSE: Colour set directly on a word or phrase is not shown in this text, so it cannot be read, and no style line uses #C00000."
+  },
+  {
+   "task_id": "kr-q3",
+   "text": "ANSWER: indent-left=28.35pt"
+  },
+  {
+   "task_id": "kr-q4",
+   "text": "ANSWER: size=12pt"
+  },
+  {
+   "task_id": "kr-e1",
+   "edits": [
+    {
+     "old": "<style name=\"Note\" fill=#EEEEEE/>",
+     "new": "<style name=\"Note\" fill=#ADD8E6/>"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e2",
+   "text": "REFUSE: Cell borders are direct formatting on cells, which cannot be read or changed in this format."
+  },
+  {
+   "task_id": "kr-e6",
+   "edits": [
+    {
+     "old": "15% 성장",
+     "new": "16% 성장"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e9",
+   "text": "REFUSE: A diagonal-stripe pattern fill cannot be expressed in this format, and cell fills are direct formatting that cannot be changed."
+  }
+ ]
+}

@@ -1,0 +1,270 @@
+{
+ "answers": [
+  {
+   "task_id": "mel-q3",
+   "text": "ANSWER: align=center line-spacing=130%"
+  },
+  {
+   "task_id": "mel-q4",
+   "text": "ANSWER: first-line=-58.96pt"
+  },
+  {
+   "task_id": "mel-q5",
+   "text": "ANSWER: line-spacing=162% font=함초롬바탕"
+  },
+  {
+   "task_id": "mel-q6",
+   "text": "ANSWER: first-line=-58.96pt space-before=24pt line-spacing=162%"
+  },
+  {
+   "task_id": "mel-q7",
+   "text": "ANSWER: line-spacing=100%"
+  },
+  {
+   "task_id": "mel-e1",
+   "edits": [
+    {
+     "old": "| {fill=#F2F2F2 border=\"0.34pt solid #000000\"}  **기금형 퇴직연금 활성화** 및 **1년 미만 퇴직급여** 관련 **노사 이견** {first-line=0pt line-spacing=120% font=함초롬바탕}<p/>   \\*  (기금형) ① 영리형(노반대vs사도입) ②지배구조(노노동자vs사전문가) ③원금보장(노필요vs사반대)<br/>(1년 미만) <사> 실질적 임금 상승 효과(비용부담) vs <노> 1년미만, 특고·플랫폼 등 도입 필요 {first-line=-58.16pt space-before=10pt line-spacing=120% size=12pt}<p/>⇒ 퇴직연금 기능강화를 위한 **노사정TF**[(’25.10월~)]{size=13pt}를 통해 **공감대 및 합의안 도출, 중요과제**는 사회적 대화로 **지속 논의** {first-line=-44.24pt space-before=20pt line-spacing=120% font=함초롬바탕} |\n",
+     "new": "| {fill=#DDEBF7 border=\"0.34pt solid #000000\"}  **기금형 퇴직연금 활성화** 및 **1년 미만 퇴직급여** 관련 **노사 이견** {first-line=0pt line-spacing=120% font=함초롬바탕}<p/>   \\*  (기금형) ① 영리형(노반대vs사도입) ②지배구조(노노동자vs사전문가) ③원금보장(노필요vs사반대)<br/>(1년 미만) <사> 실질적 임금 상승 효과(비용부담) vs <노> 1년미만, 특고·플랫폼 등 도입 필요 {first-line=-58.16pt space-before=10pt line-spacing=120% size=12pt}<p/>⇒ 퇴직연금 기능강화를 위한 **노사정TF**[(’25.10월~)]{size=13pt}를 통해 **공감대 및 합의안 도출, 중요과제**는 사회적 대화로 **지속 논의** {first-line=-44.24pt space-before=20pt line-spacing=120% font=함초롬바탕} |\n"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e6",
+   "edits": [
+    {
+     "old": " ㅇ  **(현장 밀착관리)** 산업안전 **컨트롤타워 차관급 격상**, **감독관 증원**[(’25~’26년, 1,200명)]{size=13pt}과 **안전한 일터 프로젝트**[(2.2만개소)]{size=13pt} 등 통한 **현장 밀착관리**\n",
+     "new": " ㅇ  **(현장 밀착관리)** 산업안전 **컨트롤타워 차관급 격상**, **감독관 증원**[(’25~’26년, 1,300명)]{size=13pt}과 **안전한 일터 프로젝트**[(2.2만개소)]{size=13pt} 등 통한 **현장 밀착관리**\n"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-n1",
+   "text": "ANSWER: unchanged"
+  },
+  {
+   "task_id": "mel-e12",
+   "edits": [
+    {
+     "old": " ㅇ  **(근본 대책)** 중대재해의 **근본적·구조적 원인 해결**을 위한 ｢**노동안전 종합대책**｣ 마련[(’25.9.15)]{size=13pt} 및 **차질없는 시행**[(’25.11월 4개 법안 국회 상임위 의결 등)]{size=13pt}\n",
+     "new": " ㅇ  **(근본 대책)** 중대재해의 **근본적·구조적 원인 해결**을 위한 ｢**노동안전 종합대책**｣ 마련[(’25.9.15)]{size=13pt} 및 **차질없는 시행**[(’25.11월 4개 법안 국회 상임위 의결 등)]{size=13pt} {space-before=12pt}\n"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e11",
+   "text": "REFUSE: this cannot be done here."
+  },
+  {
+   "task_id": "mel-e5",
+   "edits": [
+    {
+     "old": "<style name=\"표가운데\" align=center line-spacing=130% font=-윤명조120/>\n",
+     "new": "<style name=\"표가운데\" align=center line-spacing=130% font=-윤명조120 color=#1F3864/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e8",
+   "edits": [
+    {
+     "old": "□  **노동자의 생명과 안전 지키기: 중견·대기업**의 **산업재해 감축 추세**\\* {first-line=0pt space-before=24pt}\n",
+     "new": "□  **노동자의 생명과 안전 지키기: 중견·대기업**의 **산업재해 감축 추세**\\* {first-line=10pt space-before=24pt}\n"
+    },
+    {
+     "old": "□  **기본이 지켜지는 일터: 임금체불 청산율 88.3%로 역대 최고**[**(’25.9월 기준)**]{size=13pt} {space-before=24pt}\n",
+     "new": "□  **기본이 지켜지는 일터: 임금체불 청산율 88.3%로 역대 최고**[**(’25.9월 기준)**]{size=13pt} {first-line=10pt space-before=24pt}\n"
+    },
+    {
+     "old": "□  **상생과 연대의 기반 조성** {first-line=0pt space-before=24pt}\n",
+     "new": "□  **상생과 연대의 기반 조성** {first-line=10pt space-before=24pt}\n"
+    },
+    {
+     "old": "□ **미래대응 일자리 기반 확충** {first-line=-59.08pt space-before=24pt line-spacing=172%}\n",
+     "new": "□ **미래대응 일자리 기반 확충** {first-line=10pt space-before=24pt line-spacing=172%}\n"
+    },
+    {
+     "old": "□  **(중소‧영세사업장 산재 위험 가중)** 떨어짐･끼임 등 **재래형 사고** 지속, **기후변화·일하는 방식 다양화** 등에 따른 새로운 산재 **위험요인 대두** {first-line=-43.84pt line-spacing=172%}\n",
+     "new": "□  **(중소‧영세사업장 산재 위험 가중)** 떨어짐･끼임 등 **재래형 사고** 지속, **기후변화·일하는 방식 다양화** 등에 따른 새로운 산재 **위험요인 대두** {first-line=10pt line-spacing=172%}\n"
+    },
+    {
+     "old": "□  **(임금체불 절대액 증가)** **피해노동자 감소 추세**에도 **경제규모 확대, 임금총액 증가** 등으로 **체불액은 지속 증가**, 특히 소규모사업장에 집중 {first-line=-43.68pt line-spacing=172%}\n",
+     "new": "□  **(임금체불 절대액 증가)** **피해노동자 감소 추세**에도 **경제규모 확대, 임금총액 증가** 등으로 **체불액은 지속 증가**, 특히 소규모사업장에 집중 {first-line=10pt line-spacing=172%}\n"
+    },
+    {
+     "old": "□  **(노동보호 사각지대 확대)** 플랫폼 등 **일하는 방식이 변화**함에 따라 기존 노동법으로 **보호받지 못하는 새로운 형태의 노동** 증가 {first-line=-44pt line-spacing=172%}\n\n□  **(미래세대 청년 고용 불안)** **20·30 쉬었음 청년 70만**, 현 상황 지속시 **숙련·자산형성 부족** 등으로 **노동시장 활력 저하** 및 **경쟁력 약화 우려**[(국가부양부담↑)]{size=13pt} {first-line=-44pt line-spacing=172%}\n",
+     "new": "□  **(노동보호 사각지대 확대)** 플랫폼 등 **일하는 방식이 변화**함에 따라 기존 노동법으로 **보호받지 못하는 새로운 형태의 노동** 증가 {first-line=10pt line-spacing=172%}\n\n□  **(미래세대 청년 고용 불안)** **20·30 쉬었음 청년 70만**, 현 상황 지속시 **숙련·자산형성 부족** 등으로 **노동시장 활력 저하** 및 **경쟁력 약화 우려**[(국가부양부담↑)]{size=13pt} {first-line=10pt line-spacing=172%}\n"
+    },
+    {
+     "old": "□  **노동시장 격차 해소** {space-before=30pt}\n",
+     "new": "□  **노동시장 격차 해소** {first-line=10pt space-before=30pt}\n"
+    },
+    {
+     "old": "□  **노동있는 산업 대전환** {space-before=30pt}\n",
+     "new": "□  **노동있는 산업 대전환** {first-line=10pt space-before=30pt}\n"
+    },
+    {
+     "old": "□  **노동이 존중받는 일터** {space-before=30pt}\n",
+     "new": "□  **노동이 존중받는 일터** {first-line=10pt space-before=30pt}\n"
+    },
+    {
+     "old": "□  **추진배경** {first-line=-67.7pt space-before=30pt}\n",
+     "new": "□  **추진배경** {first-line=10pt space-before=30pt}\n"
+    },
+    {
+     "old": "□  **주요내용** {first-line=-67.7pt space-before=30pt}\n",
+     "new": "□  **주요내용** {first-line=10pt space-before=30pt}\n"
+    },
+    {
+     "old": "□  **이행계획(’26년)** {first-line=-250.8pt space-before=30pt}\n",
+     "new": "□  **이행계획(’26년)** {first-line=10pt space-before=30pt}\n"
+    },
+    {
+     "old": "|---|\n\n□  **추진배경** {first-line=-250.8pt space-before=24pt font=함초롬바탕}\n\n ㅇ  **만연한 장시간·야간노동**으로 인해 노동자들의 **건강권 침해**  및 **창의성 저해** → **국가 차원의 노동시간 단축 방향 수립**을 통해 **시간격차 해소** {first-line=-58.96pt space-before=20pt font=함초롬바탕}\n",
+     "new": "|---|\n\n□  **추진배경** {first-line=10pt space-before=24pt font=함초롬바탕}\n\n ㅇ  **만연한 장시간·야간노동**으로 인해 노동자들의 **건강권 침해**  및 **창의성 저해** → **국가 차원의 노동시간 단축 방향 수립**을 통해 **시간격차 해소** {first-line=-58.96pt space-before=20pt font=함초롬바탕}\n"
+    },
+    {
+     "old": "□  **주요내용: OECD 평균 수준**[(1,700시간대)]{size=13pt}을 목표로 **실노동시간 단축 본격 추진** {first-line=-250.8pt space-before=24pt font=함초롬바탕}\n",
+     "new": "□  **주요내용: OECD 평균 수준**[(1,700시간대)]{size=13pt}을 목표로 **실노동시간 단축 본격 추진** {first-line=10pt space-before=24pt font=함초롬바탕}\n"
+    },
+    {
+     "old": "|---|\n\n□ **이행계획(’26년)** {first-line=-250.8pt space-before=24pt font=함초롬바탕}\n\n{border=\"0.34pt solid #000000\" line-spacing=140% size=12pt}\n",
+     "new": "|---|\n\n□ **이행계획(’26년)** {first-line=10pt space-before=24pt font=함초롬바탕}\n\n{border=\"0.34pt solid #000000\" line-spacing=140% size=12pt}\n"
+    },
+    {
+     "old": "□  **추진배경** {space-before=24pt}\n",
+     "new": "□  **추진배경** {first-line=10pt space-before=24pt}\n"
+    },
+    {
+     "old": "□  **주요내용** {space-before=24pt}\n",
+     "new": "□  **주요내용** {first-line=10pt space-before=24pt}\n"
+    },
+    {
+     "old": "□ **이행계획(’26년)**\n",
+     "new": "□ **이행계획(’26년)** {first-line=10pt}\n"
+    },
+    {
+     "old": "□  **추진배경** {first-line=-61.52pt space-before=24pt line-spacing=155% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **추진배경** {first-line=10pt space-before=24pt line-spacing=155% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **주요내용**  {first-line=-250.8pt space-before=24pt line-spacing=155% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **주요내용**  {first-line=10pt space-before=24pt line-spacing=155% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **이행계획(’26년)** {first-line=-61.52pt space-before=20pt line-spacing=155% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **이행계획(’26년)** {first-line=10pt space-before=20pt line-spacing=155% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **추진배경** {align=left first-line=-44.96pt space-before=24pt font=함초롬바탕 size=15pt}\n",
+     "new": "□ **추진배경** {align=left first-line=10pt space-before=24pt font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **주요내용: 대상별 지원체계 구축** {align=left first-line=-67.7pt space-before=24pt font=함초롬바탕 size=15pt}\n",
+     "new": "□  **주요내용: 대상별 지원체계 구축** {align=left first-line=10pt space-before=24pt font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "   [**-  민간·공공 장애인 의무고용률 상향**]{size=15pt}[(민간: 3.1→]{size=13pt}[**’29**]{size=15pt}[3.5%/공공:3.8→]{size=13pt}[**’29**]{size=15pt}[4.0%)]{size=13pt} [및 **자회사형 표준사업장 지원 강화, 수준별 AI 맞춤훈련 신설**]{size=15pt}[(3.6천명)]{size=13pt} {first-line=-76.24pt space-before=16pt font=함초롬바탕}\n\n□ **이행계획(’26년)** {first-line=-250.8pt space-before=24pt font=함초롬바탕 size=15pt}\n\n",
+     "new": "   [**-  민간·공공 장애인 의무고용률 상향**]{size=15pt}[(민간: 3.1→]{size=13pt}[**’29**]{size=15pt}[3.5%/공공:3.8→]{size=13pt}[**’29**]{size=15pt}[4.0%)]{size=13pt} [및 **자회사형 표준사업장 지원 강화, 수준별 AI 맞춤훈련 신설**]{size=15pt}[(3.6천명)]{size=13pt} {first-line=-76.24pt space-before=16pt font=함초롬바탕}\n\n□ **이행계획(’26년)** {first-line=10pt space-before=24pt font=함초롬바탕 size=15pt}\n\n"
+    },
+    {
+     "old": "□ **추진배경** {align=left first-line=-44.96pt space-before=24pt line-spacing=107% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **추진배경** {align=left first-line=10pt space-before=24pt line-spacing=107% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **주요내용** {align=left first-line=-67.7pt space-before=24pt line-spacing=107% font=함초롬바탕 size=15pt}\n",
+     "new": "□  **주요내용** {align=left first-line=10pt space-before=24pt line-spacing=107% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **이행계획(’26년)** {space-before=24pt line-spacing=107% font=함초롬바탕 size=15pt}\n",
+     "new": "□ **이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=107% font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **추진배경** {space-before=24pt font=함초롬바탕}\n",
+     "new": "□  **추진배경** {first-line=10pt space-before=24pt font=함초롬바탕}\n"
+    },
+    {
+     "old": "□  **주요내용** {space-before=24pt font=함초롬바탕}\n",
+     "new": "□  **주요내용** {first-line=10pt space-before=24pt font=함초롬바탕}\n"
+    },
+    {
+     "old": "□  **이행계획(’26년)** {space-before=24pt font=함초롬바탕}\n",
+     "new": "□  **이행계획(’26년)** {first-line=10pt space-before=24pt font=함초롬바탕}\n"
+    },
+    {
+     "old": "□  **추진배경** {align=left first-line=-67.7pt space-before=24pt font=함초롬바탕}\n",
+     "new": "□  **추진배경** {align=left first-line=10pt space-before=24pt font=함초롬바탕}\n"
+    },
+    {
+     "old": "□  **주요내용** {align=left first-line=-67.7pt space-before=24pt font=함초롬바탕}\n",
+     "new": "□  **주요내용** {align=left first-line=10pt space-before=24pt font=함초롬바탕}\n"
+    },
+    {
+     "old": "□  **이행계획(’26년)** {align=left first-line=-67.7pt space-before=24pt font=함초롬바탕}\n",
+     "new": "□  **이행계획(’26년)** {align=left first-line=10pt space-before=24pt font=함초롬바탕}\n"
+    },
+    {
+     "old": "|---|\n\n□  **추진배경** {first-line=-250.8pt space-before=24pt font=함초롬바탕 size=15pt}\n\n ㅇ 고용형태가 다양화되면서 노동법 적용 회피 수단으로 **가짜 3.3계약**, **무늬만 프리랜서** 문제 증가로 **보호사각지대 해소 필요** {first-line=-59.1pt font=함초롬바탕 size=15pt}\n",
+     "new": "|---|\n\n□  **추진배경** {first-line=10pt space-before=24pt font=함초롬바탕 size=15pt}\n\n ㅇ 고용형태가 다양화되면서 노동법 적용 회피 수단으로 **가짜 3.3계약**, **무늬만 프리랜서** 문제 증가로 **보호사각지대 해소 필요** {first-line=-59.1pt font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": " ㅇ AI 전환, 플랫폼 경제 등으로 **기존 노동관계법**으로 **포괄하기 어려운 ‘권리 밖 노동자’ 증가** 등 **새로운 노동권 보호체계 긴요** {first-line=-59.6pt font=함초롬바탕 size=15pt}\n\n□  **주요내용** {first-line=-250.8pt space-before=24pt font=함초롬바탕 size=15pt}\n\n",
+     "new": " ㅇ AI 전환, 플랫폼 경제 등으로 **기존 노동관계법**으로 **포괄하기 어려운 ‘권리 밖 노동자’ 증가** 등 **새로운 노동권 보호체계 긴요** {first-line=-59.6pt font=함초롬바탕 size=15pt}\n\n□  **주요내용** {first-line=10pt space-before=24pt font=함초롬바탕 size=15pt}\n\n"
+    },
+    {
+     "old": "□ **이행계획(’26년)** {first-line=-61.52pt font=함초롬바탕 size=15pt}\n",
+     "new": "□ **이행계획(’26년)** {first-line=10pt font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **추진배경** {first-line=-250.8pt space-before=24pt font=함초롬바탕}\n",
+     "new": "□  **추진배경** {first-line=10pt space-before=24pt font=함초롬바탕}\n"
+    },
+    {
+     "old": "□  **주요내용** {first-line=-61.4pt space-before=24pt font=함초롬바탕}\n",
+     "new": "□  **주요내용** {first-line=10pt space-before=24pt font=함초롬바탕}\n"
+    },
+    {
+     "old": "□ **이행계획(’26년)** {first-line=-250.8pt space-before=24pt font=함초롬바탕}\n",
+     "new": "□ **이행계획(’26년)** {first-line=10pt space-before=24pt font=함초롬바탕}\n"
+    },
+    {
+     "old": "□  **추진배경** {first-line=-250.8pt space-before=24pt font=함초롬바탕 size=15pt}\n",
+     "new": "□  **추진배경** {first-line=10pt space-before=24pt font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□  **주요내용** {first-line=-250.8pt space-before=24pt font=함초롬바탕 size=15pt}\n",
+     "new": "□  **주요내용** {first-line=10pt space-before=24pt font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **이행계획(’26년)** {first-line=-250.8pt space-before=24pt font=함초롬바탕 size=15pt}\n",
+     "new": "□ **이행계획(’26년)** {first-line=10pt space-before=24pt font=함초롬바탕 size=15pt}\n"
+    },
+    {
+     "old": "□ **추진 배경** {space-before=24pt}\n",
+     "new": "□ **추진 배경** {first-line=10pt space-before=24pt}\n"
+    },
+    {
+     "old": "□ **주요 내용** {space-before=24pt}\n",
+     "new": "□ **주요 내용** {first-line=10pt space-before=24pt}\n"
+    },
+    {
+     "old": "□ **이행계획(’26년)** {space-before=24pt}\n",
+     "new": "□ **이행계획(’26년)** {first-line=10pt space-before=24pt}\n"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e10",
+   "edits": [
+    {
+     "old": "<style name=\"선그리기\" font=한양신명조/>\n",
+     "new": "<style name=\"선그리기\" font=한양신명조/>\n<style name=\"강조 문단\" color=#C00000/>\n"
+    },
+    {
+     "old": " ㅇ  **(근본 대책)** 중대재해의 **근본적·구조적 원인 해결**을 위한 ｢**노동안전 종합대책**｣ 마련[(’25.9.15)]{size=13pt} 및 **차질없는 시행**[(’25.11월 4개 법안 국회 상임위 의결 등)]{size=13pt}\n\n ㅇ  **(현장 밀착관리)** 산업안전 **컨트롤타워 차관급 격상**, **감독관 증원**[(’25~’26년, 1,200명)]{size=13pt}과 **안전한 일터 프로젝트**[(2.2만개소)]{size=13pt} 등 통한 **현장 밀착관리**\n",
+     "new": "<div style=\"강조 문단\"> ㅇ  **(근본 대책)** 중대재해의 **근본적·구조적 원인 해결**을 위한 ｢**노동안전 종합대책**｣ 마련[(’25.9.15)]{size=13pt} 및 **차질없는 시행**[(’25.11월 4개 법안 국회 상임위 의결 등)]{size=13pt}</div>\n\n<div style=\"강조 문단\"> ㅇ  **(현장 밀착관리)** 산업안전 **컨트롤타워 차관급 격상**, **감독관 증원**[(’25~’26년, 1,200명)]{size=13pt}과 **안전한 일터 프로젝트**[(2.2만개소)]{size=13pt} 등 통한 **현장 밀착관리**</div>\n"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,56 @@
+{
+ "answers": [
+  {
+   "task_id": "pp-q1",
+   "text": "ANSWER: The file does not say. \"Connector 6\" has no border written, so its width, line style and colour come from the theme's line style, which isn't shown here."
+  },
+  {
+   "task_id": "pp-q2",
+   "text": "ANSWER: Oval 2; Oval 4; Oval 7; Oval 10"
+  },
+  {
+   "task_id": "pp-e1",
+   "edits": [
+    {
+     "old": "name=\"Rounded Rectangle 7\" box=\"354 130 260 320\" fill=#FFFFFF",
+     "new": "name=\"Rounded Rectangle 7\" box=\"354 130 260 320\" fill=accent2"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e2",
+   "edits": [
+    {
+     "old": "name=\"Rounded Rectangle 12\" box=\"644 130 260 320\" fill=#FFFFFF border=none/>",
+     "new": "name=\"Rounded Rectangle 12\" box=\"644 130 260 320\" fill=#FFFFFF border=\"2pt solid #101B3A\"/>"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e3",
+   "edits": [
+    {
+     "old": "Battery cost down 60% in 5 years",
+     "new": "Battery cost down [60%]{size=24pt color=#FF6B5B} in 5 years"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e4",
+   "text": "REFUSE: The connectors have no line style or colour written in the file (they come from the theme), so I can't set a 3pt width while keeping their current colour and style."
+  },
+  {
+   "task_id": "pp-e5",
+   "edits": [
+    {
+     "old": "Series A · 2026",
+     "new": "Series B · 2026"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e6",
+   "text": "REFUSE: Shadows and other effects cannot be expressed in this file format."
+  }
+ ]
+}

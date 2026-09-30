@@ -1,0 +1,81 @@
+{
+ "answers": [
+  {
+   "task_id": "kr-e3",
+   "edits": [
+    {
+     "old": "| 지역 | 지점 | 매출 |",
+     "new": "| {fill=#D9D9D9} **지역** | {fill=#D9D9D9} **지점** | {fill=#D9D9D9} **매출** |"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e4",
+   "edits": [
+    {
+     "old": "# 3분기 영업 보고",
+     "new": "# [3분기 영업 보고]{color=#C00000}"
+    },
+    {
+     "old": "## 지역별 현황",
+     "new": "## [지역별 현황]{color=#C00000}"
+    },
+    {
+     "old": "## 향후 계획",
+     "new": "## [향후 계획]{color=#C00000}"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e5",
+   "edits": [
+    {
+     "old": "<style name=\"Heading 2\" size=13pt bold/>",
+     "new": "<style name=\"Heading 2\" size=13pt color=#1F3864 bold/>"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e7",
+   "edits": [
+    {
+     "old": "4분기에는 [부산]{color=#C00000}과 [대구]{color=#C00000}에 지점을 연다.",
+     "new": "4분기에는 [부산]{color=#C00000}과 [대구]{color=#C00000}에 지점을 연다.\n\n| {fill=#D9D9D9} 도시 | {fill=#D9D9D9} 개점 |\n|---|---|\n| 부산 | 10월 |\n| 대구 | 11월 |"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e8",
+   "edits": [
+    {
+     "old": "그중 [21곳이 수도권]{color=#C00000}이다.",
+     "new": "그중 [21곳이 수도권]{color=#C00000}이다. {first-line=10pt}"
+    },
+    {
+     "old": "summary=\"comment: 지방 수치 재확인 필요\"/>",
+     "new": "summary=\"comment: 지방 수치 재확인 필요\"/> {first-line=10pt}"
+    },
+    {
+     "old": "아래 표는 지점별 매출을 정리한 것이다.",
+     "new": "아래 표는 지점별 매출을 정리한 것이다. {first-line=10pt}"
+    },
+    {
+     "old": "성장했다.\n",
+     "new": "성장했다. {first-line=10pt}\n"
+    },
+    {
+     "old": "에 지점을 연다.\n",
+     "new": "에 지점을 연다. {first-line=10pt}\n"
+    },
+    {
+     "old": "부록: 지점 목록",
+     "new": "부록: 지점 목록 {first-line=10pt}"
+    },
+    {
+     "old": "서울 강남, 서울 종로, 경기 분당, 인천 송도.",
+     "new": "서울 강남, 서울 종로, 경기 분당, 인천 송도. {first-line=10pt}"
+    }
+   ]
+  }
+ ]
+}

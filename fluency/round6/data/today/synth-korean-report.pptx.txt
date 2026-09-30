@@ -1,0 +1,81 @@
+---
+type: presentation
+format: pptx
+schema: 1
+size: 960 x 540 pt
+---
+
+layout: Blank
+<shape id="s2" name="Rectangle 1" box="0 0 320 540"/>
+<shape id="s3" name="TextBox 2" box="360 180 560 80">**2026 하반기 사업 보고**</shape>
+<shape id="s4" name="TextBox 3" box="360 270 560 40">전략기획실 · 2026년 9월</shape>
+<group id="g9" name="로고" box="40 40 220 32">
+<group id="g7" name="Group 6" box="40 40 50 30">
+<shape id="s5" name="Oval 4" box="40 40 30 30"/>
+<shape id="s6" name="Oval 5" box="60 40 30 30"/>
+</group>
+<shape id="s8" name="TextBox 7" box="100 42 160 30">**한빛모빌리티**</shape>
+</group>
+
+---
+
+layout: Title Only
+::title box="36 22 648 90"::
+핵심 지표
+<shape id="s3" name="Rounded Rectangle 2" box="40 150 205 150">**1,240억**<p/>매출</shape>
+<shape id="s4" name="Rounded Rectangle 3" box="265 150 205 150">**+12%**<p/>전년 대비</shape>
+<shape id="s5" name="Rounded Rectangle 4" box="490 150 205 150">**34곳**<p/>신규 고객</shape>
+<shape id="s6" name="Rounded Rectangle 5" box="715 150 205 150">**4.7**<p/>고객 만족도</shape>
+<shape id="s7" name="TextBox 6" box="40 330 880 60">출처: 내부 집계 (2026년 9월 말 기준)</shape>
+
+---
+
+layout: Title Only
+::title box="36 22 648 90"::
+추진 절차
+<shape id="s3" name="Pentagon 2" box="40 200 190 80">기획</shape>
+<shape id="s4" name="Chevron 3" box="220 200 190 80">설계</shape>
+<shape id="s5" name="Chevron 4" box="400 200 190 80">구축</shape>
+<shape id="s6" name="Chevron 5" box="580 200 190 80">검증</shape>
+<shape id="s7" name="Chevron 6" box="760 200 190 80">확산</shape>
+<shape id="s8" name="Rectangular Callout 7" box="560 330 240 80">10월 착수 예정</shape>
+
+---
+
+layout: Two Content
+::title box="36 22 648 90"::
+지역별 현황
+::left box="36 126 318 356"::
+- 수도권 21곳
+- 신규 9곳
+::right box="366 126 318 356"::
+- 지방 13곳
+- 신규 4곳
+<shape id="s5" name="Oval 4" box="455 250 50 50">VS</shape>
+
+---
+
+layout: Blank
+<shape id="s2" name="TextBox 1" box="40 30 600 50">**조직 구성**</shape>
+<shape id="s3" name="Rounded Rectangle 2" box="400 100 160 50">대표이사</shape>
+<shape id="s4" name="Rounded Rectangle 3" box="120 230 160 50">전략기획실</shape>
+<line id="s5" name="Connector 4" from="480 150" to="200 230"/>
+<shape id="s6" name="Rounded Rectangle 5" box="400 230 160 50">사업본부</shape>
+<line id="s7" name="Connector 6" from="480 150" to="480 230"/>
+<shape id="s8" name="Rounded Rectangle 7" box="680 230 160 50">기술연구소</shape>
+<line id="s9" name="Connector 8" from="480 150" to="760 230"/>
+<keep id="kh44k" kind="picture" summary="image.jpg" box="820 400 90 90"/>
+
+---
+
+layout: Title Only
+::title box="36 22 648 90"::
+매출 구성
+<keep id="kthd3" kind="chart" summary="Chart 2" box="60 130 360 360"/>
+<shape id="s4" name="Rectangle 3" box="500 200 20 20"/>
+<shape id="s5" name="TextBox 4" box="530 195 300 30">구독 55%</shape>
+<shape id="s6" name="Rectangle 5" box="500 250 20 20"/>
+<shape id="s7" name="TextBox 6" box="530 245 300 30">라이선스 30%</shape>
+<shape id="s8" name="Rectangle 7" box="500 300 20 20"/>
+<shape id="s9" name="TextBox 8" box="530 295 300 30">서비스 15%</shape>
+

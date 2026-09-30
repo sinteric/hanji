@@ -1,0 +1,131 @@
+[
+ {
+  "unit_id": "r6p-F1-1",
+  "part": "a",
+  "candidate": "F1",
+  "seed": 1,
+  "file_chars": 8053,
+  "prompt_chars": 13269,
+  "max_line": 312,
+  "tasks": [
+   "pp-q1",
+   "pp-q2",
+   "pp-e1",
+   "pp-e2",
+   "pp-e3",
+   "pp-e4",
+   "pp-e5",
+   "pp-e6"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6p-F2o-1",
+  "part": "a",
+  "candidate": "F2o",
+  "seed": 1,
+  "file_chars": 8362,
+  "prompt_chars": 13586,
+  "max_line": 312,
+  "tasks": [
+   "pp-q1",
+   "pp-q2",
+   "pp-e1",
+   "pp-e2",
+   "pp-e3",
+   "pp-e4",
+   "pp-e5",
+   "pp-e6"
+  ],
+  "unreachable": [
+   "pp-q1",
+   "pp-e4"
+  ]
+ },
+ {
+  "unit_id": "r6p-F1-2",
+  "part": "a",
+  "candidate": "F1",
+  "seed": 2,
+  "file_chars": 4691,
+  "prompt_chars": 9821,
+  "max_line": 312,
+  "tasks": [
+   "pp-q1",
+   "pp-q2",
+   "pp-e1",
+   "pp-e2",
+   "pp-e3",
+   "pp-e4",
+   "pp-e5",
+   "pp-e6"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6p-F2o-2",
+  "part": "a",
+  "candidate": "F2o",
+  "seed": 2,
+  "file_chars": 4372,
+  "prompt_chars": 9510,
+  "max_line": 312,
+  "tasks": [
+   "pp-q1",
+   "pp-q2",
+   "pp-e1",
+   "pp-e2",
+   "pp-e3",
+   "pp-e4",
+   "pp-e5",
+   "pp-e6"
+  ],
+  "unreachable": [
+   "pp-q1",
+   "pp-e4"
+  ]
+ },
+ {
+  "unit_id": "r6p-F1-3",
+  "part": "a",
+  "candidate": "F1",
+  "seed": 3,
+  "file_chars": 20786,
+  "prompt_chars": 25997,
+  "max_line": 492,
+  "tasks": [
+   "pp-q1",
+   "pp-q2",
+   "pp-e1",
+   "pp-e2",
+   "pp-e3",
+   "pp-e4",
+   "pp-e5",
+   "pp-e6"
+  ],
+  "unreachable": []
+ },
+ {
+  "unit_id": "r6p-F2o-3",
+  "part": "a",
+  "candidate": "F2o",
+  "seed": 3,
+  "file_chars": 20444,
+  "prompt_chars": 25663,
+  "max_line": 455,
+  "tasks": [
+   "pp-q1",
+   "pp-q2",
+   "pp-e1",
+   "pp-e2",
+   "pp-e3",
+   "pp-e4",
+   "pp-e5",
+   "pp-e6"
+  ],
+  "unreachable": [
+   "pp-q1",
+   "pp-e4"
+  ]
+ }
+]

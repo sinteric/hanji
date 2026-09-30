@@ -1,0 +1,4 @@
+{
+ "message": "Read the file prompt.md in the current directory: it holds a task prompt, then the answer you gave, then the validator's errors for it. Read only that file, all of it. Reply with a corrected JSON object for the whole prompt, and nothing else.",
+ "errors": "- `mel-e3`: edit 2: the \"old\" text does not occur in the file. It must be copied exactly from the file as it is after the earlier edits (same spaces, line breaks and characters). The closest line is line 332: `| **1분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **2분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **3분기** {align=center first-line=0pt line-spacing=160% size=13`."
+}

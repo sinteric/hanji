@@ -1,0 +1,51 @@
+{
+ "answers": [
+  {
+   "task_id": "mel-q1",
+   "text": "ANSWER: fill=#E9F1FE"
+  },
+  {
+   "task_id": "mel-q2",
+   "text": "ANSWER: 구  분; 2025 예산 (A); 2026년 예산 (B); 증  감 (B-A); (B-A)/A"
+  },
+  {
+   "task_id": "mel-q3",
+   "text": "ANSWER: align=center line-spacing=130%"
+  },
+  {
+   "task_id": "mel-q4",
+   "text": "ANSWER: first-line=-58.96pt"
+  },
+  {
+   "task_id": "mel-e1",
+   "edits": [
+    {
+     "old": "| {fill=#F2F2F2 border=\"0.34pt solid #000000\"}  **기금형",
+     "new": "| {fill=#ADD8E6 border=\"0.34pt solid #000000\"}  **기금형"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e2",
+   "edits": [
+    {
+     "old": "| {fill=#F2F2F2 border=\"0.34pt solid #000000\"}  **기금형",
+     "new": "| {fill=#F2F2F2 border=\"0.34pt solid #000000\" border-bottom=\"0.34pt solid #FF0000\"}  **기금형"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e6",
+   "edits": [
+    {
+     "old": "[(’25~’26년, 1,200명)]{size=13pt}",
+     "new": "[(’25~’26년, 1,300명)]{size=13pt}"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e9",
+   "text": "REFUSE: A gradient fill is only kept as written; this format cannot write or change a gradient's colours."
+  }
+ ]
+}

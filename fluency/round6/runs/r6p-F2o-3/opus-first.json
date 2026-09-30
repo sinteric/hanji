@@ -1,0 +1,64 @@
+{
+ "answers": [
+  {
+   "task_id": "pp-q1",
+   "text": "ANSWER: fill is not set on s780022854 itself; it comes from the theme's shape style, and this file does not show that value (it may be none)."
+  },
+  {
+   "task_id": "pp-q2",
+   "text": "ANSWER: s253550464; s1717326992"
+  },
+  {
+   "task_id": "pp-e1",
+   "edits": [
+    {
+     "old": "<shape id=\"s304069585\" name=\"\" box=\"305 390 105 63\" fill=bg1-5%",
+     "new": "<shape id=\"s304069585\" name=\"\" box=\"305 390 105 63\" fill=accent2"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e2",
+   "edits": [
+    {
+     "old": "<shape id=\"s95144368\" name=\"Slide text\" box=\"120 180 414 332\" first-line",
+     "new": "<shape id=\"s95144368\" name=\"Slide text\" box=\"120 180 414 332\" border=\"2pt solid #000080\" first-line"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e3",
+   "edits": [
+    {
+     "old": "***What are presentations <br/>in editors?***",
+     "new": "***What are presentations <br/>in [editors]{size=24pt color=#FF7F50}?***"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e4",
+   "text": "REFUSE: Neither line writes its own outline, so its width, colour and style come from the theme and aren't in this file, which means I can't double the width while keeping the colour and style."
+  },
+  {
+   "task_id": "pp-e5",
+   "edits": [
+    {
+     "old": ">*Presentation Editor*</shape>",
+     "new": ">*Presentation Studio*</shape>"
+    },
+    {
+     "old": ">***Presentation Editor***</shape>",
+     "new": ">***Presentation Studio***</shape>"
+    },
+    {
+     "old": "size=80pt color=tx1::\n***Presentation Editor***",
+     "new": "size=80pt color=tx1::\n***Presentation Studio***"
+    }
+   ]
+  },
+  {
+   "task_id": "pp-e6",
+   "text": "REFUSE: This file format can't express shadows or other effects."
+  }
+ ]
+}

@@ -1,0 +1,59 @@
+{
+ "answers": [
+  {
+   "task_id": "fn-q3",
+   "text": "ANSWER: indent-left=20pt first-line=0pt"
+  },
+  {
+   "task_id": "fn-q4",
+   "text": "ANSWER: size=14pt"
+  },
+  {
+   "task_id": "fn-q5",
+   "text": "ANSWER: line-spacing=170%"
+  },
+  {
+   "task_id": "fn-q6",
+   "text": "ANSWER: size=18pt line-spacing=160%"
+  },
+  {
+   "task_id": "fn-q7",
+   "text": "ANSWER: font=HY견명조 size=16pt"
+  },
+  {
+   "task_id": "fn-e1",
+   "edits": [
+    {
+     "old": "{fill=#FFF0C3 border-top=",
+     "new": "{fill=#DDEBF7 border-top="
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e6",
+   "edits": [
+    {
+     "old": "시제품 제작 시간과 비용 절감",
+     "new": "시제품 제작 기간과 비용 절감"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-n1",
+   "text": "ANSWER: unchanged"
+  },
+  {
+   "task_id": "fn-e12",
+   "edits": [
+    {
+     "old": "본격 상용화 {style=\"개요 3\" indent-left=19pt}",
+     "new": "본격 상용화 {style=\"개요 3\" indent-left=19pt line-spacing=200%}"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e11",
+   "text": "REFUSE: A style named \"개요 4\" already exists, and giving a new style a name that is already a style is an error in this format."
+  }
+ ]
+}

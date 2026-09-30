@@ -1,0 +1,66 @@
+{
+ "answers": [
+  {
+   "task_id": "mel-q1",
+   "text": "REFUSE: The banner's fill is direct cell formatting, which is not shown in this text and cannot be read."
+  },
+  {
+   "task_id": "mel-q2",
+   "text": "REFUSE: Cell borders are direct formatting, which is not shown in this text, so I can't tell which cells have a double bottom border."
+  },
+  {
+   "task_id": "mel-q3",
+   "text": "ANSWER: align=center line-spacing=130%"
+  },
+  {
+   "task_id": "mel-q4",
+   "text": "ANSWER: first-line=0pt"
+  },
+  {
+   "task_id": "mel-e1",
+   "text": "REFUSE: The banner's fill is direct cell formatting, which cannot be changed in this format."
+  },
+  {
+   "task_id": "mel-e2",
+   "text": "REFUSE: The banner's border is direct cell formatting, which cannot be changed in this format."
+  },
+  {
+   "task_id": "mel-e6",
+   "edits": [
+    {
+     "old": "1,200명",
+     "new": "1,300명"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e9",
+   "text": "REFUSE: A gradient cannot be expressed in this format, and the banner's fill is direct formatting that can't be edited."
+  },
+  {
+   "task_id": "mel-e3",
+   "text": "REFUSE: A cell's grey fill is direct formatting, which can't be set here, and no existing style has the #D9D9D9 fill."
+  },
+  {
+   "task_id": "mel-e4",
+   "text": "REFUSE: Those headings are plain paragraphs in the default style. Dark red 18pt would need a new style or direct text formatting, and neither can be created here."
+  },
+  {
+   "task_id": "mel-e5",
+   "edits": [
+    {
+     "old": "<style name=\"표가운데\" align=center line-spacing=130% font=-윤명조120/>",
+     "new": "<style name=\"표가운데\" align=center line-spacing=130% font=-윤명조120 color=#1F3864/>"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e7",
+   "text": "REFUSE: The header cells need a #D9D9D9 fill, which is direct cell formatting and can't be set here. No existing style has that fill."
+  },
+  {
+   "task_id": "mel-e8",
+   "text": "REFUSE: The paragraphs beginning with □ are in the default style, which all other paragraphs share. A first-line indent for only those would need a new style or direct paragraph formatting, and neither can be created here."
+  }
+ ]
+}

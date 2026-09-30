@@ -1,0 +1,61 @@
+{
+ "answers": [
+  {
+   "text": "ANSWER: border=\"2pt solid accent1\"",
+   "task_id": "pp-q1"
+  },
+  {
+   "text": "ANSWER: Oval 2; Oval 4; Oval 7; Oval 10",
+   "task_id": "pp-q2"
+  },
+  {
+   "edits": [
+    {
+     "old": "<shape id=\"s8\" name=\"Rounded Rectangle 7\" box=\"354 130 260 320\" fill=#FFFFFF border=none/>\n",
+     "new": "<shape id=\"s8\" name=\"Rounded Rectangle 7\" box=\"354 130 260 320\" fill=accent2 border=none/>\n"
+    }
+   ],
+   "task_id": "pp-e1"
+  },
+  {
+   "edits": [
+    {
+     "old": "<shape id=\"s13\" name=\"Rounded Rectangle 12\" box=\"644 130 260 320\" fill=#FFFFFF border=none/>\n",
+     "new": "<shape id=\"s13\" name=\"Rounded Rectangle 12\" box=\"644 130 260 320\" fill=#FFFFFF border=\"2pt solid #1F3864\"/>\n"
+    }
+   ],
+   "task_id": "pp-e2"
+  },
+  {
+   "edits": [
+    {
+     "old": "<shape id=\"s11\" name=\"TextBox 10\" box=\"378 260 212 120\" font=Pretendard size=16pt color=#555555>Battery cost down 60% in 5 years</shape>\n",
+     "new": "<shape id=\"s11\" name=\"TextBox 10\" box=\"378 260 212 120\" font=Pretendard size=16pt color=#555555>Battery cost down [60%]{size=24pt color=#FF7F50} in 5 years</shape>\n"
+    }
+   ],
+   "task_id": "pp-e3"
+  },
+  {
+   "edits": [
+    {
+     "old": "<line id=\"s7\" name=\"Connector 6\" from=\"172 256\" to=\"300 256\" border=\"2pt solid accent1\"/>\n<shape id=\"s8\" name=\"Oval 7\" box=\"500 220 72 72\" fill=accent1 border=none size=28pt color=#FFFFFF>3</shape>\n<shape id=\"s9\" name=\"TextBox 8\" box=\"470 310 132 40\" align=center font=Pretendard size=18pt color=#222222>Market</shape>\n<line id=\"s10\" name=\"Connector 9\" from=\"372 256\" to=\"500 256\" border=\"2pt solid accent1\"/>\n<shape id=\"s11\" name=\"Oval 10\" box=\"700 220 72 72\" fill=accent1 border=none size=28pt color=#FFFFFF>4</shape>\n<shape id=\"s12\" name=\"TextBox 11\" box=\"670 310 132 40\" align=center font=Pretendard size=18pt color=#222222>Traction</shape>\n<line id=\"s13\" name=\"Connector 12\" from=\"572 256\" to=\"700 256\" border=\"2pt solid accent1\"/>\n",
+     "new": "<line id=\"s7\" name=\"Connector 6\" from=\"172 256\" to=\"300 256\" border=\"3pt solid accent1\"/>\n<shape id=\"s8\" name=\"Oval 7\" box=\"500 220 72 72\" fill=accent1 border=none size=28pt color=#FFFFFF>3</shape>\n<shape id=\"s9\" name=\"TextBox 8\" box=\"470 310 132 40\" align=center font=Pretendard size=18pt color=#222222>Market</shape>\n<line id=\"s10\" name=\"Connector 9\" from=\"372 256\" to=\"500 256\" border=\"3pt solid accent1\"/>\n<shape id=\"s11\" name=\"Oval 10\" box=\"700 220 72 72\" fill=accent1 border=none size=28pt color=#FFFFFF>4</shape>\n<shape id=\"s12\" name=\"TextBox 11\" box=\"670 310 132 40\" align=center font=Pretendard size=18pt color=#222222>Traction</shape>\n<line id=\"s13\" name=\"Connector 12\" from=\"572 256\" to=\"700 256\" border=\"3pt solid accent1\"/>\n"
+    }
+   ],
+   "task_id": "pp-e4"
+  },
+  {
+   "edits": [
+    {
+     "old": "<shape id=\"s5\" name=\"TextBox 4\" box=\"64 290 600 40\" font=Pretendard size=22pt color=#CFE8FF>Series A · 2026</shape>\n",
+     "new": "<shape id=\"s5\" name=\"TextBox 4\" box=\"64 290 600 40\" font=Pretendard size=22pt color=#CFE8FF>Series B · 2026</shape>\n"
+    }
+   ],
+   "task_id": "pp-e5"
+  },
+  {
+   "text": "REFUSE: this format cannot express it.",
+   "task_id": "pp-e6"
+  }
+ ]
+}

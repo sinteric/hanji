@@ -1,0 +1,51 @@
+{
+ "answers": [
+  {
+   "task_id": "kr-q1",
+   "text": "ANSWER: fill=#EEEEEE"
+  },
+  {
+   "task_id": "kr-q2",
+   "text": "ANSWER: 21곳이 수도권; 부산; 대구"
+  },
+  {
+   "task_id": "kr-q3",
+   "text": "ANSWER: indent-left=28.35pt"
+  },
+  {
+   "task_id": "kr-q4",
+   "text": "ANSWER: size=14pt"
+  },
+  {
+   "task_id": "kr-e1",
+   "edits": [
+    {
+     "old": "{fill=#EEEEEE}",
+     "new": "{fill=#DDEBF7}"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e2",
+   "edits": [
+    {
+     "old": "| 합계 || 215 |",
+     "new": "| 합계 || 215 | {border-bottom=\"1.5pt solid #FF0000\"}"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e6",
+   "edits": [
+    {
+     "old": "[15% 성장]",
+     "new": "[16% 성장]"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e9",
+   "text": "REFUSE: Pattern fills cannot be written or changed in this format; they can only be kept as they are or replaced by a colour."
+  }
+ ]
+}

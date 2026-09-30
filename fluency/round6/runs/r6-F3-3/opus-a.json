@@ -1,0 +1,46 @@
+{
+ "answers": [
+  {
+   "task_id": "kr-q1",
+   "text": "ANSWER: fill=#EEEEEE"
+  },
+  {
+   "task_id": "kr-q2",
+   "text": "REFUSE: No style in the file uses colour #C00000, and colour set on individual words is direct formatting, which this format does not show."
+  },
+  {
+   "task_id": "kr-q3",
+   "text": "ANSWER: indent-left=28.35pt"
+  },
+  {
+   "task_id": "kr-q4",
+   "text": "ANSWER: size=12pt"
+  },
+  {
+   "task_id": "kr-e1",
+   "edits": [
+    {
+     "old": "<style name=\"Note\" fill=#EEEEEE/>",
+     "new": "<style name=\"Note\" fill=#ADD8E6/>"
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e2",
+   "text": "REFUSE: Cell borders are direct formatting on the cells, and this format cannot show or change them."
+  },
+  {
+   "task_id": "kr-e6",
+   "edits": [
+    {
+     "old": "1,204억 원으로 15% 성장했다.",
+     "new": "1,204억 원으로 16% 성장했다."
+    }
+   ]
+  },
+  {
+   "task_id": "kr-e9",
+   "text": "REFUSE: Patterns cannot be expressed in this format, and cells have no formatting of their own here."
+  }
+ ]
+}

@@ -1,0 +1,51 @@
+{
+ "answers": [
+  {
+   "task_id": "fn-q1",
+   "text": "ANSWER: fill=#FFF0C3"
+  },
+  {
+   "task_id": "fn-q2",
+   "text": "ANSWER: 3D 프린팅 기술의 등장과 기술 발전에 따른 문제점과 정부의 대처 방안; 3D 프린팅 기술의 미래와 전망"
+  },
+  {
+   "task_id": "fn-q3",
+   "text": "ANSWER: indent-left=20pt first-line=0pt"
+  },
+  {
+   "task_id": "fn-q4",
+   "text": "ANSWER: size=14pt"
+  },
+  {
+   "task_id": "fn-e1",
+   "edits": [
+    {
+     "old": "{fill=#FFF0C3 border-top",
+     "new": "{fill=#ADD8E6 border-top"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e2",
+   "edits": [
+    {
+     "old": "{fill=#FFF0C3 border-top=\"0.34pt solid #000000\" border-bottom=\"2.83pt solid #7F7F7F\"}",
+     "new": "{fill=#FFF0C3 border-top=\"0.34pt solid #000000\" border-bottom=\"2.83pt solid #FF0000\"}"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e6",
+   "edits": [
+    {
+     "old": "시제품 제작 시간과 비용",
+     "new": "시제품 제작 기간과 비용"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e9",
+   "text": "REFUSE: Gradient fills cannot be written or changed in this format; they can only be kept as they are or replaced by a solid colour."
+  }
+ ]
+}

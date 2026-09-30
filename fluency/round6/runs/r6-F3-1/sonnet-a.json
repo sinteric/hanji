@@ -1,0 +1,41 @@
+{
+ "answers": [
+  {
+   "task_id": "fn-q1",
+   "text": "REFUSE: The banner's fill is direct formatting on the cell, which is not shown in this text, so it cannot be read."
+  },
+  {
+   "task_id": "fn-q2",
+   "text": "REFUSE: Cell borders are direct formatting that is not shown in this text, so I cannot tell which cells have a bottom border thicker than 1pt."
+  },
+  {
+   "task_id": "fn-q3",
+   "text": "ANSWER: indent-left=20pt first-line=0pt"
+  },
+  {
+   "task_id": "fn-q4",
+   "text": "ANSWER: size=14pt"
+  },
+  {
+   "task_id": "fn-e1",
+   "text": "REFUSE: The banner's fill is direct cell formatting, which cannot be read or changed in this text format."
+  },
+  {
+   "task_id": "fn-e2",
+   "text": "REFUSE: The banner's bottom border is direct cell formatting, which cannot be read or changed in this text format."
+  },
+  {
+   "task_id": "fn-e6",
+   "edits": [
+    {
+     "old": "시제품 제작 시간과 비용 절감",
+     "new": "시제품 제작 기간과 비용 절감"
+    }
+   ]
+  },
+  {
+   "task_id": "fn-e9",
+   "text": "REFUSE: A gradient fill cannot be expressed in this format."
+  }
+ ]
+}

@@ -1,0 +1,336 @@
+{
+ "answers": [
+  {
+   "task_id": "mel-q1",
+   "text": "ANSWER: fill=#E9F1FE"
+  },
+  {
+   "task_id": "mel-q2",
+   "text": "ANSWER: 구  분; 2025 예산 (A); 2026년 예산 (B); 증  감 (B-A); (B-A)/A"
+  },
+  {
+   "task_id": "mel-q3",
+   "text": "ANSWER: align=center line-spacing=130%"
+  },
+  {
+   "task_id": "mel-q4",
+   "text": "ANSWER: first-line=-58.96pt"
+  },
+  {
+   "task_id": "mel-e1",
+   "edits": [
+    {
+     "old": "{fill=#F2F2F2 border=\"0.34pt solid #000000\"}  **기금형",
+     "new": "{fill=#DFE6F7 border=\"0.34pt solid #000000\"}  **기금형"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e2",
+   "edits": [
+    {
+     "old": "{fill=#F2F2F2 border=\"0.34pt solid #000000\"}  **기금형",
+     "new": "{fill=#F2F2F2 border=\"0.34pt solid #000000\" border-bottom=\"0.34pt solid #FF0000\"}  **기금형"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e6",
+   "edits": [
+    {
+     "old": "’25~’26년, 1,200명",
+     "new": "’25~’26년, 1,300명"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e9",
+   "text": "REFUSE: The banner's fill is a gradient, which can be kept as written or replaced by a solid colour but cannot be written or changed, so a red-to-blue gradient cannot be expressed."
+  },
+  {
+   "task_id": "mel-e3",
+   "edits": [
+    {
+     "old": "| **1분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **2분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **3분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **4분기** {align=center first-line=0pt line-spacing=110% size=13pt} | {fill=#DFE6F7}",
+     "new": "| {fill=#D9D9D9} **1분기** {align=center first-line=0pt line-spacing=110% size=13pt} | {fill=#D9D9D9} **2분기** {align=center first-line=0pt line-spacing=110% size=13pt} | {fill=#D9D9D9} **3분기** {align=center first-line=0pt line-spacing=110% size=13pt} | {fill=#D9D9D9} **4분기** {align=center first-line=0pt line-spacing=110% size=13pt} | {fill=#DFE6F7}"
+    },
+    {
+     "old": "first-line=-10.08pt line-spacing=140% font=\"맑은 고딕\" size=12pt}\n| **1분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **2분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **3분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **4분기** {align=center first-line=0pt line-spacing=160% size=13pt} | {fill=#DFE6F7}",
+     "new": "first-line=-10.08pt line-spacing=140% font=\"맑은 고딕\" size=12pt}\n| {fill=#D9D9D9} **1분기** {align=center first-line=0pt line-spacing=160% size=13pt} | {fill=#D9D9D9} **2분기** {align=center first-line=0pt line-spacing=160% size=13pt} | {fill=#D9D9D9} **3분기** {align=center first-line=0pt line-spacing=160% size=13pt} | {fill=#D9D9D9} **4분기** {align=center first-line=0pt line-spacing=160% size=13pt} | {fill=#DFE6F7}"
+    },
+    {
+     "old": "| **1분기** {align=center size=13pt} | **2분기** {align=center size=13pt} | **3분기** {align=center size=13pt} | **4분기** {align=center size=13pt} | {fill=#DFE6F7}",
+     "new": "| {fill=#D9D9D9} **1분기** {align=center size=13pt} | {fill=#D9D9D9} **2분기** {align=center size=13pt} | {fill=#D9D9D9} **3분기** {align=center size=13pt} | {fill=#D9D9D9} **4분기** {align=center size=13pt} | {fill=#DFE6F7}"
+    },
+    {
+     "old": "line-spacing=155% font=함초롬바탕 size=15pt}\n\n{border=\"0.34pt solid #000000\" line-spacing=130% font=\"맑은 고딕\" size=12pt}\n| **1분기** {align=center line-spacing=160% size=13pt} | **2분기** {align=center line-spacing=160% size=13pt} | **3분기** {align=center line-spacing=160% size=13pt} | **4분기** {align=center line-spacing=160% size=13pt} | {fill=#DFE6F7}",
+     "new": "line-spacing=155% font=함초롬바탕 size=15pt}\n\n{border=\"0.34pt solid #000000\" line-spacing=130% font=\"맑은 고딕\" size=12pt}\n| {fill=#D9D9D9} **1분기** {align=center line-spacing=160% size=13pt} | {fill=#D9D9D9} **2분기** {align=center line-spacing=160% size=13pt} | {fill=#D9D9D9} **3분기** {align=center line-spacing=160% size=13pt} | {fill=#D9D9D9} **4분기** {align=center line-spacing=160% size=13pt} | {fill=#DFE6F7}"
+    },
+    {
+     "old": "| **1분기** {align=center line-spacing=110% size=13pt} | **2분기** {align=center line-spacing=110% size=13pt} | **3분기** {align=center line-spacing=110% size=13pt} | **4분기** {align=center line-spacing=110% size=13pt} | {fill=#DFE6F7 border-top=\"0.34pt solid #000000\"}",
+     "new": "| {fill=#D9D9D9} **1분기** {align=center line-spacing=110% size=13pt} | {fill=#D9D9D9} **2분기** {align=center line-spacing=110% size=13pt} | {fill=#D9D9D9} **3분기** {align=center line-spacing=110% size=13pt} | {fill=#D9D9D9} **4분기** {align=center line-spacing=110% size=13pt} | {fill=#DFE6F7 border-top=\"0.34pt solid #000000\"}"
+    },
+    {
+     "old": "| **1분기** {align=center space-before=0pt size=13pt} | **2분기** {align=center space-before=0pt size=13pt} | **3분기** {align=center space-before=0pt size=13pt} | **4분기** {align=center space-before=0pt size=13pt} | {fill=#DFE6F7 border-top=\"0.34pt solid #000000\"}",
+     "new": "| {fill=#D9D9D9} **1분기** {align=center space-before=0pt size=13pt} | {fill=#D9D9D9} **2분기** {align=center space-before=0pt size=13pt} | {fill=#D9D9D9} **3분기** {align=center space-before=0pt size=13pt} | {fill=#D9D9D9} **4분기** {align=center space-before=0pt size=13pt} | {fill=#DFE6F7 border-top=\"0.34pt solid #000000\"}"
+    },
+    {
+     "old": "{border=\"0.34pt solid #000000\" align=left line-spacing=140% font=\"맑은 고딕\" size=12pt}\n| **1분기** {align=center line-spacing=160% size=13pt} | **2분기** {align=center line-spacing=160% size=13pt} | **3분기** {align=center line-spacing=160% size=13pt} | **4분기** {align=center line-spacing=160% size=13pt} | {fill=#DFE6F7}",
+     "new": "{border=\"0.34pt solid #000000\" align=left line-spacing=140% font=\"맑은 고딕\" size=12pt}\n| {fill=#D9D9D9} **1분기** {align=center line-spacing=160% size=13pt} | {fill=#D9D9D9} **2분기** {align=center line-spacing=160% size=13pt} | {fill=#D9D9D9} **3분기** {align=center line-spacing=160% size=13pt} | {fill=#D9D9D9} **4분기** {align=center line-spacing=160% size=13pt} | {fill=#DFE6F7}"
+    },
+    {
+     "old": "| **1분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **2분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **3분기** {align=center first-line=0pt line-spacing=110% size=13pt} | **4분기** {align=center first-line=0pt line-spacing=110% size=13pt} | {fill=#DFE6F7 border-top=\"0.34pt solid #000000\"}",
+     "new": "| {fill=#D9D9D9} **1분기** {align=center first-line=0pt line-spacing=110% size=13pt} | {fill=#D9D9D9} **2분기** {align=center first-line=0pt line-spacing=110% size=13pt} | {fill=#D9D9D9} **3분기** {align=center first-line=0pt line-spacing=110% size=13pt} | {fill=#D9D9D9} **4분기** {align=center first-line=0pt line-spacing=110% size=13pt} | {fill=#DFE6F7 border-top=\"0.34pt solid #000000\"}"
+    },
+    {
+     "old": "| **1분기** {align=center space-before=0pt line-spacing=160% size=13pt} | **2분기** {align=center space-before=0pt line-spacing=160% size=13pt} | **3분기** {align=center space-before=0pt line-spacing=160% size=13pt} | **4분기** {align=center space-before=0pt line-spacing=160% size=13pt} | {fill=#DFE6F7}",
+     "new": "| {fill=#D9D9D9} **1분기** {align=center space-before=0pt line-spacing=160% size=13pt} | {fill=#D9D9D9} **2분기** {align=center space-before=0pt line-spacing=160% size=13pt} | {fill=#D9D9D9} **3분기** {align=center space-before=0pt line-spacing=160% size=13pt} | {fill=#D9D9D9} **4분기** {align=center space-before=0pt line-spacing=160% size=13pt} | {fill=#DFE6F7}"
+    },
+    {
+     "old": "{border=\"0.34pt solid #000000\" align=left first-line=-11.28pt line-spacing=110% font=\"맑은 고딕\" size=12pt}\n| **1분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **2분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **3분기** {align=center first-line=0pt line-spacing=160% size=13pt} | **4분기** {align=center first-line=0pt line-spacing=160% size=13pt} | {fill=#DFE6F7}",
+     "new": "{border=\"0.34pt solid #000000\" align=left first-line=-11.28pt line-spacing=110% font=\"맑은 고딕\" size=12pt}\n| {fill=#D9D9D9} **1분기** {align=center first-line=0pt line-spacing=160% size=13pt} | {fill=#D9D9D9} **2분기** {align=center first-line=0pt line-spacing=160% size=13pt} | {fill=#D9D9D9} **3분기** {align=center first-line=0pt line-spacing=160% size=13pt} | {fill=#D9D9D9} **4분기** {align=center first-line=0pt line-spacing=160% size=13pt} | {fill=#DFE6F7}"
+    },
+    {
+     "old": "line-spacing=139% font=함초롬바탕 size=15pt}\n\n{border=\"0.34pt solid #000000\" line-spacing=130% font=\"맑은 고딕\" size=12pt}\n| **1분기** {align=center line-spacing=160% size=13pt} | **2분기** {align=center line-spacing=160% size=13pt} | **3분기** {align=center line-spacing=160% size=13pt} | **4분기** {align=center line-spacing=160% size=13pt} | {fill=#DFE6F7}",
+     "new": "line-spacing=139% font=함초롬바탕 size=15pt}\n\n{border=\"0.34pt solid #000000\" line-spacing=130% font=\"맑은 고딕\" size=12pt}\n| {fill=#D9D9D9} **1분기** {align=center line-spacing=160% size=13pt} | {fill=#D9D9D9} **2분기** {align=center line-spacing=160% size=13pt} | {fill=#D9D9D9} **3분기** {align=center line-spacing=160% size=13pt} | {fill=#D9D9D9} **4분기** {align=center line-spacing=160% size=13pt} | {fill=#DFE6F7}"
+    },
+    {
+     "old": "| **1분기** {align=center first-line=0pt space-before=0pt line-spacing=160% size=13pt} | **2분기** {align=center first-line=0pt space-before=0pt line-spacing=160% size=13pt} | **3분기** {align=center first-line=0pt space-before=0pt line-spacing=160% size=13pt} | **4분기** {align=center first-line=0pt space-before=0pt line-spacing=160% size=13pt} | {fill=#DFE6F7}",
+     "new": "| {fill=#D9D9D9} **1분기** {align=center first-line=0pt space-before=0pt line-spacing=160% size=13pt} | {fill=#D9D9D9} **2분기** {align=center first-line=0pt space-before=0pt line-spacing=160% size=13pt} | {fill=#D9D9D9} **3분기** {align=center first-line=0pt space-before=0pt line-spacing=160% size=13pt} | {fill=#D9D9D9} **4분기** {align=center first-line=0pt space-before=0pt line-spacing=160% size=13pt} | {fill=#DFE6F7}"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e4",
+   "edits": [
+    {
+     "old": "**1. ’25년 성과: 노동과 생명을 존중하는 정책기조로 전환** {space-before=30pt line-spacing=162% font=함초롬바탕 size=16pt color=#0000FF}",
+     "new": "**1. ’25년 성과: 노동과 생명을 존중하는 정책기조로 전환** {space-before=30pt line-spacing=162% font=함초롬바탕 size=18pt color=#C00000}"
+    },
+    {
+     "old": "**2. 정책 보완점** {first-line=-58.96pt space-before=30pt line-spacing=172% font=함초롬바탕 size=16pt color=#0000FF}",
+     "new": "**2. 정책 보완점** {first-line=-58.96pt space-before=30pt line-spacing=172% font=함초롬바탕 size=18pt color=#C00000}"
+    },
+    {
+     "old": "**1. 추진방향** {space-before=24pt line-spacing=130% font=함초롬바탕 size=16pt color=#0000FF}",
+     "new": "**1. 추진방향** {space-before=24pt line-spacing=130% font=함초롬바탕 size=18pt color=#C00000}"
+    },
+    {
+     "old": "**2. 추진전략** {first-line=-44.76pt line-spacing=170% font=함초롬바탕 size=16pt color=#0000FF}",
+     "new": "**2. 추진전략** {first-line=-44.76pt line-spacing=170% font=함초롬바탕 size=18pt color=#C00000}"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e5",
+   "edits": [
+    {
+     "old": "<style name=\"표가운데\" align=center line-spacing=130% font=-윤명조120/>",
+     "new": "<style name=\"표가운데\" align=center line-spacing=130% font=-윤명조120 color=#1F3864/>"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e7",
+   "edits": [
+    {
+     "old": "[(국가부양부담↑)]{size=13pt} {first-line=-44pt space-before=20pt line-spacing=172% font=함초롬바탕}",
+     "new": "[(국가부양부담↑)]{size=13pt} {first-line=-44pt space-before=20pt line-spacing=172% font=함초롬바탕}\n\n| {fill=#D9D9D9} 구분 | {fill=#D9D9D9} 내용 |\n|---|---|\n| 청년 | 일자리 첫걸음 보장제 |"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e8",
+   "edits": [
+    {
+     "old": "**산업재해 감축 추세**\\* {space-before=24pt",
+     "new": "**산업재해 감축 추세**\\* {first-line=10pt space-before=24pt"
+    },
+    {
+     "old": "**(’25.9월 기준)**]{size=13pt} {first-line=-58.96pt",
+     "new": "**(’25.9월 기준)**]{size=13pt} {first-line=10pt"
+    },
+    {
+     "old": "**상생과 연대의 기반 조성** {space-before=24pt",
+     "new": "**상생과 연대의 기반 조성** {first-line=10pt space-before=24pt"
+    },
+    {
+     "old": "**미래대응 일자리 기반 확충** {first-line=-59.08pt",
+     "new": "**미래대응 일자리 기반 확충** {first-line=10pt"
+    },
+    {
+     "old": "**위험요인 대두** {first-line=-43.84pt",
+     "new": "**위험요인 대두** {first-line=10pt"
+    },
+    {
+     "old": "특히 소규모사업장에 집중 {first-line=-43.68pt",
+     "new": "특히 소규모사업장에 집중 {first-line=10pt"
+    },
+    {
+     "old": "**보호받지 못하는 새로운 형태의 노동** 증가 {first-line=-44pt",
+     "new": "**보호받지 못하는 새로운 형태의 노동** 증가 {first-line=10pt"
+    },
+    {
+     "old": "[(국가부양부담↑)]{size=13pt} {first-line=-44pt",
+     "new": "[(국가부양부담↑)]{size=13pt} {first-line=10pt"
+    },
+    {
+     "old": "**노동시장 격차 해소** {first-line=-58.96pt",
+     "new": "**노동시장 격차 해소** {first-line=10pt"
+    },
+    {
+     "old": "**노동있는 산업 대전환** {first-line=-58.96pt",
+     "new": "**노동있는 산업 대전환** {first-line=10pt"
+    },
+    {
+     "old": "**노동이 존중받는 일터** {first-line=-58.96pt",
+     "new": "**노동이 존중받는 일터** {first-line=10pt"
+    },
+    {
+     "old": "**추진배경** {first-line=-67.7pt space-before=30pt",
+     "new": "**추진배경** {first-line=10pt space-before=30pt"
+    },
+    {
+     "old": "**주요내용** {first-line=-67.7pt space-before=30pt",
+     "new": "**주요내용** {first-line=10pt space-before=30pt"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-250.8pt space-before=30pt",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=30pt"
+    },
+    {
+     "old": "**추진배경** {first-line=-250.8pt space-before=24pt line-spacing=144%",
+     "new": "**추진배경** {first-line=10pt space-before=24pt line-spacing=144%"
+    },
+    {
+     "old": "**실노동시간 단축 본격 추진**]{size=15pt} {first-line=-250.8pt",
+     "new": "**실노동시간 단축 본격 추진**]{size=15pt} {first-line=10pt"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-250.8pt space-before=24pt line-spacing=144%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=144%"
+    },
+    {
+     "old": "**추진배경** {first-line=-250.8pt space-before=24pt line-spacing=128%",
+     "new": "**추진배경** {first-line=10pt space-before=24pt line-spacing=128%"
+    },
+    {
+     "old": "**주요내용** {first-line=-250.8pt space-before=24pt line-spacing=128%",
+     "new": "**주요내용** {first-line=10pt space-before=24pt line-spacing=128%"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-250.8pt space-before=20pt line-spacing=128%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=20pt line-spacing=128%"
+    },
+    {
+     "old": "**추진배경** {first-line=-61.52pt space-before=24pt",
+     "new": "**추진배경** {first-line=10pt space-before=24pt"
+    },
+    {
+     "old": "{first-line=-250.8pt space-before=24pt line-spacing=155%",
+     "new": "{first-line=10pt space-before=24pt line-spacing=155%"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-61.52pt space-before=20pt line-spacing=155%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=20pt line-spacing=155%"
+    },
+    {
+     "old": "**추진배경** {align=left first-line=-44.96pt space-before=24pt line-spacing=138%",
+     "new": "**추진배경** {align=left first-line=10pt space-before=24pt line-spacing=138%"
+    },
+    {
+     "old": "{align=left first-line=-67.7pt space-before=24pt line-spacing=138%",
+     "new": "{align=left first-line=10pt space-before=24pt line-spacing=138%"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-250.8pt space-before=24pt line-spacing=138%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=138%"
+    },
+    {
+     "old": "**추진배경** {align=left first-line=-44.96pt space-before=24pt line-spacing=107%",
+     "new": "**추진배경** {align=left first-line=10pt space-before=24pt line-spacing=107%"
+    },
+    {
+     "old": "{align=left first-line=-67.7pt space-before=24pt line-spacing=107%",
+     "new": "{align=left first-line=10pt space-before=24pt line-spacing=107%"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-58.96pt space-before=24pt line-spacing=107%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=107%"
+    },
+    {
+     "old": "**추진배경** {first-line=-250.8pt space-before=24pt line-spacing=153%",
+     "new": "**추진배경** {first-line=10pt space-before=24pt line-spacing=153%"
+    },
+    {
+     "old": "**주요내용** {first-line=-250.8pt space-before=24pt line-spacing=153%",
+     "new": "**주요내용** {first-line=10pt space-before=24pt line-spacing=153%"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-250.8pt space-before=24pt line-spacing=153%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=153%"
+    },
+    {
+     "old": "**추진배경** {align=left first-line=-67.7pt space-before=24pt line-spacing=145%",
+     "new": "**추진배경** {align=left first-line=10pt space-before=24pt line-spacing=145%"
+    },
+    {
+     "old": "**주요내용** {align=left first-line=-67.7pt space-before=24pt line-spacing=145%",
+     "new": "**주요내용** {align=left first-line=10pt space-before=24pt line-spacing=145%"
+    },
+    {
+     "old": "**이행계획(’26년)** {align=left first-line=-67.7pt space-before=24pt line-spacing=145%",
+     "new": "**이행계획(’26년)** {align=left first-line=10pt space-before=24pt line-spacing=145%"
+    },
+    {
+     "old": "**추진배경** {first-line=-250.8pt space-before=24pt line-spacing=140%",
+     "new": "**추진배경** {first-line=10pt space-before=24pt line-spacing=140%"
+    },
+    {
+     "old": "**주요내용** {first-line=-250.8pt space-before=24pt line-spacing=140%",
+     "new": "**주요내용** {first-line=10pt space-before=24pt line-spacing=140%"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-61.52pt space-before=20pt line-spacing=140%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=20pt line-spacing=140%"
+    },
+    {
+     "old": "**추진배경** {first-line=-250.8pt space-before=24pt line-spacing=123%",
+     "new": "**추진배경** {first-line=10pt space-before=24pt line-spacing=123%"
+    },
+    {
+     "old": "**주요내용** {first-line=-61.4pt space-before=24pt",
+     "new": "**주요내용** {first-line=10pt space-before=24pt"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-250.8pt space-before=24pt line-spacing=123%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=123%"
+    },
+    {
+     "old": "**추진배경** {first-line=-250.8pt space-before=24pt line-spacing=139%",
+     "new": "**추진배경** {first-line=10pt space-before=24pt line-spacing=139%"
+    },
+    {
+     "old": "**주요내용** {first-line=-250.8pt space-before=24pt line-spacing=139%",
+     "new": "**주요내용** {first-line=10pt space-before=24pt line-spacing=139%"
+    },
+    {
+     "old": "**이행계획(’26년)** {first-line=-250.8pt space-before=24pt line-spacing=139%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=139%"
+    },
+    {
+     "old": "**추진 배경** {space-before=24pt line-spacing=165%",
+     "new": "**추진 배경** {first-line=10pt space-before=24pt line-spacing=165%"
+    },
+    {
+     "old": "**주요 내용** {space-before=24pt line-spacing=165%",
+     "new": "**주요 내용** {first-line=10pt space-before=24pt line-spacing=165%"
+    },
+    {
+     "old": "**이행계획(’26년)** {space-before=24pt line-spacing=165%",
+     "new": "**이행계획(’26년)** {first-line=10pt space-before=24pt line-spacing=165%"
+    }
+   ]
+  }
+ ]
+}

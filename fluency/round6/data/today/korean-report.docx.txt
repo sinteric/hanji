@@ -1,0 +1,36 @@
+---
+type: document
+format: docx
+schema: 1
+---
+# 3분기 영업 보고
+
+매출은 전년 대비 **12%** 증가했다.<keep id="khc1l" kind="footnote" summary="footnote: 내부 집계 기준."/> 신규 고객은 34곳이며, 그중 21곳이 수도권이다.
+
+<div style="Note">신규 고객 34곳 중 21곳이 수도권.</div>
+
+지방 지점의 매출은 1,204억 원으로 15% 성장했다.<keep id="ku25a" kind="comment" summary="comment: 지방 수치 재확인 필요"/>
+
+## 지역별 현황
+
+아래 표는 지점별 매출을 정리한 것이다.
+
+<keep id="kml28" kind="drawing" summary="조직도, 상자 5개"/>
+
+| 지역 | 지점 | 매출 |
+|---|---|---|
+| 서울 | 강남 | 120 |
+| ^^ | 종로 | 95 |
+| 합계 || 215 |
+
+강남 지점은 *전년 대비* <keep id="k83hu" kind="tracked-insert" summary="ins by 김민지: 8%"/>성장했다.
+
+## 향후 계획
+
+4분기에는 부산과 대구에 지점을 연다.
+
+<div style="Block Quotation">“고객이 있는 곳에 지점이 있어야 한다.” — 영업본부장</div>
+
+부록: 지점 목록
+
+서울 강남, 서울 종로, 경기 분당, 인천 송도.

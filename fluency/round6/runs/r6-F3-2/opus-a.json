@@ -1,0 +1,41 @@
+{
+ "answers": [
+  {
+   "task_id": "mel-q1",
+   "text": "REFUSE: The banner's fill is direct cell formatting, which this text format does not show, so its colour cannot be read here."
+  },
+  {
+   "task_id": "mel-q2",
+   "text": "REFUSE: Cell borders are direct cell formatting, which this text format does not show, so no cell's bottom border can be read here."
+  },
+  {
+   "task_id": "mel-q3",
+   "text": "ANSWER: align=center line-spacing=130%"
+  },
+  {
+   "task_id": "mel-q4",
+   "text": "ANSWER: first-line=0pt"
+  },
+  {
+   "task_id": "mel-e1",
+   "text": "REFUSE: The banner's fill is direct cell formatting, which cannot be changed in this format, and changing a style would not change a cell's fill."
+  },
+  {
+   "task_id": "mel-e2",
+   "text": "REFUSE: Cell borders are direct cell formatting, which cannot be read or changed in this format."
+  },
+  {
+   "task_id": "mel-e6",
+   "edits": [
+    {
+     "old": "**감독관 증원**(’25~’26년, 1,200명)",
+     "new": "**감독관 증원**(’25~’26년, 1,300명)"
+    }
+   ]
+  },
+  {
+   "task_id": "mel-e9",
+   "text": "REFUSE: This format cannot express gradients, so the banner's gradient cannot be changed here."
+  }
+ ]
+}

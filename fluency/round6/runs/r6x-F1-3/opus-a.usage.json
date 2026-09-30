@@ -1,0 +1,7 @@
+{
+ "input_tokens": 82070,
+ "output_tokens": 1386,
+ "num_turns": 3,
+ "is_error": false,
+ "duration_ms": 25835
+}
