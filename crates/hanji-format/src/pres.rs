@@ -155,6 +155,10 @@ fn is_line_line(t: &str) -> bool {
     t.starts_with("<line") && t[5..].starts_with([' ', '>', '/'])
 }
 
+fn is_picture_line(t: &str) -> bool {
+    t.starts_with("<picture") && t[8..].starts_with([' ', '>', '/'])
+}
+
 fn is_group_open(t: &str) -> bool {
     t.starts_with("<group") && t[6..].starts_with([' ', '>'])
 }
@@ -407,6 +411,7 @@ fn ends_slot(p: &Parser, j: usize) -> bool {
     marker(t).is_some()
         || is_shape_line(t)
         || is_line_line(t)
+        || is_picture_line(t)
         || is_group_open(t)
         || is_group_close(t)
         || is_object_line(p, j, true)
@@ -468,6 +473,12 @@ fn slide(p: &mut Parser, a: usize, b: usize, slidev: Option<usize>) -> Option<(S
                 maps.push(m);
             }
             i += 1;
+        } else if is_picture_line(t) {
+            if let Some((pic, m)) = picture(p, i, &mut seen, false) {
+                items.push(SlideItem::Picture(pic));
+                maps.push(m);
+            }
+            i += 1;
         } else if is_group_open(t) {
             let Some(close) = group_close(p, i, b) else {
                 p.err(i, 1, "this <group> is not closed: a group is a <group …> line, its objects' lines, then a line </group>, on one slide.");
@@ -497,7 +508,7 @@ fn slide(p: &mut Parser, a: usize, b: usize, slidev: Option<usize>) -> Option<(S
                 ),
                 _ => {
                     let list = slots.as_deref().map(|s| format!(" This slide's slots: {}.", slot_list(s))).unwrap_or_default();
-                    format!("text outside a slot: every line of a slide after its layout: line belongs to a slot, after its marker line such as ::title:: or ::body::, or is an object's line: <shape>, <keep/>, <line/> or <group>.{list}")
+                    format!("text outside a slot: every line of a slide after its layout: line belongs to a slot, after its marker line such as ::title:: or ::body::, or is an object's line: <shape>, <picture/>, <keep/>, <line/> or <group>.{list}")
                 }
             };
             p.err(i, 1, msg);
@@ -835,6 +846,117 @@ fn line_item(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> 
     Some((LineItem { id, name, ends: Ends { from, to } }, ItemMap { head, blocks: vec![] }))
 }
 
+const PICTURE_FORM: &str = "a picture is <picture id=\"…\" name=\"…\" box=\"…\" src=\"…\"/>, its id and name as they are in the file, with crop=\"left top right bottom\" (percent cut off each edge), mask=\"ellipse\" (the preset shape it is cut to) and alt=\"…\" (its alternative text) when it has them; a new picture is <picture box=\"…\" src=\"…\"/>";
+
+/// `crop="l t r b"` in percent → thousandths of a percent.
+fn parse_crop(v: &str) -> Result<Crop, String> {
+    let n: Vec<Option<f64>> = v.split_whitespace().map(parse_num).collect();
+    let [Some(l), Some(t), Some(r), Some(b)] = n.as_slice() else {
+        return Err(format!("crop=\"{v}\" is not a crop; it is four numbers, the percent of the image cut off at its left, top, right and bottom edges, such as crop=\"10 0 10 0\"."));
+    };
+    let k = |x: f64| (x * PER_PERCENT as f64).round() as i64;
+    let c = Crop { l: k(*l), t: k(*t), r: k(*r), b: k(*b) };
+    if c.l + c.r >= 100 * PER_PERCENT || c.t + c.b >= 100 * PER_PERCENT {
+        return Err(format!("crop=\"{v}\" cuts off the whole image: left and right together, and top and bottom together, stay under 100."));
+    }
+    if [c.l, c.t, c.r, c.b].iter().any(|x| *x < -1000 * PER_PERCENT) {
+        return Err(format!("crop=\"{v}\" has a value below -1000; a negative crop leaves space beside the image, at most ten times its size."));
+    }
+    Ok(c)
+}
+
+/// A `<picture …/>` line; `member`: one of a group's objects.
+fn picture(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Option<(PictureItem, ItemMap)> {
+    let form = PICTURE_FORM;
+    let line = &p.lines[i];
+    let (at, next, lead) = (line.at, line.next, line.indent());
+    let Some((tag, after, src)) = line_tag(p, i).filter(|t| t.0.self_closing && !t.0.closing) else {
+        p.err(i, lead + 1, format!("expected {form}."));
+        return None;
+    };
+    if let Err(col) = rest_blank(&src, after) {
+        p.err(i, col, format!("nothing may follow a picture's tag on its line: {form}."));
+        return None;
+    }
+    let (vals, geom) = match split_attrs(&tag, &["id", "name", "src", "crop", "mask", "alt"], true, form) {
+        Ok(v) => v,
+        Err((col, msg)) => {
+            p.err(i, col, msg);
+            return None;
+        }
+    };
+    let col_of = |k: &str| tag.attrs.iter().find(|a| a.0 == k).map_or(tag.col, |a| a.2);
+    let (id, name) = match (&vals[0], &vals[1]) {
+        (Some(id), Some(name)) => (id.clone(), name.clone()),
+        (None, None) if member => {
+            p.err(i, tag.col, "a group's objects are never added here: a new picture goes outside the group.");
+            return None;
+        }
+        (None, None) => (String::new(), String::new()),
+        _ => {
+            p.err(i, tag.col, format!("<picture> needs both id and name, or neither for a new picture: {form}."));
+            return None;
+        }
+    };
+    let Some(src_v) = vals[2].clone().filter(|s| !s.trim().is_empty()) else {
+        p.err(i, tag.col, format!("a picture names its image, src=\"…\": {form}."));
+        return None;
+    };
+    if id.is_empty() && geom.is_none() {
+        p.err(i, tag.col, "a new picture needs its box: <picture box=\"x y w h\" src=\"…\"/>.");
+        return None;
+    }
+    if geom.is_none() {
+        p.err(i, tag.col, format!("a picture shows its box: {form}."));
+        return None;
+    }
+    let crop = match vals[3].as_deref().map(parse_crop) {
+        None => None,
+        Some(Ok(c)) => Some(c),
+        Some(Err(m)) => {
+            p.err(i, col_of("crop"), m);
+            return None;
+        }
+    };
+    let mask = match vals[4].as_deref() {
+        None => None,
+        Some(m) if crate::presets::is_preset(m) => Some(m.to_string()),
+        Some(m) => {
+            let near = crate::presets::near_presets(m);
+            let hint = if near.is_empty() {
+                " such as ellipse, roundRect, triangle, hexagon or star5".to_string()
+            } else {
+                format!(": {}", near.join(", "))
+            };
+            p.err(
+                i,
+                col_of("mask"),
+                format!("mask=\"{m}\" is not a preset shape; a mask is a DrawingML preset name{hint}."),
+            );
+            return None;
+        }
+    };
+    let alt = vals[5].clone().filter(|a| !a.is_empty());
+    if !id.is_empty() && !member {
+        if let Some(shapes) = &p.names.shapes {
+            if !shapes.iter().any(|(a, b)| *a == id && *b == name) {
+                p.err(i, tag.col, format!("<picture id=\"{id}\" name=\"{name}\"> is not a picture of this file: keep a picture's id and name as they are, and write a new picture without them."));
+                return None;
+            }
+        }
+        let key = format!("<picture id=\"{id}\">");
+        if seen.contains(&key) {
+            p.err(i, tag.col, format!("{key} appears twice on this slide; a picture is written once."));
+            return None;
+        }
+        seen.push(key);
+    }
+    let head = HeadMap { start: at, end: next, mark: at + lead };
+    let crop = crop.filter(|c| !c.is_zero());
+    let mask = mask.filter(|m| m != "rect");
+    Some((PictureItem { id, name, geom, src: src_v, crop, mask, alt }, ItemMap { head, blocks: vec![] }))
+}
+
 const GROUP_FORM: &str = "a group is a line <group id=\"…\" name=\"…\" box=\"…\">, its objects' lines, then a line </group>, its id and name as they are in the file";
 
 /// The group opened on line `i` and closed on line `close`.
@@ -904,6 +1026,10 @@ fn group(p: &mut Parser, i: usize, close: usize, seen: &mut Vec<String>, member:
             if let Some((l, _)) = line_item(p, j, &mut local, true) {
                 items.push(SlideItem::Line(l));
             }
+        } else if is_picture_line(t) {
+            if let Some((pic, _)) = picture(p, j, &mut local, true) {
+                items.push(SlideItem::Picture(pic));
+            }
         } else if t.starts_with("<keep") {
             if let Some(o) = member_keep(p, j) {
                 items.push(SlideItem::Object(o));
@@ -911,7 +1037,13 @@ fn group(p: &mut Parser, i: usize, close: usize, seen: &mut Vec<String>, member:
         } else if marker(t).is_some() {
             p.err(j, 1, "a slot is never in a group: close the group with its line </group> before the slot's marker.");
         } else {
-            p.err(j, 1, format!("a group holds its objects' lines only (<shape>, <line/>, <keep/>, <group>): {form}."));
+            p.err(
+                j,
+                1,
+                format!(
+                    "a group holds its objects' lines only (<shape>, <picture/>, <line/>, <keep/>, <group>): {form}."
+                ),
+            );
         }
         j += 1;
     }
@@ -991,6 +1123,7 @@ fn item_lines(out: &mut Vec<String>, items: &[SlideItem]) {
             SlideItem::Shape(sh) => out.push(shape_line(sh)),
             SlideItem::Object(o) => out.push(object_line(o)),
             SlideItem::Line(l) => out.push(line_line(l)),
+            SlideItem::Picture(pic) => out.push(picture_line(pic)),
             SlideItem::Group(g) => {
                 out.push(format!("<group id=\"{}\" name=\"{}\"{}>", attr(&g.id), attr(&g.name), geom_attrs(&g.geom)));
                 item_lines(out, &g.items);
@@ -1033,6 +1166,27 @@ pub fn shape_line(sh: &ShapeText) -> String {
 pub fn object_line(o: &ObjectItem) -> String {
     let t = keep_tag(&o.keep);
     format!("{}{}/>", &t[..t.len() - 2], geom_attrs(&o.geom))
+}
+
+pub fn picture_line(pic: &PictureItem) -> String {
+    let mut out = String::from("<picture");
+    if !pic.id.is_empty() {
+        out.push_str(&format!(" id=\"{}\" name=\"{}\"", attr(&pic.id), attr(&pic.name)));
+    }
+    out.push_str(&geom_attrs(&pic.geom));
+    out.push_str(&format!(" src=\"{}\"", attr(&pic.src)));
+    if let Some(c) = pic.crop.filter(|c| !c.is_zero()) {
+        out.push_str(&format!(" crop=\"{} {} {} {}\"", shown_pct(c.l), shown_pct(c.t), shown_pct(c.r), shown_pct(c.b)));
+    }
+    if let Some(m) = &pic.mask {
+        out.push_str(&format!(" mask=\"{}\"", attr(m)));
+    }
+    if let Some(a) = &pic.alt {
+        // Alternative text may hold line breaks; the line cannot.
+        out.push_str(&format!(" alt=\"{}\"", attr(a).replace('\n', "&#10;").replace('\r', "&#13;")));
+    }
+    out.push_str("/>");
+    out
 }
 
 pub fn line_line(l: &LineItem) -> String {

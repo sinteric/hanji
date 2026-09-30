@@ -85,6 +85,12 @@ pub fn corpus() -> Vec<(String, Vec<u8>)> {
     files
 }
 
+/// The canvas audit's decks (`corpus/audit/`, see SOURCES.md): real designed
+/// decks and two synthetic modern ones.
+pub fn audit_decks() -> Vec<(String, Vec<u8>)> {
+    hanji_testkit::corpus(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("corpus/audit"), "pptx")
+}
+
 fn out_dir() -> PathBuf {
     PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("pptx-corpus-out")
 }
@@ -101,6 +107,17 @@ fn corpus_getput_putget_remainder() {
     assert!(sum.failures.is_empty(), "{}", sum.failures.join("\n"));
     assert_eq!(sum.getput_ok, files.len());
     // Exact spans lose nothing.
+    assert_eq!(sum.touched.get("exact").map_or(0, |t| t[2]), 0, "exact spans lost entries");
+}
+
+#[test]
+fn audit_decks_getput_putget_remainder() {
+    let files = audit_decks();
+    assert_eq!(files.len(), 5);
+    let out = Out { dir: PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("pptx-audit-out"), ext: "pptx" };
+    let sum = hanji_testkit::run_corpus_with(&Pptx, &files, &out, &edits::EDITS, "P9");
+    assert!(sum.failures.is_empty(), "{}", sum.failures.join("\n"));
+    assert_eq!(sum.getput_ok, files.len());
     assert_eq!(sum.touched.get("exact").map_or(0, |t| t[2]), 0, "exact spans lost entries");
 }
 

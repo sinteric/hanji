@@ -136,7 +136,7 @@ fn every_object_shows_its_box_and_getput_keeps_every_xfrm() {
         "<shape id=\"s4\" name=\"TextBox 3\" box=\"72 72 180 29\">Learning PPTX</shape>",
         "<line id=\"s6\" name=\"Straight Connector 5\" from=\"84 144\" to=\"252 144\"/>",
         "<shape id=\"s7\" name=\"Freeform 6\" box=\"47 211 185 136\">Cloud</shape>",
-        "<keep id=\"?\" kind=\"picture\" summary=\"Picture 1\" box=\"402 78 144 132\"/>",
+        "<picture id=\"s2\" name=\"Picture 1\" box=\"402 78 144 132\" src=\"media/image1.jpg\"/>",
         "<keep id=\"?\" kind=\"table\" summary=\"Table 2: Column1 Column2 Column3 data1 data2 data3\" box=\"300 372 372 96\"/>",
         "<line id=\"s8\" name=\"Straight Arrow Connector 7\" from=\"468 366\" to=\"468 216\"/>",
         "<line id=\"s10\" name=\"Elbow Connector 9\" from=\"186 252\" to=\"402 144\"/>",
@@ -193,8 +193,8 @@ fn objects_move_resize_align_and_a_text_box_is_added() {
     let (text, rem) = exact(
         &imp.text,
         &imp.remainder,
-        "summary=\"image.png\" box=\"576 396 72 36\"",
-        "summary=\"image.png\" box=\"504 360 144 72\"",
+        "name=\"Picture 3\" box=\"576 396 72 36\"",
+        "name=\"Picture 3\" box=\"504 360 144 72\"",
     );
     let (text, rem) = exact(
         &text,
@@ -279,11 +279,11 @@ fn lines_move_by_their_ends_and_new_lines_are_drawn() {
 fn an_object_a_connector_is_attached_to_moves_only_with_the_connector() {
     // Elbow Connector 9 ends on Picture 1 (its endCxn names shape 2).
     let imp = import(&deck("shapes.pptx"));
-    let pic = ("summary=\"Picture 1\" box=\"402 78 144 132\"", "summary=\"Picture 1\" box=\"402 178 144 132\"");
+    let pic = ("name=\"Picture 1\" box=\"402 78 144 132\"", "name=\"Picture 1\" box=\"402 178 144 132\"");
     let (text, rem) = exact(&imp.text, &imp.remainder, pic.0, pic.1);
     match PptxEngine.export(&text, &rem) {
         Err(EngineError::Refused(m)) => assert!(
-            m.starts_with("<keep id=\"")
+            m.starts_with("<picture id=\"s2\" name=\"Picture 1\">")
                 && m.contains("is moved or resized, and connector <line id=\"s10\" name=\"Elbow Connector 9\"> has its end attached to it")
                 && m.contains("move that end of the <line> in the same edit"),
             "{m}"
@@ -291,7 +291,7 @@ fn an_object_a_connector_is_attached_to_moves_only_with_the_connector() {
         other => panic!("expected a refusal, got {:?}", other.map(|_| ())),
     }
     // Resizing is refused too; moving the connector's end with it is not.
-    let (text, rem) = exact(&imp.text, &imp.remainder, pic.0, "summary=\"Picture 1\" box=\"402 78 72 132\"");
+    let (text, rem) = exact(&imp.text, &imp.remainder, pic.0, "name=\"Picture 1\" box=\"402 78 72 132\"");
     assert!(matches!(PptxEngine.export(&text, &rem), Err(EngineError::Refused(_))));
     let (text, rem) = exact(&imp.text, &imp.remainder, pic.0, pic.1);
     let (text, rem) = exact(&text, &rem, "from=\"186 252\" to=\"402 144\"", "from=\"186 252\" to=\"402 244\"");

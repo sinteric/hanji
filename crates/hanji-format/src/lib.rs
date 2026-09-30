@@ -11,6 +11,7 @@ pub mod names;
 pub mod ops;
 pub mod parse;
 pub mod pres;
+pub mod presets;
 pub mod serialize;
 pub mod sheet;
 pub mod vocab;

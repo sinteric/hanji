@@ -62,6 +62,7 @@ fn design_example_is_canonical() {
             SlideItem::Object(_) => "object",
             SlideItem::Line(_) => "line",
             SlideItem::Group(_) => "group",
+            SlideItem::Picture(_) => "picture",
         })
         .collect();
     assert_eq!(names, ["title", "body", "notes"]);
@@ -336,7 +337,7 @@ fn objects_are_keep_lines_among_the_slots() {
             SlideItem::Slot(s) => s.name.clone(),
             SlideItem::Object(o) => o.keep.id.clone(),
             SlideItem::Shape(_) => "shape".into(),
-            SlideItem::Line(_) | SlideItem::Group(_) => unreachable!(),
+            SlideItem::Line(_) | SlideItem::Group(_) | SlideItem::Picture(_) => unreachable!(),
         })
         .collect();
     // k5 ends the title slot; k1, a slot's object, is the body's text.
@@ -372,8 +373,49 @@ fn the_design_md_example_parses() {
             SlideItem::Object(o) => format!("object {}", o.keep.kind),
             SlideItem::Line(l) => format!("line {}", l.id),
             SlideItem::Group(g) => format!("group {}", g.id),
+            SlideItem::Picture(p) => format!("picture {}", p.id),
         })
         .collect();
-    assert_eq!(items, ["::title::", "::left::", "::right::", "object picture", "shape s4 (2 paragraphs)", "line s6"]);
+    assert_eq!(items, ["::title::", "::left::", "::right::", "picture s7", "shape s4 (2 paragraphs)", "line s6"]);
     assert_eq!(p.pres.front.size, Some((720 * 12_700, 540 * 12_700)));
+}
+
+#[test]
+fn pictures_read_and_write_their_image_crop_mask_and_alt() {
+    let mut n = names();
+    n.shapes
+        .as_mut()
+        .unwrap()
+        .extend([("s7".to_string(), "Photo".to_string()), ("g8".to_string(), "Group 7".to_string())]);
+    let parse = |t: &str| parse_presentation(t, &n);
+    let text = format!(
+        "{FM}\nlayout: Blank\n<picture id=\"s7\" name=\"Photo\" box=\"64 120 400 300\" rot=\"15\" src=\"media/image2.jpg\" crop=\"10.4 0 5 0\" mask=\"ellipse\" alt=\"공장 &quot;A&quot;&#10;2층\"/>\n<group id=\"g8\" name=\"Group 7\" box=\"0 0 10 10\">\n<picture id=\"s9\" name=\"Logo\" box=\"0 0 10 10\" src=\"media/image1.png\"/>\n</group>\n<picture box=\"1 2 3 4\" src=\"logo.png\"/>\n"
+    );
+    let p = parse(&text).unwrap_or_else(|e| panic!("{}", diag::render(&e)));
+    let SlideItem::Picture(pic) = &p.pres.slides[0].items[0] else { panic!() };
+    assert_eq!(pic.crop, Some(Crop { l: 10_400, t: 0, r: 5_000, b: 0 }));
+    assert_eq!((pic.mask.as_deref(), pic.alt.as_deref()), (Some("ellipse"), Some("공장 \"A\"\n2층")));
+    assert_eq!(pic.geom.unwrap().rot, 15 * 60_000);
+    let s = serialize_presentation(&p.pres);
+    assert_eq!(s, text);
+    // A rectangle mask and an empty crop are no mask and no crop.
+    let t = text.replace(" mask=\"ellipse\"", " mask=\"rect\"").replace("crop=\"10.4 0 5 0\"", "crop=\"0 0 0 0\"");
+    let s = serialize_presentation(&parse(&t).unwrap().pres);
+    assert!(s.contains("rot=\"15\" src=\"media/image2.jpg\" alt="), "{s}");
+    let err = |old: &str, new: &str| {
+        let e = parse(&text.replacen(old, new, 1)).expect_err(new);
+        e.iter().map(|d| d.message.clone()).collect::<Vec<_>>().join("\n")
+    };
+    assert!(err("mask=\"ellipse\"", "mask=\"Ellipse\"")
+        .contains("mask=\"Ellipse\" is not a preset shape; a mask is a DrawingML preset name: ellipse"));
+    assert!(err("crop=\"10.4 0 5 0\"", "crop=\"50 0 50 0\"").contains("cuts off the whole image"));
+    assert!(err("<picture box=\"1 2 3 4\"", "<picture").contains("a new picture needs its box"));
+    assert!(err("name=\"Photo\"", "name=\"Photo 2\"").contains("is not a picture of this file"));
+    assert!(err("<picture id=\"s9\" name=\"Logo\"", "<picture").contains("a group's objects are never added here"));
+    assert!(err(" src=\"logo.png\"", "").contains("a picture names its image"));
+    let keep = format!(
+        "{FM}\nlayout: Blank\n<keep id=\"k1\" kind=\"picture\" summary=\"logo\" src=\"a.png\" box=\"1 2 3 4\"/>\n"
+    );
+    let e = parse(&keep).expect_err("src on a keep");
+    assert!(e[0].message.contains("a picture is its own line, <picture box="), "{e:?}");
 }

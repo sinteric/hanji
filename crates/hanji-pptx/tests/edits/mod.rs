@@ -5,20 +5,22 @@
 //! delete an object (a picture, chart, table or group: rule 8), P11 move an
 //! object in its slide's z-order; P12 move a shape, P13 resize a picture,
 //! P14 add a text box under a title, P15 align two objects' left edges
-//! (geometry, §5.3); P9 makes them all in one revision.
+//! (geometry, §5.3); P16 crop a picture, P17 cut a picture to an ellipse and
+//! give it alternative text (pictures, §5.3); P9 makes them all in one
+//! revision.
 
 use std::collections::HashSet;
 
 use hanji_core::presentation::{geom_of, kind, shape_head, slide_head, slot_head, HeadKind};
 use hanji_core::{Block, Kind, ListItem, Para, Place};
-use hanji_format::{Geom, Inline};
+use hanji_format::{Crop, Geom, Inline, PictureItem};
 use hanji_pptx::import::SlideInfo;
 use hanji_pptx::DeckShell;
 use hanji_testkit::{
     block_ranges, chars, deleted_span, entries_at, figure_or_word, ident, replace_span, span_of, Cx, Doc, Edit, EditFn,
 };
 
-pub const EDITS: [(&str, EditFn); 14] = [
+pub const EDITS: [(&str, EditFn); 16] = [
     ("p1_title", p1_title),
     ("p2_bullet", p2_bullet),
     ("p3_add_slide", p3_add_slide),
@@ -33,6 +35,8 @@ pub const EDITS: [(&str, EditFn); 14] = [
     ("p13_resize_picture", p13_resize_picture),
     ("p14_add_text_box", p14_add_text_box),
     ("p15_align", p15_align),
+    ("p16_crop_picture", p16_crop_picture),
+    ("p17_mask_picture", p17_mask_picture),
 ];
 
 /// A slide: its head and the end of its blocks.
@@ -351,9 +355,10 @@ fn p8_layout(d: &Doc, cx: &Cx) -> Option<Edit> {
     None
 }
 
-/// Object heads (`object` head, then its placeholder) whose shape no
-/// animation of their slide plays on: `(head, slide, kind)`.
-fn objects(d: &Doc) -> Vec<(usize, usize, &str)> {
+/// Object heads (an `object` head and its placeholder, or a picture's head)
+/// whose shape no animation of their slide plays on: `(head, slide, kind,
+/// blocks)`.
+fn objects(d: &Doc) -> Vec<(usize, usize, &str, usize)> {
     let mut out = vec![];
     for sl in slides(&d.blocks) {
         let skel = d.entries.iter().find(|e| e.kind == Kind::Slide && e.meta.tag == "slide" && e.path == [sl.head]);
@@ -362,6 +367,13 @@ fn objects(d: &Doc) -> Vec<(usize, usize, &str)> {
             x.find("<p:timing").map_or(String::new(), |k| x[k..].to_string())
         });
         for k in sl.head..sl.end {
+            if let Some(HeadKind::Picture { id, .. }) = d.blocks[k].head().map(kind) {
+                let n = id.strip_prefix('s').unwrap_or_default();
+                if !timing.contains(&format!("spid=\"{n}\"")) {
+                    out.push((k, sl.head, "picture", 1));
+                }
+                continue;
+            }
             if !d.blocks[k].head().is_some_and(|h| kind(h) == HeadKind::Object) {
                 continue;
             }
@@ -377,7 +389,7 @@ fn objects(d: &Doc) -> Vec<(usize, usize, &str)> {
                 }
             });
             if !animated {
-                out.push((k, sl.head, e.meta.keep.as_ref().map_or("object", |x| x.kind.as_str())));
+                out.push((k, sl.head, e.meta.keep.as_ref().map_or("object", |x| x.kind.as_str()), 2));
             }
         }
     }
@@ -388,17 +400,17 @@ fn objects(d: &Doc) -> Vec<(usize, usize, &str)> {
 /// used: the last that is not a picture when there is one (P13 resizes a picture).
 fn p10_delete_object(d: &Doc, cx: &Cx) -> Option<Edit> {
     let all = objects(d);
-    let &(a, slide, what) = all.iter().rev().find(|o| o.2 != "picture").or(all.last())?;
+    let &(a, slide, what, n) = all.iter().rev().find(|o| o.2 != "picture").or(all.last())?;
     let mut blocks = d.blocks.clone();
-    blocks.drain(a..a + 2);
+    blocks.drain(a..a + n);
     let bmap = (0..d.blocks.len())
         .map(|k| {
             if k < a {
                 Some(k)
-            } else if k < a + 2 {
+            } else if k < a + n {
                 None
             } else {
-                Some(k - 2)
+                Some(k - n)
             }
         })
         .collect();
@@ -407,22 +419,22 @@ fn p10_delete_object(d: &Doc, cx: &Cx) -> Option<Edit> {
         format!("delete the {what} on {}", slide_name(&d.blocks, a)),
         blocks,
         bmap,
-        HashSet::from([a, a + 1]),
+        (a..a + n).collect(),
         true,
     );
     let m = block_ranges(cx, d);
-    ed.span = span_of(cx, d, &ed.blocks, m[a].0, m[a + 1].1);
+    ed.span = span_of(cx, d, &ed.blocks, m[a].0, m[a + n - 1].1);
     ed.named = vec![slide];
     Some(ed)
 }
 
 /// The first object with an item before it on its slide moves before that item.
 fn p11_move_object(d: &Doc, _cx: &Cx) -> Option<Edit> {
-    let (a, slide, obj, prev) = objects(d).into_iter().find_map(|(a, slide, obj)| {
+    let (a, slide, obj, n, prev) = objects(d).into_iter().find_map(|(a, slide, obj, n)| {
         let prev = (slide + 1..a).rev().find(|&k| d.blocks[k].head().is_some_and(|h| h.level == 1))?;
-        Some((a, slide, obj, prev))
+        Some((a, slide, obj, n, prev))
     })?;
-    let order: Vec<usize> = (0..prev).chain([a, a + 1]).chain(prev..a).chain(a + 2..d.blocks.len()).collect();
+    let order: Vec<usize> = (0..prev).chain(a..a + n).chain(prev..a).chain(a + n..d.blocks.len()).collect();
     let blocks = order.iter().map(|&o| d.blocks[o].clone()).collect();
     let mut bmap = vec![None; d.blocks.len()];
     for (n, &o) in order.iter().enumerate() {
@@ -434,7 +446,7 @@ fn p11_move_object(d: &Doc, _cx: &Cx) -> Option<Edit> {
         _ => "the object before it".into(),
     };
     let what = format!("move the {obj} on {} behind {behind} (before it in the z-order)", slide_name(&d.blocks, a));
-    let mut ed = Edit::blocks("P11 move an object", what, blocks, bmap, (prev..a + 2).collect(), false);
+    let mut ed = Edit::blocks("P11 move an object", what, blocks, bmap, (prev..a + n).collect(), false);
     ed.named = vec![slide];
     Some(ed)
 }
@@ -468,7 +480,7 @@ fn attached(d: &Doc, slide: usize, id: u32) -> bool {
 /// The shape id of a shape head (`s7` → 7) or of an object head's placeholder.
 fn shape_id_of(d: &Doc, k: usize) -> Option<u32> {
     match d.blocks[k].head().map(kind)? {
-        HeadKind::Shape { id, .. } => id.strip_prefix('s')?.parse().ok(),
+        HeadKind::Shape { id, .. } | HeadKind::Picture { id, .. } => id.strip_prefix('s')?.parse().ok(),
         HeadKind::Object => {
             let Some(Block::Keep(kid)) = d.blocks.get(k + 1) else { return None };
             let e = d.entries.iter().find(|e| e.meta.keep.as_ref().is_some_and(|x| &x.id == kid))?;
@@ -499,7 +511,10 @@ fn movable(d: &Doc, pick: &dyn Fn(&Doc, usize) -> bool) -> Vec<(usize, usize, Ge
 fn moved(d: &Doc, k: usize, g: Geom) -> Vec<Block> {
     let mut blocks = d.blocks.clone();
     if let Block::Head(h) = &mut blocks[k] {
-        h.place = Some(Place::Box(g.shown()));
+        match &mut h.place {
+            Some(Place::Picture(p)) => p.geom = Some(g.shown()),
+            place => *place = Some(Place::Box(g.shown())),
+        }
     }
     blocks
 }
@@ -507,6 +522,7 @@ fn moved(d: &Doc, k: usize, g: Geom) -> Vec<Block> {
 fn label(d: &Doc, k: usize) -> String {
     match d.blocks[k].head().map(kind) {
         Some(HeadKind::Shape { name, .. }) => format!("shape {name:?}"),
+        Some(HeadKind::Picture { .. }) => "the picture".into(),
         Some(HeadKind::Object) => {
             let kid = match d.blocks.get(k + 1) {
                 Some(Block::Keep(id)) => id.as_str(),
@@ -634,4 +650,52 @@ fn p15_align(d: &Doc, _: &Cx) -> Option<Edit> {
         return Some(geometry_edit("P15 align two objects", what, moved(d, b, to), b, slide));
     }
     None
+}
+
+// ---------------------------------------------------------------- pictures (§5.3)
+
+/// Picture heads: `(head, slide, picture)`.
+fn pictures(d: &Doc) -> Vec<(usize, usize, PictureItem)> {
+    let mut out = vec![];
+    for sl in slides(&d.blocks) {
+        for k in sl.head + 1..sl.end {
+            if let Some(Place::Picture(p)) = d.blocks[k].head().and_then(|h| h.place.as_ref()) {
+                out.push((k, sl.head, p.clone()));
+            }
+        }
+    }
+    out
+}
+
+/// `blocks` with picture head `k` written as `p`.
+fn with_picture(d: &Doc, k: usize, p: PictureItem) -> Vec<Block> {
+    let mut blocks = d.blocks.clone();
+    if let Block::Head(h) = &mut blocks[k] {
+        h.place = Some(Place::Picture(p));
+    }
+    blocks
+}
+
+/// The first picture without a crop loses a tenth of its image at the left
+/// and right and a twentieth at the top and bottom.
+fn p16_crop_picture(d: &Doc, _: &Cx) -> Option<Edit> {
+    let (k, slide, p) = pictures(d).into_iter().find(|x| x.2.crop.is_none())?;
+    let crop = Crop { l: 10_000, t: 5_000, r: 10_000, b: 5_000 };
+    let what =
+        format!("crop the picture {:?} ({}) to crop=\"10 5 10 5\" on {}", p.name, p.src, slide_name(&d.blocks, k));
+    Some(geometry_edit("P16 crop a picture", what, with_picture(d, k, PictureItem { crop: Some(crop), ..p }), k, slide))
+}
+
+/// The last picture not already an ellipse is cut to one, with new alternative text.
+fn p17_mask_picture(d: &Doc, _: &Cx) -> Option<Edit> {
+    let (k, slide, p) = pictures(d).into_iter().rev().find(|x| x.2.mask.as_deref() != Some("ellipse"))?;
+    let alt = "편집한 그림 12".to_string();
+    let what = format!(
+        "cut the picture {:?} ({}) to an ellipse, mask=\"ellipse\", with alt=\"{alt}\" on {}",
+        p.name,
+        p.src,
+        slide_name(&d.blocks, k)
+    );
+    let pic = PictureItem { mask: Some("ellipse".into()), alt: Some(alt), ..p };
+    Some(geometry_edit("P17 mask a picture", what, with_picture(d, k, pic), k, slide))
 }
