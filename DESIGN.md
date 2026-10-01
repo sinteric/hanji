@@ -608,7 +608,14 @@ layout: Two Content
   its layout's and master's placeholder's. No fill shows nothing, and a fill
   left out is none; a gradient, pattern or picture fill is shown
   (`fill=gradient`) and kept while left as shown, as is a colour the style
-  adjusts other than by Office's tints (`fill=accent1*`).
+  adjusts other than by Office's tints (`fill=accent1*`). A two-stop linear
+  gradient, its stops at the start and end in colours the text writes, is
+  shown and written as `fill="linear <angle> <from> <to>"`
+  (`fill="linear 90 accent1 #FFFFFF"`): its angle in whole degrees
+  clockwise from left-to-right (`a:lin ang`), its two stops' colours. A
+  changed angle or colour writes only that part, the rest of `a:gradFill`
+  kept; a new one is written with `scaled="0"`. Other gradients (more
+  stops, a path, stops elsewhere) stay `fill=gradient`.
   - A fill left as shown keeps the XML. A changed one is set in `p:spPr`
     after the geometry and before the outline, other children kept; one equal
     to what the style or layout gives removes the shape's own; leaving a

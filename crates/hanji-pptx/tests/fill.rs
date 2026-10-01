@@ -168,3 +168,61 @@ fn what_cannot_be_written_is_refused() {
     let out = PptxEngine.export(&t.text, &t.remainder).unwrap();
     assert_eq!(slide(&package::read(&out).unwrap(), 1), slide(&package::read(&deck("turns-deck.pptx")).unwrap(), 1));
 }
+
+const BAND: &str = "name=\"Rectangle 1\" box=\"0 0 960 180\" fill=\"linear 0 #14B8A6 #0EA5E9\"";
+
+/// The `a:gradFill` of the shape named `name` on slide `n`.
+fn grad_of(parts: &[Part], n: usize, name: &str) -> String {
+    let sp = sp_pr(&slide(parts, n), name);
+    sp[sp.find("<a:gradFill").unwrap()..sp.find("</a:gradFill>").unwrap() + 13].to_string()
+}
+
+#[test]
+fn a_two_stop_linear_gradient_is_shown_and_written_by_its_parts() {
+    let pkg = deck("audit/synth-modern-pitch.pptx");
+    let before = package::read(&pkg).unwrap();
+    let imp = import(&pkg);
+    assert!(imp.text.contains(BAND), "{}", imp.text);
+    let a = grad_of(&before, 4, "Rectangle 1");
+    // Its angle alone: top to bottom.
+    let (parts, back) = edited(&imp, BAND, &BAND.replace("linear 0", "linear 90"));
+    assert_eq!(grad_of(&parts, 4, "Rectangle 1"), a.replace("<a:lin ang=\"0\"", "<a:lin ang=\"5400000\""));
+    // Its end colour alone, a theme colour; the rest (rotWithShape) kept.
+    let (parts, _) = edited(
+        &back,
+        &BAND.replace("linear 0", "linear 90"),
+        &BAND.replace("linear 0 #14B8A6 #0EA5E9", "linear 90 #14B8A6 accent2"),
+    );
+    let g = grad_of(&parts, 4, "Rectangle 1");
+    assert!(
+        g.starts_with("<a:gradFill rotWithShape=\"1\">")
+            && g.contains("<a:gs pos=\"100000\"><a:schemeClr val=\"accent2\"/></a:gs>"),
+        "{g}"
+    );
+    // A solid shape made a gradient, and a gradient made solid.
+    let s = import(&deck("shapes.pptx"));
+    let r8 = "name=\"Rectangle 8\" box=\"174 72 72 72\" fill=accent1+80%";
+    let (parts, _) = edited(&s, r8, &r8.replace("fill=accent1+80%", "fill=\"linear 45 accent1 #FFFFFF\""));
+    assert_eq!(
+        grad_of(&parts, 6, "Rectangle 8"),
+        "<a:gradFill><a:gsLst><a:gs pos=\"0\"><a:schemeClr val=\"accent1\"/></a:gs><a:gs pos=\"100000\"><a:srgbClr val=\"FFFFFF\"/></a:gs></a:gsLst><a:lin ang=\"2700000\" scaled=\"0\"/></a:gradFill>"
+    );
+    let (parts, _) = edited(&imp, BAND, &BAND.replace("\"linear 0 #14B8A6 #0EA5E9\"", "#14B8A6"));
+    assert!(sp_pr(&slide(&parts, 4), "Rectangle 1").contains("<a:solidFill><a:srgbClr val=\"14B8A6\"/></a:solidFill>"));
+}
+
+#[test]
+fn a_gradient_the_text_cannot_write_is_refused() {
+    let imp = import(&deck("audit/synth-modern-pitch.pptx"));
+    let err = |text: String| match PptxEngine.export(&text, &imp.remainder) {
+        Err(EngineError::Invalid(d)) => hanji_format::diag::render(&d),
+        Err(EngineError::Refused(m)) => m,
+        other => panic!("expected an error, got {:?}", other.map(|_| ())),
+    };
+    let m = err(imp.text.replace(BAND, &BAND.replace("#0EA5E9", "accent1*")));
+    assert!(m.contains("cannot be written"), "{m}");
+    let m = err(imp.text.replace(BAND, &BAND.replace("linear 0 #14B8A6 #0EA5E9", "linear up #14B8A6 #0EA5E9")));
+    assert!(m.contains("not an angle") && m.contains("linear <angle> <from> <to>"), "{m}");
+    let m = err(imp.text.replace(BAND, &BAND.replace("linear 0 #14B8A6 #0EA5E9", "linear 0 #14B8A6")));
+    assert!(m.contains("linear <angle> <from> <to>"), "{m}");
+}
