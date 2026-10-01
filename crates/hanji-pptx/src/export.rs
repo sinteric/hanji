@@ -985,9 +985,10 @@ impl<'a> Exporter<'a> {
         // show where it now stands is written; the rest stays as it is.
         if let Some((u, want)) = style {
             // What the text leaves unsaid, the run inherits.
-            let mut want = want.over(&u.now.shown());
+            let hangul = text::has_hangul(&c.units);
+            let mut want = want.over(&u.now.shown_for(hangul));
             let own = rpr.as_ref().map_or_else(RunStyle::default, |r| RunStyle::of(r, u.fonts));
-            let had = own.over(u.now).shown();
+            let had = own.over(u.now).shown_for(hangul);
             // A colour kept as the file stores it (`*`, a gradient…) is not
             // written from the text: one the run showed under the slide's old
             // layout is copied from there.
@@ -1001,7 +1002,7 @@ impl<'a> Exporter<'a> {
             }
             if had != want || pin.is_some() {
                 let r = rpr.get_or_insert_with(|| el("a:rPr").with_attr("lang", lang));
-                text::write(r, &want, &had, u.now)?;
+                text::write(r, &want, &had, u.now, hangul)?;
                 if let Some(f) = pin {
                     text::set_fill(r, &f);
                 }

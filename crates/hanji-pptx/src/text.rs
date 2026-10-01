@@ -27,6 +27,10 @@ pub struct RunStyle {
     /// file stores it, so a run can keep it where it no longer inherits it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub fill: Option<String>,
+    /// The theme's Hangul face (`a:font script="Hang"`) of the font group
+    /// the East Asian font comes from: what Hangul shows when `a:ea` is empty.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hang: Option<String>,
 }
 
 /// A theme's fonts (`a:fontScheme`): major (headings) and minor (body),
@@ -37,6 +41,11 @@ pub struct ThemeFonts {
     pub major_ea: Option<String>,
     pub minor_latin: Option<String>,
     pub minor_ea: Option<String>,
+    /// Each group's `a:font script="Hang"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub major_hang: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub minor_hang: Option<String>,
 }
 
 impl ThemeFonts {
@@ -48,11 +57,21 @@ impl ThemeFonts {
                 let face = |g: &str, k: &str| {
                     e.child(g).and_then(|x| x.child(k)).and_then(|x| x.get("typeface")).filter(|t| !t.is_empty())
                 };
+                let hang = |g: &str| {
+                    e.child(g)
+                        .and_then(|x| {
+                            x.elements().find(|f| f.is("a:font") && f.get("script").as_deref() == Some("Hang"))
+                        })
+                        .and_then(|x| x.get("typeface"))
+                        .filter(|t| !t.is_empty())
+                };
                 f = ThemeFonts {
                     major_latin: face("a:majorFont", "a:latin"),
                     major_ea: face("a:majorFont", "a:ea"),
                     minor_latin: face("a:minorFont", "a:latin"),
                     minor_ea: face("a:minorFont", "a:ea"),
+                    major_hang: hang("a:majorFont"),
+                    minor_hang: hang("a:minorFont"),
                 };
             }
         });
@@ -82,7 +101,19 @@ impl RunStyle {
             size: self.size.or(under.size),
             color: self.color.clone().or_else(|| under.color.clone()),
             fill: if self.color.is_some() { self.fill.clone() } else { under.fill.clone() },
+            hang: self.hang.clone().or_else(|| under.hang.clone()),
         }
+    }
+
+    /// As a paragraph with Hangul (`hangul`) or without shows it:
+    /// [`RunStyle::shown`], except that Korean text shows the theme's Hangul
+    /// face where the theme leaves `a:ea` empty, as PowerPoint draws it.
+    pub fn shown_for(&self, hangul: bool) -> TextStyle {
+        let mut s = self.shown();
+        if hangul && self.ea.is_none() && self.hang.is_some() {
+            s.font = self.hang.clone();
+        }
+        s
     }
 
     /// As the text shows it: the East Asian font when there is one, else
@@ -94,7 +125,13 @@ impl RunStyle {
     /// What an `a:rPr` or `a:defRPr` sets.
     pub fn of(rpr: &Element, fonts: &ThemeFonts) -> RunStyle {
         let face = |k: &str| rpr.child(k).and_then(|x| x.get("typeface")).and_then(|t| fonts.resolve(&t));
+        let hang = match rpr.child("a:ea").and_then(|x| x.get("typeface")).as_deref() {
+            Some("+mj-ea") => fonts.major_hang.clone(),
+            Some("+mn-ea") => fonts.minor_hang.clone(),
+            _ => None,
+        };
         RunStyle {
+            hang,
             latin: face("a:latin"),
             ea: face("a:ea"),
             size: rpr.get("sz").and_then(|v| v.trim().parse().ok()),
@@ -115,6 +152,7 @@ pub fn defaults(fonts: &ThemeFonts) -> RunStyle {
         size: Some(1800),
         color: Some("tx1".into()),
         fill: None,
+        hang: fonts.minor_hang.clone(),
     }
 }
 
@@ -147,10 +185,10 @@ pub fn over(top: &[RunStyle; 9], under: &[RunStyle; 9]) -> [RunStyle; 9] {
 pub fn base(el: &Element, inherited: &[RunStyle; 9], fonts: &ThemeFonts) -> [RunStyle; 9] {
     let mut under = inherited.clone();
     if let Some(fr) = el.child("p:style").and_then(|s| s.child("a:fontRef")) {
-        let (latin, ea) = match fr.get("idx").as_deref() {
-            Some("major") => (fonts.major_latin.clone(), fonts.major_ea.clone()),
-            Some("minor") => (fonts.minor_latin.clone(), fonts.minor_ea.clone()),
-            _ => (None, None),
+        let (latin, ea, hang) = match fr.get("idx").as_deref() {
+            Some("major") => (fonts.major_latin.clone(), fonts.major_ea.clone(), fonts.major_hang.clone()),
+            Some("minor") => (fonts.minor_latin.clone(), fonts.minor_ea.clone(), fonts.minor_hang.clone()),
+            _ => (None, None, None),
         };
         let color = color_of(fr);
         let fill = color
@@ -158,7 +196,7 @@ pub fn base(el: &Element, inherited: &[RunStyle; 9], fonts: &ThemeFonts) -> [Run
             .filter(|c| is_kept(c))
             .and_then(|_| fr.elements().next())
             .map(|c| format!("<a:solidFill>{}</a:solidFill>", c.to_xml()));
-        let r = RunStyle { latin, ea, size: None, color, fill };
+        let r = RunStyle { latin, ea, size: None, color, fill, hang };
         under =
             over(&[r.clone(), r.clone(), r.clone(), r.clone(), r.clone(), r.clone(), r.clone(), r.clone(), r], &under);
     }
@@ -388,8 +426,15 @@ const RPR_ORDER: &[&str] = &[
 /// for the run): a value equal to what the run inherits (`base`) removes the
 /// run's own, any other is set on the run. A key `want` does not state is
 /// left as it is.
-pub fn write(rpr: &mut Element, want: &TextStyle, had: &TextStyle, base: &RunStyle) -> Result<(), String> {
-    let inherited = base.shown();
+/// `hangul`: the run's paragraph holds Hangul ([`RunStyle::shown_for`]).
+pub fn write(
+    rpr: &mut Element,
+    want: &TextStyle,
+    had: &TextStyle,
+    base: &RunStyle,
+    hangul: bool,
+) -> Result<(), String> {
+    let inherited = base.shown_for(hangul);
     if let Some(s) = want.size.filter(|s| Some(*s) != had.size) {
         if Some(s) == inherited.size {
             rpr.remove_attr("sz");
@@ -413,11 +458,23 @@ pub fn write(rpr: &mut Element, want: &TextStyle, had: &TextStyle, base: &RunSty
         rpr.children.retain(|n| !matches!(n, Node::El(e) if e.is("a:latin") || e.is("a:ea")));
         if Some(f) != inherited.font.as_ref() {
             insert_ordered(rpr, Element::new("a:latin").with_attr("typeface", f), RPR_ORDER);
-            // Where the run shows its East Asian font, that is the one written too.
-            if base.ea.is_some() {
+            // Where the run shows its East Asian font (in Korean text, the
+            // theme's Hangul face), that is the one written too.
+            if base.ea.is_some() || (hangul && base.hang.is_some()) {
                 insert_ordered(rpr, Element::new("a:ea").with_attr("typeface", f), RPR_ORDER);
             }
         }
     }
     Ok(())
+}
+
+/// A Hangul syllable or jamo.
+pub(crate) fn is_hangul(c: char) -> bool {
+    matches!(c as u32, 0xAC00..=0xD7A3 | 0x1100..=0x11FF | 0x3130..=0x318F)
+}
+
+/// Whether a paragraph's units hold Hangul: in such a paragraph the text
+/// shows the theme's Hangul face ([`RunStyle::shown_for`]).
+pub(crate) fn has_hangul(units: &[hanji_format::Unit]) -> bool {
+    units.iter().any(|u| matches!(u.atom, hanji_format::Atom::Char(c) if is_hangul(c)))
 }

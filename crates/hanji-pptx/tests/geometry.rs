@@ -152,11 +152,12 @@ fn every_object_shows_its_box_and_getput_keeps_every_xfrm() {
     // Every slot shows its box, inherited from the layout or the master.
     let k = import(&deck("korean-deck.pptx"));
     assert!(
-        k.text.contains("layout: Title Slide\n::title box=\"54 168 612 116\" font=Calibri size=44pt color=tx1::\n"),
+        k.text
+            .contains("layout: Title Slide\n::title box=\"54 168 612 116\" font=\"맑은 고딕\" size=44pt color=tx1::\n"),
         "{}",
         k.text
     );
-    assert!(k.text.contains("::body box=\"36 126 648 356\" font=Calibri color=tx1::\n"));
+    assert!(k.text.contains("::body box=\"36 126 648 356\" font=\"맑은 고딕\" color=tx1::\n"));
 }
 
 #[test]
@@ -168,8 +169,8 @@ fn a_box_left_as_shown_keeps_its_exact_emu() {
     let (text, rem) = exact(
         &imp.text,
         &imp.remainder,
-        "box=\"36 475 288 29\" font=Calibri size=18pt color=tx1>출처",
-        "box=\"396 475 288 29\" font=Calibri size=18pt color=tx1>출처",
+        "box=\"36 475 288 29\" font=\"맑은 고딕\" size=18pt color=tx1>출처",
+        "box=\"396 475 288 29\" font=\"맑은 고딕\" size=18pt color=tx1>출처",
     );
     let parts = export(&text, &rem);
     assert_eq!(
@@ -180,12 +181,12 @@ fn a_box_left_as_shown_keeps_its_exact_emu() {
     // the other numbers the master's exact ones (y 274638 EMU shows as 22 pt).
     let s2 = slides(&before)[1].clone();
     assert!(!xml(&before, &s2).contains("<a:xfrm"));
-    let old = "::title box=\"36 22 648 90\" font=Calibri size=44pt color=tx1::\n핵심 지표";
+    let old = "::title box=\"36 22 648 90\" font=\"맑은 고딕\" size=44pt color=tx1::\n핵심 지표";
     let (text, rem) = exact(
         &imp.text,
         &imp.remainder,
         old,
-        "::title box=\"36 22 648 60\" font=Calibri size=44pt color=tx1::\n핵심 지표",
+        "::title box=\"36 22 648 60\" font=\"맑은 고딕\" size=44pt color=tx1::\n핵심 지표",
     );
     let parts = export(&text, &rem);
     assert_eq!(
@@ -198,7 +199,7 @@ fn a_box_left_as_shown_keeps_its_exact_emu() {
         let (t2, r2) = exact(
             &imp2.text,
             &imp2.remainder,
-            "::title box=\"36 22 648 60\" font=Calibri size=44pt color=tx1::\n핵심 지표",
+            "::title box=\"36 22 648 60\" font=\"맑은 고딕\" size=44pt color=tx1::\n핵심 지표",
             back,
         );
         let parts = export(&t2, &r2);
@@ -221,8 +222,8 @@ fn objects_move_resize_align_and_a_text_box_is_added() {
     let (text, rem) = exact(
         &text,
         &rem,
-        "::title box=\"36 22 648 90\" font=Calibri size=44pt color=tx1::\n분기별 매출\n",
-        "::title box=\"36 22 648 90\" font=Calibri size=44pt color=tx1::\n분기별 매출\n<shape box=\"36 112 648 28\">단위: 억 원</shape>\n",
+        "::title box=\"36 22 648 90\" font=\"맑은 고딕\" size=44pt color=tx1::\n분기별 매출\n",
+        "::title box=\"36 22 648 90\" font=\"맑은 고딕\" size=44pt color=tx1::\n분기별 매출\n<shape box=\"36 112 648 28\">단위: 억 원</shape>\n",
     );
     let (parts, back) = export_new(&text, &rem, &[("s5", "TextBox 4")]);
     let x = xml(&parts, &s4);
@@ -234,7 +235,7 @@ fn objects_move_resize_align_and_a_text_box_is_added() {
     // The text read back shows the new box's id and name, after the title, before the table.
     assert!(
         back.contains(
-            "분기별 매출\n<shape id=\"s5\" name=\"TextBox 4\" box=\"36 112 648 28\" font=Calibri size=18pt color=tx1>단위: 억 원</shape>\n<keep id=\""
+            "분기별 매출\n<shape id=\"s5\" name=\"TextBox 4\" box=\"36 112 648 28\" font=\"맑은 고딕\" size=18pt color=tx1>단위: 억 원</shape>\n<keep id=\""
         ),
         "{back}"
     );
@@ -384,14 +385,13 @@ fn a_layout_change_keeps_each_slot_where_its_box_says() {
     assert_eq!(xfrms(&x).len(), 2, "{x}");
     // Bare markers put them where the new layout does.
     let t2 = text
-        .replace("::title box=\"57 347 612 107\" font=Calibri size=40pt color=tx1::\n부록", "::title::\n부록")
-        .replace("::body box=\"57 229 612 118\" font=Calibri size=20pt color=tx1*::", "::body::");
+        .replace("::title box=\"57 347 612 107\" font=\"맑은 고딕\" size=40pt color=tx1::\n부록", "::title::\n부록")
+        .replace("::body box=\"57 229 612 118\" font=\"맑은 고딕\" size=20pt color=tx1*::", "::body::");
     let r = rewrite_in(&PptxModel, &rem, &text, &t2, CAPS).unwrap_or_else(|e| panic!("{e}"));
     let parts = export(&r.text, &r.remainder);
     assert!(xfrms(&xml(&parts, &slides(&parts)[5])).is_empty());
-    assert!(
-        canonical(&t2, &r.remainder).contains("::title box=\"36 22 648 90\" font=Calibri size=44pt color=tx1::\n부록")
-    );
+    assert!(canonical(&t2, &r.remainder)
+        .contains("::title box=\"36 22 648 90\" font=\"맑은 고딕\" size=44pt color=tx1::\n부록"));
 }
 
 #[test]
