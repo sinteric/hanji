@@ -1,0 +1,18 @@
+{
+  "name": "hanji",
+  "version": "0.1.0",
+  "description": "Read and edit Word, PowerPoint, Excel and Hancom files (docx, pptx, xlsx, hwpx) as text, keeping everything the text does not show",
+  "keywords": ["docx", "pptx", "xlsx", "hwpx", "office", "word", "powerpoint", "excel", "hancom", "mcp"],
+  "skills": "./skills/",
+  "mcpServers": "./codex.mcp.json",
+  "interface": {
+    "displayName": "hanji",
+    "shortDescription": "Office files (docx, pptx, xlsx, hwpx) as editable text",
+    "longDescription": "Open a Word, PowerPoint, Excel or Hancom (hwpx) file, read it as text, edit it by exact spans or range operations, and export it with its formatting, pictures and comments kept. Macros and remote content are removed on open; comments, hidden text and metadata are surfaced before export.",
+    "developerName": "sinteric",
+    "category": "Productivity",
+    "capabilities": ["Interactive", "Write"],
+    "websiteURL": "https://github.com/sinteric/hanji",
+    "defaultPrompt": ["Summarize the attached .docx", "Update the totals in this .xlsx"]
+  }
+}

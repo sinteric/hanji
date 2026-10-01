@@ -1,0 +1,98 @@
+name: release
+# Builds hanji-mcp and hanji for each platform the plugin launcher
+# (plugins/hanji/scripts/hanji-mcp) downloads for. A v* tag publishes them
+# as a GitHub release; a pull request that touches the plugin or this file
+# builds them and checks the launcher against the built archive.
+on:
+  push:
+    tags: ["v*"]
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - plugins/**
+      - scripts/check-plugins.py
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { target: x86_64-unknown-linux-musl, os: ubuntu-latest, check: true }
+          - { target: aarch64-unknown-linux-musl, os: ubuntu-24.04-arm, check: true }
+          - { target: x86_64-apple-darwin, os: macos-latest, check: false }
+          - { target: aarch64-apple-darwin, os: macos-latest, check: true }
+          - { target: x86_64-pc-windows-msvc, os: windows-latest, check: true }
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: build
+        run: cargo build --release --locked --target ${{ matrix.target }} -p hanji-mcp -p hanji-cli
+      - name: package
+        run: |
+          version=$(sed -n 's/^version=//p' plugins/hanji/scripts/hanji-mcp)
+          name=hanji-$version-${{ matrix.target }}
+          exe=; [[ ${{ matrix.target }} == *windows* ]] && exe=.exe
+          mkdir -p dist/$name
+          cp target/${{ matrix.target }}/release/hanji-mcp$exe target/${{ matrix.target }}/release/hanji$exe dist/$name/
+          cd dist
+          tar -czf $name.tar.gz $name
+          rm -r $name
+          if command -v sha256sum >/dev/null; then sha256sum $name.tar.gz; else shasum -a 256 $name.tar.gz; fi > $name.tar.gz.sha256
+          cat $name.tar.gz.sha256
+      - name: the plugin launcher downloads, checks and starts it
+        if: matrix.check
+        env:
+          XDG_CACHE_HOME: ${{ runner.temp }}/cache
+        run: |
+          cat dist/*.sha256 > dist/SHA256SUMS
+          if command -v hanji-mcp; then echo "hanji-mcp is on PATH: the launcher would not download"; exit 1; fi
+          # file:///C:/... on Windows, file:///home/... elsewhere
+          dist=$(cd dist && { pwd -W 2>/dev/null || pwd; })
+          HANJI_MCP_DOWNLOAD_BASE="file:///${dist#/}" python scripts/check-plugins.py
+          rm dist/SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hanji-${{ matrix.target }}
+          path: dist/*
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: the tag is the plugin's version
+        run: |
+          version=$(sed -n 's/^version=//p' plugins/hanji/scripts/hanji-mcp)
+          test "$GITHUB_REF_NAME" = "v$version" || { echo "tag $GITHUB_REF_NAME, plugin version $version"; exit 1; }
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd dist
+          cat *.sha256 > SHA256SUMS
+          rm *.sha256
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "hanji $GITHUB_REF_NAME" --generate-notes *.tar.gz SHA256SUMS

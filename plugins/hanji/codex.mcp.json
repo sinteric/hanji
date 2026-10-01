@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "hanji": {
+      "command": "sh",
+      "args": ["./scripts/hanji-mcp"],
+      "cwd": ".",
+      "startup_timeout_sec": 60,
+      "env_vars": ["HANJI_MCP_BIN", "HANJI_MCP_DOWNLOAD_BASE", "HANJI_STORE", "XDG_CACHE_HOME", "HTTPS_PROXY", "https_proxy", "NO_PROXY", "no_proxy"]
+    }
+  }
+}

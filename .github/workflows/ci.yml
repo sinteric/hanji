@@ -51,3 +51,38 @@ jobs:
         run: cargo run --release --manifest-path validation/office-kit/Cargo.toml
       - name: kit files
         run: python3 validation/ooxml-schema/validate.py -q target/office-kit
+
+  # The Claude Code and Codex plugin (plugins/hanji): manifests, marketplace,
+  # skills, and the MCP server started from each tool's configured command.
+  plugins:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --locked -p hanji-mcp
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Pinned: a new CLI release that changes the plugin format fails here
+      # only when these are bumped.
+      - run: npm install -g @anthropic-ai/claude-code@2.1.285 @openai/codex@0.159.2
+      - name: Claude Code validates the plugin and the marketplace
+        run: |
+          claude plugin validate --strict plugins/hanji
+          claude plugin validate --strict .
+      - name: Claude Code installs it and sees its skill and MCP server
+        run: |
+          claude plugin marketplace add "$PWD"
+          claude plugin install hanji@hanji
+          claude plugin details hanji | tee "$RUNNER_TEMP/details.txt"
+          grep -E 'Skills \(1\) +office-documents' "$RUNNER_TEMP/details.txt"
+          grep -E 'MCP servers \(1\) +hanji' "$RUNNER_TEMP/details.txt"
+      - name: Codex installs it and sees its skill and MCP server
+        run: |
+          codex plugin marketplace add "$PWD"
+          codex plugin add hanji@hanji
+          codex mcp get hanji --json | tee "$RUNNER_TEMP/codex-mcp.json"
+          codex debug prompt-input hi | grep -q 'hanji:office-documents'
+      - name: the MCP server answers from each plugin's command
+        run: PATH="$PWD/target/debug:$PATH" python3 scripts/check-plugins.py --codex-mcp-json "$RUNNER_TEMP/codex-mcp.json"
