@@ -73,7 +73,8 @@ impl Default for ImportOptions {
     }
 }
 
-/// A rendered preview (a stub until an engine renders).
+/// A rendered preview (a stub: the pptx preview is the native `hanji-preview`
+/// crate, since it reads font files).
 #[derive(Clone, Debug)]
 pub struct Rendered {
     pub pages: Vec<Vec<u8>>,
@@ -89,7 +90,8 @@ pub trait Engine {
     fn import(&self, package: &[u8], opts: &ImportOptions) -> Result<Imported, EngineError>;
     /// model text + remainder (of the same revision) → package.
     fn export(&self, text: &str, remainder: &Remainder) -> Result<Vec<u8>, EngineError>;
-    /// Renders the bytes `export` produced (§2 rule 4). Not implemented yet.
+    /// Renders the bytes `export` produced (§2 rule 4). Not implemented by the
+    /// engines (see [`Rendered`]).
     fn render(&self, _package: &[u8]) -> Result<Rendered, EngineError> {
         Err(EngineError::Unsupported("rendering is not implemented yet"))
     }

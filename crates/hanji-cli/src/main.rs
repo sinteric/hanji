@@ -7,8 +7,10 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
+use hanji_preview::store::Output;
 use hanji_store::{
-    Changed, DocType, Error, ExportOptions, Format, FsStorage, ImportReport, Result, TextEdit, Window, Workspace,
+    Changed, DocType, Error, ExportOptions, Format, FsStorage, ImportReport, MemStorage, Result, TextEdit, Window,
+    Workspace,
 };
 use serde::Serialize;
 
@@ -103,6 +105,22 @@ enum Cmd {
         #[arg(long)]
         tracked_changes: bool,
     },
+    /// Render a revision to check the look: an HTML viewer, or SVG or PNG per slide (pptx).
+    Preview {
+        /// A document, or a .pptx file (rendered as hanji would export it; not stored).
+        doc: String,
+        #[arg(long)]
+        rev: Option<u32>,
+        /// The directory to write to; by default the document's file's directory (or this one).
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// html (one viewer file), svg or png (one file per slide).
+        #[arg(long, default_value = "html", value_parser = parse_output)]
+        format: Output,
+        /// A font directory or file, searched before $HANJI_FONT_DIR and the system fonts (repeatable).
+        #[arg(long = "font-dir")]
+        font_dirs: Vec<PathBuf>,
+    },
     /// Bring a person's edits of an exported file back in as a new revision.
     Reimport { doc: String, path: PathBuf },
     /// List a document's revisions.
@@ -146,6 +164,51 @@ fn parse_type(s: &str) -> std::result::Result<DocType, String> {
 
 fn parse_format(s: &str) -> std::result::Result<Format, String> {
     Format::parse(s).ok_or_else(|| format!("{s:?} is not a format: docx, hwpx, pptx or xlsx"))
+}
+
+fn parse_output(s: &str) -> std::result::Result<Output, String> {
+    Output::parse(s).ok_or_else(|| format!("{s:?} is not a preview format: html, svg or png"))
+}
+
+/// `hanji preview`: a stored document, or a file imported in memory.
+fn preview(
+    ws: &Workspace<FsStorage>,
+    doc: &str,
+    rev: Option<u32>,
+    out_dir: Option<PathBuf>,
+    format: Output,
+    font_dirs: Vec<PathBuf>,
+) -> Result<Out> {
+    let opts = hanji_preview::Options::with_font_dirs(font_dirs);
+    let path = Path::new(doc);
+    let (mut p, preview, dir) = if path.is_file() && Format::of_name(doc).is_some() {
+        if rev.is_some() {
+            return Err(Error::bad("--rev names a revision of a stored document; a file is previewed as it is."));
+        }
+        hanji_preview::store::check_format(Format::of_name(doc).unwrap_or(Format::Pptx))?;
+        let mut mem = Workspace::new(MemStorage::new());
+        let bytes = std::fs::read(path).map_err(|e| Error::io(format!("cannot read {}: {e}", path.display())))?;
+        let name = path.file_name().map_or_else(|| doc.to_string(), |n| n.to_string_lossy().into_owned());
+        let o = mem.open_bytes(&name, &bytes, None)?;
+        let (p, preview) = hanji_preview::store::render(&mem, &o.doc_id, None, &opts)?;
+        let parent =
+            path.parent().filter(|p| !p.as_os_str().is_empty()).map_or_else(|| PathBuf::from("."), Path::to_path_buf);
+        (p, preview, out_dir.unwrap_or(parent))
+    } else {
+        let (p, preview) = hanji_preview::store::render(ws, doc, rev, &opts)?;
+        let dir = out_dir.unwrap_or_else(|| hanji_preview::store::default_dir(ws, doc, Path::new(".")));
+        (p, preview, dir)
+    };
+    hanji_preview::store::write(&preview, &mut p, format, &dir)?;
+    let mut t = String::new();
+    for f in &p.files {
+        t.push_str(&format!("wrote {f}\n"));
+    }
+    t.push_str(&format!("{} slides from revision {} of {}; {}\n", p.slides, p.revision, p.doc_id, p.summary));
+    for w in &p.warnings {
+        t.push_str(&format!("warning: {w}\n"));
+    }
+    Ok(out(&p, t))
 }
 
 fn read_input(path: &Path) -> Result<String> {
@@ -312,6 +375,7 @@ fn run(cli: Cli) -> Result<Out> {
             }
             out(&e, t)
         }
+        Cmd::Preview { doc, rev, out, format, font_dirs } => preview(&ws, &doc, rev, out, format, font_dirs)?,
         Cmd::Reimport { doc, path } => {
             let r = ws.reimport(&doc, &path)?;
             let t = if r.unchanged {

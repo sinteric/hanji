@@ -74,7 +74,10 @@ line 14, column 24: placeholder id="zzzzz" is not in this file. Placeholders com
 ```
 
 Subcommands: `open`, `new`, `read`, `edit`, `write`, `ops`, `validate`,
-`export`, `reimport`, `history`, `diff`, `list`, `guide`. Add `--json` for
+`export`, `preview`, `reimport`, `history`, `diff`, `list`, `guide`.
+`hanji preview DOC` (pptx) writes an HTML viewer of the revision as it would
+export (`--format svg` or `png` for one file per slide) and says which fonts
+it had to substitute; `--font-dir DIR` or `$HANJI_FONT_DIR` adds fonts. Add `--json` for
 machine-readable output. Documents and their revisions are kept in `.hanji/`,
 or in the directory named by `--store` or `$HANJI_STORE`. `hanji guide` prints
 the format summary that agents read.
@@ -86,7 +89,7 @@ from v0.1.0 has `hanji-<version>-<target>.tar.gz` with both binaries (`hanji`
 and `hanji-mcp`) for Linux x86_64 and arm64 (static, musl), macOS x86_64 and
 arm64, and Windows x86_64, plus `SHA256SUMS`.
 
-**From source** (Rust 1.85 or later):
+**From source** (Rust 1.93 or later):
 
 ```sh
 cargo install --locked --git https://github.com/sinteric/hanji hanji-cli   # the hanji command
@@ -117,7 +120,7 @@ cached binary and are immediate. For other MCP clients, and for details, see
 
 ## MCP server
 
-`hanji-mcp` runs over stdio and has ten tools:
+`hanji-mcp` runs over stdio and has eleven tools:
 
 | Tool | What it does |
 |---|---|
@@ -131,6 +134,7 @@ cached binary and are immediate. For other MCP clients, and for details, see
 | `hanji_export` | Write a revision to a file. Refused until surfaced content (comments, hidden text, metadata) is acknowledged |
 | `hanji_reimport` | Bring back a file a person edited in Office or Hancom as a new revision, and merge or refuse concurrent edits |
 | `hanji_history` | List a document's revisions, or show the diff between two of them |
+| `hanji_preview` | Render a presentation to check the look: an HTML viewer, or SVG or PNG per slide (optionally one slide as an image), with the fonts it substituted |
 
 ## Formats
 
@@ -188,7 +192,8 @@ These are not supported yet:
   writes.
 - xlsx: cell styles beyond formats, new charts, renaming or deleting sheets,
   tables and columns, column insert and delete.
-- Preview and rendering.
+- Preview of docx, hwpx and xlsx (pptx previews; Korean text needs a
+  Korean font installed or in `--font-dir`).
 
 For the details of each engine, see [crates/README.md](crates/README.md).
 

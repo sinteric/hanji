@@ -80,7 +80,15 @@ impl Server {
         let v = self.request("tools/call", json!({"name": tool, "arguments": args}));
         let r = &v["result"];
         assert!(r.is_object(), "{tool}: {v}");
-        let blocks = r["content"].as_array().unwrap().iter().map(|b| b["text"].as_str().unwrap().to_string()).collect();
+        let blocks = r["content"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|b| match b["type"].as_str() {
+                Some("image") => format!("image {}", b["mimeType"].as_str().unwrap()),
+                _ => b["text"].as_str().unwrap().to_string(),
+            })
+            .collect();
         Reply { blocks, error: r["isError"] == true }
     }
 
@@ -154,7 +162,8 @@ fn tools_are_listed_with_descriptions_and_schemas() {
             "hanji_validate",
             "hanji_export",
             "hanji_reimport",
-            "hanji_history"
+            "hanji_history",
+            "hanji_preview"
         ]
         .into_iter()
         .collect()
@@ -184,6 +193,30 @@ fn hwpx() {
 #[test]
 fn pptx() {
     round_trip(&mut Server::start("pptx"), "crates/hanji-pptx/corpus/korean-deck.pptx", "핵심 지표", "핵심 성과 지표");
+}
+
+#[test]
+fn a_presentation_is_previewed_with_its_fonts_report() {
+    let mut s = Server::start("preview");
+    let o = s.ok("hanji_open", json!({"path": corpus("crates/hanji-pptx/corpus/korean-deck.pptx")})).json();
+    let id = o["doc_id"].as_str().unwrap().to_string();
+    let out = s.path("previews");
+    let r = s.ok("hanji_preview", json!({"doc_id": id, "out_dir": out, "include_png": 2}));
+    let v = r.json();
+    assert_eq!((v["slides"].as_u64(), v["output"].as_str()), (Some(7), Some("html")));
+    let file = v["files"][0].as_str().unwrap();
+    assert!(file.ends_with("korean-deck-r1-preview.html") && std::path::Path::new(file).is_file(), "{v}");
+    assert!(v["fonts"]["substituted"].as_array().unwrap().iter().any(|e| e["requested"] == "Calibri"), "{v}");
+    assert!(v["summary"].as_str().unwrap().starts_with("fonts: "));
+    assert_eq!(r.blocks[1], "image image/png");
+    let v = s.ok("hanji_preview", json!({"doc_id": id, "out_dir": out, "format": "svg"})).json();
+    assert_eq!(v["files"].as_array().unwrap().len(), 7);
+    let e = s.err("hanji_preview", json!({"doc_id": id, "include_png": 8}));
+    assert_eq!(e["code"], "bad_request");
+    s.ok("hanji_open", json!({"path": corpus("prototype/remainder/corpus/korean-report.docx")}));
+    let e = s.err("hanji_preview", json!({"doc_id": "korean-report"}));
+    assert_eq!(e["code"], "unsupported");
+    assert!(e["message"].as_str().unwrap().starts_with("preview not supported yet for docx"), "{e}");
 }
 
 #[test]
