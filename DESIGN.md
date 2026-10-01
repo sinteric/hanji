@@ -495,7 +495,16 @@ layout: Two Content
   later slides are separated by a line containing only `---`. `size` in the
   front matter is the slide's width and height in points.
 - The first line of every slide is `layout: Name`, as listed, spaces included
-  (quotes allowed). No other `key: value` lines.
+  (quotes allowed). No other `key: value` lines. Instead of the name, a slide
+  may give the layout's type, the `ST_SlideLayoutType` code of its
+  `p:sldLayout@type` (`title`, `obj`, `objTx`, `twoObj`, `secHead`,
+  `titleOnly`, `blank`, `picTx`, …; `cust` for a layout without one), when
+  exactly one of the file's layouts has it: `layout: objTx` is the deck's
+  "Content with Caption". A name is matched first, so a layout named `obj`
+  is `layout: obj` even when another layout's type is `obj`. A type several
+  layouts share is an error that lists their names; a value that is neither
+  is an error that lists every layout's name and type. The text read back
+  always shows the name.
 - Real Slidev closes the per-slide front matter with a second `---`. Here that
   line starts an empty, layout-less slide and is an error.
 - **Objects and z-order.** A slide is its objects written back to front, slots

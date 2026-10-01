@@ -210,6 +210,34 @@ fn shape_text_and_a_layout_change() {
 }
 
 #[test]
+fn a_layout_is_given_by_its_type_and_reads_back_by_its_name() {
+    let imp = import(&deck("korean-deck.pptx"));
+    let n = imp.text.len();
+    let (text, rem) = span_edit(&imp, n, n, "\n---\n\nlayout: objTx\n::title::\n캡션 슬라이드\n");
+    let parts = export(&text, &rem);
+    let new = slides(&parts).last().unwrap().clone();
+    assert_eq!(rel_targets(&parts, &new, "slideLayout"), ["ppt/slideLayouts/slideLayout8.xml"]);
+    let back = import(&PptxEngine.export(&text, &rem).unwrap()).text;
+    assert!(back.contains("layout: Content with Caption\n::title") && !back.contains("layout: objTx"), "{back}");
+    // A layout change by type, as by name.
+    let r = edit_in(&PptxModel, &imp.remainder, &imp.text, "layout: Section Header", "layout: obj", CAPS).unwrap();
+    let parts = export(&r.text, &r.remainder);
+    assert_eq!(rel_targets(&parts, &slides(&parts)[5], "slideLayout"), ["ppt/slideLayouts/slideLayout2.xml"]);
+    // Several untyped layouts are all `cust`: the type does not say which.
+    let imp = import(&deck("ph-populated-placeholders.pptx"));
+    let at = imp.text.find("layout: ").unwrap();
+    let end = at + imp.text[at..].find('\n').unwrap();
+    let bad = format!("{}layout: cust{}", &imp.text[..at], &imp.text[end..]);
+    match PptxEngine.export(&bad, &imp.remainder) {
+        Err(EngineError::Invalid(d)) => {
+            let m = hanji_format::diag::render(&d);
+            assert!(m.contains("layout: cust is the type of 9 layouts") && m.contains("\"Custom Layout\""), "{m}");
+        }
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
 fn invalid_texts_are_refused_with_what_is_allowed() {
     let imp = import(&deck("korean-deck.pptx"));
     let bad = imp.text.replace("layout: Title Only", "layout: Nope");

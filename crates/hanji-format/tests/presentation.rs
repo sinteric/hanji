@@ -7,7 +7,7 @@ const FM: &str = "---\ntype: presentation\nformat: pptx\ntemplate: org/deck\nsch
 const EXAMPLE: &str = "---\ntype: presentation\nformat: pptx\ntemplate: org/deck\nschema: 1\n---\n\nlayout: Title and Content\n::title::\n핵심 지표\n::body::\n- 매출 **12% 증가**\n- 신규 고객 34곳\n::notes::\n전년 대비 강조\n\n---\n\nlayout: Two Content\n::title::\n지역별 현황\n::left::\n- 수도권 21곳\n::right::\n- 지방 13곳\n<shape id=\"s4\" name=\"출처\">출처: 내부 집계</shape>\n";
 
 fn names() -> Names {
-    let l = |n: &str, s: &[&str]| Layout { name: n.into(), slots: s.iter().map(|x| x.to_string()).collect() };
+    let l = |n: &str, s: &[&str]| Layout { name: n.into(), slots: s.iter().map(|x| x.to_string()).collect(), ty: None };
     Names {
         layouts: Some(vec![
             l("Title Slide", &["title", "subtitle"]),
@@ -427,4 +427,70 @@ fn pictures_read_and_write_their_image_crop_mask_and_alt() {
     );
     let e = parse(&keep).expect_err("src on a keep");
     assert!(e[0].message.contains("a picture is its own line, <picture box="), "{e:?}");
+}
+
+/// Layouts with their types: two of type `cust`, and one named `obj`, the
+/// type of another.
+fn typed_names() -> Names {
+    let l = |n: &str, t: &str, s: &[&str]| Layout {
+        name: n.into(),
+        slots: s.iter().map(|x| x.to_string()).collect(),
+        ty: Some(t.into()),
+    };
+    Names {
+        layouts: Some(vec![
+            l("Title Slide", "title", &["title", "subtitle"]),
+            l("Title and Content", "obj", &["title", "body"]),
+            l("Two Content", "twoObj", &["title", "left", "right"]),
+            l("Custom A", "cust", &["title"]),
+            l("Custom B", "cust", &[]),
+            l("obj", "titleOnly", &["title"]),
+        ]),
+        ..Default::default()
+    }
+}
+
+fn typed(body: &str) -> Result<ParsedPresentation, Vec<String>> {
+    parse_presentation(&format!("{FM}{body}"), &typed_names()).map_err(|e| e.iter().map(|d| d.to_string()).collect())
+}
+
+#[test]
+fn a_layout_is_given_by_its_name_or_by_a_type_only_it_has() {
+    let p = typed("\nlayout: Title and Content\n::body::\nx\n").unwrap();
+    assert_eq!(p.pres.slides[0].layout, "Title and Content");
+    // A type one layout has is that layout: its slots, and its name in the text written back.
+    let p = typed("\nlayout: twoObj\n::left::\nx\n::right::\ny\n").unwrap();
+    assert_eq!(p.pres.slides[0].layout, "Two Content");
+    assert!(serialize_presentation(&p.pres).contains("\nlayout: Two Content\n"));
+    let e = typed("\nlayout: title\n::body::\nx\n").unwrap_err();
+    assert!(e[0].contains("::body:: is not a slot of layout \"Title Slide\""), "{e:?}");
+}
+
+#[test]
+fn a_type_several_layouts_have_is_refused_with_their_names() {
+    let e = typed("\nlayout: cust\n::title::\nx\n").unwrap_err();
+    assert_eq!(
+        e,
+        ["line 8, column 1: layout: cust is the type of 2 layouts of this file, so it does not say which; write the layout's name: \"Custom A\", \"Custom B\"."]
+    );
+}
+
+#[test]
+fn a_layout_neither_named_nor_typed_is_refused_with_names_and_types() {
+    let e = typed("\nlayout: picTx\n::title::\nx\n").unwrap_err();
+    assert_eq!(
+        e,
+        ["line 8, column 1: layout: picTx is not a layout of this file; write a layout's name as listed, spaces included, or its type (in brackets) when only that layout has it. Layouts: \"Title Slide\" (title), \"Title and Content\" (obj), \"Two Content\" (twoObj), \"Custom A\" (cust), \"Custom B\" (cust), \"obj\" (titleOnly)."]
+    );
+    // Types are matched as written.
+    assert!(typed("\nlayout: TwoObj\n::title::\nx\n").unwrap_err()[0].contains("is not a layout of this file"));
+}
+
+#[test]
+fn a_name_wins_over_another_layouts_type() {
+    // `obj` is the name of one layout and the type of "Title and Content".
+    let p = typed("\nlayout: obj\n::title::\nx\n").unwrap();
+    assert_eq!(p.pres.slides[0].layout, "obj");
+    let e = typed("\nlayout: obj\n::body::\nx\n").unwrap_err();
+    assert!(e[0].contains("::body:: is not a slot of layout \"obj\""), "{e:?}");
 }
