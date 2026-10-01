@@ -68,7 +68,8 @@ fn sp_pr(parts: &[Part], name: &str) -> String {
 }
 
 const PITCH: &str = "audit/synth-modern-pitch.pptx";
-const CARD: &str = "name=\"Rounded Rectangle 2\" box=\"64 130 260 320\" kind=\"roundRect\" adj=\"8000\" fill=#FFFFFF/>";
+const CARD: &str =
+    "name=\"Rounded Rectangle 2\" box=\"64 130 260 320\" kind=\"roundRect\" adj=\"8000\" fill=#FFFFFF effects=\"shadow\"/>";
 
 #[test]
 fn every_preset_is_shown_and_a_rectangle_is_none() {
