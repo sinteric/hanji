@@ -12,8 +12,8 @@
 //!
 //! A deck's -edits.md gives each box an edit names in cm too, in PowerPoint's
 //! Format Shape → Size & Properties fields. With LibreOffice, PyMuPDF and
-//! Pillow installed, `render.py` draws each edited slide of a `pset` file
-//! next to its original slide (`NN-…-pset-slideK.png`, the changed objects
+//! Pillow installed, `render.py` draws each edited slide of a `pset` or feature file
+//! next to its original slide (`NN-…-slideK.png`, the changed objects
 //! outlined); `OFFICE_KIT_RENDER=0` skips it.
 //!
 //! Writes `target/office-kit/` (the files, `CHECKLIST.md`, `checklist.csv`)
@@ -39,7 +39,12 @@
 //!   straightened; and connectors: an object moved with its connectors
 //!   following, a connector re-attached; and effects: a shape's effects
 //!   removed, a shape given a shadow; a freeform drawn as an ellipse; and a
-//!   group turned 15°; and a shape filled with a two-stop gradient).
+//!   group turned 15°; and a shape filled with a two-stop gradient). Some
+//!   decks also get one file per feature, its edits exact and its check
+//!   what to look for in PowerPoint: a shape moved with a straight and an
+//!   elbow connector attached, a shadowed shape refilled and one's shadow
+//!   removed, a freeform moved, resized and refilled, a shape in a turned
+//!   group moved, and a two-stop gradient edited.
 //! - xlsx: per workbook, GetPut and range operations that change the inputs
 //!   of formulas, whose cached values the export recomputes, and `format`
 //!   operations on named ranges (a header row filled and bold, a column in
@@ -548,7 +553,139 @@ fn pptx(kit: &mut Kit) {
                 "order": fin,
             }));
         }
+        for f in FEATURES.iter().filter(|f| f.deck == *name) {
+            feature(kit, name, licence, &text, &rem, &orig, f);
+        }
     }
+}
+
+/// One feature checked on its own: exact edits of a deck's text, in order,
+/// with what to look for in PowerPoint.
+struct Feature {
+    deck: &'static str,
+    variant: &'static str,
+    about: &'static str,
+    /// (old, new): each an exact, unique span of the text as the edits before it left it.
+    edits: &'static [(&'static str, &'static str)],
+    /// The edits in plain words; a line naming a box gets PowerPoint's fields in cm.
+    notes: &'static [&'static str],
+    /// What to look for in PowerPoint.
+    check: &'static str,
+}
+
+const FEATURES: &[Feature] = &[
+    Feature {
+        deck: "audit/synth-modern-pitch.pptx",
+        variant: "connectors",
+        about: "connector reroute: on slide 2, Connector 9 bent into an elbow connector, then Oval 4 moved up with its two connectors attached (Connector 6 straight, Connector 9 an elbow)",
+        edits: &[
+            (
+                "<line id=\"s10\" name=\"Connector 9\" from=\"s5.3\" to=\"s8.1\" border",
+                "<line id=\"s10\" name=\"Connector 9\" from=\"s5.3\" to=\"s8.1\" kind=\"bentConnector3\" border",
+            ),
+            (
+                "<shape id=\"s5\" name=\"Oval 4\" box=\"300 220 72 72\"",
+                "<shape id=\"s5\" name=\"Oval 4\" box=\"300 130 72 72\"",
+            ),
+        ],
+        notes: &[
+            "slide 2: line \"Connector 9\" (Oval 4 to Oval 7): kind=\"bentConnector3\", an elbow connector",
+            "slide 2: shape \"Oval 4\" (the circle \"2\") moved up from box 300 220 72 72 to 300 130 72 72; its connectors follow it: \"Connector 6\" from Oval 2 stays straight, \"Connector 9\" to Oval 7 stays an elbow",
+        ],
+        check: "Slide 2: the circle \"2\" sits higher than circles 1, 3 and 4, at the listed cm; the line from circle 1 runs straight to it and the line on to circle 3 is an elbow (right-angled segments, not one slanted line); click each line: both ends show as attached (green dots on the circles), and dragging circle 2 drags both lines with it",
+    },
+    Feature {
+        deck: "audit/synth-modern-pitch.pptx",
+        variant: "effects",
+        about: "effects: on slide 3, Card 2's shadowed rounded rectangle refilled with its shadow kept, and Card 3's rounded rectangle's shadow removed",
+        edits: &[
+            (
+                "name=\"Rounded Rectangle 7\" box=\"354 130 260 320\" kind=\"roundRect\" adj=\"8000\" fill=#FFFFFF effects=\"shadow\"",
+                "name=\"Rounded Rectangle 7\" box=\"354 130 260 320\" kind=\"roundRect\" adj=\"8000\" fill=#FFE4DE effects=\"shadow\"",
+            ),
+            (
+                "name=\"Rounded Rectangle 12\" box=\"644 130 260 320\" kind=\"roundRect\" adj=\"8000\" fill=#FFFFFF effects=\"shadow\"",
+                "name=\"Rounded Rectangle 12\" box=\"644 130 260 320\" kind=\"roundRect\" adj=\"8000\" fill=#FFFFFF",
+            ),
+        ],
+        notes: &[
+            "slide 3: shape \"Rounded Rectangle 7\" (Card 2, \"Costs\") filled #FFE4DE, its effects=\"shadow\" kept, in box 354 130 260 320",
+            "slide 3: shape \"Rounded Rectangle 12\" (Card 3, \"People\") without effects (its shadow removed), in box 644 130 260 320",
+        ],
+        check: "Slide 3: card 1 (\"Cities\") is unchanged, white with its shadow; card 2 (\"Costs\") is light coral (#FFE4DE) with the same shadow as card 1 (Format Shape > Effects > Shadow still set); card 3 (\"People\") is white with no shadow (Shadow: none); all three in the listed boxes",
+    },
+    Feature {
+        deck: "shapes.pptx",
+        variant: "freeform",
+        about: "custom geometry: the freeform cloud moved, resized and filled accent 2, its outline kept",
+        edits: &[(
+            "name=\"Freeform 6\" box=\"47 211 185 136\" kind=\"custom\" fill=accent1",
+            "name=\"Freeform 6\" box=\"60 230 220 160\" kind=\"custom\" fill=accent2",
+        )],
+        notes: &[
+            "slide 1: shape \"Freeform 6\" (the cloud, kind=\"custom\") moved and resized from box 47 211 185 136 to 60 230 220 160, and filled accent2",
+        ],
+        check: "Slide 1: the cloud (\"Cloud\") is still a cloud (Edit Points shows its own outline, not a rectangle), stretched to the listed cm, filled in accent 2 with its accent 1 outline; the elbow arrow starting inside it is not attached to it (it starts at a fixed point) and, like the other objects, stays where it was",
+    },
+    Feature {
+        deck: "audit/onlyoffice-sample.pptx",
+        variant: "turned-group",
+        about: "turned group: a bar inside a group turned 5° moved to the right within the group",
+        edits: &[(
+            "<shape id=\"s997013066\" name=\"\" box=\"705 264 56 9\"",
+            "<shape id=\"s997013066\" name=\"\" box=\"740 264 56 9\"",
+        )],
+        notes: &[
+            "slide 3: in the group turned 5° (rot=\"5\", box 560 226 249 151), the bar shape s997013066 moved right from box 705 264 56 9 to 740 264 56 9 (a box inside the group, before its turn)",
+        ],
+        check: "Slide 3: in the card turned 5° (the middle of the three tilted cards), the short bar above the right-hand column of lines sits 1.23 cm further right along the card's own (tilted) top edge, still turned 5° with the card and inside it; the rest of the card is unchanged and the card still selects as one group",
+    },
+    Feature {
+        deck: "audit/synth-modern-pitch.pptx",
+        variant: "gradient",
+        about: "two-stop gradient: on slide 4, the banner's teal-to-blue gradient turned to run top to bottom, its second stop made accent 2",
+        edits: &[(
+            "name=\"Rectangle 1\" box=\"0 0 960 180\" fill=\"linear 0 #14B8A6 #0EA5E9\"",
+            "name=\"Rectangle 1\" box=\"0 0 960 180\" fill=\"linear 90 #14B8A6 accent2\"",
+        )],
+        notes: &[
+            "slide 4: shape \"Rectangle 1\" (the banner behind \"Traction\") fill=\"linear 90 #14B8A6 accent2\": from teal #14B8A6 at the top to accent 2 at the bottom (before: linear 0, teal at the left to #0EA5E9 at the right), its shadow kept, in box 0 0 960 180",
+        ],
+        check: "Slide 4: the banner shades from teal at the top to accent 2 at the bottom (Format Shape > Fill: Gradient fill, Linear, angle 90°, two stops: #14B8A6 at 0%, accent 2 at 100%), no longer left to right; its box and shadow are unchanged",
+    },
+];
+
+/// A [`Feature`]'s file: its edits applied one after another as exact edits,
+/// the export, its -edits.md and its before/after renders.
+fn feature(
+    kit: &mut Kit,
+    name: &str,
+    licence: &str,
+    text: &str,
+    rem: &Remainder,
+    orig: &[Option<String>],
+    f: &Feature,
+) {
+    let (mut cur_text, mut cur_rem) = (text.to_string(), rem.clone());
+    for (old, new) in f.edits {
+        let r = hanji_core::edit::edit_in(Pptx.model(), &cur_rem, &cur_text, old, new, CAPS)
+            .unwrap_or_else(|e| panic!("{name} {}: {old:?}: {e:?}", f.variant));
+        (cur_text, cur_rem) = (r.text, r.remainder);
+    }
+    let out = PptxEngine.export(&cur_text, &cur_rem).unwrap_or_else(|e| panic!("{name} {}: {e:?}", f.variant));
+    let fin = slide_ids(&hanji_testkit::written(&Pptx, &cur_text, &cur_rem), &cur_rem, orig);
+    let checks = vec![opened_in("PowerPoint"), f.check.into()];
+    let notes = f.notes.iter().map(|n| in_cm(n.to_string())).collect();
+    kit.add("pptx", name, licence, f.variant, f.about, &out, checks, notes);
+    kit.edits(&text_diff(text, &cur_text), TEXT_DIFF);
+    kit.renders.push(serde_json::json!({
+        "file": kit.items.last().unwrap().file,
+        "md": kit.items.last().unwrap().md,
+        "original": kit.file_of(name, "original"),
+        "before": text,
+        "after": cur_text,
+        "order": fin,
+    }));
 }
 
 /// Where PowerPoint shows a box: Format Shape → Size & Properties (도형 서식 → 크기 및 속성), in cm
@@ -582,6 +719,12 @@ fn in_cm(line: String) -> String {
     let after_word = |w: &str| line.find(w).map(|k| &line[k + w.len()..]);
     let (before, after) = if let Some(rest) = after_word("from box ") {
         (four(rest), rest.find(" to ").and_then(|k| four(&rest[k + 4..])))
+    } else if let Some(rest) = after_word(" in box ") {
+        let Some(b) = four(rest) else { return line };
+        return format!(
+            "{line}. **In PowerPoint** (도형 서식 → 크기 및 속성 / Format Shape → Size & Properties): unchanged, {}. PowerPoint rounds to 0.01 cm",
+            box_cm(b)
+        );
     } else if let Some(rest) = after_word(" at box ") {
         (None, four(rest))
     } else if let Some(rest) = after_word("(box ") {
@@ -1167,7 +1310,7 @@ fn checklist(kit: &Kit, commit: &str) -> (String, String) {
     (md, csv)
 }
 
-const HOW_TO_CHECK_A_DECK: &str = "hanji's text of a deck holds each slide's layout, and every object on it in z-order with its position and size in points (`box=\"x y w h\"` from the slide's top-left corner, 72 pt = 1 inch = 2.54 cm; each -edits.md line that names a box also gives it in cm as PowerPoint shows it under 도형 서식 → 크기 및 속성 (Format Shape → Size & Properties): 가로 위치 (Horizontal position) and 세로 위치 (Vertical position), from the top-left corner, 너비 (Width) and 높이 (Height). PowerPoint rounds to 0.01 cm, so a field can differ from the listed value by 0.01 cm): the slots (title, body, …) and shapes with their text, lines and connectors by their two ends, groups with their objects, pictures as `<picture/>` lines with their image, crop (percent cut off each edge), mask (the shape they are cut to) and alternative text, and a `<keep/>` line for each object it does not model (a table or chart). The design (fonts, colours, fills, the theme, masters and layouts, transitions, animations) stays in the remainder, which the export writes back unchanged. So, comparing a `pset` export with its `original`: a slide no edit touched must look exactly like its original slide (the **Slide order** line says which original slide each one is); an edited slide may differ only in the text, order, layout, positions and sizes its edits list, and an object an edit moved or resized must sit at the box it names (a new text box under a title: just below it, as wide as it). Beside each `pset` file's -edits.md, `NN-…-pset-slideK.png` shows slide K of the file after its edits (right) next to the original slide it came from (left), the objects the edits changed outlined in red. These are LibreOffice renders, which can differ slightly from PowerPoint (fonts, text wrapping, effects): they show where to look, and PowerPoint is what the check is about. Anything else, such as an object moved that no edit names, a lost picture, a connector come loose or a changed font, is a fail: note the slide.";
+const HOW_TO_CHECK_A_DECK: &str = "hanji's text of a deck holds each slide's layout, and every object on it in z-order with its position and size in points (`box=\"x y w h\"` from the slide's top-left corner, 72 pt = 1 inch = 2.54 cm; each -edits.md line that names a box also gives it in cm as PowerPoint shows it under 도형 서식 → 크기 및 속성 (Format Shape → Size & Properties): 가로 위치 (Horizontal position) and 세로 위치 (Vertical position), from the top-left corner, 너비 (Width) and 높이 (Height). PowerPoint rounds to 0.01 cm, so a field can differ from the listed value by 0.01 cm): the slots (title, body, …) and shapes with their text, lines and connectors by their two ends, groups with their objects, pictures as `<picture/>` lines with their image, crop (percent cut off each edge), mask (the shape they are cut to) and alternative text, and a `<keep/>` line for each object it does not model (a table or chart). The design (fonts, colours, fills, the theme, masters and layouts, transitions, animations) stays in the remainder, which the export writes back unchanged. So, comparing a `pset` export with its `original`: a slide no edit touched must look exactly like its original slide (the **Slide order** line says which original slide each one is); an edited slide may differ only in the text, order, layout, positions and sizes its edits list, and an object an edit moved or resized must sit at the box it names (a new text box under a title: just below it, as wide as it). Beside each `pset` file's -edits.md (and each feature file's, such as `connectors` or `gradient`), `NN-…-slideK.png` shows slide K of the file after its edits (right) next to the original slide it came from (left), the objects the edits changed outlined in red. These are LibreOffice renders, which can differ slightly from PowerPoint (fonts, text wrapping, effects): they show where to look, and PowerPoint is what the check is about. Anything else, such as an object moved that no edit names, a lost picture, a connector come loose or a changed font, is a fail: note the slide.";
 
 /// Before/after PNGs of the decks' edited slides (`render.py`: LibreOffice, then PyMuPDF), when
 /// LibreOffice is installed; `OFFICE_KIT_RENDER=0` skips them.
