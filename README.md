@@ -135,7 +135,7 @@ MCP clients, and for details, see [plugins/hanji](plugins/hanji/README.md).
 |---|---|---|---|---|
 | Text model | Document | Document | Presentation | Spreadsheet: the structure as text, cells as row windows |
 | Edit text | yes | yes | slides, slots, text shapes, notes | range operations |
-| Styles and direct formatting | yes | yes | fills, outlines, spans | cell formats; `format` op |
+| Styles and direct formatting | yes | yes | fills, outlines, effects, spans | cell formats; `format` op |
 | Tables | yes, with merges | yes, with merges | `<keep/>` | sheet tables |
 | Lists | yes | yes | bullets from layouts | — |
 | Add, delete, move | blocks | blocks | slides (from layouts); objects: move, resize, delete | rows, tables, sheets |
@@ -170,8 +170,9 @@ Version 0.1.0. The format has `schema: 1` and may change before 1.0.
 
 These are not supported yet:
 
-- pptx: effects, custom geometry, turned groups and gradients cannot be edited.
-  Pictures, charts and tables cannot be created.
+- pptx: effects can only be removed or set to the preset shadow. Gradients,
+  custom geometry and turned groups cannot be edited. Pictures, charts and
+  tables cannot be created.
 - Links, fields, footnotes and math in documents. They are read as
   placeholders, and the docx engine refuses new ones on export.
 - Editing header, footer and section text.
