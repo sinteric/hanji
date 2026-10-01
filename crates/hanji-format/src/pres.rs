@@ -833,7 +833,7 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
     Some((sh, ItemMap { head, blocks }))
 }
 
-const LINE_FORM: &str = "a line is <line id=\"…\" name=\"…\" from=\"x y\" to=\"x y\"/>, its two ends in points, its id and name as they are in the file, with kind=\"bentConnector3\" (or another connector) when it is not straight, border=\"<width>pt <style> <colour>\" and start= and end= arrowheads (triangle, stealth, diamond, oval, arrow) when it has them; a new line is <line from=\"x y\" to=\"x y\"/>";
+const LINE_FORM: &str = "a line is <line id=\"…\" name=\"…\" from=\"x y\" to=\"x y\"/>, its two ends in points (a connector's end attached to an object is that object's id and connection site, from=\"s3.2\"), its id and name as they are in the file, with kind=\"bentConnector3\" (or another connector) when it is not straight, border=\"<width>pt <style> <colour>\" and start= and end= arrowheads (triangle, stealth, diamond, oval, arrow) when it has them; a new line is <line from=\"x y\" to=\"x y\"/>";
 
 /// A `<line …/>` line.
 fn line_item(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Option<(LineItem, ItemMap)> {
@@ -863,11 +863,17 @@ fn line_item(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> 
         p.err(i, tag.col, format!("a line has no fill; its colour is its border=: {form}."));
         return None;
     }
-    let point = |k: usize| vals[k].as_deref().map(|v| (v, parse_point(v)));
-    let (from, to) = match (point(2), point(3)) {
+    // An end is a point, or (a connector's) the connection site it is attached to.
+    let point = |k: usize| {
+        vals[k].as_deref().map(|v| match Attach::parse(v) {
+            Some(a) => (v, Some(((0, 0), Some(a)))),
+            None => (v, parse_point(v).map(|p| (p, None))),
+        })
+    };
+    let ((from, from_at), (to, to_at)) = match (point(2), point(3)) {
         (Some((_, Some(f))), Some((_, Some(t)))) => (f, t),
         (Some((v, None)), _) | (_, Some((v, None))) => {
-            p.err(i, tag.col, format!("\"{v}\" is not a point; a line's ends are x y in points: {form}."));
+            p.err(i, tag.col, format!("\"{v}\" is not a point or a connection site; a line's ends are x y in points, or an object's id and site such as s3.2: {form}."));
             return None;
         }
         _ => {
@@ -902,7 +908,7 @@ fn line_item(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> 
         seen.push(key);
     }
     let head = HeadMap { start: at, end: next, mark: at + lead };
-    Some((LineItem { id, name, ends: Ends { from, to }, look }, ItemMap { head, blocks: vec![] }))
+    Some((LineItem { id, name, ends: Ends { from, to, from_at, to_at }, look }, ItemMap { head, blocks: vec![] }))
 }
 
 const PICTURE_FORM: &str = "a picture is <picture id=\"…\" name=\"…\" box=\"…\" src=\"…\"/>, its id and name as they are in the file, with crop=\"left top right bottom\" (percent cut off each edge), mask=\"ellipse\" (the preset shape it is cut to) and alt=\"…\" (its alternative text) when it has them; a new picture is <picture box=\"…\" src=\"…\"/>";
@@ -1316,8 +1322,10 @@ pub fn picture_line(pic: &PictureItem) -> String {
 }
 
 pub fn line_line(l: &LineItem) -> String {
-    let p = |(x, y): (i64, i64)| format!("{} {}", pt(x), pt(y));
-    let ends = format!("from=\"{}\" to=\"{}\"{}", p(l.ends.from), p(l.ends.to), look_attrs(&l.look));
+    let p =
+        |(x, y): (i64, i64), at: Option<Attach>| at.map_or_else(|| format!("{} {}", pt(x), pt(y)), |a| a.to_string());
+    let e = &l.ends;
+    let ends = format!("from=\"{}\" to=\"{}\"{}", p(e.from, e.from_at), p(e.to, e.to_at), look_attrs(&l.look));
     if l.id.is_empty() {
         format!("<line {ends}/>")
     } else {

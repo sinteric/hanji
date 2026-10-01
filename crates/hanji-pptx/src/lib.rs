@@ -21,6 +21,7 @@ pub mod kind;
 pub mod members;
 pub mod outline;
 pub mod pml;
+pub mod route;
 pub mod safety;
 pub mod text;
 
@@ -271,7 +272,11 @@ fn shown_group(mut g: fmt::GroupItem) -> fmt::GroupItem {
             fmt::SlideItem::Shape(sh) => sh.geom = sh.geom.map(|x| x.shown()),
             fmt::SlideItem::Object(o) => o.geom = o.geom.map(|x| x.shown()),
             fmt::SlideItem::Line(l) => {
-                l.ends = fmt::Ends { from: (r(l.ends.from.0), r(l.ends.from.1)), to: (r(l.ends.to.0), r(l.ends.to.1)) }
+                l.ends = fmt::Ends {
+                    from: (r(l.ends.from.0), r(l.ends.from.1)),
+                    to: (r(l.ends.to.0), r(l.ends.to.1)),
+                    ..l.ends
+                }
             }
             fmt::SlideItem::Group(inner) => *inner = shown_group(inner.clone()),
             fmt::SlideItem::Picture(p) => {

@@ -140,7 +140,7 @@ fn every_object_shows_its_box_and_getput_keeps_every_xfrm() {
         "<picture id=\"s2\" name=\"Picture 1\" box=\"402 78 144 132\" src=\"media/image1.jpg\"/>",
         "<keep id=\"?\" kind=\"table\" summary=\"Table 2: Column1 Column2 Column3 data1 data2 data3\" box=\"300 372 372 96\"/>",
         "<line id=\"s8\" name=\"Straight Arrow Connector 7\" from=\"468 366\" to=\"468 216\" border=\"0.75pt solid accent1*\" start=arrow end=arrow/>",
-        "<line id=\"s10\" name=\"Elbow Connector 9\" from=\"186 252\" to=\"402 144\" kind=\"bentConnector3\" border=\"0.75pt solid accent1*\" end=arrow/>",
+        "<line id=\"s10\" name=\"Elbow Connector 9\" from=\"186 252\" to=\"s2.1\" kind=\"bentConnector3\" border=\"0.75pt solid accent1*\" end=arrow/>",
     ]
     .join("\n");
     assert!(keep_ids_out(&imp.text).contains(&s1), "{}", imp.text);
@@ -298,26 +298,16 @@ fn lines_move_by_their_ends_and_new_lines_are_drawn() {
 }
 
 #[test]
-fn an_object_a_connector_is_attached_to_moves_only_with_the_connector() {
-    // Elbow Connector 9 ends on Picture 1 (its endCxn names shape 2).
+fn an_object_a_connector_is_attached_to_takes_the_connector_along() {
+    // Elbow Connector 9 ends on Picture 1 (its endCxn names shape 2, site 1):
+    // moved or resized, the picture takes that end along (tests/route.rs).
     let imp = import(&deck("shapes.pptx"));
-    let pic = ("name=\"Picture 1\" box=\"402 78 144 132\"", "name=\"Picture 1\" box=\"402 178 144 132\"");
-    let (text, rem) = exact(&imp.text, &imp.remainder, pic.0, pic.1);
-    match PptxEngine.export(&text, &rem) {
-        Err(EngineError::Refused(m)) => assert!(
-            m.starts_with("<picture id=\"s2\" name=\"Picture 1\">")
-                && m.contains("is moved or resized, and connector <line id=\"s10\" name=\"Elbow Connector 9\"> has its end attached to it")
-                && m.contains("move that end of the <line> in the same edit"),
-            "{m}"
-        ),
-        other => panic!("expected a refusal, got {:?}", other.map(|_| ())),
+    let pic = "name=\"Picture 1\" box=\"402 78 144 132\"";
+    for to in ["name=\"Picture 1\" box=\"402 178 144 132\"", "name=\"Picture 1\" box=\"402 78 72 132\""] {
+        let (text, rem) = exact(&imp.text, &imp.remainder, pic, to);
+        let x = xml(&export(&text, &rem), &slides(&package::read(&deck("shapes.pptx")).unwrap())[0]);
+        assert!(x.contains("<a:endCxn id=\"2\" idx=\"1\"/>"), "{x}");
     }
-    // Resizing is refused too; moving the connector's end with it is not.
-    let (text, rem) = exact(&imp.text, &imp.remainder, pic.0, "name=\"Picture 1\" box=\"402 78 72 132\"");
-    assert!(matches!(PptxEngine.export(&text, &rem), Err(EngineError::Refused(_))));
-    let (text, rem) = exact(&imp.text, &imp.remainder, pic.0, pic.1);
-    let (text, rem) = exact(&text, &rem, "from=\"186 252\" to=\"402 144\"", "from=\"186 252\" to=\"402 244\"");
-    export(&text, &rem);
     // An object nothing is attached to moves alone.
     let (text, rem) = exact(&imp.text, &imp.remainder, "box=\"47 211 185 136\"", "box=\"47 311 185 136\"");
     export(&text, &rem);

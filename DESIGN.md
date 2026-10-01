@@ -706,14 +706,33 @@ layout: Two Content
 - **Lines and connectors** are `<line id="s6" name="…" from="x y" to="x y"/>`:
   the two ends, not a box. Writing them rewrites `a:off`, `a:ext` and the flips.
   Its outline, arrowheads and kind (a straight, bent or curved connector)
-  are shown (Outline and Preset shape, above); its connection ids stay in
-  the remainder.
-  - *Attached connectors.* Moving or resizing an object that a connector is
-    attached to (its `stCxn` or `endCxn` names the object) is refused, with the
-    connector and the reason named, unless the same edit also rewrites every
-    attached `<line>`. The write does not reroute connectors: rerouting is
-    deferred (§10.9), and a refusal is better than a connector left detached
-    in PowerPoint (rule 1).
+  are shown (Outline and Preset shape, above), and its ends' attachments
+  as below.
+  - *Attached connectors* (built). A connector's end attached to an object
+    the text shows by id (its `stCxn` or `endCxn` names a shape, picture or
+    group, top-level or in a group) shows as that object's id and
+    connection site instead of a point: `to="s2.1"`. An end attached to a
+    slot or a `<keep/>` object shows its point, as before. A turned line
+    shows its ends where they are on the slide, through its rotation.
+    - When the object moves or is resized, or the text attaches the end to
+      another site or object, the end is put on the site again: the site
+      from the object's preset (`rect`, `roundRect`, `diamond` and the
+      flowchart process and decision shapes: the middles of the sides, top,
+      left, bottom, right; `ellipse`: eight round it from the top) through
+      its flips, rotation and group, and the connector's box from its ends,
+      its rotation kept. A straight connector lands exactly; an elbow
+      (`bentConnector2`, `bentConnector3`) is routed by its ends, its bend
+      back at the midpoint. An end neither moved nor re-attached keeps its
+      stored point, so an unchanged connector stays byte-exact.
+    - An end written as a point comes loose (its `stCxn`/`endCxn` goes). A
+      new line may be drawn attached, `<line from="s4.2" to="s2.1"/>`.
+    - The connector's fingerprint leaves its attachments out. Refused, with
+      the connector and the reason named: rerouting a curved or other
+      connector, an object whose sites are not known (another preset,
+      custom geometry, a group), a site it does not have, an object not on
+      the slide, one in a turned or flipped group, and moving an object a
+      connector inside a group or a `<keep/>` is attached to, unless that
+      connector's end is written in the same edit.
 - **Groups** are a `<group id name box>` line, the group's objects, then
   `</group>`. Its objects show slide coordinates (through the group's child
   offset and extent), and the group's box is the box around them. Changing the
