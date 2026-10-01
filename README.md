@@ -171,9 +171,10 @@ Version 0.1.0. The format has `schema: 1` and may change before 1.0.
 These are not supported yet:
 
 - pptx: effects can only be removed or set to the preset shadow. Gradients
-  and turned groups cannot be edited. Custom geometry (`kind="custom"`) is
-  kept as the file draws it, or replaced by a preset; its paths cannot be
-  edited. Pictures, charts and tables cannot be created.
+  cannot be edited. Custom geometry (`kind="custom"`) is kept as the file
+  draws it, or replaced by a preset; its paths cannot be edited. A turned or
+  flipped group moves, resizes and turns as a whole, and its objects move
+  only within its box. Pictures, charts and tables cannot be created.
 - Links, fields, footnotes and math in documents. They are read as
   placeholders, and the docx engine refuses new ones on export.
 - Editing header, footer and section text.
