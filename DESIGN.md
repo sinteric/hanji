@@ -774,8 +774,17 @@ layout: Two Content
   holding what the text does not show (a field) is refused. The group's
   fingerprint leaves its shapes' paragraphs and fills out. Otherwise only
   the boxes of a group's objects change here: their names and number stay
-  (refused with the reason). A rotated or flipped group is one
-  `<keep kind="group" … box/>`. Groups are never created or ungrouped here.
+  (refused with the reason). Groups are never created or ungrouped here.
+  - *Turned and flipped groups* (built). A group with a rotation or flips
+    shows them on its tag, `<group id="g3" name="…" box="…" rot="347">`, and
+    its objects as they are in it before its turn and flips (in the box the
+    group's line shows). Moving, resizing, turning or flipping the whole
+    group writes its `a:xfrm` only, its objects following. Its objects'
+    text, formatting, fill, outline, kind and effects are written in place,
+    and an object may move or resize within the box its objects fill.
+    Refused, with the reason: moving or resizing an object beyond that box,
+    which would re-derive the group's child offset and extent and move its
+    turn's centre, and so the other objects on the slide.
 - **New objects** are written without `id`; the export gives ids and names
   (`TextBox 4`, `Straight Connector 10`), and the file read back shows them.
   They are:
@@ -1549,9 +1558,8 @@ side.
    fixes a rule 8 gap: the old text left out connectors and textless shapes (9 of the 19 objects in
    shapes.pptx). Across the 21 corpus decks, 36% of slide placeholders have
    their own box. A schema-1 text without boxes still reads unchanged.
-   Deferred: rerouting attached connectors (an edit that moves an attached
-   object without rewriting its connectors is refused, §5.3), editing inside
-   rotated groups (kept whole), pictures from a file, and cm as a view or
+   Deferred then, built since: rerouting attached connectors and editing
+   inside rotated groups (§5.3). Deferred: pictures from a file, and cm as a view or
    input over points (the unit Korean PowerPoint shows; not measured).
 
 10. **Direct formatting (proposed, 2026-09-30; docx and hwpx built, §5.2; xlsx built, §5.4)** — by §6 round 6, per kind:

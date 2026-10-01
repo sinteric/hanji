@@ -107,3 +107,67 @@ fn what_a_group_s_shapes_cannot_take_is_refused() {
     let m = err(imp.text.replace(BODY, &BODY.replace("font=Pretendard", "fill=gradient font=Pretendard")));
     assert!(m.contains("fill=gradient") && m.contains("cannot be written"), "{m}");
 }
+
+const TURNED: &str = "<group id=\"g300278322\" name=\"\" box=\"648 122 249 151\" rot=\"347\">";
+const INNER: &str = "<shape id=\"s1461313824\" name=\"\" box=\"682 215 49 32\" fill=bg1";
+
+/// The `a:xfrm` of the group with shape id `id`.
+fn group_xfrm(parts: &[Part], id: &str) -> String {
+    let x = parts
+        .iter()
+        .filter(|p| p.name.starts_with("ppt/slides/slide"))
+        .map(|p| String::from_utf8(p.data.to_vec()).unwrap())
+        .find(|x| x.contains(&format!("<p:cNvPr id=\"{id}\"")))
+        .unwrap();
+    let at = x.find(&format!("<p:cNvPr id=\"{id}\"")).unwrap();
+    let s = at + x[at..].find("<a:xfrm").unwrap();
+    // Empty elements written as the export writes them.
+    let mut out = x[s..s + x[s..].find("</a:xfrm>").unwrap() + 9].to_string();
+    for n in ["a:off", "a:ext", "a:chOff", "a:chExt"] {
+        out = out.replace(&format!("></{n}>"), "/>");
+    }
+    out
+}
+
+#[test]
+fn a_turned_group_shows_its_turn_and_moves_or_turns_whole() {
+    let imp = import(&deck("audit/onlyoffice-sample.pptx"));
+    // Its objects as they are in it before its turn.
+    assert!(
+        imp.text.contains(&format!("{TURNED}\n<group id=\"g1156312507\" name=\"\" box=\"648 122 249 151\">")),
+        "{}",
+        imp.text
+    );
+    let before = group_xfrm(&package::read(&deck("audit/onlyoffice-sample.pptx")).unwrap(), "300278322");
+    // Moved: its offset changes, its turn stays, its objects follow.
+    let (parts, back) = edited(&imp, TURNED, &TURNED.replace("648 122", "600 122"));
+    let after = group_xfrm(&parts, "300278322");
+    assert!(after.starts_with("<a:xfrm rot=\"") && after != before, "{after}");
+    assert_eq!(
+        after.replace(&after[after.find("<a:off").unwrap()..after.find("<a:ext").unwrap()], ""),
+        before.replace(&before[before.find("<a:off").unwrap()..before.find("<a:ext").unwrap()], "")
+    );
+    assert!(back.text.contains("<group id=\"g300278322\" name=\"\" box=\"600 122 249 151\" rot=\"347\">"));
+    // Turned: only its rotation changes.
+    let (parts, _) = edited(&imp, TURNED, &TURNED.replace("rot=\"347\"", "rot=\"10\""));
+    let after = group_xfrm(&parts, "300278322");
+    assert!(after.starts_with("<a:xfrm rot=\"600000\" flipH=\"0\" flipV=\"0\">"), "{after}");
+    assert_eq!(after[after.find('>').unwrap()..], before[before.find('>').unwrap()..]);
+}
+
+#[test]
+fn a_turned_group_s_objects_are_edited_in_place_and_not_moved_out() {
+    let imp = import(&deck("audit/onlyoffice-sample.pptx"));
+    // Their formatting, in place.
+    let (parts, _) = edited(&imp, INNER, &INNER.replace("fill=bg1", "fill=accent2"));
+    assert!(
+        group_xfrm(&parts, "300278322")
+            == group_xfrm(&package::read(&deck("audit/onlyoffice-sample.pptx")).unwrap(), "300278322")
+    );
+    // Moved beyond the box the objects fill: refused, the reason named.
+    let r = edit_in(&PptxModel, &imp.remainder, &imp.text, INNER, &INNER.replace("682 215", "682 415"), CAPS).unwrap();
+    match PptxEngine.export(&r.text, &r.remainder) {
+        Err(EngineError::Refused(m)) => assert!(m.contains("turned or flipped") && m.contains("whole group"), "{m}"),
+        other => panic!("expected a refusal, got {:?}", other.map(|_| ())),
+    }
+}

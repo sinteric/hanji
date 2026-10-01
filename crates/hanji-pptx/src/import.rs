@@ -720,16 +720,14 @@ pub fn object_geom(el: &Element) -> Option<Geom> {
 }
 
 /// A group as the text shows it (§5.3): its box and its objects in slide
-/// coordinates, through `parent` (the frame the group sits in). `None` for
-/// a rotated or flipped group, or one with an object the text cannot show:
-/// it is one `<keep/>`.
+/// coordinates, through `parent` (the frame the group sits in); a turned or
+/// flipped group's objects as they are in it before its turn and flips.
+/// `None` for a group with an object the text cannot show: it is one
+/// `<keep/>`.
 pub fn group_item(el: &Element, parent: &Frame, rels: &Rels, sty: Option<Styling>) -> Option<GroupItem> {
     let id = geom::shape_id(el)?;
     let name = c_nv_pr(el)?.get("name").unwrap_or_default();
     let own = geom::own(el)?;
-    if own.rot != 0 || own.flip_h || own.flip_v {
-        return None;
-    }
     let f = Frame::of(el)?.within(parent);
     let mut items = vec![];
     for c in el.elements() {
