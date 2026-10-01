@@ -95,4 +95,9 @@ jobs:
           cd dist
           cat *.sha256 > SHA256SUMS
           rm *.sha256
-          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "hanji $GITHUB_REF_NAME" --generate-notes *.tar.gz SHA256SUMS
+          # A release made by hand for the tag keeps its title and notes; it gets the assets.
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber *.tar.gz SHA256SUMS
+          else
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "hanji $GITHUB_REF_NAME" --generate-notes *.tar.gz SHA256SUMS
+          fi

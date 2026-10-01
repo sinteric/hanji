@@ -84,7 +84,7 @@ fn every_outline_is_shown_from_where_it_comes() {
     // No outline is nothing: a text box.
     assert!(t.contains("<shape id=\"s4\" name=\"TextBox 3\" box=\"72 72 180 29\" font=Calibri"), "{t}");
     // A line's own, in a group.
-    assert!(import(&deck("turns-deck.pptx")).text.contains("border=\"2pt solid accent1\"/>"));
+    assert!(import(&deck("turns-deck.pptx")).text.contains("border=\"2pt solid accent1\" effects=\"shadow\"/>"));
 }
 
 #[test]

@@ -461,10 +461,10 @@ fn a_stored_rotation_left_as_shown_keeps_its_exact_value() {
     let s1 = slides(&before)[0].clone();
     let imp = import(&pkg);
     for shown in [
-        "name=\"Minus ninety\" box=\"60 160 200 40\" rot=\"270\" fill=gradient border=\"0.75pt solid accent1*\" font=Calibri size=18pt color=lt1>",
-        "name=\"Minus fifteen flipped\" box=\"300 160 160 60\" rot=\"345\" flip=\"h\" kind=\"rightArrow\" fill=gradient border=\"0.75pt solid accent1*\" font=Calibri size=18pt color=lt1>",
-        "name=\"Past a turn\" box=\"500 160 160 60\" rot=\"60\" fill=gradient border=\"0.75pt solid accent1*\" font=Calibri size=18pt color=lt1>",
-        "name=\"Turned in group\" box=\"80 420 80 80\" rot=\"315\" kind=\"ellipse\" fill=gradient border=\"0.75pt solid accent1*\"/>",
+        "name=\"Minus ninety\" box=\"60 160 200 40\" rot=\"270\" fill=gradient border=\"0.75pt solid accent1*\" effects=\"shadow\" font=Calibri size=18pt color=lt1>",
+        "name=\"Minus fifteen flipped\" box=\"300 160 160 60\" rot=\"345\" flip=\"h\" kind=\"rightArrow\" fill=gradient border=\"0.75pt solid accent1*\" effects=\"shadow\" font=Calibri size=18pt color=lt1>",
+        "name=\"Past a turn\" box=\"500 160 160 60\" rot=\"60\" fill=gradient border=\"0.75pt solid accent1*\" effects=\"shadow\" font=Calibri size=18pt color=lt1>",
+        "name=\"Turned in group\" box=\"80 420 80 80\" rot=\"315\" kind=\"ellipse\" fill=gradient border=\"0.75pt solid accent1*\" effects=\"shadow\"/>",
     ] {
         assert!(imp.text.contains(shown), "{shown}\n{}", imp.text);
     }

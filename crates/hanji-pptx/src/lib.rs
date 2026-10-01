@@ -13,6 +13,7 @@
 //! and indices, which is what export does here too.
 
 pub mod deck;
+pub mod effects;
 pub mod export;
 pub mod fill;
 pub mod geom;
@@ -130,6 +131,7 @@ impl TextModel for PptxModel {
                     if h.look.is_empty() {
                         h.look.fill = fill::shown(slot.and_then(|s| s.fill.as_ref()));
                         h.look.border = slot.and_then(|s| s.line.as_ref()).and_then(|l| l.border());
+                        h.look.effects = crate::effects::shown(slot.and_then(|s| s.fx.as_ref()));
                         (h.look.kind, h.look.adj) =
                             slot.and_then(|s| s.geo.as_ref()).map_or((None, None), |g| g.shown(false));
                     }

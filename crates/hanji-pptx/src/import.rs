@@ -45,6 +45,7 @@ use hanji_package::clip;
 use hanji_package::xml::{canon, fp, is_blank, Element, Node, Scope};
 
 use crate::deck::{LayoutInfo, SlotInfo};
+use crate::effects;
 use crate::fill;
 use crate::geom::{self, Frame};
 use crate::kind;
@@ -256,6 +257,7 @@ impl Importer<'_> {
                     self.show_fill(&el, slot.fill.as_ref(), &layout.fills);
                     self.show_kind(&el, slot.geo.as_ref(), false);
                     self.show_outline(&el, slot.line.as_ref(), &layout.fills, false);
+                    self.show_effects(&el, slot.fx.as_ref(), &layout.fills);
                     let t = Some((&slot.text, &layout.fonts));
                     self.text_shape(&el, &slot.bullets, &k.to_string(), true, g, t)?;
                 }
@@ -291,6 +293,7 @@ impl Importer<'_> {
                     self.show_kind(&el, None, false);
                     self.show_fill(&el, None, &layout.fills);
                     self.show_outline(&el, None, &layout.fills, false);
+                    self.show_effects(&el, None, &layout.fills);
                     self.name_shape(id, name);
                     let t = Some((&layout.other_text, &layout.fonts));
                     self.text_shape(&el, &layout.other, &k.to_string(), false, g, t)?;
@@ -334,6 +337,7 @@ impl Importer<'_> {
                     if matches!(what, What::Bare(..) | What::Line(..)) {
                         self.show_kind(&el, None, matches!(what, What::Line(..)));
                         self.show_outline(&el, None, &layout.fills, matches!(what, What::Line(..)));
+                        self.show_effects(&el, None, &layout.fills);
                     }
                     self.name_shape(id, name);
                     self.whole(&el, &k.to_string());
@@ -412,6 +416,12 @@ impl Importer<'_> {
         }
     }
 
+    fn show_effects(&mut self, el: &Element, parent: Option<&effects::EffectsXml>, theme: &fill::ThemeFills) {
+        if let Some(Block::Head(h)) = self.blocks.last_mut() {
+            h.look.effects = effects::shown(effects::effective(el, parent, theme).as_ref());
+        }
+    }
+
     fn show_fill(&mut self, el: &Element, parent: Option<&fill::FillXml>, theme: &fill::ThemeFills) {
         if let Some(Block::Head(h)) = self.blocks.last_mut() {
             h.look.fill = fill::shown(fill::effective(el, parent, theme).as_ref());
@@ -422,9 +432,11 @@ impl Importer<'_> {
         let hi = self.blocks.len() - 1;
         // A shape's fill is the text's (§5.3), as its geometry is.
         let bare = geom::without_geometry(&match el.name.as_str() {
-            "p:sp" => kind::without_kind(&outline::without_outline(&fill::without_fill(el))),
+            "p:sp" => effects::without_effects(&kind::without_kind(&outline::without_outline(&fill::without_fill(el)))),
             // A connector's attachments are the text's too.
-            "p:cxnSp" => route::without_attachments(&kind::without_kind(&outline::without_outline(el))),
+            "p:cxnSp" => route::without_attachments(&effects::without_effects(&kind::without_kind(
+                &outline::without_outline(el),
+            ))),
             // A group's shapes' text and fills are the text's too.
             "p:grpSp" => members::without_shown(el),
             _ => el.clone(),
@@ -467,7 +479,8 @@ impl Importer<'_> {
                 pr.children.retain(|n| !matches!(n, Node::El(e) if e.is("p:ph")));
             }
         }
-        let bare = kind::without_kind(&outline::without_outline(&fill::without_fill(&fshell)));
+        let bare =
+            effects::without_effects(&kind::without_kind(&outline::without_outline(&fill::without_fill(&fshell))));
         let f = self.fp(&[Some(&geom::without_geometry(&bare))]);
         let meta = Meta {
             tag: shell.name.clone(),
