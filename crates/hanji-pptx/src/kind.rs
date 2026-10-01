@@ -39,10 +39,11 @@ impl Geo {
     }
 
     /// Its kind and adjustments as the text shows them: no kind for a
-    /// rectangle (a straight line) or custom geometry, no adjustments for a
-    /// preset's own or for guides that are not plain values (kept).
+    /// rectangle (a straight line), `custom` for custom geometry (kept), no
+    /// adjustments for a preset's own or for guides that are not plain
+    /// values (kept).
     pub fn shown(&self, line: bool) -> (Option<String>, Option<String>) {
-        let Geo::Preset { prst, av } = self else { return (None, None) };
+        let Geo::Preset { prst, av } = self else { return (Some(look::CUSTOM.into()), None) };
         let plain = matches!(prst.as_str(), "line" | "straightConnector1") && line || prst == "rect" && !line;
         let kind = (!plain).then(|| prst.clone());
         let vals: Option<Vec<(String, i64)>> =
@@ -67,11 +68,12 @@ pub fn shown(el: &Element, parent: Option<&Geo>, line: bool) -> (Option<String>,
     effective(el, parent).map_or((None, None), |g| g.shown(line))
 }
 
-/// `el` without its own preset geometry: what its fingerprint holds.
+/// `el` without its own geometry, preset or custom: what its fingerprint
+/// holds, so a shape given another kind is found again.
 pub fn without_kind(el: &Element) -> Element {
     let mut e = el.clone();
     if let Some(sp) = e.child_mut("p:spPr") {
-        sp.children.retain(|n| !matches!(n, Node::El(c) if c.is("a:prstGeom")));
+        sp.children.retain(|n| !matches!(n, Node::El(c) if c.is("a:prstGeom") || c.is("a:custGeom")));
     }
     e
 }
@@ -85,11 +87,11 @@ pub fn write(el: &mut Element, want: &Look, parent: Option<&Geo>, line: bool) ->
     if hk == want.kind && ha == want.adj {
         return Ok(());
     }
-    if now == Some(Geo::Custom) {
-        return Err(
-            "it is drawn with custom geometry, which the text keeps as the file has it; leave kind= and adj= out"
-                .into(),
-        );
+    if want.kind.as_deref() == Some(look::CUSTOM) {
+        return Err("kind=\"custom\" is shown for custom geometry the file draws, and cannot be written anew: write a preset such as kind=\"roundRect\", or leave kind out for a rectangle".into());
+    }
+    if now == Some(Geo::Custom) && want.adj.is_some() && want.kind.is_none() {
+        return Err("custom geometry has no preset adjustments: leave adj= out, or give the shape a preset kind".into());
     }
     if let (Some(p), true) = (parent, own(el).is_some()) {
         if p.shown(line) == (want.kind.clone(), want.adj.clone()) {
@@ -127,6 +129,8 @@ pub fn write(el: &mut Element, want: &Look, parent: Option<&Geo>, line: bool) ->
         el.children.insert(at, Node::El(Element::new("p:spPr")));
     }
     let sp = el.child_mut("p:spPr").expect("p:spPr");
+    // A preset in place of custom geometry.
+    sp.children.retain(|n| !matches!(n, Node::El(c) if c.is("a:custGeom")));
     if sp.child("a:prstGeom").is_none() {
         let mut g = Element::new("a:prstGeom");
         g.children.push(Node::El(Element::new("a:avLst")));
@@ -180,10 +184,18 @@ mod tests {
         assert_eq!(shown(&c, None, true), (Some("bentConnector3".into()), None));
         write(&mut c, &look(None, None), None, true).unwrap();
         assert!(c.to_xml().contains("prst=\"straightConnector1\""));
-        // Custom geometry is kept, and refused a kind.
-        let mut g = fragment("<p:sp><p:spPr><a:custGeom/></p:spPr></p:sp>");
-        assert_eq!(shown(&g, None, false), (None, None));
-        assert!(write(&mut g, &look(Some("ellipse"), None), None, false).is_err());
+        // Custom geometry is shown as custom and kept; a preset can take its place.
+        let mut g = fragment("<p:sp><p:spPr><a:xfrm/><a:custGeom><a:pathLst/></a:custGeom><a:noFill/></p:spPr></p:sp>");
+        assert_eq!(shown(&g, None, false), (Some("custom".into()), None));
+        write(&mut g, &look(Some("custom"), None), None, false).unwrap();
+        assert!(g.to_xml().contains("<a:custGeom><a:pathLst/></a:custGeom>"));
+        let mut r = fragment("<p:sp><p:spPr/></p:sp>");
+        assert!(write(&mut r, &look(Some("custom"), None), None, false).is_err());
+        write(&mut g, &look(Some("ellipse"), None), None, false).unwrap();
+        assert_eq!(
+            g.to_xml(),
+            "<p:sp><p:spPr><a:xfrm/><a:prstGeom prst=\"ellipse\"><a:avLst/></a:prstGeom><a:noFill/></p:spPr></p:sp>"
+        );
         // A slot back at its layout's preset loses its own.
         let parent = Geo::Preset { prst: "roundRect".into(), av: vec![] };
         let mut s = fragment("<p:sp><p:spPr><a:prstGeom prst=\"ellipse\"><a:avLst/></a:prstGeom></p:spPr></p:sp>");
