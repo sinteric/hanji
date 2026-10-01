@@ -456,7 +456,7 @@ impl<'a> Exporter<'a> {
                         self.run_el(p, &eff, segs[si], rm_at.get(&Target::Seg(si)).map(Vec::as_slice).unwrap_or(&[]))?;
                     if let Some(f) = &self.fmt {
                         let (a, _, own) = segs[si];
-                        let shown = own.map(&stored).unwrap_or_default();
+                        let shown = own.map(stored).unwrap_or_default();
                         if shown != want[a] {
                             if r.child("w:rPr").is_none() {
                                 r.children.insert(0, node(el("w:rPr")));
