@@ -326,6 +326,8 @@ impl fmt::Display for Border {
 
 pub const ALIGN: &[&str] = &["left", "center", "right", "justify", "distribute"];
 pub const VALIGN: &[&str] = &["top", "middle", "bottom"];
+/// A table's own `table-align` (§5.2).
+pub const TABLE_ALIGN: &[&str] = &["left", "center", "right"];
 
 /// A value that must be one of `allowed`.
 pub fn parse_choice(key: &str, v: &str, allowed: &[&str]) -> Result<String, String> {

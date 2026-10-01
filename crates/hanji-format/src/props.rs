@@ -434,6 +434,9 @@ pub fn unknown(name: &str) -> String {
     if let Some(k) = instead {
         return format!("{name} is not a property; write {k}. The properties are {keys}");
     }
+    if matches!(name, "table-align" | "table-indent") {
+        return format!("{name} is a table's own position: it goes on the table line {{…}} directly before the table's header row, not here");
+    }
     let refused = match name {
         "highlight" | "mark" => Some("text highlight"),
         "shadow" | "glow" | "effect" | "effects" | "reflection" | "emboss" | "engrave" | "3d" => {

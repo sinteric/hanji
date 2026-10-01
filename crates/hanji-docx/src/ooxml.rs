@@ -159,6 +159,28 @@ pub const PPR_ORDER: &[&str] = &[
     "pPrChange",
 ];
 
+/// `w:tblPr` children in schema order (CT_TblPr).
+pub const TBLPR_ORDER: &[&str] = &[
+    "tblStyle",
+    "tblpPr",
+    "tblOverlap",
+    "bidiVisual",
+    "tblStyleRowBandSize",
+    "tblStyleColBandSize",
+    "tblW",
+    "jc",
+    "tblCellSpacing",
+    "tblInd",
+    "tblBorders",
+    "shd",
+    "tblLayout",
+    "tblCellMar",
+    "tblLook",
+    "tblCaption",
+    "tblDescription",
+    "tblPrChange",
+];
+
 pub const TCPR_ORDER: &[&str] = &[
     "cnfStyle",
     "tcW",

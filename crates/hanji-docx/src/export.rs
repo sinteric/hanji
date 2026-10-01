@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use hanji_core::{Block, Entry, Kind, ListPlan, StyleSet};
 use hanji_format::styled::{self, StyleTable};
-use hanji_format::{Atom, Cell, Inline, Key, Marks, Props};
+use hanji_format::{Atom, Cell, Inline, Key, Marks, Props, TablePlace};
 
 use crate::format::{self, Theme};
 
@@ -591,6 +591,7 @@ impl<'a> Exporter<'a> {
                 tbl
             }
         };
+        self.set_table_place(&mut tbl, &t.place);
         for (ri, row) in t.rows.iter().enumerate() {
             self.bmarkers(&mut tbl, &[bi, ri]);
             let mut tr = self.at(&[bi, ri], Kind::Tr).first().map_or_else(|| el("w:tr"), |e| assemble(&e.xml));
@@ -675,6 +676,20 @@ impl<'a> Exporter<'a> {
         for m in ms {
             parent.children.push(node(fragment(&m.xml[0])));
         }
+    }
+
+    /// Sets the table's own position (`w:jc`, `w:tblInd`) where the text's
+    /// differs from what the stored `w:tblPr` shows; an unchanged one keeps
+    /// its XML.
+    fn set_table_place(&self, tbl: &mut Element, want: &TablePlace) {
+        let shown = tbl.child("w:tblPr").map(format::tblpr_place).unwrap_or_default();
+        if shown == *want {
+            return;
+        }
+        if tbl.child("w:tblPr").is_none() {
+            tbl.children.insert(0, node(el("w:tblPr")));
+        }
+        format::set_tblpr_place(tbl.child_mut("w:tblPr").unwrap(), want);
     }
 
     /// Sets the table style the text names; no name is the default table

@@ -219,7 +219,7 @@ impl Engine for DocxEngine {
     }
 
     fn capabilities(&self) -> Capabilities {
-        Capabilities { formatting: true, ..Default::default() }
+        Capabilities { formatting: true, table_place: true, ..Default::default() }
     }
 
     fn import(&self, package: &[u8], opts: &ImportOptions) -> Result<Imported, EngineError> {

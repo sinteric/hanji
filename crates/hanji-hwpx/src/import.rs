@@ -499,7 +499,7 @@ impl<'a> Importer<'a> {
         if boxes.iter().flatten().all(Props::is_empty) {
             boxes.clear();
         }
-        Ok(Some(Table { boxes, style: None, rows }))
+        Ok(Some(Table { boxes, style: None, rows, place: Default::default() }))
     }
 
     // ------------------------------------------------------------ paragraphs

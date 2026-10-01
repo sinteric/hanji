@@ -21,7 +21,7 @@
 //! that deletes or moves a placeholder (a field, another author's tracked
 //! change, a note reference, a moved picture, which would be written twice),
 //! text inside a field's result, a section break inserted or deleted,
-//! changed table shape or style, a changed style line or cell box (fill,
+//! changed table shape, style or position, a changed style line or cell box (fill,
 //! borders, valign), and a whole-file rewrite whose alignment
 //! chose among identical blocks (make it as exact edits instead).
 
@@ -1020,6 +1020,11 @@ impl<'a> Merge<'a> {
         if a.style != b.style {
             return Err("the edit changes a table's style, which is not written as a tracked change yet".into());
         }
+        if a.place != b.place {
+            return Err("the edit changes a table's position (table-align, table-indent), which is not written as a \
+                        tracked change yet"
+                .into());
+        }
         if a.boxes != b.boxes {
             return Err("the edit changes a table cell's fill, borders or vertical alignment, which is not written \
                         as a tracked change yet"
@@ -1044,7 +1049,7 @@ impl<'a> Merge<'a> {
             }
             rows.push(row);
         }
-        Ok(Block::Table(Table { boxes: b.boxes.clone(), style: b.style.clone(), rows }))
+        Ok(Block::Table(Table { boxes: b.boxes.clone(), style: b.style.clone(), rows, place: b.place.clone() }))
     }
 
     /// A table inserted or deleted whole.
@@ -1077,7 +1082,7 @@ impl<'a> Merge<'a> {
             rows.push(out);
         }
         let style = t.style.clone();
-        Ok(Block::Table(Table { boxes: t.boxes.clone(), style, rows }))
+        Ok(Block::Table(Table { boxes: t.boxes.clone(), style, rows, place: t.place.clone() }))
     }
 
     fn cell(&mut self, seq: Vec<It>, at: &[usize]) -> Result<Vec<CellPara>, String> {

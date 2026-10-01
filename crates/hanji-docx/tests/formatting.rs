@@ -8,7 +8,7 @@ use hanji_docx::DocxEngine;
 use hanji_package::package;
 
 const CAPS: Capabilities =
-    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: true };
+    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: true, table_place: true };
 
 fn corpus(name: &str) -> Vec<u8> {
     let path = format!("{}/../../prototype/remainder/corpus/{name}", env!("CARGO_MANIFEST_DIR"));
@@ -150,4 +150,139 @@ fn what_the_vocabulary_or_word_cannot_hold_is_refused() {
     // changed in the same revision that starts to use it.
     let m = invalid(line, &format!("{line}<style name=\"Body Text\" size=9pt/>\n"));
     assert!(m.contains("\"Body Text\" is already a style of this file"), "{m}");
+}
+
+/// `pkg` with its document.xml changed by `f`.
+fn with_document(pkg: &[u8], f: impl Fn(&str) -> String) -> Vec<u8> {
+    let mut parts = package::read(pkg).unwrap();
+    let doc = parts.iter_mut().find(|p| p.name == "word/document.xml").unwrap();
+    doc.data = f(std::str::from_utf8(&doc.data).unwrap()).into_bytes();
+    package::write(&parts).unwrap()
+}
+
+/// The first `w:tblPr` of a document.xml.
+fn tblpr(xml: &str) -> String {
+    let at = xml.find("<w:tblPr>").unwrap();
+    xml[at..at + xml[at..].find("</w:tblPr>").unwrap() + "</w:tblPr>".len()].to_string()
+}
+
+#[test]
+fn a_table_s_own_position_reads_and_writes_back_child_by_child() {
+    // korean-report's table sets w:jc and w:tblInd itself; here it is centred and indented.
+    const STORED: &str = r#"<w:jc w:val="left"/><w:tblInd w:w="0" w:type="dxa"/>"#;
+    let left = corpus("korean-report.docx");
+    assert!(part(&left, "word/document.xml").contains(STORED));
+    let pkg =
+        with_document(&left, |x| x.replacen(STORED, r#"<w:jc w:val="center"/><w:tblInd w:w="144" w:type="dxa"/>"#, 1));
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    let (t, rem) = (&imp.text, &imp.remainder);
+    assert!(t.contains("\n{table-align=center table-indent=7.2pt}\n| 지역 | 지점 | 매출 |\n"), "{t}");
+    let canon = |p: &[u8]| hanji_docx::xml::canon_part(part(p, "word/document.xml").as_bytes()).unwrap();
+    // GetPut: the same XML.
+    assert_eq!(canon(&DocxEngine.export(t, rem).unwrap()), canon(&pkg));
+    // Each edit loses no entry (`edits` checks the report), reads back as
+    // written (PutGet), and changes only what `stored` becomes in document.xml.
+    let source = part(&pkg, "word/document.xml");
+    let check = |list: &[(&str, &str)], stored: &str, becomes: &str| {
+        let r = edits(t, rem, list);
+        let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+        let canonical = DocxEngine::text_of(&r.new, &r.remainder, None);
+        assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, canonical);
+        assert_eq!(r.text, canonical);
+        assert!(source.contains(stored));
+        let want = source.replacen(stored, becomes, 1);
+        assert_eq!(canon(&out), hanji_docx::xml::canon_part(want.as_bytes()).unwrap(), "{list:?}");
+    };
+    // Changed: w:jc's value only.
+    check(
+        &[("{table-align=center ", "{table-align=right ")],
+        r#"<w:jc w:val="center"/><w:tblInd"#,
+        r#"<w:jc w:val="right"/><w:tblInd"#,
+    );
+    // The indent: w:tblInd's width only.
+    check(&[("table-indent=7.2pt}", "table-indent=-5.4pt}")], r#"<w:tblInd w:w="144""#, r#"<w:tblInd w:w="-108""#);
+    // Left out: the child is removed (the table style's position applies).
+    check(
+        &[("{table-align=center table-indent=7.2pt}", "{table-indent=7.2pt}")],
+        r#"<w:jc w:val="center"/><w:tblInd"#,
+        "<w:tblInd",
+    );
+    check(
+        &[("{table-align=center table-indent=7.2pt}\n", "")],
+        r#"<w:jc w:val="center"/><w:tblInd w:w="144" w:type="dxa"/>"#,
+        "",
+    );
+
+    // A table without them shows neither, and gets them in schema order;
+    // the other tables are not touched.
+    // (Its remote picture link is neutralised on import: the unedited export is the reference.)
+    let imp = DocxEngine.import(&corpus("docx4j-tables.docx"), &ImportOptions::default()).unwrap();
+    assert!(!imp.text.contains("table-align") && !imp.text.contains("table-indent"));
+    let source = part(&DocxEngine.export(&imp.text, &imp.remainder).unwrap(), "word/document.xml");
+    let r = edits(
+        &imp.text,
+        &imp.remainder,
+        &[("row height\n\n{fill=pattern}\n", "row height\n\n{table-align=center table-indent=3pt fill=pattern}\n")],
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine.import(&out, &ImportOptions::default()).unwrap().text,
+        DocxEngine::text_of(&r.new, &r.remainder, None)
+    );
+    let x0 = tblpr(&source);
+    let x1 = x0.replace(
+        r#"<w:tblW w:w="0" w:type="auto"/>"#,
+        r#"<w:tblW w:w="0" w:type="auto"/><w:jc w:val="center"/><w:tblInd w:w="60" w:type="dxa"/>"#,
+    );
+    assert_ne!(x0, x1);
+    let want = source.replacen(&x0, &x1, 1);
+    assert_eq!(canon(&out), hanji_docx::xml::canon_part(want.as_bytes()).unwrap());
+
+    // A new table: w:jc after w:tblW.
+    let r = edits(
+        &imp.text,
+        &imp.remainder,
+        &[(
+            "Merging, empty cells\n",
+            "Merging, empty cells\n\n{table-align=right}\n| 새 | 표 |\n|---|---|\n| 1 | 2 |\n",
+        )],
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    let xml = part(&out, "word/document.xml");
+    let new = around(&xml, "w:tbl", ">새<");
+    assert!(new.contains(r#"<w:tblW w:w="0" w:type="auto"/><w:jc w:val="right"/>"#), "{new}");
+    assert!(DocxEngine
+        .import(&out, &ImportOptions::default())
+        .unwrap()
+        .text
+        .contains("{table-align=right}\n| 새 | 표 |"));
+}
+
+#[test]
+fn a_table_s_own_position_is_checked_where_it_is_written() {
+    let pkg = corpus("korean-report.docx");
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    let (t, rem) = (&imp.text, &imp.remainder);
+    let invalid = |old: &str, new: &str| match rewrite(rem, t, &t.replacen(old, new, 1), CAPS) {
+        Err(Refusal::Invalid(d)) => d[0].message.clone(),
+        other => panic!("{new}: {:?}", other.map(|r| r.text)),
+    };
+    let line = "{table-align=left table-indent=0pt}";
+    let m = invalid(line, "{table-align=middle table-indent=0pt}");
+    assert!(m.contains("table-align=middle is not one of left, center, right"), "{m}");
+    let m = invalid(line, "{table-align=left table-indent=wide}");
+    assert!(m.contains("table-indent") && m.contains("not a length"), "{m}");
+    let m = invalid(line, "{table-align}");
+    assert!(m.contains("table-align needs a value"), "{m}");
+    // Only on the table line: not in a cell, a row or a paragraph.
+    let m = invalid("| 서울 |", "| {table-align=center} 서울 |");
+    assert!(m.contains("table line"), "{m}");
+    let m = invalid("| 서울 | 강남 | 120 |", "| 서울 | 강남 | 120 | {table-align=center}");
+    assert!(m.contains("table line"), "{m}");
+    let para = "\n아래 표는 지점별 매출을 정리한 것이다.\n";
+    let m = invalid(para, "\n아래 표는 지점별 매출을 정리한 것이다. {table-align=center}\n");
+    assert!(m.contains("table line"), "{m}");
+    // `align` on a table line stays the cell paragraphs'.
+    let r = rewrite(rem, t, &t.replacen(line, "{table-align=center align=right}", 1), CAPS).unwrap();
+    assert!(r.text.contains("{table-align=center align=right}\n"), "{}", r.text);
 }

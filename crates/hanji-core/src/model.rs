@@ -89,6 +89,8 @@ pub struct Table {
     pub rows: Vec<Vec<Cell>>,
     /// Each cell's box properties, as [`fmt::Table::boxes`].
     pub boxes: Vec<Vec<Props>>,
+    /// The table's own position, as [`fmt::Table::place`].
+    pub place: fmt::TablePlace,
 }
 
 /// Anchor path: `[block]`, `[block, row]`, `[block, row, col]` or
@@ -205,6 +207,8 @@ pub struct Capabilities {
     pub math: bool,
     /// Direct formatting and the style section (§5.2).
     pub formatting: bool,
+    /// A table's own position: `table-align`, `table-indent` (§5.2).
+    pub table_place: bool,
 }
 
 /// An empty paragraph's content.
@@ -324,7 +328,10 @@ pub fn resolve(
                 }
                 // The default table style named is no style line (canonical form).
                 let style = t.style.clone().filter(|s| Some(s) != styles.default_table.as_ref());
-                out.push(Block::Table(Table { style, rows, boxes: t.boxes.clone() }));
+                if !caps.table_place && !t.place.is_empty() {
+                    err(NO_TABLE_PLACE.into());
+                }
+                out.push(Block::Table(Table { style, rows, boxes: t.boxes.clone(), place: t.place.clone() }));
             }
             fmt::Block::List(items) => {
                 let mut margin = None;
@@ -369,6 +376,8 @@ pub fn resolve(
         Err(errs)
     }
 }
+
+const NO_TABLE_PLACE: &str = "a table's own position (table-align, table-indent) cannot be written to this file format; leave them out of the table line, and the table keeps the position the file gives it.";
 
 const NO_FORMATTING: &str = "formatting ({…}, [text]{…}, style lines) cannot be written to this file format yet; write the text and style names only.";
 
@@ -578,9 +587,12 @@ pub fn unresolve(
             // A Document has no heads.
             Block::Head(_) => continue,
             Block::Keep(id) => fmt::Block::Keep(keep(id)),
-            Block::Table(t) => {
-                fmt::Block::Table(fmt::Table { style: t.style.clone(), rows: t.rows.clone(), boxes: t.boxes.clone() })
-            }
+            Block::Table(t) => fmt::Block::Table(fmt::Table {
+                style: t.style.clone(),
+                rows: t.rows.clone(),
+                boxes: t.boxes.clone(),
+                place: t.place.clone(),
+            }),
             Block::Para(p) => {
                 // Empty: `<p/>` / `<p style="Name"/>`. Spaces only: a `<div>`.
                 // Spaces only: a `<div>` naming the style, so the spaces stay text.

@@ -9,7 +9,7 @@ use hanji_docx::{package, DocxEngine, ExportOptions, History, Reviewer};
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const CAPS: Capabilities =
-    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: true };
+    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: true, table_place: true };
 const AUTHOR: &str = "hanji";
 
 const STYLES: &str = r#"<?xml version="1.0" encoding="UTF-8"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/></w:style><w:style w:type="paragraph" w:styleId="Note"><w:name w:val="Note"/></w:style><w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/></w:style></w:styles>"#;
@@ -130,6 +130,22 @@ fn table_cells_track_and_edits_compose() {
     let x = run(&body, &[("| 120 |", "| 1205 |"), ("before", "before this"), ("this", "that")]).unwrap();
     assert!(x.contains("<w:tc><w:p><w:del") || x.contains("<w:t>120</w:t></w:r><w:ins"), "{x}");
     assert!(!x.contains("this"), "an insertion edited again is one insertion: {x}");
+}
+
+#[test]
+fn a_table_s_position_change_is_refused_as_a_tracked_change() {
+    let cell = |t: &str| format!("<w:tc>{}</w:tc>", p(t));
+    let body = format!(
+        "<w:tbl><w:tblPr/><w:tblGrid><w:gridCol/><w:gridCol/></w:tblGrid><w:tr>{}{}</w:tr><w:tr>{}{}</w:tr></w:tbl>",
+        cell("지역"),
+        cell("매출"),
+        cell("서울"),
+        cell("120"),
+    );
+    match run(&body, &[("| 지역 | 매출 |", "{table-align=center}\n| 지역 | 매출 |")]) {
+        Err(EngineError::Refused(m)) => assert!(m.contains("table's position"), "{m}"),
+        other => panic!("{other:?}"),
+    }
 }
 
 #[test]

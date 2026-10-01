@@ -214,7 +214,8 @@ fn with_own(content: &Inline, props: &Props, base: &Props, tl: &Props) -> (Strin
 /// line, more than half of a row's (differing from the line's) on the row;
 /// a layout or text value more than half of the cell paragraphs with text
 /// set beyond their style is on the table line (a table of one cell has no
-/// table line values). Each cell and paragraph writes what differs.
+/// table line values). Each cell and paragraph writes what differs. The
+/// line starts with the style, then the table's own place.
 fn table(out: &mut Vec<String>, t: &Table, st: &StyleTable) {
     let dflt = styled::box_default();
     let text_cells: Vec<(usize, usize)> = t
@@ -286,7 +287,8 @@ fn table(out: &mut Vec<String>, t: &Table, st: &StyleTable) {
     }
     let head = table_box.overlay(&table_para);
     let style = t.style.as_ref().map(|s| format!("style=\"{}\"", attr(s)));
-    let parts: Vec<String> = style.into_iter().chain((!head.is_empty()).then(|| head.write())).collect();
+    let place = (!t.place.is_empty()).then(|| t.place.write());
+    let parts: Vec<String> = style.into_iter().chain(place).chain((!head.is_empty()).then(|| head.write())).collect();
     if !parts.is_empty() {
         out.push(format!("{{{}}}", parts.join(" ")));
     }
