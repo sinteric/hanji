@@ -1244,6 +1244,16 @@ p:attrName`), and its public render has no CJK fonts; rdocx 0.14 reaches
 Hangul through Noto CJK SC coverage fallback, not the requested East Asian
 font.
 
+**pptx preview is implemented** in `crates/hanji-preview` (`hanji preview`,
+MCP `hanji_preview`): rpptx 0.12.1 as published, fonts resolved, subset and
+reported as §7.1 says (no bundled Korean pack yet). Its copy of the export
+gets three engine-compat transforms that do not change what PowerPoint
+draws: an empty theme `a:ea` takes the `script="Hang"` face, runs are split
+where the script changes between East Asian and other text, `p:timing` is
+dropped; and every face rpptx lays out with gets a 1.2 em line
+(PowerPoint's single line; rpptx uses ascent + descent + gap). Layout on the
+8 baseline decks: 0.944 (rpptx in the spike: 0.791).
+
 Found by [prototype/tracked-changes/SPIKE.md](prototype/tracked-changes/SPIKE.md):
 rhwp 0.8.6 drops hwpx track-change marks on save without a loss report, and a
 plain rdocx 0.14 open/save of one corpus file wrote a `styles.xml` that is not
@@ -1655,8 +1665,10 @@ side.
   on ≥ 90% of files, and ≥ 90% of pages ≥ 0.80 (a page without text by
   content-SSIM ≥ 0.80). Calibration: a 1 px shift scores 0.987, 5 pt 0.898,
   a blank page 0. On 30 baseline files (2026-10-01) no engine meets it: rhwp
-  0.836, rpptx 0.791 (it refuses one deck), rdocx 0.619. Five of the nine
-  Word PDFs were printed in markup view and must be re-exported. Fonts are
+  0.836, rpptx 0.791 (it refuses one deck), rdocx 0.619. hanji's pptx
+  preview (§7) reaches 0.944 on the same 8 decks and meets all four on the
+  pages with text. Five of the nine Word PDFs were printed in markup view and
+  must be re-exported. Fonts are
   unchecked: no Hancom or Microsoft font was available. The font-identity
   sub-score F (≥ 0.99 over text whose requested font is available to the
   run), visible substitutions and a font policy are in §7.1.

@@ -1,0 +1,31 @@
+[package]
+name = "hanji-preview"
+description = "hanji preview: renders the package an export would write, one SVG per slide, with fonts subset and reported"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+# rpptx 0.12 needs 1.93.
+rust-version = "1.93"
+
+# Native only: the preview reads font files (a font directory, system fonts).
+# On wasm32 the crate is empty, so `cargo build --workspace` for wasm builds.
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+hanji-core.workspace = true
+hanji-package.workspace = true
+hanji-store = { path = "../hanji-store" }
+hanji-pptx = { path = "../hanji-pptx" }
+rpptx = { version = "=0.12.1", default-features = false, features = ["render"] }
+rpptx-render = { version = "=0.12.1", default-features = false }
+rpptx-layout = { version = "=0.12.1", default-features = false }
+ttf-parser = "0.25"
+oxml-layout = { version = "=0.12.1", default-features = false, features = ["system-fonts"] }
+fontdb = { version = "0.23", default-features = false, features = ["std", "fs", "fontconfig"] }
+allsorts = { version = "0.17", default-features = false, features = ["flate2_zlib-rs"] }
+resvg = { version = "=0.48.1", default-features = false, features = ["text", "raster-images"] }
+base64 = "0.22"
+serde = { version = "1", features = ["derive"] }
+toml = { version = "1", default-features = false, features = ["parse", "serde"] }
+
+[target.'cfg(not(target_family = "wasm"))'.dev-dependencies]
+serde_json = "1"

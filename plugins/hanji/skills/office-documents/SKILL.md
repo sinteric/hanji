@@ -38,12 +38,15 @@ directory may be the plugin's own directory, not the project's.
 4. A refusal changes nothing and says why (line, column, the allowed names, or
    how often `old` occurs). Fix that and retry; never resend it unchanged. If
    the revision is stale, read again.
-5. `hanji_export` to a path the person chose, next to the original unless
+5. For a presentation, `hanji_preview` to check the look (`include_png` with a
+   slide number shows you that slide). Mention substituted fonts that change
+   it.
+6. `hanji_export` to a path the person chose, next to the original unless
    they said otherwise; do not overwrite the original without asking. If the
    export lists `surfaced` items, show them and export with
    `acknowledge_surfaced` only once the person agrees. For a Word file a person
    will review, offer `tracked_changes`.
-6. If the person edits the exported file in Office or Hancom and wants you to
+7. If the person edits the exported file in Office or Hancom and wants you to
    continue, `hanji_reimport` it and read again.
 
 `hanji_history` lists the revisions and diffs any two of them: use it to

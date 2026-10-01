@@ -4,9 +4,10 @@
 //! teaches read-before-edit and exact spans. A refusal is a tool result with
 //! `isError` and the reason, never a silent success (DESIGN.md §2 rule 1).
 //!
-//! `hanji-mcp [--store DIR]`: documents are kept in DIR (default
-//! `$HANJI_STORE`, else `~/.hanji`). Paths in tool
-//! arguments are absolute, or relative to the server's working directory.
+//! `hanji-mcp [--store DIR] [--font-dir DIR]…`: documents are kept in DIR
+//! (default `$HANJI_STORE`, else `~/.hanji`); `hanji_preview` looks for fonts
+//! in each `--font-dir`, then `$HANJI_FONT_DIR`, then the system's. Paths in
+//! tool arguments are absolute, or relative to the server's working directory.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
@@ -22,7 +23,14 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone)]
 struct Hanji {
     ws: Arc<Mutex<Workspace<FsStorage>>>,
+    config: Arc<Config>,
     tool_router: ToolRouter<Self>,
+}
+
+/// The server's command line.
+struct Config {
+    store: PathBuf,
+    font_dirs: Vec<PathBuf>,
 }
 
 #[derive(Deserialize, JsonSchema)]
@@ -189,6 +197,28 @@ struct HistoryArgs {
     to: Option<u32>,
 }
 
+#[derive(Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+enum PreviewFormatArg {
+    Html,
+    Svg,
+    Png,
+}
+
+#[derive(Deserialize, JsonSchema)]
+struct PreviewArgs {
+    /// The document, as hanji_open or hanji_new named it.
+    doc_id: String,
+    /// The revision to render; the current one when left out.
+    revision: Option<u32>,
+    /// html (default): one self-contained viewer file; svg or png: one file per slide.
+    format: Option<PreviewFormatArg>,
+    /// The directory to write to (absolute, or relative to the server's working directory); by default the directory of the file the document was opened from, else the store's `previews` directory.
+    out_dir: Option<String>,
+    /// A slide number (1-based): also return that slide as a PNG image, to look at it.
+    include_png: Option<usize>,
+}
+
 fn json<T: Serialize>(v: &T) -> String {
     serde_json::to_string_pretty(v).expect("results serialize")
 }
@@ -212,8 +242,12 @@ fn answer<T: Serialize>(r: hanji_store::Result<T>) -> Result<CallToolResult, Err
 
 #[tool_router]
 impl Hanji {
-    fn new(store: PathBuf) -> Hanji {
-        Hanji { ws: Arc::new(Mutex::new(Workspace::new(FsStorage::new(store)))), tool_router: Self::tool_router() }
+    fn new(config: Config) -> Hanji {
+        Hanji {
+            ws: Arc::new(Mutex::new(Workspace::new(FsStorage::new(&config.store)))),
+            config: Arc::new(config),
+            tool_router: Self::tool_router(),
+        }
     }
 
     /// Run an operation on the blocking pool, so the server keeps reading
@@ -329,6 +363,57 @@ impl Hanji {
     }
 
     #[tool(
+        description = "Render a revision of a presentation (pptx) to check how it looks, before or after export: writes an HTML viewer with every slide (or one SVG or PNG file per slide) and returns the paths, and `fonts`: `substituted` lists the fonts this machine lacks and what draws them instead (the preview is then approximate, the file is unchanged; tell the person when it matters), `missing_glyphs` characters no font here can draw, `warnings` what to fix (e.g. no Korean font). include_png: a slide number, to also get that slide as an image and look at it. docx, hwpx and xlsx are not supported yet."
+    )]
+    async fn hanji_preview(&self, Parameters(a): Parameters<PreviewArgs>) -> Result<CallToolResult, ErrorData> {
+        use hanji_preview::store::{self as preview, Output};
+        let config = self.config.clone();
+        let format = match a.format {
+            None | Some(PreviewFormatArg::Html) => Output::Html,
+            Some(PreviewFormatArg::Svg) => Output::Svg,
+            Some(PreviewFormatArg::Png) => Output::Png,
+        };
+        let r = self
+            .with(move |ws| {
+                let opts = hanji_preview::Options::with_font_dirs(config.font_dirs.clone());
+                let (mut out, p) = preview::render(ws, &a.doc_id, a.revision, &opts)?;
+                let png = match a.include_png {
+                    None => None,
+                    Some(n) if (1..=p.slide_count()).contains(&n) => Some(
+                        p.slide_png(n - 1, preview::PNG_DPI)
+                            .map_err(|m| Error::new(hanji_store::Code::Package, format!("slide {n}: {m}")))?,
+                    ),
+                    Some(n) => {
+                        return Err(Error::bad(format!(
+                            "include_png is a slide number: {} has slides 1–{}, not {n}.",
+                            a.doc_id,
+                            p.slide_count()
+                        )))
+                    }
+                };
+                let dir = match &a.out_dir {
+                    Some(d) => PathBuf::from(d),
+                    None => preview::default_dir(ws, &a.doc_id, &config.store.join("previews")),
+                };
+                preview::write(&p, &mut out, format, &dir)?;
+                Ok((out, png))
+            })
+            .await;
+        Ok(match r {
+            Err(e) => refused(e),
+            Ok((out, png)) => {
+                use base64::Engine as _;
+                let mut blocks = vec![ContentBlock::text(json(&out))];
+                if let Some(png) = png {
+                    blocks
+                        .push(ContentBlock::image(base64::engine::general_purpose::STANDARD.encode(png), "image/png"));
+                }
+                CallToolResult::success(blocks)
+            }
+        })
+    }
+
+    #[tool(
         description = "List a document's revisions: id, parent, and what made each (open, new, edit, write, ops, reimport), and the current one (`head`). With `from` and `to`: the text diff between those two revisions instead."
     )]
     async fn hanji_history(&self, Parameters(a): Parameters<HistoryArgs>) -> Result<CallToolResult, ErrorData> {
@@ -349,33 +434,36 @@ impl ServerHandler for Hanji {
     }
 }
 
-fn store_dir() -> Result<PathBuf, String> {
+const USAGE: &str = "hanji-mcp [--store DIR] [--font-dir DIR]…: the hanji MCP server over stdio. Documents are kept in DIR (default $HANJI_STORE, else ~/.hanji); hanji_preview looks for fonts in each --font-dir, then $HANJI_FONT_DIR, then the system's.";
+
+fn config() -> Result<Config, String> {
     let mut args = std::env::args().skip(1);
     let mut store = std::env::var_os("HANJI_STORE").map(PathBuf::from);
+    let mut font_dirs = vec![];
     while let Some(a) = args.next() {
         match a.as_str() {
             "--store" => store = Some(args.next().ok_or("--store needs a directory")?.into()),
-            "--help" | "-h" => {
-                return Err("hanji-mcp [--store DIR]: the hanji MCP server over stdio. Documents are kept in DIR (default $HANJI_STORE, else ~/.hanji).".into())
-            }
-            other => return Err(format!("unknown argument {other:?}; hanji-mcp [--store DIR]")),
+            "--font-dir" => font_dirs.push(args.next().ok_or("--font-dir needs a directory")?.into()),
+            "--help" | "-h" => return Err(USAGE.into()),
+            other => return Err(format!("unknown argument {other:?}; {USAGE}")),
         }
     }
     // Clients start servers in any directory (often `/`): the default is in the home directory.
     let home = std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(PathBuf::from);
-    Ok(store.unwrap_or_else(|| home.map_or_else(|| PathBuf::from(".hanji"), |h| h.join(".hanji"))))
+    let store = store.unwrap_or_else(|| home.map_or_else(|| PathBuf::from(".hanji"), |h| h.join(".hanji")));
+    Ok(Config { store, font_dirs })
 }
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> std::process::ExitCode {
-    let store = match store_dir() {
-        Ok(s) => s,
+    let config = match config() {
+        Ok(c) => c,
         Err(m) => {
             eprintln!("{m}");
             return std::process::ExitCode::from(2);
         }
     };
-    let served = match Hanji::new(store).serve(rmcp::transport::stdio()).await {
+    let served = match Hanji::new(config).serve(rmcp::transport::stdio()).await {
         Ok(s) => s,
         Err(e) => {
             eprintln!("hanji-mcp: {e}");

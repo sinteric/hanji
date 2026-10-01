@@ -1,0 +1,143 @@
+# The preview's font alias table (DESIGN.md §7.1). Compiled into hanji; an
+# `aliases.toml` in a font directory (--font-dir, HANJI_FONT_DIR) is read
+# after it, and an entry there that shares a name with one here replaces it.
+#
+# A requested face is drawn by the first that exists:
+#   1. the face itself, by any of its `names` (font directory, then system fonts);
+#   2. a `metric` face (the same advances: Carlito = Calibri);
+#   3. a `substitute` (other glyphs and widths);
+#   4. the `class` fallback (sans, serif or mono).
+# Each of 2–4 is looked up in the font directory, system fonts, then the faces
+# compiled into hanji (Carlito, Caladea, Liberation Sans/Serif/Mono).
+#
+# `ea_advance` (optional): the requested face's Hangul and CJK advance in em,
+# measured (§7.1). A substitute is laid out with it, so lines break where the
+# requested face breaks them ("metrics: table" in the report).
+
+# Korean, Microsoft
+[[family]]
+names = ["맑은 고딕", "Malgun Gothic", "MalgunGothic"]
+substitute = ["Noto Sans CJK KR", "Noto Sans KR", "Source Han Sans K", "Source Han Sans KR", "Apple SD Gothic Neo", "NanumGothic"]
+class = "sans"
+ea_advance = 1.0
+
+[[family]]
+names = ["굴림", "Gulim", "굴림체", "GulimChe"]
+substitute = ["Malgun Gothic", "Noto Sans CJK KR", "Noto Sans KR", "Source Han Sans K", "Apple SD Gothic Neo", "NanumGothic"]
+class = "sans"
+ea_advance = 1.0
+
+[[family]]
+names = ["돋움", "Dotum", "돋움체", "DotumChe"]
+substitute = ["Malgun Gothic", "Noto Sans CJK KR", "Noto Sans KR", "Source Han Sans K", "Apple SD Gothic Neo", "NanumGothic"]
+class = "sans"
+ea_advance = 1.0
+
+[[family]]
+names = ["바탕", "Batang", "바탕체", "BatangChe"]
+substitute = ["Noto Serif CJK KR", "Noto Serif KR", "Source Han Serif K", "Source Han Serif KR", "AppleMyungjo", "NanumMyeongjo"]
+class = "serif"
+ea_advance = 1.0
+
+[[family]]
+names = ["궁서", "Gungsuh", "궁서체", "GungsuhChe"]
+substitute = ["Noto Serif CJK KR", "Noto Serif KR", "Source Han Serif K", "AppleMyungjo", "NanumMyeongjo"]
+class = "serif"
+
+# Korean, Hancom
+[[family]]
+names = ["함초롬바탕", "HCR Batang", "HCRBatang"]
+substitute = ["Noto Serif CJK KR", "Noto Serif KR", "Source Han Serif K", "Source Han Serif KR", "AppleMyungjo", "NanumMyeongjo"]
+class = "serif"
+ea_advance = 0.97
+
+[[family]]
+names = ["한컴바탕", "Haansoft Batang", "휴먼명조", "HMKMM", "HY견명조", "HYmjrE"]
+substitute = ["함초롬바탕", "Noto Serif CJK KR", "Noto Serif KR", "Source Han Serif K", "Source Han Serif KR", "AppleMyungjo", "NanumMyeongjo"]
+class = "serif"
+
+[[family]]
+names = ["함초롬돋움", "HCR Dotum", "HCRDotum"]
+substitute = ["Noto Sans CJK KR", "Noto Sans KR", "Source Han Sans K", "Source Han Sans KR", "Apple SD Gothic Neo", "NanumGothic"]
+class = "sans"
+ea_advance = 0.97
+
+[[family]]
+names = ["한컴돋움", "Haansoft Dotum", "한컴 고딕", "Hancom Gothic", "HY중고딕", "HYGothic-Medium", "H2hdrM"]
+substitute = ["함초롬돋움", "Noto Sans CJK KR", "Noto Sans KR", "Source Han Sans K", "Source Han Sans KR", "Apple SD Gothic Neo", "NanumGothic"]
+class = "sans"
+
+# Latin, with metric-compatible faces
+[[family]]
+names = ["Calibri"]
+metric = ["Carlito"]
+class = "sans"
+
+[[family]]
+names = ["Calibri Light"]
+metric = ["Carlito"]
+class = "sans"
+
+[[family]]
+names = ["Cambria"]
+metric = ["Caladea"]
+class = "serif"
+
+[[family]]
+names = ["Arial", "Helvetica"]
+metric = ["Liberation Sans", "Arimo"]
+class = "sans"
+
+[[family]]
+names = ["Times New Roman", "Times"]
+metric = ["Liberation Serif", "Tinos"]
+class = "serif"
+
+[[family]]
+names = ["Courier New", "Courier"]
+metric = ["Liberation Mono", "Cousine"]
+class = "mono"
+
+# Latin, substitutes only
+[[family]]
+names = ["Aptos", "Aptos Display", "Segoe UI", "Tahoma", "Verdana", "Century Gothic", "Trebuchet MS"]
+substitute = ["Carlito", "Liberation Sans"]
+class = "sans"
+
+[[family]]
+names = ["Georgia", "Garamond", "Palatino Linotype", "Book Antiqua"]
+substitute = ["Caladea", "Liberation Serif"]
+class = "serif"
+
+[[family]]
+names = ["Consolas", "Lucida Console"]
+substitute = ["Liberation Mono"]
+class = "mono"
+
+# Korean faces with Latin glyphs of their own, standing in for each other
+[[family]]
+names = ["Noto Sans KR", "Noto Sans CJK KR", "Source Han Sans K", "Source Han Sans KR", "본고딕"]
+substitute = ["Noto Sans CJK KR", "Noto Sans KR", "Source Han Sans K", "Source Han Sans KR"]
+class = "sans"
+
+[[family]]
+names = ["Noto Serif KR", "Noto Serif CJK KR", "Source Han Serif K", "Source Han Serif KR", "본명조"]
+substitute = ["Noto Serif CJK KR", "Noto Serif KR", "Source Han Serif K", "Source Han Serif KR"]
+class = "serif"
+
+# The class fallbacks: the last candidates for a face the table does not
+# name (its class is unknown, so sans) or whose candidates are all missing.
+# PowerPoint draws Latin text in a face it does not have in Calibri, hence
+# Carlito first (on the preview baseline, deck 13's Pretendard: layout 0.887
+# with Liberation Sans, 0.975 with Carlito).
+[class.sans]
+latin = ["Carlito", "Liberation Sans"]
+hangul = ["Noto Sans CJK KR", "Noto Sans KR", "Source Han Sans K", "Malgun Gothic", "Apple SD Gothic Neo", "NanumGothic"]
+
+[class.serif]
+latin = ["Liberation Serif"]
+hangul = ["Noto Serif CJK KR", "Noto Serif KR", "Source Han Serif K", "Batang", "AppleMyungjo", "NanumMyeongjo", "Noto Sans CJK KR", "Noto Sans KR"]
+
+[class.mono]
+latin = ["Liberation Mono"]
+hangul = ["Noto Sans Mono CJK KR", "Noto Sans CJK KR", "Noto Sans KR", "D2Coding", "NanumGothicCoding"]

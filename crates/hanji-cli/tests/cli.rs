@@ -106,6 +106,33 @@ fn pptx() {
 }
 
 #[test]
+fn preview_of_a_document_and_of_a_file() {
+    let env = Env::new("preview");
+    env.ok(&["open", &corpus("crates/hanji-pptx/corpus/korean-deck.pptx")]);
+    let out = env.path("out");
+    let v = env.ok(&["preview", "korean-deck", "--out", &out, "--format", "png"]);
+    assert_eq!(v["files"].as_array().unwrap().len(), 7);
+    assert!(Path::new(v["files"][0].as_str().unwrap()).is_file());
+    assert!(v["fonts"]["substituted"].is_array());
+    // A file is previewed as hanji would export it, and not stored.
+    let deck = env.path("deck.pptx");
+    std::fs::copy(corpus("crates/hanji-pptx/corpus/shapes.pptx"), &deck).unwrap();
+    let text = env.cmd().args(["preview", &deck]).output().unwrap();
+    assert!(text.status.success());
+    let text = String::from_utf8(text.stdout).unwrap();
+    assert!(text.starts_with("wrote ") && text.contains("deck-r1-preview.html"), "{text}");
+    assert!(text.lines().nth(1).unwrap().starts_with("6 slides from revision 1 of deck; fonts: "), "{text}");
+    assert!(Path::new(&env.path("deck-r1-preview.html")).is_file());
+    assert_eq!(env.ok(&["list"]).as_array().unwrap().len(), 1, "the file was not stored");
+    let e = env.err(&["preview", &deck, "--rev", "2"]);
+    assert_eq!(e["code"], "bad_request");
+    env.ok(&["open", &corpus("prototype/remainder/corpus/korean-report.docx")]);
+    let e = env.err(&["preview", "korean-report"]);
+    assert_eq!(e["code"], "unsupported");
+    assert!(e["message"].as_str().unwrap().starts_with("preview not supported yet for docx"), "{e:#}");
+}
+
+#[test]
 fn xlsx() {
     let env = Env::new("xlsx");
     round_trip(
