@@ -1218,14 +1218,66 @@ v0.7.3; "lossless … regarding content", not formatting).
 
 ### 7.1 Fonts in the preview (surveyed 2026-10-01)
 
-**Decided in principle** with the owner (2026-10-01): one alias table; layout
-on the original's or a metric-compatible font's metrics; a bundled substitute
-set behind the user's fonts; per-page subsetting and embedding; the
-resolution order; visible substitutions; the F sub-score; an optional font
-policy. Everything else here is **proposed**. Fonts decide most of the look
-(rhwp 25 keeps Hancom's layout at 0.948 with substitute glyphs,
-[SPIKE.md](prototype/preview/SPIKE.md)), and some Korean organisations allow
-only one or two mandated fonts, so **no substitution is silent**.
+**Decided** with the owner (2026-10-01): fonts have two requirements. Fonts
+decide most of the look (rhwp 25 keeps Hancom's layout at 0.948 with
+substitute glyphs, [SPIKE.md](prototype/preview/SPIKE.md)), and some Korean
+organisations allow only one or two mandated fonts.
+
+**1. Support fonts.** hanji uses the real font wherever it exists. Each
+requested face and script slot is looked up, in order, in:
+
+1. the org/user font directory: `--font-dir DIR` (repeatable) on the CLI,
+   and `--font-dir` or `HANJI_FONT_DIR` in the MCP server's config;
+2. the document's own embedded copy (proposed; pptx `embeddedFontLst`, hwpx
+   `isEmbedded`);
+3. installed system fonts.
+
+Names match across languages (맑은 고딕 = Malgun Gothic). The bundled set
+(4, below) comes in only as a fallback. Optional: a font policy,
+`hanji validate --doc NAME --fonts POLICY` (also an MCP `validate`
+argument), checks every face a document uses, styles and theme defaults
+included, against `allowed = […]` (optionally per script) in a policy file
+or `policy.toml` in the org font directory. A face outside the list is an
+error, with where it is used; an allowed face this machine cannot draw is a
+warning.
+
+**2. If a font is missing at import or export, warn, and fall back.** No
+substitution is silent. hanji warns at every step:
+
+- **Open/import:** `hanji_open`'s report and the CLI `open` output list the
+  document's faces this machine cannot draw. Proposed: a `fonts` list beside
+  `neutralised` and `surfaced` in `ImportReport`
+  (`hanji-core/src/engine.rs:23`, `hanji-store/src/lib.rs:97`), printed by
+  the CLI's `report_lines` (`hanji-cli/src/main.rs:174`); `hanji_reimport`
+  carries the same report.
+- **Export:** a face an edit introduced that is unavailable or outside the
+  policy is warned about. Proposed: a `fonts` list in `Exported`
+  (`hanji-store/src/lib.rs:217`), and a CLI line per face as for
+  acknowledged surfaced content (`hanji-cli/src/main.rs:310`). Export never
+  fails for a font: unlike `surfaced`, which refuses until acknowledged, it
+  is a warning only.
+- **Preview:** substituted text is marked, and the result returns the
+  `fonts` substitution report (below).
+
+And it falls back in two places:
+
+- **(a) The preview** draws with a substitute chosen by the alias table, on
+  the original's metrics where it can (below).
+- **(b) The exported file** carries fallback hints for the recipient's app:
+  hwpx `hh:substFont` in the face's `hh:font`, and docx `w:altName` (with
+  `w:panose1` and `w:family` when known) in `word/fontTable.xml`'s `w:font`.
+  A hint is added only where the document has none, never over the
+  author's. **Proposed; not implemented.** Today hanji-hwpx keeps the
+  author's `substFont` (it clones `header.xml` and only appends faces,
+  `hanji-hwpx/src/header.rs:656`) but writes a new face as `id`, `face`,
+  `type=TTF` and `isEmbedded=0` only (`header.rs:310`). hanji-docx writes a
+  new face into `w:rFonts` only (`hanji-docx/src/format.rs:627`) and never
+  touches `fontTable.xml`: the author's `altName`, `panose1` and `family`
+  stay, and a new face gets no entry.
+
+#### Implementation notes
+
+Proposed unless marked decided in principle.
 
 **How the formats name fonts.**
 
@@ -1236,142 +1288,105 @@ only one or two mandated fonts, so **no substitution is silent**.
 | hwpx | `hh:charPr/hh:fontRef hangul= latin= hanja= japanese= other= symbol= user=`: an id per language group into `hh:fontfaces` (one `hh:fontface lang=` each), with per-group `ratio`, `spacing`, `relSz` | `hh:font type=TTF\|HFT isEmbedded`, `hh:typeInfo`, and `hh:substFont` (Hancom's substitute) |
 
 In the baseline, 6 of 8 hwpx name a `substFont` (한컴바탕, 휴먼명조,
-함초롬바탕). File 23 has 34 HFT faces, Hancom's legacy font format, and its
+함초롬바탕). File 23 has 34 HFT faces (Hancom's legacy format), and its
 `typeInfo familyType` is `FCAT_GOTHIC` even for 바탕, so that field is no
 hint. The native PDFs drew Calibri, Aptos, Malgun Gothic, Batang, Arial and
-Times New Roman (Office), and HCR Batang/Dotum, Haansoft Batang/Dotum, HMKMM
-(휴먼명조), H2hdrM, DotumChe, Gulim and Malgun Gothic (Hancom).
+Times New Roman (Office), and HCR Batang/Dotum, Haansoft Batang/Dotum,
+HMKMM (휴먼명조), H2hdrM, DotumChe, Gulim and Malgun Gothic (Hancom).
 
 **The read view** shows one `font` per style or run (§5.1, round 6): docx
 `eastAsia` over `ascii` over `hAnsi`, theme references resolved
-(`hanji-docx/src/format.rs:264`), pptx `ea` over `latin` (`hanji-pptx/src/text.rs:90`),
-hwpx the HANGUL face (`hanji-hwpx/src/format.rs:233`). One gap is found:
-hanji-pptx reads a theme's `a:ea` but not `a:font script="Hang"`
-(`text.rs:44`), so Korean deck 10 reads `font=Calibri` where PowerPoint drew
-맑은 고딕. Proposed: when `ea` is empty and the run's `lang` is Korean, read
-`Hang`. Nothing else changes in the text. Per-script detail goes to the
+(`hanji-docx/src/format.rs:264`), pptx `ea` over `latin`
+(`hanji-pptx/src/text.rs:90`), hwpx the HANGUL face
+(`hanji-hwpx/src/format.rs:233`). One gap: hanji-pptx reads a theme's `a:ea`
+but not `a:font script="Hang"` (`text.rs:44`), so Korean deck 10 reads
+`font=Calibri` where PowerPoint drew 맑은 고딕. Proposed: when `ea` is empty
+and the run's `lang` is Korean, read `Hang`. Per-script detail goes to the
 preview report and to `validate --fonts`.
 
 **Engines today.**
 
 | | Name → face | Layout metrics | Glyphs | Metrics from A, glyphs from B |
 |---|---|---|---|---|
-| rdocx 0.14 | oxml-layout 0.12.1 `FontManager`: caller fonts and `set_caller_aliases`, a built-in Word map (Calibri → Carlito, Cambria → Caladea, Arial/Times/Courier → Liberation; `font.rs:1967`), then a per-run coverage fallback led by Noto Sans SC (`font.rs:530`). The family comes from `w:ascii`/`asciiTheme` only (`rdocx-layout engine.rs:7829`): **`w:eastAsia` is never read**, hence Hangul in Noto CJK SC | the face that shapes the run (harfrust) | the same face | not in the engine; yes at hanji's SVG lowering, which writes a per-character `x` from the layout, so another family can draw at those positions |
-| rpptx 0.12.1 | the same `FontManager`. Public `render_deterministic` has bundled fonts only (no CJK). Caller fonts need `rpptx_render::layout_presentation_with_font_manager`, which passes no paragraph directions: the `…_and_text_directions` variant is public, but rpptx computes the directions privately (`rpptx lib.rs:7744`). RTL is lost and LTR decks are unaffected | as rdocx | as rdocx | as rdocx |
-| rhwp 0.8.6 | a built-in metric table of 396 families, among them 맑은 고딕, 바탕, 돋움, 굴림, HCR Batang/Dotum, 휴먼명조 and HY* (`font_metrics_generated.rs`), plus aliases | the table | the viewer's CSS family chain; `FontEmbedMode::{None, Style, Subset, Full}` with `font_paths` (`svg.rs:53`) | **yes, by design**: the table lays out and a fallback draws. A per-character trace records requested face, alias, metric match and paint (`font_decision.rs`) |
+| rdocx 0.14 | oxml-layout 0.12.1 `FontManager`: caller fonts and `set_caller_aliases`, a built-in Word map (Calibri → Carlito, Cambria → Caladea, Arial/Times/Courier → Liberation; `font.rs:1967`), then a per-run coverage fallback led by Noto Sans SC (`font.rs:530`). The family comes from `w:ascii`/`asciiTheme` only (`rdocx-layout engine.rs:7829`): **`w:eastAsia` is never read**, hence Hangul in Noto CJK SC | the face that shapes the run (harfrust) | the same face | not in the engine; yes at hanji's SVG lowering, which writes a per-character `x` from the layout |
+| rpptx 0.12.1 | the same `FontManager`. Public `render_deterministic` has bundled fonts only (no CJK). Caller fonts need `rpptx_render::layout_presentation_with_font_manager`, which passes no paragraph directions (rpptx computes them privately, `rpptx lib.rs:7744`), so RTL is lost; LTR decks are unaffected | as rdocx | as rdocx | as rdocx |
+| rhwp 0.8.6 | a built-in metric table of 396 families, among them 맑은 고딕, 바탕, 돋움, 굴림, HCR Batang/Dotum, 휴먼명조 and HY* (`font_metrics_generated.rs`), plus aliases | the table | the viewer's CSS family chain; `FontEmbedMode::{None, Style, Subset, Full}` with `font_paths` (`svg.rs:53`) | **yes, by design**; a per-character trace records requested face, alias, metric match and paint (`font_decision.rs`) |
 
-rhwp's `Subset` mode uses `subsetter`, which removes `cmap` (its docs: for
-PDF only) and reads face 0 of a `.ttc`, so it is not used. resvg does not read
-`@font-face` (no occurrence in usvg 0.48), so PNG rasterisation loads the
-same subset faces into resvg's fontdb.
+rhwp's `Subset` mode uses `subsetter`, which removes `cmap` (for PDF only)
+and reads face 0 of a `.ttc`, so it is not used. resvg does not read
+`@font-face` (usvg 0.48), so PNG rasterisation loads the same subset faces
+into resvg's fontdb.
 
-**Resolution order** (decided in principle). For each requested face and
-script slot, the requested name is looked up first in each of these tiers:
+**Substitutes and the alias table** (decided in principle; its shape is
+proposed). Only if tiers 1–3 lack the requested face does a substitute come
+in: the document's own hint (hwpx `substFont`, docx `altName`), then the
+alias table's candidates, each looked up in tiers 1, 3 and **4, the bundled
+set**. An identity match in any tier beats every substitute. One table
+serves all three engines, `fonts/aliases.toml`, compiled in; an
+`aliases.toml` in the org font directory is merged over it and wins. Each
+family has `names` (맑은 고딕, Malgun Gothic, MalgunGothic), `metric` (a
+metric-compatible face: Calibri → Carlito), `substitute` (→ Noto Sans CJK
+KR) and `class` (sans, serif or mono, for the last fallback). It is seeded
+from the spike's `engines/aliases.txt`, rhwp's `font_local_aliases` and
+oxml-layout's `map_font_name`. rdocx and rpptx get the resolved faces as
+caller fonts plus `set_caller_aliases`, so their coverage fallback is never
+reached for a mapped name. For rdocx's `eastAsia` gap, hanji's preview copy
+(never exported) splits runs at script boundaries and writes the East Asian
+face into `ascii`; the gap is also reported upstream.
 
-1. the org/user font directory: `--font-dir DIR` (repeatable) on the CLI, and
-   `--font-dir` or `HANJI_FONT_DIR` in the MCP server's config;
-2. the document's own embedded copy (proposed; pptx `embeddedFontLst`, hwpx
-   `isEmbedded`);
-3. installed system fonts.
+**Metrics and glyphs** (decided in principle). Layout metrics come from the
+first that exists: the requested face; a metric-compatible face (Carlito =
+Calibri, equal widths in rhwp's table; Caladea = Cambria; Liberation
+Sans/Serif/Mono = Arial/Times New Roman/Courier New); a metric table
+(rhwp's own for hwpx; for docx and pptx a proposed **metric-adjusted
+substitute**, whose advances and vertical metrics are replaced by the
+requested face's at preview time, each glyph centred in its new advance);
+else the substitute's own, reported as such. Glyphs come from the requested
+face if available, else the substitute. Measured Hangul advances: 맑은 고딕,
+바탕, 돋움 and 굴림 1.000 em; HCR Batang and Dotum 0.970; Noto Serif CJK KR
+0.966; Nanum Myeongjo 0.950; Nanum Gothic 0.940; Noto Sans CJK KR 0.920. A
+맑은 고딕 line on Noto Sans metrics holds about 8% more Hangul and breaks
+elsewhere: the LibreOffice + Nanum effect on file 09 (W 0.26).
 
-Only if no tier has it does a substitute come in. The candidates are the
-document's own hint (hwpx `substFont`, docx `altName`), then the alias
-table's candidates, each through tiers 1, 3 and 4:
-
-4. the bundled set.
-
-An identity match in any tier beats every substitute. Names match across
-languages (맑은 고딕 = Malgun Gothic, through the font's own name table and
-the alias table).
-
-**Alias table** (decided in principle; its shape is proposed). There is one
-table for all three engines, `fonts/aliases.toml`, compiled into the binary.
-An `aliases.toml` in the org font directory is merged over it, and its
-entries win. Each requested family has:
-
-- `names`: equivalent names (맑은 고딕, Malgun Gothic, MalgunGothic);
-- `metric`: a metric-compatible face (Calibri → Carlito);
-- `substitute`: a visual substitute (→ Noto Sans CJK KR);
-- `class`: sans, serif or mono, for the last fallback.
-
-It is seeded from the spike's `engines/aliases.txt`, rhwp's
-`font_local_aliases` and oxml-layout's `map_font_name`. rdocx and rpptx get
-the resolved faces as caller fonts plus `set_caller_aliases`, so the coverage
-fallback is never reached for a mapped name. For rdocx's `eastAsia` gap,
-hanji's preview copy (never exported) splits runs at script boundaries and
-writes the East Asian face into `ascii`. The gap is also reported upstream.
-
-**Layout metrics and glyph source** (decided in principle). Metrics come from
-the first of these that exists:
-
-1. the requested face;
-2. a metric-compatible face: Carlito = Calibri (equal widths in rhwp's
-   table), Caladea = Cambria, Liberation Sans/Serif/Mono = Arial/Times New
-   Roman/Courier New;
-3. a metric table (rhwp's own for hwpx);
-4. the substitute's own metrics, reported as such.
-
-For docx and pptx, step 3 is a proposed **metric-adjusted substitute**: at
-preview time, the bundled substitute's advances (and vertical metrics) are
-replaced by the requested face's, from a table, with each glyph centred in
-its new advance. The engines then shape with the right widths. Glyphs come
-from the requested face if available, else from the substitute.
-
-Measured Hangul advances: 맑은 고딕, 바탕, 돋움 and 굴림 1.000 em; HCR Batang
-and Dotum 0.970; Noto Serif CJK KR 0.966; Nanum Myeongjo 0.950; Nanum
-Gothic 0.940; Noto Sans CJK KR 0.920. A 맑은 고딕 line laid out on Noto Sans
-metrics holds about 8% more Hangul and breaks elsewhere. That is the
-LibreOffice + Nanum effect on file 09 (W 0.26).
-
-**Bundled set and shipping** (proposed).
+**Bundled set and shipping.**
 
 - **Compiled in already:** Carlito, Caladea and Liberation Sans/Serif/Mono,
-  four styles each, inside rdocx's 8.6 MB of fonts. hanji reuses them and
-  compiles in no Korean font. Today's `hanji` binary is 15 MB, and the
-  engines add about 30–40 MB.
-- **A Korean pack as a release asset:** `hanji-fonts-<version>.tar.gz` in
-  `SHA256SUMS`. It is fetched on the first preview that needs it into
+  four styles each, in rdocx's 8.6 MB of fonts. hanji compiles in no Korean
+  font. Today's binary is 15 MB; the engines add about 30–40 MB.
+- **Korean pack as a release asset:** `hanji-fonts-<version>.tar.gz` in
+  `SHA256SUMS`, fetched on the first preview that needs it into
   `${XDG_CACHE_HOME:-~/.cache}/hanji/fonts/<version>/` and checked as the
-  launcher checks the binary, or fetched ahead by `hanji fonts install`.
-  Offline, `--font-dir` points at an unpacked pack, and the wasm client
-  fetches it by URL.
-- **The pack's contents:** Noto Sans CJK KR and Noto Serif CJK KR, Regular
-  and Bold, cut to Latin, KS X 1001 symbols and Hanja (4,888) and all 11,172
-  Hangul syllables. Measured (OTF): Sans Regular 4.9 MB, Sans Bold 5.1 MB,
-  Serif Regular 7.8 MB; about 26 MB for the four faces (Serif Bold
-  estimated). Characters outside
-  the cut fall back to system fonts and are reported.
-- **Not bundled:** 함초롬바탕/돋움 (licence below), Nanum (OFL with reserved
+  launcher checks the binary, or ahead by `hanji fonts install`. Offline,
+  `--font-dir` points at an unpacked pack; the wasm client fetches it by URL.
+- **Contents:** Noto Sans and Serif CJK KR, Regular and Bold, cut to Latin,
+  KS X 1001 symbols, Hanja (4,888) and all 11,172 Hangul syllables; about
+  26 MB (OTF: Sans 4.9/5.1 MB, Serif Regular 7.8 MB, Serif Bold estimated).
+  Characters outside the cut fall back to system fonts and are reported.
+- **Not bundled:** 함초롬바탕/돋움 (licence below), Nanum (OFL reserved
   names, no gain in metrics), KoPub (no modified version under its name
   without approval), UnFonts (GPL-2).
 
 **Subsetting and embedding** (decided in principle: per page).
 
 - **A standalone page SVG** carries one `@font-face` per face, weight and
-  style used on the page, as a `data:` URI subset to that page's characters.
-  The subset is cut from the right face of a `.ttc`, which also fixes rdocx's
-  face-0 bug. Measured with Noto Sans CJK KR: a 158-character page needs
-  21 KB (OTF) and a 377-character page 60 KB, against 47–81 MB today.
-- **The HTML viewer** subsets each face once for the whole document and
-  declares it once. Pages are inlined `<svg>` elements without their own
-  `@font-face`.
-- **Crate:** allsorts 0.17 (Apache-2.0). It subsets CFF and TrueType, so it
-  covers Noto CJK OTF, and it keeps a Unicode `cmap` for the web (its
-  `CmapTarget::Unicode`). Rejected: `subsetter` 0.2 (typst, MIT/Apache)
-  drops `cmap`; skera 0.7 and fontcull 2.0.1 (fontations' HarfBuzz port,
-  MIT/Apache and MIT) have no CFF subsetting in their sources.
-- **Plain OTF/TTF in the `data:` URI, not WOFF2, for now.** WOFF2 saves about
-  25% (46 against 60 KB), but its encoders are C++ (woofwoof) or
-  TrueType-only (ttf2woff2).
+  style used on the page, as a `data:` URI subset to that page's characters,
+  cut from the right face of a `.ttc` (which also fixes rdocx's face-0 bug).
+  With Noto Sans CJK KR, a 158-character page needs 21 KB and a
+  377-character page 60 KB, against 47–81 MB today.
+- **The HTML viewer** subsets each face once per document; pages are inlined
+  `<svg>` without their own `@font-face`.
+- **Crate:** allsorts 0.17 (Apache-2.0): subsets CFF and TrueType and keeps
+  a Unicode `cmap` (`CmapTarget::Unicode`). Rejected: `subsetter` 0.2 drops
+  `cmap`; skera 0.7 and fontcull 2.0.1 have no CFF subsetting.
+- **Plain OTF/TTF, not WOFF2, for now:** WOFF2 saves about 25% (46 against
+  60 KB), but its encoders are C++ (woofwoof) or TrueType-only (ttf2woff2).
 
-**Visible substitution** (decided in principle).
-
-- **The viewer** marks substituted text (a dotted underline, on by default,
-  with a toggle) and lists every substitution in a banner. Hovering shows,
-  for example, `휴먼명조 → Noto Serif CJK KR (metrics: table)`. Each `<text>`
-  carries `data-font-requested` and `data-font-drawn`.
-- **PNG** stays unmarked; the result carries the list.
-- **CLI `--json` and MCP** return this structure:
+**Visible substitution** (decided in principle). The viewer marks
+substituted text (a dotted underline, on by default, with a toggle), lists
+every substitution in a banner, and shows on hover, for example,
+`휴먼명조 → Noto Serif CJK KR (metrics: table)`; each `<text>` carries
+`data-font-requested` and `data-font-drawn`. PNG stays unmarked; the result
+carries the list. CLI `--json` and MCP return:
 
 ```json
 "fonts": {
@@ -1393,50 +1408,35 @@ The text form has one line per entry, for example
 `휴먼명조 → Noto Serif CJK KR, 1,380 chars, pages 1, 4 (metrics: table)`.
 
 **F, the font-identity sub-score** (decided in principle; its threshold is
-proposed, §11).
-
-- **Definition:** F = matched characters drawn in the family the native PDF
-  drew them in ÷ matched characters whose native family is available to the
-  run (tiers 1–4).
-- **Families** are compared after normalising PostScript names
-  (`MalgunGothicBold` → Malgun Gothic) through the alias table's `names`. A
-  metric clone is not identity: Carlito ≠ Calibri.
-- **Text whose native family is unavailable** is left out of F, but every
-  such matched character must be covered by a `substituted` entry. That check
-  must pass in full.
-- **F stays out of layout = (T·P·L·W)^¼.** Layout stays blind to glyphs, so
-  it keeps separating fonts from engine bugs. F gates rule 5 beside it:
-  F ≥ 0.99 per format corpus.
-- **No available native family:** F is "n/a", not 1. That is the case for
-  all 30 spike files today.
-- **Inputs:** `data-font-drawn` on the preview side and pymupdf's span font
-  on the native side.
-
-**Font policy** (decided in principle as optional; its shape is proposed).
-`hanji validate --doc NAME --fonts POLICY`, also an MCP `validate` argument,
-checks every face a document uses against `allowed = […]` (optionally per
-script) in a policy file, or `policy.toml` in the org font directory. The
-check covers each script slot, styles and theme defaults included. It is an
-error for a face outside the list, with where it is used, and a warning for
-an allowed face the preview cannot draw. Export is unchanged.
+proposed, §11). F = matched characters drawn in the family the native PDF
+drew them in ÷ matched characters whose native family is available to the
+run (tiers 1–4). Families are compared after normalising PostScript names
+(`MalgunGothicBold` → Malgun Gothic) through the alias table's `names`; a
+metric clone is not identity (Carlito ≠ Calibri). Text whose native family
+is unavailable is left out of F, but every such matched character must be
+covered by a `substituted` entry, in full. F stays out of layout =
+(T·P·L·W)^¼, so layout keeps separating fonts from engine bugs; F gates
+rule 5 beside it at F ≥ 0.99 per format corpus. With no available native
+family F is "n/a", not 1, as for all 30 spike files today. Inputs:
+`data-font-drawn` on the preview side, pymupdf's span font on the native
+side.
 
 **Open.**
 
-- **함초롬 redistribution is unverified.** Secondary sources say free use and
-  free distribution, but no commercial distribution or modification: iText's
-  `hancom.txt` ([github.com/itext/i7js-highlevel](https://github.com/itext/i7js-highlevel/blob/develop/src/main/resources/fonts/hancom.txt))
+- **함초롬 redistribution is unverified.** Secondary sources say free use
+  and free distribution, but no commercial distribution or modification:
+  iText's `hancom.txt` ([github.com/itext/i7js-highlevel](https://github.com/itext/i7js-highlevel/blob/develop/src/main/resources/fonts/hancom.txt))
   and the hcr-lvt README
   ([github.com/dohyunkim/hcr-lvt](https://github.com/dohyunkim/hcr-lvt)),
-  read 2026-10-01. Hancom's own pages, KLDP, noonnu and ko.wikipedia were
+  read 2026-10-01; Hancom's own pages, KLDP, noonnu and ko.wikipedia were
   blocked here. Subsetting may count as modification. Until Hancom confirms
-  in writing, the faces come from the font directory or the system
-  (installed with Hancom Office, or a free download).
+  in writing, the faces come from the font directory or the system.
 - **No metric clone was found for 맑은 고딕, 바탕, 돋움 or 굴림.** Baekmuk and
   UnFonts match the 1.000 em Hangul advance but not the Latin. The
   metric-adjusted substitute needs vertical metrics too, which rhwp's table
   lacks.
 - **OFL reserved font names on embedded subsets** (Carlito, Liberation,
-  Nanum): whether a subset embedded in an SVG is a "Modified Version" was not
+  Nanum): whether an SVG-embedded subset is a "Modified Version" was not
   checked (the OFL FAQ was blocked here).
 - **WOFF2**, and **network access at preview time** in an MCP server.
 
