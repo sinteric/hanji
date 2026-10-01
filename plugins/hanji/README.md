@@ -49,6 +49,12 @@ No Rust toolchain is needed. The launcher runs, in order:
    `${XDG_CACHE_HOME:-~/.cache}/hanji/<version>/` and checked against the
    release's `SHA256SUMS`. It needs `curl` or `wget`, and `tar`.
 
+The download happens on the server's first start, while the client waits for
+it. If Claude Code gives up first (`/mcp` shows `hanji` as failed, or its tools
+are missing), reconnect `hanji` from `/mcp` once; Codex waits up to
+`startup_timeout_sec` (60 s, in `codex.mcp.json`). Later starts run the cached
+binary at once.
+
 The release is made by `.github/workflows/release.yml` when a `v*` tag that
 matches the plugin's version is pushed. Until the tag exists, use 1 or 2.
 
