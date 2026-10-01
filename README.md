@@ -109,8 +109,11 @@ codex plugin add hanji@hanji
 
 You do not need a Rust toolchain for either plugin. The launcher uses
 `hanji-mcp` from `PATH` if it is there. Otherwise it downloads the release
-binary for your platform once and checks it against `SHA256SUMS`. For other
-MCP clients, and for details, see [plugins/hanji](plugins/hanji/README.md).
+binary for your platform once and checks it against `SHA256SUMS`. That first
+start can take longer than Claude Code waits: if `/mcp` shows `hanji` as
+failed or its tools are missing, reconnect it there once. Later starts use the
+cached binary and are immediate. For other MCP clients, and for details, see
+[plugins/hanji](plugins/hanji/README.md).
 
 ## MCP server
 
