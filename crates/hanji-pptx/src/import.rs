@@ -566,6 +566,11 @@ impl Importer<'_> {
         self.buf.clear();
         self.ustyle.clear();
         let mut texts: Vec<(usize, String)> = vec![];
+        // As `text::has_hangul` reads the units: only the text of runs the text models.
+        let hangul = p
+            .elements()
+            .filter(|c| c.is("a:r") && run_modellable(c))
+            .any(|c| c.text_of(&["a:t"]).chars().any(text::is_hangul));
         for c in &p.children {
             let c = match c {
                 Node::El(c) => c,
@@ -576,11 +581,11 @@ impl Importer<'_> {
                 "a:pPr" | "a:endParaRPr" => {}
                 "a:r" if run_modellable(c) => {
                     let t = c.text_of(&["a:t"]);
-                    let ix = self.run(c, &path, &t, false, under.as_ref());
+                    let ix = self.run(c, &path, &t, false, under.as_ref(), hangul);
                     texts.push((ix, t));
                 }
                 "a:br" if c.elements().all(|x| x.is("a:rPr")) => {
-                    self.run(c, &path, "", true, under.as_ref());
+                    self.run(c, &path, "", true, under.as_ref(), hangul);
                 }
                 _ => {
                     let pos = self.buf.len();
@@ -636,9 +641,19 @@ impl Importer<'_> {
 
     /// `a:r` or `a:br` → a `Run` entry and its text; the entry's index.
     /// `under`: what the run inherits (its formatting is shown over it).
-    fn run(&mut self, r: &Element, path: &[usize], text: &str, br: bool, under: Option<&RunStyle>) -> usize {
+    /// `hangul`: the paragraph holds Hangul.
+    fn run(
+        &mut self,
+        r: &Element,
+        path: &[usize],
+        text: &str,
+        br: bool,
+        under: Option<&RunStyle>,
+        hangul: bool,
+    ) -> usize {
         let rpr = r.child("a:rPr");
-        let shown = under.map(|u| rpr.map_or(RunStyle::default(), |x| RunStyle::of(x, &self.fonts)).over(u).shown());
+        let shown =
+            under.map(|u| rpr.map_or(RunStyle::default(), |x| RunStyle::of(x, &self.fonts)).over(u).shown_for(hangul));
         let marks = marks_of(rpr);
         let shell = r.shell();
         let mut rest = rpr.cloned();

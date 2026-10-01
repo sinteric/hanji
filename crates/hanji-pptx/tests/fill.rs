@@ -120,7 +120,7 @@ fn a_fill_left_out_is_none_and_written_back_it_is_the_style_s() {
 #[test]
 fn a_new_text_box_and_a_slot_take_a_fill() {
     let imp = import(&deck("korean-deck.pptx"));
-    let title = "::title box=\"36 22 648 90\" font=Calibri size=44pt color=tx1::\n핵심 지표\n";
+    let title = "::title box=\"36 22 648 90\" font=\"맑은 고딕\" size=44pt color=tx1::\n핵심 지표\n";
     let (_, imp2) = edited(&imp, title, &title.replace("90\" font", "90\" fill=accent2-25% font"));
     let (parts, back) =
         edited(&imp2, "핵심 지표\n", "핵심 지표\n<shape box=\"36 112 648 28\" fill=bg2>새 상자</shape>\n");
@@ -135,7 +135,7 @@ fn a_new_text_box_and_a_slot_take_a_fill() {
         ),
         "{x}"
     );
-    assert!(back.text.contains(" fill=bg2 font=Calibri size=18pt color=tx1>새 상자</shape>"), "{}", back.text);
+    assert!(back.text.contains(" fill=bg2 font=\"맑은 고딕\" size=18pt color=tx1>새 상자</shape>"), "{}", back.text);
 }
 
 #[test]

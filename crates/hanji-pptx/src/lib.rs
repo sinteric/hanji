@@ -255,7 +255,7 @@ fn show_inherited(out: &mut [Block], rem: &Remainder, shell: &DeckShell) {
             let Block::Para(p) = b else { continue };
             let lvl =
                 p.item.as_ref().map_or_else(|| levels.get(&(hi + 1 + bi)).copied().unwrap_or(0) as usize, |i| i.level);
-            let under = base[lvl.min(8)].shown();
+            let under = base[lvl.min(8)].shown_for(text::has_hangul(&p.content.units));
             let st: Vec<istyle::TextStyle> = istyle::unit_styles(&p.content)
                 .into_iter()
                 .zip(&p.content.units)

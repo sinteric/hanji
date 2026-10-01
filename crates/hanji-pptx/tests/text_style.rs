@@ -64,15 +64,15 @@ fn shape<'a>(x: &'a str, name: &str) -> &'a str {
 }
 
 const SOURCE: &str =
-    "<shape id=\"s5\" name=\"출처\" box=\"36 475 288 29\" font=Calibri size=18pt color=tx1>출처: 내부 집계</shape>";
+    "<shape id=\"s5\" name=\"출처\" box=\"36 475 288 29\" font=\"맑은 고딕\" size=18pt color=tx1>출처: 내부 집계</shape>";
 
 #[test]
 fn every_run_shows_what_it_inherits() {
     let imp = import(&deck("korean-deck.pptx"));
     // A slot's formatting on its marker, what a paragraph adds at its end.
     assert!(imp.text.contains(concat!(
-        "::title box=\"36 22 648 90\" font=Calibri size=44pt color=tx1::\n핵심 지표\n",
-        "::body box=\"36 126 648 356\" font=Calibri color=tx1::\n- 매출 **12% 증가** {size=32pt}\n"
+        "::title box=\"36 22 648 90\" font=\"맑은 고딕\" size=44pt color=tx1::\n핵심 지표\n",
+        "::body box=\"36 126 648 356\" font=\"맑은 고딕\" color=tx1::\n- 매출 **12% 증가** {size=32pt}\n"
     )));
     // A text box's from the deck's defaults and its theme.
     assert!(imp.text.contains(SOURCE), "{}", imp.text);
@@ -90,7 +90,7 @@ fn a_word_restyled_writes_only_its_run() {
     let (parts, _) = edited(
         &imp,
         SOURCE,
-        "<shape id=\"s5\" name=\"출처\" box=\"36 475 288 29\" font=Calibri size=18pt color=tx1>[출처]{size=24pt color=#FF7F50}: 내부 집계</shape>",
+        "<shape id=\"s5\" name=\"출처\" box=\"36 475 288 29\" font=\"맑은 고딕\" size=18pt color=tx1>[출처]{size=24pt color=#FF7F50}: 내부 집계</shape>",
     );
     let sh = shape(&slide(&parts, 3), "출처").to_string();
     assert!(
@@ -108,14 +108,16 @@ fn a_shape_font_and_a_slot_size_are_written_and_taken_back() {
     let imp = import(&deck("korean-deck.pptx"));
     let before = package::read(&deck("korean-deck.pptx")).unwrap();
     let (parts, _) =
-        edited(&imp, "font=Calibri size=18pt color=tx1>출처", "font=\"Noto Sans KR\" size=18pt color=tx1>출처");
+        edited(&imp, "font=\"맑은 고딕\" size=18pt color=tx1>출처", "font=\"Noto Sans KR\" size=18pt color=tx1>출처");
     let sh = shape(&slide(&parts, 3), "출처").to_string();
     assert!(
-        sh.contains("<a:rPr lang=\"ko-KR\" altLang=\"en-US\"><a:latin typeface=\"Noto Sans KR\"/></a:rPr>"),
+        sh.contains(
+            "<a:rPr lang=\"ko-KR\" altLang=\"en-US\"><a:latin typeface=\"Noto Sans KR\"/><a:ea typeface=\"Noto Sans KR\"/></a:rPr>"
+        ),
         "{sh}"
     );
     // A title at 40 pt, then back at the size it inherits: the run is as it was.
-    let old = "::title box=\"36 22 648 90\" font=Calibri size=44pt color=tx1::\n핵심 지표";
+    let old = "::title box=\"36 22 648 90\" font=\"맑은 고딕\" size=44pt color=tx1::\n핵심 지표";
     let (parts, text) = edited(&imp, old, &old.replace("44pt", "40pt"));
     assert!(slide(&parts, 2).contains("sz=\"4000\""), "{}", slide(&parts, 2));
     let imp2 = import(&package::write(&parts).unwrap());
@@ -209,4 +211,22 @@ fn marks_on_spaces_between_differently_formatted_runs_are_kept() {
         assert_eq!(slide(&b, 3), slide(&a, 3), "{}", imp.text);
         assert_eq!(import(&out).text, imp.text);
     }
+}
+
+/// A theme whose `a:ea` is empty draws Hangul in its `a:font script="Hang"`
+/// face, as PowerPoint does; text without Hangul keeps the Latin face, and
+/// Japanese text does not take the Hangul one.
+#[test]
+fn hangul_shows_the_themes_hangul_face() {
+    let k = import(&deck("korean-deck.pptx"));
+    assert!(
+        k.text.contains("::title box=\"54 168 612 116\" font=\"맑은 고딕\" size=44pt color=tx1::\n3분기 영업 보고\n"),
+        "{}",
+        k.text
+    );
+    let s = import(&deck("shapes.pptx"));
+    assert!(s.text.contains("font=Calibri size=18pt color=tx1>Learning PPTX</shape>"), "{}", s.text);
+    assert!(!s.text.contains("맑은 고딕"), "{}", s.text);
+    let j = import(&deck("with_japanese.pptx"));
+    assert!(!j.text.contains("맑은 고딕"), "{}", j.text);
 }

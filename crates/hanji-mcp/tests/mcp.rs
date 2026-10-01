@@ -217,9 +217,9 @@ fn a_new_presentation_written_whole() {
     // and text formatting from its layout.
     let canonical = concat!(
         "---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 960 x 540 pt\n---\n\nlayout: Title Slide\n",
-        "::title box=\"120 88 720 188\" font=\"Calibri Light\" size=60pt color=tx1::\n3분기 보고\n\n---\n\n",
-        "layout: Title and Content\n::title box=\"66 29 828 104\" font=\"Calibri Light\" size=44pt color=tx1::\n핵심 지표\n",
-        "::body box=\"66 144 828 343\" font=Calibri size=28pt color=tx1::\n- 매출 12% 증가\n::notes::\n강조\n"
+        "::title box=\"120 88 720 188\" font=\"맑은 고딕\" size=60pt color=tx1::\n3분기 보고\n\n---\n\n",
+        "layout: Title and Content\n::title box=\"66 29 828 104\" font=\"맑은 고딕\" size=44pt color=tx1::\n핵심 지표\n",
+        "::body box=\"66 144 828 343\" font=\"맑은 고딕\" size=28pt color=tx1::\n- 매출 12% 증가\n::notes::\n강조\n"
     );
     assert_eq!(s.read(&id).1, canonical);
     let out = s.path("deck.pptx");

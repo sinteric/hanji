@@ -103,10 +103,15 @@ pub fn paras(sp: &Element, sty: Option<Styling>) -> Vec<Inline> {
             }
             if let (Some(b), Some(s)) = (&base, sty) {
                 let under = &b[level(p)];
+                let hangul = text::has_hangul(&i.units);
                 let st: Vec<TextStyle> = src
                     .iter()
                     .map(|x| {
-                        x.rpr.as_ref().map_or_else(RunStyle::default, |r| RunStyle::of(r, s.fonts)).over(under).shown()
+                        x.rpr
+                            .as_ref()
+                            .map_or_else(RunStyle::default, |r| RunStyle::of(r, s.fonts))
+                            .over(under)
+                            .shown_for(hangul)
                     })
                     .collect();
                 istyle::set_unit_styles(&mut i, &st);
@@ -219,15 +224,16 @@ fn paragraph(
     if let Some(ppr) = p.child("a:pPr") {
         out.children.push(Node::El(ppr.clone()));
     }
+    let hangul = text::has_hangul(&n.units);
     let mut k = 0;
     while k < n.units.len() {
         let mut rpr = tpl[k].clone().unwrap_or_else(|| Element::new("a:rPr"));
         crate::export::set_marks(&mut rpr, marks[k]);
         if let (Some(u), Some(f)) = (under, fonts) {
-            let w = want[k].over(&u.shown());
-            let had = RunStyle::of(&rpr, f).over(u).shown();
+            let w = want[k].over(&u.shown_for(hangul));
+            let had = RunStyle::of(&rpr, f).over(u).shown_for(hangul);
             if istyle::visible(&n.units[k].atom) && had != w {
-                text::write(&mut rpr, &w, &had, u)?;
+                text::write(&mut rpr, &w, &had, u, hangul)?;
             }
         }
         if n.units[k].atom == Atom::Break {
