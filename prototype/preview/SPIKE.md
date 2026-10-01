@@ -97,7 +97,7 @@ Noto, 0.363 with Nanum, same layout). It stays as the secondary signal.
    - **W** position: mean over same-page matched words of 1 − min(1, d / (2% of the page diagonal)). d is the distance between the centroids of the matched glyph origins. 2% of A4 is 20.6 pt.
    - **layout = (T·P·L·W)^¼** per file, over the whole document.
    - **Per page:** (T_k·L_k·W_k)^⅓, where T_k counts only matches that stay on page k.
-   - **F** font identity (**proposed**, not in `layout` yet): share of matched characters drawn in the font family the native PDF used. See next steps, item 1(g).
+   - **F** font identity (**proposed**, not in `layout` yet): share of matched characters drawn in the font family the native PDF used. See [DESIGN.md §7.1](../../DESIGN.md#71-fonts-in-the-preview-surveyed-2026-10-01).
    - **W_rel** (diagnostic): W after removing each page's median offset. A high W_rel with a low W means the page moved as a whole.
 6. **Baseline guard.** A native page printed in Word's markup view is
    detected by the grey (0.949) comment pane. The pane's text is dropped and
@@ -211,7 +211,7 @@ Per format corpus (each of docx, pptx, hwpx; xlsx separately, below):
 2. **≥ 80%** of files score **≥ 0.85**, which lies between rhwp 25 (0.948) and rdocx 04 (0.702).
 3. Page count exact on **≥ 90%** of files. On today's 8–9-file corpora that means every file, which is intended: a wrong page count is the most visible failure.
 4. **≥ 90%** of pages score **≥ 0.80** (a 5 pt shift: min page 0.80). A page with no native text counts when its content-SSIM is ≥ 0.80. Shapes-only slides 11 p3 and p6 score 0.92–0.97 in every candidate.
-5. Font identity (**proposed**, item 1(g)): F ≥ 0.99 over text whose requested font is available to the run (org or user font dir, installed, or bundled). Text in an unavailable font is excluded from F but must appear in the substitution list.
+5. Font identity (**proposed**, DESIGN.md §7.1): F ≥ 0.99 over text whose requested font is available to the run (org or user font dir, installed, or bundled). Text in an unavailable font is excluded from F but must appear in the substitution list.
 
 Content-SSIM is reported and reviewed, not gated. On text pages it stays
 glyph-bound (0.1–0.6 for good layouts).
@@ -247,48 +247,14 @@ a reference. Not built.
 
 ## Next steps
 
-1. **Font system.** Fonts decide most of the look. SeongUk noted that apart
-   from fonts, rhwp's 25 looks like Hancom's, and the numbers agree: layout
-   0.948, raw SSIM 0.57–0.94. Engine bugs (rdocx 04/05, rhwp 28, rpptx 12) are
-   a separate problem, and the layout metric is built to separate the two.
-   Glyph shape does not move it; metrics and engine layout do.
-   1. **Name resolution.** One alias table from document font names
-      (함초롬바탕/돋움, 맑은 고딕, 바탕, 굴림, Calibri, Cambria, Aptos, Arial,
-      Times New Roman, …) to the fonts available. This spike's table is
-      `fonts/fonts.conf` / `engines/aliases.txt`. Shared by the three engines
-      so that rdocx/rpptx stop reaching Hangul through Noto CJK SC coverage
-      fallback.
-   2. **Layout metrics.** Break lines with the original font's metrics, or a
-      metric-compatible substitute (Carlito = Calibri, Caladea = Cambria,
-      Liberation = Arial/Times/Courier), even when the glyphs come from
-      another font. rhwp already lays out from built-in metrics, which is why
-      25 kept Hancom's layout with Noto glyphs. LibreOffice with Noto Serif on
-      24 reflowed to 3 pages instead of Hancom's 2 (with Nanum: 2).
-   3. **Bundled set.** Noto Sans/Serif CJK KR, Carlito, Caladea and
-      Liberation. 함초롬바탕/돋움 too, if Hancom's licence allows
-      redistribution. That is **unverified**: its download page could not be
-      reached from here. The user's installed fonts come before the bundled
-      ones.
-   4. **Per-page subsetting and embedding in the SVG.** Today's 47–81 MB
-      pages come from whole `.ttc` embedding. rhwp embeds nothing, so its
-      look depends on the viewer.
-
-   Because some Korean organisations allow only one or two mandated fonts,
-   font **identity** matters, not just layout:
-
-   - **(e) No silent substitution.** Resolution order: an org/user font
-     directory (a CLI `--font-dir` flag and an MCP server config entry), then
-     installed system fonts, then the bundled substitutes.
-   - **(f) Substitutions are visible.** The HTML viewer marks substituted
-     text and lists each substitution, e.g. "휴먼명조 → Noto Serif CJK KR, N
-     chars". The preview CLI/MCP result returns the same list. rhwp's chain
-     per `<text>` and rdocx/rpptx's resolved faces are the inputs.
-   - **(g) Font-identity sub-score F** in rule 5 (defined above, computed
-     here for PDF candidates: 0.00 on all 30 LibreOffice files). A
-     layout-perfect page in the wrong font then cannot pass. The engines must
-     report the resolved face per run for F to be computed on SVG.
-   - **(h) Optional font policy.** `hanji validate` checks a document's fonts
-     against an allowed list.
+1. **Font system:** designed in [DESIGN.md §7.1](../../DESIGN.md#71-fonts-in-the-preview-surveyed-2026-10-01).
+   It covers the alias table, the resolution order, layout metrics against
+   glyph source, the bundled set and how it ships, per-page subsetting, the
+   substitution report, F and the font policy; the spike's font proposals
+   are decided in principle there. Fonts decide most of the look:
+   apart from fonts, rhwp's 25 looks like Hancom's (layout 0.948, raw SSIM
+   0.57–0.94). Engine bugs (rdocx 04/05, rhwp 28, rpptx 12) are a separate
+   problem, and the layout metric separates the two.
 2. **Re-export the five markup-view docx PDFs** (01, 02, 05, 06, 07) with
    Review → No Markup (the view rdocx renders as `Accepted`), and add that
    step to `baseline/CHECKLIST.md`. Then rescore docx.
