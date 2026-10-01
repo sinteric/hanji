@@ -51,6 +51,7 @@ jobs:
           exe=; [[ ${{ matrix.target }} == *windows* ]] && exe=.exe
           mkdir -p dist/$name
           cp target/${{ matrix.target }}/release/hanji-mcp$exe target/${{ matrix.target }}/release/hanji$exe dist/$name/
+          cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md "dist/$name/"
           cd dist
           tar -czf $name.tar.gz $name
           rm -r $name
