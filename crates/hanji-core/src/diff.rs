@@ -1,6 +1,10 @@
 //! A port of Python's `difflib.SequenceMatcher` (no junk, `autojunk=False`).
 //! The remainder prototype's numbers were measured with it; the same
 //! matcher keeps alignment and re-anchoring comparable.
+//!
+//! Ported from CPython's `Lib/difflib.py`, Copyright (c) 2001-2023 Python
+//! Software Foundation, under the PSF License Version 2: see
+//! THIRD_PARTY_NOTICES.md at the repository root.
 
 use std::collections::HashMap;
 use std::hash::Hash;

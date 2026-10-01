@@ -1,0 +1,9 @@
+file,name,format,n_native,n_render,page_mismatch,score,score_content,score_norm,worst_page,worst_ssim,status
+23,23-hwpx-untouched-fdi-2025q2,hwpx,9,9,False,0.797,0.5672,0.4344,1,0.5139,ok
+24,24-hwpx-untouched-hy-002,hwpx,2,2,False,0.8265,0.5775,0.4456,1,0.7733,ok
+25,25-hwpx-untouched-hcar-001,hwpx,6,6,False,0.7497,0.3657,0.1944,1,0.5705,ok
+26,26-hwpx-untouched-footnote-01,hwpx,6,6,False,0.8412,0.347,0.0,3,0.6881,ok
+27,27-hwpx-untouched-para-001,hwpx,3,3,False,0.845,0.5353,0.3817,1,0.8038,ok
+28,28-hwpx-edited-footnote-01-e10,hwpx,7,6,True,0.6897,0.2206,0.0,7,0.0,ok
+29,29-hwpx-edited-hy-002-e10,hwpx,3,3,False,0.7322,0.2974,0.1062,2,0.6329,ok
+30,30-hwpx-new-plan-ko,hwpx,2,2,False,0.9231,0.2612,0.0,1,0.898,ok

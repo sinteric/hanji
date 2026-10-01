@@ -1,0 +1,696 @@
+{
+ "candidate": "renders/rdocx",
+ "overall": {
+  "files": 9,
+  "mean_layout": 0.6193,
+  "min_layout": 0.3773,
+  "share_files_ge_0.85": 0.0,
+  "T": 0.9672,
+  "P": 0.9609,
+  "L": 0.9357,
+  "W": 0.2217,
+  "pages_scored": 27,
+  "share_pages_ge_0.80": 0.0741,
+  "min_page": 0.0,
+  "page_count_exact": 0.7778,
+  "page_mismatches": 2,
+  "no_render": 0
+ },
+ "per_format": {
+  "docx": {
+   "files": 9,
+   "mean_layout": 0.6193,
+   "min_layout": 0.3773,
+   "share_files_ge_0.85": 0.0,
+   "T": 0.9672,
+   "P": 0.9609,
+   "L": 0.9357,
+   "W": 0.2217,
+   "pages_scored": 27,
+   "share_pages_ge_0.80": 0.0741,
+   "min_page": 0.0,
+   "page_count_exact": 0.7778,
+   "page_mismatches": 2,
+   "no_render": 0
+  }
+ },
+ "files": [
+  {
+   "n_native_pages": 2,
+   "n_render_pages": 2,
+   "page_diff": 0,
+   "native_chars": 240,
+   "render_chars": 240,
+   "matched_chars": 236,
+   "native_words": 95,
+   "matched_words": 93,
+   "word_recall": 0.9789,
+   "T": 0.9833,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.3391,
+   "W_rel": 0.5415,
+   "F": null,
+   "layout": 0.7599,
+   "pages": [
+    {
+     "page": 1,
+     "native": true,
+     "render": true,
+     "n_native_chars": 213,
+     "n_render_chars": 213,
+     "T": 0.9812,
+     "L": 1.0,
+     "W": 0.3045,
+     "layout": 0.6685,
+     "W_rel": 0.5079,
+     "offset_pt": [
+      -9.2,
+      9.1
+     ]
+    },
+    {
+     "page": 2,
+     "native": true,
+     "render": true,
+     "n_native_chars": 27,
+     "n_render_chars": 27,
+     "T": 1.0,
+     "L": 1.0,
+     "W": 0.5966,
+     "layout": 0.8419,
+     "W_rel": 0.7925,
+     "offset_pt": [
+      -5.9,
+      3.8
+     ]
+    }
+   ],
+   "file": "01",
+   "name": "01-docx-untouched-korean-report",
+   "format": "docx",
+   "status": "ok",
+   "baseline_note": "Word markup view on 2/2 pages: rescaled"
+  },
+  {
+   "n_native_pages": 5,
+   "n_render_pages": 5,
+   "page_diff": 0,
+   "native_chars": 1055,
+   "render_chars": 1054,
+   "matched_chars": 1054,
+   "native_words": 205,
+   "matched_words": 205,
+   "word_recall": 1.0,
+   "T": 0.9995,
+   "P": 0.9122,
+   "L": 0.932,
+   "W": 0.0532,
+   "W_rel": 0.6301,
+   "F": null,
+   "layout": 0.4612,
+   "pages": [
+    {
+     "page": 1,
+     "native": true,
+     "render": true,
+     "n_native_chars": 748,
+     "n_render_chars": 764,
+     "T": 0.9894,
+     "L": 0.9538,
+     "W": 0.0129,
+     "layout": 0.2303,
+     "W_rel": 0.5928,
+     "offset_pt": [
+      -2.0,
+      -42.9
+     ]
+    },
+    {
+     "page": 2,
+     "native": true,
+     "render": true,
+     "n_native_chars": 71,
+     "n_render_chars": 55,
+     "T": 0.873,
+     "L": 0.8,
+     "W": 0.1225,
+     "layout": 0.4406,
+     "W_rel": 0.4629,
+     "offset_pt": [
+      -1.7,
+      -67.3
+     ]
+    },
+    {
+     "page": 3,
+     "native": true,
+     "render": true,
+     "n_native_chars": 64,
+     "n_render_chars": 110,
+     "T": 0.7356,
+     "L": 1.0,
+     "W": 0.3062,
+     "layout": 0.6085,
+     "W_rel": 0.6524,
+     "offset_pt": [
+      -2.5,
+      -29.5
+     ]
+    },
+    {
+     "page": 4,
+     "native": true,
+     "render": true,
+     "n_native_chars": 54,
+     "n_render_chars": 8,
+     "T": 0.0,
+     "L": 1.0,
+     "W": 0.0,
+     "layout": 0.0,
+     "W_rel": null,
+     "offset_pt": [
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "page": 5,
+     "native": true,
+     "render": true,
+     "n_native_chars": 118,
+     "n_render_chars": 117,
+     "T": 0.9277,
+     "L": 1.0,
+     "W": 0.185,
+     "layout": 0.5558,
+     "W_rel": 0.9499,
+     "offset_pt": [
+      -1.9,
+      -16.4
+     ]
+    }
+   ],
+   "file": "02",
+   "name": "02-docx-untouched-sample-docx",
+   "format": "docx",
+   "status": "ok",
+   "baseline_note": "Word markup view on 5/5 pages: rescaled"
+  },
+  {
+   "n_native_pages": 3,
+   "n_render_pages": 3,
+   "page_diff": 0,
+   "native_chars": 779,
+   "render_chars": 779,
+   "matched_chars": 779,
+   "native_words": 277,
+   "matched_words": 277,
+   "word_recall": 1.0,
+   "T": 1.0,
+   "P": 0.9711,
+   "L": 1.0,
+   "W": 0.1224,
+   "W_rel": 0.7052,
+   "F": null,
+   "layout": 0.5871,
+   "pages": [
+    {
+     "page": 1,
+     "native": true,
+     "render": true,
+     "n_native_chars": 200,
+     "n_render_chars": 200,
+     "T": 1.0,
+     "L": 1.0,
+     "W": 0.5985,
+     "layout": 0.8427,
+     "W_rel": 0.7106,
+     "offset_pt": [
+      0.1,
+      -5.4
+     ]
+    },
+    {
+     "page": 2,
+     "native": true,
+     "render": true,
+     "n_native_chars": 497,
+     "n_render_chars": 511,
+     "T": 0.9861,
+     "L": 1.0,
+     "W": 0.0,
+     "layout": 0.0,
+     "W_rel": 0.709,
+     "offset_pt": [
+      2.0,
+      -37.3
+     ]
+    },
+    {
+     "page": 3,
+     "native": true,
+     "render": true,
+     "n_native_chars": 82,
+     "n_render_chars": 68,
+     "T": 0.9067,
+     "L": 1.0,
+     "W": 0.0,
+     "layout": 0.0,
+     "W_rel": 0.5993,
+     "offset_pt": [
+      0.1,
+      -174.4
+     ]
+    }
+   ],
+   "file": "03",
+   "name": "03-docx-untouched-docx4j-tables",
+   "format": "docx",
+   "status": "ok",
+   "baseline_note": ""
+  },
+  {
+   "n_native_pages": 2,
+   "n_render_pages": 5,
+   "page_diff": 3,
+   "native_chars": 567,
+   "render_chars": 687,
+   "matched_chars": 554,
+   "native_words": 147,
+   "matched_words": 142,
+   "word_recall": 0.966,
+   "T": 0.8836,
+   "P": 0.8169,
+   "L": 0.9333,
+   "W": 0.3609,
+   "W_rel": 0.3735,
+   "F": null,
+   "layout": 0.7022,
+   "pages": [
+    {
+     "page": 1,
+     "native": true,
+     "render": true,
+     "n_native_chars": 395,
+     "n_render_chars": 395,
+     "T": 0.9241,
+     "L": 0.9091,
+     "W": 0.2601,
+     "layout": 0.6023,
+     "W_rel": 0.2691,
+     "offset_pt": [
+      -0.0,
+      17.2
+     ]
+    },
+    {
+     "page": 2,
+     "native": true,
+     "render": true,
+     "n_native_chars": 172,
+     "n_render_chars": 128,
+     "T": 0.6867,
+     "L": 1.0,
+     "W": 0.7277,
+     "layout": 0.7935,
+     "W_rel": 0.7537,
+     "offset_pt": [
+      0.0,
+      -1.8
+     ]
+    },
+    {
+     "page": 3,
+     "native": false,
+     "render": true,
+     "n_native_chars": 0,
+     "n_render_chars": 84,
+     "T": 0.0,
+     "L": null,
+     "W": null,
+     "layout": 0.0,
+     "W_rel": null,
+     "offset_pt": [
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "page": 4,
+     "native": false,
+     "render": true,
+     "n_native_chars": 0,
+     "n_render_chars": 40,
+     "T": 0.0,
+     "L": null,
+     "W": null,
+     "layout": 0.0,
+     "W_rel": null,
+     "offset_pt": [
+      0.0,
+      0.0
+     ]
+    },
+    {
+     "page": 5,
+     "native": false,
+     "render": true,
+     "n_native_chars": 0,
+     "n_render_chars": 40,
+     "T": 0.0,
+     "L": null,
+     "W": null,
+     "layout": 0.0,
+     "W_rel": null,
+     "offset_pt": [
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "file": "04",
+   "name": "04-docx-untouched-testword-various",
+   "format": "docx",
+   "status": "ok",
+   "baseline_note": ""
+  },
+  {
+   "n_native_pages": 3,
+   "n_render_pages": 4,
+   "page_diff": 1,
+   "native_chars": 630,
+   "render_chars": 526,
+   "matched_chars": 490,
+   "native_words": 101,
+   "matched_words": 77,
+   "word_recall": 0.7624,
+   "T": 0.8478,
+   "P": 0.9481,
+   "L": 0.9383,
+   "W": 0.257,
+   "W_rel": 0.3925,
+   "F": null,
+   "layout": 0.6635,
+   "pages": [
+    {
+     "page": 1,
+     "native": true,
+     "render": true,
+     "n_native_chars": 423,
+     "n_render_chars": 355,
+     "T": 0.8792,
+     "L": 0.9444,
+     "W": 0.3354,
+     "layout": 0.6531,
+     "W_rel": 0.5141,
+     "offset_pt": [
+      -2.7,
+      -10.4
+     ]
+    },
+    {
+     "page": 2,
+     "native": true,
+     "render": true,
+     "n_native_chars": 134,
+     "n_render_chars": 125,
+     "T": 0.7645,
+     "L": 0.9189,
+     "W": 0.1608,
+     "layout": 0.4834,
+     "W_rel": 0.1644,
+     "offset_pt": [
+      -4.1,
+      -4.6
+     ]
+    },
+    {
+     "page": 3,
+     "native": true,
+     "render": true,
+     "n_native_chars": 73,
+     "n_render_chars": 38,
+     "T": 0.5225,
+     "L": 1.0,
+     "W": 0.2027,
+     "layout": 0.4731,
+     "W_rel": 0.7665,
+     "offset_pt": [
+      -5.1,
+      12.4
+     ]
+    },
+    {
+     "page": 4,
+     "native": false,
+     "render": true,
+     "n_native_chars": 0,
+     "n_render_chars": 8,
+     "T": 0.0,
+     "L": null,
+     "W": null,
+     "layout": 0.0,
+     "W_rel": null,
+     "offset_pt": [
+      0.0,
+      0.0
+     ]
+    }
+   ],
+   "file": "05",
+   "name": "05-docx-untouched-loadandsave",
+   "format": "docx",
+   "status": "ok",
+   "baseline_note": "Word markup view on 3/3 pages: rescaled"
+  },
+  {
+   "n_native_pages": 2,
+   "n_render_pages": 2,
+   "page_diff": 0,
+   "native_chars": 234,
+   "render_chars": 234,
+   "matched_chars": 232,
+   "native_words": 85,
+   "matched_words": 83,
+   "word_recall": 0.9765,
+   "T": 0.9915,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.3737,
+   "W_rel": 0.5891,
+   "F": null,
+   "layout": 0.7802,
+   "pages": [
+    {
+     "page": 1,
+     "native": true,
+     "render": true,
+     "n_native_chars": 107,
+     "n_render_chars": 107,
+     "T": 0.9813,
+     "L": 1.0,
+     "W": 0.3561,
+     "layout": 0.7044,
+     "W_rel": 0.606,
+     "offset_pt": [
+      -10.2,
+      5.0
+     ]
+    },
+    {
+     "page": 2,
+     "native": true,
+     "render": true,
+     "n_native_chars": 127,
+     "n_render_chars": 127,
+     "T": 1.0,
+     "L": 1.0,
+     "W": 0.3917,
+     "layout": 0.7317,
+     "W_rel": 0.5717,
+     "offset_pt": [
+      -5.0,
+      6.9
+     ]
+    }
+   ],
+   "file": "06",
+   "name": "06-docx-edited-korean-report-e10",
+   "format": "docx",
+   "status": "ok",
+   "baseline_note": "Word markup view on 2/2 pages: rescaled"
+  },
+  {
+   "n_native_pages": 4,
+   "n_render_pages": 4,
+   "page_diff": 0,
+   "native_chars": 1075,
+   "render_chars": 1074,
+   "matched_chars": 1074,
+   "native_words": 205,
+   "matched_words": 205,
+   "word_recall": 1.0,
+   "T": 0.9995,
+   "P": 1.0,
+   "L": 0.932,
+   "W": 0.058,
+   "W_rel": 0.6521,
+   "F": null,
+   "layout": 0.4822,
+   "pages": [
+    {
+     "page": 1,
+     "native": true,
+     "render": true,
+     "n_native_chars": 756,
+     "n_render_chars": 756,
+     "T": 1.0,
+     "L": 0.9677,
+     "W": 0.0132,
+     "layout": 0.2339,
+     "W_rel": 0.6187,
+     "offset_pt": [
+      -2.1,
+      -42.9
+     ]
+    },
+    {
+     "page": 2,
+     "native": true,
+     "render": true,
+     "n_native_chars": 76,
+     "n_render_chars": 76,
+     "T": 1.0,
+     "L": 1.0,
+     "W": 0.2297,
+     "layout": 0.6124,
+     "W_rel": 0.7066,
+     "offset_pt": [
+      -2.5,
+      -32.3
+     ]
+    },
+    {
+     "page": 3,
+     "native": true,
+     "render": true,
+     "n_native_chars": 54,
+     "n_render_chars": 54,
+     "T": 1.0,
+     "L": 1.0,
+     "W": 0.1531,
+     "layout": 0.535,
+     "W_rel": 0.8255,
+     "offset_pt": [
+      -2.2,
+      -28.3
+     ]
+    },
+    {
+     "page": 4,
+     "native": true,
+     "render": true,
+     "n_native_chars": 189,
+     "n_render_chars": 188,
+     "T": 0.9973,
+     "L": 0.8387,
+     "W": 0.1388,
+     "layout": 0.4878,
+     "W_rel": 0.6984,
+     "offset_pt": [
+      -1.8,
+      -17.8
+     ]
+    }
+   ],
+   "file": "07",
+   "name": "07-docx-edited-sample-docx-e10",
+   "format": "docx",
+   "status": "ok",
+   "baseline_note": "Word markup view on 4/4 pages: rescaled"
+  },
+  {
+   "n_native_pages": 1,
+   "n_render_pages": 1,
+   "page_diff": 0,
+   "native_chars": 282,
+   "render_chars": 282,
+   "matched_chars": 282,
+   "native_words": 57,
+   "matched_words": 57,
+   "word_recall": 1.0,
+   "T": 1.0,
+   "P": 1.0,
+   "L": 0.8182,
+   "W": 0.4079,
+   "W_rel": 0.4772,
+   "F": null,
+   "layout": 0.76,
+   "pages": [
+    {
+     "page": 1,
+     "native": true,
+     "render": true,
+     "n_native_chars": 282,
+     "n_render_chars": 282,
+     "T": 1.0,
+     "L": 0.8182,
+     "W": 0.4079,
+     "layout": 0.6936,
+     "W_rel": 0.4772,
+     "offset_pt": [
+      0.1,
+      -4.0
+     ]
+    }
+   ],
+   "file": "08",
+   "name": "08-docx-new-report-en",
+   "format": "docx",
+   "status": "ok",
+   "baseline_note": ""
+  },
+  {
+   "n_native_pages": 1,
+   "n_render_pages": 1,
+   "page_diff": 0,
+   "native_chars": 125,
+   "render_chars": 125,
+   "matched_chars": 125,
+   "native_words": 50,
+   "matched_words": 50,
+   "word_recall": 1.0,
+   "T": 1.0,
+   "P": 1.0,
+   "L": 0.8679,
+   "W": 0.0233,
+   "W_rel": 0.1722,
+   "F": null,
+   "layout": 0.3773,
+   "pages": [
+    {
+     "page": 1,
+     "native": true,
+     "render": true,
+     "n_native_chars": 125,
+     "n_render_chars": 125,
+     "T": 1.0,
+     "L": 0.8679,
+     "W": 0.0233,
+     "layout": 0.2726,
+     "W_rel": 0.1722,
+     "offset_pt": [
+      13.0,
+      -35.5
+     ]
+    }
+   ],
+   "file": "09",
+   "name": "09-docx-new-report-ko",
+   "format": "docx",
+   "status": "ok",
+   "baseline_note": ""
+  }
+ ]
+}

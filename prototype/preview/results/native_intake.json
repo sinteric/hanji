@@ -1,0 +1,422 @@
+{
+ "01-docx-untouched-korean-report.pdf": {
+  "pages": 2,
+  "size_pt": [
+   595.2,
+   841.9
+  ],
+  "fonts": [
+   "Batang",
+   "TimesNewRomanPS-BoldMT",
+   "TimesNewRomanPS-ItalicMT",
+   "TimesNewRomanPSMT"
+  ]
+ },
+ "02-docx-untouched-sample-docx.pdf": {
+  "pages": 5,
+  "size_pt": [
+   595.4,
+   841.9
+  ],
+  "fonts": [
+   "Arial-Black",
+   "ArialMT",
+   "Batang",
+   "Calibri",
+   "Calibri-Bold",
+   "Calibri-Italic",
+   "Cambria",
+   "Cambria-Bold",
+   "CourierNewPSMT",
+   "SymbolMT",
+   "Tahoma-Bold"
+  ]
+ },
+ "03-docx-untouched-docx4j-tables.pdf": {
+  "pages": 3,
+  "size_pt": [
+   595.2,
+   841.9
+  ],
+  "fonts": [
+   "Arial-BoldMT",
+   "ArialMT",
+   "ArialNarrow"
+  ]
+ },
+ "04-docx-untouched-testword-various.pdf": {
+  "pages": 2,
+  "size_pt": [
+   612.0,
+   792.0
+  ],
+  "fonts": [
+   "ArialMT",
+   "Calibri",
+   "Calibri-Bold",
+   "Calibri-Italic",
+   "MS-Gothic",
+   "MS-Mincho",
+   "SegoeUIHistoric",
+   "SymbolMT"
+  ]
+ },
+ "05-docx-untouched-loadandsave.pdf": {
+  "pages": 3,
+  "size_pt": [
+   419.5,
+   595.2
+  ],
+  "fonts": [
+   "Aptos",
+   "Aptos-Bold",
+   "Aptos-BoldItalic",
+   "Aptos-Italic",
+   "AptosDisplay",
+   "AptosDisplay-Bold",
+   "ArialMT",
+   "Batang",
+   "CambriaMath",
+   "TimesNewRomanPSMT"
+  ]
+ },
+ "06-docx-edited-korean-report-e10.pdf": {
+  "pages": 2,
+  "size_pt": [
+   595.2,
+   841.9
+  ],
+  "fonts": [
+   "Batang",
+   "TimesNewRomanPS-BoldMT",
+   "TimesNewRomanPS-ItalicMT",
+   "TimesNewRomanPSMT"
+  ]
+ },
+ "07-docx-edited-sample-docx-e10.pdf": {
+  "pages": 4,
+  "size_pt": [
+   595.4,
+   841.9
+  ],
+  "fonts": [
+   "Arial-Black",
+   "ArialMT",
+   "Batang",
+   "Calibri",
+   "Calibri-Bold",
+   "Calibri-Italic",
+   "Cambria",
+   "Cambria-Bold",
+   "CourierNewPSMT",
+   "SymbolMT",
+   "Tahoma-Bold"
+  ]
+ },
+ "08-docx-new-report-en.pdf": {
+  "pages": 1,
+  "size_pt": [
+   595.2,
+   841.9
+  ],
+  "fonts": [
+   "ArialMT",
+   "Calibri",
+   "Calibri-Bold",
+   "Calibri-Italic"
+  ]
+ },
+ "09-docx-new-report-ko.pdf": {
+  "pages": 1,
+  "size_pt": [
+   595.2,
+   841.9
+  ],
+  "fonts": [
+   "ArialMT",
+   "Calibri",
+   "Calibri-Bold",
+   "Calibri-Italic",
+   "MalgunGothic",
+   "MalgunGothicBold"
+  ]
+ },
+ "10-pptx-untouched-korean-deck.pdf": {
+  "pages": 7,
+  "size_pt": [
+   720.0,
+   540.0
+  ],
+  "fonts": [
+   "ArialMT",
+   "Calibri",
+   "Calibri-Bold",
+   "MalgunGothic",
+   "MalgunGothicBold"
+  ]
+ },
+ "11-pptx-untouched-shapes.pdf": {
+  "pages": 6,
+  "size_pt": [
+   720.0,
+   540.0
+  ],
+  "fonts": [
+   "Calibri",
+   "Calibri-Bold"
+  ]
+ },
+ "12-pptx-untouched-onlyoffice-sample.pdf": {
+  "pages": 7,
+  "size_pt": [
+   959.8,
+   540.0
+  ],
+  "fonts": [
+   "Arial-BoldItalicMT",
+   "Arial-BoldMT",
+   "Arial-ItalicMT",
+   "ArialMT",
+   "CourierNewPSMT",
+   "OpenSans-Bold",
+   "TimesNewRomanPS-BoldItalicMT",
+   "TimesNewRomanPS-BoldMT"
+  ]
+ },
+ "13-pptx-untouched-modern-pitch.pdf": {
+  "pages": 8,
+  "size_pt": [
+   959.8,
+   540.0
+  ],
+  "fonts": [
+   "Calibri",
+   "Calibri-Bold"
+  ]
+ },
+ "14-pptx-untouched-korean-report-deck.pdf": {
+  "pages": 6,
+  "size_pt": [
+   959.8,
+   540.0
+  ],
+  "fonts": [
+   "ArialMT",
+   "Calibri",
+   "Calibri-Bold",
+   "MalgunGothic",
+   "MalgunGothicBold"
+  ]
+ },
+ "15-pptx-edited-korean-deck-pset.pdf": {
+  "pages": 7,
+  "size_pt": [
+   720.0,
+   540.0
+  ],
+  "fonts": [
+   "ArialMT",
+   "Calibri",
+   "MalgunGothic",
+   "MalgunGothicBold"
+  ]
+ },
+ "16-pptx-edited-modern-pitch-pset.pdf": {
+  "pages": 8,
+  "size_pt": [
+   959.8,
+   540.0
+  ],
+  "fonts": [
+   "ArialMT",
+   "Calibri",
+   "Calibri-Bold",
+   "MalgunGothic"
+  ]
+ },
+ "17-pptx-new-deck-ko.pdf": {
+  "pages": 4,
+  "size_pt": [
+   959.8,
+   540.0
+  ],
+  "fonts": [
+   "ArialMT",
+   "Calibri",
+   "Calibri-Bold",
+   "Calibri-Italic",
+   "Calibri-Light",
+   "MalgunGothic"
+  ]
+ },
+ "18-xlsx-untouched-korean-sales.pdf": {
+  "pages": 5,
+  "size_pt": [
+   595.3,
+   841.9
+  ],
+  "fonts": [
+   "MalgunGothic",
+   "MalgunGothicBold"
+  ]
+ },
+ "19-xlsx-untouched-monthly-budget.pdf": {
+  "pages": 2,
+  "size_pt": [
+   792.0,
+   612.0
+  ],
+  "fonts": [
+   "CenturyGothic",
+   "Georgia",
+   "Georgia-Italic"
+  ]
+ },
+ "20-xlsx-untouched-tables-forms.pdf": {
+  "pages": 21,
+  "size_pt": [
+   841.9,
+   595.3
+  ],
+  "fonts": [
+   "TimesNewRomanPS-BoldMT",
+   "TimesNewRomanPS-ItalicMT",
+   "TimesNewRomanPSMT"
+  ]
+ },
+ "21-xlsx-edited-korean-sales-ops.pdf": {
+  "pages": 5,
+  "size_pt": [
+   595.3,
+   841.9
+  ],
+  "fonts": [
+   "MalgunGothic",
+   "MalgunGothicBold"
+  ]
+ },
+ "22-xlsx-new-sales-ko.pdf": {
+  "pages": 2,
+  "size_pt": [
+   595.3,
+   841.9
+  ],
+  "fonts": [
+   "MalgunGothic",
+   "MalgunGothicBold"
+  ]
+ },
+ "23-hwpx-untouched-fdi-2025q2.pdf": {
+  "pages": 9,
+  "size_pt": [
+   595.0,
+   842.0
+  ],
+  "fonts": [
+   "DotumChe",
+   "Gulim",
+   "H2hdrM",
+   "HCRBatang",
+   "HCRDotum-Bold",
+   "HMKMM",
+   "Haansoft-Batang",
+   "MalgunGothic-Regular",
+   "PalatinoLinotype-Roman"
+  ]
+ },
+ "24-hwpx-untouched-hy-002.pdf": {
+  "pages": 2,
+  "size_pt": [
+   595.0,
+   842.0
+  ],
+  "fonts": [
+   "DotumChe",
+   "HCRBatang",
+   "HCRDotum-Bold",
+   "HMKMM",
+   "PalatinoLinotype-Roman"
+  ]
+ },
+ "25-hwpx-untouched-hcar-001.pdf": {
+  "pages": 6,
+  "size_pt": [
+   595.0,
+   842.0
+  ],
+  "fonts": [
+   "DotumChe",
+   "GulimChe",
+   "H2hdrM",
+   "HCRDotum",
+   "HCRDotum-Bold",
+   "Haansoft-Dotum",
+   "HancomGothicBold",
+   "HancomGothicRegular",
+   "MalgunGothic-Regular"
+  ]
+ },
+ "26-hwpx-untouched-footnote-01.pdf": {
+  "pages": 6,
+  "size_pt": [
+   595.0,
+   842.0
+  ],
+  "fonts": [
+   "HCRBatang",
+   "HCRDotum",
+   "HMKMM",
+   "HYmjrE",
+   "NanumGothic"
+  ]
+ },
+ "27-hwpx-untouched-para-001.pdf": {
+  "pages": 3,
+  "size_pt": [
+   595.0,
+   842.0
+  ],
+  "fonts": [
+   "HCRBatang"
+  ]
+ },
+ "28-hwpx-edited-footnote-01-e10.pdf": {
+  "pages": 7,
+  "size_pt": [
+   595.0,
+   842.0
+  ],
+  "fonts": [
+   "HCRBatang",
+   "HCRDotum",
+   "HMKMM",
+   "HYmjrE",
+   "NanumGothic"
+  ]
+ },
+ "29-hwpx-edited-hy-002-e10.pdf": {
+  "pages": 3,
+  "size_pt": [
+   595.0,
+   842.0
+  ],
+  "fonts": [
+   "DotumChe",
+   "HCRBatang",
+   "HCRDotum-Bold",
+   "HMKMM",
+   "PalatinoLinotype-Roman"
+  ]
+ },
+ "30-hwpx-new-plan-ko.pdf": {
+  "pages": 2,
+  "size_pt": [
+   595.0,
+   842.0
+  ],
+  "fonts": [
+   "HCRBatang",
+   "HCRBatang-Bold"
+  ]
+ }
+}

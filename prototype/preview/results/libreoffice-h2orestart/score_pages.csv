@@ -1,0 +1,51 @@
+file,name,format,page,native,render,ssim,ssim_content,ssim_norm,aspect_diff,note
+23,23-hwpx-untouched-fdi-2025q2,hwpx,1,True,True,0.5454570863109179,0.13811022643815515,0.0,0.0,
+23,23-hwpx-untouched-fdi-2025q2,hwpx,2,True,True,0.704081801443801,0.14352821239774796,0.0,0.0,
+23,23-hwpx-untouched-fdi-2025q2,hwpx,3,True,True,0.4639476609233794,0.1654737549330917,0.0,0.0,
+23,23-hwpx-untouched-fdi-2025q2,hwpx,4,True,True,0.4737676489356359,0.1775802768861551,0.0,0.0,
+23,23-hwpx-untouched-fdi-2025q2,hwpx,5,True,True,0.501317441590135,0.17596252603470705,0.0,0.0,
+23,23-hwpx-untouched-fdi-2025q2,hwpx,6,True,True,0.4311052679491015,0.16282462884717816,0.0,0.0,
+23,23-hwpx-untouched-fdi-2025q2,hwpx,7,True,True,0.5377461440922898,0.22094041708001064,0.0,0.0,
+23,23-hwpx-untouched-fdi-2025q2,hwpx,8,True,True,0.5441048292685027,0.2299141482855842,0.0,0.0,
+23,23-hwpx-untouched-fdi-2025q2,hwpx,9,True,True,0.7110400805384978,0.1703563486274087,0.0,0.0,
+23,23-hwpx-untouched-fdi-2025q2,hwpx,10,False,True,0.0,0.0,0.0,,render only
+23,23-hwpx-untouched-fdi-2025q2,hwpx,11,False,True,0.0,0.0,0.0,,render only
+23,23-hwpx-untouched-fdi-2025q2,hwpx,12,False,True,0.0,0.0,0.0,,render only
+23,23-hwpx-untouched-fdi-2025q2,hwpx,13,False,True,0.0,0.0,0.0,,render only
+23,23-hwpx-untouched-fdi-2025q2,hwpx,14,False,True,0.0,0.0,0.0,,render only
+24,24-hwpx-untouched-hy-002,hwpx,1,True,True,0.504175404954292,0.13077344373929922,0.0,0.0,
+24,24-hwpx-untouched-hy-002,hwpx,2,True,True,0.6035634634856214,0.1392905145531767,0.0,0.0,
+24,24-hwpx-untouched-hy-002,hwpx,3,False,True,0.0,0.0,0.0,,render only
+25,25-hwpx-untouched-hcar-001,hwpx,1,True,True,0.600846734515194,0.14108724815258705,0.0,0.0,
+25,25-hwpx-untouched-hcar-001,hwpx,2,True,True,0.495134653660862,0.09870934047870289,0.0,0.0,
+25,25-hwpx-untouched-hcar-001,hwpx,3,True,True,0.5154603793159265,0.10144943774963512,0.0,0.0,
+25,25-hwpx-untouched-hcar-001,hwpx,4,True,True,0.9191490447986328,0.18724660387821723,0.0,0.0,
+25,25-hwpx-untouched-hcar-001,hwpx,5,True,True,0.7505581265963778,0.26952876467251113,0.0,0.0,
+25,25-hwpx-untouched-hcar-001,hwpx,6,True,True,0.5766796856454439,0.1450507262990413,0.0,0.0,
+25,25-hwpx-untouched-hcar-001,hwpx,7,False,True,0.0,0.0,0.0,,render only
+25,25-hwpx-untouched-hcar-001,hwpx,8,False,True,0.0,0.0,0.0,,render only
+25,25-hwpx-untouched-hcar-001,hwpx,9,False,True,0.0,0.0,0.0,,render only
+25,25-hwpx-untouched-hcar-001,hwpx,10,False,True,0.0,0.0,0.0,,render only
+26,26-hwpx-untouched-footnote-01,hwpx,1,True,True,0.702177838156271,0.27941825118143654,0.0,0.0,
+26,26-hwpx-untouched-footnote-01,hwpx,2,True,True,0.7717377734162688,0.1997630191178343,0.0,0.0,
+26,26-hwpx-untouched-footnote-01,hwpx,3,True,True,0.6701644628844733,0.16262403901065525,0.0,0.0,
+26,26-hwpx-untouched-footnote-01,hwpx,4,True,True,0.8082405884211314,0.1894686107246891,0.0,0.0,
+26,26-hwpx-untouched-footnote-01,hwpx,5,True,True,0.9078114332897932,0.367682753069873,0.0,0.0,
+26,26-hwpx-untouched-footnote-01,hwpx,6,True,True,0.9766132971721095,0.7008098270065213,0.0,0.0,
+26,26-hwpx-untouched-footnote-01,hwpx,7,False,True,0.0,0.0,0.0,,render only
+27,27-hwpx-untouched-para-001,hwpx,1,True,True,0.6067205640611025,0.15779937230693,0.0,0.0,
+27,27-hwpx-untouched-para-001,hwpx,2,True,True,0.552626177971111,0.1374194461139254,0.0,0.0,
+27,27-hwpx-untouched-para-001,hwpx,3,True,True,0.673145783046646,0.1526521630352084,0.0,0.0,
+27,27-hwpx-untouched-para-001,hwpx,4,False,True,0.0,0.0,0.0,,render only
+28,28-hwpx-edited-footnote-01-e10,hwpx,1,True,True,0.8902960685443491,0.4795455142426104,0.0,0.0,
+28,28-hwpx-edited-footnote-01-e10,hwpx,2,True,True,0.7662541843823508,0.3824191128005549,0.0,0.0,
+28,28-hwpx-edited-footnote-01-e10,hwpx,3,True,True,0.9691229946403056,0.1814896816774833,0.0,0.0,
+28,28-hwpx-edited-footnote-01-e10,hwpx,4,True,True,0.6899196351072204,0.17727039372166117,0.0,0.0,
+28,28-hwpx-edited-footnote-01-e10,hwpx,5,True,True,0.6937115355352668,0.17850823561749624,0.0,0.0,
+28,28-hwpx-edited-footnote-01-e10,hwpx,6,True,True,0.8887775917683962,0.17873275978111253,0.0,0.0,
+28,28-hwpx-edited-footnote-01-e10,hwpx,7,True,True,0.9996299921297601,0.33939260171677715,0.0,0.0,
+29,29-hwpx-edited-hy-002-e10,hwpx,1,True,True,0.6500784602416452,0.1266735296360357,0.0,0.0,
+29,29-hwpx-edited-hy-002-e10,hwpx,2,True,True,0.5295605508051054,0.1627769059175916,0.0,0.0,
+29,29-hwpx-edited-hy-002-e10,hwpx,3,True,True,0.9231580254778425,0.16686517550650193,0.0,0.0,
+30,30-hwpx-new-plan-ko,hwpx,1,True,True,0.842046464980921,0.14128612637253826,0.0,0.0,
+30,30-hwpx-new-plan-ko,hwpx,2,True,True,0.937041963136378,0.15169671312338046,0.0,0.0,

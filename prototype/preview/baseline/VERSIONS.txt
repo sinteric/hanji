@@ -1,0 +1,8 @@
+Fill in once, then send this file back with the PDFs.
+
+OS (name + version, e.g. Windows 11 23H2 / macOS 15.1): mac OS 27.0(26A428)
+Word (version/build, e.g. Microsoft 365 2409 build 18025.20140): 16.113.1 (26091740)
+PowerPoint (version/build): 6.113.1 (26091740)
+Excel (version/build): 6.113.1 (26091740)
+Hancom Office / 한글 (version, e.g. 한컴오피스 2024 13.0.0.xxxx): 12.30.0(6523)
+Default printer / paper size if not A4 or Letter (optional):

@@ -1,0 +1,16 @@
+[{"op": "add_sheet", "name": "매출"},
+ {"op": "add_table", "sheet": "매출", "name": "Sales", "anchor": "A1",
+  "columns": [{"name": "월", "type": "date", "format": "yyyy-mm"}, {"name": "지점", "type": "text"}, {"name": "Product", "type": "text"}, {"name": "매출", "type": "number", "format": "#,##0"}, {"name": "원가", "type": "number", "format": "#,##0"}, {"name": "이익", "type": "number", "format": "#,##0", "formula": "=[@매출]-[@원가]"}, {"name": "이익률", "type": "number", "format": "0.0%", "formula": "=[@이익]/[@매출]"}, {"name": "코드", "type": "text"}],
+  "rows": [
+   {"월": "2026-01", "지점": "강남", "Product": "가전 Appliances", "매출": 12400000, "원가": 9000000, "코드": "00123"},
+   {"월": "2026-01", "지점": "종로", "Product": "Mobile", "매출": 8150000, "원가": 6020000, "코드": "00124"},
+   {"월": "2026-02", "지점": "부산", "Product": "가구", "매출": 5320000, "원가": 4100000, "코드": "00456"},
+   {"월": "2026-02", "지점": "강남", "Product": "가전 Appliances", "매출": 13900000, "원가": 9800000, "코드": "00123"},
+   {"월": "2026-03", "지점": "대구", "Product": "Mobile", "매출": 6400000, "원가": 5100000, "코드": "00789"},
+   {"월": "2026-03", "지점": "종로", "Product": "가구", "매출": 7250000, "원가": 5300000, "코드": "00124"}]},
+ {"op": "format", "range": "매출!A1:H1", "set": {"fill": "#1F3864", "color": "#FFFFFF", "bold": true, "align": "center", "border-bottom": "1.5pt solid #000000"}},
+ {"op": "format", "range": "매출!D2:G7", "set": {"align": "right"}},
+ {"op": "format", "range": "매출!F2:F7", "set": {"fill": "accent6+80%"}},
+ {"op": "format", "range": "매출!A1:H7", "set": {"outline": "2.25pt solid #1F3864"}},
+ {"op": "set", "range": "Sheet1!A1", "values": [["2026 1분기 매출 요약 (Q1 sales summary)"]]},
+ {"op": "format", "range": "Sheet1!A1", "set": {"bold": true, "size": 14}}]

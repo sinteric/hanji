@@ -1,0 +1,15 @@
+[package]
+name = "render-rhwp"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+rhwp = { git = "https://github.com/edwardkim/rhwp", rev = "680111ec7bea2fe11110de18c3676ba5a1cf7847", default-features = false }
+resvg = "=0.48.1"
+serde_json = "1"
+
+[profile.release]
+debug = false

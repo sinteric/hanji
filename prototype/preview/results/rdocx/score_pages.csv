@@ -1,0 +1,28 @@
+file,name,format,page,native,render,ssim,ssim_content,ssim_norm,aspect_diff,note
+01,01-docx-untouched-korean-report,docx,1,True,True,0.880551187317497,0.6865667371374149,0.0,0.0,
+01,01-docx-untouched-korean-report,docx,2,True,True,0.982198167743947,0.9194224954003904,0.0,0.0,
+02,02-docx-untouched-sample-docx,docx,1,True,True,0.7919054867442041,0.5373116910147135,0.0,0.0,
+02,02-docx-untouched-sample-docx,docx,2,True,True,0.8707542996524291,0.6512649796355264,0.0,0.0,
+02,02-docx-untouched-sample-docx,docx,3,True,True,0.84094665015228,0.615096985331293,0.0,0.0,
+02,02-docx-untouched-sample-docx,docx,4,True,True,0.9899725594930152,0.9578418059845591,0.0,0.0,
+02,02-docx-untouched-sample-docx,docx,5,True,True,0.9677183370259198,0.8763309948505346,0.0,0.0,
+03,03-docx-untouched-docx4j-tables,docx,1,True,True,0.7591268287011329,0.26808894866445904,0.0,0.0,
+03,03-docx-untouched-docx4j-tables,docx,2,True,True,0.6776052973726769,0.3428621403110129,0.0,0.0,
+03,03-docx-untouched-docx4j-tables,docx,3,True,True,0.8143991870373058,0.19145404474920846,0.0,0.0,
+04,04-docx-untouched-testword-various,docx,1,True,True,0.8935846530408724,0.21613139857838903,0.0,0.0,
+04,04-docx-untouched-testword-various,docx,2,True,True,0.9818669578362388,0.3859385880833549,0.15337296469641118,0.0,
+04,04-docx-untouched-testword-various,docx,3,False,True,0.0,0.0,0.0,,render only
+04,04-docx-untouched-testword-various,docx,4,False,True,0.0,0.0,0.0,,render only
+04,04-docx-untouched-testword-various,docx,5,False,True,0.0,0.0,0.0,,render only
+05,05-docx-untouched-loadandsave,docx,1,True,True,0.8372245488313504,0.6302708460567727,0.0,0.0018,
+05,05-docx-untouched-loadandsave,docx,2,True,True,0.8389417921187574,0.6408015513851402,0.0,0.0018,
+05,05-docx-untouched-loadandsave,docx,3,True,True,0.8833394311283951,0.708094340553172,0.0,0.0018,
+05,05-docx-untouched-loadandsave,docx,4,False,True,0.0,0.0,0.0,,render only
+06,06-docx-edited-korean-report-e10,docx,1,True,True,0.9365565385550538,0.8014079973896974,0.0,0.0,
+06,06-docx-edited-korean-report-e10,docx,2,True,True,0.9245346332936157,0.77829666694423,0.0,0.0,
+07,07-docx-edited-sample-docx-e10,docx,1,True,True,0.7935953227616653,0.5521203162273719,0.0,0.0,
+07,07-docx-edited-sample-docx-e10,docx,2,True,True,0.7943441885055005,0.5489337947578151,0.0,0.0,
+07,07-docx-edited-sample-docx-e10,docx,3,True,True,0.910902793276,0.7363266267051729,0.0,0.0,
+07,07-docx-edited-sample-docx-e10,docx,4,True,True,0.9529871664599924,0.8310854888353922,0.0,0.0,
+08,08-docx-new-report-en,docx,1,True,True,0.9233737456100901,0.14348691842057196,0.0,0.0,
+09,09-docx-new-report-ko,docx,1,True,True,0.9023676058293719,0.1420763043777475,0.0,0.0,

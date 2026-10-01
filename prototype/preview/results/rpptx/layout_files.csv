@@ -1,0 +1,9 @@
+file,name,format,status,n_native_pages,n_render_pages,page_diff,native_chars,render_chars,matched_chars,native_words,matched_words,word_recall,T,P,L,W,W_rel,F,layout,baseline_note
+10,10-pptx-untouched-korean-deck,pptx,ok,7,7,0,207,207,207,48,48,1.0,1.0,1.0,1.0,0.4939,0.6172,,0.8383,
+11,11-pptx-untouched-shapes,pptx,ok,6,6,0,280,280,280,45,45,1.0,1.0,1.0,1.0,0.9711,0.9816,,0.9927,
+12,12-pptx-untouched-onlyoffice-sample,pptx,no_render,7,0,-7,2681,0,0,446,0,0.0,0.0,0.0,0.0,0.0,,,0.0,
+13,13-pptx-untouched-modern-pitch,pptx,ok,8,8,0,429,429,428,106,105,0.9906,0.9977,1.0,0.9839,0.9227,0.9261,,0.9755,
+14,14-pptx-untouched-korean-report-deck,pptx,ok,6,6,0,190,181,181,46,44,0.9565,0.9757,1.0,1.0,0.6792,0.7314,,0.9023,
+15,15-pptx-edited-korean-deck-pset,pptx,ok,7,7,0,153,153,153,32,32,1.0,1.0,1.0,1.0,0.4287,0.573,,0.8092,
+16,16-pptx-edited-modern-pitch-pset,pptx,ok,8,8,0,382,382,381,100,99,0.99,0.9974,1.0,0.9434,0.8156,0.8215,,0.936,
+17,17-pptx-new-deck-ko,pptx,ok,4,4,0,202,202,202,48,48,1.0,1.0,1.0,1.0,0.5774,0.626,,0.8717,
