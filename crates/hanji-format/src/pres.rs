@@ -121,6 +121,37 @@ fn layout_value(t: &str) -> Option<String> {
     Some(if unq('"') || unq('\'') { v[1..v.len() - 1].to_string() } else { v.to_string() })
 }
 
+/// The layout `layout: v` stands for (§5.3): the one named `v`, else the one
+/// layout whose type is `v`. A name wins over a type: a layout named `obj`
+/// is `layout: obj` even when another layout's type is `obj`.
+fn find_layout<'l>(layouts: &'l [Layout], v: &str) -> Result<&'l Layout, String> {
+    if let Some(l) = layouts.iter().find(|x| x.name == v) {
+        return Ok(l);
+    }
+    let typed: Vec<&Layout> = layouts.iter().filter(|x| x.ty.as_deref() == Some(v)).collect();
+    match typed[..] {
+        [l] => Ok(l),
+        [] => {
+            let list: Vec<String> = layouts
+                .iter()
+                .map(|l| match &l.ty {
+                    Some(t) => format!("\"{}\" ({t})", l.name),
+                    None => format!("\"{}\"", l.name),
+                })
+                .collect();
+            Err(format!(
+                "layout: {v} is not a layout of this file; write a layout's name as listed, spaces included, or its type (in brackets) when only that layout has it. Layouts: {}.",
+                list.join(", ")
+            ))
+        }
+        _ => Err(format!(
+            "layout: {v} is the type of {} layouts of this file, so it does not say which; write the layout's name: {}.",
+            typed.len(),
+            quoted(&typed.iter().map(|l| l.name.clone()).collect::<Vec<_>>())
+        )),
+    }
+}
+
 /// A `key: value` line: its key.
 fn key_value(t: &str) -> Option<&str> {
     let (k, rest) = t.split_once(':')?;
@@ -444,15 +475,16 @@ fn slide(p: &mut Parser, a: usize, b: usize, slidev: Option<usize>) -> Option<(S
         }
         return None;
     };
-    let lay: Option<&Layout> = layouts.and_then(|l| l.iter().find(|x| x.name == layout));
-    if let (Some(_), None) = (layouts, lay) {
-        let msg = format!(
-            "layout: {layout} is not a layout of this file; the name is written as listed, spaces included. Layouts: {}.",
-            layout_names().unwrap()
-        );
-        p.err(i0, 1, msg);
-        return None;
-    }
+    let lay: Option<&Layout> = match layouts.map(|l| find_layout(l, &layout)).transpose() {
+        Ok(l) => l,
+        Err(msg) => {
+            p.err(i0, 1, msg);
+            return None;
+        }
+    };
+    // A layout given by its type is its name from here on: the text the
+    // write returns shows the name.
+    let layout = lay.map_or(layout, |l| l.name.clone());
     let slots: Option<Vec<String>> = lay.map(|l| l.slots.iter().cloned().chain(["notes".to_string()]).collect());
     let line = &p.lines[i0];
     let head = HeadMap { start: line.at, end: line.next, mark: line.end };

@@ -31,4 +31,9 @@ pub struct Names {
 pub struct Layout {
     pub name: String,
     pub slots: Vec<String>,
+    /// Its type code (pptx: `p:sldLayout@type`, such as `objTx`), which
+    /// `layout:` may give instead of the name when no layout has that name and
+    /// exactly one has that type (§5.3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ty: Option<String>,
 }

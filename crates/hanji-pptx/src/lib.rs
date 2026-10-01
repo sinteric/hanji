@@ -78,7 +78,11 @@ impl DeckShell {
                 self.deck
                     .layouts
                     .iter()
-                    .map(|l| Layout { name: l.name.clone(), slots: l.slots.iter().map(|s| s.name.clone()).collect() })
+                    .map(|l| Layout {
+                        name: l.name.clone(),
+                        slots: l.slots.iter().map(|s| s.name.clone()).collect(),
+                        ty: l.ty.clone(),
+                    })
                     .collect(),
             ),
             shapes: Some(self.shapes.clone()),

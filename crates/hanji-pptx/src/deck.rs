@@ -52,10 +52,54 @@ pub struct SlotInfo {
     pub fx: Option<crate::effects::EffectsXml>,
 }
 
+/// The layout types of ISO/IEC 29500-1 `ST_SlideLayoutType`.
+pub const LAYOUT_TYPES: [&str; 36] = [
+    "title",
+    "tx",
+    "twoColTx",
+    "tbl",
+    "txAndChart",
+    "chartAndTx",
+    "dgm",
+    "chart",
+    "txAndClipArt",
+    "clipArtAndTx",
+    "titleOnly",
+    "blank",
+    "txAndObj",
+    "objAndTx",
+    "objOnly",
+    "obj",
+    "txAndMedia",
+    "mediaAndTx",
+    "objOverTx",
+    "txOverObj",
+    "txAndTwoObj",
+    "twoObjAndTx",
+    "twoObjOverTx",
+    "fourObj",
+    "vertTx",
+    "clipArtAndVertTx",
+    "vertTitleAndTx",
+    "vertTitleAndTxOverChart",
+    "twoObj",
+    "objAndTwoObj",
+    "twoObjAndObj",
+    "cust",
+    "secHead",
+    "twoTxTwoObj",
+    "objTx",
+    "picTx",
+];
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct LayoutInfo {
     /// The name the text writes (`layout: Name`), unique in the deck.
     pub name: String,
+    /// Its type (`p:sldLayout@type`, `cust` when it has none), a token of
+    /// [`LAYOUT_TYPES`]: `layout:` may give it instead of the name (§5.3).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ty: Option<String>,
     pub part: String,
     pub slots: Vec<SlotInfo>,
     /// Bullets of text in shapes that are not placeholders (the master's `p:otherStyle`).
@@ -147,6 +191,8 @@ impl Deck {
                 let stem = lpart.rsplit('/').next().unwrap_or(&lpart).trim_end_matches(".xml").to_string();
                 let base = layout.child("p:cSld").and_then(|c| c.get("name")).filter(|n| !n.is_empty()).unwrap_or(stem);
                 let name = unique(&base, |n| deck.layout(n).is_some());
+                let ty = layout.get("type").unwrap_or_else(|| "cust".into());
+                let ty = LAYOUT_TYPES.contains(&ty.as_str()).then_some(ty);
                 let mut slots = vec![];
                 let phs = placeholders(&layout, &fills);
                 let ltexts = placeholder_texts(&layout, &fonts);
@@ -216,6 +262,7 @@ impl Deck {
                 }
                 deck.layouts.push(LayoutInfo {
                     name,
+                    ty,
                     part: lpart,
                     slots,
                     other,
