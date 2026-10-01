@@ -8,7 +8,7 @@ use hanji_core::{edit, rewrite, Capabilities, Engine, EngineError, ImportOptions
 use hanji_hwpx::{package, xml, HwpxEngine};
 
 const CAPS: Capabilities =
-    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: true };
+    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: true, table_place: false };
 
 fn corpus(name: &str) -> Vec<u8> {
     let path = format!("{}/corpus/{name}", env!("CARGO_MANIFEST_DIR"));
@@ -229,4 +229,7 @@ fn what_the_vocabulary_or_hwpx_cannot_hold_is_refused() {
     // hwpx has no table styles.
     let m = invalid("| {fill=#FFF0C3", "{style=\"Grid\"}\n| {fill=#FFF0C3");
     assert!(m.contains("table style"), "{m}");
+    // Nor a table's own position (docx's table-align, table-indent).
+    let m = invalid("| {fill=#FFF0C3", "{table-align=center}\n| {fill=#FFF0C3");
+    assert!(m.contains("table's own position") && m.contains("cannot be written to this file format"), "{m}");
 }

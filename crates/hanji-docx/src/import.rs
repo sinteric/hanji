@@ -386,10 +386,14 @@ impl<'a> Importer<'a> {
         // The style the table is drawn with: its own, or the file's default.
         let style_id = tbl.child("w:tblPr").and_then(|p| p.child("w:tblStyle")).and_then(|s| s.get("w:val"));
         let style_id = style_id.or_else(|| self.default_table.clone());
+        // The table's own position (§5.2); the fingerprint leaves out what the text shows.
+        let place = tbl.child("w:tblPr").map(format::tblpr_place).unwrap_or_default();
         let mut head_fp: Vec<Element> = head.iter().map(|e| (*e).clone()).collect();
         for h in &mut head_fp {
             if h.is("w:tblPr") {
-                remove_child(h, "w:tblStyle");
+                for n in std::iter::once("w:tblStyle").chain(format::shown_tblpr(h)) {
+                    remove_child(h, n);
+                }
             }
         }
         let fpv = fp(self.scope, &std::iter::once(Some(&shell)).chain(head_fp.iter().map(Some)).collect::<Vec<_>>());
@@ -469,7 +473,7 @@ impl<'a> Importer<'a> {
         if boxes.iter().flatten().all(Props::is_empty) {
             boxes.clear();
         }
-        Ok(Some(Table { style, rows, boxes }))
+        Ok(Some(Table { style, rows, boxes, place }))
     }
 
     // ------------------------------------------------------------ paragraphs

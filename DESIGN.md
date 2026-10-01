@@ -357,6 +357,19 @@ schema: 1
     its own `{…}`: `| {fill=#FFF0C3 border-bottom="2.83pt solid #7F7F7F"} **3D 프린팅 기술의 미래와 전망** {align=center size=20pt} |`.
   - a row: ` {…}` after its last `|`; the table: the `{style="Name" …}`
     line before the header row.
+  - the table itself (owner, 2026-10-01): `table-align=left|center|right`
+    and `table-indent=<length>` (negative reaches into the margin) on its
+    table line, after `style`, place the table between the margins; `align`
+    there stays the cell paragraphs'. They are written only on the table
+    line, and shown as the file stores them, only when it does; left out,
+    the table style's (or the application's) position applies. *Why as
+    stored:* the text has no table style lines to compare a value with, so
+    a value shown only when it differs from the style's could not read back
+    as written. docx: `w:tblPr/w:jc` (`start`/`end` read as left/right) and
+    `w:tblInd` in twips (`dxa`; another type, or another `w:jc` value, is
+    not shown and stays); a changed value rewrites that child only, in
+    schema order. hwpx refuses both, as it refuses table styles, and so
+    does a tracked-changes export (§10.2) for a change to them.
   - Canonical form lifts what is shared: a property every run of a paragraph
     has is on the paragraph; a value more than half of a row's cells (or of
     a table's cells and cell paragraphs) have is on the row (or table) line,

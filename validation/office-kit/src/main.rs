@@ -24,7 +24,8 @@
 //! - docx: per source, GetPut (no edit), E10 (every scripted edit in one
 //!   revision, with the formatting edits F1–F4: a first-line indent on body
 //!   paragraphs, a heading style restyled, a new style given to a
-//!   paragraph, a table's header row filled), and tracked changes: the scripted edits one at a time, as
+//!   paragraph, a table's header row filled; and a table centred between
+//!   the margins), and tracked changes: the scripted edits one at a time, as
 //!   many as the tracked export writes (it refuses some, with the reason);
 //!   and two new documents from hanji-store's blank docx.
 //! - pptx: per deck, GetPut and P9 (title, bullet, notes and shape text
@@ -317,7 +318,7 @@ fn docx(kit: &mut Kit) {
         let (blocks, _, _, _) = DocxEngine::split(&bytes, &opts).unwrap();
         let d = Doc { blocks, entries: rem.entries.clone() };
         let cx = Cx { fmt: &Docx, rem: &rem };
-        let jobs = edit_jobs(&Docx, &d, &cx, &text, &hanji_testkit::FORMATTED_EDITS, "E10", None);
+        let jobs = edit_jobs(&Docx, &d, &cx, &text, &DOCX_EDITS, "E10", None);
         let e10 = jobs.last().unwrap();
         match hanji_core::rewrite(&rem, &text, &e10.new_text, CAPS) {
             Ok(r) => {
@@ -328,7 +329,7 @@ fn docx(kit: &mut Kit) {
                     name,
                     licence,
                     "e10",
-                    "every scripted edit (E1–E9, and the formatting edits F1–F4) in one revision, as direct changes",
+                    "every scripted edit (E1–E9, the formatting edits F1–F4, and a table centred) in one revision, as direct changes",
                     &out,
                     vec![word.clone(), "Shows the edits listed below".into()],
                     notes,
@@ -1070,6 +1071,39 @@ fn mark_left(window: &str, sheet: &str, left: &[(String, hanji_core::cells::Cell
 }
 
 // ---------------------------------------------------------------- hwpx
+
+/// The docx E10 set: E1–E9, the formatting edits F1–F4, and a table
+/// centred between the margins (a table's own `table-align`, §5.2).
+const DOCX_EDITS: [(&str, EditFn); 14] = {
+    let f = hanji_testkit::FORMATTED_EDITS;
+    [f[0], f[1], f[2], f[3], f[4], f[5], f[6], f[7], f[8], f[9], f[10], f[11], f[12], ("k1_table_center", table_center)]
+};
+
+/// The first table not centred, centred (`table-align=center`).
+fn table_center(d: &Doc, _: &Cx) -> Option<Edit> {
+    let i = (0..d.blocks.len())
+        .find(|&i| matches!(&d.blocks[i], Block::Table(t) if t.place.align.as_deref() != Some("center")))?;
+    let mut blocks = d.blocks.clone();
+    let Block::Table(t) = &mut blocks[i] else { unreachable!() };
+    let was = t.place.align.clone().unwrap_or_else(|| "unset".into());
+    t.place.align = Some("center".into());
+    let first = t.rows[0].iter().find_map(|c| match c {
+        hanji_format::Cell::Text(ps) => Some(ps.iter().map(|p| p.content.text()).collect::<Vec<_>>().join(" ")),
+        _ => None,
+    });
+    let first: String =
+        first.unwrap_or_default().split_whitespace().collect::<Vec<_>>().join(" ").chars().take(30).collect();
+    let mut ed = Edit::blocks(
+        "K1 table centred",
+        format!("table-align {was} → center on the table at block {i} (first header cell {first:?}): the table sits centred between the margins"),
+        blocks,
+        hanji_testkit::ident(d.blocks.len()),
+        std::collections::HashSet::from([i]),
+        true,
+    );
+    ed.named = vec![i];
+    Some(ed)
+}
 
 const HWPX_DIR: &str = "crates/hanji-hwpx/corpus";
 

@@ -164,6 +164,7 @@ fn table_cell_escapes() {
         blocks: vec![Block::Table(Table {
             boxes: vec![],
             style: None,
+            place: TablePlace::default(),
             rows: vec![
                 vec![cell("a|b"), cell("^^"), cell(""), cell(" pad ")],
                 vec![cell("x\\"), cell("\\|"), Cell::Left, cell("$|x|$")],
@@ -293,7 +294,16 @@ fn random_doc(seed: u64) -> Document {
                             .collect()
                     })
                     .collect();
-                Block::Table(Table { boxes: vec![], style: (r.below(2) == 0).then(|| "Grid Table 4".into()), rows })
+                let place = TablePlace {
+                    align: (r.below(3) == 0).then(|| ["left", "center", "right"][r.below(3)].to_string()),
+                    indent: (r.below(3) == 0).then(|| r.below(4000) as i64 * 5 - 5000),
+                };
+                Block::Table(Table {
+                    boxes: vec![],
+                    style: (r.below(2) == 0).then(|| "Grid Table 4".into()),
+                    rows,
+                    place,
+                })
             }
             3 => Block::Keep(Keep { id: "kb".into(), kind: "table".into(), summary: "x".into() }),
             4 => Block::PageBreak,
@@ -595,6 +605,39 @@ fn table_style_line_sits_on_the_header_row() {
     assert!(e[0].contains("directly followed by the header row"), "{e:?}");
     // Trailing whitespace on the style line is not part of it.
     assert_eq!(roundtrip(&doc("{style=\"Grid Table 4\"}  \n| a |\n|---|\n")), ok);
+}
+
+#[test]
+fn a_table_line_holds_the_table_s_own_position() {
+    // Canonical order: the style, the table's own place, then the cells'.
+    let text =
+        doc("{fill=#D9D9D9 table-indent=-5.4pt style=\"Grid\" table-align=center}\n| a | b |\n|---|---|\n| c | d |\n");
+    let want =
+        doc("{style=\"Grid\" table-align=center table-indent=-5.4pt fill=#D9D9D9}\n| a | b |\n|---|---|\n| c | d |\n");
+    assert_eq!(roundtrip(&text), want);
+    let d = parse(&want).unwrap();
+    let Block::Table(t) = &d.blocks[0] else { panic!() };
+    assert_eq!(t.place, TablePlace { align: Some("center".into()), indent: Some(-540) });
+    // Alone, too; `align` stays the cell paragraphs'.
+    let only = doc("{table-align=right}\n| a |\n|---|\n");
+    assert_eq!(roundtrip(&only), only);
+    let both = doc("{table-align=right align=center}\n| a | b |\n|---|---|\n| c | d |\n");
+    let d = parse(&both).unwrap();
+    let Block::Table(t) = &d.blocks[0] else { panic!() };
+    assert_eq!(t.place.align.as_deref(), Some("right"));
+    let Cell::Text(ps) = &t.rows[1][0] else { panic!() };
+    assert_eq!(ps[0].props.get(Key::Align).and_then(Value::choice), Some("center"));
+    // Refused with the reason.
+    let e = errors("{table-align=middle}\n| a |\n|---|\n");
+    assert!(e[0].contains("table-align=middle is not one of left, center, right"), "{e:?}");
+    let e = errors("{table-indent=2cm}\n| a |\n|---|\n");
+    assert!(e[0].contains("table-indent") && e[0].contains("in points"), "{e:?}");
+    let e = errors("{table-align=left table-align=right}\n| a |\n|---|\n");
+    assert!(e[0].contains("written twice"), "{e:?}");
+    let e = errors("| {table-align=center} a |\n|---|\n");
+    assert!(e[0].contains("goes on the table line"), "{e:?}");
+    let e = errors("a {table-indent=3pt}\n");
+    assert!(e[0].contains("goes on the table line"), "{e:?}");
 }
 
 #[test]

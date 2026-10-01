@@ -6,6 +6,7 @@ use crate::diag::{quoted, Diagnostic};
 use crate::names::Names;
 use crate::props;
 use crate::styled::{self, StyleTable};
+use crate::vocab;
 use crate::SCHEMA_VERSION;
 
 /// Byte positions of every block and unit in the source text; used to
@@ -734,7 +735,7 @@ impl<'a> Parser<'a> {
     fn styled_table(&mut self, i: usize) -> Option<(Block, BlockMap, usize)> {
         let line = &self.lines[i];
         let (at, trimmed) = (line.at, line.text.trim());
-        let form = "A table line is {style=\"Name\" key=value …}, directly before the header row of the table: the table style, and what most of its cells and cell paragraphs have.";
+        let form = "A table line is {style=\"Name\" key=value …}, directly before the header row of the table: the table style, the table's own table-align and table-indent, and what most of its cells and cell paragraphs have.";
         let lead = line.indent();
         if !trimmed.ends_with('}') {
             self.err(i, lead + 1, format!("{form} It ends with }}."));
@@ -742,7 +743,7 @@ impl<'a> Parser<'a> {
         }
         let src = chars_of(&Line { text: line.text.trim_end(), ..*line }, lead);
         let inner: String = src[1..src.len() - 1].iter().map(|s| s.2).collect();
-        let (props, others) = match props::parse_list(&inner, &["style"]) {
+        let (props, others) = match props::parse_list(&inner, &["style", "table-align", "table-indent"]) {
             Ok(x) => x,
             Err((c, m)) => {
                 self.err(i, src.get(c).map_or(lead + 1, |s| s.1), format!("{m}. {form}"));
@@ -754,22 +755,41 @@ impl<'a> Parser<'a> {
             return Some((Block::PageBreak, dummy(at), i + 1));
         }
         let mut style = None;
-        if let Some((_, v, col)) = others.into_iter().next() {
-            let v = v.unwrap_or_default();
-            let tag = Tag {
-                name: "table".into(),
-                closing: false,
-                self_closing: false,
-                attrs: vec![("style".into(), v, lead + col)],
-                col: lead + 1,
-            };
-            style = self.style_attr(i, &tag, "a table style line", "table");
-            if style.is_none() {
-                return Some((Block::PageBreak, dummy(at), i + 1));
-            }
-        } else if props.is_empty() {
+        let mut place = TablePlace::default();
+        if props.is_empty() && others.is_empty() {
             self.err(i, lead + 1, format!("the braces are empty. {form}"));
             return Some((Block::PageBreak, dummy(at), i + 1));
+        }
+        for (name, v, col) in others {
+            let col = lead + col;
+            if name == "style" {
+                let v = v.unwrap_or_default();
+                let tag = Tag {
+                    name: "table".into(),
+                    closing: false,
+                    self_closing: false,
+                    attrs: vec![("style".into(), v, col)],
+                    col: lead + 1,
+                };
+                style = self.style_attr(i, &tag, "a table style line", "table");
+                if style.is_none() {
+                    return Some((Block::PageBreak, dummy(at), i + 1));
+                }
+                continue;
+            }
+            let Some(v) = v else {
+                self.err(i, col, format!("{name} needs a value: {name}=…. {form}"));
+                return Some((Block::PageBreak, dummy(at), i + 1));
+            };
+            let parsed = if name == "table-align" {
+                vocab::parse_choice(&name, &v, vocab::TABLE_ALIGN).map(|a| place.align = Some(a))
+            } else {
+                vocab::parse_length(&v, true).map(|n| place.indent = Some(n)).map_err(|m| format!("{name}: {m}"))
+            };
+            if let Err(m) = parsed {
+                self.err(i, col, format!("{m}. {form}"));
+                return Some((Block::PageBreak, dummy(at), i + 1));
+            }
         }
         let next_is_table =
             i + 1 < self.stop && self.lines.get(i + 1).is_some_and(|l| l.text.trim_start().starts_with('|'));
@@ -777,7 +797,8 @@ impl<'a> Parser<'a> {
             self.err(i, lead + 1, "a table line {…} must be directly followed by the header row of its table, with no blank line or other text between.");
             return Some((Block::PageBreak, dummy(at), i + 1));
         }
-        let (t, cells, j) = self.table_with(i + 1, style, props)?;
+        let (mut t, cells, j) = self.table_with(i + 1, style, props)?;
+        t.place = place;
         let end = self.lines[j - 1].next;
         Some((Block::Table(t), BlockMap { start: at, end, kind: BlockMapKind::Table(cells) }, j))
     }
@@ -808,7 +829,7 @@ impl<'a> Parser<'a> {
                 row_props.push(rp);
             }
         }
-        let empty = |style| Table { style, rows: vec![], boxes: vec![] };
+        let empty = |style| Table { style, rows: vec![], boxes: vec![], place: TablePlace::default() };
         if self.errors.len() > before {
             return Some((empty(style), vec![], j));
         }
@@ -975,7 +996,7 @@ impl<'a> Parser<'a> {
         if boxes.iter().flatten().all(Props::is_empty) {
             boxes.clear();
         }
-        Some((Table { style, rows, boxes }, maps, j))
+        Some((Table { style, rows, boxes, place: TablePlace::default() }, maps, j))
     }
 
     /// A row's cells, and the `{…}` after its last `|`.

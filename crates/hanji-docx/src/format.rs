@@ -13,10 +13,10 @@ use std::collections::HashMap;
 use hanji_core::{Part, StyleSet};
 use hanji_format::styled::{self, StyleTable};
 use hanji_format::vocab::{Border, Color, ColorBase, Fill, LineSpacing, Tint};
-use hanji_format::{Key, Props, StyleLine, Value};
+use hanji_format::{Key, Props, StyleLine, TablePlace, Value};
 use hanji_package::package;
 
-use crate::ooxml::{insert_ordered, remove_child, PPR_ORDER, RPR_ORDER, TCPR_ORDER};
+use crate::ooxml::{insert_ordered, remove_child, PPR_ORDER, RPR_ORDER, TBLPR_ORDER, TCPR_ORDER};
 use crate::xml::{self, Element, Node};
 
 // ---------------------------------------------------------------- theme
@@ -312,6 +312,62 @@ pub fn tcpr_props(tcpr: &Element) -> Props {
         p.set(Key::Valign, Value::Choice(a.into()));
     }
     p
+}
+
+/// What a `w:tblPr` sets for the table's own position (§5.2): `w:jc`
+/// (`start`/`end` as left/right) and a `w:tblInd` in twips. Another `w:jc`
+/// value, and a `w:tblInd` of another type (`nil`, `auto`, `pct`), are not
+/// shown and stay as the file has them.
+pub fn tblpr_place(tblpr: &Element) -> TablePlace {
+    let align = tblpr.child("w:jc").and_then(|j| j.get("w:val")).and_then(|v| {
+        Some(match v.as_str() {
+            "left" | "start" => "left",
+            "center" => "center",
+            "right" | "end" => "right",
+            _ => return None,
+        })
+    });
+    let indent = tblpr
+        .child("w:tblInd")
+        .filter(|i| i.get("w:type").is_none_or(|t| t == "dxa"))
+        .and_then(|i| i.get("w:w"))
+        .and_then(|v| v.parse::<i64>().ok())
+        .map(|tw| tw * 5);
+    TablePlace { align: align.map(String::from), indent }
+}
+
+/// The `w:tblPr` children [`tblpr_place`] shows: a fingerprint leaves them out.
+pub fn shown_tblpr(tblpr: &Element) -> Vec<&'static str> {
+    let p = tblpr_place(tblpr);
+    [p.align.is_some().then_some("w:jc"), p.indent.is_some().then_some("w:tblInd")].into_iter().flatten().collect()
+}
+
+/// Writes the table's own position on `tblpr` where it differs from what
+/// it shows: each changed child only, in schema order, keeping its other
+/// attributes. `None` removes the child: the table style's, or the
+/// application's, position applies.
+pub fn set_tblpr_place(tblpr: &mut Element, want: &TablePlace) {
+    let shown = tblpr_place(tblpr);
+    if shown.align != want.align {
+        match &want.align {
+            Some(a) => child(tblpr, "w:jc", TBLPR_ORDER).set("w:val", a),
+            None => {
+                remove_child(tblpr, "w:jc");
+            }
+        }
+    }
+    if shown.indent != want.indent {
+        match want.indent {
+            Some(n) => {
+                let ind = child(tblpr, "w:tblInd", TBLPR_ORDER);
+                ind.set("w:w", &twips(n));
+                ind.set("w:type", "dxa");
+            }
+            None => {
+                remove_child(tblpr, "w:tblInd");
+            }
+        }
+    }
 }
 
 /// The `w:pPr` children the text shows (§5.2): a fingerprint leaves them out.

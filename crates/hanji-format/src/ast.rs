@@ -442,6 +442,33 @@ pub struct Table {
     /// when no cell has any. Row and table lines are a way of writing them
     /// (lifting, §5.2).
     pub boxes: Vec<Vec<Props>>,
+    /// The table's own position, from its table line.
+    pub place: TablePlace,
+}
+
+/// Where a table itself sits between the margins (§5.2): `table-align`
+/// and `table-indent` on its table line. `None` is what the file's table
+/// style (or the application) gives.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
+pub struct TablePlace {
+    /// `left`, `center` or `right` ([`crate::vocab::TABLE_ALIGN`]).
+    pub align: Option<String>,
+    /// The indent from the leading margin, hundredths of a point (negative
+    /// reaches into the margin).
+    pub indent: Option<i64>,
+}
+
+impl TablePlace {
+    pub fn is_empty(&self) -> bool {
+        self.align.is_none() && self.indent.is_none()
+    }
+
+    /// Canonical text, no braces: `table-align=… table-indent=…`.
+    pub fn write(&self) -> String {
+        let a = self.align.as_ref().map(|a| format!("table-align={a}"));
+        let i = self.indent.map(|n| format!("table-indent={}", crate::vocab::length_text(n)));
+        a.into_iter().chain(i).collect::<Vec<_>>().join(" ")
+    }
 }
 
 impl Table {

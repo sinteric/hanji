@@ -18,7 +18,7 @@ use hanji_format::{Atom, Cell, Inline, Marks, Unit};
 use hanji_package::{package, xml};
 
 pub const CAPS: Capabilities =
-    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: true };
+    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: true, table_place: true };
 
 /// What the harness needs from an engine.
 pub trait Format {

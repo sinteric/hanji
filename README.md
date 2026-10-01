@@ -184,6 +184,8 @@ These are not supported yet:
   placeholders, and the docx engine refuses new ones on export.
 - Editing header, footer and section text.
 - Nested tables. They stay placeholders.
+- hwpx: a table's own position (`table-align`, `table-indent`), which docx
+  writes.
 - xlsx: cell styles beyond formats, new charts, renaming or deleting sheets,
   tables and columns, column insert and delete.
 - Preview and rendering.
