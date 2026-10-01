@@ -184,4 +184,15 @@ For the details of each engine, see [crates/README.md](crates/README.md).
 
 ## License
 
-TBD.
+Licensed under either of
+
+- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
+- MIT license ([LICENSE-MIT](LICENSE-MIT))
+
+at your option. Third-party material in the repository and the binaries is
+listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). The test files
+keep their own licences, which each corpus's `SOURCES.md` names.
+
+Unless you explicitly state otherwise, any contribution you intentionally
+submit for inclusion in the work, as defined in the Apache-2.0 license, is
+dual licensed as above, without any additional terms or conditions.
