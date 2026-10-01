@@ -1191,6 +1191,18 @@ project's own interface so it can be replaced.
 Each engine must build and pass the same tests on a native target and on
 wasm32 (§10 item 4).
 
+Preview (decided 2026-10-01 by
+[prototype/preview/SPIKE.md](prototype/preview/SPIKE.md)): the in-binary
+engines render it, one SVG per page: rdocx for docx, rpptx for pptx, rhwp for
+hwp/hwpx. hanji subsets the fonts used on each page and embeds them; today
+rdocx/rpptx embed whole fonts (47–81 MB per Korean page) and rhwp none. xlsx
+previews as an HTML grid (later). LibreOffice is not a preview engine; it
+served only as a reference (worst on hwpx through H2Orestart). Found there:
+rpptx 0.12.1 refuses a deck over a schema-valid animation list (`duplicate
+p:attrName`), and its public render has no CJK fonts; rdocx 0.14 reaches
+Hangul through Noto CJK SC coverage fallback, not the requested East Asian
+font.
+
 Found by [prototype/tracked-changes/SPIKE.md](prototype/tracked-changes/SPIKE.md):
 rhwp 0.8.6 drops hwpx track-change marks on save without a loss report, and a
 plain rdocx 0.14 open/save of one corpus file wrote a `styles.xml` that is not
@@ -1226,7 +1238,7 @@ v0.7.3; "lossless … regarding content", not formatting).
 | Rule 1 (preserve) | GetPut on a real corpus per engine: import → export with no edit is XML-equivalent per part |
 | PutGet | After each fluency-test edit, re-import shows exactly the written text |
 | Validity | Every export opens in Word / PowerPoint / Excel / Hancom with no repair prompt; schema validation alone is not enough (a schema-valid file Word rejected: office_oxide #208). Checked by hand for the office-kit in all four, 2026-09-29/30 (§11). CI validates every corpus source and kit file against the ISO/IEC 29500 transitional schemas plus the rules outside them that Office enforces (`validation/ooxml-schema`): necessary, not sufficient, and it caught the synthetic pitch deck PowerPoint repaired (kit v8, 44–46) |
-| Rule 5 (fidelity) | Per-page SSIM of our preview against the native application's own PDF export — Word, PowerPoint, Excel, Hancom — not against LibreOffice |
+| Rule 5 (fidelity) | Layout of our preview against the native application's own PDF export — Word, PowerPoint, Excel, Hancom — not against LibreOffice: words aligned over the whole document, scored on text present (T), page (P), line starts (L) and position (W), combined as (T·P·L·W)^¼ per file; content-masked SSIM as the secondary check for what has no text. Raw per-page SSIM is not used: a blank page scores 0.868 and a correct layout in a substitute font 0.57 ([prototype/preview/SPIKE.md](prototype/preview/SPIKE.md)). xlsx (an HTML grid) is checked on shown values and formats instead |
 | Presentation geometry | GetPut per object on the pptx corpus: every `a:xfrm` (and every absent one) unchanged after import → export; PutGet after box, z-order, group and new-object edits; the office-kit shows moved, resized and added objects where the text puts them, in PowerPoint |
 | Rule 8 (the model sees it) | Per corpus deck, every object on a slide appears in the text: slots, shapes with or without text, lines, groups and their objects, `<keep/>` lines |
 | Direct formatting (proposed, §10 item 10) | GetPut per element on every corpus file: a formatting value left as shown leaves its `pPr`/`rPr`/`tcPr`, `paraPrIDRef`/`charPrIDRef`/`borderFillIDRef`, `spPr`/`p:style` and cell `s` untouched (the kit holds this on the text for 28 of 29 flow files); PutGet after fill, border, colour, size, indent and style-line edits, the returned text canonical (lifting, snapped widths); a new style line adds one style (docx `w:style`, hwpx `hh:style` with its `paraPr`/`charPr`) and a taken name is refused; a `format` op changes only the properties it writes, on the cells of its range; each vocabulary value opens as written in Word, Hancom, PowerPoint and Excel (the office-kit) |
@@ -1372,9 +1384,17 @@ v0.7.3; "lossless … regarding content", not formatting).
   workbook model (`wb.py`), not a real xlsx engine, on workbooks of a few
   hundred rows (150–190 data rows), not 100k. GPT, Gemini and Haiku are still
   untested.
-- The 90% fidelity target is not yet a defined metric beyond "per-page SSIM
-  against the native app's PDF"; the threshold per page and per corpus is
-  unset.
+- The 90% fidelity target is now the layout metric of §9, but its threshold
+  is **proposed**, not adopted
+  ([prototype/preview/SPIKE.md](prototype/preview/SPIKE.md)): per format, a
+  mean file layout score ≥ 0.90, ≥ 80% of files ≥ 0.85, the page count exact
+  on ≥ 90% of files, and ≥ 90% of pages ≥ 0.80 (a page without text by
+  content-SSIM ≥ 0.80). Calibration: a 1 px shift scores 0.987, 5 pt 0.898,
+  a blank page 0. On 30 baseline files (2026-10-01) no engine meets it: rhwp
+  0.836, rpptx 0.791 (it refuses one deck), rdocx 0.619. Five of the nine
+  Word PDFs were printed in markup view and must be re-exported. Fonts are
+  unchecked: no Hancom or Microsoft font was available, and a font-identity
+  sub-score, visible substitutions and a font policy are proposed there too.
 - rdocx/rpptx capability statements are the project's own claims.
 
 ## 12. References

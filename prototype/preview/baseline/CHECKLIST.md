@@ -1,0 +1,51 @@
+# hanji preview baseline: checklist
+
+30 files (9 docx, 8 pptx, 5 xlsx, 8 hwpx), all hanji exports (hanji `0024cc3`). Each PDF is scored page by page against hanji's preview of the same file.
+
+For each file:
+
+1. Open it in the app in the table. Don't edit it, and don't accept any prompt that would change the file (enable editing is fine; no "convert", "update fields/links", "repair and save").
+2. If a repair or recovery prompt appears, note it in `checklist.csv` (`repair_prompt` = yes, plus what it said) and still save the PDF of what opens.
+3. Save as PDF with default settings, using the expected PDF name (same stem as the file):
+   - Word: File → Save As → PDF.
+   - PowerPoint: File → Export → PDF, full-page slides, one slide per page.
+   - Excel: File → Save As → PDF, Options → "Entire workbook".
+   - Hancom: 파일 → PDF로 저장하기 (Save as PDF).
+4. Close without saving the original.
+
+Fill in `VERSIONS.txt` once (OS and each app's version). Send all 30 PDFs, `VERSIONS.txt` and `checklist.csv` back in one zip.
+
+`MANIFEST.json` (for scoring, no action needed) gives each file's source, kind, edits and SHA-256; `edits/` holds the edit lists (file numbers inside them are the office-kit's, not this zip's).
+
+| File | App | Expected PDF |
+|---|---|---|
+| 01-docx-untouched-korean-report.docx | Word | 01-docx-untouched-korean-report.pdf |
+| 02-docx-untouched-sample-docx.docx | Word | 02-docx-untouched-sample-docx.pdf |
+| 03-docx-untouched-docx4j-tables.docx | Word | 03-docx-untouched-docx4j-tables.pdf |
+| 04-docx-untouched-testword-various.docx | Word | 04-docx-untouched-testword-various.pdf |
+| 05-docx-untouched-loadandsave.docx | Word | 05-docx-untouched-loadandsave.pdf |
+| 06-docx-edited-korean-report-e10.docx | Word | 06-docx-edited-korean-report-e10.pdf |
+| 07-docx-edited-sample-docx-e10.docx | Word | 07-docx-edited-sample-docx-e10.pdf |
+| 08-docx-new-report-en.docx | Word | 08-docx-new-report-en.pdf |
+| 09-docx-new-report-ko.docx | Word | 09-docx-new-report-ko.pdf |
+| 10-pptx-untouched-korean-deck.pptx | PowerPoint | 10-pptx-untouched-korean-deck.pdf |
+| 11-pptx-untouched-shapes.pptx | PowerPoint | 11-pptx-untouched-shapes.pdf |
+| 12-pptx-untouched-onlyoffice-sample.pptx | PowerPoint | 12-pptx-untouched-onlyoffice-sample.pdf |
+| 13-pptx-untouched-modern-pitch.pptx | PowerPoint | 13-pptx-untouched-modern-pitch.pdf |
+| 14-pptx-untouched-korean-report-deck.pptx | PowerPoint | 14-pptx-untouched-korean-report-deck.pdf |
+| 15-pptx-edited-korean-deck-pset.pptx | PowerPoint | 15-pptx-edited-korean-deck-pset.pdf |
+| 16-pptx-edited-modern-pitch-pset.pptx | PowerPoint | 16-pptx-edited-modern-pitch-pset.pdf |
+| 17-pptx-new-deck-ko.pptx | PowerPoint | 17-pptx-new-deck-ko.pdf |
+| 18-xlsx-untouched-korean-sales.xlsx | Excel | 18-xlsx-untouched-korean-sales.pdf |
+| 19-xlsx-untouched-monthly-budget.xlsx | Excel | 19-xlsx-untouched-monthly-budget.pdf |
+| 20-xlsx-untouched-tables-forms.xlsx | Excel | 20-xlsx-untouched-tables-forms.pdf |
+| 21-xlsx-edited-korean-sales-ops.xlsx | Excel | 21-xlsx-edited-korean-sales-ops.pdf |
+| 22-xlsx-new-sales-ko.xlsx | Excel | 22-xlsx-new-sales-ko.pdf |
+| 23-hwpx-untouched-fdi-2025q2.hwpx | Hancom | 23-hwpx-untouched-fdi-2025q2.pdf |
+| 24-hwpx-untouched-hy-002.hwpx | Hancom | 24-hwpx-untouched-hy-002.pdf |
+| 25-hwpx-untouched-hcar-001.hwpx | Hancom | 25-hwpx-untouched-hcar-001.pdf |
+| 26-hwpx-untouched-footnote-01.hwpx | Hancom | 26-hwpx-untouched-footnote-01.pdf |
+| 27-hwpx-untouched-para-001.hwpx | Hancom | 27-hwpx-untouched-para-001.pdf |
+| 28-hwpx-edited-footnote-01-e10.hwpx | Hancom | 28-hwpx-edited-footnote-01-e10.pdf |
+| 29-hwpx-edited-hy-002-e10.hwpx | Hancom | 29-hwpx-edited-hy-002-e10.pdf |
+| 30-hwpx-new-plan-ko.hwpx | Hancom | 30-hwpx-new-plan-ko.pdf |

@@ -1,0 +1,16 @@
+# Local inputs and outputs of a rerun (README.md). Never commit the native PDFs, their rasters,
+# full render dirs or font files.
+/native
+/native-png
+/renders
+/lo-pdf
+/lo-pdf-hwpx
+/fontsub
+/out
+/venv
+/fonts/files
+/fonts/cache
+/fonts/cache-nanum
+/engines/*/target
+__pycache__/
+*.pdf

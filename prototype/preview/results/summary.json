@@ -1,0 +1,2233 @@
+{
+ "thresholds": {
+  "corpus_mean": 0.9,
+  "file_min": 0.85,
+  "share_files": 0.8,
+  "page_exact": 0.9,
+  "page_good": 0.8,
+  "share_pages_good": 0.9
+ },
+ "table": [
+  {
+   "candidate": "libreoffice",
+   "format": "docx",
+   "scope": "all",
+   "files": 9,
+   "layout": 0.822,
+   "T": 0.988,
+   "P": 0.989,
+   "L": 0.983,
+   "W": 0.535,
+   "W_rel": 0.701,
+   "content_ssim": 0.537,
+   "raw_ssim": 0.865,
+   "page_mismatch": 1,
+   "no_render": 0,
+   "rule5": {
+    "mean": 0.822,
+    "share_files_ge": 0.444,
+    "page_exact": 0.889,
+    "share_pages_ge_080": 0.583,
+    "min_page": 0.0,
+    "pass": false
+   }
+  },
+  {
+   "candidate": "libreoffice",
+   "format": "docx",
+   "scope": "clean",
+   "files": 4,
+   "layout": 0.781,
+   "T": 1.0,
+   "P": 0.991,
+   "L": 0.961,
+   "W": 0.472,
+   "W_rel": 0.682,
+   "content_ssim": 0.363,
+   "raw_ssim": 0.901,
+   "page_mismatch": 0,
+   "no_render": 0,
+   "rule5": {
+    "mean": 0.781,
+    "share_files_ge": 0.5,
+    "page_exact": 1.0,
+    "share_pages_ge_080": 0.429,
+    "min_page": 0.0,
+    "pass": false
+   }
+  },
+  {
+   "candidate": "libreoffice",
+   "format": "pptx",
+   "scope": "all",
+   "files": 8,
+   "layout": 0.924,
+   "T": 0.998,
+   "P": 1.0,
+   "L": 0.982,
+   "W": 0.76,
+   "W_rel": 0.796,
+   "content_ssim": 0.535,
+   "raw_ssim": 0.949,
+   "page_mismatch": 0,
+   "no_render": 0,
+   "rule5": {
+    "mean": 0.924,
+    "share_files_ge": 0.75,
+    "page_exact": 1.0,
+    "share_pages_ge_080": 0.811,
+    "min_page": 0.436,
+    "pass": false
+   }
+  },
+  {
+   "candidate": "libreoffice",
+   "format": "xlsx",
+   "scope": "all",
+   "files": 5,
+   "layout": 0.585,
+   "T": 0.932,
+   "P": 0.725,
+   "L": 0.941,
+   "W": 0.333,
+   "W_rel": 0.488,
+   "content_ssim": 0.235,
+   "raw_ssim": 0.832,
+   "page_mismatch": 1,
+   "no_render": 0,
+   "rule5": {
+    "mean": 0.585,
+    "share_files_ge": 0.4,
+    "page_exact": 0.8,
+    "share_pages_ge_080": 0.086,
+    "min_page": 0.0,
+    "pass": false
+   }
+  },
+  {
+   "candidate": "libreoffice-h2orestart",
+   "format": "hwpx",
+   "scope": "all",
+   "files": 8,
+   "layout": 0.285,
+   "T": 0.927,
+   "P": 0.551,
+   "L": 0.643,
+   "W": 0.071,
+   "W_rel": 0.165,
+   "content_ssim": 0.157,
+   "raw_ssim": 0.586,
+   "page_mismatch": 5,
+   "no_render": 0,
+   "rule5": {
+    "mean": 0.285,
+    "share_files_ge": 0.0,
+    "page_exact": 0.375,
+    "share_pages_ge_080": 0.0,
+    "min_page": 0.0,
+    "pass": false
+   }
+  },
+  {
+   "candidate": "rdocx",
+   "format": "docx",
+   "scope": "all",
+   "files": 9,
+   "layout": 0.619,
+   "T": 0.967,
+   "P": 0.961,
+   "L": 0.936,
+   "W": 0.222,
+   "W_rel": 0.504,
+   "content_ssim": 0.462,
+   "raw_ssim": 0.801,
+   "page_mismatch": 2,
+   "no_render": 0,
+   "rule5": {
+    "mean": 0.619,
+    "share_files_ge": 0.0,
+    "page_exact": 0.778,
+    "share_pages_ge_080": 0.074,
+    "min_page": 0.0,
+    "pass": false
+   }
+  },
+  {
+   "candidate": "rdocx",
+   "format": "docx",
+   "scope": "clean",
+   "files": 4,
+   "layout": 0.607,
+   "T": 0.971,
+   "P": 0.947,
+   "L": 0.905,
+   "W": 0.229,
+   "W_rel": 0.432,
+   "content_ssim": 0.168,
+   "raw_ssim": 0.738,
+   "page_mismatch": 1,
+   "no_render": 0,
+   "rule5": {
+    "mean": 0.607,
+    "share_files_ge": 0.0,
+    "page_exact": 0.75,
+    "share_pages_ge_080": 0.1,
+    "min_page": 0.0,
+    "pass": false
+   }
+  },
+  {
+   "candidate": "rpptx",
+   "format": "pptx",
+   "scope": "all",
+   "files": 8,
+   "layout": 0.791,
+   "T": 0.871,
+   "P": 0.875,
+   "L": 0.866,
+   "W": 0.611,
+   "W_rel": 0.66,
+   "content_ssim": 0.469,
+   "raw_ssim": 0.837,
+   "page_mismatch": 1,
+   "no_render": 1,
+   "rule5": {
+    "mean": 0.791,
+    "share_files_ge": 0.625,
+    "page_exact": 0.875,
+    "share_pages_ge_080": 0.604,
+    "min_page": 0.0,
+    "pass": false
+   }
+  },
+  {
+   "candidate": "rhwp",
+   "format": "hwpx",
+   "scope": "all",
+   "files": 8,
+   "layout": 0.836,
+   "T": 0.99,
+   "P": 0.851,
+   "L": 0.951,
+   "W": 0.713,
+   "W_rel": 0.854,
+   "content_ssim": 0.396,
+   "raw_ssim": 0.801,
+   "page_mismatch": 1,
+   "no_render": 0,
+   "rule5": {
+    "mean": 0.836,
+    "share_files_ge": 0.625,
+    "page_exact": 0.875,
+    "share_pages_ge_080": 0.605,
+    "min_page": 0.0,
+    "pass": false
+   }
+  }
+ ],
+ "files": [
+  {
+   "candidate": "libreoffice",
+   "file": "01",
+   "name": "01-docx-untouched-korean-report",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 2,
+   "n_render_pages": 2,
+   "page_diff": 0,
+   "T": 0.9917,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.3378,
+   "W_rel": 0.5749,
+   "layout": 0.7608,
+   "content_ssim": 0.8041,
+   "raw_ssim": 0.9317,
+   "baseline_note": "Word markup view on 2/2 pages: rescaled",
+   "worst_pages": [
+    [
+     1,
+     0.6649,
+     [
+      -7.1,
+      9.8
+     ]
+    ],
+    [
+     2,
+     0.8638,
+     [
+      -5.2,
+      3.8
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "02",
+   "name": "02-docx-untouched-sample-docx",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 5,
+   "n_render_pages": 5,
+   "page_diff": 0,
+   "T": 0.9958,
+   "P": 0.9854,
+   "L": 1.0,
+   "W": 0.8431,
+   "W_rel": 0.9592,
+   "layout": 0.9537,
+   "content_ssim": 0.7093,
+   "raw_ssim": 0.8785,
+   "baseline_note": "Word markup view on 5/5 pages: rescaled",
+   "worst_pages": [
+    [
+     2,
+     0.7313,
+     [
+      -1.6,
+      -13.5
+     ]
+    ],
+    [
+     5,
+     0.9531,
+     [
+      -1.6,
+      -0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "03",
+   "name": "03-docx-untouched-docx4j-tables",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 3,
+   "n_render_pages": 3,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 0.9711,
+   "L": 1.0,
+   "W": 0.1445,
+   "W_rel": 0.7052,
+   "layout": 0.612,
+   "content_ssim": 0.3304,
+   "raw_ssim": 0.7712,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     2,
+     0.0,
+     [
+      -0.6,
+      -37.3
+     ]
+    ],
+    [
+     3,
+     0.0,
+     [
+      0.1,
+      -112.8
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "04",
+   "name": "04-docx-untouched-testword-various",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 2,
+   "n_render_pages": 2,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 0.9932,
+   "L": 1.0,
+   "W": 0.6581,
+   "W_rel": 0.8371,
+   "layout": 0.8992,
+   "content_ssim": 0.3647,
+   "raw_ssim": 0.9562,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     2,
+     0.5973,
+     [
+      0.1,
+      -28.1
+     ]
+    ],
+    [
+     1,
+     0.9495,
+     [
+      0.1,
+      -1.3
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "05",
+   "name": "05-docx-untouched-loadandsave",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 3,
+   "n_render_pages": 4,
+   "page_diff": 1,
+   "T": 0.9132,
+   "P": 0.9518,
+   "L": 1.0,
+   "W": 0.4926,
+   "W_rel": 0.4072,
+   "layout": 0.8089,
+   "content_ssim": 0.4286,
+   "raw_ssim": 0.5951,
+   "baseline_note": "Word markup view on 3/3 pages: rescaled",
+   "worst_pages": [
+    [
+     4,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     2,
+     0.2892,
+     [
+      -3.8,
+      -25.9
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "06",
+   "name": "06-docx-edited-korean-report-e10",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 2,
+   "n_render_pages": 2,
+   "page_diff": 0,
+   "T": 0.9915,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.3688,
+   "W_rel": 0.6668,
+   "layout": 0.7776,
+   "content_ssim": 0.7915,
+   "raw_ssim": 0.9311,
+   "baseline_note": "Word markup view on 2/2 pages: rescaled",
+   "worst_pages": [
+    [
+     2,
+     0.6914,
+     [
+      -1.8,
+      13.4
+     ]
+    ],
+    [
+     1,
+     0.736,
+     [
+      -7.1,
+      8.0
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "07",
+   "name": "07-docx-edited-sample-docx-e10",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 4,
+   "n_render_pages": 4,
+   "page_diff": 0,
+   "T": 0.9958,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.8861,
+   "W_rel": 0.9671,
+   "layout": 0.9692,
+   "content_ssim": 0.6498,
+   "raw_ssim": 0.8458,
+   "baseline_note": "Word markup view on 4/4 pages: rescaled",
+   "worst_pages": [
+    [
+     1,
+     0.9564,
+     [
+      -1.7,
+      -1.2
+     ]
+    ],
+    [
+     4,
+     0.9602,
+     [
+      -1.6,
+      -0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "08",
+   "name": "08-docx-new-report-en",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 1,
+   "n_render_pages": 1,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 1.0,
+   "L": 0.9231,
+   "W": 0.8728,
+   "W_rel": 0.8742,
+   "layout": 0.9474,
+   "content_ssim": 0.6031,
+   "raw_ssim": 0.9723,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     1,
+     0.9305,
+     [
+      0.1,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "09",
+   "name": "09-docx-new-report-ko",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 1,
+   "n_render_pages": 1,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 1.0,
+   "L": 0.92,
+   "W": 0.2137,
+   "W_rel": 0.3135,
+   "layout": 0.6659,
+   "content_ssim": 0.1541,
+   "raw_ssim": 0.9057,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     1,
+     0.5815,
+     [
+      -0.0,
+      -23.6
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "10",
+   "name": "10-pptx-untouched-korean-deck",
+   "format": "pptx",
+   "status": "ok",
+   "n_native_pages": 7,
+   "n_render_pages": 7,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.7979,
+   "W_rel": 0.8136,
+   "layout": 0.9451,
+   "content_ssim": 0.2156,
+   "raw_ssim": 0.9464,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     1,
+     0.8345,
+     [
+      -1.4,
+      1.3
+     ]
+    ],
+    [
+     3,
+     0.9069,
+     [
+      2.0,
+      0.2
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "11",
+   "name": "11-pptx-untouched-shapes",
+   "format": "pptx",
+   "status": "ok",
+   "n_native_pages": 6,
+   "n_render_pages": 6,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.9615,
+   "W_rel": 0.9736,
+   "layout": 0.9902,
+   "content_ssim": 0.8641,
+   "raw_ssim": 0.9854,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     2,
+     0.9748,
+     [
+      -0.4,
+      1.3
+     ]
+    ],
+    [
+     1,
+     0.9856,
+     [
+      -0.5,
+      0.1
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "12",
+   "name": "12-pptx-untouched-onlyoffice-sample",
+   "format": "pptx",
+   "status": "ok",
+   "n_native_pages": 7,
+   "n_render_pages": 7,
+   "page_diff": 0,
+   "T": 0.9873,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.8982,
+   "W_rel": 0.9342,
+   "layout": 0.9704,
+   "content_ssim": 0.7401,
+   "raw_ssim": 0.9026,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     4,
+     0.9306,
+     [
+      -0.7,
+      4.1
+     ]
+    ],
+    [
+     2,
+     0.9441,
+     [
+      -0.6,
+      1.3
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "13",
+   "name": "13-pptx-untouched-modern-pitch",
+   "format": "pptx",
+   "status": "ok",
+   "n_native_pages": 8,
+   "n_render_pages": 8,
+   "page_diff": 0,
+   "T": 0.9988,
+   "P": 1.0,
+   "L": 0.9365,
+   "W": 0.5089,
+   "W_rel": 0.5948,
+   "layout": 0.8306,
+   "content_ssim": 0.7758,
+   "raw_ssim": 0.9507,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     8,
+     0.4362,
+     [
+      36.8,
+      1.7
+     ]
+    ],
+    [
+     1,
+     0.5679,
+     [
+      29.3,
+      3.1
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "14",
+   "name": "14-pptx-untouched-korean-report-deck",
+   "format": "pptx",
+   "status": "ok",
+   "n_native_pages": 6,
+   "n_render_pages": 6,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.8292,
+   "W_rel": 0.8455,
+   "layout": 0.9542,
+   "content_ssim": 0.6815,
+   "raw_ssim": 0.9611,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     6,
+     0.8134,
+     [
+      -0.5,
+      -0.5
+     ]
+    ],
+    [
+     1,
+     0.9409,
+     [
+      -1.6,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "15",
+   "name": "15-pptx-edited-korean-deck-pset",
+   "format": "pptx",
+   "status": "ok",
+   "n_native_pages": 7,
+   "n_render_pages": 7,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.7821,
+   "W_rel": 0.7899,
+   "layout": 0.9404,
+   "content_ssim": 0.1581,
+   "raw_ssim": 0.9515,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     1,
+     0.8611,
+     [
+      2.1,
+      1.3
+     ]
+    ],
+    [
+     2,
+     0.8984,
+     [
+      0.4,
+      0.2
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "16",
+   "name": "16-pptx-edited-modern-pitch-pset",
+   "format": "pptx",
+   "status": "ok",
+   "n_native_pages": 8,
+   "n_render_pages": 8,
+   "page_diff": 0,
+   "T": 0.9987,
+   "P": 1.0,
+   "L": 0.9189,
+   "W": 0.4435,
+   "W_rel": 0.5458,
+   "layout": 0.7987,
+   "content_ssim": 0.6781,
+   "raw_ssim": 0.9501,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     8,
+     0.4362,
+     [
+      36.8,
+      1.7
+     ]
+    ],
+    [
+     3,
+     0.582,
+     [
+      13.2,
+      0.3
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "17",
+   "name": "17-pptx-new-deck-ko",
+   "format": "pptx",
+   "status": "ok",
+   "n_native_pages": 4,
+   "n_render_pages": 4,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.8553,
+   "W_rel": 0.8683,
+   "layout": 0.9617,
+   "content_ssim": 0.1678,
+   "raw_ssim": 0.9473,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     4,
+     0.9197,
+     [
+      -4.0,
+      1.8
+     ]
+    ],
+    [
+     2,
+     0.9254,
+     [
+      0.6,
+      0.9
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "18",
+   "name": "18-xlsx-untouched-korean-sales",
+   "format": "xlsx",
+   "status": "ok",
+   "n_native_pages": 5,
+   "n_render_pages": 5,
+   "page_diff": 0,
+   "T": 0.9054,
+   "P": 0.7688,
+   "L": 0.9344,
+   "W": 0.0543,
+   "W_rel": 0.1566,
+   "layout": 0.4335,
+   "content_ssim": 0.1512,
+   "raw_ssim": 0.8586,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     2,
+     0.0,
+     [
+      -17.7,
+      -89.0
+     ]
+    ],
+    [
+     3,
+     0.0,
+     [
+      -268.3,
+      73.1
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "19",
+   "name": "19-xlsx-untouched-monthly-budget",
+   "format": "xlsx",
+   "status": "ok",
+   "n_native_pages": 2,
+   "n_render_pages": 2,
+   "page_diff": 0,
+   "T": 0.8901,
+   "P": 1.0,
+   "L": 0.9915,
+   "W": 0.8482,
+   "W_rel": 0.8539,
+   "layout": 0.9302,
+   "content_ssim": 0.5767,
+   "raw_ssim": 0.9453,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     2,
+     0.0,
+     [
+      -476.3,
+      62.6
+     ]
+    ],
+    [
+     1,
+     0.9428,
+     [
+      0.4,
+      -0.3
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "20",
+   "name": "20-xlsx-untouched-tables-forms",
+   "format": "xlsx",
+   "status": "ok",
+   "n_native_pages": 21,
+   "n_render_pages": 15,
+   "page_diff": -6,
+   "T": 0.9683,
+   "P": 0.0844,
+   "L": 0.968,
+   "W": 0.0512,
+   "W_rel": 0.4409,
+   "layout": 0.2522,
+   "content_ssim": 0.1082,
+   "raw_ssim": 0.5479,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     2,
+     0.0,
+     [
+      327.5,
+      -27.6
+     ]
+    ],
+    [
+     4,
+     0.0,
+     [
+      94.7,
+      0.4
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "21",
+   "name": "21-xlsx-edited-korean-sales-ops",
+   "format": "xlsx",
+   "status": "ok",
+   "n_native_pages": 5,
+   "n_render_pages": 5,
+   "page_diff": 0,
+   "T": 0.9042,
+   "P": 0.773,
+   "L": 0.933,
+   "W": 0.0577,
+   "W_rel": 0.1626,
+   "layout": 0.4405,
+   "content_ssim": 0.1496,
+   "raw_ssim": 0.8567,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     2,
+     0.0,
+     [
+      -18.0,
+      -89.0
+     ]
+    ],
+    [
+     3,
+     0.0,
+     [
+      -268.3,
+      73.1
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice",
+   "file": "22",
+   "name": "22-xlsx-new-sales-ko",
+   "format": "xlsx",
+   "status": "ok",
+   "n_native_pages": 2,
+   "n_render_pages": 2,
+   "page_diff": 0,
+   "T": 0.9915,
+   "P": 1.0,
+   "L": 0.88,
+   "W": 0.6553,
+   "W_rel": 0.8238,
+   "layout": 0.8696,
+   "content_ssim": 0.1874,
+   "raw_ssim": 0.9492,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     1,
+     0.8193,
+     [
+      -13.1,
+      0.6
+     ]
+    ],
+    [
+     2,
+     0.8336,
+     [
+      -2.7,
+      -5.9
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice-h2orestart",
+   "file": "23",
+   "name": "23-hwpx-untouched-fdi-2025q2",
+   "format": "hwpx",
+   "status": "ok",
+   "n_native_pages": 9,
+   "n_render_pages": 14,
+   "page_diff": 5,
+   "T": 0.634,
+   "P": 0.0551,
+   "L": 0.363,
+   "W": 0.0071,
+   "W_rel": 0.1622,
+   "layout": 0.0973,
+   "content_ssim": 0.1132,
+   "raw_ssim": 0.3509,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     2,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     3,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice-h2orestart",
+   "file": "24",
+   "name": "24-hwpx-untouched-hy-002",
+   "format": "hwpx",
+   "status": "ok",
+   "n_native_pages": 2,
+   "n_render_pages": 3,
+   "page_diff": 1,
+   "T": 0.97,
+   "P": 0.7088,
+   "L": 0.7375,
+   "W": 0.005,
+   "W_rel": 0.1461,
+   "layout": 0.2241,
+   "content_ssim": 0.09,
+   "raw_ssim": 0.3692,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     2,
+     0.0,
+     [
+      -1.1,
+      252.5
+     ]
+    ],
+    [
+     3,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice-h2orestart",
+   "file": "25",
+   "name": "25-hwpx-untouched-hcar-001",
+   "format": "hwpx",
+   "status": "ok",
+   "n_native_pages": 6,
+   "n_render_pages": 10,
+   "page_diff": 4,
+   "T": 0.9806,
+   "P": 0.0142,
+   "L": 0.8062,
+   "W": 0.1946,
+   "W_rel": 0.3595,
+   "layout": 0.2163,
+   "content_ssim": 0.0943,
+   "raw_ssim": 0.3858,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     2,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     3,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice-h2orestart",
+   "file": "26",
+   "name": "26-hwpx-untouched-footnote-01",
+   "format": "hwpx",
+   "status": "ok",
+   "n_native_pages": 6,
+   "n_render_pages": 7,
+   "page_diff": 1,
+   "T": 0.944,
+   "P": 0.2301,
+   "L": 0.6818,
+   "W": 0.0069,
+   "W_rel": 0.1204,
+   "layout": 0.1787,
+   "content_ssim": 0.2714,
+   "raw_ssim": 0.691,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     2,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     3,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice-h2orestart",
+   "file": "27",
+   "name": "27-hwpx-untouched-para-001",
+   "format": "hwpx",
+   "status": "ok",
+   "n_native_pages": 3,
+   "n_render_pages": 4,
+   "page_diff": 1,
+   "T": 1.0,
+   "P": 0.6751,
+   "L": 0.2293,
+   "W": 0.0017,
+   "W_rel": 0.0996,
+   "layout": 0.1271,
+   "content_ssim": 0.112,
+   "raw_ssim": 0.4581,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     2,
+     0.0,
+     [
+      27.8,
+      214.8
+     ]
+    ],
+    [
+     3,
+     0.0,
+     [
+      -21.0,
+      369.8
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice-h2orestart",
+   "file": "28",
+   "name": "28-hwpx-edited-footnote-01-e10",
+   "format": "hwpx",
+   "status": "ok",
+   "n_native_pages": 7,
+   "n_render_pages": 7,
+   "page_diff": 0,
+   "T": 0.9422,
+   "P": 0.8526,
+   "L": 0.6822,
+   "W": 0.0071,
+   "W_rel": 0.1924,
+   "layout": 0.2496,
+   "content_ssim": 0.2739,
+   "raw_ssim": 0.8425,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     1,
+     0.0,
+     [
+      -18.9,
+      -24.6
+     ]
+    ],
+    [
+     3,
+     0.0,
+     [
+      -5.5,
+      35.6
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice-h2orestart",
+   "file": "29",
+   "name": "29-hwpx-edited-hy-002-e10",
+   "format": "hwpx",
+   "status": "ok",
+   "n_native_pages": 3,
+   "n_render_pages": 3,
+   "page_diff": 0,
+   "T": 0.9743,
+   "P": 0.8808,
+   "L": 0.6753,
+   "W": 0.1129,
+   "W_rel": 0.0201,
+   "layout": 0.5058,
+   "content_ssim": 0.1521,
+   "raw_ssim": 0.7009,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     3,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     1,
+     0.2005,
+     [
+      -25.2,
+      40.1
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "libreoffice-h2orestart",
+   "file": "30",
+   "name": "30-hwpx-new-plan-ko",
+   "format": "hwpx",
+   "status": "ok",
+   "n_native_pages": 2,
+   "n_render_pages": 2,
+   "page_diff": 0,
+   "T": 0.9725,
+   "P": 0.9932,
+   "L": 0.967,
+   "W": 0.231,
+   "W_rel": 0.2158,
+   "layout": 0.6815,
+   "content_ssim": 0.1465,
+   "raw_ssim": 0.8895,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     1,
+     0.5296,
+     [
+      -2.2,
+      28.5
+     ]
+    ],
+    [
+     2,
+     0.7546,
+     [
+      -7.2,
+      2.9
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rdocx",
+   "file": "01",
+   "name": "01-docx-untouched-korean-report",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 2,
+   "n_render_pages": 2,
+   "page_diff": 0,
+   "T": 0.9833,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.3391,
+   "W_rel": 0.5415,
+   "layout": 0.7599,
+   "content_ssim": 0.803,
+   "raw_ssim": 0.9314,
+   "baseline_note": "Word markup view on 2/2 pages: rescaled",
+   "worst_pages": [
+    [
+     1,
+     0.6685,
+     [
+      -9.2,
+      9.1
+     ]
+    ],
+    [
+     2,
+     0.8419,
+     [
+      -5.9,
+      3.8
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rdocx",
+   "file": "02",
+   "name": "02-docx-untouched-sample-docx",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 5,
+   "n_render_pages": 5,
+   "page_diff": 0,
+   "T": 0.9995,
+   "P": 0.9122,
+   "L": 0.932,
+   "W": 0.0532,
+   "W_rel": 0.6301,
+   "layout": 0.4612,
+   "content_ssim": 0.7276,
+   "raw_ssim": 0.8923,
+   "baseline_note": "Word markup view on 5/5 pages: rescaled",
+   "worst_pages": [
+    [
+     4,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     1,
+     0.2303,
+     [
+      -2.0,
+      -42.9
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rdocx",
+   "file": "03",
+   "name": "03-docx-untouched-docx4j-tables",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 3,
+   "n_render_pages": 3,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 0.9711,
+   "L": 1.0,
+   "W": 0.1224,
+   "W_rel": 0.7052,
+   "layout": 0.5871,
+   "content_ssim": 0.2675,
+   "raw_ssim": 0.7504,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     2,
+     0.0,
+     [
+      2.0,
+      -37.3
+     ]
+    ],
+    [
+     3,
+     0.0,
+     [
+      0.1,
+      -174.4
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rdocx",
+   "file": "04",
+   "name": "04-docx-untouched-testword-various",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 2,
+   "n_render_pages": 5,
+   "page_diff": 3,
+   "T": 0.8836,
+   "P": 0.8169,
+   "L": 0.9333,
+   "W": 0.3609,
+   "W_rel": 0.3735,
+   "layout": 0.7022,
+   "content_ssim": 0.1204,
+   "raw_ssim": 0.3751,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     3,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     4,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rdocx",
+   "file": "05",
+   "name": "05-docx-untouched-loadandsave",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 3,
+   "n_render_pages": 4,
+   "page_diff": 1,
+   "T": 0.8478,
+   "P": 0.9481,
+   "L": 0.9383,
+   "W": 0.257,
+   "W_rel": 0.3925,
+   "layout": 0.6635,
+   "content_ssim": 0.4948,
+   "raw_ssim": 0.6399,
+   "baseline_note": "Word markup view on 3/3 pages: rescaled",
+   "worst_pages": [
+    [
+     4,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     3,
+     0.4731,
+     [
+      -5.1,
+      12.4
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rdocx",
+   "file": "06",
+   "name": "06-docx-edited-korean-report-e10",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 2,
+   "n_render_pages": 2,
+   "page_diff": 0,
+   "T": 0.9915,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.3737,
+   "W_rel": 0.5891,
+   "layout": 0.7802,
+   "content_ssim": 0.7899,
+   "raw_ssim": 0.9305,
+   "baseline_note": "Word markup view on 2/2 pages: rescaled",
+   "worst_pages": [
+    [
+     1,
+     0.7044,
+     [
+      -10.2,
+      5.0
+     ]
+    ],
+    [
+     2,
+     0.7317,
+     [
+      -5.0,
+      6.9
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rdocx",
+   "file": "07",
+   "name": "07-docx-edited-sample-docx-e10",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 4,
+   "n_render_pages": 4,
+   "page_diff": 0,
+   "T": 0.9995,
+   "P": 1.0,
+   "L": 0.932,
+   "W": 0.058,
+   "W_rel": 0.6521,
+   "layout": 0.4822,
+   "content_ssim": 0.6671,
+   "raw_ssim": 0.863,
+   "baseline_note": "Word markup view on 4/4 pages: rescaled",
+   "worst_pages": [
+    [
+     1,
+     0.2339,
+     [
+      -2.1,
+      -42.9
+     ]
+    ],
+    [
+     4,
+     0.4878,
+     [
+      -1.8,
+      -17.8
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rdocx",
+   "file": "08",
+   "name": "08-docx-new-report-en",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 1,
+   "n_render_pages": 1,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 1.0,
+   "L": 0.8182,
+   "W": 0.4079,
+   "W_rel": 0.4772,
+   "layout": 0.76,
+   "content_ssim": 0.1435,
+   "raw_ssim": 0.9234,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     1,
+     0.6936,
+     [
+      0.1,
+      -4.0
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rdocx",
+   "file": "09",
+   "name": "09-docx-new-report-ko",
+   "format": "docx",
+   "status": "ok",
+   "n_native_pages": 1,
+   "n_render_pages": 1,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 1.0,
+   "L": 0.8679,
+   "W": 0.0233,
+   "W_rel": 0.1722,
+   "layout": 0.3773,
+   "content_ssim": 0.1421,
+   "raw_ssim": 0.9024,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     1,
+     0.2726,
+     [
+      13.0,
+      -35.5
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rpptx",
+   "file": "10",
+   "name": "10-pptx-untouched-korean-deck",
+   "format": "pptx",
+   "status": "ok",
+   "n_native_pages": 7,
+   "n_render_pages": 7,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.4939,
+   "W_rel": 0.6172,
+   "layout": 0.8383,
+   "content_ssim": 0.1954,
+   "raw_ssim": 0.9294,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     5,
+     0.6263,
+     [
+      -7.6,
+      19.9
+     ]
+    ],
+    [
+     2,
+     0.6276,
+     [
+      -2.5,
+      19.5
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rpptx",
+   "file": "11",
+   "name": "11-pptx-untouched-shapes",
+   "format": "pptx",
+   "status": "ok",
+   "n_native_pages": 6,
+   "n_render_pages": 6,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.9711,
+   "W_rel": 0.9816,
+   "layout": 0.9927,
+   "content_ssim": 0.894,
+   "raw_ssim": 0.9877,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     2,
+     0.9759,
+     [
+      -0.4,
+      -0.2
+     ]
+    ],
+    [
+     1,
+     0.9921,
+     [
+      -0.4,
+      0.1
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rpptx",
+   "file": "12",
+   "name": "12-pptx-untouched-onlyoffice-sample",
+   "format": "pptx",
+   "status": "no_render",
+   "n_native_pages": 7,
+   "n_render_pages": 0,
+   "page_diff": -7,
+   "T": 0.0,
+   "P": 0.0,
+   "L": 0.0,
+   "W": 0.0,
+   "W_rel": null,
+   "layout": 0.0,
+   "content_ssim": 0.0,
+   "raw_ssim": 0.0,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     1,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     2,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rpptx",
+   "file": "13",
+   "name": "13-pptx-untouched-modern-pitch",
+   "format": "pptx",
+   "status": "ok",
+   "n_native_pages": 8,
+   "n_render_pages": 8,
+   "page_diff": 0,
+   "T": 0.9977,
+   "P": 1.0,
+   "L": 0.9839,
+   "W": 0.9227,
+   "W_rel": 0.9261,
+   "layout": 0.9755,
+   "content_ssim": 0.8869,
+   "raw_ssim": 0.9758,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     8,
+     0.7826,
+     [
+      -0.2,
+      0.1
+     ]
+    ],
+    [
+     7,
+     0.8936,
+     [
+      -0.4,
+      0.3
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rpptx",
+   "file": "14",
+   "name": "14-pptx-untouched-korean-report-deck",
+   "format": "pptx",
+   "status": "ok",
+   "n_native_pages": 6,
+   "n_render_pages": 6,
+   "page_diff": 0,
+   "T": 0.9757,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.6792,
+   "W_rel": 0.7314,
+   "layout": 0.9023,
+   "content_ssim": 0.6697,
+   "raw_ssim": 0.9524,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     4,
+     0.7482,
+     [
+      -2.3,
+      11.4
+     ]
+    ],
+    [
+     6,
+     0.7553,
+     [
+      -3.2,
+      2.5
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rpptx",
+   "file": "15",
+   "name": "15-pptx-edited-korean-deck-pset",
+   "format": "pptx",
+   "status": "ok",
+   "n_native_pages": 7,
+   "n_render_pages": 7,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.4287,
+   "W_rel": 0.573,
+   "layout": 0.8092,
+   "content_ssim": 0.1781,
+   "raw_ssim": 0.9436,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     4,
+     0.5949,
+     [
+      -7.5,
+      19.9
+     ]
+    ],
+    [
+     2,
+     0.7236,
+     [
+      -3.0,
+      8.3
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rpptx",
+   "file": "16",
+   "name": "16-pptx-edited-modern-pitch-pset",
+   "format": "pptx",
+   "status": "ok",
+   "n_native_pages": 8,
+   "n_render_pages": 8,
+   "page_diff": 0,
+   "T": 0.9974,
+   "P": 1.0,
+   "L": 0.9434,
+   "W": 0.8156,
+   "W_rel": 0.8215,
+   "layout": 0.936,
+   "content_ssim": 0.779,
+   "raw_ssim": 0.9739,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     7,
+     0.5848,
+     [
+      -3.6,
+      3.4
+     ]
+    ],
+    [
+     8,
+     0.7826,
+     [
+      -0.2,
+      0.1
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rpptx",
+   "file": "17",
+   "name": "17-pptx-new-deck-ko",
+   "format": "pptx",
+   "status": "ok",
+   "n_native_pages": 4,
+   "n_render_pages": 4,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 1.0,
+   "L": 1.0,
+   "W": 0.5774,
+   "W_rel": 0.626,
+   "layout": 0.8717,
+   "content_ssim": 0.1453,
+   "raw_ssim": 0.9319,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     4,
+     0.265,
+     [
+      17.8,
+      18.8
+     ]
+    ],
+    [
+     1,
+     0.6287,
+     [
+      2.6,
+      7.2
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rhwp",
+   "file": "23",
+   "name": "23-hwpx-untouched-fdi-2025q2",
+   "format": "hwpx",
+   "status": "ok",
+   "n_native_pages": 9,
+   "n_render_pages": 9,
+   "page_diff": 0,
+   "T": 0.9931,
+   "P": 0.9939,
+   "L": 0.9874,
+   "W": 0.9184,
+   "W_rel": 0.9571,
+   "layout": 0.9727,
+   "content_ssim": 0.5672,
+   "raw_ssim": 0.797,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     1,
+     0.7921,
+     [
+      -1.0,
+      -11.6
+     ]
+    ],
+    [
+     9,
+     0.8683,
+     [
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rhwp",
+   "file": "24",
+   "name": "24-hwpx-untouched-hy-002",
+   "format": "hwpx",
+   "status": "ok",
+   "n_native_pages": 2,
+   "n_render_pages": 2,
+   "page_diff": 0,
+   "T": 0.9704,
+   "P": 1.0,
+   "L": 0.9317,
+   "W": 0.9793,
+   "W_rel": 0.9798,
+   "layout": 0.97,
+   "content_ssim": 0.5775,
+   "raw_ssim": 0.8265,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     1,
+     0.9345,
+     [
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     2,
+     0.9775,
+     [
+      0.1,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rhwp",
+   "file": "25",
+   "name": "25-hwpx-untouched-hcar-001",
+   "format": "hwpx",
+   "status": "ok",
+   "n_native_pages": 6,
+   "n_render_pages": 6,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 0.9979,
+   "L": 1.0,
+   "W": 0.8104,
+   "W_rel": 0.9524,
+   "layout": 0.9483,
+   "content_ssim": 0.3657,
+   "raw_ssim": 0.7497,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     5,
+     0.0,
+     [
+      0.2,
+      -33.8
+     ]
+    ],
+    [
+     4,
+     0.9423,
+     [
+      -0.4,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rhwp",
+   "file": "26",
+   "name": "26-hwpx-untouched-footnote-01",
+   "format": "hwpx",
+   "status": "ok",
+   "n_native_pages": 6,
+   "n_render_pages": 6,
+   "page_diff": 0,
+   "T": 0.9933,
+   "P": 0.9772,
+   "L": 0.9231,
+   "W": 0.2983,
+   "W_rel": 0.6865,
+   "layout": 0.719,
+   "content_ssim": 0.347,
+   "raw_ssim": 0.8412,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     5,
+     0.0,
+     [
+      -0.0,
+      -174.0
+     ]
+    ],
+    [
+     1,
+     0.3571,
+     [
+      -0.1,
+      -25.2
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rhwp",
+   "file": "27",
+   "name": "27-hwpx-untouched-para-001",
+   "format": "hwpx",
+   "status": "ok",
+   "n_native_pages": 3,
+   "n_render_pages": 3,
+   "page_diff": 0,
+   "T": 1.0,
+   "P": 1.0,
+   "L": 0.9434,
+   "W": 0.8879,
+   "W_rel": 0.8887,
+   "layout": 0.9567,
+   "content_ssim": 0.5353,
+   "raw_ssim": 0.845,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     1,
+     0.8545,
+     [
+      -0.1,
+      -0.1
+     ]
+    ],
+    [
+     3,
+     0.9955,
+     [
+      -0.1,
+      -0.1
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rhwp",
+   "file": "28",
+   "name": "28-hwpx-edited-footnote-01-e10",
+   "format": "hwpx",
+   "status": "ok",
+   "n_native_pages": 7,
+   "n_render_pages": 6,
+   "page_diff": -1,
+   "T": 0.9907,
+   "P": 0.2665,
+   "L": 0.88,
+   "W": 0.0503,
+   "W_rel": 0.5731,
+   "layout": 0.3288,
+   "content_ssim": 0.2206,
+   "raw_ssim": 0.6897,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     1,
+     0.0,
+     [
+      0.0,
+      -40.6
+     ]
+    ],
+    [
+     3,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rhwp",
+   "file": "29",
+   "name": "29-hwpx-edited-hy-002-e10",
+   "format": "hwpx",
+   "status": "ok",
+   "n_native_pages": 3,
+   "n_render_pages": 3,
+   "page_diff": 0,
+   "T": 0.9747,
+   "P": 0.5757,
+   "L": 0.9427,
+   "W": 0.8831,
+   "W_rel": 0.9199,
+   "layout": 0.8267,
+   "content_ssim": 0.2974,
+   "raw_ssim": 0.7322,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     3,
+     0.0,
+     [
+      0.0,
+      0.0
+     ]
+    ],
+    [
+     2,
+     0.703,
+     [
+      0.0,
+      -6.6
+     ]
+    ]
+   ]
+  },
+  {
+   "candidate": "rhwp",
+   "file": "30",
+   "name": "30-hwpx-new-plan-ko",
+   "format": "hwpx",
+   "status": "ok",
+   "n_native_pages": 2,
+   "n_render_pages": 2,
+   "page_diff": 0,
+   "T": 0.9938,
+   "P": 0.9934,
+   "L": 1.0,
+   "W": 0.8739,
+   "W_rel": 0.8756,
+   "layout": 0.9638,
+   "content_ssim": 0.2612,
+   "raw_ssim": 0.9231,
+   "baseline_note": "",
+   "worst_pages": [
+    [
+     1,
+     0.9513,
+     [
+      -0.6,
+      -0.1
+     ]
+    ],
+    [
+     2,
+     0.9576,
+     [
+      -0.7,
+      -2.9
+     ]
+    ]
+   ]
+  }
+ ]
+}

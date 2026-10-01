@@ -1,0 +1,10 @@
+file,name,format,status,n_native_pages,n_render_pages,page_diff,native_chars,render_chars,matched_chars,native_words,matched_words,word_recall,T,P,L,W,W_rel,F,layout,baseline_note
+01,01-docx-untouched-korean-report,docx,ok,2,2,0,240,240,236,95,93,0.9789,0.9833,1.0,1.0,0.3391,0.5415,,0.7599,Word markup view on 2/2 pages: rescaled
+02,02-docx-untouched-sample-docx,docx,ok,5,5,0,1055,1054,1054,205,205,1.0,0.9995,0.9122,0.932,0.0532,0.6301,,0.4612,Word markup view on 5/5 pages: rescaled
+03,03-docx-untouched-docx4j-tables,docx,ok,3,3,0,779,779,779,277,277,1.0,1.0,0.9711,1.0,0.1224,0.7052,,0.5871,
+04,04-docx-untouched-testword-various,docx,ok,2,5,3,567,687,554,147,142,0.966,0.8836,0.8169,0.9333,0.3609,0.3735,,0.7022,
+05,05-docx-untouched-loadandsave,docx,ok,3,4,1,630,526,490,101,77,0.7624,0.8478,0.9481,0.9383,0.257,0.3925,,0.6635,Word markup view on 3/3 pages: rescaled
+06,06-docx-edited-korean-report-e10,docx,ok,2,2,0,234,234,232,85,83,0.9765,0.9915,1.0,1.0,0.3737,0.5891,,0.7802,Word markup view on 2/2 pages: rescaled
+07,07-docx-edited-sample-docx-e10,docx,ok,4,4,0,1075,1074,1074,205,205,1.0,0.9995,1.0,0.932,0.058,0.6521,,0.4822,Word markup view on 4/4 pages: rescaled
+08,08-docx-new-report-en,docx,ok,1,1,0,282,282,282,57,57,1.0,1.0,1.0,0.8182,0.4079,0.4772,,0.76,
+09,09-docx-new-report-ko,docx,ok,1,1,0,125,125,125,50,50,1.0,1.0,1.0,0.8679,0.0233,0.1722,,0.3773,

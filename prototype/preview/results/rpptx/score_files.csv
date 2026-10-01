@@ -1,0 +1,9 @@
+file,name,format,n_native,n_render,page_mismatch,score,score_content,score_norm,worst_page,worst_ssim,status
+10,10-pptx-untouched-korean-deck,pptx,7,7,False,0.9294,0.1954,0.0034,5,0.8549,ok
+11,11-pptx-untouched-shapes,pptx,6,6,False,0.9877,0.894,0.8079,5,0.9795,ok
+12,12-pptx-untouched-onlyoffice-sample,pptx,7,0,True,0.0,0.0,0.0,1,0.0,no_render
+13,13-pptx-untouched-modern-pitch,pptx,8,8,False,0.9758,0.8869,0.7639,7,0.8871,ok
+14,14-pptx-untouched-korean-report-deck,pptx,6,6,False,0.9524,0.6697,0.3464,6,0.9171,ok
+15,15-pptx-edited-korean-deck-pset,pptx,7,7,False,0.9436,0.1781,0.0068,4,0.8525,ok
+16,16-pptx-edited-modern-pitch-pset,pptx,8,8,False,0.9739,0.779,0.6608,6,0.9149,ok
+17,17-pptx-new-deck-ko,pptx,4,4,False,0.9319,0.1453,0.0,2,0.903,ok

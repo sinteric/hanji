@@ -1,0 +1,10 @@
+file,name,format,n_native,n_render,page_mismatch,score,score_content,score_norm,worst_page,worst_ssim,status
+01,01-docx-untouched-korean-report,docx,2,2,False,0.9314,0.803,0.0,1,0.8806,ok
+02,02-docx-untouched-sample-docx,docx,5,5,False,0.8923,0.7276,0.0,1,0.7919,ok
+03,03-docx-untouched-docx4j-tables,docx,3,3,False,0.7504,0.2675,0.0,2,0.6776,ok
+04,04-docx-untouched-testword-various,docx,2,5,True,0.3751,0.1204,0.0307,3,0.0,ok
+05,05-docx-untouched-loadandsave,docx,3,4,True,0.6399,0.4948,0.0,4,0.0,ok
+06,06-docx-edited-korean-report-e10,docx,2,2,False,0.9305,0.7899,0.0,2,0.9245,ok
+07,07-docx-edited-sample-docx-e10,docx,4,4,False,0.863,0.6671,0.0,1,0.7936,ok
+08,08-docx-new-report-en,docx,1,1,False,0.9234,0.1435,0.0,1,0.9234,ok
+09,09-docx-new-report-ko,docx,1,1,False,0.9024,0.1421,0.0,1,0.9024,ok
