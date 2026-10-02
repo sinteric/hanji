@@ -13,7 +13,7 @@
 # Arguments are passed through (hanji-mcp [--store DIR]).
 set -eu
 
-version=0.1.0
+version=0.2.0
 repo=sinteric/hanji
 base=${HANJI_MCP_DOWNLOAD_BASE:-https://github.com/$repo/releases/download/v$version}
 
