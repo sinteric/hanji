@@ -20,12 +20,12 @@ jobs:
       - name: a Korean font for the preview tests
         run: fc-list :lang=ko file | grep -q /usr/share/fonts/ || { sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk; }
       - run: cargo test --workspace
-      # The CLI and the MCP server are native only (files, processes, stdio).
+      # The CLI is native only (files, processes, stdio).
       - name: build for wasm32-unknown-unknown
-        run: cargo build --target wasm32-unknown-unknown --workspace --exclude hanji-cli --exclude hanji-mcp
+        run: cargo build --target wasm32-unknown-unknown --workspace --exclude hanji-cli
       - uses: bytecodealliance/actions/wasmtime/setup@v1
       - name: test on wasm32-wasip1 (wasmtime)
-        run: cargo test --target wasm32-wasip1 --workspace --exclude hanji-cli --exclude hanji-mcp
+        run: cargo test --target wasm32-wasip1 --workspace --exclude hanji-cli
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: wasmtime run --dir=${{ github.workspace }}
 
@@ -56,14 +56,14 @@ jobs:
         run: python3 validation/ooxml-schema/validate.py -q target/office-kit
 
   # The Claude Code and Codex plugin (plugins/hanji): manifests, marketplace,
-  # skills, and the MCP server started from each tool's configured command.
+  # the skill, and the hanji CLI run through the skill's launcher.
   plugins:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --locked -p hanji-mcp
+      - run: cargo build --locked -p hanji-cli
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -74,18 +74,24 @@ jobs:
         run: |
           claude plugin validate --strict plugins/hanji
           claude plugin validate --strict .
-      - name: Claude Code installs it and sees its skill and MCP server
+      - name: Claude Code installs it and sees its skill and no MCP server
         run: |
           claude plugin marketplace add "$PWD"
           claude plugin install hanji@hanji
           claude plugin details hanji | tee "$RUNNER_TEMP/details.txt"
           grep -E 'Skills \(1\) +office-documents' "$RUNNER_TEMP/details.txt"
-          grep -E 'MCP servers \(1\) +hanji' "$RUNNER_TEMP/details.txt"
-      - name: Codex installs it and sees its skill and MCP server
+          grep -E 'MCP servers \(0\)' "$RUNNER_TEMP/details.txt"
+      - name: Codex installs it and sees its skill
         run: |
           codex plugin marketplace add "$PWD"
           codex plugin add hanji@hanji
-          codex mcp get hanji --json | tee "$RUNNER_TEMP/codex-mcp.json"
           codex debug prompt-input hi | grep -q 'hanji:office-documents'
-      - name: the MCP server answers from each plugin's command
-        run: PATH="$PWD/target/debug:$PATH" python3 scripts/check-plugins.py --codex-mcp-json "$RUNNER_TEMP/codex-mcp.json"
+          if codex mcp get hanji; then exit 1; fi
+      - name: the skill's launcher runs the CLI, from the checkout and from each installed copy
+        run: |
+          launcher=skills/office-documents/scripts/hanji
+          claude_copy=$(find ~/.claude/plugins -path "*/$launcher" -type f | head -n 1)
+          codex_copy=$(find ~/.codex/plugins -path "*/$launcher" -type f | head -n 1)
+          test -n "$claude_copy" && test -n "$codex_copy"
+          PATH="$PWD/target/debug:$PATH" python3 scripts/check-plugins.py \
+            --installed "${claude_copy%/"$launcher"}" --installed "${codex_copy%/"$launcher"}"

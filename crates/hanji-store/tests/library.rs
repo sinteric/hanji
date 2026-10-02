@@ -361,7 +361,7 @@ fn export_shows_what_it_would_surface_and_needs_an_acknowledgement() {
         "{:?}",
         e.detail.surfaced
     );
-    assert!(e.message.contains("acknowledge_surfaced"), "{}", e.message);
+    assert!(e.message.contains("--acknowledge-surfaced"), "{}", e.message);
     let (out, _) = ws.export_bytes(&o.doc_id, None, &ACK).unwrap();
     assert_eq!(out.surfaced, e.detail.surfaced);
     // Tracked changes (§10.2): with no edit since the file was opened, the same bytes.

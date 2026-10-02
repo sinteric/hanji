@@ -1,8 +1,9 @@
 name: release
-# Builds hanji-mcp and hanji for each platform the plugin launcher
-# (plugins/hanji/scripts/hanji-mcp) downloads for. A v* tag publishes them
-# as a GitHub release; a pull request that touches the plugin or this file
-# builds them and checks the launcher against the built archive.
+# Builds hanji for each platform the plugin launcher
+# (plugins/hanji/skills/office-documents/scripts/hanji) downloads for. A v*
+# tag publishes them as a GitHub release; a pull request that touches the
+# plugin or this file builds them and checks the launcher against the built
+# archive.
 on:
   push:
     tags: ["v*"]
@@ -43,14 +44,14 @@ jobs:
         with:
           python-version: "3.12"
       - name: build
-        run: cargo build --release --locked --target ${{ matrix.target }} -p hanji-mcp -p hanji-cli
+        run: cargo build --release --locked --target ${{ matrix.target }} -p hanji-cli
       - name: package
         run: |
-          version=$(sed -n 's/^version=//p' plugins/hanji/scripts/hanji-mcp)
+          version=$(sed -n 's/^version=//p' plugins/hanji/skills/office-documents/scripts/hanji)
           name=hanji-$version-${{ matrix.target }}
           exe=; [[ ${{ matrix.target }} == *windows* ]] && exe=.exe
           mkdir -p dist/$name
-          cp target/${{ matrix.target }}/release/hanji-mcp$exe target/${{ matrix.target }}/release/hanji$exe dist/$name/
+          cp target/${{ matrix.target }}/release/hanji$exe dist/$name/
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md "dist/$name/"
           cd dist
           tar -czf $name.tar.gz $name
@@ -63,10 +64,10 @@ jobs:
           XDG_CACHE_HOME: ${{ runner.temp }}/cache
         run: |
           cat dist/*.sha256 > dist/SHA256SUMS
-          if command -v hanji-mcp; then echo "hanji-mcp is on PATH: the launcher would not download"; exit 1; fi
+          if command -v hanji; then echo "hanji is on PATH: the launcher would not download"; exit 1; fi
           # file:///C:/... on Windows, file:///home/... elsewhere
           dist=$(cd dist && { pwd -W 2>/dev/null || pwd; })
-          HANJI_MCP_DOWNLOAD_BASE="file:///${dist#/}" python scripts/check-plugins.py
+          HANJI_DOWNLOAD_BASE="file:///${dist#/}" python scripts/check-plugins.py
           rm dist/SHA256SUMS
       - uses: actions/upload-artifact@v4
         with:
@@ -83,7 +84,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: the tag is the plugin's version
         run: |
-          version=$(sed -n 's/^version=//p' plugins/hanji/scripts/hanji-mcp)
+          version=$(sed -n 's/^version=//p' plugins/hanji/skills/office-documents/scripts/hanji)
           test "$GITHUB_REF_NAME" = "v$version" || { echo "tag $GITHUB_REF_NAME, plugin version $version"; exit 1; }
       - uses: actions/download-artifact@v4
         with:

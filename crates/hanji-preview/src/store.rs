@@ -1,4 +1,4 @@
-//! The preview of a stored document, for the CLI and the MCP server: the
+//! The preview of a stored document, for the CLI: the
 //! revision is exported in memory (§2 rule 4: the bytes export would
 //! write; the original file is never read again), rendered, and written as
 //! HTML, SVG or PNG files.

@@ -1,6 +1,6 @@
-//! hanji's documents and revisions, and the operations the `hanji` CLI and
-//! the MCP server share (DESIGN.md §4): open, new, read, edit, write, range
-//! operations, validate, export, re-import, history and diff.
+//! hanji's documents and revisions, and the operations of the `hanji` CLI
+//! (DESIGN.md §4): open, new, read, edit, write, range operations,
+//! validate, export, re-import, history and diff.
 //!
 //! A document is stored as what §4 says is the truth: for each revision its
 //! model text and its remainder (serialized as the core serializes it), and
@@ -45,8 +45,8 @@ use merge::{line_of, Hunk, Merged};
 /// The date tracked changes carry: fixed, so the same revision exports the same bytes (§8).
 const TRACKED_DATE: &str = "2026-01-01T00:00:00Z";
 
-/// How to work with hanji and the format, written for a model (the MCP
-/// server's instructions, `hanji guide`).
+/// How to work with hanji and the format, written for a model (`hanji
+/// guide`).
 pub const GUIDE: &str = include_str!("guide.md");
 
 /// What made a revision.
@@ -820,7 +820,7 @@ impl<S: Storage> Workspace<S> {
             let mut e = Error::new(
                 Code::SurfacedNotAcknowledged,
                 format!(
-                    "the file would carry content nobody may have reviewed (§8):\n{}\nShow this list to the person; export again with acknowledge_surfaced once they have seen it, or remove the content first.",
+                    "the file would carry content nobody may have reviewed (§8):\n{}\nShow this list to the person; export again with --acknowledge-surfaced once they have seen it, or remove the content first.",
                     list.join("\n")
                 ),
             );

@@ -1,6 +1,6 @@
 [package]
 name = "hanji-store"
-description = "hanji documents and revisions, and the operations the CLI and the MCP server share"
+description = "hanji documents and revisions, and the operations of the CLI"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

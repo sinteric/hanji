@@ -1,23 +1,24 @@
 #!/usr/bin/env python3
 """Checks the Claude Code and Codex plugin in plugins/hanji (CI runs it).
 
-    scripts/check-plugins.py [--codex-mcp-json FILE]
+    scripts/check-plugins.py [--installed PLUGIN_DIR]...
 
 - The manifests and the marketplace parse; their names and versions agree
   with each other, with the workspace version and with the launcher's
   version (it downloads that release).
 - Each skill's SKILL.md has front matter whose name is its directory's.
-- The MCP server starts from each plugin's configured command, as each tool
-  resolves it (Claude Code: ${CLAUDE_PLUGIN_ROOT} substituted, the project as
-  working directory; Codex: the plugin root as working directory, and only
-  the environment Codex passes), and answers initialize and tools/list with
-  the tools crates/hanji-mcp defines.
-- With --codex-mcp-json, the same for the server config Codex itself
-  resolved (`codex mcp get hanji --json` after installing the plugin).
+- The plugin ships no MCP server (no .mcp.json, no codex.mcp.json, no
+  mcpServers in a manifest or the marketplace entry) and no top-level bin/
+  (claude.ai and Cowork refuse a plugin that has one).
+- The skill's launcher, run as the skill tells the agent to (`sh
+  <skill dir>/scripts/hanji …` from the project's directory), runs the hanji
+  CLI of this version: `--version`, `guide` (the text of
+  crates/hanji-store/src/guide.md), and new, read and export of a document.
+- With --installed, the same for the launcher in each installed copy of the
+  plugin (the directory Claude Code or Codex installed it to).
 
-The launcher picks hanji-mcp from PATH, $HANJI_MCP_BIN or the release
-download, so put a built hanji-mcp on PATH (or set HANJI_MCP_DOWNLOAD_BASE)
-before running this.
+The launcher picks hanji from $HANJI_BIN, PATH or the release download, so
+put a built hanji on PATH (or set HANJI_DOWNLOAD_BASE) before running this.
 """
 import json
 import os
@@ -25,13 +26,10 @@ import re
 import subprocess
 import sys
 import tempfile
-import threading
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PLUGIN = os.path.join(ROOT, "plugins", "hanji")
-# The variables Codex passes to a stdio MCP server (codex-rs/rmcp-client
-# DEFAULT_ENV_VARS), besides the server's own env_vars.
-CODEX_ENV = ["HOME", "LOGNAME", "PATH", "SHELL", "USER", "LANG", "LC_ALL", "TERM", "TMPDIR", "TZ"]
+LAUNCHER = os.path.join("skills", "office-documents", "scripts", "hanji")
 
 failures = []
 
@@ -56,14 +54,9 @@ def workspace_version():
     return m.group(1)
 
 
-def launcher_version():
-    text = open(os.path.join(PLUGIN, "scripts", "hanji-mcp"), encoding="utf-8").read()
+def launcher_version(plugin=PLUGIN):
+    text = open(os.path.join(plugin, LAUNCHER), encoding="utf-8").read()
     return re.search(r"^version=(\S+)$", text, re.M).group(1)
-
-
-def expected_tools():
-    src = open(os.path.join(ROOT, "crates", "hanji-mcp", "src", "main.rs"), encoding="utf-8").read()
-    return set(re.findall(r"async fn (hanji_\w+)\(", src))
 
 
 def check_static():
@@ -85,6 +78,18 @@ def check_static():
         fail("marketplace.json lists hanji once, with source ./plugins/hanji")
     ok(f"manifests and marketplace agree on hanji {version}")
 
+    mcp = [f for f in (".mcp.json", "codex.mcp.json") if os.path.exists(os.path.join(PLUGIN, f))]
+    mcp += [what for what, m in [("Claude Code plugin.json", claude), ("Codex plugin.json", codex)] + [
+        ("the marketplace entry", e) for e in entries
+    ] if "mcpServers" in m]
+    bin_dir = os.path.exists(os.path.join(PLUGIN, "bin"))
+    if mcp:
+        fail(f"the plugin ships no MCP server, but has: {', '.join(mcp)}")
+    if bin_dir:
+        fail("the plugin has a top-level bin/, which claude.ai and Cowork refuse")
+    if not mcp and not bin_dir:
+        ok("no MCP server and no top-level bin/")
+
     skills = os.path.join(PLUGIN, "skills")
     names = sorted(os.listdir(skills))
     if not names:
@@ -95,104 +100,86 @@ def check_static():
         front = dict(line.split(": ", 1) for line in m.group(1).splitlines()) if m else {}
         if front.get("name") != name or not front.get("description"):
             fail(f"skills/{name}/SKILL.md: front matter needs name: {name} and a description")
+    text = open(os.path.join(skills, "office-documents", "SKILL.md"), encoding="utf-8").read()
+    if "${CLAUDE_SKILL_DIR}/scripts/hanji" not in text:
+        fail("skills/office-documents/SKILL.md does not name its launcher as ${CLAUDE_SKILL_DIR}/scripts/hanji")
     ok(f"skills: {', '.join(names)}")
 
 
-def handshake(label, command, args, cwd, env):
-    """Starts the server and checks initialize and tools/list."""
-    try:
-        p = subprocess.Popen(
-            [command, *args],
-            cwd=cwd,
-            env=env,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            # MCP is UTF-8 JSON; the locale's encoding (cp1252 on Windows) is not.
-            encoding="utf-8",
-        )
-    except OSError as e:
-        fail(f"{label}: cannot start {command} {args}: {e}")
-        return
-    err = []
-    threading.Thread(target=lambda: err.extend(p.stderr), daemon=True).start()
-    timer = threading.Timer(120, p.kill)
-    timer.start()
-
-    def call(id, method, params):
-        p.stdin.write(json.dumps({"jsonrpc": "2.0", "id": id, "method": method, "params": params}) + "\n")
-        p.stdin.flush()
-        for line in p.stdout:
-            msg = json.loads(line)
-            if msg.get("id") == id:
-                return msg
-        raise EOFError("the server closed stdout")
-
-    try:
-        init = call(1, "initialize", {
-            "protocolVersion": "2025-06-18",
-            "capabilities": {},
-            "clientInfo": {"name": "check-plugins", "version": "1"},
-        })
-        p.stdin.write(json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n")
-        p.stdin.flush()
-        tools = call(2, "tools/list", {})
-    except (EOFError, ValueError, BrokenPipeError) as e:
-        p.kill()
-        p.wait()
-        fail(f"{label}: {e}; stderr: {''.join(err).strip()}")
-        return
-    finally:
-        timer.cancel()
-    p.stdin.close()
-    p.wait(timeout=30)
-    name = init.get("result", {}).get("serverInfo", {}).get("name")
-    got = {t["name"] for t in tools.get("result", {}).get("tools", [])}
-    want = expected_tools()
-    if name != "hanji" or got != want:
-        fail(f"{label}: server {name!r}, tools {sorted(got)}; expected hanji with {sorted(want)}")
-        return
-    ok(f"{label}: initialize and tools/list answer {len(got)} tools")
-
-
-def codex_env(server):
-    if os.name == "nt":
-        # Codex passes Windows' core variables there; not mirrored here.
-        return dict(os.environ, **(server.get("env") or {}))
-    names = CODEX_ENV + [v if isinstance(v, str) else v["name"] for v in server.get("env_vars") or []]
-    env = {k: os.environ[k] for k in names if k in os.environ}
-    env.update(server.get("env") or {})
-    return env
-
-
-def check_servers(codex_json):
+def check_launcher(label, plugin):
+    """Runs the launcher as the skill tells the agent to, from a project directory."""
+    launcher = os.path.join(plugin, LAUNCHER)
     project = tempfile.mkdtemp(prefix="hanji-plugin-project-")
-    store = tempfile.mkdtemp(prefix="hanji-plugin-store-")
-    os.environ["HANJI_STORE"] = store
+    env = dict(os.environ)
+    env.pop("HANJI_STORE", None)
 
-    claude = load("plugins/hanji/.mcp.json")["mcpServers"]["hanji"]
-    sub = lambda s: s.replace("${CLAUDE_PLUGIN_ROOT}", PLUGIN)
-    env = dict(os.environ, CLAUDE_PLUGIN_ROOT=PLUGIN)
-    handshake("Claude Code .mcp.json", sub(claude["command"]), [sub(a) for a in claude.get("args", [])], project, env)
+    def run(*args, timeout=300):
+        try:
+            return subprocess.run(
+                ["sh", launcher, *args],
+                cwd=project,
+                env=env,
+                capture_output=True,
+                encoding="utf-8",
+                timeout=timeout,
+            )
+        except (OSError, subprocess.TimeoutExpired) as e:
+            fail(f"{label}: sh {launcher} {' '.join(args)}: {e}")
+            return None
 
-    codex = load("plugins/hanji/codex.mcp.json")["mcpServers"]["hanji"]
-    cwd = os.path.normpath(os.path.join(PLUGIN, codex.get("cwd", ".")))
-    handshake("Codex codex.mcp.json", codex["command"], codex.get("args", []), cwd, codex_env(codex))
-
-    if codex_json:
-        server = json.load(open(codex_json, encoding="utf-8"))["transport"]
-        handshake("Codex (as `codex mcp get` resolved it)", server["command"], server.get("args") or [], server["cwd"], codex_env(server))
+    want = launcher_version(plugin)
+    # The first run may download the release binary: give it the time.
+    p = run("--version")
+    if p is None:
+        return
+    if p.returncode != 0 or p.stdout.split() != ["hanji", want]:
+        fail(f"{label}: `hanji --version` printed {p.stdout.strip()!r} (status {p.returncode}), expected 'hanji {want}'; stderr: {p.stderr.strip()}")
+        return
+    guide = open(os.path.join(ROOT, "crates", "hanji-store", "src", "guide.md"), encoding="utf-8").read()
+    p = run("guide", timeout=60)
+    if p is None:
+        return
+    if p.returncode != 0 or p.stdout != guide:
+        fail(f"{label}: `hanji guide` (status {p.returncode}) does not print guide.md; stderr: {p.stderr.strip()}")
+        return
+    out = os.path.join(project, "new.docx")
+    steps = [
+        ("--json", "new", "document"),
+        ("--json", "read", "{doc}"),
+        ("--json", "export", "{doc}", out),
+    ]
+    doc = None
+    for step in steps:
+        args = [a.format(doc=doc) for a in step]
+        p = run(*args, timeout=60)
+        if p is None:
+            return
+        try:
+            result = json.loads(p.stdout)
+        except ValueError:
+            result = {}
+        if p.returncode != 0 or "error" in result:
+            fail(f"{label}: `hanji {' '.join(args)}` (status {p.returncode}): {p.stdout.strip()} {p.stderr.strip()}")
+            return
+        doc = doc or result.get("doc_id")
+    if not os.path.isfile(out) or not os.path.isdir(os.path.join(project, ".hanji")):
+        fail(f"{label}: export wrote no {out}, or the store is not .hanji/ in the project's directory")
+        return
+    ok(f"{label}: the launcher runs hanji {want} (--version, guide, new, read, export)")
 
 
 def main():
-    codex_json = None
+    installed = []
     argv = sys.argv[1:]
-    if argv[:1] == ["--codex-mcp-json"]:
-        codex_json = argv[1]
-    elif argv:
+    while argv[:1] == ["--installed"] and len(argv) > 1:
+        installed.append(argv[1])
+        argv = argv[2:]
+    if argv:
         sys.exit(__doc__)
     check_static()
-    check_servers(codex_json)
+    check_launcher("plugins/hanji", PLUGIN)
+    for plugin in installed:
+        check_launcher(f"installed copy {plugin}", plugin)
     if failures:
         sys.exit(f"{len(failures)} plugin check(s) failed")
 

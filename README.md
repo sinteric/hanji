@@ -85,18 +85,19 @@ the format summary that agents read.
 ## Install
 
 **Release binaries.** Each [release](https://github.com/sinteric/hanji/releases)
-from v0.1.0 has `hanji-<version>-<target>.tar.gz` with both binaries (`hanji`
-and `hanji-mcp`) for Linux x86_64 and arm64 (static, musl), macOS x86_64 and
-arm64, and Windows x86_64, plus `SHA256SUMS`.
+has `hanji-<version>-<target>.tar.gz` with the `hanji` binary for Linux
+x86_64 and arm64 (static, musl), macOS x86_64 and arm64, and Windows x86_64,
+plus `SHA256SUMS`. (v0.1.0 also had `hanji-mcp`, an MCP server, which has
+since been removed: agents run the CLI.)
 
 **From source** (Rust 1.93 or later):
 
 ```sh
-cargo install --locked --git https://github.com/sinteric/hanji hanji-cli   # the hanji command
-cargo install --locked --git https://github.com/sinteric/hanji hanji-mcp   # the MCP server
+cargo install --locked --git https://github.com/sinteric/hanji hanji-cli
 ```
 
-**Claude Code plugin** (the MCP server and the `office-documents` skill):
+**Claude Code plugin** (the `office-documents` skill and a launcher for the
+`hanji` command):
 
 ```sh
 /plugin marketplace add sinteric/hanji
@@ -110,31 +111,29 @@ codex plugin marketplace add sinteric/hanji
 codex plugin add hanji@hanji
 ```
 
-You do not need a Rust toolchain for either plugin. The launcher uses
-`hanji-mcp` from `PATH` if it is there. Otherwise it downloads the release
-binary for your platform once and checks it against `SHA256SUMS`. That first
-start can take longer than Claude Code waits: if `/mcp` shows `hanji` as
-failed or its tools are missing, reconnect it there once. Later starts use the
-cached binary and are immediate. For other MCP clients, and for details, see
+You do not need a Rust toolchain for either plugin. The skill tells the agent
+to run `hanji` commands through its launcher, which uses `hanji` from `PATH`
+if it is there. Otherwise its first run downloads the release binary for your
+platform once and checks it against `SHA256SUMS`; the command waits for the
+download. Later runs use the cached binary. For details, see
 [plugins/hanji](plugins/hanji/README.md).
 
-## MCP server
+## Commands
 
-`hanji-mcp` runs over stdio and has eleven tools:
-
-| Tool | What it does |
+| Command | What it does |
 |---|---|
-| `hanji_open` | Open a file. Returns the doc id, revision 1 and the safety report (what was removed, what to show the person before export) |
-| `hanji_new` | Create a new document from a blank file or a template |
-| `hanji_read` | Read a revision's text, or a part of it: lines, a section, slides, or spreadsheet row windows |
-| `hanji_edit` | Edit exact spans (`old` → `new`). Each `old` must occur exactly once, and the edit must be against the current revision |
-| `hanji_write` | Replace the whole text. hanji aligns the old and new text to find where unshown content goes |
-| `hanji_ops` | Write spreadsheet cells with JSON range operations (set, append/insert/delete rows, fill_formula, sort, add_table, format, …) |
-| `hanji_validate` | Check a text against the grammar and the document's style, layout and placeholder names |
-| `hanji_export` | Write a revision to a file. Refused until surfaced content (comments, hidden text, metadata) is acknowledged |
-| `hanji_reimport` | Bring back a file a person edited in Office or Hancom as a new revision, and merge or refuse concurrent edits |
-| `hanji_history` | List a document's revisions, or show the diff between two of them |
-| `hanji_preview` | Render a presentation to check the look: an HTML viewer, or SVG or PNG per slide (optionally one slide as an image), with the fonts it substituted |
+| `hanji open FILE` | Open a file. Prints the doc id, revision 1 and the safety report (what was removed, what to show the person before export) |
+| `hanji new TYPE` | Create a new document from a blank file or a template (`--format`, `--template`) |
+| `hanji read DOC` | Print a revision's text, or a part of it: `--lines`, `--section`, `--slides`, or spreadsheet row windows (`--table` with `--rows`, `--sheet` with `--range`) |
+| `hanji edit DOC --rev N` | Edit exact spans (`--old`/`--new`, `--old-file`/`--new-file`, or a JSON list with `--edits`). Each `old` must occur exactly once, and the edit must be against the current revision |
+| `hanji write DOC --rev N FILE` | Replace the whole text. hanji aligns the old and new text to find where unshown content goes |
+| `hanji ops DOC --rev N OPS` | Write spreadsheet cells with JSON range operations (set, append/insert/delete rows, fill_formula, sort, add_table, format, …) |
+| `hanji validate FILE` | Check a text against the grammar, and with `--doc` the document's style, layout and placeholder names |
+| `hanji export DOC PATH` | Write a revision to a file. Refused until surfaced content (comments, hidden text, metadata) is acknowledged (`--acknowledge-surfaced`); `--tracked-changes` for docx |
+| `hanji reimport DOC PATH` | Bring back a file a person edited in Office or Hancom as a new revision, and merge or refuse concurrent edits |
+| `hanji history DOC`, `hanji diff DOC A B` | List a document's revisions, and show the diff between two of them |
+| `hanji preview DOC` | Render a presentation to check the look: an HTML viewer, or SVG or PNG per slide, with the fonts it substituted |
+| `hanji list`, `hanji guide` | List the stored documents; print the format summary for agents |
 
 ## Formats
 
