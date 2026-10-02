@@ -211,9 +211,9 @@ pub struct Preview {
     faces: HashMap<FontId, FaceInfo>,
     /// Characters drawn per page and face.
     chars: Vec<BTreeMap<FontId, BTreeSet<char>>>,
-    /// The exact subsets used by standalone SVG/PNG pages and the HTML viewer.
-    page_subsets: Vec<Vec<(FontId, Vec<u8>)>>,
-    document_subsets: Vec<(FontId, Vec<u8>)>,
+    /// Identical character sets share the exact subset bytes across pages/viewer.
+    page_subsets: Vec<Subsets>,
+    document_subsets: Subsets,
     pub fonts: FontsReport,
     /// Missing fonts, font-directory problems, and summaries of rendering fallbacks.
     pub warnings: Vec<String>,
@@ -221,6 +221,9 @@ pub struct Preview {
     /// Paths use zero-based page/element indices; document-wide paths are reported once.
     pub diagnostics: Vec<Diagnostic>,
 }
+
+type Subsets = Vec<(FontId, Arc<[u8]>)>;
+type SubsetCache = BTreeMap<FontId, BTreeMap<BTreeSet<char>, Result<Arc<[u8]>, String>>>;
 
 /// `fonts` in the preview result (DESIGN.md §7.1).
 #[derive(Clone, Debug, Default, Serialize)]
@@ -581,18 +584,24 @@ impl Preview {
         &self,
         chars: &BTreeMap<FontId, BTreeSet<char>>,
         path: &str,
-    ) -> (Vec<(FontId, Vec<u8>)>, Vec<Diagnostic>) {
+        cache: &mut SubsetCache,
+    ) -> (Subsets, Vec<Diagnostic>) {
         let (mut subsets, mut diagnostics) = (vec![], vec![]);
         for (id, cs) in chars {
-            let result = self
-                .layout
-                .fonts
-                .iter()
-                .find(|f| f.id == *id)
-                .ok_or_else(|| "font data is absent from the layout".to_string())
-                .and_then(|f| subset::subset(&f.data, f.face_index, cs));
-            match result {
-                Ok(data) => subsets.push((*id, data)),
+            let face_cache = cache.entry(*id).or_default();
+            if !face_cache.contains_key(cs) {
+                let result = self
+                    .layout
+                    .fonts
+                    .iter()
+                    .find(|f| f.id == *id)
+                    .ok_or_else(|| "font data is absent from the layout".to_string())
+                    .and_then(|f| subset::subset(&f.data, f.face_index, cs))
+                    .map(Arc::from);
+                face_cache.insert(cs.clone(), result);
+            }
+            match &face_cache[cs] {
+                Ok(data) => subsets.push((*id, data.clone())),
                 Err(e) => {
                     let requested = self.faces.get(id).map_or("unknown", |f| f.requested.as_str());
                     diagnostics.push(Diagnostic {
@@ -607,30 +616,37 @@ impl Preview {
         (subsets, diagnostics)
     }
 
-    /// Prepare both font transports and collect every page's diagnostics once.
+    /// Validate/cache unique font subsets and inspect pages without serializing SVG.
     /// Library consumers can inspect them before choosing HTML, SVG or PNG output.
     fn prepare_output(&mut self) -> Result<(), String> {
+        fn append_unique(out: &mut Vec<Diagnostic>, seen: &mut BTreeSet<(String, String)>, ds: Vec<Diagnostic>) {
+            for d in ds {
+                if seen.insert((d.path.clone(), d.message.clone())) {
+                    out.push(d);
+                }
+            }
+        }
+        let mut seen = BTreeSet::new();
+        let mut cache = SubsetCache::new();
         let mut all: BTreeMap<FontId, BTreeSet<char>> = BTreeMap::new();
         for (k, chars) in self.chars.iter().enumerate() {
-            let (subsets, diagnostics) = self.subsets(chars, &format!("pages[{k}].fonts"));
+            let (subsets, diagnostics) = self.subsets(chars, &format!("pages[{k}].fonts"), &mut cache);
             self.page_subsets.push(subsets);
-            self.diagnostics.extend(diagnostics);
+            append_unique(&mut self.diagnostics, &mut seen, diagnostics);
             for (id, cs) in chars {
                 all.entry(*id).or_default().extend(cs);
             }
         }
-        let (subsets, diagnostics) = self.subsets(&all, "viewer.fonts");
+        let (subsets, diagnostics) = self.subsets(&all, "viewer.fonts", &mut cache);
         self.document_subsets = subsets;
-        self.diagnostics.extend(diagnostics);
+        drop(cache);
+        append_unique(&mut self.diagnostics, &mut seen, diagnostics);
+        append_unique(&mut self.diagnostics, &mut seen, svg::layout_diagnostics(&self.layout));
         for k in 0..self.slide_count() {
-            let hooks = PageHooks { preview: self, css: String::new(), marks: false };
-            let page = svg::render_page(&self.layout, k, &hooks)
+            let diagnostics = svg::page_diagnostics(&self.layout, k)
                 .ok_or_else(|| format!("cannot render slide {}: the layout page is absent", k + 1))?;
-            self.diagnostics.extend(page.diagnostics);
+            append_unique(&mut self.diagnostics, &mut seen, diagnostics);
         }
-        // SVG lowering repeats document-wide layout diagnostics on every page.
-        let mut seen = BTreeSet::new();
-        self.diagnostics.retain(|d| seen.insert((d.path.clone(), d.message.clone())));
         let mut summaries: BTreeMap<&str, (usize, &str)> = BTreeMap::new();
         for d in &self.diagnostics {
             let summary = summaries.entry(&d.message).or_insert((0, &d.path));
@@ -646,7 +662,7 @@ impl Preview {
         Ok(())
     }
 
-    fn font_css(subsets: &[(FontId, Vec<u8>)]) -> String {
+    fn font_css(subsets: &[(FontId, Arc<[u8]>)]) -> String {
         subsets
             .iter()
             .map(|(id, d)| {
@@ -842,6 +858,109 @@ mod tests {
         assert!(p.diagnostics.iter().any(|d| d.path.starts_with("pages[0].elements[") && d.message == message));
         assert!(p.warnings.iter().any(|w| w.contains(message)));
         assert!(p.html("preview").contains(message));
+    }
+
+    #[test]
+    fn many_pages_and_layout_diagnostics_keep_only_linear_storage() {
+        const N: usize = 256;
+        let mut p = deck();
+        let mut page = (*p.layout.pages[0]).clone();
+        page.elements = vec![PositionedElement::Image {
+            rect: oxml_layout::Rect { x: 0.0, y: 0.0, width: 10.0, height: 10.0 },
+            data: b"GIF89a".to_vec(),
+            content_type: "image/gif".into(),
+            media_id: oxml_layout::MediaId::from_bytes(b"GIF89a"),
+        }];
+        let page = Arc::new(page);
+        p.layout.pages = vec![page; N];
+        p.layout.diagnostics =
+            (0..N).map(|i| oxml_layout::Diagnostic { message: format!("layout fallback {i}") }).collect();
+        p.chars = vec![BTreeMap::new(); N];
+        reset_output(&mut p);
+        p.prepare_output().unwrap();
+        assert_eq!(p.diagnostics.len(), N * 2);
+        assert!(p.diagnostics.capacity() <= N * 4, "retained capacity {}", p.diagnostics.capacity());
+        assert_eq!(p.diagnostics.iter().filter(|d| d.path.starts_with("layout.diagnostics[")).count(), N);
+        assert_eq!(p.diagnostics.iter().filter(|d| d.path.starts_with("pages[")).count(), N);
+    }
+
+    #[test]
+    fn repeated_page_and_viewer_character_sets_share_subset_buffers() {
+        let mut p = deck();
+        p.layout.pages = vec![p.layout.pages[0].clone(); 128];
+        p.chars = vec![p.chars[0].clone(); 128];
+        reset_output(&mut p);
+        p.prepare_output().unwrap();
+        assert!(!p.page_subsets[0].is_empty());
+        for page in &p.page_subsets {
+            for (id, bytes) in page {
+                let first = &p.page_subsets[0].iter().find(|(f, _)| f == id).unwrap().1;
+                let viewer = &p.document_subsets.iter().find(|(f, _)| f == id).unwrap().1;
+                assert!(Arc::ptr_eq(bytes, first));
+                assert!(Arc::ptr_eq(bytes, viewer));
+            }
+        }
+    }
+
+    #[test]
+    fn diagnostic_inspection_matches_serialization_on_nested_fallbacks() {
+        fn first_text(elements: &[PositionedElement]) -> Option<oxml_layout::GlyphRun> {
+            elements.iter().find_map(|e| match e {
+                PositionedElement::Text(r) => Some(r.clone()),
+                PositionedElement::MultilingualText(r) => Some(r.legacy_projection()),
+                PositionedElement::Group(g) => first_text(&g.children),
+                PositionedElement::MarkedContent { children, .. } => first_text(children),
+                _ => None,
+            })
+        }
+        let mut p = deck();
+        let mut text = p.layout.pages.iter().find_map(|p| first_text(&p.elements)).unwrap();
+        text.font_id = FontId(u32::MAX);
+        text.text = "ab\0".into();
+        text.glyph_ids.clear();
+        text.advances.clear();
+        let page = Arc::make_mut(&mut p.layout.pages[0]);
+        page.background = Some(oxml_layout::Paint::Tile {
+            image: oxml_layout::MediaId::from_bytes(b"missing"),
+            tile: oxml_layout::Rect { x: 0.0, y: 0.0, width: 10.0, height: 10.0 },
+            transform: oxml_layout::Transform::IDENTITY,
+        });
+        for scale in [0.0, 2.0] {
+            page.elements.push(PositionedElement::Group(oxml_layout::GroupElement {
+                transform: oxml_layout::Transform { a: scale, d: 1.0, ..oxml_layout::Transform::IDENTITY },
+                clip: None,
+                opacity: 1.0,
+                effects: vec![oxml_layout::Effect::OuterShadow {
+                    dx: 1.0,
+                    dy: 1.0,
+                    blur: 2.0,
+                    color: oxml_layout::Color::BLACK,
+                }],
+                children: vec![PositionedElement::Text(text.clone())],
+            }));
+        }
+        page.elements.push(PositionedElement::LinkAnnotation {
+            rect: oxml_layout::Rect { x: 0.0, y: 0.0, width: 10.0, height: 10.0 },
+            url: "javascript:alert(1)".into(),
+        });
+        let hooks = PageHooks { preview: &p, css: String::new(), marks: false };
+        for k in 0..p.slide_count() {
+            let inspected = svg::page_diagnostics(&p.layout, k).unwrap();
+            let rendered = svg::render_page(&p.layout, k, &hooks).unwrap();
+            assert_eq!(inspected, rendered.diagnostics);
+        }
+        let inspected = svg::page_diagnostics(&p.layout, 0).unwrap();
+        for message in [
+            "tile paint",
+            "complex shaping",
+            "XML-invalid",
+            "absent from the layout",
+            "singular-transform",
+            "anisotropic",
+            "link target",
+        ] {
+            assert!(inspected.iter().any(|d| d.message.contains(message)), "missing {message}: {inspected:?}");
+        }
     }
 
     #[test]
