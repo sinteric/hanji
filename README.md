@@ -98,8 +98,10 @@ executing macros or external links. JSON `cells` reports `formula_result` as
 missing results display `#UNEVALUATED`. Charts, images, conditional formatting,
 print layout and other omitted features have diagnostics. Column widths and
 text wrapping are approximate. Default library budgets are 512 rows, 128
-columns, 32,768 cells, 2 MiB of window text and 16,777,216 PNG pixels; the CLI
-uses these budgets and a 64 MiB raw/unpacked package limit. A window cutting a
+columns, 32,768 cells, 2 MiB of window text and 16,777,216 PNG pixels. Clipped
+cells have a diagnostic with their address; narrow numeric columns can hide
+leading digits, while JSON `cells[].display` retains the complete value.
+The CLI uses these budgets and a 64 MiB raw/unpacked package limit. A window cutting a
 merged cell is refused with the complete merge address. Request a smaller
 window on a budget refusal; there is no silent truncation. For example:
 

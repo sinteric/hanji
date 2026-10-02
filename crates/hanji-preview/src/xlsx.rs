@@ -614,6 +614,7 @@ impl<'a> GridBuilder<'a> {
         lines.push((line, glyphs, advances));
         let line_height = style.size * 1.2;
         let content_height = lines.len() as f64 * line_height;
+        let mut clipped = content_height > rect.height;
         let top = match style.vertical.as_str() {
             "top" => rect.y + 1.0,
             "center" => rect.y + ((rect.height - content_height) / 2.0).max(0.0),
@@ -628,6 +629,7 @@ impl<'a> GridBuilder<'a> {
                 "general" if numeric => rect.x + rect.width - width - 2.0,
                 _ => rect.x + 2.0,
             };
+            clipped |= x < rect.x || x + width > rect.x + rect.width;
             children.push(PositionedElement::Text(GlyphRun {
                 origin: Point { x, y: top + style.size + i as f64 * line_height },
                 font_id: id,
@@ -643,6 +645,12 @@ impl<'a> GridBuilder<'a> {
                 field_source: None,
                 note: None,
             }));
+        }
+        if clipped {
+            self.diagnostics.push(diagnostic(
+                format!("{path}.clipping"),
+                "cell text exceeds its stored size and is clipped; leading digits of right-aligned values may be hidden; cells[].display retains the complete value",
+            ));
         }
         self.elements.push(PositionedElement::Group(GroupElement {
             transform: Transform::IDENTITY,

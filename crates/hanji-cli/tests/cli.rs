@@ -180,6 +180,7 @@ fn xlsx_file_preview_formats_are_read_only_and_report_cached_results() {
             .iter()
             .any(|w| w.as_str().unwrap().contains("conditionalFormatting")));
         assert!(v["diagnostics"].as_array().unwrap().iter().any(|d| d["path"] == "sheets[0].drawing"));
+        assert!(v["diagnostics"].as_array().unwrap().iter().any(|d| d["path"] == "sheets[0].cells[B3].clipping"));
         let files = v["files"].as_array().unwrap();
         assert_eq!(files.len(), 1);
         let file = files[0].as_str().unwrap();

@@ -73,6 +73,20 @@ fn arbitrary_sparse_addresses_do_not_expand_the_reported_dimension() {
 }
 
 #[test]
+fn clipped_numeric_values_report_the_cell_and_keep_the_complete_display() {
+    let sheet = r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="2"/><col min="2" max="2" width="20"/></cols><sheetData><row r="1"><c r="A1"><v>123456789</v></c><c r="B1"><v>7</v></c></row></sheetData></worksheet>"#;
+    let mut b = open_xlsx(&fixture::build(sheet, "", fixture::STYLES, &[]), XlsxOptions::default()).unwrap();
+    let w = b.render_window_with_fonts(0, "A1:B1", &FontOptions::default()).unwrap();
+    assert_eq!(w.cells[0].display, "123456789");
+    assert!(w
+        .diagnostics()
+        .iter()
+        .any(|d| d.path == "sheets[0].cells[A1].clipping" && d.message.contains("leading digits")));
+    assert!(!w.diagnostics().iter().any(|d| d.path == "sheets[0].cells[B1].clipping"));
+    assert!(w.render(PageFormat::Svg).unwrap().diagnostics.iter().any(|d| d.path == "sheets[0].cells[A1].clipping"));
+}
+
+#[test]
 fn resource_budgets_refuse_instead_of_truncating_or_allocating_large_rasters() {
     let bytes = fixture::build(fixture::GRID, "", fixture::STYLES, &[]);
     assert!(error(open_xlsx(&bytes, XlsxOptions { max_unpacked_bytes: 100, ..Default::default() })).contains("expands"));
