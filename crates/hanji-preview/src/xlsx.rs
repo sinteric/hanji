@@ -400,7 +400,14 @@ impl Workbook {
                         return Err(format!("{path}: unsupported cell value type {:?}", c.ty()));
                     }
                 }
-                let mut display = cell.map(|c| self.book.display(c)).unwrap_or_default();
+                // Use the same effective style as the visual projection: a cell
+                // without `s` can inherit its number format from the row/column.
+                let mut display = cell
+                    .map(|c| {
+                        let format = self.book.styles.format_of(style_index as u32);
+                        hanji_xlsx::numfmt::display(&self.book.value(c), &format, self.book.date1904)
+                    })
+                    .unwrap_or_default();
                 let formula = cell.and_then(Cell::formula);
                 let formula_result = if let Some(c) = cell.filter(|c| c.f.is_some()) {
                     if c.lacks_cached_value()
@@ -582,7 +589,14 @@ impl<'a> GridBuilder<'a> {
                 style.edges[k].as_ref().map_or((0.3, Color::from_hex("D0D0D0"), None), |e| (e.width, e.color, e.dash));
             self.elements.push(PositionedElement::Line { start, end, width, color, dash_pattern });
         }
-        if text.is_empty() || rect.width <= 4.0 || rect.height <= 0.0 {
+        if text.is_empty() {
+            return Ok(());
+        }
+        if rect.width <= 4.0 || rect.height <= 0.0 {
+            self.diagnostics.push(diagnostic(
+                format!("{path}.clipping"),
+                "cell text is omitted because its visible size leaves no text area; cells[].display retains the complete value",
+            ));
             return Ok(());
         }
         let id = self.font(style, text)?;

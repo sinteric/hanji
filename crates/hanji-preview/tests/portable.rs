@@ -103,6 +103,93 @@ fn a_custom_resolver_produces_the_same_buffers_and_library_diagnostics() {
 }
 
 #[test]
+fn per_style_resolved_faces_drive_reports_and_html_substitution_marks() {
+    struct StylePolicy {
+        regular: FontData,
+        bold: FontData,
+        italic: FontData,
+        both: FontData,
+    }
+    impl FontResolver for StylePolicy {
+        fn resolve_font(&self, requested: &str, _: fonts::Script, bold: bool, italic: bool) -> Option<ResolvedFont> {
+            let (font, family, source, metrics) = match (bold, italic) {
+                (false, false) => {
+                    (&self.regular, requested.to_string(), fonts::Source::Supplied, fonts::Metrics::Original)
+                }
+                (true, false) => {
+                    (&self.bold, "Bold Fallback".into(), fonts::Source::Embedded, fonts::Metrics::Substitute)
+                }
+                (false, true) => (
+                    &self.italic,
+                    "Italic Fallback".into(),
+                    fonts::Source::Bundled,
+                    fonts::Metrics::Compatible(requested.into()),
+                ),
+                (true, true) => {
+                    (&self.both, "Both Fallback".into(), fonts::Source::Supplied, fonts::Metrics::Substitute)
+                }
+            };
+            Some(ResolvedFont { family, source, metrics, ea_advance: None, font: font.clone() })
+        }
+    }
+    let variant = |bold, italic| {
+        let (_, data) = oxml_layout::bundled_fonts::bundled_font_data()
+            .into_iter()
+            .find(|(_, data)| {
+                ttf_parser::Face::parse(data, 0).is_ok_and(|f| f.is_bold() == bold && f.is_italic() == italic)
+            })
+            .unwrap();
+        FontData::new(
+            hanji_preview::sfnt::build(
+                data,
+                0,
+                &hanji_preview::sfnt::Adjust {
+                    family: "Style Test".into(),
+                    bold,
+                    italic,
+                    line_em: None,
+                    ea_advance: None,
+                },
+            )
+            .unwrap(),
+        )
+    };
+    let policy = StylePolicy {
+        regular: variant(false, false),
+        bold: variant(true, false),
+        italic: variant(false, true),
+        both: variant(true, true),
+    };
+    let slide = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/><p:sp><p:nvSpPr><p:cNvPr id="2" name="Styles"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="914400" y="914400"/><a:ext cx="8000000" cy="3000000"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:rPr sz="2400" b="0" i="0"><a:latin typeface="Style Requested"/></a:rPr><a:t>Regular</a:t></a:r><a:r><a:rPr sz="2400" b="1" i="0"><a:latin typeface="Style Requested"/></a:rPr><a:t> Bold</a:t></a:r><a:r><a:rPr sz="2400" b="0" i="1"><a:latin typeface="Style Requested"/></a:rPr><a:t> Italic</a:t></a:r><a:r><a:rPr sz="2400" b="1" i="1"><a:latin typeface="Style Requested"/></a:rPr><a:t> Both</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>"#;
+    let mut parts = hanji_package::package::read(SHAPES).unwrap();
+    parts.iter_mut().find(|p| p.name == "ppt/slides/slide1.xml").unwrap().data = slide.to_vec();
+    let bytes = hanji_package::package::write(&parts).unwrap();
+    let p = hanji_preview::render_pptx_with_resolver(&bytes, &policy).unwrap();
+    let original = p.fonts.drawn_as_requested.iter().find(|f| f.requested == "Style Requested").unwrap();
+    assert_eq!(original.chars, 7, "only the regular run uses the requested face");
+    assert_eq!(original.source, fonts::Source::Supplied);
+    for (family, source, metrics, chars) in [
+        ("Bold Fallback", fonts::Source::Embedded, fonts::Metrics::Substitute, 4),
+        ("Italic Fallback", fonts::Source::Bundled, fonts::Metrics::Compatible("Style Requested".into()), 6),
+        ("Both Fallback", fonts::Source::Supplied, fonts::Metrics::Substitute, 4),
+    ] {
+        let f = p
+            .fonts
+            .substituted
+            .iter()
+            .find(|f| f.requested == "Style Requested" && f.drawn.as_deref() == Some(family))
+            .unwrap_or_else(|| panic!("missing {family}: {:#?}", p.fonts));
+        assert_eq!(f.source, Some(source));
+        assert_eq!(f.metrics, metrics);
+        assert_eq!(f.chars, chars);
+        let html = p.html("styles");
+        assert!(html.contains(&format!("data-font-requested=\"Style Requested\" data-font-drawn=\"{family}\"")));
+        assert!(html.contains(&format!("<title>Style Requested → {family} (metrics: {})</title>", metrics.name())));
+        assert!(!html.contains("<title>Style Requested → Style Requested"));
+    }
+}
+
+#[test]
 #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 fn the_native_adapter_and_byte_path_have_equivalent_outputs_without_host_fonts() {
     let bytes = hanji_preview::render_pptx_with_fonts(SHAPES, &FontOptions::default()).unwrap();

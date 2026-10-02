@@ -104,8 +104,9 @@ fn requested_typeface(style: &ResolvedRunStyle, text: &str) -> String {
 struct Request {
     requested: String,
     script: Script,
-    /// `None`: nothing here draws the script (no Korean font).
-    drawn: Option<ResolvedFont>,
+    /// Metadata of each successfully loaded face, keyed by its actual style.
+    /// A face's `drawn: None` means the script needed a Latin fallback.
+    drawn: BTreeMap<(bool, bool), FaceInfo>,
     /// (bold, italic) variants the slides ask for.
     styles: BTreeSet<(bool, bool)>,
 }
@@ -125,7 +126,7 @@ impl Requests {
     fn label(&mut self, requested: String, text: &str, bold: bool, italic: bool) -> String {
         let script = Script::of(text);
         let i = *self.index.entry((requested.clone(), script)).or_insert_with(|| {
-            self.list.push(Request { requested, script, drawn: None, styles: BTreeSet::new() });
+            self.list.push(Request { requested, script, drawn: BTreeMap::new(), styles: BTreeSet::new() });
             self.list.len() - 1
         });
         self.list[i].styles.insert((bold, italic));
@@ -496,20 +497,18 @@ fn layout_preview(
 
     let mut files = vec![];
     for (i, r) in req.list.iter_mut().enumerate() {
-        r.drawn = fonts.resolve_font(&r.requested, r.script, false, false);
         let mut seen = BTreeSet::new();
         for &(bold, italic) in &r.styles {
+            let resolved = fonts.resolve_font(&r.requested, r.script, bold, italic);
+            let draws_script = resolved.is_some();
             // Text no face draws still takes up room: lay it out in the Latin face.
-            let Some(face) = fonts
-                .resolve_font(&r.requested, r.script, bold, italic)
-                .or_else(|| fonts.resolve_font(&r.requested, Script::Latin, bold, italic))
-            else {
+            let Some(face) = resolved.or_else(|| fonts.resolve_font(&r.requested, Script::Latin, bold, italic)) else {
                 continue;
             };
             let (data, index) = (&face.font.data, face.font.face_index);
             let (b, it) =
                 ttf_parser::Face::parse(data, index).map(|f| (f.is_bold(), f.is_italic())).unwrap_or_default();
-            if !seen.insert((b, it)) {
+            if seen.contains(&(b, it)) {
                 continue;
             }
             let adj = sfnt::Adjust {
@@ -517,15 +516,32 @@ fn layout_preview(
                 bold: b,
                 italic: it,
                 line_em: Some(LINE_EM),
-                ea_advance: face.ea_advance.filter(|_| r.drawn.is_some()),
+                ea_advance: face.ea_advance.filter(|_| draws_script),
             };
             match sfnt::build(data, index, &adj) {
-                Ok(data) => files.push(FontFile { family: label(i), data }),
+                Ok(data) => {
+                    seen.insert((b, it));
+                    r.drawn.insert(
+                        (b, it),
+                        FaceInfo {
+                            requested: r.requested.clone(),
+                            script: r.script,
+                            drawn: draws_script.then(|| face.family.clone()),
+                            source: draws_script.then_some(face.source),
+                            metrics: if draws_script { face.metrics } else { Metrics::Substitute },
+                        },
+                    );
+                    files.push(FontFile { family: label(i), data });
+                }
                 Err(e) => warnings.push(format!("the face {} for {} cannot be used: {e}", face.family, r.requested)),
             }
         }
     }
-    if req.list.iter().any(|r| r.script == Script::Hangul && r.drawn.is_none()) {
+    if req
+        .list
+        .iter()
+        .any(|r| r.script == Script::Hangul && (r.drawn.is_empty() || r.drawn.values().any(|f| f.drawn.is_none())))
+    {
         warnings.push(NO_KOREAN_FONT.to_string());
     }
 
@@ -554,13 +570,8 @@ fn layout_preview(
                 .strip_prefix("hanji-face-")
                 .and_then(|n| n.parse::<usize>().ok())
                 .and_then(|i| req.list.get(i))
-                .map(|r| FaceInfo {
-                    requested: r.requested.clone(),
-                    script: r.script,
-                    drawn: r.drawn.as_ref().map(|d| d.family.clone()),
-                    source: r.drawn.as_ref().map(|d| d.source),
-                    metrics: r.drawn.as_ref().map_or(Metrics::Substitute, |d| d.metrics.clone()),
-                })
+                .and_then(|r| r.drawn.get(&(f.bold, f.italic)))
+                .cloned()
                 // A face rpptx chose itself (a chart's, or a fallback for characters the requested face lacks).
                 .unwrap_or_else(|| FaceInfo {
                     requested: f.family.clone(),

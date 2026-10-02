@@ -9,6 +9,8 @@ use serde_json::Value;
 
 #[path = "../../hanji-preview/tests/fixtures/xlsx_grid.rs"]
 mod xlsx_grid;
+#[path = "../../hanji-preview/tests/fixtures/xlsx_inherited.rs"]
+mod xlsx_inherited;
 
 struct Env {
     dir: PathBuf,
@@ -323,6 +325,32 @@ fn xlsx_preview_keeps_macros_and_external_formulas_inert() {
     let html = std::fs::read_to_string(v["files"][0].as_str().unwrap()).unwrap();
     assert!(!html.contains("https://invalid.example"));
     assert!(!html.contains("<script>"));
+}
+
+#[test]
+fn xlsx_preview_json_and_svg_apply_inherited_number_formats() {
+    let env = Env::new("xlsx-preview-inherited-formats");
+    let path = env.path("inherited.xlsx");
+    std::fs::write(&path, xlsx_grid::build(xlsx_inherited::INHERITED_GRID, "", xlsx_inherited::INHERITED_STYLES, &[]))
+        .unwrap();
+    let v = env.ok(&["preview", &path, "--range", "A1:E6", "--format", "svg"]);
+    for (address, display) in [
+        ("A1", "50%"),
+        ("B1", "1900-01-02"),
+        ("C1", "$1,234.50"),
+        ("C3", "50%"),
+        ("E3", "0.500"),
+        ("B4", "1900-01-02"),
+        ("B5", "$1,234.50"),
+    ] {
+        assert_eq!(cell(&v, address)["display"], display, "{address}");
+    }
+    assert_eq!(cell(&v, "D3")["display"], "0.5", "explicit General overrides inherited percentage");
+    assert_eq!(cell(&v, "C3")["formula_result"], "cached-unverified");
+    let svg = std::fs::read_to_string(v["files"][0].as_str().unwrap()).unwrap();
+    for display in ["50%", "1900-01-02", "$1,234.50", "0.500"] {
+        assert!(svg.contains(&format!(">{display}</text>")), "{display}");
+    }
 }
 
 #[test]

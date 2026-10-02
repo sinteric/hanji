@@ -1,6 +1,8 @@
 //! Bounded library worksheet jobs: actual package bytes, fonts and SVG/PNG output.
 #[path = "fixtures/xlsx_grid.rs"]
 mod fixture;
+#[path = "fixtures/xlsx_inherited.rs"]
+mod inherited;
 use hanji_preview::{
     xlsx::{open_xlsx, FormulaResult, XlsxOptions},
     FontOptions, PageData, PageFormat,
@@ -84,6 +86,81 @@ fn clipped_numeric_values_report_the_cell_and_keep_the_complete_display() {
         .any(|d| d.path == "sheets[0].cells[A1].clipping" && d.message.contains("leading digits")));
     assert!(!w.diagnostics().iter().any(|d| d.path == "sheets[0].cells[B1].clipping"));
     assert!(w.render(PageFormat::Svg).unwrap().diagnostics.iter().any(|d| d.path == "sheets[0].cells[A1].clipping"));
+}
+
+#[test]
+fn inherited_number_formats_use_the_effective_cell_row_or_column_style() {
+    let bytes = fixture::build(inherited::INHERITED_GRID, "", inherited::INHERITED_STYLES, &[]);
+    let mut b = open_xlsx(&bytes, XlsxOptions::default()).unwrap();
+    let w = b.render_window_with_fonts(0, "A1:E6", &FontOptions::default()).unwrap();
+    let cells = serde_json::to_value(&w.cells).unwrap();
+    for (address, display) in [
+        ("A1", "50%"),
+        ("B1", "1900-01-02"),
+        ("C1", "$1,234.50"),
+        ("A2", "50%"),
+        ("B2", "1900-01-02"),
+        ("C2", "$1,234.50"),
+        ("A3", "50%"),
+        ("B3", "50%"),
+        ("C3", "50%"),
+        ("D3", "0.5"),
+        ("E3", "0.500"),
+        ("A4", "1900-01-02"),
+        ("B4", "1900-01-02"),
+        ("C4", "1900-01-02"),
+        ("D4", "50%"),
+        ("A5", "$1,234.50"),
+        ("B5", "$1,234.50"),
+        ("C5", "$1,234.50"),
+        ("D5", "1234.5"),
+        ("A6", "50%"),
+        ("B6", "1900-01-02"),
+        ("C6", "$1,234.50"),
+    ] {
+        let cell = cells.as_array().unwrap().iter().find(|c| c["address"] == address).unwrap();
+        assert_eq!(cell["display"], display, "{address}");
+    }
+    for address in ["A2", "B2", "C2", "C3", "E3", "B4", "B5"] {
+        assert_eq!(
+            w.cells.iter().find(|c| c.address == address).unwrap().formula_result,
+            FormulaResult::CachedUnverified
+        );
+    }
+    let PageData::Svg(svg) = w.render(PageFormat::Svg).unwrap().data else { panic!() };
+    for display in ["50%", "1900-01-02", "$1,234.50", "0.500"] {
+        assert!(svg.contains(&format!(">{display}</text>")), "{display}");
+    }
+}
+
+#[test]
+fn inherited_date_formats_respect_the_workbook_date_system() {
+    let bytes = fixture::build(inherited::INHERITED_GRID, "", inherited::INHERITED_STYLES, &[]);
+    let mut parts = hanji_package::package::read(&bytes).unwrap();
+    let workbook = parts.iter_mut().find(|p| p.name == "xl/workbook.xml").unwrap();
+    workbook.data = String::from_utf8(workbook.data.clone())
+        .unwrap()
+        .replace("<sheets>", "<workbookPr date1904=\"1\"/><sheets>")
+        .into_bytes();
+    let mut b = open_xlsx(&hanji_package::package::write(&parts).unwrap(), XlsxOptions::default()).unwrap();
+    let w = b.render_window_with_fonts(0, "A1:E6", &FontOptions::default()).unwrap();
+    for address in ["B1", "B2", "A4", "B4", "C4", "B6"] {
+        assert_eq!(w.cells.iter().find(|c| c.address == address).unwrap().display, "1904-01-03", "{address}");
+    }
+}
+
+#[test]
+fn nonempty_text_omitted_from_a_narrow_visible_cell_is_diagnosed() {
+    let sheet = r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="2" width="0.01"/></cols><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>OMITTED</t></is></c><c r="B1" t="inlineStr"><is><t/></is></c></row></sheetData></worksheet>"#;
+    let mut b = open_xlsx(&fixture::build(sheet, "", fixture::STYLES, &[]), XlsxOptions::default()).unwrap();
+    let w = b.render_window_with_fonts(0, "A1:B1", &FontOptions::default()).unwrap();
+    assert_eq!(w.cells[0].display, "OMITTED");
+    assert!(w.diagnostics().iter().any(|d| d.path == "sheets[0].cells[A1].clipping" && d.message.contains("omitted")));
+    assert!(!w.diagnostics().iter().any(|d| d.path == "sheets[0].cells[B1].clipping"));
+    assert!(w.warnings().iter().any(|w| w.contains("cell text is omitted")));
+    let PageData::Svg(svg) = w.render(PageFormat::Svg).unwrap().data else { panic!() };
+    assert!(!svg.contains("OMITTED"));
+    assert!(w.html("narrow").contains("cell text is omitted"));
 }
 
 #[test]
