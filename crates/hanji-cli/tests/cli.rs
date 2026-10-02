@@ -124,6 +124,13 @@ fn preview_of_a_document_and_of_a_file() {
     assert!(text.lines().nth(1).unwrap().starts_with("6 slides from revision 1 of deck; fonts: "), "{text}");
     assert!(Path::new(&env.path("deck-r1-preview.html")).is_file());
     assert_eq!(env.ok(&["list"]).as_array().unwrap().len(), 1, "the file was not stored");
+    let v = env.ok(&["preview", &deck, "--out", &out, "--format", "svg"]);
+    assert!(v["diagnostics"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|d| d["message"] == "unsupported connector line style retained as visible default"));
+    assert!(text.contains("warning: ") && text.contains("unsupported connector line style"));
     let e = env.err(&["preview", &deck, "--rev", "2"]);
     assert_eq!(e["code"], "bad_request");
     env.ok(&["open", &corpus("prototype/remainder/corpus/korean-report.docx")]);

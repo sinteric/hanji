@@ -18,7 +18,7 @@ use oxml_layout::{
 };
 
 /// One stable diagnostic produced while lowering a page to SVG.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct SvgDiagnostic {
     /// Location in the layout result that required a fallback or was omitted.
     pub path: String,
@@ -31,7 +31,7 @@ pub struct SvgDiagnostic {
 pub struct SvgRenderResult {
     /// Complete UTF-8 SVG document.
     pub svg: String,
-    /// Layout diagnostics followed by SVG lowering diagnostics.
+    /// Page lowering diagnostics. Document-wide layout diagnostics are collected separately.
     pub diagnostics: Vec<SvgDiagnostic>,
 }
 
@@ -47,22 +47,7 @@ pub trait Hooks {
 
 pub fn render_page(layout: &LayoutResult, page_index: usize, hooks: &dyn Hooks) -> Option<SvgRenderResult> {
     let page = layout.pages.get(page_index)?;
-    let mut state = SvgState::new(
-        layout,
-        hooks,
-        page_index,
-        page.width,
-        page.height,
-        layout
-            .diagnostics
-            .iter()
-            .enumerate()
-            .map(|(index, diagnostic)| SvgDiagnostic {
-                path: format!("layout.diagnostics[{index}]"),
-                message: diagnostic.message.clone(),
-            })
-            .collect(),
-    );
+    let mut state = SvgState::new(layout, Some(hooks), page_index, page.width, page.height);
 
     let mut used_fonts = Vec::new();
     let mut seen_fonts = HashSet::new();
@@ -110,9 +95,35 @@ pub fn render_page(layout: &LayoutResult, page_index: usize, hooks: &dyn Hooks) 
     Some(SvgRenderResult { svg, diagnostics: state.diagnostics })
 }
 
+pub fn layout_diagnostics(layout: &LayoutResult) -> Vec<SvgDiagnostic> {
+    layout
+        .diagnostics
+        .iter()
+        .enumerate()
+        .map(|(index, diagnostic)| SvgDiagnostic {
+            path: format!("layout.diagnostics[{index}]"),
+            message: diagnostic.message.clone(),
+        })
+        .collect()
+}
+
+/// Use the same fallback checks as serialization, without XML/font/image encoding.
+pub fn page_diagnostics(layout: &LayoutResult, page_index: usize) -> Option<Vec<SvgDiagnostic>> {
+    let page = layout.pages.get(page_index)?;
+    let mut state = SvgState::new(layout, None, page_index, page.width, page.height);
+    if let Some(background) = &page.background {
+        state.paint_attributes(background, "fill", &format!("pages[{page_index}].background"));
+    }
+    let mut output = String::new();
+    state.emit_elements(&page.elements, &format!("pages[{page_index}].elements"), &mut output, Transform::IDENTITY);
+    debug_assert!(output.is_empty() && state.defs.is_empty());
+    Some(state.diagnostics)
+}
+
 struct SvgState<'a> {
     layout: &'a LayoutResult,
-    hooks: &'a dyn Hooks,
+    /// None selects diagnostics only; output buffers stay empty.
+    hooks: Option<&'a dyn Hooks>,
     page_index: usize,
     page_width: f64,
     page_height: f64,
@@ -125,11 +136,10 @@ struct SvgState<'a> {
 impl<'a> SvgState<'a> {
     fn new(
         layout: &'a LayoutResult,
-        hooks: &'a dyn Hooks,
+        hooks: Option<&'a dyn Hooks>,
         page_index: usize,
         page_width: f64,
         page_height: f64,
-        diagnostics: Vec<SvgDiagnostic>,
     ) -> Self {
         Self {
             layout,
@@ -138,7 +148,7 @@ impl<'a> SvgState<'a> {
             page_width,
             page_height,
             defs: String::new(),
-            diagnostics,
+            diagnostics: vec![],
             next_definition: 0,
             diagnosed_fonts: HashSet::new(),
         }
@@ -155,10 +165,11 @@ impl<'a> SvgState<'a> {
     }
 
     fn emit_font_definitions(&mut self, used_fonts: &[FontId]) {
+        let Some(hooks) = self.hooks else { return };
         if used_fonts.is_empty() {
             return;
         }
-        let rules = self.hooks.font_css(used_fonts);
+        let rules = hooks.font_css(used_fonts);
         if !rules.is_empty() {
             write!(self.defs, "<style>{rules}</style>").unwrap();
         }
@@ -193,6 +204,9 @@ impl<'a> SvgState<'a> {
                     }
                 }
                 PositionedElement::Line { start, end, width, color, dash_pattern } => {
+                    if self.hooks.is_none() {
+                        continue;
+                    }
                     write!(
                         output,
                         "<line x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\" stroke=\"{}\" stroke-opacity=\"{}\" stroke-width=\"{}\"",
@@ -211,6 +225,9 @@ impl<'a> SvgState<'a> {
                     output.push_str("/>");
                 }
                 PositionedElement::FilledRect { rect, color } => {
+                    if self.hooks.is_none() {
+                        continue;
+                    }
                     write!(
                         output,
                         "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\" fill-opacity=\"{}\"/>",
@@ -228,9 +245,13 @@ impl<'a> SvgState<'a> {
                 PositionedElement::Path(path_element) => self.emit_path_element(path_element, &element_path, output),
                 PositionedElement::Group(group) => self.emit_group(group, &element_path, output, accumulated),
                 PositionedElement::MarkedContent { children, .. } => {
-                    output.push_str("<g>");
+                    if self.hooks.is_some() {
+                        output.push_str("<g>");
+                    }
                     self.emit_elements(children, &format!("{element_path}.children"), output, accumulated);
-                    output.push_str("</g>");
+                    if self.hooks.is_some() {
+                        output.push_str("</g>");
+                    }
                 }
                 _ => self.diagnose(&element_path, "unsupported positioned element was omitted from SVG output"),
             }
@@ -242,7 +263,16 @@ impl<'a> SvgState<'a> {
             return;
         }
         self.diagnose_font_on_first_use(run.font_id);
-        let mark = self.hooks.mark(run.font_id);
+        let scalar_count = run.text.chars().count();
+        let simple = scalar_count == run.glyph_ids.len() && run.advances.len() == run.glyph_ids.len();
+        if !simple {
+            self.diagnose(path, "complex shaping kept searchable text with total-advance positioning");
+        }
+        if run.text.chars().any(|c| !is_xml_character(c)) {
+            self.diagnose(path, "XML-invalid text characters were replaced with U+FFFD");
+        }
+        let Some(hooks) = self.hooks else { return };
+        let mark = hooks.mark(run.font_id);
         if let Some(title) = &mark {
             write!(output, "<g class=\"hanji-subst\"><title>{}</title>", escape_text(title)).unwrap();
         }
@@ -252,7 +282,7 @@ impl<'a> SvgState<'a> {
             "<text xml:space=\"preserve\" y=\"{}\" font-family=\"hanji-font-{}\"{} font-size=\"{}\" font-weight=\"{}\" font-style=\"{}\" fill=\"{}\" fill-opacity=\"{}\"",
             number(run.origin.y),
             run.font_id.0,
-            self.hooks.text_attributes(run.font_id),
+            hooks.text_attributes(run.font_id),
             number(run.font_size),
             if run.bold { "bold" } else { "normal" },
             if run.italic { "italic" } else { "normal" },
@@ -261,8 +291,7 @@ impl<'a> SvgState<'a> {
         )
         .unwrap();
 
-        let scalar_count = run.text.chars().count();
-        if scalar_count == run.glyph_ids.len() && run.advances.len() == run.glyph_ids.len() {
+        if simple {
             let mut x = run.origin.x;
             output.push_str(" x=\"");
             for (index, advance) in run.advances.iter().enumerate() {
@@ -282,12 +311,8 @@ impl<'a> SvgState<'a> {
                 number(advance)
             )
             .unwrap();
-            self.diagnose(path, "complex shaping kept searchable text with total-advance positioning");
         }
-        let (text, replaced_invalid_xml) = sanitize_xml_text(&run.text);
-        if replaced_invalid_xml {
-            self.diagnose(path, "XML-invalid text characters were replaced with U+FFFD");
-        }
+        let (text, _) = sanitize_xml_text(&run.text);
         write!(output, ">{}</text>", escape_text(&text)).unwrap();
         if mark.is_some() {
             // A dotted underline a little below the baseline, the run's width.
@@ -332,6 +357,9 @@ impl<'a> SvgState<'a> {
             self.diagnose(path, "image bytes are neither PNG nor JPEG and were omitted");
             return;
         };
+        if self.hooks.is_none() {
+            return;
+        }
         write!(
             output,
             "<image x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" preserveAspectRatio=\"none\" href=\"data:{mime};base64,{}\"/>",
@@ -349,6 +377,9 @@ impl<'a> SvgState<'a> {
             self.diagnose(path, "active or unsupported link target was omitted");
             return;
         }
+        if self.hooks.is_none() {
+            return;
+        }
         write!(
             output,
             "<a href=\"{}\"><rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"none\" pointer-events=\"all\"/></a>",
@@ -362,6 +393,15 @@ impl<'a> SvgState<'a> {
     }
 
     fn emit_path_element(&mut self, element: &PathElement, path: &str, output: &mut String) {
+        if self.hooks.is_none() {
+            if let Some(paint) = &element.fill {
+                self.paint_attributes(paint, "fill", &format!("{path}.fill"));
+            }
+            if let Some(stroke) = &element.stroke {
+                self.paint_attributes(&stroke.paint, "stroke", &format!("{path}.stroke"));
+            }
+            return;
+        }
         write!(output, "<path d=\"{}\" fill-rule=\"{}\"", path_data(&element.path), fill_rule(element.path.fill_rule))
             .unwrap();
         match &element.fill {
@@ -406,8 +446,13 @@ impl<'a> SvgState<'a> {
     }
 
     fn emit_group(&mut self, group: &GroupElement, path: &str, output: &mut String, accumulated: Transform) {
-        let mut attributes = String::new();
         let group_to_page = group.transform.then(accumulated);
+        let filter_region = self.diagnose_group_effects(group, path, group_to_page);
+        if self.hooks.is_none() {
+            self.emit_elements(&group.children, &format!("{path}.children"), output, group_to_page);
+            return;
+        }
+        let mut attributes = String::new();
         if !group.transform.is_identity() {
             write!(
                 attributes,
@@ -439,21 +484,15 @@ impl<'a> SvgState<'a> {
         }
         if !group.effects.is_empty() {
             let id = self.definition_id();
-            let filter_region = group
-                .effects
-                .iter()
-                .any(|effect| matches!(effect, Effect::OuterShadow { .. }))
-                .then(|| self.filter_region(group, group_to_page));
             let mut filter = String::new();
             let mut shadows = Vec::new();
             for (index, effect) in group.effects.iter().enumerate() {
-                match effect {
-                    Effect::OuterShadow { dx, dy, blur, color } => {
-                        let blur_id = format!("{id}-blur-{index}");
-                        let offset_id = format!("{id}-offset-{index}");
-                        let flood_id = format!("{id}-flood-{index}");
-                        let shadow_id = format!("{id}-shadow-{index}");
-                        write!(
+                if let Effect::OuterShadow { dx, dy, blur, color } = effect {
+                    let blur_id = format!("{id}-blur-{index}");
+                    let offset_id = format!("{id}-offset-{index}");
+                    let flood_id = format!("{id}-flood-{index}");
+                    let shadow_id = format!("{id}-shadow-{index}");
+                    write!(
                             filter,
                             "<feGaussianBlur in=\"SourceAlpha\" stdDeviation=\"{}\" result=\"{blur_id}\"/><feOffset in=\"{blur_id}\" dx=\"{}\" dy=\"{}\" result=\"{offset_id}\"/><feFlood flood-color=\"{}\" flood-opacity=\"{}\" result=\"{flood_id}\"/><feComposite in=\"{flood_id}\" in2=\"{offset_id}\" operator=\"in\" result=\"{shadow_id}\"/>",
                             number((*blur).max(0.0) / 2.0),
@@ -463,21 +502,7 @@ impl<'a> SvgState<'a> {
                             number(color.a.clamp(0.0, 1.0))
                         )
                         .unwrap();
-                        shadows.push(shadow_id);
-                        if *blur > 0.0
-                            && !preserves_isotropic_blur(group_to_page)
-                            && matches!(filter_region, Some(Ok(Some(_))))
-                        {
-                            self.diagnose(
-                                &format!("{path}.effects[{index}]"),
-                                "non-uniform or skewed transform makes SVG shadow blur anisotropic instead of the raster backend's average-scale isotropic blur",
-                            );
-                        }
-                    }
-                    _ => self.diagnose(
-                        &format!("{path}.effects[{index}]"),
-                        "unsupported group effect was omitted while its children were preserved",
-                    ),
+                    shadows.push(shadow_id);
                 }
             }
             if !filter.is_empty() {
@@ -500,10 +525,7 @@ impl<'a> SvgState<'a> {
                         write!(attributes, " filter=\"url(#{id})\"").unwrap();
                     }
                     Some(Ok(None)) | None => {}
-                    Some(Err(())) => self.diagnose(
-                        path,
-                        "group effects were omitted because singular-transform source bounds could not be proven",
-                    ),
+                    Some(Err(())) => {}
                 }
             }
         }
@@ -517,6 +539,42 @@ impl<'a> SvgState<'a> {
             output.push_str("</g>");
         }
         output.push_str("</g>");
+    }
+
+    fn diagnose_group_effects(
+        &mut self,
+        group: &GroupElement,
+        path: &str,
+        group_to_page: Transform,
+    ) -> Option<Result<Option<Rect>, ()>> {
+        let region = group
+            .effects
+            .iter()
+            .any(|effect| matches!(effect, Effect::OuterShadow { .. }))
+            .then(|| self.filter_region(group, group_to_page));
+        for (index, effect) in group.effects.iter().enumerate() {
+            match effect {
+                Effect::OuterShadow { blur, .. } => {
+                    if *blur > 0.0 && !preserves_isotropic_blur(group_to_page) && matches!(region, Some(Ok(Some(_)))) {
+                        self.diagnose(
+                            &format!("{path}.effects[{index}]"),
+                            "non-uniform or skewed transform makes SVG shadow blur anisotropic instead of the raster backend's average-scale isotropic blur",
+                        );
+                    }
+                }
+                _ => self.diagnose(
+                    &format!("{path}.effects[{index}]"),
+                    "unsupported group effect was omitted while its children were preserved",
+                ),
+            }
+        }
+        if matches!(region, Some(Err(()))) {
+            self.diagnose(
+                path,
+                "group effects were omitted because singular-transform source bounds could not be proven",
+            );
+        }
+        region
     }
 
     fn filter_region(&self, group: &GroupElement, group_to_page: Transform) -> Result<Option<Rect>, ()> {
@@ -538,13 +596,20 @@ impl<'a> SvgState<'a> {
 
     fn paint_attributes(&mut self, paint: &Paint, property: &str, path: &str) -> Option<String> {
         match paint {
+            Paint::Linear { extend, .. } | Paint::Radial { extend, .. } => {
+                self.diagnose_gradient_extension(*extend, path)
+            }
+            Paint::Tile { .. } => self.diagnose(path, "tile paint was omitted because its carrier has no media bytes"),
+            Paint::Solid(_) => {}
+        }
+        self.hooks?;
+        match paint {
             Paint::Solid(color) => Some(format!(
                 "{property}=\"{}\" {property}-opacity=\"{}\"",
                 color_hex(*color),
                 number(color.a.clamp(0.0, 1.0))
             )),
-            Paint::Linear { start, end, stops, extend } => {
-                self.diagnose_gradient_extension(*extend, path);
+            Paint::Linear { start, end, stops, .. } => {
                 let id = self.definition_id();
                 let mut definition = format!(
                     "<linearGradient id=\"{id}\" gradientUnits=\"userSpaceOnUse\" x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\">",
@@ -558,8 +623,7 @@ impl<'a> SvgState<'a> {
                 self.defs.push_str(&definition);
                 Some(format!("{property}=\"url(#{id})\""))
             }
-            Paint::Radial { center, radius, focal, stops, extend } => {
-                self.diagnose_gradient_extension(*extend, path);
+            Paint::Radial { center, radius, focal, stops, .. } => {
                 let id = self.definition_id();
                 let mut definition = format!(
                     "<radialGradient id=\"{id}\" gradientUnits=\"userSpaceOnUse\" cx=\"{}\" cy=\"{}\" r=\"{}\" fx=\"{}\" fy=\"{}\">",
@@ -574,10 +638,7 @@ impl<'a> SvgState<'a> {
                 self.defs.push_str(&definition);
                 Some(format!("{property}=\"url(#{id})\""))
             }
-            Paint::Tile { .. } => {
-                self.diagnose(path, "tile paint was omitted because its carrier has no media bytes");
-                None
-            }
+            Paint::Tile { .. } => None,
         }
     }
 

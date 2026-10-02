@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 use hanji_store::{Code, Error, ExportOptions, Format, Result, Storage, Workspace};
 use serde::Serialize;
 
-use crate::{render_pptx, FontsReport, Options, Preview};
+use crate::{render_pptx, Diagnostic, FontsReport, Options, Preview};
 
 /// What the preview writes.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
@@ -51,6 +51,9 @@ pub struct Previewed {
     pub summary: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub warnings: Vec<String>,
+    /// Rendering and font-embedding fallbacks, with their source paths.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub diagnostics: Vec<Diagnostic>,
 }
 
 /// Whether hanji can preview `format` yet, as the refusal to give.
@@ -90,6 +93,7 @@ pub fn render<S: Storage>(
         summary: p.fonts.summary(),
         fonts: p.fonts.clone(),
         warnings: p.warnings.clone(),
+        diagnostics: p.diagnostics.clone(),
     };
     Ok((out, p))
 }
