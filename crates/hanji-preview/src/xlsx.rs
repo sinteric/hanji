@@ -1,0 +1,663 @@
+//! Read-only worksheet windows from package bytes. This is a grid projection,
+//! not Excel print layout or a calculation API. No macros, links or formulas execute.
+mod styles;
+
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::sync::Arc;
+
+use hanji_core::cells::{col_letters, CellRange, CellRef, MAX_COL, MAX_ROW};
+use hanji_package::{opc, package, xml};
+use hanji_xlsx::book::{Book, SheetKind, Shell};
+use hanji_xlsx::store::{Cell, Row};
+use hanji_xlsx::value::CellValue;
+use oxml_layout::{
+    Color, FontId, GlyphRun, GroupElement, LayoutResult, PageFrame, Path, Point, PositionedElement, Rect, Transform,
+};
+use serde::Serialize;
+
+use crate::{
+    fonts::{Fonts, Script},
+    Diagnostic, FaceInfo, FontOptions, FontResolver, FontsReport, PageFormat, PageInfo, Preview, RenderedPage,
+};
+use styles::Style;
+
+/// Configurable workload budgets, independent of Excel's address limits.
+/// Exceeding one is an explicit error; no cells/results are silently truncated.
+#[derive(Clone, Debug)]
+pub struct XlsxOptions {
+    pub max_unpacked_bytes: u64,
+    pub max_window_rows: u32,
+    pub max_window_columns: u32,
+    pub max_window_cells: u64,
+    pub max_window_text_bytes: usize,
+    pub max_window_merges: usize,
+    pub max_png_pixels: u64,
+    pub max_font_family_bytes: usize,
+    pub max_number_format_bytes: usize,
+}
+impl Default for XlsxOptions {
+    fn default() -> Self {
+        Self {
+            max_unpacked_bytes: 64 << 20,
+            max_window_rows: 512,
+            max_window_columns: 128,
+            max_window_cells: 32_768,
+            max_window_text_bytes: 2 << 20,
+            max_window_merges: 4096,
+            max_png_pixels: 16_777_216,
+            max_font_family_bytes: 1024,
+            max_number_format_bytes: 4096,
+        }
+    }
+}
+#[derive(Clone, Debug, Serialize)]
+pub struct SheetInfo {
+    pub index: usize,
+    pub name: String,
+    pub state: String,
+    pub is_worksheet: bool,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum FormulaResult {
+    NotFormula,
+    CachedUnverified,
+    CachedPossiblyStale,
+    Missing,
+}
+#[derive(Clone, Debug, Serialize)]
+pub struct CellInfo {
+    pub address: String,
+    pub display: String,
+    /// Stored text only; shared-formula follower expressions are not expanded.
+    pub formula: Option<String>,
+    pub formula_result: FormulaResult,
+}
+
+/// Holds sparse package rows, shared strings and styles. A worksheet is indexed
+/// on first access; only requested rows become visual layout elements.
+pub struct Workbook {
+    book: Book,
+    styles: Vec<Style>,
+    options: XlsxOptions,
+    possibly_stale: bool,
+    pub sheets: Vec<SheetInfo>,
+    pub diagnostics: Vec<Diagnostic>,
+}
+/// A single window is one coarse render job, using the same embedded-font and
+/// SVG/PNG pipeline as presentation pages. Retain/drop windows independently.
+pub struct Window {
+    preview: Preview,
+    max_png_pixels: u64,
+    pub sheet: SheetInfo,
+    pub range: String,
+    pub cells: Vec<CellInfo>,
+}
+fn diagnostic(path: impl Into<String>, message: impl Into<String>) -> Diagnostic {
+    Diagnostic { path: path.into(), message: message.into() }
+}
+fn yes(s: Option<String>) -> bool {
+    s.is_some_and(|s| s == "1" || s == "true")
+}
+fn attr(attrs: &[(String, String)], key: &str) -> Option<String> {
+    attrs.iter().find(|(k, _)| k == key).map(|(_, v)| xml::unescape(v))
+}
+fn size(s: Option<String>, default: f64, max: f64) -> Result<f64, String> {
+    let n = match s {
+        Some(s) => s.parse::<f64>().map_err(|_| "invalid row/column size")?,
+        None => default,
+    };
+    if !n.is_finite() || n < 0.0 || n > max {
+        return Err("row/column size outside supported numeric range".into());
+    }
+    Ok(n)
+}
+
+pub fn open_xlsx(bytes: &[u8], options: XlsxOptions) -> Result<Workbook, String> {
+    if options.max_unpacked_bytes == 0
+        || options.max_unpacked_bytes > package::MAX_UNPACKED
+        || options.max_window_rows == 0
+        || options.max_window_columns == 0
+        || options.max_window_cells == 0
+        || options.max_window_text_bytes == 0
+        || options.max_window_merges == 0
+        || options.max_png_pixels == 0
+        || options.max_font_family_bytes == 0
+        || options.max_number_format_bytes == 0
+    {
+        return Err(
+            "XLSX preview budgets must be positive; package budget cannot exceed the package reader's limit".into()
+        );
+    }
+    let parts = package::read_limited(bytes, options.max_unpacked_bytes)?;
+    let mut diagnostics = vec![];
+    if parts.iter().any(|p| p.name.to_ascii_lowercase().ends_with("vbaproject.bin")) {
+        diagnostics.push(diagnostic("workbook.macros", "macro content is ignored and never executed"));
+    }
+    if parts.iter().filter(|p| p.name.ends_with(".rels")).any(|p| opc::parse_rels(&p.data).iter().any(|r| r.external)) {
+        diagnostics.push(diagnostic(
+            "workbook.externalLinks",
+            "external relationships are not fetched, activated or refreshed",
+        ));
+    }
+    let book = Book::load(parts, vec![], Shell::default())?;
+    if book.styles.fmts.values().any(|s| s.len() > options.max_number_format_bytes) {
+        return Err("number format exceeds the configured metadata budget".into());
+    }
+    let styles = styles::parse(
+        book.styles.part.as_deref().and_then(|p| package::get(&book.parts, p)),
+        options.max_font_family_bytes,
+    )?;
+    let possibly_stale = book.wb.root.elements().find(|e| e.local() == "calcPr").is_some_and(|c| {
+        yes(c.get("fullCalcOnLoad"))
+            || yes(c.get("forceFullCalc"))
+            || c.get("calcMode").as_deref() == Some("manual")
+            || c.get("calcCompleted").is_some_and(|v| v == "0" || v == "false")
+    });
+    let sheets = book
+        .sheets
+        .iter()
+        .enumerate()
+        .map(|(index, s)| SheetInfo {
+            index,
+            name: s.name.clone(),
+            state: s.state.clone(),
+            is_worksheet: s.kind == SheetKind::Work,
+        })
+        .collect();
+    Ok(Workbook { book, styles, options, possibly_stale, sheets, diagnostics })
+}
+
+impl Workbook {
+    /// Range uses Excel A1 addresses. Hidden rows/columns collapse; hidden sheets
+    /// are listed with their state and can be accessed only by explicit index.
+    pub fn render_window_with_fonts(
+        &mut self,
+        sheet: usize,
+        range: &str,
+        fonts: &FontOptions,
+    ) -> Result<Window, String> {
+        let window = {
+            let resolver = Fonts::from_bytes(&fonts.fonts, &[], fonts.aliases.clone())?;
+            self.layout_window(sheet, range, &resolver)?
+        };
+        finish_window(window)
+    }
+
+    pub fn render_window_with_resolver(
+        &mut self,
+        sheet: usize,
+        range: &str,
+        fonts: &dyn FontResolver,
+    ) -> Result<Window, String> {
+        finish_window(self.layout_window(sheet, range, fonts)?)
+    }
+
+    fn layout_window(&mut self, sheet: usize, range: &str, fonts: &dyn FontResolver) -> Result<Window, String> {
+        let range = CellRange::parse(range).ok_or("invalid worksheet window; expected an A1 range")?;
+        if range.rows() > self.options.max_window_rows
+            || range.cols() > self.options.max_window_columns
+            || u64::from(range.rows()) * u64::from(range.cols()) > self.options.max_window_cells
+        {
+            return Err(
+                "worksheet window exceeds the configured row/column/cell budget; request a smaller range".into()
+            );
+        }
+        let info = self.sheets.get(sheet).ok_or("worksheet index is out of range")?.clone();
+        if !info.is_worksheet {
+            return Err("chart/macro/dialog sheets do not have a worksheet grid preview".into());
+        }
+        self.book.load_store(sheet)?;
+        let store = self.book.store(sheet);
+        let prefix = format!("sheets[{sheet}]");
+        let mut diagnostics = self.diagnostics.clone();
+        diagnostics.push(diagnostic(format!("{prefix}.grid"), "worksheet window only: column widths use a 7-pixel maximum-digit approximation; text wraps by character, clips to cells, and stored row heights are not auto-fitted; rich-text runs use the cell font; print pagination is not applied"));
+        let mut merges = vec![];
+        if let Some(list) = store.child("mergeCells") {
+            for e in list.elements().filter(|e| e.local() == "mergeCell") {
+                let m = e.get("ref").and_then(|s| CellRange::parse(&s)).ok_or("invalid merged-cell range")?;
+                if !m.intersects(&range) {
+                    continue;
+                }
+                if merges.len() >= self.options.max_window_merges {
+                    return Err("window exceeds the configured merged-range budget".into());
+                }
+                if merges.iter().any(|o: &CellRange| o.intersects(&m)) {
+                    return Err("overlapping merged-cell ranges are not supported".into());
+                }
+                if m.intersects(&range) && (!range.contains(m.first) || !range.contains(m.last)) {
+                    return Err(format!(
+                        "window cuts merged range {m}; request a window containing that complete range"
+                    ));
+                }
+                merges.push(m);
+            }
+        }
+        for feature in [
+            "drawing",
+            "legacyDrawing",
+            "conditionalFormatting",
+            "tableParts",
+            "dataValidations",
+            "hyperlinks",
+            "autoFilter",
+            "sheetProtection",
+            "extLst",
+            "pageSetup",
+            "pageMargins",
+            "headerFooter",
+            "rowBreaks",
+            "colBreaks",
+            "sheetViews",
+        ] {
+            if store.child(feature).is_some() {
+                diagnostics.push(diagnostic(format!("{prefix}.{feature}"), format!("{feature} semantics are not applied in the worksheet grid (charts/images, rules, table styles, filters, protection, links, freeze panes and print settings are separate work)")));
+            }
+        }
+        let mut rows = BTreeMap::<u32, Row>::new();
+        for r in range.first.row..=range.last.row {
+            if let Some(row) = store.try_row(r).map_err(|e| format!("{prefix}.rows[{r}]: {e}"))? {
+                rows.insert(r, row);
+            }
+        }
+        let format = store.child("sheetFormatPr");
+        let default_height = size(format.and_then(|f| f.get("defaultRowHeight")), 15.0, 409.0)?;
+        let default_width = size(format.and_then(|f| f.get("defaultColWidth")), 8.43, 255.0)?;
+        let mut widths = vec![(default_width * 7.0 + 5.0) * 0.75; range.cols() as usize];
+        let mut col_styles = vec![0usize; widths.len()];
+        if let Some(cols) = store.child("cols") {
+            for c in cols.elements().filter(|c| c.local() == "col") {
+                let min = c.get("min").and_then(|s| s.parse::<u32>().ok()).ok_or("invalid column min")?;
+                let max = c.get("max").and_then(|s| s.parse::<u32>().ok()).ok_or("invalid column max")?;
+                if min == 0 || min > max || max > MAX_COL {
+                    return Err("invalid column span".into());
+                }
+                let width = size(c.get("width"), default_width, 255.0)?;
+                let width = if yes(c.get("hidden")) || width == 0.0 { 0.0 } else { (width * 7.0 + 5.0) * 0.75 };
+                for col in (min - 1).max(range.first.col)..=(max - 1).min(range.last.col) {
+                    widths[(col - range.first.col) as usize] = width;
+                    col_styles[(col - range.first.col) as usize] =
+                        c.get("style").and_then(|s| s.parse().ok()).unwrap_or(0);
+                }
+            }
+        }
+        let default_hidden = yes(format.and_then(|f| f.get("zeroHeight")));
+        let mut heights = vec![if default_hidden { 0.0 } else { default_height }; range.rows() as usize];
+        for (&r, row) in &rows {
+            if r == 0 || r > MAX_ROW {
+                return Err("invalid row address".into());
+            }
+            heights[(r - range.first.row) as usize] =
+                if attr(&row.attrs, "hidden").map_or(default_hidden, |v| v == "1" || v == "true") {
+                    0.0
+                } else {
+                    size(attr(&row.attrs, "ht"), default_height, 409.0)?
+                };
+        }
+        let offsets = |sizes: &[f64], start: f64| {
+            let mut out = vec![start];
+            for n in sizes {
+                out.push(out.last().unwrap() + n);
+            }
+            out
+        };
+        let xs = offsets(&widths, 36.0);
+        let ys = offsets(&heights, 18.0);
+        let mut builder = GridBuilder::new(fonts, self.options.max_window_text_bytes, diagnostics);
+        for (ci, &w) in widths.iter().enumerate().filter(|(_, w)| **w > 0.0) {
+            let rect = Rect { x: xs[ci], y: 0.0, width: w, height: 18.0 };
+            builder.cell(rect, &col_letters(range.first.col + ci as u32), &Style::default(), false, "header")?;
+        }
+        let mut cells = vec![];
+        let mut used_styles = BTreeSet::new();
+        for (ri, &h) in heights.iter().enumerate().filter(|(_, h)| **h > 0.0) {
+            let r = range.first.row + ri as u32;
+            builder.cell(
+                Rect { x: 0.0, y: ys[ri], width: 36.0, height: h },
+                &r.to_string(),
+                &Style::default(),
+                true,
+                "header",
+            )?;
+            let row = rows.get(&r);
+            let values: BTreeMap<u32, &Cell> = row.into_iter().flat_map(|r| &r.cells).map(|c| (c.col, c)).collect();
+            if row.is_some_and(|row| {
+                row.r != r
+                    || values.len() != row.cells.len()
+                    || row.cells.iter().any(|c| {
+                        c.col >= MAX_COL
+                            || c.get("r").and_then(CellRef::parse).is_none_or(|a| a.row != r || a.col != c.col)
+                    })
+            }) {
+                return Err(format!("{prefix}.rows[{r}]: duplicate or invalid cell column"));
+            }
+            for (ci, _) in widths.iter().enumerate().filter(|(_, w)| **w > 0.0) {
+                let col = range.first.col + ci as u32;
+                let address = CellRef::new(col, r);
+                let merged = merges.iter().find(|m| m.contains(address));
+                if merged.is_some_and(|m| m.first != address) {
+                    continue;
+                }
+                let (last_col, last_row) = merged.map_or((col, r), |m| (m.last.col, m.last.row));
+                let rect = Rect {
+                    x: xs[ci],
+                    y: ys[ri],
+                    width: xs[(last_col - range.first.col + 1) as usize] - xs[ci],
+                    height: ys[(last_row - range.first.row + 1) as usize] - ys[ri],
+                };
+                let cell = values.get(&col).copied();
+                let style_index = cell
+                    .and_then(|c| c.get("s"))
+                    .and_then(|s| s.parse().ok())
+                    .or_else(|| {
+                        row.filter(|r| yes(attr(&r.attrs, "customFormat")))
+                            .and_then(|r| attr(&r.attrs, "s"))
+                            .and_then(|s| s.parse().ok())
+                    })
+                    .unwrap_or(col_styles[ci]);
+                let style = self
+                    .styles
+                    .get(style_index)
+                    .ok_or_else(|| format!("{prefix}.cells[{address}]: invalid cell style {style_index}"))?;
+                if used_styles.insert(style_index) {
+                    for loss in &style.losses {
+                        builder.diagnostics.push(diagnostic(format!("{prefix}.styles[{style_index}]"), loss));
+                    }
+                }
+                let path = format!("{prefix}.cells[{address}]");
+                if let Some(c) = cell {
+                    if c.ty() == "s"
+                        && c.v
+                            .as_deref()
+                            .and_then(|s| s.parse::<usize>().ok())
+                            .and_then(|i| self.book.sst.as_ref()?.get(i))
+                            .is_none()
+                    {
+                        return Err(format!("{path}: invalid shared-string reference"));
+                    }
+                    if c.ty() == "b"
+                        && c.v.as_deref().is_some_and(|v| !matches!(v.trim(), "0" | "1" | "true" | "false"))
+                    {
+                        return Err(format!("{path}: invalid boolean value"));
+                    }
+                    if c.ty() == "n"
+                        && c.v.as_deref().and_then(|s| s.parse::<f64>().ok()).is_some_and(|v| !v.is_finite())
+                    {
+                        return Err(format!("{path}: nonfinite numeric value"));
+                    }
+                    if !matches!(c.ty(), "n" | "s" | "str" | "inlineStr" | "b" | "e" | "d") {
+                        return Err(format!("{path}: unsupported cell value type {:?}", c.ty()));
+                    }
+                }
+                let mut display = cell.map(|c| self.book.display(c)).unwrap_or_default();
+                let formula = cell.and_then(Cell::formula);
+                let formula_result = if let Some(c) = cell.filter(|c| c.f.is_some()) {
+                    if c.lacks_cached_value()
+                        || (c.ty() != "str" && c.v.as_deref().is_some_and(|v| v.trim().is_empty()))
+                    {
+                        display = "#UNEVALUATED".into();
+                        builder.diagnostics.push(diagnostic(
+                            format!("{path}.formula"),
+                            "formula has no cached result; shown as #UNEVALUATED; no evaluation was performed",
+                        ));
+                        FormulaResult::Missing
+                    } else {
+                        builder.diagnostics.push(diagnostic(format!("{path}.formula"), if self.possibly_stale {
+                            "stored formula result shown; workbook requests recalculation or uses manual calculation, so this cache may be stale; no evaluation was performed"
+                        } else { "stored formula result shown; cache freshness is unverified; no evaluation was performed" }));
+                        if self.possibly_stale {
+                            FormulaResult::CachedPossiblyStale
+                        } else {
+                            FormulaResult::CachedUnverified
+                        }
+                    }
+                } else {
+                    FormulaResult::NotFormula
+                };
+                let numeric = cell.is_some_and(|c| matches!(self.book.value(c), CellValue::Number(_)));
+                builder.cell(rect, &display, style, numeric, &path)?;
+                if cell.is_some() {
+                    cells.push(CellInfo { address: address.to_string(), display, formula, formula_result });
+                }
+            }
+        }
+        let preview = builder.finish(*xs.last().unwrap(), *ys.last().unwrap())?;
+        Ok(Window {
+            preview,
+            max_png_pixels: self.options.max_png_pixels,
+            sheet: info,
+            range: range.to_string(),
+            cells,
+        })
+    }
+}
+
+impl Window {
+    pub fn page_info(&self) -> PageInfo {
+        self.preview.page_info(0).unwrap()
+    }
+    pub fn fonts(&self) -> &FontsReport {
+        &self.preview.fonts
+    }
+    pub fn diagnostics(&self) -> &[Diagnostic] {
+        &self.preview.diagnostics
+    }
+    pub fn warnings(&self) -> &[String] {
+        &self.preview.warnings
+    }
+    pub fn render(&self, format: PageFormat) -> Result<RenderedPage, String> {
+        if let PageFormat::Png { dpi } = format {
+            if !dpi.is_finite() || dpi <= 0.0 {
+                return Err("PNG DPI must be finite and positive".into());
+            }
+            let p = self.page_info();
+            let w = (p.width * dpi / 72.0).round().max(1.0);
+            let h = (p.height * dpi / 72.0).round().max(1.0);
+            if !w.is_finite()
+                || !h.is_finite()
+                || w > u32::MAX as f64
+                || h > u32::MAX as f64
+                || w * h > self.max_png_pixels as f64
+            {
+                return Err(
+                    "worksheet PNG exceeds the configured pixel budget; lower DPI or request a smaller window".into()
+                );
+            }
+        }
+        let mut output = self.preview.render_page(0, format)?;
+        output.diagnostics = self.preview.diagnostics.clone();
+        Ok(output)
+    }
+    /// A self-contained static window. No scripts, external links or event handlers.
+    pub fn html(&self, title: &str) -> String {
+        let esc = xml::escape_text;
+        let warnings: String = self.preview.warnings.iter().map(|w| format!("<li>{}</li>", esc(w))).collect();
+        format!("<!doctype html><html><head><meta charset=\"utf-8\"><title>{}</title></head><body><h1>{}</h1><p>{}: {} — worksheet window, cached formula results only</p><ul>{warnings}</ul>{}</body></html>", esc(title), esc(title), esc(&self.sheet.name), esc(&self.range), self.preview.slide_svg(0))
+    }
+}
+
+fn finish_window(mut window: Window) -> Result<Window, String> {
+    // Drop worksheet layout/font-selection temporaries before subset preflight.
+    window.preview.count();
+    window.preview.prepare_output()?;
+    Ok(window)
+}
+
+struct GridBuilder<'a> {
+    resolver: &'a dyn FontResolver,
+    elements: Vec<PositionedElement>,
+    fonts: Vec<oxml_layout::FontData>,
+    faces: HashMap<FontId, FaceInfo>,
+    keys: BTreeMap<(String, Script, bool, bool), FontId>,
+    diagnostics: Vec<Diagnostic>,
+    remaining_text: usize,
+}
+impl<'a> GridBuilder<'a> {
+    fn new(resolver: &'a dyn FontResolver, remaining_text: usize, diagnostics: Vec<Diagnostic>) -> Self {
+        Self {
+            resolver,
+            elements: vec![],
+            fonts: vec![],
+            faces: HashMap::new(),
+            keys: BTreeMap::new(),
+            diagnostics,
+            remaining_text,
+        }
+    }
+    fn font(&mut self, style: &Style, text: &str) -> Result<FontId, String> {
+        let script = Script::of(text);
+        let key = (style.family.clone(), script, style.bold, style.italic);
+        if let Some(id) = self.keys.get(&key) {
+            return Ok(*id);
+        }
+        let drawn = self.resolver.resolve_font(&style.family, script, style.bold, style.italic);
+        let face = drawn
+            .clone()
+            .or_else(|| self.resolver.resolve_font(&style.family, Script::Latin, style.bold, style.italic))
+            .ok_or("no font available to lay out worksheet text")?;
+        if face.ea_advance.is_some() {
+            self.diagnostics.push(diagnostic(
+                format!("window.fonts[{}]", self.fonts.len()),
+                "East Asian advance overrides are not applied in the worksheet grid; selected face advances are used",
+            ));
+        }
+        let parsed = ttf_parser::Face::parse(&face.font.data, face.font.face_index)
+            .map_err(|e| format!("worksheet font: {e}"))?;
+        let id = FontId(self.fonts.len() as u32);
+        self.fonts.push(oxml_layout::FontData {
+            id,
+            family: face.family.clone(),
+            data: face.font.data.clone(),
+            face_index: face.font.face_index,
+            bold: parsed.is_bold(),
+            italic: parsed.is_italic(),
+        });
+        self.faces.insert(
+            id,
+            FaceInfo {
+                requested: style.family.clone(),
+                script,
+                drawn: drawn.as_ref().map(|f| f.family.clone()),
+                source: drawn.as_ref().map(|f| f.source),
+                metrics: drawn.map_or(crate::fonts::Metrics::Substitute, |f| {
+                    if f.ea_advance.is_some() {
+                        crate::fonts::Metrics::Substitute
+                    } else {
+                        f.metrics
+                    }
+                }),
+            },
+        );
+        self.keys.insert(key, id);
+        Ok(id)
+    }
+    fn cell(&mut self, rect: Rect, text: &str, style: &Style, numeric: bool, path: &str) -> Result<(), String> {
+        self.remaining_text =
+            self.remaining_text.checked_sub(text.len()).ok_or("worksheet window exceeds the configured text budget")?;
+        if text.chars().any(|c| matches!(c as u32, 0x0300..=0x036F | 0x0590..=0x10FF | 0x1780..=0x17FF | 0x200E..=0x200F | 0x202A..=0x202E | 0x2066..=0x2069)) {
+            self.diagnostics.push(diagnostic(format!("{path}.text"), "complex-script shaping and bidirectional reordering are not performed; scalar-positioned text may differ"));
+        }
+        if let Some(color) = style.fill {
+            self.elements.push(PositionedElement::FilledRect { rect, color });
+        }
+        let corners = [
+            (Point { x: rect.x, y: rect.y }, Point { x: rect.x, y: rect.y + rect.height }),
+            (Point { x: rect.x + rect.width, y: rect.y }, Point { x: rect.x + rect.width, y: rect.y + rect.height }),
+            (Point { x: rect.x, y: rect.y }, Point { x: rect.x + rect.width, y: rect.y }),
+            (Point { x: rect.x, y: rect.y + rect.height }, Point { x: rect.x + rect.width, y: rect.y + rect.height }),
+        ];
+        for (k, (start, end)) in corners.into_iter().enumerate() {
+            let (width, color, dash_pattern) =
+                style.edges[k].as_ref().map_or((0.3, Color::from_hex("D0D0D0"), None), |e| (e.width, e.color, e.dash));
+            self.elements.push(PositionedElement::Line { start, end, width, color, dash_pattern });
+        }
+        if text.is_empty() || rect.width <= 4.0 || rect.height <= 0.0 {
+            return Ok(());
+        }
+        let id = self.font(style, text)?;
+        let font = &self.fonts[id.0 as usize];
+        let face = ttf_parser::Face::parse(&font.data, font.face_index).map_err(|e| format!("worksheet font: {e}"))?;
+        let scale = style.size / f64::from(face.units_per_em());
+        if (style.bold && !font.bold) || (style.italic && !font.italic) {
+            self.diagnostics.push(diagnostic(
+                format!("{path}.font"),
+                "requested bold/italic face is unavailable; the selected face is drawn without synthetic styling",
+            ));
+        }
+        let mut lines: Vec<(String, Vec<u16>, Vec<f64>)> = vec![];
+        let (mut line, mut glyphs, mut advances, mut width) = (String::new(), vec![], vec![], 0.0);
+        for c in text.chars() {
+            let glyph = face.glyph_index(c).unwrap_or(ttf_parser::GlyphId(0));
+            let advance = f64::from(face.glyph_hor_advance(glyph).unwrap_or(face.units_per_em() / 2)) * scale;
+            if c == '\n' || (style.wrap && width + advance > rect.width - 4.0 && !line.is_empty()) {
+                lines.push((std::mem::take(&mut line), std::mem::take(&mut glyphs), std::mem::take(&mut advances)));
+                width = 0.0;
+            }
+            if c != '\n' {
+                line.push(c);
+                glyphs.push(glyph.0);
+                advances.push(advance);
+                width += advance;
+            }
+        }
+        lines.push((line, glyphs, advances));
+        let line_height = style.size * 1.2;
+        let content_height = lines.len() as f64 * line_height;
+        let top = match style.vertical.as_str() {
+            "top" => rect.y + 1.0,
+            "center" => rect.y + ((rect.height - content_height) / 2.0).max(0.0),
+            _ => rect.y + (rect.height - content_height - 1.0).max(0.0),
+        };
+        let mut children = vec![];
+        for (i, (text, glyph_ids, advances)) in lines.into_iter().enumerate() {
+            let width: f64 = advances.iter().sum();
+            let x = match style.horizontal.as_str() {
+                "center" => rect.x + (rect.width - width) / 2.0,
+                "right" => rect.x + rect.width - width - 2.0,
+                "general" if numeric => rect.x + rect.width - width - 2.0,
+                _ => rect.x + 2.0,
+            };
+            children.push(PositionedElement::Text(GlyphRun {
+                origin: Point { x, y: top + style.size + i as f64 * line_height },
+                font_id: id,
+                font_size: style.size,
+                glyph_ids,
+                advances,
+                text,
+                source: None,
+                color: style.color,
+                bold: font.bold,
+                italic: font.italic,
+                field_kind: None,
+                field_source: None,
+                note: None,
+            }));
+        }
+        self.elements.push(PositionedElement::Group(GroupElement {
+            transform: Transform::IDENTITY,
+            clip: Some(Path::rect(rect)),
+            opacity: 1.0,
+            effects: vec![],
+            children,
+        }));
+        Ok(())
+    }
+    fn finish(self, width: f64, height: f64) -> Result<Preview, String> {
+        let p = Preview {
+            layout: LayoutResult::new(
+                vec![Arc::new(PageFrame::new(1, width, height, self.elements))],
+                self.fonts,
+                None,
+                vec![],
+            ),
+            faces: self.faces,
+            chars: vec![],
+            page_subsets: vec![],
+            document_subsets: vec![],
+            fonts: FontsReport::default(),
+            warnings: self.resolver.warnings().to_vec(),
+            diagnostics: self.diagnostics,
+        };
+        Ok(p)
+    }
+}

@@ -1,6 +1,6 @@
 [package]
 name = "hanji-preview"
-description = "hanji preview: renders the package an export would write, one SVG per slide, with fonts subset and reported"
+description = "hanji preview: package bytes to presentation pages and bounded worksheet grids, with embedded fonts and diagnostics"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -17,6 +17,7 @@ host-fonts = ["dep:hanji-store", "oxml-layout/system-fonts", "fontdb/fs", "fontd
 hanji-core.workspace = true
 hanji-package.workspace = true
 hanji-pptx = { path = "../hanji-pptx" }
+hanji-xlsx = { path = "../hanji-xlsx" }
 rpptx = { version = "=0.12.1", default-features = false, features = ["render"] }
 rpptx-render = { version = "=0.12.1", default-features = false }
 rpptx-layout = { version = "=0.12.1", default-features = false }

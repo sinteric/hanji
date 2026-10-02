@@ -866,6 +866,7 @@ dependencies = [
  "hanji-package",
  "hanji-pptx",
  "hanji-store",
+ "hanji-xlsx",
  "oxml-layout",
  "resvg",
  "rpptx",

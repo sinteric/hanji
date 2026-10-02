@@ -199,8 +199,10 @@ These are not supported yet:
   writes.
 - xlsx: cell styles beyond formats, new charts, renaming or deleting sheets,
   tables and columns, column insert and delete.
-- Preview of docx, hwpx and xlsx (pptx previews; Korean text needs a
-  Korean font installed or in `--font-dir`).
+- Preview of docx and hwpx; XLSX print layout and advanced visuals. The
+  library provides bounded read-only XLSX worksheet windows with SVG/PNG/HTML
+  output and explicit cached-formula/unsupported-feature diagnostics; the CLI
+  previews PPTX. Korean text needs a supplied or installed Korean font.
 
 For the details of each engine, see [crates/README.md](crates/README.md).
 

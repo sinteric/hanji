@@ -1,7 +1,8 @@
 //! hanji's preview (DESIGN.md §2 rules 4–5, §7, §7.1): renders the package
 //! an export writes, one SVG per slide, with the fonts each slide draws
 //! subset and embedded, an HTML viewer that marks substituted text, and PNG.
-//! pptx only, through rpptx 0.12.1; docx and hwpx come later.
+//! PPTX through rpptx 0.12.1, and bounded read-only XLSX worksheet windows.
+//! DOCX and HWPX come later. XLSX windows are grids, not printed pages.
 //!
 //! The pipeline: the export's bytes → the engine-compat transforms of
 //! [`prep`] on a copy → rpptx resolves the slides → every run's font
@@ -21,6 +22,7 @@ pub mod sfnt;
 pub mod store;
 pub mod subset;
 mod svg;
+pub mod xlsx;
 
 pub use fonts::{FontData, FontResolver, ResolvedFont};
 /// A nonfatal rendering or font-embedding fallback and its source path.

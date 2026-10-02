@@ -1237,7 +1237,10 @@ Preview (decided 2026-10-01 by
 engines render it, one SVG per page: rdocx for docx, rpptx for pptx, rhwp for
 hwp/hwpx. hanji subsets the fonts used on each page and embeds them (§7.1);
 today rdocx/rpptx embed whole fonts (47–81 MB per Korean page) and rhwp none. xlsx
-previews as an HTML grid (later). LibreOffice is not a preview engine; it
+previews as bounded read-only worksheet windows in the Rust library, with SVG,
+PNG and static HTML output; formula results come from stored caches and are
+not evaluated or verified by preview. Print layout, charts and conditional
+formatting remain separate work. LibreOffice is not a preview engine; it
 served only as a reference (worst on hwpx through H2Orestart). Found there:
 rpptx 0.12.1 refuses a deck over a schema-valid animation list (`duplicate
 p:attrName`), and its public render has no CJK fonts; rdocx 0.14 reaches

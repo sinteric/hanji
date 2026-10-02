@@ -587,8 +587,16 @@ impl Store {
 
     /// Row `r`, parsed (a copy for a raw row); `None` when the sheet has no such row.
     pub fn row(&self, r: u32) -> Option<Row> {
-        let k = self.find(r).ok()?;
-        self.parse_slot(k, r).ok()
+        self.try_row(r).ok().flatten()
+    }
+
+    /// Row `r`, without treating malformed row content as an absent row.
+    /// Read-only visual previews must report parse failures rather than hiding cells.
+    pub fn try_row(&self, r: u32) -> Result<Option<Row>, String> {
+        match self.find(r) {
+            Ok(k) => self.parse_slot(k, r).map(Some),
+            Err(_) => Ok(None),
+        }
     }
 
     /// Row `r`, parsed in place, made when missing.
