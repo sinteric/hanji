@@ -496,6 +496,7 @@ fn layout_preview(
     }
 
     let mut files = vec![];
+    let mut file_faces = vec![];
     for (i, r) in req.list.iter_mut().enumerate() {
         let mut seen = BTreeSet::new();
         for &(bold, italic) in &r.styles {
@@ -521,16 +522,15 @@ fn layout_preview(
             match sfnt::build(data, index, &adj) {
                 Ok(data) => {
                     seen.insert((b, it));
-                    r.drawn.insert(
-                        (b, it),
-                        FaceInfo {
-                            requested: r.requested.clone(),
-                            script: r.script,
-                            drawn: draws_script.then(|| face.family.clone()),
-                            source: draws_script.then_some(face.source),
-                            metrics: if draws_script { face.metrics } else { Metrics::Substitute },
-                        },
-                    );
+                    let info = FaceInfo {
+                        requested: r.requested.clone(),
+                        script: r.script,
+                        drawn: draws_script.then(|| face.family.clone()),
+                        source: draws_script.then_some(face.source),
+                        metrics: if draws_script { face.metrics } else { Metrics::Substitute },
+                    };
+                    r.drawn.insert((b, it), info.clone());
+                    file_faces.push(info);
                     files.push(FontFile { family: label(i), data });
                 }
                 Err(e) => warnings.push(format!("the face {} for {} cannot be used: {e}", face.family, r.requested)),
@@ -565,13 +565,13 @@ fn layout_preview(
         .fonts
         .iter()
         .map(|f| {
-            let info = f
-                .family
-                .strip_prefix("hanji-face-")
-                .and_then(|n| n.parse::<usize>().ok())
-                .and_then(|i| req.list.get(i))
-                .and_then(|r| r.drawn.get(&(f.bold, f.italic)))
-                .cloned()
+            // FontManager can label a nearest regular face as bold/italic for
+            // synthetic styling. Match the loaded bytes, not those request flags.
+            let info = files
+                .iter()
+                .zip(&file_faces)
+                .find(|(file, _)| file.family == f.family && file.data.as_slice() == f.data.as_ref())
+                .map(|(_, info)| info.clone())
                 // A face rpptx chose itself (a chart's, or a fallback for characters the requested face lacks).
                 .unwrap_or_else(|| FaceInfo {
                     requested: f.family.clone(),

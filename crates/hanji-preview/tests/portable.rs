@@ -187,6 +187,21 @@ fn per_style_resolved_faces_drive_reports_and_html_substitution_marks() {
         assert!(html.contains(&format!("<title>Style Requested → {family} (metrics: {})</title>", metrics.name())));
         assert!(!html.contains("<title>Style Requested → Style Requested"));
     }
+    // A resolver may offer only a regular physical face for styled requests.
+    // FontManager's synthetic style flags must not erase that face's metadata.
+    let regular_only = FontOptions {
+        fonts: vec![policy.regular.clone()],
+        aliases: Some(
+            fonts::Aliases::parse("[[family]]\nnames = [\"Style Requested\"]\nmetric = [\"Style Test\"]\n").unwrap(),
+        ),
+    };
+    let p = hanji_preview::render_pptx_with_fonts(&bytes, &regular_only).unwrap();
+    assert_eq!(
+        p.fonts.substituted.iter().filter(|f| f.requested == "Style Requested").map(|f| f.chars).sum::<usize>(),
+        21
+    );
+    assert!(!p.fonts.drawn_as_requested.iter().any(|f| f.requested.starts_with("hanji-face-")));
+    assert!(!p.fonts.substituted.iter().any(|f| f.requested.starts_with("hanji-face-")));
 }
 
 #[test]
