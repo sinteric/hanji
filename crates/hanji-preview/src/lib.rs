@@ -212,8 +212,8 @@ pub struct Preview {
     /// Characters drawn per page and face.
     chars: Vec<BTreeMap<FontId, BTreeSet<char>>>,
     /// Identical character sets share the exact subset bytes across pages/viewer.
-    page_subsets: Vec<Subsets>,
-    document_subsets: Subsets,
+    page_subsets: Vec<PreparedSubsets>,
+    document_subsets: PreparedSubsets,
     pub fonts: FontsReport,
     /// Missing fonts, font-directory problems, and summaries of rendering fallbacks.
     pub warnings: Vec<String>,
@@ -223,7 +223,10 @@ pub struct Preview {
 }
 
 type Subsets = Vec<(FontId, Arc<[u8]>)>;
-type SubsetCache = BTreeMap<FontId, BTreeMap<BTreeSet<char>, Result<Arc<[u8]>, String>>>;
+type PreparedSubsets = Vec<(FontId, Option<Arc<[u8]>>)>;
+type SubsetCache = BTreeMap<FontId, BTreeMap<BTreeSet<char>, Result<Option<Arc<[u8]>>, String>>>;
+// A performance cache, not an output limit: validated uncached subsets are recreated on demand.
+const SUBSET_CACHE_BYTES: usize = 16 * 1024 * 1024;
 
 /// `fonts` in the preview result (DESIGN.md §7.1).
 #[derive(Clone, Debug, Default, Serialize)]
@@ -370,6 +373,15 @@ const LINE_EM: f64 = 1.2;
 
 /// Renders a pptx package (the bytes export wrote).
 pub fn render_pptx(package: &[u8], opts: &Options) -> Result<Preview, String> {
+    // Release parser, resolved input, stock layout, and font-building buffers
+    // before subsetting. Only the preview's owned layout must remain live.
+    let mut p = layout_pptx(package, opts)?;
+    p.count();
+    p.prepare_output()?;
+    Ok(p)
+}
+
+fn layout_pptx(package: &[u8], opts: &Options) -> Result<Preview, String> {
     let prepared = prep::prepare(package)?;
     let pres = rpptx::Presentation::from_bytes(&prepared).map_err(|e| format!("rpptx cannot open the deck: {e}"))?;
     let (mut input, stock) = pres.render_deterministic().map_err(|e| format!("rpptx cannot resolve the deck: {e}"))?;
@@ -476,7 +488,7 @@ pub fn render_pptx(package: &[u8], opts: &Options) -> Result<Preview, String> {
             (f.id, info)
         })
         .collect();
-    let mut p = Preview {
+    let p = Preview {
         layout,
         faces,
         chars: vec![],
@@ -486,8 +498,6 @@ pub fn render_pptx(package: &[u8], opts: &Options) -> Result<Preview, String> {
         warnings,
         diagnostics: vec![],
     };
-    p.count();
-    p.prepare_output()?;
     Ok(p)
 }
 
@@ -585,7 +595,8 @@ impl Preview {
         chars: &BTreeMap<FontId, BTreeSet<char>>,
         path: &str,
         cache: &mut SubsetCache,
-    ) -> (Subsets, Vec<Diagnostic>) {
+        cache_remaining: &mut usize,
+    ) -> (PreparedSubsets, Vec<Diagnostic>) {
         let (mut subsets, mut diagnostics) = (vec![], vec![]);
         for (id, cs) in chars {
             let face_cache = cache.entry(*id).or_default();
@@ -597,7 +608,14 @@ impl Preview {
                     .find(|f| f.id == *id)
                     .ok_or_else(|| "font data is absent from the layout".to_string())
                     .and_then(|f| subset::subset(&f.data, f.face_index, cs))
-                    .map(Arc::from);
+                    .map(|data| {
+                        if data.len() <= *cache_remaining {
+                            *cache_remaining -= data.len();
+                            Some(Arc::from(data))
+                        } else {
+                            None
+                        }
+                    });
                 face_cache.insert(cs.clone(), result);
             }
             match &face_cache[cs] {
@@ -619,6 +637,10 @@ impl Preview {
     /// Validate/cache unique font subsets and inspect pages without serializing SVG.
     /// Library consumers can inspect them before choosing HTML, SVG or PNG output.
     fn prepare_output(&mut self) -> Result<(), String> {
+        self.prepare_output_with_cache_budget(SUBSET_CACHE_BYTES)
+    }
+
+    fn prepare_output_with_cache_budget(&mut self, mut cache_remaining: usize) -> Result<(), String> {
         fn append_unique(out: &mut Vec<Diagnostic>, seen: &mut BTreeSet<(String, String)>, ds: Vec<Diagnostic>) {
             for d in ds {
                 if seen.insert((d.path.clone(), d.message.clone())) {
@@ -630,14 +652,15 @@ impl Preview {
         let mut cache = SubsetCache::new();
         let mut all: BTreeMap<FontId, BTreeSet<char>> = BTreeMap::new();
         for (k, chars) in self.chars.iter().enumerate() {
-            let (subsets, diagnostics) = self.subsets(chars, &format!("pages[{k}].fonts"), &mut cache);
+            let (subsets, diagnostics) =
+                self.subsets(chars, &format!("pages[{k}].fonts"), &mut cache, &mut cache_remaining);
             self.page_subsets.push(subsets);
             append_unique(&mut self.diagnostics, &mut seen, diagnostics);
             for (id, cs) in chars {
                 all.entry(*id).or_default().extend(cs);
             }
         }
-        let (subsets, diagnostics) = self.subsets(&all, "viewer.fonts", &mut cache);
+        let (subsets, diagnostics) = self.subsets(&all, "viewer.fonts", &mut cache, &mut cache_remaining);
         self.document_subsets = subsets;
         drop(cache);
         append_unique(&mut self.diagnostics, &mut seen, diagnostics);
@@ -662,6 +685,21 @@ impl Preview {
         Ok(())
     }
 
+    /// Only successful preflight entries are present. Inputs stay immutable, so
+    /// uncached subsets deterministically reproduce the already validated bytes.
+    fn output_subsets(&self, prepared: &PreparedSubsets, chars: &BTreeMap<FontId, BTreeSet<char>>) -> Subsets {
+        prepared
+            .iter()
+            .filter_map(|(id, cached)| {
+                let data = cached.clone().or_else(|| {
+                    let font = self.layout.fonts.iter().find(|f| f.id == *id)?;
+                    subset::subset(&font.data, font.face_index, chars.get(id)?).ok().map(Arc::from)
+                })?;
+                Some((*id, data))
+            })
+            .collect()
+    }
+
     fn font_css(subsets: &[(FontId, Arc<[u8]>)]) -> String {
         subsets
             .iter()
@@ -680,17 +718,18 @@ impl Preview {
     /// Slide `k` (0-based) as a standalone SVG with its fonts subset to the
     /// slide's characters and embedded.
     pub fn slide_svg(&self, k: usize) -> String {
-        self.page_svg(k, Self::font_css(&self.page_subsets[k]), false)
+        let subsets = self.output_subsets(&self.page_subsets[k], &self.chars[k]);
+        self.page_svg(k, Self::font_css(&subsets), false)
     }
 
     /// Slide `k` (0-based) as PNG at `dpi`, drawn with the same subset faces.
     pub fn slide_png(&self, k: usize, dpi: f64) -> Result<Vec<u8>, String> {
         use resvg::{tiny_skia, usvg};
-        let subsets = &self.page_subsets[k];
+        let subsets = self.output_subsets(&self.page_subsets[k], &self.chars[k]);
         let svg = self.page_svg(k, String::new(), false);
         let mut options = usvg::Options::default();
         let mut exact = HashMap::new();
-        for (id, data) in subsets {
+        for (id, data) in &subsets {
             let ids = options.fontdb_mut().load_font_source(usvg::fontdb::Source::Binary(Arc::new(data.clone())));
             if let Some(face) = ids.first() {
                 exact.insert(format!("hanji-font-{}", id.0), *face);
@@ -716,7 +755,13 @@ impl Preview {
     /// The viewer: one self-contained HTML file, slides stacked, each face
     /// subset once for the whole deck, substituted text marked.
     pub fn html(&self, title: &str) -> String {
-        let css = Self::font_css(&self.document_subsets);
+        let mut all: BTreeMap<FontId, BTreeSet<char>> = BTreeMap::new();
+        for page in &self.chars {
+            for (id, cs) in page {
+                all.entry(*id).or_default().extend(cs);
+            }
+        }
+        let css = Self::font_css(&self.output_subsets(&self.document_subsets, &all));
         let esc = hanji_package::xml::escape_text;
         let mut banner = String::new();
         let lines = self.fonts.lines();
@@ -896,10 +941,48 @@ mod tests {
             for (id, bytes) in page {
                 let first = &p.page_subsets[0].iter().find(|(f, _)| f == id).unwrap().1;
                 let viewer = &p.document_subsets.iter().find(|(f, _)| f == id).unwrap().1;
-                assert!(Arc::ptr_eq(bytes, first));
-                assert!(Arc::ptr_eq(bytes, viewer));
+                assert!(Arc::ptr_eq(bytes.as_ref().unwrap(), first.as_ref().unwrap()));
+                assert!(Arc::ptr_eq(bytes.as_ref().unwrap(), viewer.as_ref().unwrap()));
             }
         }
+    }
+
+    #[test]
+    fn a_full_subset_cache_preserves_output_and_preflight_diagnostics() {
+        let mut p = deck();
+        let svg = p.slide_svg(0);
+        let png = p.slide_png(0, 48.0).unwrap();
+        let html = p.html("test");
+        let diagnostics = p.diagnostics.clone();
+        let warnings = p.warnings.clone();
+        let budget = p.page_subsets[0][0].1.as_ref().unwrap().len();
+        reset_output(&mut p);
+        p.prepare_output_with_cache_budget(budget).unwrap();
+        let buffers: BTreeMap<usize, usize> = p
+            .page_subsets
+            .iter()
+            .chain(std::iter::once(&p.document_subsets))
+            .flatten()
+            .filter_map(|(_, data)| data.as_ref())
+            .map(|data| (data.as_ptr() as usize, data.len()))
+            .collect();
+        let retained = buffers.values().sum::<usize>();
+        assert!(retained > 0 && retained <= budget);
+        reset_output(&mut p);
+        p.prepare_output_with_cache_budget(0).unwrap();
+        assert!(p.page_subsets.iter().flatten().all(|(_, data)| data.is_none()));
+        assert!(p.document_subsets.iter().all(|(_, data)| data.is_none()));
+        assert_eq!(p.diagnostics, diagnostics);
+        assert_eq!(p.warnings, warnings);
+        assert_eq!(p.slide_svg(0), svg);
+        assert_eq!(p.slide_png(0, 48.0).unwrap(), png);
+        assert_eq!(p.html("test"), html);
+        let id = *p.chars[0].keys().next().unwrap();
+        p.layout.fonts.iter_mut().find(|f| f.id == id).unwrap().data = Arc::from(b"invalid".as_slice());
+        reset_output(&mut p);
+        p.prepare_output_with_cache_budget(0).unwrap();
+        assert!(p.diagnostics.iter().any(|d| d.path.starts_with("pages[0].fonts") && d.message.contains("not a font")));
+        assert!(p.diagnostics.iter().any(|d| d.path.starts_with("viewer.fonts") && d.message.contains("not a font")));
     }
 
     #[test]

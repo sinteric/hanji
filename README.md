@@ -82,8 +82,9 @@ fallbacks and font-embedding failures are warnings; `--json` also returns their
 `diagnostics` with source paths. The preview library exposes the same diagnostics
 before any output is requested. Add `--json` for machine-readable output.
 Diagnostic inspection does not serialize SVG or encode image data. Unique
-page/viewer font subsets are validated and cached before output; identical
-character sets share their buffers. The full layout and unique subsets remain
+page/viewer font subsets are validated before output; identical character sets
+share buffers in a 16 MiB performance cache. Validated subsets that do not fit
+are recreated when requested, without limiting output. The full layout remains
 in memory, so preview preparation is not incremental.
 Documents and their revisions are kept in `.hanji/`,
 or in the directory named by `--store` or `$HANJI_STORE`. `hanji guide` prints
