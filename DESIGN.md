@@ -820,9 +820,9 @@ layout: Two Content
   - a text box, `<shape box="…">text</shape>`;
   - a picture, `<picture box="…" src="…"/>` (with `crop`, `mask` and `alt` if
     wanted), showing an image of the package or a file the host hands the
-    write by that name (the engine's `export_with_files`; the CLI and MCP
-    server do not hand files over yet, so there such a write is refused with
-    the reason). A host's file must be a PNG, JPEG, GIF or BMP image; it
+    write by that name (the engine's `export_with_files`; the CLI does not
+    hand files over yet, so there such a write is refused with the reason).
+    A host's file must be a PNG, JPEG, GIF or BMP image; it
     becomes a new image part (`media/image5.png`), which the text read back
     shows as the picture's `src`. A new picture in a picture slot is not
     built yet;
@@ -1244,8 +1244,8 @@ p:attrName`), and its public render has no CJK fonts; rdocx 0.14 reaches
 Hangul through Noto CJK SC coverage fallback, not the requested East Asian
 font.
 
-**pptx preview is implemented** in `crates/hanji-preview` (`hanji preview`,
-MCP `hanji_preview`): rpptx 0.12.1 as published, fonts resolved, subset and
+**pptx preview is implemented** in `crates/hanji-preview` (`hanji
+preview`): rpptx 0.12.1 as published, fonts resolved, subset and
 reported as §7.1 says (no bundled Korean pack yet). Its copy of the export
 gets three engine-compat transforms that do not change what PowerPoint
 draws: an empty theme `a:ea` takes the `script="Hang"` face, runs are split
@@ -1275,15 +1275,15 @@ organisations allow only one or two mandated fonts.
 requested face and script slot is looked up, in order, in:
 
 1. the org/user font directory: `--font-dir DIR` (repeatable) on the CLI,
-   and `--font-dir` or `HANJI_FONT_DIR` in the MCP server's config;
+   or `HANJI_FONT_DIR`;
 2. the document's own embedded copy (proposed; pptx `embeddedFontLst`, hwpx
    `isEmbedded`);
 3. installed system fonts.
 
 Names match across languages (맑은 고딕 = Malgun Gothic). The bundled set
 (4, below) comes in only as a fallback. Optional: a font policy,
-`hanji validate --doc NAME --fonts POLICY` (also an MCP `validate`
-argument), checks every face a document uses, styles and theme defaults
+`hanji validate --doc NAME --fonts POLICY` checks every face a document
+uses, styles and theme defaults
 included, against `allowed = […]` (optionally per script) in a policy file
 or `policy.toml` in the org font directory. A face outside the list is an
 error, with where it is used; an allowed face this machine cannot draw is a
@@ -1434,7 +1434,7 @@ substituted text (a dotted underline, on by default, with a toggle), lists
 every substitution in a banner, and shows on hover, for example,
 `휴먼명조 → Noto Serif CJK KR (metrics: table)`; each `<text>` carries
 `data-font-requested` and `data-font-drawn`. PNG stays unmarked; the result
-carries the list. CLI `--json` and MCP return:
+carries the list. CLI `--json` returns:
 
 ```json
 "fonts": {
@@ -1486,7 +1486,7 @@ side.
 - **OFL reserved font names on embedded subsets** (Carlito, Liberation,
   Nanum): whether an SVG-embedded subset is a "Modified Version" was not
   checked (the OFL FAQ was blocked here).
-- **WOFF2**, and **network access at preview time** in an MCP server.
+- **WOFF2**, and **network access at preview time**.
 
 ## 8. Safety
 

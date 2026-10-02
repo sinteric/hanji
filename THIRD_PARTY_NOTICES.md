@@ -12,8 +12,8 @@ crates.io.
 
 ## rhwp: the blank hwpx package
 
-`crates/hanji-store/blank/hwpx/` is compiled into the `hanji` and `hanji-mcp`
-binaries. It is derived from rhwp's sample `basic-table-01.hwpx`, at commit
+`crates/hanji-store/blank/hwpx/` is compiled into the `hanji` binary. It
+is derived from rhwp's sample `basic-table-01.hwpx`, at commit
 `680111ec7bea2fe11110de18c3676ba5a1cf7847`
 (<https://github.com/edwardkim/rhwp>). The header, settings and page setup
 are kept, and a bullet is added.
@@ -117,7 +117,7 @@ subsets the fonts, upstream embeds them whole), per-page definition ids, and
 
 ## Fonts compiled into the binaries
 
-The `hanji` and `hanji-mcp` binaries contain the fonts oxml-layout 0.12.1
+The `hanji` binary contains the fonts oxml-layout 0.12.1
 bundles (`fonts/` in the crate), which the preview draws with when nothing
 better is installed, and of which it embeds subsets in its SVG and HTML
 output:

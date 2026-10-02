@@ -351,7 +351,7 @@ impl FontsReport {
 }
 
 /// The message for Korean text no face here draws.
-pub const NO_KOREAN_FONT: &str = "no Korean font was found, so Hangul is drawn as empty boxes. Install Noto Sans CJK KR (Linux: the fonts-noto-cjk package; or from https://github.com/notofonts/noto-cjk), or pass --font-dir DIR (HANJI_FONT_DIR for the MCP server) with a Korean font such as 맑은 고딕.";
+pub const NO_KOREAN_FONT: &str = "no Korean font was found, so Hangul is drawn as empty boxes. Install Noto Sans CJK KR (Linux: the fonts-noto-cjk package; or from https://github.com/notofonts/noto-cjk), or pass --font-dir DIR (or set HANJI_FONT_DIR) with a Korean font such as 맑은 고딕.";
 
 /// PowerPoint's single line, in em.
 const LINE_EM: f64 = 1.2;
