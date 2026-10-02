@@ -151,6 +151,56 @@ fn the_shapes_deck_renders_every_slide() {
 }
 
 #[test]
+fn rendering_diagnostics_reach_json_and_every_output_mode_without_refusing_the_deck() {
+    let (ws, id) = opened("shapes.pptx");
+    let (mut out, p) = store::render(&ws, &id, None, &no_fonts()).unwrap();
+    let message = "unsupported connector line style retained as visible default";
+    assert_eq!(
+        p.diagnostics.iter().filter(|d| d.message == message).count(),
+        1,
+        "document-wide diagnostics are not repeated for every slide"
+    );
+    assert!(p.diagnostics.iter().any(|d| d.path.starts_with("layout.diagnostics[") && d.message == message));
+    assert!(p.warnings.iter().any(|w| w.contains(message)));
+    let dir = std::env::temp_dir().join(format!("hanji-preview-diagnostics-{}", std::process::id()));
+    for output in [Output::Html, Output::Svg, Output::Png] {
+        store::write(&p, &mut out, output, &dir).unwrap();
+        let json = serde_json::to_value(&out).unwrap();
+        assert!(json["diagnostics"].as_array().unwrap().iter().any(|d| d["message"] == message));
+        assert!(json["warnings"].as_array().unwrap().iter().any(|w| w.as_str().unwrap().contains(message)));
+        assert_eq!(out.files.len(), if output == Output::Html { 1 } else { 6 });
+        if output == Output::Html {
+            let html = std::fs::read_to_string(&out.files[0]).unwrap();
+            assert!(html.contains(message));
+            assert!(html.contains("ppaction://hlinksldjump"));
+        }
+    }
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
+fn an_unsupported_picture_is_reported_instead_of_silently_omitted() {
+    let bytes = std::fs::read(corpus("korean-deck.pptx")).unwrap();
+    let mut parts = hanji_package::package::read(&bytes).unwrap();
+    let media = parts.iter_mut().find(|p| p.name.starts_with("ppt/media/")).unwrap();
+    let name = media.name.clone();
+    media.data =
+        base64::engine::general_purpose::STANDARD.decode("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==").unwrap();
+    let types = parts.iter_mut().find(|p| p.name == "[Content_Types].xml").unwrap();
+    types.data = String::from_utf8(types.data.clone())
+        .unwrap()
+        .replace("</Types>", &format!("<Override PartName=\"/{name}\" ContentType=\"image/gif\"/></Types>"))
+        .into_bytes();
+    let mut ws = Workspace::new(MemStorage::new());
+    let id = ws.open_bytes("gif.pptx", &hanji_package::package::write(&parts).unwrap(), None).unwrap().doc_id;
+    let (out, p) = store::render(&ws, &id, None, &no_fonts()).unwrap();
+    assert_eq!(p.slide_count(), 7);
+    assert!(out.diagnostics.iter().any(|d| d.message.contains("missing slide picture image relationship")));
+    assert!(out.warnings.iter().any(|w| w.contains("missing slide picture image relationship")));
+    assert!(!p.slide_svg(0).contains("<image "));
+}
+
+#[test]
 fn the_viewer_embeds_each_font_once_and_marks_substituted_text() {
     let (ws, id) = opened("korean-deck.pptx");
     let (mut out, p) = store::render(&ws, &id, None, &no_fonts()).unwrap();

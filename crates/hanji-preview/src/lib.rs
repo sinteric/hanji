@@ -21,6 +21,9 @@ pub mod store;
 pub mod subset;
 mod svg;
 
+/// A nonfatal rendering or font-embedding fallback and its source path.
+pub use svg::SvgDiagnostic as Diagnostic;
+
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -208,9 +211,15 @@ pub struct Preview {
     faces: HashMap<FontId, FaceInfo>,
     /// Characters drawn per page and face.
     chars: Vec<BTreeMap<FontId, BTreeSet<char>>>,
+    /// The exact subsets used by standalone SVG/PNG pages and the HTML viewer.
+    page_subsets: Vec<Vec<(FontId, Vec<u8>)>>,
+    document_subsets: Vec<(FontId, Vec<u8>)>,
     pub fonts: FontsReport,
-    /// What the reader should know: missing fonts, unreadable font directories, text rpptx laid out itself.
+    /// Missing fonts, font-directory problems, and summaries of rendering fallbacks.
     pub warnings: Vec<String>,
+    /// Nonfatal renderer and font-embedding diagnostics, available before output is requested.
+    /// Paths use zero-based page/element indices; document-wide paths are reported once.
+    pub diagnostics: Vec<Diagnostic>,
 }
 
 /// `fonts` in the preview result (DESIGN.md §7.1).
@@ -464,8 +473,18 @@ pub fn render_pptx(package: &[u8], opts: &Options) -> Result<Preview, String> {
             (f.id, info)
         })
         .collect();
-    let mut p = Preview { layout, faces, chars: vec![], fonts: FontsReport::default(), warnings };
+    let mut p = Preview {
+        layout,
+        faces,
+        chars: vec![],
+        page_subsets: vec![],
+        document_subsets: vec![],
+        fonts: FontsReport::default(),
+        warnings,
+        diagnostics: vec![],
+    };
     p.count();
+    p.prepare_output()?;
     Ok(p)
 }
 
@@ -557,16 +576,74 @@ impl Preview {
         };
     }
 
-    /// Each face's subset for `chars`, as (font, subset bytes); a face that
-    /// cannot be subset is left out (its text falls back in the viewer).
-    fn subsets(&self, chars: &BTreeMap<FontId, BTreeSet<char>>) -> Vec<(FontId, Vec<u8>)> {
-        chars
-            .iter()
-            .filter_map(|(id, cs)| {
-                let f = self.layout.fonts.iter().find(|f| f.id == *id)?;
-                subset::subset(&f.data, f.face_index, cs).ok().map(|d| (*id, d))
-            })
-            .collect()
+    /// Subset failures remain nonfatal, but must be reported before any output is written.
+    fn subsets(
+        &self,
+        chars: &BTreeMap<FontId, BTreeSet<char>>,
+        path: &str,
+    ) -> (Vec<(FontId, Vec<u8>)>, Vec<Diagnostic>) {
+        let (mut subsets, mut diagnostics) = (vec![], vec![]);
+        for (id, cs) in chars {
+            let result = self
+                .layout
+                .fonts
+                .iter()
+                .find(|f| f.id == *id)
+                .ok_or_else(|| "font data is absent from the layout".to_string())
+                .and_then(|f| subset::subset(&f.data, f.face_index, cs));
+            match result {
+                Ok(data) => subsets.push((*id, data)),
+                Err(e) => {
+                    let requested = self.faces.get(id).map_or("unknown", |f| f.requested.as_str());
+                    diagnostics.push(Diagnostic {
+                        path: format!("{path}[{}].subset", id.0),
+                        message: format!(
+                            "font {requested:?} could not be subset for embedding; its text may be missing: {e}"
+                        ),
+                    });
+                }
+            }
+        }
+        (subsets, diagnostics)
+    }
+
+    /// Prepare both font transports and collect every page's diagnostics once.
+    /// Library consumers can inspect them before choosing HTML, SVG or PNG output.
+    fn prepare_output(&mut self) -> Result<(), String> {
+        let mut all: BTreeMap<FontId, BTreeSet<char>> = BTreeMap::new();
+        for (k, chars) in self.chars.iter().enumerate() {
+            let (subsets, diagnostics) = self.subsets(chars, &format!("pages[{k}].fonts"));
+            self.page_subsets.push(subsets);
+            self.diagnostics.extend(diagnostics);
+            for (id, cs) in chars {
+                all.entry(*id).or_default().extend(cs);
+            }
+        }
+        let (subsets, diagnostics) = self.subsets(&all, "viewer.fonts");
+        self.document_subsets = subsets;
+        self.diagnostics.extend(diagnostics);
+        for k in 0..self.slide_count() {
+            let hooks = PageHooks { preview: self, css: String::new(), marks: false };
+            let page = svg::render_page(&self.layout, k, &hooks)
+                .ok_or_else(|| format!("cannot render slide {}: the layout page is absent", k + 1))?;
+            self.diagnostics.extend(page.diagnostics);
+        }
+        // SVG lowering repeats document-wide layout diagnostics on every page.
+        let mut seen = BTreeSet::new();
+        self.diagnostics.retain(|d| seen.insert((d.path.clone(), d.message.clone())));
+        let mut summaries: BTreeMap<&str, (usize, &str)> = BTreeMap::new();
+        for d in &self.diagnostics {
+            let summary = summaries.entry(&d.message).or_insert((0, &d.path));
+            summary.0 += 1;
+        }
+        for (message, (count, path)) in summaries {
+            self.warnings.push(if count == 1 {
+                format!("{path}: {message}")
+            } else {
+                format!("{message} ({count} occurrences; first at {path})")
+            });
+        }
+        Ok(())
     }
 
     fn font_css(subsets: &[(FontId, Vec<u8>)]) -> String {
@@ -581,25 +658,24 @@ impl Preview {
 
     fn page_svg(&self, k: usize, css: String, marks: bool) -> String {
         let hooks = PageHooks { preview: self, css, marks };
-        svg::render_page(&self.layout, k, &hooks).map(|r| r.svg).unwrap_or_default()
+        svg::render_page(&self.layout, k, &hooks).expect("the slide's layout page exists").svg
     }
 
     /// Slide `k` (0-based) as a standalone SVG with its fonts subset to the
     /// slide's characters and embedded.
     pub fn slide_svg(&self, k: usize) -> String {
-        let subsets = self.subsets(&self.chars[k]);
-        self.page_svg(k, Self::font_css(&subsets), false)
+        self.page_svg(k, Self::font_css(&self.page_subsets[k]), false)
     }
 
     /// Slide `k` (0-based) as PNG at `dpi`, drawn with the same subset faces.
     pub fn slide_png(&self, k: usize, dpi: f64) -> Result<Vec<u8>, String> {
         use resvg::{tiny_skia, usvg};
-        let subsets = self.subsets(&self.chars[k]);
+        let subsets = &self.page_subsets[k];
         let svg = self.page_svg(k, String::new(), false);
         let mut options = usvg::Options::default();
         let mut exact = HashMap::new();
         for (id, data) in subsets {
-            let ids = options.fontdb_mut().load_font_source(usvg::fontdb::Source::Binary(Arc::new(data)));
+            let ids = options.fontdb_mut().load_font_source(usvg::fontdb::Source::Binary(Arc::new(data.clone())));
             if let Some(face) = ids.first() {
                 exact.insert(format!("hanji-font-{}", id.0), *face);
             }
@@ -624,13 +700,7 @@ impl Preview {
     /// The viewer: one self-contained HTML file, slides stacked, each face
     /// subset once for the whole deck, substituted text marked.
     pub fn html(&self, title: &str) -> String {
-        let mut all: BTreeMap<FontId, BTreeSet<char>> = BTreeMap::new();
-        for page in &self.chars {
-            for (id, cs) in page {
-                all.entry(*id).or_default().extend(cs);
-            }
-        }
-        let css = Self::font_css(&self.subsets(&all));
+        let css = Self::font_css(&self.document_subsets);
         let esc = hanji_package::xml::escape_text;
         let mut banner = String::new();
         let lines = self.fonts.lines();
@@ -727,6 +797,57 @@ impl svg::Hooks for PageHooks<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn deck() -> Preview {
+        let bytes = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../hanji-pptx/corpus/shapes.pptx")).unwrap();
+        render_pptx(&bytes, &Options { font_dirs: vec![], system_fonts: false }).unwrap()
+    }
+
+    // Exercise a fresh preparation after injecting malformed font/image data.
+    fn reset_output(p: &mut Preview) {
+        p.page_subsets.clear();
+        p.document_subsets.clear();
+        p.diagnostics.clear();
+        p.warnings.clear();
+    }
+
+    #[test]
+    fn a_font_subset_failure_is_a_warning_with_a_path_before_output() {
+        let mut p = deck();
+        let id = *p.chars[0].keys().next().unwrap();
+        let font = p.layout.fonts.iter_mut().find(|f| f.id == id).unwrap();
+        font.data = Arc::from(b"invalid font".as_slice());
+        reset_output(&mut p);
+        p.prepare_output().unwrap();
+        let path = format!("pages[0].fonts[{}].subset", id.0);
+        assert!(p.diagnostics.iter().any(|d| d.path == path && d.message.contains("not a font")));
+        assert!(p.diagnostics.iter().any(|d| d.path == format!("viewer.fonts[{}].subset", id.0)));
+        assert!(p.warnings.iter().any(|w| w.contains("could not be subset") && w.contains("text may be missing")));
+        assert!(p.html("preview").contains("could not be subset"));
+        assert!(!p.page_subsets[0].iter().any(|(font, _)| *font == id));
+    }
+
+    #[test]
+    fn svg_lowering_diagnostics_are_reported_with_the_page_and_element_path() {
+        let mut p = deck();
+        Arc::make_mut(&mut p.layout.pages[0]).elements.push(PositionedElement::Image {
+            rect: oxml_layout::Rect { x: 0.0, y: 0.0, width: 10.0, height: 10.0 },
+            data: b"GIF89a".to_vec(),
+            content_type: "image/gif".into(),
+            media_id: oxml_layout::MediaId::from_bytes(b"GIF89a"),
+        });
+        reset_output(&mut p);
+        p.prepare_output().unwrap();
+        let message = "image bytes are neither PNG nor JPEG and were omitted";
+        assert!(p.diagnostics.iter().any(|d| d.path.starts_with("pages[0].elements[") && d.message == message));
+        assert!(p.warnings.iter().any(|w| w.contains(message)));
+        assert!(p.html("preview").contains(message));
+    }
+
+    #[test]
+    fn a_package_that_cannot_be_opened_is_still_a_fatal_error() {
+        assert!(render_pptx(b"not a package", &Options { font_dirs: vec![], system_fonts: false }).is_err());
+    }
 
     #[test]
     fn page_lists_and_counts_read_well() {

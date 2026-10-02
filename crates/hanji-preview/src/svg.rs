@@ -18,7 +18,7 @@ use oxml_layout::{
 };
 
 /// One stable diagnostic produced while lowering a page to SVG.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct SvgDiagnostic {
     /// Location in the layout result that required a fallback or was omitted.
     pub path: String,

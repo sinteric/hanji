@@ -77,8 +77,11 @@ Subcommands: `open`, `new`, `read`, `edit`, `write`, `ops`, `validate`,
 `export`, `preview`, `reimport`, `history`, `diff`, `list`, `guide`.
 `hanji preview DOC` (pptx) writes an HTML viewer of the revision as it would
 export (`--format svg` or `png` for one file per slide) and says which fonts
-it had to substitute; `--font-dir DIR` or `$HANJI_FONT_DIR` adds fonts. Add `--json` for
-machine-readable output. Documents and their revisions are kept in `.hanji/`,
+it had to substitute; `--font-dir DIR` or `$HANJI_FONT_DIR` adds fonts. Rendering
+fallbacks and font-embedding failures are warnings; `--json` also returns their
+`diagnostics` with source paths. The preview library exposes the same diagnostics
+before any output is requested. Add `--json` for machine-readable output.
+Documents and their revisions are kept in `.hanji/`,
 or in the directory named by `--store` or `$HANJI_STORE`. `hanji guide` prints
 the format summary that agents read.
 
