@@ -6,7 +6,9 @@
 //! (`fonts/aliases.toml`, and an `aliases.toml` in a font directory over it).
 
 use std::collections::BTreeMap;
+#[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
@@ -14,6 +16,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum Source {
+    Supplied,
     FontDir,
     Embedded,
     System,
@@ -174,6 +177,40 @@ pub struct Drawn {
     tier: usize,
 }
 
+/// A caller-owned font file or selected face of a font collection.
+#[derive(Clone, Debug)]
+pub struct FontData {
+    pub data: Arc<[u8]>,
+    /// Zero-based face index; use zero for a single-face font.
+    pub face_index: u32,
+}
+
+impl FontData {
+    pub fn new(data: impl Into<Arc<[u8]>>) -> FontData {
+        FontData { data: data.into(), face_index: 0 }
+    }
+}
+
+/// The face selected by a resolver for one request and style.
+#[derive(Clone, Debug)]
+pub struct ResolvedFont {
+    pub family: String,
+    pub source: Source,
+    pub metrics: Metrics,
+    pub ea_advance: Option<f64>,
+    pub font: FontData,
+}
+
+/// Font selection inside a document job. Implementations return bytes, never paths.
+/// Select the nearest available style when an exact bold/italic face is absent.
+pub trait FontResolver {
+    fn resolve_font(&self, requested: &str, script: Script, bold: bool, italic: bool) -> Option<ResolvedFont>;
+
+    fn warnings(&self) -> &[String] {
+        &[]
+    }
+}
+
 /// Whether face `id` of `db` has a glyph for `c`.
 fn draws(db: &fontdb::Database, id: fontdb::ID, c: char) -> bool {
     db.with_face_data(id, |d, i| ttf_parser::Face::parse(d, i).is_ok_and(|f| f.glyph_index(c).is_some())) == Some(true)
@@ -190,6 +227,7 @@ pub struct Fonts {
 }
 
 /// Font files and directories in `HANJI_FONT_DIR` (a path list).
+#[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 pub fn env_font_dirs() -> Vec<PathBuf> {
     std::env::var_os("HANJI_FONT_DIR")
         .map(|v| std::env::split_paths(&v).filter(|p| !p.as_os_str().is_empty()).collect())
@@ -197,8 +235,40 @@ pub fn env_font_dirs() -> Vec<PathBuf> {
 }
 
 impl Fonts {
+    /// Caller fonts, document-embedded fonts, then bundled faces. No host discovery.
+    /// An alias table overrides matching entries in the built-in font policy.
+    pub fn from_bytes(
+        supplied: &[FontData],
+        embedded: &[oxml_layout::FontFile],
+        aliases: Option<Aliases>,
+    ) -> Result<Fonts, String> {
+        let mut supplied_db = fontdb::Database::new();
+        for (i, font) in supplied.iter().enumerate() {
+            ttf_parser::Face::parse(&font.data, font.face_index)
+                .map_err(|e| format!("supplied font {i}, face {} is invalid: {e}", font.face_index))?;
+            let ids = supplied_db.load_font_source(fontdb::Source::Binary(Arc::new(font.data.clone())));
+            let mut loaded = false;
+            for id in ids {
+                if supplied_db.face(id).is_some_and(|face| face.index == font.face_index) {
+                    loaded = true;
+                } else {
+                    supplied_db.remove_face(id);
+                }
+            }
+            if !loaded {
+                return Err(format!("supplied font {i}, face {} has no usable family name", font.face_index));
+            }
+        }
+        let mut fonts = Self::from_tiers(vec![(Source::Supplied, supplied_db)], embedded, vec![]);
+        if let Some(aliases) = aliases {
+            fonts.aliases.merge(aliases);
+        }
+        Ok(fonts)
+    }
+
     /// The tiers: `font_dirs`, `embedded` (the document's own fonts),
     /// system fonts when `system`, and the bundled faces.
+    #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
     pub fn load(font_dirs: &[PathBuf], embedded: &[oxml_layout::FontFile], system: bool) -> Fonts {
         let mut warnings = vec![];
         let mut aliases = Aliases::builtin();
@@ -223,25 +293,33 @@ impl Fonts {
                 }
             }
         }
-        let mut embedded_db = fontdb::Database::new();
-        for f in embedded {
-            embedded_db.load_font_data(f.data.clone());
-        }
         let mut system_db = fontdb::Database::new();
         if system {
             system_db.load_system_fonts();
+        }
+        let mut fonts = Self::from_tiers(vec![(Source::FontDir, dir_db)], embedded, vec![(Source::System, system_db)]);
+        fonts.aliases = aliases;
+        fonts.warnings = warnings;
+        fonts
+    }
+
+    fn from_tiers(
+        mut before: Vec<(Source, fontdb::Database)>,
+        embedded: &[oxml_layout::FontFile],
+        after: Vec<(Source, fontdb::Database)>,
+    ) -> Fonts {
+        let mut embedded_db = fontdb::Database::new();
+        for f in embedded {
+            embedded_db.load_font_data(f.data.clone());
         }
         let mut bundled = fontdb::Database::new();
         for (_, data) in oxml_layout::bundled_fonts::bundled_font_data() {
             bundled.load_font_source(fontdb::Source::Binary(std::sync::Arc::new(data)));
         }
-        let tiers = vec![
-            (Source::FontDir, dir_db),
-            (Source::Embedded, embedded_db),
-            (Source::System, system_db),
-            (Source::Bundled, bundled),
-        ];
-        Fonts { tiers, any_face: Default::default(), aliases, warnings }
+        before.push((Source::Embedded, embedded_db));
+        before.extend(after);
+        before.push((Source::Bundled, bundled));
+        Fonts { tiers: before, any_face: Default::default(), aliases: Aliases::builtin(), warnings: vec![] }
     }
 
     /// The face of tier `tier` named `name` (any of its localized family
@@ -331,12 +409,30 @@ impl Fonts {
     }
 }
 
+impl FontResolver for Fonts {
+    fn resolve_font(&self, requested: &str, script: Script, bold: bool, italic: bool) -> Option<ResolvedFont> {
+        let drawn = self.resolve(requested, script)?;
+        let (data, face_index) = self.face_data(&drawn, bold, italic)?;
+        Some(ResolvedFont {
+            family: drawn.family,
+            source: drawn.source,
+            metrics: drawn.metrics,
+            ea_advance: drawn.ea_advance,
+            font: FontData { data: data.into(), face_index },
+        })
+    }
+
+    fn warnings(&self) -> &[String] {
+        &self.warnings
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     fn bundled_only() -> Fonts {
-        Fonts::load(&[], &[], false)
+        Fonts::from_bytes(&[], &[], None).unwrap()
     }
 
     #[test]
@@ -406,6 +502,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
     fn a_missing_font_directory_is_a_warning() {
         let f = Fonts::load(&[PathBuf::from("/nonexistent/hanji-fonts")], &[], false);
         assert_eq!(f.warnings.len(), 1, "{:?}", f.warnings);
