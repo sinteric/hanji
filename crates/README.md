@@ -75,7 +75,12 @@ worksheet model. `Workbook::sheets` lists names, visibility and worksheet kind;
 `Window::render(PageFormat)` uses the shared SVG/PNG/font pipeline and returns
 all window diagnostics with the buffer. `Window::html` is a static standalone
 viewer. The library has no filesystem, network, macro execution or formula
-recalculation on this path; the CLI is unchanged.
+recalculation on this path. Native adapters in `hanji_preview::store` export
+stored revisions or read an unstored file, select one bounded window, and
+write its output. `hanji preview DOC --sheet NAME --range A1:H40` uses those
+adapters; `--sheet-index N` is 1-based, while library/JSON indexes are 0-based.
+CLI defaults select the first visible worksheet and `A1:L40`, and JSON includes
+the sheet inventory, cells/cache status, dimensions, fonts and diagnostics.
 
 ```rust,ignore
 use hanji_preview::{xlsx::{open_xlsx, XlsxOptions}, FontOptions, PageFormat};

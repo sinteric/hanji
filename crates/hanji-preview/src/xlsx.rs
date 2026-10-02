@@ -169,6 +169,17 @@ pub fn open_xlsx(bytes: &[u8], options: XlsxOptions) -> Result<Workbook, String>
 }
 
 impl Workbook {
+    /// Native host-font adapter. Selection/layout stay in this library; the
+    /// byte-only APIs remain available without filesystem or host discovery.
+    #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
+    pub fn render_window(&mut self, sheet: usize, range: &str, opts: &crate::Options) -> Result<Window, String> {
+        let window = {
+            let fonts = Fonts::load(&opts.font_dirs, &[], opts.system_fonts);
+            self.layout_window(sheet, range, &fonts)?
+        };
+        finish_window(window)
+    }
+
     /// Range uses Excel A1 addresses. Hidden rows/columns collapse; hidden sheets
     /// are listed with their state and can be accessed only by explicit index.
     pub fn render_window_with_fonts(
