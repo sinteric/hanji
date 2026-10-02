@@ -172,7 +172,7 @@ The old binary formats (.doc, .ppt, .xls, .hwp) are not supported.
 
 ## Status and limitations
 
-Version 0.1.0. The format has `schema: 1` and may change before 1.0.
+Version 0.2.0. The format has `schema: 1` and may change before 1.0.
 
 These are not supported yet:
 

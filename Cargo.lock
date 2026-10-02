@@ -780,7 +780,7 @@ dependencies = [
 
 [[package]]
 name = "hanji-cli"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "assert_cmd",
  "clap",
@@ -794,7 +794,7 @@ dependencies = [
 
 [[package]]
 name = "hanji-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hanji-format",
  "serde",
@@ -803,7 +803,7 @@ dependencies = [
 
 [[package]]
 name = "hanji-docx"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hanji-core",
  "hanji-format",
@@ -816,7 +816,7 @@ dependencies = [
 
 [[package]]
 name = "hanji-format"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -824,7 +824,7 @@ dependencies = [
 
 [[package]]
 name = "hanji-hwpx"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hanji-core",
  "hanji-format",
@@ -836,7 +836,7 @@ dependencies = [
 
 [[package]]
 name = "hanji-package"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hanji-core",
  "quick-xml 0.42.0",
@@ -845,7 +845,7 @@ dependencies = [
 
 [[package]]
 name = "hanji-pptx"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hanji-core",
  "hanji-format",
@@ -857,7 +857,7 @@ dependencies = [
 
 [[package]]
 name = "hanji-preview"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "allsorts",
  "base64 0.22.1",
@@ -879,7 +879,7 @@ dependencies = [
 
 [[package]]
 name = "hanji-store"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hanji-core",
  "hanji-docx",
@@ -894,7 +894,7 @@ dependencies = [
 
 [[package]]
 name = "hanji-testkit"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hanji-core",
  "hanji-format",
@@ -903,7 +903,7 @@ dependencies = [
 
 [[package]]
 name = "hanji-xlsx"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "hanji-core",
  "hanji-format",

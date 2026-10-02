@@ -13,7 +13,7 @@
 #      release's SHA256SUMS.
 set -eu
 
-version=0.1.0
+version=0.2.0
 repo=sinteric/hanji
 base=${HANJI_DOWNLOAD_BASE:-https://github.com/$repo/releases/download/v$version}
 
