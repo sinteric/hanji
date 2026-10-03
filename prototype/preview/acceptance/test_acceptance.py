@@ -155,6 +155,17 @@ class HarnessTests(unittest.TestCase):
         self.assertEqual(self.check('font_coverage')['status'],'passed')
         self.assertEqual(self.check('font_glyph_evidence')['status'],'blocked')
 
+    def test_bitmap_svg_color_and_cff_containers_remain_unverified_with_glyf(self):
+        for tag in ('CFF ','CFF2','COLR','CBDT','EBDT','sbix','SVG '):
+            with self.subTest(tag=tag):
+                metrics = a.FontMetrics(metric_stub()); metrics.tables[tag] = b'container-test-double'
+                self.assertIsNotNone(metrics.advance('C',12))
+                self.assertEqual(metrics.glyph_evidence('C')[0],'blocked')
+
+    def test_generic_metadata_still_fails_in_an_uninspected_container(self):
+        metrics = a.FontMetrics(metric_stub(generic=True)); metrics.tables['sbix'] = b'container-test-double'
+        self.assertEqual(metrics.glyph_evidence('C')[0],'failed')
+
     def test_authored_nonempty_outline_passes_evidence_without_native_promotion(self):
         self.assertEqual(self.check('font_glyph_evidence')['status'],'passed')
         self.assertFalse(self.audit()['fidelity_promoted'])

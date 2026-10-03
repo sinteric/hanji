@@ -210,6 +210,8 @@ class FontMetrics:
 
     def outline(self, glyph):
         """Inspect TrueType records only; CFF/bitmap/SVG outlines stay unverified."""
+        if any(t in self.tables for t in ('CFF ','CFF2','COLR','CBDT','EBDT','sbix','SVG ')):
+            return None
         if not all(t in self.tables for t in ('glyf','loca','maxp')):
             return None
         count = struct.unpack_from('>H',self.tables['maxp'],4)[0]
