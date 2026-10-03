@@ -3,6 +3,8 @@
 mod fixture;
 #[path = "fixtures/xlsx_inherited.rs"]
 mod inherited;
+#[path = "fixtures/xlsx_numeric.rs"]
+mod numeric;
 use hanji_preview::{
     xlsx::{open_xlsx, FormulaResult, XlsxOptions},
     FontOptions, PageData, PageFormat,
@@ -83,9 +85,108 @@ fn clipped_numeric_values_report_the_cell_and_keep_the_complete_display() {
     assert!(w
         .diagnostics()
         .iter()
-        .any(|d| d.path == "sheets[0].cells[A1].clipping" && d.message.contains("leading digits")));
+        .any(|d| d.path == "sheets[0].cells[A1].clipping" && d.message.contains("overflow indicator")));
     assert!(!w.diagnostics().iter().any(|d| d.path == "sheets[0].cells[B1].clipping"));
     assert!(w.render(PageFormat::Svg).unwrap().diagnostics.iter().any(|d| d.path == "sheets[0].cells[A1].clipping"));
+    assert!(w.quality().enforce(hanji_preview::quality::Strictness::CriticalLosses).is_ok());
+}
+
+#[test]
+fn numeric_overflow_never_draws_a_truncated_value_and_keeps_accessible_full_values() {
+    let bytes = fixture::build(numeric::GRID, "", numeric::STYLES, &[]);
+    let original = bytes.clone();
+    let mut book = open_xlsx(&bytes, XlsxOptions::default()).unwrap();
+    let window = book.render_window_with_fonts(0, "A1:D11", &FontOptions::default()).unwrap();
+    let PageData::Svg(svg) = window.render(PageFormat::Svg).unwrap().data else { panic!() };
+    let tree = hanji_package::xml::parse(svg.as_bytes()).unwrap();
+    let mut drawn = vec![];
+    tree.root.walk(&mut |element| {
+        if element.local() == "text" {
+            drawn.push(
+                element
+                    .children
+                    .iter()
+                    .filter_map(|node| match node {
+                        hanji_package::xml::Node::Text(text) => Some(hanji_package::xml::unescape(text)),
+                        _ => None,
+                    })
+                    .collect::<String>(),
+            );
+        }
+    });
+    assert_eq!(
+        drawn.iter().filter(|s| s.as_str() == "-123456789").count(),
+        1,
+        "only the wide control may draw its complete number: {drawn:?}"
+    );
+    for address in ["A1", "A2", "A3", "A4", "A5", "A6", "A7", "A8", "A9", "D11"] {
+        assert!(
+            window.diagnostics().iter().any(|d| d.path == format!("sheets[0].cells[{address}].clipping")
+                && d.message.contains("overflow indicator")),
+            "{address}"
+        );
+    }
+    assert!(drawn.iter().filter(|s| !s.is_empty() && s.chars().all(|c| c == '#')).count() >= 10, "{drawn:?}");
+    let cell = |a: &str| window.cells.iter().find(|c| c.address == a).unwrap();
+    assert_eq!(cell("A1").display, "-123456789");
+    assert_eq!(cell("A3").display, "-12345.00%");
+    assert_eq!(cell("A4").display, "-1.23E+08");
+    assert_eq!(cell("A5").display, "2023-03-15");
+    assert_eq!(cell("A6").display, "2026-10-03T13:00:00Z");
+    assert_eq!(cell("A10").display, "#UNEVALUATED");
+    assert_eq!(cell("A10").formula_result, FormulaResult::Missing);
+    assert_eq!(cell("B10").display, "0");
+    assert_ne!(cell("B10").formula_result, FormulaResult::Missing);
+    assert!(drawn.iter().any(|s| s == "?"));
+    assert!(drawn.iter().any(|s| s == "0"));
+    assert!(drawn.iter().any(|s| s == "#UNEVALUATED"));
+    assert!(svg.contains("aria-describedby="));
+    let html = window.html("numeric overflow");
+    assert!(html.contains("Complete cell values"));
+    for cell in &window.cells {
+        assert!(html.contains(&format!("<td>{}</td>", hanji_package::xml::escape_text(&cell.display))));
+        assert!(svg.contains(&hanji_package::xml::escape_text(&format!("{}: {}", cell.address, cell.display))));
+    }
+    let PageData::Png(png) = window.render(PageFormat::Png { dpi: 96.0 }).unwrap().data else { panic!() };
+    assert!(resvg::tiny_skia::Pixmap::decode_png(&png).is_ok());
+    assert_eq!(bytes, original);
+}
+
+#[test]
+fn an_overflow_font_without_marker_glyphs_uses_an_unambiguous_vector_fallback() {
+    let chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ".chars().collect();
+    let data = hanji_preview::subset::subset(oxml_layout::bundled_fonts::bundled_font_data()[0].1, 0, &chars).unwrap();
+    assert!(ttf_parser::Face::parse(&data, 0).unwrap().glyph_index('#').is_none());
+    let fonts = FontOptions { fonts: vec![hanji_preview::FontData::new(data)], ..Default::default() };
+    let sheet = r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="2"/></cols><sheetData><row r="1"><c r="A1"><v>123456789</v></c></row></sheetData></worksheet>"#;
+    let mut b = open_xlsx(&fixture::build(sheet, "", fixture::STYLES, &[]), XlsxOptions::default()).unwrap();
+    let window = b.render_window_with_fonts(0, "A1", &fonts).unwrap();
+    let PageData::Svg(svg) = window.render(PageFormat::Svg).unwrap().data else { panic!() };
+    assert!(!svg.contains(">123456789</text>"));
+    assert!(svg.contains("A1: 123456789"));
+    let tree = hanji_package::xml::parse(svg.as_bytes()).unwrap();
+    let mut diagonal_lines = 0;
+    tree.root.walk(&mut |e| {
+        if e.local() == "line" && e.get("x1") != e.get("x2") && e.get("y1") != e.get("y2") {
+            diagonal_lines += 1;
+        }
+    });
+    assert_eq!(diagonal_lines, 2);
+    assert_eq!(window.fonts().missing_glyphs_total, 0);
+}
+
+#[test]
+fn accessible_metadata_keeps_svg_valid_when_cell_text_contains_xml_invalid_controls() {
+    let sheet = r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>A_x0001_B</t></is></c></row></sheetData></worksheet>"#;
+    let mut b = open_xlsx(&fixture::build(sheet, "", fixture::STYLES, &[]), XlsxOptions::default()).unwrap();
+    let window = b.render_window_with_fonts(0, "A1", &FontOptions::default()).unwrap();
+    assert_eq!(window.cells[0].display, "A\u{1}B");
+    let PageData::Svg(svg) = window.render(PageFormat::Svg).unwrap().data else { panic!() };
+    assert!(!svg.contains('\u{1}'));
+    assert!(svg.contains("A1: A\u{FFFD}B"));
+    hanji_package::xml::parse(svg.as_bytes()).unwrap();
+    assert!(!window.html("controls").contains('\u{1}'));
+    assert!(window.quality().diagnostics.iter().any(|d| d.code == hanji_preview::quality::DiagnosticCode::InvalidText));
 }
 
 #[test]
@@ -159,7 +260,8 @@ fn nonempty_text_omitted_from_a_narrow_visible_cell_is_diagnosed() {
     assert!(!w.diagnostics().iter().any(|d| d.path == "sheets[0].cells[B1].clipping"));
     assert!(w.warnings().iter().any(|w| w.contains("cell text is omitted")));
     let PageData::Svg(svg) = w.render(PageFormat::Svg).unwrap().data else { panic!() };
-    assert!(!svg.contains("OMITTED"));
+    assert!(!svg.contains(">OMITTED</text>"));
+    assert!(svg.contains("A1: OMITTED")); // Accessibility keeps the complete omitted value.
     assert!(w.html("narrow").contains("cell text is omitted"));
 }
 

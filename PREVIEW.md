@@ -131,3 +131,80 @@ pages retain their original identifiers and drawing behavior. Browser visual
 validation of the combined viewer remains pending: this execution environment
 exposes no supported browser preview workflow, and restricted file navigation
 has not been bypassed.
+
+
+## Structured diagnostic and quality contract (v1)
+
+CLI preview JSON adds `quality` beside the existing fields. The existing
+`diagnostics[].path` and `message`, warnings, fonts, cell display values and
+legacy Rust result/diagnostic structs remain unchanged. Library jobs expose
+`Window::quality()`, `hwpx::Preview::quality()` and
+`Preview::quality(DocumentKind)` / `DocumentPreview::quality(DocumentKind)`;
+supply the same input kind used to construct a PPTX/DOCX job. The legacy page
+methods retain their signatures and permissive behavior.
+
+A report has `version: 1`, `source`, `rendering`, `status`, `coverage` and
+structured `diagnostics`. Rendering is `ready` for prepared jobs, `rendered`
+only after output succeeds, or `refused` in an opt-in strictness refusal.
+Quality status is `no-known-issues`, `degraded` or `unsupported-content`.
+A successful render can have degraded/unsupported content. `no-known-issues`
+means the implemented checks found none; it never certifies native fidelity.
+`coverage.complete` is always false in v1. The checked/unchecked lists make
+that boundary explicit, including unreported renderer losses and exhaustive
+Hancom control detection. No fidelity score is calculated.
+
+Each structured entry retains `path`/`message` and adds a stable `code`,
+`severity` (`info`, `warning`, `error`), `source`, `location` and `consequence`.
+Location indices are zero-based: `page_index`/`page_indices`, `sheet_index`,
+`cell` and `object_path` are present only when source evidence establishes
+that location. Missing-font legacy page numbers remain one-based in `fonts`;
+the structured report translates them to zero-based indices. Unknown upstream
+messages use `renderer.layout-report` or
+`preview.diagnostic-unclassified`; arbitrary message keywords are not used to
+invent a critical loss or an object location. Consumers must tolerate additional
+codes/fields. `quality::DiagnosticCode` documents the code catalogue.
+
+Initial signals include font embedding/character losses and substitutions,
+owned SVG omissions/approximations, XLSX numeric overflow/cache states/listed
+worksheet features, and HWPX external images/reported table overflow/overlap.
+The HWPX checks do not claim comprehensive unsupported-control detection.
+
+Opt-in library strictness is additive:
+
+```rust,ignore
+use hanji_preview::{PageFormat, quality::Strictness};
+let quality = window.quality();
+quality.enforce(Strictness::CriticalLosses)?; // before rendering or writing
+let page = window.render(PageFormat::Svg)?;
+let report = quality.rendered(); // only after output buffers are produced
+```
+
+`CriticalLosses` refuses detected error-severity losses with typed
+`QualityRefusal { code: "preview.critical-loss-refused", quality }`.
+Font substitutions, approximation/opaque upstream warnings and experimental
+status alone do not refuse. Default `AllowKnownLosses` preserves behavior.
+Strictness is not proof of complete detection. Package/window/raster budget
+and invalid-input errors keep their existing Result/CLI error contract; they
+never produce a successful rendered report. No CLI strictness flag is added
+in this initial API slice.
+
+## XLSX numeric overflow and complete values
+
+Numeric values (including inherited currency/percent/scientific/date formats)
+and ISO date cells are drawn completely or replaced as a whole with a visible
+`#` overflow indicator. A stored wrap style cannot expose only part of a
+number. The indicator fits actual font ink bounds; tiny visible cells retain
+an indicator rather than readable numeric fragments. If the drawing font lacks
+the marker, a vector cross supplies an unambiguous fallback. Hidden zero-size
+rows/columns remain hidden.
+
+Missing formula caches retain `#UNEVALUATED` and `formula_result: "missing"`;
+a narrow uncached marker uses `?`, separately from numeric overflow. A cached
+zero remains `0`, with its existing unverified/possibly-stale cache state.
+`xlsx.numeric-overflow` and `xlsx.formula-cache-missing` have distinct codes
+and consequences. Overflow retains the complete `cells[].display`; SVG title/
+description metadata and an accessible HTML “Complete cell values” table also
+retain the original value/cache state. PNG paints the same indicator layout;
+its machine result retains complete cell values. XML-invalid characters are replaced with U+FFFD in XML/HTML and reported;
+the machine cell display remains unchanged. The source workbook is not
+modified, widths are not silently expanded, and formulas are not calculated.

@@ -104,6 +104,28 @@ pub struct XlsxPreviewed {
     pub diagnostics: Vec<Diagnostic>,
 }
 
+impl Previewed {
+    pub fn quality(&self) -> crate::quality::QualityReport {
+        let source = match self.format {
+            Format::Pptx => crate::quality::PreviewSource::Pptx,
+            Format::Docx => crate::quality::PreviewSource::Docx,
+            Format::Hwpx => crate::quality::PreviewSource::Hwpx,
+            Format::Xlsx => crate::quality::PreviewSource::Xlsx,
+        };
+        crate::quality::QualityReport::inspect(source, &self.diagnostics, &self.fonts, &self.warnings)
+    }
+}
+impl XlsxPreviewed {
+    pub fn quality(&self) -> crate::quality::QualityReport {
+        crate::quality::QualityReport::inspect(
+            crate::quality::PreviewSource::Xlsx,
+            &self.diagnostics,
+            &self.fonts,
+            &self.warnings,
+        )
+    }
+}
+
 fn render_xlsx_bytes(
     bytes: &[u8],
     id: String,
@@ -317,7 +339,11 @@ pub fn write_document(p: &DocumentPreview, out: &mut Previewed, output: Output, 
             if output == Output::Html {
                 files.push((
                     format!("{stem}-preview.html"),
-                    p.html(&format!("{} · revision {} · preview", out.doc_id, out.revision)).into_bytes(),
+                    crate::quality::add_html_notice(
+                        p.html(&format!("{} · revision {} · preview", out.doc_id, out.revision)),
+                        &out.quality(),
+                    )
+                    .into_bytes(),
                 ));
             } else {
                 let format = if output == Output::Svg { PageFormat::Svg } else { PageFormat::Png { dpi: PNG_DPI } };
@@ -374,7 +400,10 @@ pub fn write(p: &Preview, out: &mut Previewed, output: Output, dir: &Path) -> Re
     out.files = match output {
         Output::Html => {
             let title = format!("{} · revision {} · preview", out.doc_id, out.revision);
-            vec![put(format!("{stem}-preview.html"), p.html(&title).as_bytes())?]
+            vec![put(
+                format!("{stem}-preview.html"),
+                crate::quality::add_html_notice(p.html(&title), &out.quality()).as_bytes(),
+            )?]
         }
         Output::Svg => (0..p.slide_count())
             .map(|k| put(format!("{stem}-{unit}-{}.svg", k + 1), p.slide_svg(k).as_bytes()))

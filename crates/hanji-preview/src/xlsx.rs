@@ -317,7 +317,7 @@ impl Workbook {
         let mut builder = GridBuilder::new(fonts, self.options.max_window_text_bytes, diagnostics);
         for (ci, &w) in widths.iter().enumerate().filter(|(_, w)| **w > 0.0) {
             let rect = Rect { x: xs[ci], y: 0.0, width: w, height: 18.0 };
-            builder.cell(rect, &col_letters(range.first.col + ci as u32), &Style::default(), false, "header")?;
+            builder.cell(rect, &col_letters(range.first.col + ci as u32), &Style::default(), false, false, "header")?;
         }
         let mut cells = vec![];
         let mut used_styles = BTreeSet::new();
@@ -328,6 +328,7 @@ impl Workbook {
                 &r.to_string(),
                 &Style::default(),
                 true,
+                false,
                 "header",
             )?;
             let row = rows.get(&r);
@@ -414,10 +415,9 @@ impl Workbook {
                         || (c.ty() != "str" && c.v.as_deref().is_some_and(|v| v.trim().is_empty()))
                     {
                         display = "#UNEVALUATED".into();
-                        builder.diagnostics.push(diagnostic(
-                            format!("{path}.formula"),
-                            "formula has no cached result; shown as #UNEVALUATED; no evaluation was performed",
-                        ));
+                        builder
+                            .diagnostics
+                            .push(diagnostic(format!("{path}.formula"), crate::quality::FORMULA_MISSING));
                         FormulaResult::Missing
                     } else {
                         builder.diagnostics.push(diagnostic(format!("{path}.formula"), if self.possibly_stale {
@@ -432,8 +432,8 @@ impl Workbook {
                 } else {
                     FormulaResult::NotFormula
                 };
-                let numeric = cell.is_some_and(|c| matches!(self.book.value(c), CellValue::Number(_)));
-                builder.cell(rect, &display, style, numeric, &path)?;
+                let numeric = cell.is_some_and(|c| c.ty() == "d" || matches!(self.book.value(c), CellValue::Number(_)));
+                builder.cell(rect, &display, style, numeric, formula_result == FormulaResult::Missing, &path)?;
                 if cell.is_some() {
                     cells.push(CellInfo { address: address.to_string(), display, formula, formula_result });
                 }
@@ -483,14 +483,58 @@ impl Window {
             }
         }
         let mut output = self.preview.render_page(0, format)?;
+        if let crate::PageData::Svg(svg) = &mut output.data {
+            *svg = self.accessible_svg(svg);
+        }
         output.diagnostics = self.preview.diagnostics.clone();
         Ok(output)
     }
     /// A self-contained static window. No scripts, external links or event handlers.
     pub fn html(&self, title: &str) -> String {
-        let esc = xml::escape_text;
+        let esc = crate::svg::escape_xml_text;
         let warnings: String = self.preview.warnings.iter().map(|w| format!("<li>{}</li>", esc(w))).collect();
-        format!("<!doctype html><html><head><meta charset=\"utf-8\"><title>{}</title></head><body><h1>{}</h1><p>{}: {} — worksheet window, cached formula results only</p><ul>{warnings}</ul>{}</body></html>", esc(title), esc(title), esc(&self.sheet.name), esc(&self.range), self.preview.slide_svg(0))
+        let cells: String = self
+            .cells
+            .iter()
+            .map(|c| {
+                format!(
+                    "<tr><th scope=\"row\">{}</th><td>{}</td><td>{}</td></tr>",
+                    esc(&c.address),
+                    esc(&c.display),
+                    formula_description(&c.formula_result)
+                )
+            })
+            .collect();
+        format!("<!doctype html><html><head><meta charset=\"utf-8\"><title>{}</title></head><body><h1>{}</h1><p>{}: {} — worksheet window, cached formula results only</p>{}<ul>{warnings}</ul>{}<details><summary>Complete cell values</summary><table><caption>Complete displayed values and formula cache state</caption><thead><tr><th>Cell</th><th>Display</th><th>Formula cache</th></tr></thead><tbody>{cells}</tbody></table></details></body></html>", esc(title), esc(title), esc(&self.sheet.name), esc(&self.range), self.quality().html_notice(), self.accessible_svg(&self.preview.slide_svg(0)))
+    }
+
+    fn accessible_svg(&self, svg: &str) -> String {
+        let description: String = self
+            .cells
+            .iter()
+            .map(|c| format!("{}: {}; {}. ", c.address, c.display, formula_description(&c.formula_result)))
+            .collect();
+        let heading = format!("{}: {}", self.sheet.name, self.range);
+        let prefix = svg.find('>').expect("own SVG has a root start tag");
+        format!("{} role=\"img\" aria-labelledby=\"hanji-xlsx-title\" aria-describedby=\"hanji-xlsx-description\"><title id=\"hanji-xlsx-title\">{}</title><desc id=\"hanji-xlsx-description\">{}Diagnostic coverage is partial; native Excel fidelity is unverified.</desc>{}", &svg[..prefix], crate::svg::escape_xml_text(&heading), crate::svg::escape_xml_text(&description), &svg[prefix+1..])
+    }
+
+    pub fn quality(&self) -> crate::quality::QualityReport {
+        crate::quality::QualityReport::inspect(
+            crate::quality::PreviewSource::Xlsx,
+            self.diagnostics(),
+            self.fonts(),
+            self.warnings(),
+        )
+    }
+}
+
+fn formula_description(result: &FormulaResult) -> &'static str {
+    match result {
+        FormulaResult::NotFormula => "not a formula",
+        FormulaResult::CachedUnverified => "stored formula cache; freshness unverified",
+        FormulaResult::CachedPossiblyStale => "stored formula cache; possibly stale",
+        FormulaResult::Missing => "missing formula cache; unevaluated",
     }
 }
 
@@ -569,7 +613,15 @@ impl<'a> GridBuilder<'a> {
         self.keys.insert(key, id);
         Ok(id)
     }
-    fn cell(&mut self, rect: Rect, text: &str, style: &Style, numeric: bool, path: &str) -> Result<(), String> {
+    fn cell(
+        &mut self,
+        rect: Rect,
+        text: &str,
+        style: &Style,
+        numeric: bool,
+        missing_formula: bool,
+        path: &str,
+    ) -> Result<(), String> {
         self.remaining_text =
             self.remaining_text.checked_sub(text.len()).ok_or("worksheet window exceeds the configured text budget")?;
         if text.chars().any(|c| matches!(c as u32, 0x0300..=0x036F | 0x0590..=0x10FF | 0x1780..=0x17FF | 0x200E..=0x200F | 0x202A..=0x202E | 0x2066..=0x2069)) {
@@ -592,7 +644,8 @@ impl<'a> GridBuilder<'a> {
         if text.is_empty() {
             return Ok(());
         }
-        if rect.width <= 4.0 || rect.height <= 0.0 {
+        let guarded = numeric || missing_formula;
+        if rect.height <= 0.0 || rect.width <= 0.0 || (rect.width <= 4.0 && !guarded) {
             self.diagnostics.push(diagnostic(
                 format!("{path}.clipping"),
                 "cell text is omitted because its visible size leaves no text area; cells[].display retains the complete value",
@@ -614,7 +667,7 @@ impl<'a> GridBuilder<'a> {
         for c in text.chars() {
             let glyph = face.glyph_index(c).unwrap_or(ttf_parser::GlyphId(0));
             let advance = f64::from(face.glyph_hor_advance(glyph).unwrap_or(face.units_per_em() / 2)) * scale;
-            if c == '\n' || (style.wrap && width + advance > rect.width - 4.0 && !line.is_empty()) {
+            if c == '\n' || (style.wrap && !guarded && width + advance > rect.width - 4.0 && !line.is_empty()) {
                 lines.push((std::mem::take(&mut line), std::mem::take(&mut glyphs), std::mem::take(&mut advances)));
                 width = 0.0;
             }
@@ -644,6 +697,19 @@ impl<'a> GridBuilder<'a> {
                 _ => rect.x + 2.0,
             };
             clipped |= x < rect.x || x + width > rect.x + rect.width;
+            if guarded {
+                let mut pen = x;
+                for (&glyph, &advance) in glyph_ids.iter().zip(&advances) {
+                    if let Some(bounds) = face.glyph_bounding_box(ttf_parser::GlyphId(glyph)) {
+                        let baseline = top + style.size + i as f64 * line_height;
+                        clipped |= pen + f64::from(bounds.x_min) * scale < rect.x
+                            || pen + f64::from(bounds.x_max) * scale > rect.x + rect.width
+                            || baseline - f64::from(bounds.y_max) * scale < rect.y
+                            || baseline - f64::from(bounds.y_min) * scale > rect.y + rect.height;
+                    }
+                    pen += advance;
+                }
+            }
             children.push(PositionedElement::Text(GlyphRun {
                 origin: Point { x, y: top + style.size + i as f64 * line_height },
                 font_id: id,
@@ -662,9 +728,26 @@ impl<'a> GridBuilder<'a> {
             }));
         }
         if clipped {
+            if guarded {
+                children = overflow_indicator(
+                    rect,
+                    &face,
+                    id,
+                    font.bold,
+                    font.italic,
+                    style,
+                    if missing_formula { '?' } else { '#' },
+                );
+            }
             self.diagnostics.push(diagnostic(
                 format!("{path}.clipping"),
-                "cell text exceeds its stored size and is clipped; leading digits of right-aligned values may be hidden; cells[].display retains the complete value",
+                if numeric {
+                    crate::quality::NUMERIC_OVERFLOW
+                } else if missing_formula {
+                    crate::quality::FORMULA_MARKER_OVERFLOW
+                } else {
+                    "cell text exceeds its stored size and is clipped; cells[].display retains the complete value"
+                },
             ));
         }
         self.elements.push(PositionedElement::Group(GroupElement {
@@ -694,4 +777,60 @@ impl<'a> GridBuilder<'a> {
         };
         Ok(p)
     }
+}
+
+// Replace the whole value. Fit the indicator's actual ink bounds, even for
+// short rows/tiny visible columns; never leave a readable numeric suffix.
+fn overflow_indicator(
+    rect: Rect,
+    face: &ttf_parser::Face<'_>,
+    id: FontId,
+    bold: bool,
+    italic: bool,
+    style: &Style,
+    marker: char,
+) -> Vec<PositionedElement> {
+    if let Some(glyph) = face.glyph_index(marker) {
+        if let (Some(advance), Some(bounds)) = (face.glyph_hor_advance(glyph), face.glyph_bounding_box(glyph)) {
+            let upem = f64::from(face.units_per_em());
+            let count =
+                if marker == '#' && f64::from(advance) * style.size / upem * 3.0 <= rect.width - 4.0 { 3 } else { 1 };
+            let ink_width = f64::from(bounds.x_max) - f64::from(bounds.x_min) + (count - 1) as f64 * f64::from(advance);
+            let ink_height = f64::from(bounds.y_max) - f64::from(bounds.y_min);
+            if ink_width > 0.0 && ink_height > 0.0 {
+                let scale = (style.size / upem).min(rect.width * 0.8 / ink_width).min(rect.height * 0.8 / ink_height);
+                return vec![PositionedElement::Text(GlyphRun {
+                    origin: Point {
+                        x: rect.x + (rect.width - ink_width * scale) / 2.0 - f64::from(bounds.x_min) * scale,
+                        y: rect.y + (rect.height - ink_height * scale) / 2.0 + f64::from(bounds.y_max) * scale,
+                    },
+                    font_id: id,
+                    font_size: scale * upem,
+                    glyph_ids: vec![glyph.0; count],
+                    advances: vec![f64::from(advance) * scale; count],
+                    text: std::iter::repeat_n(marker, count).collect(),
+                    source: None,
+                    color: style.color,
+                    bold,
+                    italic,
+                    field_kind: None,
+                    field_source: None,
+                    note: None,
+                    tab_aligned: None,
+                })];
+            }
+        }
+    }
+    // A drawing font can lack ASCII markers. A vector cross cannot be read as
+    // a truncated number and does not depend on missing font coverage.
+    [(0.2, 0.2, 0.8, 0.8), (0.2, 0.8, 0.8, 0.2)]
+        .into_iter()
+        .map(|(x1, y1, x2, y2)| PositionedElement::Line {
+            start: Point { x: rect.x + rect.width * x1, y: rect.y + rect.height * y1 },
+            end: Point { x: rect.x + rect.width * x2, y: rect.y + rect.height * y2 },
+            width: (rect.width.min(rect.height) * 0.1).min(1.0),
+            color: style.color,
+            dash_pattern: None,
+        })
+        .collect()
 }
