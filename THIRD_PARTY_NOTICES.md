@@ -115,6 +115,16 @@ contributors), licensed MIT OR Apache-2.0 like hanji (`LICENSE-MIT`,
 subsets the fonts, upstream embeds them whole), per-page definition ids, and
 `hanji-font-N` font families.
 
+## Preview renderer dependencies
+
+DOCX and PPTX use rdocx / rpptx / oxml-layout from
+<https://github.com/sinteric/rdocx>, derived from
+<https://github.com/tensorbee/rdocx>, licensed MIT OR Apache-2.0. HWPX uses
+rhwp from <https://github.com/sinteric/rhwp>, derived from
+<https://github.com/edwardkim/rhwp>, licensed MIT. The immutable source
+revisions are recorded in `Cargo.toml` and `Cargo.lock`. The SVG lowering
+copy above retains its original provenance independently of these pins.
+
 ## Fonts compiled into the binaries
 
 The `hanji` binary contains the fonts oxml-layout 0.12.1

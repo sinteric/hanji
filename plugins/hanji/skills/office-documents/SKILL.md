@@ -81,6 +81,10 @@ later runs start at once.
    file or image reader. Without `--out` the files go next to the original,
    so pass a scratch directory. Mention substituted fonts that change the
    look.
+   For a Word or HWPX document, the same command writes one PNG per page
+   (`<doc>-r<rev>-page-<n>.png`). These page renderers are experimental:
+   inspect tables, page breaks, headers/footers and any rendering diagnostics;
+   do not treat a successful render as native Word/Hancom fidelity.
    For a spreadsheet, `hanji preview DOC --sheet NAME --range A1:H40
    --format png --out /abs/scratch/dir` writes one bounded worksheet window.
    `--sheet-index N` is 1-based; the default is the first visible worksheet

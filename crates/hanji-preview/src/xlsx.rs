@@ -658,6 +658,7 @@ impl<'a> GridBuilder<'a> {
                 field_kind: None,
                 field_source: None,
                 note: None,
+                tab_aligned: None,
             }));
         }
         if clipped {

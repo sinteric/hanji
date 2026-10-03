@@ -65,7 +65,7 @@ fn page_jobs_validate_indices_and_raster_resolution() {
     let image = resvg::tiny_skia::Pixmap::decode_png(&bytes).unwrap();
     assert_eq!(image.width(), (page.page.width * 48.0 / 72.0).round() as u32);
     assert_eq!(image.height(), (page.page.height * 48.0 / 72.0).round() as u32);
-    assert!(page.diagnostics.iter().any(|d| d.message.contains("unsupported connector line style")));
+    assert!(page.diagnostics.iter().any(|d| d.message.contains("unsupported slide hyperlink action")));
 }
 
 #[test]

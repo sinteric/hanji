@@ -18,24 +18,28 @@ native targets and on wasm32 (§10.4).
 | `hanji-pptx` | The pptx engine. Splits each slide and notes page at the XML level into a skeleton (with stand-ins for the placeholders and text shapes the text shows) and text entries, and copies every other part through byte for byte. Layout names and slots come from the layouts' placeholders (`deck.rs`), bullets from the inheritance chain up to the master text styles. Objects that are not placeholders (pictures, charts, tables, groups) are `<keep/>` lines in z-order. Slides can be added from a layout, deleted (their notes and unreachable parts go; a slide something else links to is refused) and moved; `sldIdLst`, sections, rels and content types follow. §8 (`safety.rs`): macros, ActiveX, OLE objects (their preview picture stays), program and macro click actions, linked media, images and objects, other external relationships. `examples/dump_pptx.rs` prints a file's model text |
 | `hanji-xlsx` | The xlsx engine (§5.4). The structure (sheets, tables, column types, formats and formulas, placeholders) is text; cells are read through row windows (`view.rs`) and written by range operations (`ops.rs`). Each worksheet is a skeleton plus its rows as byte ranges, parsed only when read or changed (`store.rs`); merged cells, conditional formats, data validations and hyperlinks are range entries (`hanji_core::cells`). Values as displayed (`numfmt.rs`). Cell formatting (round 6 part D, `format.rs`): each cell style's font, fill, border and alignment in the vocabulary, shown as read-only `<format range …/>` lines (one per rectangle of equal cells, `hanji_format::cellfmt`) and a `<format default …/>` line for Normal, and written by the `format` operation as copies of the cells' styles with the written keys changed. Row shifts move formulas, tables, entries, defined names, drawings, notes and pivot sources, and refuse what they would tear (`shift.rs`). Cached values: IronCalc computes the formulas whose inputs changed, over the rows they read, and writes only their `<v>`; what it cannot compute keeps its value and the file asks to be recalculated when opened (`calc.rs`). §8 (`safety.rs`): macros and macro sheets, external links, DDE, OLE, ActiveX, connections and query tables, fetching formulas. `examples/dump_xlsx.rs` prints a file's structure and windows, `examples/apply_ops.rs` applies an operation list |
 | `hanji-store` | Documents and their revisions, and the operations of the CLI (§4): open, new, read (partial views by line range, section or slide range, and row windows, §2 rule 11), exact-span edits and whole-file rewrites against a known revision, range operations, validate, export behind the §8 surface list, re-import of a person's edits (rule 7, an edit against the revision before it merged by lines or refused), history and diff. Each revision is its model text and its remainder; storage is a small key–value trait (`MemStorage`, and `FsStorage` on native builds). The blank packages a new file starts from are in `blank/`. Errors are written for the model and reuse the validator's. `guide.md` is the format summary a model reads |
-| `hanji-preview` | The preview (§2 rules 4–5, §7, §7.1), PPTX and bounded XLSX windows: the bytes a revision exports, rendered by rpptx 0.12.1 to one SVG per slide, an HTML viewer and PNG (resvg). `prep.rs`: engine-compat transforms on the preview's copy (an empty theme `a:ea` takes the Hangul face, runs split where the script changes, `p:timing` dropped). `fonts.rs`: each requested face looked up in `--font-dir`/`HANJI_FONT_DIR`, the deck's embedded fonts, system fonts and the faces compiled in, by name, then by `fonts/aliases.toml` (metric twin, substitutes, class). `sfnt.rs`: the face rpptx lays out with, renamed per request and given a 1.2 em line. `subset.rs`: fonts cut per page (allsorts, `cmap` kept). The `fonts` report: substituted, drawn as requested, missing glyphs. `render_pptx_with_fonts`/`render_pptx_with_resolver`: byte-only native/WASM document jobs; `render_page`: SVG/PNG buffers with diagnostics. `store.rs` and host font discovery are optional native adapters (`host-fonts`, enabled by default) |
+| `hanji-preview` | PPTX slides through rpptx, experimental DOCX pages through rdocx, experimental HWPX pages through rhwp, and bounded XLSX windows, all from exported revision bytes. Owned page jobs return SVG/PNG buffers, HTML, font provenance, actual missing characters and reported rendering diagnostics. `prep.rs` applies PPTX compatibility transforms on a preview copy. `fonts.rs` resolves caller, embedded, optional host and bundled faces using the alias policy. `sfnt.rs` renames selected fonts; the 1.2 em line adjustment applies to PPTX. `subset.rs` embeds per-page/viewer subsets. `store.rs` and host-font discovery are optional native adapters; byte APIs also compile for WASM. See [PREVIEW.md](../PREVIEW.md) for format-specific fidelity and limits |
 | `hanji-cli` | The `hanji` binary: each operation as a subcommand, text for people or `--json`; `hanji preview` writes the preview, `hanji guide` prints `guide.md`. Native only. Packaged with a skill as a Claude Code and Codex plugin in [`plugins/hanji`](../plugins/hanji/README.md) |
 | `hanji-testkit` | The corpus harness the engines run (not published): the prototype's E1–E10 edits (P1–P9 for pptx), oracle and scoring, GetPut, PutGet and well-formedness |
 
 rdocx is not on the import/export path. Its typed model (`CT_P`, `CT_RPr`,
 hyperlinks as run spans) does not expose the original `pPr`/`rPr` fragments,
-bookmarks and wrappers that the remainder stores. It remains the candidate for
-the docx preview. rpptx is not on the pptx import/export path for the same
+bookmarks and wrappers that the remainder stores. It supplies the experimental
+docx preview. rpptx is not on the pptx import/export path for the same
 reason: it rewrites the parts it opens through its typed model. Adding a slide
 from a layout, the one thing it would have saved, is done at the XML level.
-It renders the pptx preview (`hanji-preview`). `Engine::render` in hanji-core
+`hanji-preview` uses rpptx for PPTX, rdocx for DOCX, rhwp for HWPX and an
+internal bounded worksheet grid for XLSX. `Engine::render` in hanji-core
 stays a stub; the reusable preview library has its own document-byte/font-byte
 entry points on native and wasm32 targets. Its optional `host-fonts` adapter
 retains font directories, system discovery and stored-file output on native targets.
 
 ### Embedding preview
 
-Use `hanji-preview` with `default-features = false` for a byte-only build.
+Use `hanji-preview` with `default-features = false` for byte-only PPTX/DOCX/XLSX
+jobs. Add `features = ["hwpx"]` for byte-only HWPX. Both `host-fonts` and
+`hwpx` are enabled by default. [PREVIEW.md](../PREVIEW.md) describes fidelity
+and resource limits.
 `render_pptx_with_fonts(package, &FontOptions)` accepts caller-owned font bytes
 and optional aliases, then considers package-embedded and bundled faces.
 `FontData::face_index` selects a face in a font collection. A custom Rust
@@ -186,8 +190,8 @@ conversion runs natively only, and the rhwp check is a separate crate
   content controls stay block placeholders (4 of the corpus's 29 tables, 40
   of the table survey's 506 docx tables). Zero-width markers between rows,
   cells or cell paragraphs are remainder entries and do not block a table.
-- §4 rule 5: the docx/hwpx preview and XLSX print/advanced visual fidelity. The pptx preview has no live
-  reload, no bundled Korean font pack (§7.1) and no font policy yet.
+- §4 rule 5: DOCX/HWPX native layout fidelity and XLSX print/advanced visual
+  fidelity. PPTX has no live reload or bundled Korean font pack (§7.1).
 - §9 validity in Word: exports are checked for well-formed XML and a
   LibreOffice PDF conversion only.
 - Lists inside table cells and multi-paragraph list items (§5.2): a numbered

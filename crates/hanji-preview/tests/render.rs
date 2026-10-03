@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use base64::Engine as _;
 use hanji_preview::store::{self, Output};
 use hanji_preview::{fonts::Script, Options, Preview};
-use hanji_store::{Code, MemStorage, TextEdit, Workspace};
+use hanji_store::{MemStorage, TextEdit, Workspace};
 
 fn corpus(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../hanji-pptx/corpus").join(name)
@@ -172,7 +172,7 @@ fn the_korean_font_can_be_supplied_as_bytes_without_host_discovery() {
 fn rendering_diagnostics_reach_json_and_every_output_mode_without_refusing_the_deck() {
     let (ws, id) = opened("shapes.pptx");
     let (mut out, p) = store::render(&ws, &id, None, &no_fonts()).unwrap();
-    let message = "unsupported connector line style retained as visible default";
+    let message = "unsupported slide hyperlink action `ppaction://hlinksldjump`";
     assert_eq!(
         p.diagnostics.iter().filter(|d| d.message == message).count(),
         1,
@@ -259,10 +259,11 @@ fn a_revision_is_previewed_from_its_export_not_the_original() {
 }
 
 #[test]
-fn other_formats_are_not_supported_yet() {
+fn blank_documents_have_an_experimental_page_preview() {
     let mut ws = Workspace::new(MemStorage::new());
     let id = ws.create(hanji_store::DocType::Document, None, None).unwrap().doc_id;
-    let e = store::render(&ws, &id, None, &no_fonts()).err().unwrap();
-    assert_eq!(e.code, Code::Unsupported);
-    assert!(e.message.starts_with("preview not supported yet for docx"), "{}", e.message);
+    let (out, preview) = store::render(&ws, &id, None, &no_fonts()).unwrap();
+    assert!(preview.page_count() >= 1);
+    assert_eq!(out.pages, preview.page_count());
+    assert!(out.warnings.iter().any(|warning| warning.contains("experimental")));
 }

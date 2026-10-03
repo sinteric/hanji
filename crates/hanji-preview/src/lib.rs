@@ -1,8 +1,9 @@
 //! hanji's preview (DESIGN.md §2 rules 4–5, §7, §7.1): renders the package
 //! an export writes, one SVG per slide, with the fonts each slide draws
 //! subset and embedded, an HTML viewer that marks substituted text, and PNG.
-//! PPTX through rpptx 0.12.1, and bounded read-only XLSX worksheet windows.
-//! DOCX and HWPX come later. XLSX windows are grids, not printed pages.
+//! PPTX through rpptx, experimental DOCX through rdocx, experimental HWPX
+//! through rhwp, and bounded read-only XLSX worksheet windows. XLSX windows
+//! are grids, not printed pages.
 //!
 //! The pipeline: the export's bytes → the engine-compat transforms of
 //! [`prep`] on a copy → rpptx resolves the slides → every run's font
@@ -15,7 +16,10 @@
 //! native and WASM targets. The default `host-fonts` feature retains the native
 //! font-directory/system-font and stored-file adapters; disable it for a byte-only build.
 
+pub mod docx;
 pub mod fonts;
+#[cfg(feature = "hwpx")]
+pub mod hwpx;
 pub mod prep;
 pub mod sfnt;
 #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
@@ -267,6 +271,93 @@ pub struct RenderedPage {
     pub data: PageData,
     /// Document-wide diagnostics and those for this page; paths are unchanged.
     pub diagnostics: Vec<Diagnostic>,
+}
+
+/// Paged document formats. XLSX uses the explicit worksheet-window API.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DocumentKind {
+    Pptx,
+    Docx,
+    Hwpx,
+}
+
+/// The common page-job interface over the two existing renderer outputs.
+pub enum DocumentPreview {
+    Layout(Box<Preview>),
+    #[cfg(feature = "hwpx")]
+    Hwpx(hwpx::Preview),
+}
+
+/// Portable document job. Caller fonts are bytes, and no host fonts are searched.
+pub fn render_document_with_fonts(
+    kind: DocumentKind,
+    bytes: &[u8],
+    fonts: &FontOptions,
+) -> Result<DocumentPreview, String> {
+    match kind {
+        DocumentKind::Pptx => {
+            render_pptx_with_fonts(bytes, fonts).map(|preview| DocumentPreview::Layout(Box::new(preview)))
+        }
+        DocumentKind::Docx => {
+            docx::render_with_fonts(bytes, fonts).map(|preview| DocumentPreview::Layout(Box::new(preview)))
+        }
+        #[cfg(feature = "hwpx")]
+        DocumentKind::Hwpx => hwpx::render_with_fonts(bytes, fonts).map(DocumentPreview::Hwpx),
+        #[cfg(not(feature = "hwpx"))]
+        DocumentKind::Hwpx => Err("HWPX preview requires the hanji-preview hwpx feature".into()),
+    }
+}
+
+impl DocumentPreview {
+    pub fn page_count(&self) -> usize {
+        match self {
+            Self::Layout(p) => p.slide_count(),
+            #[cfg(feature = "hwpx")]
+            Self::Hwpx(p) => p.page_count(),
+        }
+    }
+    pub fn page_info(&self, index: usize) -> Option<PageInfo> {
+        match self {
+            Self::Layout(p) => p.page_info(index),
+            #[cfg(feature = "hwpx")]
+            Self::Hwpx(p) => p.page_info(index),
+        }
+    }
+    pub fn render_page(&self, index: usize, format: PageFormat) -> Result<RenderedPage, String> {
+        match self {
+            Self::Layout(p) => p.render_page(index, format),
+            #[cfg(feature = "hwpx")]
+            Self::Hwpx(p) => p.render_page(index, format),
+        }
+    }
+    pub fn fonts(&self) -> &FontsReport {
+        match self {
+            Self::Layout(p) => &p.fonts,
+            #[cfg(feature = "hwpx")]
+            Self::Hwpx(p) => &p.fonts,
+        }
+    }
+    pub fn warnings(&self) -> &[String] {
+        match self {
+            Self::Layout(p) => &p.warnings,
+            #[cfg(feature = "hwpx")]
+            Self::Hwpx(p) => &p.warnings,
+        }
+    }
+    pub fn diagnostics(&self) -> &[Diagnostic] {
+        match self {
+            Self::Layout(p) => &p.diagnostics,
+            #[cfg(feature = "hwpx")]
+            Self::Hwpx(p) => &p.diagnostics,
+        }
+    }
+    pub fn html(&self, title: &str) -> String {
+        match self {
+            Self::Layout(p) => p.html(title),
+            #[cfg(feature = "hwpx")]
+            Self::Hwpx(p) => p.html(title),
+        }
+    }
 }
 type Subsets = Vec<(FontId, Arc<[u8]>)>;
 type PreparedSubsets = Vec<(FontId, Option<Arc<[u8]>>)>;
@@ -610,6 +701,10 @@ fn runs<'a>(elements: &'a [PositionedElement], out: &mut Vec<(FontId, &'a str)>)
 }
 
 impl Preview {
+    pub fn page_count(&self) -> usize {
+        self.layout.pages.len()
+    }
+
     pub fn slide_count(&self) -> usize {
         self.layout.pages.len()
     }

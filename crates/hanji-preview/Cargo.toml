@@ -1,6 +1,6 @@
 [package]
 name = "hanji-preview"
-description = "hanji preview: package bytes to presentation pages and bounded worksheet grids, with embedded fonts and diagnostics"
+description = "hanji preview: package bytes to document/presentation pages and bounded worksheet grids, with embedded fonts and diagnostics"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -10,19 +10,23 @@ rust-version = "1.93"
 
 [features]
 # Keep the existing native API; byte-only consumers can disable this adapter.
-default = ["host-fonts"]
+default = ["host-fonts", "hwpx"]
 host-fonts = ["dep:hanji-store", "oxml-layout/system-fonts", "fontdb/fs", "fontdb/fontconfig"]
+# The CLI includes HWPX; small PPTX/DOCX byte-only consumers can omit rhwp.
+hwpx = ["dep:rhwp"]
 
 [dependencies]
 hanji-core.workspace = true
 hanji-package.workspace = true
 hanji-pptx = { path = "../hanji-pptx" }
 hanji-xlsx = { path = "../hanji-xlsx" }
-rpptx = { version = "=0.12.1", default-features = false, features = ["render"] }
-rpptx-render = { version = "=0.12.1", default-features = false }
-rpptx-layout = { version = "=0.12.1", default-features = false }
+rpptx = { workspace = true, features = ["render"] }
+rpptx-render.workspace = true
+rpptx-layout.workspace = true
+rdocx.workspace = true
+rhwp = { workspace = true, optional = true }
 ttf-parser = "0.25"
-oxml-layout = { version = "=0.12.1", default-features = false }
+oxml-layout.workspace = true
 fontdb = { version = "0.23", default-features = false, features = ["std"] }
 allsorts = { version = "0.17", default-features = false, features = ["flate2_zlib-rs"] }
 resvg = { version = "=0.48.1", default-features = false, features = ["text", "raster-images"] }

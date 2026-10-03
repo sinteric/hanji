@@ -105,9 +105,9 @@ enum Cmd {
         #[arg(long)]
         tracked_changes: bool,
     },
-    /// Render PPTX slides or a bounded XLSX worksheet window to HTML, SVG or PNG.
+    /// Render PPTX slides, experimental DOCX/HWPX pages or an XLSX window to HTML, SVG or PNG.
     Preview {
-        /// A stored document or a .pptx/.xlsx file (file previews are not stored).
+        /// A stored document or a .docx/.pptx/.xlsx/.hwpx file (file previews are not stored).
         doc: String,
         #[arg(long)]
         rev: Option<u32>,
@@ -238,21 +238,22 @@ fn preview(
         let bytes = std::fs::read(path).map_err(|e| Error::io(format!("cannot read {}: {e}", path.display())))?;
         let name = path.file_name().map_or_else(|| doc.to_string(), |n| n.to_string_lossy().into_owned());
         let o = mem.open_bytes(&name, &bytes, None)?;
-        let (p, preview) = hanji_preview::store::render(&mem, &o.doc_id, None, &opts)?;
+        let (p, preview) = hanji_preview::store::render_document(&mem, &o.doc_id, None, &opts)?;
         let parent =
             path.parent().filter(|p| !p.as_os_str().is_empty()).map_or_else(|| PathBuf::from("."), Path::to_path_buf);
         (p, preview, out_dir.unwrap_or(parent))
     } else {
-        let (p, preview) = hanji_preview::store::render(ws, doc, rev, &opts)?;
+        let (p, preview) = hanji_preview::store::render_document(ws, doc, rev, &opts)?;
         let dir = out_dir.unwrap_or_else(|| hanji_preview::store::default_dir(ws, doc, Path::new(".")));
         (p, preview, dir)
     };
-    hanji_preview::store::write(&preview, &mut p, format, &dir)?;
+    hanji_preview::store::write_document(&preview, &mut p, format, &dir)?;
     let mut t = String::new();
     for f in &p.files {
         t.push_str(&format!("wrote {f}\n"));
     }
-    t.push_str(&format!("{} slides from revision {} of {}; {}\n", p.slides, p.revision, p.doc_id, p.summary));
+    let unit = if p.format == Format::Pptx { "slides" } else { "pages" };
+    t.push_str(&format!("{} {unit} from revision {} of {}; {}\n", p.pages, p.revision, p.doc_id, p.summary));
     for w in &p.warnings {
         t.push_str(&format!("warning: {w}\n"));
     }

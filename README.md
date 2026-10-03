@@ -75,8 +75,9 @@ line 14, column 24: placeholder id="zzzzz" is not in this file. Placeholders com
 
 Subcommands: `open`, `new`, `read`, `edit`, `write`, `ops`, `validate`,
 `export`, `preview`, `reimport`, `history`, `diff`, `list`, `guide`.
-`hanji preview DOC` (pptx) writes an HTML viewer of the revision as it would
-export (`--format svg` or `png` for one file per slide) and says which fonts
+`hanji preview DOC` writes an HTML viewer of the revision as it would
+export. PPTX writes one slide per SVG/PNG; experimental DOCX and HWPX
+write one page per SVG/PNG (`--format svg` or `png`) and says which fonts
 it had to substitute; `--font-dir DIR` or `$HANJI_FONT_DIR` adds fonts. Rendering
 fallbacks and font-embedding failures are warnings; `--json` also returns their
 `diagnostics` with source paths. The preview library exposes the same diagnostics
@@ -111,11 +112,21 @@ cargo run --locked -p hanji-cli -- --json preview crates/hanji-xlsx/corpus/korea
 cargo run --locked -p hanji-cli -- preview crates/hanji-xlsx/corpus/korean-sales.xlsx --range A1:H20 --format html --out /tmp/hanji-xlsx-html
 ```
 
-Diagnostic inspection does not serialize SVG or encode image data. Unique
-page/viewer font subsets are validated before output; identical character sets
-share buffers in a 16 MiB performance cache. Validated subsets that do not fit
-are recreated when requested, without limiting output. The full layout remains
-in memory, so preview preparation is not incremental.
+PPTX, DOCX and HWPX render every page; there is no product page or image-size
+cap. Reported engine omissions, actual missing glyphs and font subset
+failures remain visible in warnings and JSON. DOCX pagination and vertical text can differ
+from Word. HWPX retains rhwp source/table geometry rather than reflowing with
+the selected drawing fonts. These previews do not establish the design
+fidelity target. See [the preview support matrix](PREVIEW.md) for APIs,
+limits, diagnostics and validation scope.
+
+PPTX/DOCX diagnostic inspection does not serialize SVG or encode image data.
+Unique page/viewer font subsets are validated before output; identical
+character sets share buffers in a 16 MiB performance cache. Validated subsets
+that do not fit are recreated when requested, without limiting output. HWPX
+preparation obtains each SVG from rhwp and prepares page/viewer subsets. All
+three retain their complete layout or page data in memory; preparation is
+not incremental.
 Documents and their revisions are kept in `.hanji/`,
 or in the directory named by `--store` or `$HANJI_STORE`. `hanji guide` prints
 the format summary that agents read.
@@ -170,7 +181,7 @@ download. Later runs use the cached binary. For details, see
 | `hanji export DOC PATH` | Write a revision to a file. Refused until surfaced content (comments, hidden text, metadata) is acknowledged (`--acknowledge-surfaced`); `--tracked-changes` for docx |
 | `hanji reimport DOC PATH` | Bring back a file a person edited in Office or Hancom as a new revision, and merge or refuse concurrent edits |
 | `hanji history DOC`, `hanji diff DOC A B` | List a document's revisions, and show the diff between two of them |
-| `hanji preview DOC` | Render PPTX slides or a bounded XLSX worksheet window to HTML, SVG or PNG, with font and rendering diagnostics |
+| `hanji preview DOC` | Render PPTX slides, experimental DOCX/HWPX pages or a bounded XLSX worksheet window to HTML, SVG or PNG, with font and rendering diagnostics |
 | `hanji list`, `hanji guide` | List the stored documents; print the format summary for agents |
 
 ## Formats
@@ -210,7 +221,7 @@ The old binary formats (.doc, .ppt, .xls, .hwp) are not supported.
 
 ## Status and limitations
 
-Version 0.2.0. The format has `schema: 1` and may change before 1.0.
+Version 0.3.0 (release candidate). The format has `schema: 1` and may change before 1.0.
 
 These are not supported yet:
 
@@ -229,10 +240,11 @@ These are not supported yet:
   writes.
 - xlsx: cell styles beyond formats, new charts, renaming or deleting sheets,
   tables and columns, column insert and delete.
-- Preview of docx and hwpx; XLSX print layout and advanced visuals. The
-  library provides bounded read-only XLSX worksheet windows with SVG/PNG/HTML
-  output and explicit cached-formula/unsupported-feature diagnostics, also
-  exposed through the CLI. Korean text needs a supplied or installed Korean font.
+- Native-application fidelity for all DOCX/HWPX features, and XLSX print
+  layout and advanced visuals. DOCX/HWPX previews are experimental. XLSX
+  previews are bounded read-only worksheet windows with explicit cached
+  formula and unsupported-feature diagnostics. Korean text needs a supplied
+  or installed Korean font.
 
 For the details of each engine, see [crates/README.md](crates/README.md).
 

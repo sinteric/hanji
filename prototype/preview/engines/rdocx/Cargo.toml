@@ -7,8 +7,8 @@ publish = false
 [workspace]
 
 [dependencies]
-rdocx = { version = "=0.14.0", default-features = false }
-oxml-layout = { version = "=0.12.1", default-features = false }
+rdocx = { git = "https://github.com/sinteric/rdocx", rev = "f82067c72bb9d2dad82c57c448189a18d67cd6c0", default-features = false }
+oxml-layout = { git = "https://github.com/sinteric/rdocx", rev = "f82067c72bb9d2dad82c57c448189a18d67cd6c0", default-features = false }
 base64 = "0.23"
 resvg = "=0.48.1"
 serde_json = "1"

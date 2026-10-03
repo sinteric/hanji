@@ -134,17 +134,89 @@ fn preview_of_a_document_and_of_a_file() {
         .as_array()
         .unwrap()
         .iter()
-        .any(|d| d["message"] == "unsupported connector line style retained as visible default"));
-    assert!(text.contains("warning: ") && text.contains("unsupported connector line style"));
+        .any(|d| d["message"].as_str().unwrap().contains("unsupported slide hyperlink action")));
+    assert!(text.contains("warning: ") && text.contains("unsupported slide hyperlink action"));
     let e = env.err(&["preview", &deck, "--range", "A1:B2"]);
     assert_eq!(e["code"], "bad_request");
     assert!(e["message"].as_str().unwrap().contains("only to XLSX"));
     let e = env.err(&["preview", &deck, "--rev", "2"]);
     assert_eq!(e["code"], "bad_request");
     env.ok(&["open", &corpus("prototype/remainder/corpus/korean-report.docx")]);
-    let e = env.err(&["preview", "korean-report"]);
-    assert_eq!(e["code"], "unsupported");
-    assert!(e["message"].as_str().unwrap().starts_with("preview not supported yet for docx"), "{e:#}");
+    let p = env.ok(&["preview", "korean-report", "--out", &out]);
+    assert_eq!(p["format"], "docx");
+    assert!(p["pages"].as_u64().unwrap() >= 1);
+    assert!(p["slides"].is_null());
+    assert!(p["warnings"].as_array().unwrap().iter().any(|w| w.as_str().unwrap().contains("experimental")));
+}
+
+#[test]
+fn docx_file_and_stored_revision_preview_keep_content_and_source_read_only() {
+    let env = Env::new("docx-preview");
+    let file = env.path("report.docx");
+    let original = std::fs::read(corpus("prototype/preview/baseline/01-docx-untouched-korean-report.docx")).unwrap();
+    std::fs::write(&file, &original).unwrap();
+    let out = env.path("pages");
+    let p = env.ok(&["preview", &file, "--format", "svg", "--out", &out]);
+    assert_eq!(p["pages"], 2);
+    assert_eq!(p["files"].as_array().unwrap().len(), 2);
+    let svg = std::fs::read_to_string(p["files"][0].as_str().unwrap()).unwrap();
+    let content = hanji_package::xml::parse(svg.as_bytes()).unwrap().root.text_of(&["text", "tspan"]);
+    assert!(content.contains("3분기") && svg.contains("data:font/") && svg.contains("<image"), "{p:#}");
+    assert!(p["diagnostics"].is_array());
+    assert_eq!(std::fs::read(&file).unwrap(), original);
+    assert!(env.ok(&["list"]).as_array().unwrap().is_empty());
+    env.ok(&["open", &file]);
+    env.ok(&["edit", "report", "--rev", "1", "--old", "3분기 영업 보고", "--new", "수정된 영업 보고"]);
+    let history = env.ok(&["history", "report"]);
+    std::fs::remove_file(&file).unwrap();
+    let p = env.ok(&["preview", "report", "--rev", "1", "--format", "svg", "--out", &out]);
+    let svg = std::fs::read_to_string(p["files"][0].as_str().unwrap()).unwrap();
+    let content = hanji_package::xml::parse(svg.as_bytes()).unwrap().root.text_of(&["text", "tspan"]);
+    assert!(content.contains("3분기") && !content.contains("수정된"));
+    assert_eq!(env.ok(&["history", "report"]), history);
+    let p = env.ok(&["preview", "report", "--format", "svg", "--out", &out]);
+    let svg = std::fs::read_to_string(p["files"][0].as_str().unwrap()).unwrap();
+    let content = hanji_package::xml::parse(svg.as_bytes()).unwrap().root.text_of(&["text", "tspan"]);
+    assert!(content.contains("수정된"));
+}
+
+#[test]
+fn hwpx_file_outputs_and_stored_revisions_are_read_only() {
+    let env = Env::new("hwpx-preview");
+    let file = env.path("plan.hwpx");
+    let original = std::fs::read(corpus("prototype/preview/baseline/30-hwpx-new-plan-ko.hwpx")).unwrap();
+    std::fs::write(&file, &original).unwrap();
+    let out = env.path("pages");
+    for format in ["svg", "png", "html"] {
+        let p = env.ok(&["preview", &file, "--format", format, "--out", &out]);
+        assert_eq!(p["format"], "hwpx");
+        assert_eq!(p["pages"], 2);
+        assert!(p["slides"].is_null());
+        assert_eq!(p["files"].as_array().unwrap().len(), if format == "html" { 1 } else { 2 });
+        assert!(p["warnings"].as_array().unwrap().iter().any(|w| w.as_str().unwrap().contains("experimental")));
+        assert_eq!(std::fs::read(&file).unwrap(), original);
+        assert!(env.ok(&["list"]).as_array().unwrap().is_empty());
+    }
+    env.ok(&["open", &file]);
+    let text = env.read("plan");
+    let heading = text.lines().find_map(|line| line.strip_prefix("# ")).unwrap();
+    env.ok(&["edit", "plan", "--rev", "1", "--old", heading, "--new", "HANJI_PREVIEW_REVISION_TWO"]);
+    let history = env.ok(&["history", "plan"]);
+    std::fs::remove_file(&file).unwrap();
+    for (rev, edited) in [("1", false), ("2", true)] {
+        let p = env.ok(&["preview", "plan", "--rev", rev, "--format", "svg", "--out", &out]);
+        let content: String = p["files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|file| {
+                let svg = std::fs::read(file.as_str().unwrap()).unwrap();
+                hanji_package::xml::parse(&svg).unwrap().root.text_of(&["text", "tspan"])
+            })
+            .collect();
+        assert_eq!(content.contains("HANJI_PREVIEW_REVISION_TWO"), edited, "{content}");
+        assert_eq!(env.ok(&["history", "plan"]), history);
+    }
 }
 
 fn xlsx_fixture(env: &Env, name: &str, sheet: &str) -> String {

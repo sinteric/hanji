@@ -9,7 +9,9 @@ use std::path::{Path, PathBuf};
 use hanji_store::{Code, Error, ExportOptions, Format, Result, Storage, Workspace};
 use serde::Serialize;
 
-use crate::{render_pptx, xlsx, Diagnostic, FontsReport, Options, PageData, PageFormat, PageInfo, Preview};
+use crate::{
+    docx, render_pptx, xlsx, Diagnostic, DocumentPreview, FontsReport, Options, PageData, PageFormat, PageInfo, Preview,
+};
 
 /// What the preview writes.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
@@ -44,8 +46,11 @@ pub struct Previewed {
     pub revision: u32,
     pub format: Format,
     pub output: Output,
+    /// Presentation slide count, retained for existing PPTX clients.
+    #[serde(skip_serializing_if = "crate::is_zero")]
     pub slides: usize,
-    /// The files written, in slide order.
+    pub pages: usize,
+    /// The files written, in page order.
     pub files: Vec<String>,
     pub fonts: FontsReport,
     /// The fonts report in one line.
@@ -219,11 +224,14 @@ pub fn write_xlsx(window: &xlsx::Window, out: &mut XlsxPreviewed, output: Output
 /// Whether hanji can preview `format` yet, as the refusal to give.
 pub fn check_format(format: Format) -> Result<()> {
     match format {
-        Format::Pptx | Format::Xlsx => Ok(()),
+        Format::Pptx | Format::Docx | Format::Xlsx => Ok(()),
+        #[cfg(feature = "hwpx")]
+        Format::Hwpx => Ok(()),
+        #[cfg(not(feature = "hwpx"))]
         f => Err(Error::new(
             Code::Unsupported,
             format!(
-                "preview not supported yet for {}: hanji previews pptx slides and xlsx worksheet windows (docx and hwpx are planned).",
+                "preview not supported yet for {}: hanji previews pptx slides, experimental docx pages and xlsx worksheet windows.",
                 f.name()
             ),
         )),
@@ -239,19 +247,25 @@ pub fn render<S: Storage>(
 ) -> Result<(Previewed, Preview)> {
     let doc = ws.doc(id)?;
     check_format(doc.format)?;
-    if doc.format != Format::Pptx {
-        return Err(Error::bad("use render_xlsx for a worksheet window"));
+    if !matches!(doc.format, Format::Pptx | Format::Docx) {
+        return Err(Error::bad("use render_document for HWPX pages or render_xlsx for a worksheet window"));
     }
     // The preview stays on this machine: content to surface does not stop it.
     let (e, bytes) =
         ws.export_bytes(id, revision, &ExportOptions { acknowledge_surfaced: true, tracked_changes: false })?;
-    let p = render_pptx(&bytes, opts).map_err(|m| Error::new(Code::Package, format!("cannot preview {id}: {m}")))?;
+    let p = match doc.format {
+        Format::Pptx => render_pptx(&bytes, opts),
+        Format::Docx => docx::render_native(&bytes, opts),
+        _ => unreachable!("check_format accepted only page and worksheet formats"),
+    }
+    .map_err(|m| Error::new(Code::Package, format!("cannot preview {id}: {m}")))?;
     let out = Previewed {
         doc_id: e.doc_id,
         revision: e.revision,
         format: e.format,
         output: Output::Html,
-        slides: p.slide_count(),
+        slides: if e.format == Format::Pptx { p.slide_count() } else { 0 },
+        pages: p.slide_count(),
         files: vec![],
         summary: p.fonts.summary(),
         fonts: p.fonts.clone(),
@@ -259,6 +273,79 @@ pub fn render<S: Storage>(
         diagnostics: p.diagnostics.clone(),
     };
     Ok((out, p))
+}
+
+/// Common native page job, retaining the existing PPTX/DOCX adapter API.
+pub fn render_document<S: Storage>(
+    ws: &Workspace<S>,
+    id: &str,
+    revision: Option<u32>,
+    opts: &Options,
+) -> Result<(Previewed, DocumentPreview)> {
+    #[cfg(feature = "hwpx")]
+    if ws.doc(id)?.format == Format::Hwpx {
+        let (e, bytes) =
+            ws.export_bytes(id, revision, &ExportOptions { acknowledge_surfaced: true, tracked_changes: false })?;
+        let preview = crate::hwpx::render_native(&bytes, opts)
+            .map_err(|m| Error::new(Code::Package, format!("cannot preview {id}: {m}")))?;
+        let out = Previewed {
+            doc_id: e.doc_id,
+            revision: e.revision,
+            format: e.format,
+            output: Output::Html,
+            slides: 0,
+            pages: preview.page_count(),
+            files: vec![],
+            summary: preview.fonts.summary(),
+            fonts: preview.fonts.clone(),
+            warnings: preview.warnings.clone(),
+            diagnostics: preview.diagnostics.clone(),
+        };
+        return Ok((out, DocumentPreview::Hwpx(preview)));
+    }
+    render(ws, id, revision, opts).map(|(out, preview)| (out, DocumentPreview::Layout(Box::new(preview))))
+}
+
+/// Write shared page-job output. Presentation names remain unchanged.
+pub fn write_document(p: &DocumentPreview, out: &mut Previewed, output: Output, dir: &Path) -> Result<()> {
+    match p {
+        DocumentPreview::Layout(p) => write(p, out, output, dir),
+        #[cfg(feature = "hwpx")]
+        DocumentPreview::Hwpx(_) => {
+            let stem = format!("{}-r{}", out.doc_id, out.revision);
+            let mut files = Vec::new();
+            if output == Output::Html {
+                files.push((
+                    format!("{stem}-preview.html"),
+                    p.html(&format!("{} · revision {} · preview", out.doc_id, out.revision)).into_bytes(),
+                ));
+            } else {
+                let format = if output == Output::Svg { PageFormat::Svg } else { PageFormat::Png { dpi: PNG_DPI } };
+                for index in 0..p.page_count() {
+                    let rendered = p
+                        .render_page(index, format)
+                        .map_err(|m| Error::new(Code::Package, format!("page {}: {m}", index + 1)))?;
+                    let (ext, data) = match rendered.data {
+                        PageData::Svg(s) => ("svg", s.into_bytes()),
+                        PageData::Png(p) => ("png", p),
+                    };
+                    files.push((format!("{stem}-page-{}.{ext}", index + 1), data));
+                }
+            }
+            std::fs::create_dir_all(dir).map_err(|e| Error::io(format!("cannot make {}: {e}", dir.display())))?;
+            out.files = files
+                .into_iter()
+                .map(|(name, data)| {
+                    let path = dir.join(name);
+                    std::fs::write(&path, data)
+                        .map_err(|e| Error::io(format!("cannot write {}: {e}", path.display())))?;
+                    Ok(std::path::absolute(&path).unwrap_or(path).display().to_string())
+                })
+                .collect::<Result<_>>()?;
+            out.output = output;
+            Ok(())
+        }
+    }
 }
 
 /// Where a document's preview goes by default: beside the file it was opened
@@ -277,6 +364,7 @@ pub fn default_dir<S: Storage>(ws: &Workspace<S>, id: &str, fallback: &Path) -> 
 pub fn write(p: &Preview, out: &mut Previewed, output: Output, dir: &Path) -> Result<()> {
     std::fs::create_dir_all(dir).map_err(|e| Error::io(format!("cannot make {}: {e}", dir.display())))?;
     let stem = format!("{}-r{}", out.doc_id, out.revision);
+    let unit = if out.format == Format::Pptx { "slide" } else { "page" };
     let put = |name: String, data: &[u8]| -> Result<String> {
         let path = dir.join(name);
         std::fs::write(&path, data).map_err(|e| Error::io(format!("cannot write {}: {e}", path.display())))?;
@@ -289,13 +377,13 @@ pub fn write(p: &Preview, out: &mut Previewed, output: Output, dir: &Path) -> Re
             vec![put(format!("{stem}-preview.html"), p.html(&title).as_bytes())?]
         }
         Output::Svg => (0..p.slide_count())
-            .map(|k| put(format!("{stem}-slide-{}.svg", k + 1), p.slide_svg(k).as_bytes()))
+            .map(|k| put(format!("{stem}-{unit}-{}.svg", k + 1), p.slide_svg(k).as_bytes()))
             .collect::<Result<_>>()?,
         Output::Png => (0..p.slide_count())
             .map(|k| {
                 let png =
-                    p.slide_png(k, PNG_DPI).map_err(|m| Error::new(Code::Package, format!("slide {}: {m}", k + 1)))?;
-                put(format!("{stem}-slide-{}.png", k + 1), &png)
+                    p.slide_png(k, PNG_DPI).map_err(|m| Error::new(Code::Package, format!("{unit} {}: {m}", k + 1)))?;
+                put(format!("{stem}-{unit}-{}.png", k + 1), &png)
             })
             .collect::<Result<_>>()?,
     };
