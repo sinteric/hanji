@@ -971,6 +971,10 @@ fn sanitize_xml_text(value: &str) -> (String, bool) {
     (text, replaced)
 }
 
+pub(crate) fn escape_xml_text(value: &str) -> String {
+    escape_text(&sanitize_xml_text(value).0)
+}
+
 fn is_xml_character(character: char) -> bool {
     matches!(character, '\u{9}' | '\u{A}' | '\u{D}')
         || matches!(character as u32, 0x20..=0xD7FF | 0xE000..=0xFFFD | 0x10000..=0x10FFFF)

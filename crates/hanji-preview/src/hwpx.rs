@@ -493,6 +493,14 @@ fn viewer_svg(page: &xml::Element, index: usize) -> String {
 }
 
 impl Preview {
+    pub fn quality(&self) -> crate::quality::QualityReport {
+        crate::quality::QualityReport::inspect(
+            crate::quality::PreviewSource::Hwpx,
+            &self.diagnostics,
+            &self.fonts,
+            &self.warnings,
+        )
+    }
     pub fn page_count(&self) -> usize {
         self.pages.len()
     }

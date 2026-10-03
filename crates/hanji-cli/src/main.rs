@@ -228,7 +228,9 @@ fn preview(
         for w in &p.warnings {
             t.push_str(&format!("warning: {w}\n"));
         }
-        return Ok(out(&p, t));
+        let quality = p.quality().rendered();
+        t.push_str(&format!("preview quality: {}; diagnostic coverage: partial\n", quality.summary()));
+        return Ok(out(&hanji_preview::quality::WithQuality { result: &p, quality }, t));
     }
     if selection.is_requested() {
         return Err(Error::bad("--sheet, --sheet-index and --range apply only to XLSX worksheet previews"));
@@ -257,7 +259,9 @@ fn preview(
     for w in &p.warnings {
         t.push_str(&format!("warning: {w}\n"));
     }
-    Ok(out(&p, t))
+    let quality = p.quality().rendered();
+    t.push_str(&format!("preview quality: {}; diagnostic coverage: partial\n", quality.summary()));
+    Ok(out(&hanji_preview::quality::WithQuality { result: &p, quality }, t))
 }
 
 fn read_input(path: &Path) -> Result<String> {

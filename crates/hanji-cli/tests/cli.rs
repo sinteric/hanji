@@ -11,6 +11,8 @@ use serde_json::Value;
 mod xlsx_grid;
 #[path = "../../hanji-preview/tests/fixtures/xlsx_inherited.rs"]
 mod xlsx_inherited;
+#[path = "../../hanji-preview/tests/fixtures/xlsx_numeric.rs"]
+mod xlsx_numeric;
 
 struct Env {
     dir: PathBuf,
@@ -423,6 +425,54 @@ fn xlsx_preview_json_and_svg_apply_inherited_number_formats() {
     for display in ["50%", "1900-01-02", "$1,234.50", "0.500"] {
         assert!(svg.contains(&format!(">{display}</text>")), "{display}");
     }
+}
+
+#[test]
+fn numeric_overflow_and_quality_contract_are_consistent_across_cli_outputs() {
+    let env = Env::new("numeric-quality");
+    let path = env.path("numbers.xlsx");
+    let original = xlsx_grid::build(xlsx_numeric::GRID, "", xlsx_numeric::STYLES, &[]);
+    std::fs::write(&path, &original).unwrap();
+    for format in ["svg", "png", "html"] {
+        let v = env.ok(&["preview", &path, "--range", "A1:D11", "--format", format]);
+        assert_eq!(cell(&v, "A1")["display"], "-123456789");
+        assert_eq!(cell(&v, "A10")["display"], "#UNEVALUATED");
+        assert_eq!(cell(&v, "A10")["formula_result"], "missing");
+        assert_eq!(cell(&v, "B10")["display"], "0");
+        assert_ne!(cell(&v, "B10")["formula_result"], "missing");
+        assert_eq!(v["quality"]["version"], 1);
+        assert_eq!(v["quality"]["source"], "xlsx");
+        assert_eq!(v["quality"]["rendering"], "rendered");
+        assert_eq!(v["quality"]["status"], "degraded");
+        assert_eq!(v["quality"]["coverage"]["complete"], false);
+        let diagnostics = v["quality"]["diagnostics"].as_array().unwrap();
+        let d =
+            diagnostics.iter().find(|d| d["code"] == "xlsx.numeric-overflow" && d["location"]["cell"] == "A1").unwrap();
+        assert_eq!(d["severity"], "warning");
+        assert_eq!(d["location"]["sheet_index"], 0);
+        assert_eq!(d["consequence"], "overflow-indicator");
+        assert!(v["diagnostics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|old| old["path"] == d["path"] && old["message"] == d["message"]));
+        assert!(diagnostics.iter().any(|d| d["code"] == "xlsx.formula-cache-missing"
+            && d["location"]["cell"] == "A10"
+            && d["severity"] == "error"));
+        let file = v["files"][0].as_str().unwrap();
+        let output = std::fs::read(file).unwrap();
+        if format != "png" {
+            let text = String::from_utf8(output).unwrap();
+            assert!(text.contains("A1: -123456789"));
+            assert!(!text.contains(">2026-10-03T13:00:00Z</text>"));
+            if format == "html" {
+                assert!(text.contains("Complete cell values"));
+            }
+        } else {
+            assert!(output.starts_with(b"\x89PNG\r\n\x1a\n"));
+        }
+    }
+    assert_eq!(std::fs::read(&path).unwrap(), original);
 }
 
 #[test]

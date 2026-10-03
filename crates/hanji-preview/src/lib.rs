@@ -21,6 +21,7 @@ pub mod fonts;
 #[cfg(feature = "hwpx")]
 pub mod hwpx;
 pub mod prep;
+pub mod quality;
 pub mod sfnt;
 #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 pub mod store;
@@ -379,6 +380,19 @@ pub fn render_document_with_fonts(
 }
 
 impl DocumentPreview {
+    /// Supply the same input kind used to construct this job. The report does
+    /// not identify a format from warning text or assert native completeness.
+    pub fn quality(&self, kind: DocumentKind) -> quality::QualityReport {
+        match self {
+            Self::Layout(p) => p.quality(kind),
+            #[cfg(feature = "hwpx")]
+            Self::Hwpx(p) => p.quality(),
+        }
+    }
+
+    pub fn html_with_quality(&self, title: &str, kind: DocumentKind) -> String {
+        quality::add_html_notice(self.html(title), &self.quality(kind))
+    }
     pub fn page_count(&self) -> usize {
         match self {
             Self::Layout(p) => p.slide_count(),
@@ -820,6 +834,11 @@ fn runs<'a>(elements: &'a [PositionedElement], out: &mut Vec<(FontId, &'a str)>)
 }
 
 impl Preview {
+    /// A separate, versioned report; the legacy diagnostic/result types stay
+    /// source-compatible. `kind` must match this PPTX/DOCX input job.
+    pub fn quality(&self, kind: DocumentKind) -> quality::QualityReport {
+        quality::QualityReport::inspect(kind.into(), &self.diagnostics, &self.fonts, &self.warnings)
+    }
     pub fn page_count(&self) -> usize {
         self.layout.pages.len()
     }
