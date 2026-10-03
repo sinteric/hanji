@@ -1,7 +1,8 @@
 //! hanji's preview (DESIGN.md §2 rules 4–5, §7, §7.1): renders the package
 //! an export writes, one SVG per slide, with the fonts each slide draws
 //! subset and embedded, an HTML viewer that marks substituted text, and PNG.
-//! pptx only, through rpptx 0.12.1; docx and hwpx come later.
+//! PPTX through rpptx 0.12.1, and bounded read-only XLSX worksheet windows.
+//! DOCX and HWPX come later. XLSX windows are grids, not printed pages.
 //!
 //! The pipeline: the export's bytes → the engine-compat transforms of
 //! [`prep`] on a copy → rpptx resolves the slides → every run's font
@@ -10,21 +11,25 @@
 //! ([`sfnt`]: renamed, 1.2 em lines) → the layout is lowered to SVG
 //! ([`svg`], from rdocx) → the fonts report is read off the layout.
 //!
-//! Native only (it reads font files); on wasm32 the crate is empty.
-
-#![cfg(not(target_family = "wasm"))]
+//! [`render_pptx_with_fonts`] and [`render_pptx_with_resolver`] take bytes on
+//! native and WASM targets. The default `host-fonts` feature retains the native
+//! font-directory/system-font and stored-file adapters; disable it for a byte-only build.
 
 pub mod fonts;
 pub mod prep;
 pub mod sfnt;
+#[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 pub mod store;
 pub mod subset;
 mod svg;
+pub mod xlsx;
 
+pub use fonts::{FontData, FontResolver, ResolvedFont};
 /// A nonfatal rendering or font-embedding fallback and its source path.
 pub use svg::SvgDiagnostic as Diagnostic;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
+#[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -32,10 +37,19 @@ use oxml_layout::{FontFile, FontId, LayoutResult, PositionedElement};
 use rpptx_layout::{ResolvedBullet, ResolvedContent, ResolvedRunStyle, ResolvedTextBody, ResolvedTextRun};
 use serde::Serialize;
 
-use fonts::{Drawn, Fonts, Metrics, Script, Source};
+use fonts::{Fonts, Metrics, Script, Source};
+
+/// Caller fonts and alias policy. Assets remain inside the PPTX package.
+/// The default uses only document-embedded and bundled fonts, with no host discovery.
+#[derive(Clone, Debug, Default)]
+pub struct FontOptions {
+    pub fonts: Vec<FontData>,
+    pub aliases: Option<fonts::Aliases>,
+}
 
 /// Where the preview finds fonts.
 #[derive(Clone, Debug)]
+#[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 pub struct Options {
     /// Font files and directories, searched first (`--font-dir`, `HANJI_FONT_DIR`).
     pub font_dirs: Vec<PathBuf>,
@@ -43,12 +57,14 @@ pub struct Options {
     pub system_fonts: bool,
 }
 
+#[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 impl Default for Options {
     fn default() -> Options {
         Options { font_dirs: vec![], system_fonts: true }
     }
 }
 
+#[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 impl Options {
     /// `font_dirs` (`--font-dir`), then `HANJI_FONT_DIR`, then system fonts.
     pub fn with_font_dirs(mut font_dirs: Vec<PathBuf>) -> Options {
@@ -88,8 +104,9 @@ fn requested_typeface(style: &ResolvedRunStyle, text: &str) -> String {
 struct Request {
     requested: String,
     script: Script,
-    /// `None`: nothing here draws the script (no Korean font).
-    drawn: Option<Drawn>,
+    /// Metadata of each successfully loaded face, keyed by its actual style.
+    /// A face's `drawn: None` means the script needed a Latin fallback.
+    drawn: BTreeMap<(bool, bool), FaceInfo>,
     /// (bold, italic) variants the slides ask for.
     styles: BTreeSet<(bool, bool)>,
 }
@@ -109,7 +126,7 @@ impl Requests {
     fn label(&mut self, requested: String, text: &str, bold: bool, italic: bool) -> String {
         let script = Script::of(text);
         let i = *self.index.entry((requested.clone(), script)).or_insert_with(|| {
-            self.list.push(Request { requested, script, drawn: None, styles: BTreeSet::new() });
+            self.list.push(Request { requested, script, drawn: BTreeMap::new(), styles: BTreeSet::new() });
             self.list.len() - 1
         });
         self.list[i].styles.insert((bold, italic));
@@ -222,6 +239,35 @@ pub struct Preview {
     pub diagnostics: Vec<Diagnostic>,
 }
 
+/// One page's dimensions, in points (72 points per inch).
+#[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+pub struct PageInfo {
+    pub index: usize,
+    pub width: f64,
+    pub height: f64,
+}
+
+/// A page job's requested encoding. Raster DPI must be finite and positive.
+#[derive(Clone, Copy, Debug)]
+pub enum PageFormat {
+    Svg,
+    Png { dpi: f64 },
+}
+
+/// Owned output buffers; adapters decide how to transfer/display them.
+#[derive(Debug)]
+pub enum PageData {
+    Svg(String),
+    Png(Vec<u8>),
+}
+
+#[derive(Debug)]
+pub struct RenderedPage {
+    pub page: PageInfo,
+    pub data: PageData,
+    /// Document-wide diagnostics and those for this page; paths are unchanged.
+    pub diagnostics: Vec<Diagnostic>,
+}
 type Subsets = Vec<(FontId, Arc<[u8]>)>;
 type PreparedSubsets = Vec<(FontId, Option<Arc<[u8]>>)>;
 type SubsetCache = BTreeMap<FontId, BTreeMap<BTreeSet<char>, Result<Option<Arc<[u8]>>, String>>>;
@@ -372,21 +418,55 @@ pub const NO_KOREAN_FONT: &str = "no Korean font was found, so Hangul is drawn a
 const LINE_EM: f64 = 1.2;
 
 /// Renders a pptx package (the bytes export wrote).
+#[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 pub fn render_pptx(package: &[u8], opts: &Options) -> Result<Preview, String> {
-    // Release parser, resolved input, stock layout, and font-building buffers
-    // before subsetting. Only the preview's owned layout must remain live.
-    let mut p = layout_pptx(package, opts)?;
+    let p = {
+        let (input, stock) = resolve_pptx(package)?;
+        let fonts = Fonts::load(&opts.font_dirs, &input.fonts, opts.system_fonts);
+        layout_preview(input, stock, &fonts)?
+    };
+    finish_preview(p)
+}
+
+/// One document job using caller fonts, package fonts, then bundled faces.
+/// Neither this function nor its built-in resolver reads host files or environment variables.
+pub fn render_pptx_with_fonts(package: &[u8], opts: &FontOptions) -> Result<Preview, String> {
+    let p = {
+        let (input, stock) = resolve_pptx(package)?;
+        let fonts = Fonts::from_bytes(&opts.fonts, &input.fonts, opts.aliases.clone())?;
+        layout_preview(input, stock, &fonts)?
+    };
+    finish_preview(p)
+}
+
+/// One document job with caller-defined font selection. The resolver owns its full
+/// selection/fallback policy; use [`render_pptx_with_fonts`] for the built-in policy.
+/// Resolver calls stay inside Rust, not at the platform/FFI boundary.
+pub fn render_pptx_with_resolver(package: &[u8], resolver: &dyn FontResolver) -> Result<Preview, String> {
+    let (input, stock) = resolve_pptx(package)?;
+    finish_preview(layout_preview(input, stock, resolver)?)
+}
+
+// Layout temporaries and built-in font databases have been released before preflight.
+// A caller-owned resolver remains under the caller's lifetime policy.
+fn finish_preview(mut p: Preview) -> Result<Preview, String> {
     p.count();
     p.prepare_output()?;
     Ok(p)
 }
 
-fn layout_pptx(package: &[u8], opts: &Options) -> Result<Preview, String> {
+fn resolve_pptx(package: &[u8]) -> Result<(rpptx_render::RenderInput, LayoutResult), String> {
     let prepared = prep::prepare(package)?;
     let pres = rpptx::Presentation::from_bytes(&prepared).map_err(|e| format!("rpptx cannot open the deck: {e}"))?;
-    let (mut input, stock) = pres.render_deterministic().map_err(|e| format!("rpptx cannot resolve the deck: {e}"))?;
-    let fonts = Fonts::load(&opts.font_dirs, &input.fonts, opts.system_fonts);
-    let mut warnings = fonts.warnings.clone();
+    pres.render_deterministic().map_err(|e| format!("rpptx cannot resolve the deck: {e}"))
+}
+
+fn layout_preview(
+    mut input: rpptx_render::RenderInput,
+    stock: LayoutResult,
+    fonts: &dyn FontResolver,
+) -> Result<Preview, String> {
+    let mut warnings = fonts.warnings().to_vec();
 
     let mut req = Requests::default();
     for slide in &mut input.slides {
@@ -416,16 +496,20 @@ fn layout_pptx(package: &[u8], opts: &Options) -> Result<Preview, String> {
     }
 
     let mut files = vec![];
+    let mut file_faces = vec![];
     for (i, r) in req.list.iter_mut().enumerate() {
-        r.drawn = fonts.resolve(&r.requested, r.script);
-        // Text no face draws still takes up room: lay it out in the Latin face.
-        let Some(face) = r.drawn.clone().or_else(|| fonts.resolve(&r.requested, Script::Latin)) else { continue };
         let mut seen = BTreeSet::new();
         for &(bold, italic) in &r.styles {
-            let Some((data, index)) = fonts.face_data(&face, bold, italic) else { continue };
+            let resolved = fonts.resolve_font(&r.requested, r.script, bold, italic);
+            let draws_script = resolved.is_some();
+            // Text no face draws still takes up room: lay it out in the Latin face.
+            let Some(face) = resolved.or_else(|| fonts.resolve_font(&r.requested, Script::Latin, bold, italic)) else {
+                continue;
+            };
+            let (data, index) = (&face.font.data, face.font.face_index);
             let (b, it) =
-                ttf_parser::Face::parse(&data, index).map(|f| (f.is_bold(), f.is_italic())).unwrap_or_default();
-            if !seen.insert((b, it)) {
+                ttf_parser::Face::parse(data, index).map(|f| (f.is_bold(), f.is_italic())).unwrap_or_default();
+            if seen.contains(&(b, it)) {
                 continue;
             }
             let adj = sfnt::Adjust {
@@ -433,15 +517,31 @@ fn layout_pptx(package: &[u8], opts: &Options) -> Result<Preview, String> {
                 bold: b,
                 italic: it,
                 line_em: Some(LINE_EM),
-                ea_advance: face.ea_advance.filter(|_| r.drawn.is_some()),
+                ea_advance: face.ea_advance.filter(|_| draws_script),
             };
-            match sfnt::build(&data, index, &adj) {
-                Ok(data) => files.push(FontFile { family: label(i), data }),
+            match sfnt::build(data, index, &adj) {
+                Ok(data) => {
+                    seen.insert((b, it));
+                    let info = FaceInfo {
+                        requested: r.requested.clone(),
+                        script: r.script,
+                        drawn: draws_script.then(|| face.family.clone()),
+                        source: draws_script.then_some(face.source),
+                        metrics: if draws_script { face.metrics } else { Metrics::Substitute },
+                    };
+                    r.drawn.insert((b, it), info.clone());
+                    file_faces.push(info);
+                    files.push(FontFile { family: label(i), data });
+                }
                 Err(e) => warnings.push(format!("the face {} for {} cannot be used: {e}", face.family, r.requested)),
             }
         }
     }
-    if req.list.iter().any(|r| r.script == Script::Hangul && r.drawn.is_none()) {
+    if req
+        .list
+        .iter()
+        .any(|r| r.script == Script::Hangul && (r.drawn.is_empty() || r.drawn.values().any(|f| f.drawn.is_none())))
+    {
         warnings.push(NO_KOREAN_FONT.to_string());
     }
 
@@ -465,18 +565,13 @@ fn layout_pptx(package: &[u8], opts: &Options) -> Result<Preview, String> {
         .fonts
         .iter()
         .map(|f| {
-            let info = f
-                .family
-                .strip_prefix("hanji-face-")
-                .and_then(|n| n.parse::<usize>().ok())
-                .and_then(|i| req.list.get(i))
-                .map(|r| FaceInfo {
-                    requested: r.requested.clone(),
-                    script: r.script,
-                    drawn: r.drawn.as_ref().map(|d| d.family.clone()),
-                    source: r.drawn.as_ref().map(|d| d.source),
-                    metrics: r.drawn.as_ref().map_or(Metrics::Substitute, |d| d.metrics.clone()),
-                })
+            // FontManager can label a nearest regular face as bold/italic for
+            // synthetic styling. Match the loaded bytes, not those request flags.
+            let info = files
+                .iter()
+                .zip(&file_faces)
+                .find(|(file, _)| file.family == f.family && file.data.as_slice() == f.data.as_ref())
+                .map(|(_, info)| info.clone())
                 // A face rpptx chose itself (a chart's, or a fallback for characters the requested face lacks).
                 .unwrap_or_else(|| FaceInfo {
                     requested: f.family.clone(),
@@ -517,6 +612,28 @@ fn runs<'a>(elements: &'a [PositionedElement], out: &mut Vec<(FontId, &'a str)>)
 impl Preview {
     pub fn slide_count(&self) -> usize {
         self.layout.pages.len()
+    }
+
+    pub fn page_info(&self, index: usize) -> Option<PageInfo> {
+        self.layout.pages.get(index).map(|p| PageInfo { index, width: p.width, height: p.height })
+    }
+
+    /// A coarse page job returning an owned buffer and stable diagnostics.
+    /// Drop the [`Preview`] to release the document's layout/font caches.
+    pub fn render_page(&self, index: usize, format: PageFormat) -> Result<RenderedPage, String> {
+        let page = self.page_info(index).ok_or_else(|| format!("page index {index} is out of range"))?;
+        let data = match format {
+            PageFormat::Svg => PageData::Svg(self.slide_svg(index)),
+            PageFormat::Png { dpi } => PageData::Png(self.slide_png(index, dpi)?),
+        };
+        let prefix = format!("pages[{index}].");
+        let diagnostics = self
+            .diagnostics
+            .iter()
+            .filter(|d| !d.path.starts_with("pages[") || d.path.starts_with(&prefix))
+            .cloned()
+            .collect();
+        Ok(RenderedPage { page, data, diagnostics })
     }
 
     /// Characters per page and face, and the fonts report.
@@ -725,6 +842,10 @@ impl Preview {
     /// Slide `k` (0-based) as PNG at `dpi`, drawn with the same subset faces.
     pub fn slide_png(&self, k: usize, dpi: f64) -> Result<Vec<u8>, String> {
         use resvg::{tiny_skia, usvg};
+        let page = self.layout.pages.get(k).ok_or_else(|| format!("page index {k} is out of range"))?;
+        if !dpi.is_finite() || dpi <= 0.0 {
+            return Err("PNG DPI must be finite and positive".into());
+        }
         let subsets = self.output_subsets(&self.page_subsets[k], &self.chars[k]);
         let svg = self.page_svg(k, String::new(), false);
         let mut options = usvg::Options::default();
@@ -742,7 +863,6 @@ impl Preview {
             select_fallback: Box::new(|_, _, _| None),
         };
         let tree = usvg::Tree::from_str(&svg, &options).map_err(|e| format!("usvg: {e}"))?;
-        let page = &self.layout.pages[k];
         let scale = dpi / 72.0;
         let (w, h) = ((page.width * scale).round() as u32, (page.height * scale).round() as u32);
         let mut pm = tiny_skia::Pixmap::new(w.max(1), h.max(1)).ok_or("the slide is too large to draw")?;
@@ -860,8 +980,8 @@ mod tests {
     use super::*;
 
     fn deck() -> Preview {
-        let bytes = std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../hanji-pptx/corpus/shapes.pptx")).unwrap();
-        render_pptx(&bytes, &Options { font_dirs: vec![], system_fonts: false }).unwrap()
+        let bytes = include_bytes!("../../hanji-pptx/corpus/shapes.pptx");
+        render_pptx_with_fonts(bytes, &FontOptions::default()).unwrap()
     }
 
     // Exercise a fresh preparation after injecting malformed font/image data.
@@ -1048,7 +1168,7 @@ mod tests {
 
     #[test]
     fn a_package_that_cannot_be_opened_is_still_a_fatal_error() {
-        assert!(render_pptx(b"not a package", &Options { font_dirs: vec![], system_fonts: false }).is_err());
+        assert!(render_pptx_with_fonts(b"not a package", &FontOptions::default()).is_err());
     }
 
     #[test]

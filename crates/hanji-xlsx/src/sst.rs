@@ -33,10 +33,20 @@ pub fn decode_xstring(s: &str) -> String {
         let hex = tail.get(2..6).filter(|h| h.bytes().all(|b| b.is_ascii_hexdigit()));
         match (hex, tail.get(6..7)) {
             (Some(h), Some("_")) => {
-                if let Some(c) = u32::from_str_radix(h, 16).ok().and_then(char::from_u32) {
-                    out.push(c);
+                let unit = u16::from_str_radix(h, 16).expect("validated hex");
+                let low = tail
+                    .get(7..14)
+                    .filter(|s| s.starts_with("_x") && s.ends_with('_'))
+                    .and_then(|s| s.get(2..6).and_then(|h| u16::from_str_radix(h, 16).ok()))
+                    .filter(|u| (0xDC00..=0xDFFF).contains(u));
+                if let Some(low) = low.filter(|_| (0xD800..=0xDBFF).contains(&unit)) {
+                    let scalar = 0x10000 + ((u32::from(unit) - 0xD800) << 10) + u32::from(low) - 0xDC00;
+                    out.push(char::from_u32(scalar).expect("paired surrogate"));
+                    rest = &tail[14..];
+                } else {
+                    out.push(char::from_u32(u32::from(unit)).unwrap_or('\u{FFFD}'));
+                    rest = &tail[7..];
                 }
-                rest = &tail[7..];
             }
             _ => {
                 out.push_str("_x");
