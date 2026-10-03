@@ -234,11 +234,25 @@ If an older custom resolver explicitly returns such a face, the job reports
 `font.generic-symbols` and missing usable glyphs; critical-loss strictness refuses.
 Private-use symbols are not rescued by scanning unrelated font families.
 
+One DOCX legacy encoding bridge is independently verified: an explicit Symbol
+numbering bullet `U+F0B7` with Symbol charset `02`. If the selected physical
+Symbol face lacks that Unicode entry, but its Macintosh encoding `0xB7` and
+Unicode `U+2022` point to the same real glyph named `bullet`, the preview font
+receives a `U+F0B7` cmap alias to that glyph. Original text, outlines and metrics
+are retained; no document character is replaced. The full-repertoire Unicode
+subtable preserves existing mappings and the original subtables are retained.
+The [OpenType encoding description](https://learn.microsoft.com/en-us/typography/opentype/spec/cmap#windows-platform-platform-id--3)
+and [Adobe Symbol mapping](https://www.unicode.org/Public/MAPPINGS/VENDORS/ADOBE/symbol.txt)
+explain the legacy code. A family name alone, a missing face, a conflicting
+mapping or other private-use text does not activate this bridge. This does not
+implement general symbol-font encoding or certify native Word layout.
+
 On the connected Mac's existing fonts, the targeted synthetic XLSX has zero
 missing characters after previously missing ten ASCII characters. HWPX `24`,
 `26` and `28` also have zero reported/embedded missing characters after previously
-missing three/four/four. DOCX `04` recovers its Gothic and CJK characters and
-retains one reported missing Symbol code (`U+F0B7`). Input hashes, drawn character
+missing three/four/four. DOCX `04` recovers its Gothic and CJK characters; its
+remaining Symbol code (`U+F0B7`) is addressed only by the verified bridge above.
+Input hashes, drawn character
 counts and page enumeration are preserved. This is character-coverage evidence,
 not a native Office/Hancom visual approval or a golden update. Other font
 environments can still have genuine unavailable characters; structured diagnostics

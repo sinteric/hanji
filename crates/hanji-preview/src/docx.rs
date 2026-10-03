@@ -39,7 +39,21 @@ fn embedded_fonts(document: &rdocx::Document) -> Vec<FontFile> {
         .collect()
 }
 
-fn requested_fonts(bytes: &[u8]) -> Result<(BTreeMap<String, Script>, BTreeSet<char>), String> {
+struct RequestedFonts {
+    families: BTreeMap<String, Script>,
+    chars: BTreeSet<char>,
+    symbol_bullet: bool,
+}
+
+fn attr(element: &xml::Element, name: &str) -> Option<String> {
+    element.attrs.iter().find(|(n, _)| xml::local_name(n) == name).map(|(_, v)| xml::unescape(v))
+}
+
+fn child<'a>(element: &'a xml::Element, name: &str) -> Option<&'a xml::Element> {
+    element.elements().find(|e| e.local() == name)
+}
+
+fn requested_fonts(bytes: &[u8]) -> Result<RequestedFonts, String> {
     let mut requested = BTreeMap::from([
         ("Arial".to_string(), Script::Latin),
         ("Calibri".to_string(), Script::Latin),
@@ -48,12 +62,24 @@ fn requested_fonts(bytes: &[u8]) -> Result<(BTreeMap<String, Script>, BTreeSet<c
     let mut observed = BTreeMap::new();
     let mut chars = BTreeSet::new();
     let mut has_hangul = false;
+    let mut symbol_charset = false;
+    let mut symbol_bullet = false;
     for part in package::read(bytes)? {
         if !part.name.starts_with("word/") || !part.name.ends_with(".xml") {
             continue;
         }
         let tree = xml::parse(&part.data).map_err(|e| format!("{}: {e}", part.name))?;
         tree.root.walk(&mut |element| {
+            if part.name == "word/fontTable.xml" && element.local() == "font" {
+                symbol_charset |= attr(element, "name").as_deref() == Some("Symbol")
+                    && child(element, "charset").and_then(|e| attr(e, "val")).as_deref() == Some("02");
+            }
+            if part.name == "word/numbering.xml" && element.local() == "lvl" {
+                symbol_bullet |= child(element, "numFmt").and_then(|e| attr(e, "val")).as_deref() == Some("bullet")
+                    && child(element, "lvlText").and_then(|e| attr(e, "val")).as_deref() == Some("\u{F0B7}")
+                    && child(element, "rPr").and_then(|e| child(e, "rFonts")).and_then(|e| attr(e, "ascii")).as_deref()
+                        == Some("Symbol");
+            }
             if element.local() == "t" {
                 for node in &element.children {
                     if let xml::Node::Text(value) = node {
@@ -61,7 +87,7 @@ fn requested_fonts(bytes: &[u8]) -> Result<(BTreeMap<String, Script>, BTreeSet<c
                     }
                 }
             } else if element.local() == "lvlText" {
-                if let Some(value) = element.get("val") {
+                if let Some(value) = attr(element, "val") {
                     chars.extend(value.chars());
                 }
             }
@@ -140,7 +166,7 @@ fn requested_fonts(bytes: &[u8]) -> Result<(BTreeMap<String, Script>, BTreeSet<c
         }
     }
     requested.extend(observed);
-    Ok((requested, chars))
+    Ok(RequestedFonts { families: requested, chars, symbol_bullet: symbol_charset && symbol_bullet })
 }
 
 fn prefer_script(left: Script, right: Script) -> Script {
@@ -156,8 +182,8 @@ fn render(document: &rdocx::Document, bytes: &[u8], resolver: &dyn FontResolver)
     let mut infos = Vec::new();
     let mut warnings = resolver.warnings().to_vec();
     warnings.push("DOCX preview is experimental: pagination and Word-specific layout may differ from Word; inspect rendering diagnostics.".into());
-    let (requested, chars) = requested_fonts(bytes)?;
-    for (requested, script) in requested {
+    let requested_fonts = requested_fonts(bytes)?;
+    for (requested, script) in requested_fonts.families {
         let mut physical_styles = std::collections::BTreeSet::new();
         for (bold, italic) in [(false, false), (true, false), (false, true), (true, true)] {
             let face = resolver.resolve_font(&requested, script, bold, italic);
@@ -171,7 +197,7 @@ fn render(document: &rdocx::Document, bytes: &[u8], resolver: &dyn FontResolver)
             if !physical_styles.insert(style) {
                 continue;
             }
-            let data = sfnt::build(
+            let mut data = sfnt::build(
                 &face.font.data,
                 face.font.face_index,
                 &sfnt::Adjust {
@@ -182,6 +208,19 @@ fn render(document: &rdocx::Document, bytes: &[u8], resolver: &dyn FontResolver)
                     ea_advance: face.ea_advance.filter(|_| draws_script),
                 },
             )?;
+            // A Windows Symbol bullet is a font code, not a generic Unicode
+            // bullet. Bridge only an explicit Symbol/charset-02 numbering
+            // request to a verified legacy mapping in that same physical face.
+            // The original U+F0B7 text, outlines and metrics remain unchanged.
+            if requested_fonts.symbol_bullet
+                && requested == "Symbol"
+                && face.family == "Symbol"
+                && face.metrics == Metrics::Original
+            {
+                if let Some(adapted) = sfnt::symbol_bullet_encoding(&data)? {
+                    data = adapted;
+                }
+            }
             files.push(FontFile { family: requested.clone(), data });
             infos.push(FaceInfo {
                 requested: requested.clone(),
@@ -196,7 +235,7 @@ fn render(document: &rdocx::Document, bytes: &[u8], resolver: &dyn FontResolver)
     // available coverage fallbacks for real source characters absent from all
     // current faces, instead of assuming its small bundled subsets are complete.
     // The engine retains shaping, source spans and pagination ownership.
-    for c in chars.into_iter().filter(|c| !c.is_whitespace() && !c.is_control()) {
+    for c in requested_fonts.chars.into_iter().filter(|c| !c.is_whitespace() && !c.is_control()) {
         let text = c.to_string();
         if files.iter().any(|f| crate::fonts::covers_text(&f.data, 0, &text)) {
             continue;
@@ -277,7 +316,7 @@ mod tests {
     #[test]
     fn japanese_runs_do_not_request_a_hangul_font() {
         let bytes = include_bytes!("../../../prototype/preview/baseline/04-docx-untouched-testword-various.docx");
-        let requested = requested_fonts(bytes).unwrap().0;
+        let requested = requested_fonts(bytes).unwrap().families;
         assert_eq!(requested.get("MS Mincho"), Some(&Script::Cjk));
         assert_eq!(requested.get("Arial"), Some(&Script::Latin));
     }

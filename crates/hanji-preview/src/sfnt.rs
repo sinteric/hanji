@@ -2,7 +2,9 @@
 //! face cut out of its file (one face of a `.ttc`), renamed to the
 //! requested family, and with the engine-compat metric changes below. Only
 //! the `name`, `hhea`, `OS/2` and `hmtx` tables change; the outlines are the
-//! source face's, so what is drawn is that face's glyphs.
+//! source face's, so what is drawn is that face's glyphs. DOCX's separately
+//! verified legacy Symbol bullet bridge can also extend `cmap` without
+//! changing the source text, glyph outlines or metrics.
 //!
 //! - **Renamed** to the requested family, so the layout's font list says
 //!   which request each face serves (the substitution report and the
@@ -187,6 +189,88 @@ pub fn build(data: &[u8], index: u32, adj: &Adjust) -> Result<Vec<u8>, String> {
         }
     }
     Ok(write(tables))
+}
+
+/// Expose a verified Macintosh Symbol byte B7 under Word's F0B7 font code.
+/// The caller must establish an authored Symbol/charset-02 bullet and the
+/// same physical Symbol face. This is not a Unicode text replacement or a
+/// fallback to a bullet in some other font. No mapping is inferred from shape.
+pub(crate) fn symbol_bullet_encoding(data: &[u8]) -> Result<Option<Vec<u8>>, String> {
+    let face = ttf_parser::Face::parse(data, 0).map_err(|e| format!("not a font: {e}"))?;
+    if crate::fonts::last_resort(&face) || face.glyph_index('\u{F0B7}').is_some() {
+        return Ok(None);
+    }
+    let Some(bullet) = face.glyph_index('\u{2022}').filter(|g| g.0 != 0 && g.0 < face.number_of_glyphs()) else {
+        return Ok(None);
+    };
+    let Some(cmap) = face.tables().cmap else { return Ok(None) };
+    if face.glyph_name(bullet) != Some("bullet")
+        || !cmap.subtables.into_iter().any(|s| {
+            s.platform_id == ttf_parser::PlatformId::Macintosh
+                && s.encoding_id == 0
+                && s.glyph_index(0xB7) == Some(bullet)
+        })
+    {
+        return Ok(None);
+    }
+    // A full-repertoire Unicode subtable must retain the existing Unicode
+    // mappings. Keep the original subtables (including variation sequences),
+    // and add/replace only Windows Unicode full repertoire, platform 3/10.
+    let mut mappings = std::collections::BTreeMap::new();
+    for subtable in cmap.subtables.into_iter().filter(|s| s.is_unicode()) {
+        subtable.codepoints(|cp| {
+            if let Some(glyph) = char::from_u32(cp).and_then(|c| face.glyph_index(c)) {
+                mappings.insert(cp, glyph.0);
+            }
+        });
+    }
+    mappings.insert(0xF0B7, bullet.0);
+    let mut unicode = Vec::new();
+    unicode.extend_from_slice(&12u16.to_be_bytes());
+    unicode.extend_from_slice(&0u16.to_be_bytes());
+    unicode.extend_from_slice(&((16 + 12 * mappings.len()) as u32).to_be_bytes());
+    unicode.extend_from_slice(&0u32.to_be_bytes());
+    unicode.extend_from_slice(&(mappings.len() as u32).to_be_bytes());
+    for (cp, glyph) in mappings {
+        for value in [cp, cp, u32::from(glyph)] {
+            unicode.extend_from_slice(&value.to_be_bytes());
+        }
+    }
+    let raw = face.raw_face().table(Tag::from_bytes(b"cmap")).ok_or("font cmap is absent")?;
+    let count = usize::from(be16(raw, 2));
+    let records = raw.get(4..4 + count * 8).ok_or("font cmap records are incomplete")?;
+    let mut records: Vec<_> = records
+        .as_chunks::<8>()
+        .0
+        .iter()
+        .filter_map(|r| {
+            let platform = be16(r, 0);
+            let encoding = be16(r, 2);
+            let offset = u32::from_be_bytes(r[4..8].try_into().unwrap());
+            ((platform, encoding) != (3, 10)).then_some((platform, encoding, offset))
+        })
+        .collect();
+    let header = 4 + 8 * (records.len() + 1);
+    for (_, _, offset) in &mut records {
+        *offset = offset.checked_add(header as u32).ok_or("font cmap offset exceeds the file format")?;
+    }
+    records.push((3, 10, (header + raw.len()) as u32));
+    records.sort_unstable();
+    let count = u16::try_from(records.len()).map_err(|_| "too many cmap records")?;
+    let mut adapted = Vec::new();
+    adapted.extend_from_slice(&0u16.to_be_bytes());
+    adapted.extend_from_slice(&count.to_be_bytes());
+    for (platform, encoding, offset) in records {
+        adapted.extend_from_slice(&platform.to_be_bytes());
+        adapted.extend_from_slice(&encoding.to_be_bytes());
+        adapted.extend_from_slice(&offset.to_be_bytes());
+    }
+    adapted.extend_from_slice(raw);
+    adapted.extend(unicode);
+    let mut tables = tables(data, 0)?;
+    let table = tables.iter_mut().find(|(tag, _)| *tag == Tag::from_bytes(b"cmap")).ok_or("font cmap is absent")?;
+    table.1 = adapted;
+    Ok(Some(write(tables)))
 }
 
 /// Ascent and descent (both positive) summing to `line` font units, in the
