@@ -208,3 +208,38 @@ retain the original value/cache state. PNG paints the same indicator layout;
 its machine result retains complete cell values. XML-invalid characters are replaced with U+FFFD in XML/HTML and reported;
 the machine cell display remains unchanged. The source workbook is not
 modified, widths are not silently expanded, and formulas are not calculated.
+
+## Character coverage and available fallback faces
+
+`FontResolver::resolve_font_for_text` is an additive method. Existing custom
+resolvers retain their `resolve_font` behavior through its default implementation.
+The built-in resolver checks every visible character against the selected face,
+keeps a complete requested face/style, and otherwise selects a complete available
+face. It does not trade one missing character for another. Supplied, embedded,
+system and bundled font sources remain distinct; no new fonts are distributed.
+Some bundled Noto faces are deliberately small fixture subsets, not full families.
+
+Worksheet face caches check each later cell's repertoire before reuse. HWPX
+selection checks the complete repertoire of each font/script/style request while
+preserving rhwp's page and text geometry. DOCX supplies available supplemental
+faces to rdocx when source characters are absent from its current font inputs;
+rdocx continues to own shaping, source spans and pagination. DOCX's supplemental
+substitution entries name the engine fallback family, which does not establish
+the original Word run's authored typeface.
+
+Generic LastResort cmap entries are not proof of character support. The resolver
+excludes fonts with OpenType `head.flags` bit 14, as defined in the
+[OpenType specification](https://learn.microsoft.com/en-us/typography/opentype/spec/head).
+If an older custom resolver explicitly returns such a face, the job reports
+`font.generic-symbols` and missing usable glyphs; critical-loss strictness refuses.
+Private-use symbols are not rescued by scanning unrelated font families.
+
+On the connected Mac's existing fonts, the targeted synthetic XLSX has zero
+missing characters after previously missing ten ASCII characters. HWPX `24`,
+`26` and `28` also have zero reported/embedded missing characters after previously
+missing three/four/four. DOCX `04` recovers its Gothic and CJK characters and
+retains one reported missing Symbol code (`U+F0B7`). Input hashes, drawn character
+counts and page enumeration are preserved. This is character-coverage evidence,
+not a native Office/Hancom visual approval or a golden update. Other font
+environments can still have genuine unavailable characters; structured diagnostics
+and the experimental/native-fidelity boundary remain in force.

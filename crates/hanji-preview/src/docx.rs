@@ -1,6 +1,6 @@
 //! Experimental DOCX pages through the shared layout, font and output pipeline.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use hanji_package::{package, xml};
 use oxml_layout::{FontFile, FontId};
@@ -39,13 +39,14 @@ fn embedded_fonts(document: &rdocx::Document) -> Vec<FontFile> {
         .collect()
 }
 
-fn requested_fonts(bytes: &[u8]) -> Result<BTreeMap<String, Script>, String> {
+fn requested_fonts(bytes: &[u8]) -> Result<(BTreeMap<String, Script>, BTreeSet<char>), String> {
     let mut requested = BTreeMap::from([
         ("Arial".to_string(), Script::Latin),
         ("Calibri".to_string(), Script::Latin),
         ("Times New Roman".to_string(), Script::Latin),
     ]);
     let mut observed = BTreeMap::new();
+    let mut chars = BTreeSet::new();
     let mut has_hangul = false;
     for part in package::read(bytes)? {
         if !part.name.starts_with("word/") || !part.name.ends_with(".xml") {
@@ -53,6 +54,17 @@ fn requested_fonts(bytes: &[u8]) -> Result<BTreeMap<String, Script>, String> {
         }
         let tree = xml::parse(&part.data).map_err(|e| format!("{}: {e}", part.name))?;
         tree.root.walk(&mut |element| {
+            if element.local() == "t" {
+                for node in &element.children {
+                    if let xml::Node::Text(value) = node {
+                        chars.extend(xml::unescape(value).chars());
+                    }
+                }
+            } else if element.local() == "lvlText" {
+                if let Some(value) = element.get("val") {
+                    chars.extend(value.chars());
+                }
+            }
             if element.local() == "r" {
                 let mut text = String::new();
                 element.walk(&mut |child| {
@@ -128,7 +140,7 @@ fn requested_fonts(bytes: &[u8]) -> Result<BTreeMap<String, Script>, String> {
         }
     }
     requested.extend(observed);
-    Ok(requested)
+    Ok((requested, chars))
 }
 
 fn prefer_script(left: Script, right: Script) -> Script {
@@ -144,7 +156,8 @@ fn render(document: &rdocx::Document, bytes: &[u8], resolver: &dyn FontResolver)
     let mut infos = Vec::new();
     let mut warnings = resolver.warnings().to_vec();
     warnings.push("DOCX preview is experimental: pagination and Word-specific layout may differ from Word; inspect rendering diagnostics.".into());
-    for (requested, script) in requested_fonts(bytes)? {
+    let (requested, chars) = requested_fonts(bytes)?;
+    for (requested, script) in requested {
         let mut physical_styles = std::collections::BTreeSet::new();
         for (bold, italic) in [(false, false), (true, false), (false, true), (true, true)] {
             let face = resolver.resolve_font(&requested, script, bold, italic);
@@ -178,6 +191,45 @@ fn render(document: &rdocx::Document, bytes: &[u8], resolver: &dyn FontResolver)
                 metrics: if draws_script { face.metrics } else { Metrics::Substitute },
             });
         }
+    }
+    // The deterministic renderer searches only the faces handed to it. Supply
+    // available coverage fallbacks for real source characters absent from all
+    // current faces, instead of assuming its small bundled subsets are complete.
+    // The engine retains shaping, source spans and pagination ownership.
+    for c in chars.into_iter().filter(|c| !c.is_whitespace() && !c.is_control()) {
+        let text = c.to_string();
+        if files.iter().any(|f| crate::fonts::covers_text(&f.data, 0, &text)) {
+            continue;
+        }
+        let script = Script::of(&text);
+        let Some(face) = resolver.resolve_font_for_text("Arial", script, false, false, &text) else { continue };
+        if !crate::fonts::covers_text(&face.font.data, face.font.face_index, &text) {
+            continue;
+        }
+        // Keep the physical family distinct; replacing Arial wholesale with a
+        // Gothic-only font would lose Latin text. Report this as an engine
+        // fallback family, not a claim about the original authored request.
+        let parsed = ttf_parser::Face::parse(&face.font.data, face.font.face_index)
+            .map_err(|e| format!("fallback font {}: {e}", face.family))?;
+        let data = sfnt::build(
+            &face.font.data,
+            face.font.face_index,
+            &sfnt::Adjust {
+                family: face.family.clone(),
+                bold: parsed.is_bold(),
+                italic: parsed.is_italic(),
+                line_em: None,
+                ea_advance: None,
+            },
+        )?;
+        infos.push(FaceInfo {
+            requested: face.family.clone(),
+            script,
+            drawn: Some(face.family.clone()),
+            source: Some(face.source),
+            metrics: Metrics::Substitute,
+        });
+        files.push(FontFile { family: face.family, data });
     }
     let refs: Vec<_> = files.iter().map(|f| (f.family.as_str(), f.data.as_slice())).collect();
     let layout = document
@@ -225,7 +277,7 @@ mod tests {
     #[test]
     fn japanese_runs_do_not_request_a_hangul_font() {
         let bytes = include_bytes!("../../../prototype/preview/baseline/04-docx-untouched-testword-various.docx");
-        let requested = requested_fonts(bytes).unwrap();
+        let requested = requested_fonts(bytes).unwrap().0;
         assert_eq!(requested.get("MS Mincho"), Some(&Script::Cjk));
         assert_eq!(requested.get("Arial"), Some(&Script::Latin));
     }

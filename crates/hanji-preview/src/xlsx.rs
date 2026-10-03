@@ -550,7 +550,7 @@ struct GridBuilder<'a> {
     elements: Vec<PositionedElement>,
     fonts: Vec<oxml_layout::FontData>,
     faces: HashMap<FontId, FaceInfo>,
-    keys: BTreeMap<(String, Script, bool, bool), FontId>,
+    keys: BTreeMap<(String, Script, bool, bool), Vec<FontId>>,
     diagnostics: Vec<Diagnostic>,
     remaining_text: usize,
 }
@@ -569,14 +569,27 @@ impl<'a> GridBuilder<'a> {
     fn font(&mut self, style: &Style, text: &str) -> Result<FontId, String> {
         let script = Script::of(text);
         let key = (style.family.clone(), script, style.bold, style.italic);
-        if let Some(id) = self.keys.get(&key) {
-            return Ok(*id);
+        if let Some(ids) = self.keys.get(&key) {
+            for id in ids {
+                let font = &self.fonts[id.0 as usize];
+                if crate::fonts::covers_text(&font.data, font.face_index, text) {
+                    return Ok(*id);
+                }
+            }
         }
-        let drawn = self.resolver.resolve_font(&style.family, script, style.bold, style.italic);
+        let drawn = self.resolver.resolve_font_for_text(&style.family, script, style.bold, style.italic, text);
         let face = drawn
             .clone()
             .or_else(|| self.resolver.resolve_font(&style.family, Script::Latin, style.bold, style.italic))
             .ok_or("no font available to lay out worksheet text")?;
+        if let Some(ids) = self.keys.get(&key) {
+            if let Some(id) = ids.iter().find(|id| {
+                let font = &self.fonts[id.0 as usize];
+                font.face_index == face.font.face_index && font.data == face.font.data
+            }) {
+                return Ok(*id);
+            }
+        }
         if face.ea_advance.is_some() {
             self.diagnostics.push(diagnostic(
                 format!("window.fonts[{}]", self.fonts.len()),
@@ -610,7 +623,7 @@ impl<'a> GridBuilder<'a> {
                 }),
             },
         );
-        self.keys.insert(key, id);
+        self.keys.entry(key).or_default().push(id);
         Ok(id)
     }
     fn cell(

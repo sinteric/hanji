@@ -549,7 +549,7 @@ impl FontsReport {
         if self.missing_glyphs_total > 0 {
             let shown: Vec<&str> = self.missing_glyphs.iter().take(8).map(|m| m.char.as_str()).collect();
             out.push(format!(
-                "{} characters have no glyph in any font here ({}{})",
+                "{} characters have no usable glyph in the selected drawing fonts ({}{})",
                 thousands(self.missing_glyphs_total),
                 shown.join(" "),
                 if self.missing_glyphs_total > shown.len() { " …" } else { "" }
@@ -890,8 +890,15 @@ impl Preview {
                     continue;
                 }
                 let face = data.get(&id).and_then(|(d, i)| ttf_parser::Face::parse(d, *i).ok());
+                if face.as_ref().is_some_and(fonts::last_resort) {
+                    self.diagnostics.push(Diagnostic {
+                        path: format!("pages[{k}].fonts[{}]", id.0),
+                        message: quality::GENERIC_FONT.into(),
+                    });
+                }
                 for &c in &drawn {
-                    if face.as_ref().is_none_or(|f| f.glyph_index(c).is_none()) {
+                    if face.as_ref().is_none_or(|f| fonts::last_resort(f) || f.glyph_index(c).is_none_or(|g| g.0 == 0))
+                    {
                         missing.entry(c).or_insert_with(|| (info.requested.clone(), BTreeSet::new())).1.insert(k + 1);
                     }
                 }

@@ -10,6 +10,7 @@ pub(crate) const NUMERIC_OVERFLOW: &str = "numeric/date value does not fit its s
 pub(crate) const FORMULA_MISSING: &str =
     "formula has no cached result; shown as #UNEVALUATED; no evaluation was performed";
 pub(crate) const FORMULA_MARKER_OVERFLOW: &str = "missing formula cache marker does not fit its stored cell size; a question-mark indicator replaces the visible marker; cells[].display retains #UNEVALUATED";
+pub(crate) const GENERIC_FONT: &str = "selected font provides generic LastResort symbols, not character-specific glyphs; source text is preserved but character coverage is unavailable";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -63,6 +64,8 @@ pub enum DiagnosticCode {
     MissingGlyphs,
     #[serde(rename = "font.substituted")]
     FontSubstituted,
+    #[serde(rename = "font.generic-symbols")]
+    FontGenericSymbols,
     #[serde(rename = "xlsx.grid-approximation")]
     GridApproximation,
     #[serde(rename = "xlsx.numeric-overflow")]
@@ -322,6 +325,7 @@ fn classify(source: PreviewSource, d: &Diagnostic) -> (DiagnosticCode, Severity,
         }
     }
     match d.message.as_str() {
+        GENERIC_FONT => (FontGenericSymbols, Error, MissingText),
         "image bytes are neither PNG nor JPEG and were omitted" => (ImageOmitted, Error, UnsupportedOmission),
         "unsupported positioned element was omitted from SVG output" => (ElementOmitted, Error, UnsupportedOmission),
         "invalid multilingual glyph positioning was omitted from SVG output" => (InvalidPositioning, Error, MissingText),

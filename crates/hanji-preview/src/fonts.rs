@@ -206,6 +206,19 @@ pub struct ResolvedFont {
 pub trait FontResolver {
     fn resolve_font(&self, requested: &str, script: Script, bold: bool, italic: bool) -> Option<ResolvedFont>;
 
+    /// Select a drawing face for the actual repertoire. Existing resolvers
+    /// retain their behavior; missing glyphs are still reported by the job.
+    fn resolve_font_for_text(
+        &self,
+        requested: &str,
+        script: Script,
+        bold: bool,
+        italic: bool,
+        _text: &str,
+    ) -> Option<ResolvedFont> {
+        self.resolve_font(requested, script, bold, italic)
+    }
+
     fn warnings(&self) -> &[String] {
         &[]
     }
@@ -213,7 +226,30 @@ pub trait FontResolver {
 
 /// Whether face `id` of `db` has a glyph for `c`.
 fn draws(db: &fontdb::Database, id: fontdb::ID, c: char) -> bool {
-    db.with_face_data(id, |d, i| ttf_parser::Face::parse(d, i).is_ok_and(|f| f.glyph_index(c).is_some())) == Some(true)
+    db.with_face_data(id, |d, i| covers_text(d, i, &c.to_string())) == Some(true)
+}
+
+// OpenType head.flags bit 14 means generic LastResort symbols rather than
+// character-specific outlines. A nonzero cmap entry is not character coverage.
+pub(crate) fn last_resort(face: &ttf_parser::Face<'_>) -> bool {
+    face.raw_face()
+        .table(ttf_parser::Tag::from_bytes(b"head"))
+        .and_then(|head| head.get(16..18))
+        .is_some_and(|flags| u16::from_be_bytes([flags[0], flags[1]]) & (1 << 14) != 0)
+}
+
+fn private_use(c: char) -> bool {
+    matches!(c as u32, 0xE000..=0xF8FF | 0xF0000..=0xFFFFD | 0x100000..=0x10FFFD)
+}
+
+pub(crate) fn covers_text(data: &[u8], index: u32, text: &str) -> bool {
+    ttf_parser::Face::parse(data, index).is_ok_and(|face| {
+        !last_resort(&face)
+            && text
+                .chars()
+                .filter(|c| !c.is_whitespace() && !c.is_control())
+                .all(|c| face.glyph_index(c).is_some_and(|g| g.0 != 0))
+    })
 }
 
 /// The faces a preview can draw with.
@@ -341,6 +377,9 @@ impl Fonts {
             stretch: fontdb::Stretch::Normal,
         };
         let id = db.query(&q)?;
+        if db.with_face_data(id, |d, i| ttf_parser::Face::parse(d, i).is_ok_and(|f| last_resort(&f))) == Some(true) {
+            return None;
+        }
         if probe.is_some_and(|c| !draws(db, id, c)) {
             return None;
         }
@@ -420,6 +459,58 @@ impl FontResolver for Fonts {
             ea_advance: drawn.ea_advance,
             font: FontData { data: data.into(), face_index },
         })
+    }
+
+    fn resolve_font_for_text(
+        &self,
+        requested: &str,
+        script: Script,
+        bold: bool,
+        italic: bool,
+        text: &str,
+    ) -> Option<ResolvedFont> {
+        let primary = self.resolve_font(requested, script, bold, italic);
+        if primary.as_ref().is_some_and(|f| covers_text(&f.font.data, f.font.face_index, text)) {
+            return primary;
+        }
+        // Private-use symbols have meaning only in their authored font. An
+        // unrelated font with the same code point is not a semantic fallback.
+        if text.chars().any(private_use) {
+            return primary;
+        }
+        // Preserve the existing Latin coverage fallback before considering
+        // other available families. Never rescue one character by dropping
+        // another: every non-control, non-whitespace character must be covered.
+        if script == Script::Latin {
+            if let Some(mut font) = self.resolve_font("Arial", script, bold, italic) {
+                if covers_text(&font.font.data, font.font.face_index, text) {
+                    font.metrics = Metrics::Substitute;
+                    font.ea_advance = None;
+                    return Some(font);
+                }
+            }
+        }
+        for (tier, (source, db)) in self.tiers.iter().enumerate() {
+            let families: std::collections::BTreeSet<_> =
+                db.faces().filter_map(|f| f.families.first().map(|(name, _)| name.as_str())).collect();
+            for family in families {
+                let Some((id, family)) = self.query(tier, family, bold, italic, None) else { continue };
+                if db.with_face_data(id, |data, index| covers_text(data, index, text)) != Some(true) {
+                    continue;
+                }
+                let (data, face_index) = db.with_face_data(id, |data, index| (data.to_vec(), index))?;
+                return Some(ResolvedFont {
+                    family,
+                    source: *source,
+                    metrics: Metrics::Substitute,
+                    ea_advance: None,
+                    font: FontData { data: data.into(), face_index },
+                });
+            }
+        }
+        // No complete drawing face is available. Keep the selected face and
+        // exact text so the job's missing-character diagnostics remain honest.
+        primary
     }
 
     fn warnings(&self) -> &[String] {
