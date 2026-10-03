@@ -7,9 +7,12 @@ publish = false
 [workspace]
 
 [dependencies]
-rhwp = { git = "https://github.com/edwardkim/rhwp", rev = "680111ec7bea2fe11110de18c3676ba5a1cf7847", default-features = false }
+rhwp = { git = "https://github.com/sinteric/rhwp", rev = "fed548c9acc3858624320538be0ce96b6ca0c742", default-features = false }
 resvg = "=0.48.1"
 serde_json = "1"
 
 [profile.release]
 debug = false
+
+[patch.crates-io]
+svg2pdf = { git = "https://github.com/edwardkim/svg2pdf", rev = "2caeb0a038f9128b79833d803b94c2667565c4da" }

@@ -3,6 +3,13 @@
 Findings, numbers and the proposed rule-5 threshold: **[SPIKE.md](SPIKE.md)**. Per-candidate tables:
 [results/summary.md](results/summary.md). Calibration: [results/calibration.json](results/calibration.json).
 
+The checked-in scores and comparison pictures describe the original spike's
+engine versions. The render CLIs now consume immutable fork revisions recorded
+in their manifests and lockfiles. Rerunning them produces new candidate output;
+it does not update those historical scores without the native reference PDFs.
+Current production preview support and release validation are documented in
+[PREVIEW.md](../../PREVIEW.md).
+
 ## Layout
 
 | Path | What |

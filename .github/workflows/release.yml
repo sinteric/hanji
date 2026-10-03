@@ -43,6 +43,13 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: native musl C compiler
+        if: endsWith(matrix.target, '-linux-musl')
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq --no-install-recommends musl-tools
+          target='${{ matrix.target }}'
+          echo "CC_${target//-/_}=musl-gcc" >> "$GITHUB_ENV"
       - name: build
         run: cargo build --release --locked --target ${{ matrix.target }} -p hanji-cli
       - name: package

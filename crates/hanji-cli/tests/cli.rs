@@ -7,6 +7,11 @@ use std::path::{Path, PathBuf};
 use assert_cmd::Command;
 use serde_json::Value;
 
+#[path = "../../hanji-preview/tests/fixtures/xlsx_grid.rs"]
+mod xlsx_grid;
+#[path = "../../hanji-preview/tests/fixtures/xlsx_inherited.rs"]
+mod xlsx_inherited;
+
 struct Env {
     dir: PathBuf,
 }
@@ -129,14 +134,307 @@ fn preview_of_a_document_and_of_a_file() {
         .as_array()
         .unwrap()
         .iter()
-        .any(|d| d["message"] == "unsupported connector line style retained as visible default"));
-    assert!(text.contains("warning: ") && text.contains("unsupported connector line style"));
+        .any(|d| d["message"].as_str().unwrap().contains("unsupported slide hyperlink action")));
+    assert!(text.contains("warning: ") && text.contains("unsupported slide hyperlink action"));
+    let e = env.err(&["preview", &deck, "--range", "A1:B2"]);
+    assert_eq!(e["code"], "bad_request");
+    assert!(e["message"].as_str().unwrap().contains("only to XLSX"));
     let e = env.err(&["preview", &deck, "--rev", "2"]);
     assert_eq!(e["code"], "bad_request");
     env.ok(&["open", &corpus("prototype/remainder/corpus/korean-report.docx")]);
-    let e = env.err(&["preview", "korean-report"]);
-    assert_eq!(e["code"], "unsupported");
-    assert!(e["message"].as_str().unwrap().starts_with("preview not supported yet for docx"), "{e:#}");
+    let p = env.ok(&["preview", "korean-report", "--out", &out]);
+    assert_eq!(p["format"], "docx");
+    assert!(p["pages"].as_u64().unwrap() >= 1);
+    assert!(p["slides"].is_null());
+    assert!(p["warnings"].as_array().unwrap().iter().any(|w| w.as_str().unwrap().contains("experimental")));
+}
+
+#[test]
+fn docx_file_and_stored_revision_preview_keep_content_and_source_read_only() {
+    let env = Env::new("docx-preview");
+    let file = env.path("report.docx");
+    let original = std::fs::read(corpus("prototype/preview/baseline/01-docx-untouched-korean-report.docx")).unwrap();
+    std::fs::write(&file, &original).unwrap();
+    let out = env.path("pages");
+    let p = env.ok(&["preview", &file, "--format", "svg", "--out", &out]);
+    assert_eq!(p["pages"], 2);
+    assert_eq!(p["files"].as_array().unwrap().len(), 2);
+    let svg = std::fs::read_to_string(p["files"][0].as_str().unwrap()).unwrap();
+    let content = hanji_package::xml::parse(svg.as_bytes()).unwrap().root.text_of(&["text", "tspan"]);
+    assert!(content.contains("3분기") && svg.contains("data:font/") && svg.contains("<image"), "{p:#}");
+    assert!(p["diagnostics"].is_array());
+    assert_eq!(std::fs::read(&file).unwrap(), original);
+    assert!(env.ok(&["list"]).as_array().unwrap().is_empty());
+    env.ok(&["open", &file]);
+    env.ok(&["edit", "report", "--rev", "1", "--old", "3분기 영업 보고", "--new", "수정된 영업 보고"]);
+    let history = env.ok(&["history", "report"]);
+    std::fs::remove_file(&file).unwrap();
+    let p = env.ok(&["preview", "report", "--rev", "1", "--format", "svg", "--out", &out]);
+    let svg = std::fs::read_to_string(p["files"][0].as_str().unwrap()).unwrap();
+    let content = hanji_package::xml::parse(svg.as_bytes()).unwrap().root.text_of(&["text", "tspan"]);
+    assert!(content.contains("3분기") && !content.contains("수정된"));
+    assert_eq!(env.ok(&["history", "report"]), history);
+    let p = env.ok(&["preview", "report", "--format", "svg", "--out", &out]);
+    let svg = std::fs::read_to_string(p["files"][0].as_str().unwrap()).unwrap();
+    let content = hanji_package::xml::parse(svg.as_bytes()).unwrap().root.text_of(&["text", "tspan"]);
+    assert!(content.contains("수정된"));
+}
+
+#[test]
+fn hwpx_file_outputs_and_stored_revisions_are_read_only() {
+    let env = Env::new("hwpx-preview");
+    let file = env.path("plan.hwpx");
+    let original = std::fs::read(corpus("prototype/preview/baseline/30-hwpx-new-plan-ko.hwpx")).unwrap();
+    std::fs::write(&file, &original).unwrap();
+    let out = env.path("pages");
+    for format in ["svg", "png", "html"] {
+        let p = env.ok(&["preview", &file, "--format", format, "--out", &out]);
+        assert_eq!(p["format"], "hwpx");
+        assert_eq!(p["pages"], 2);
+        assert!(p["slides"].is_null());
+        assert_eq!(p["files"].as_array().unwrap().len(), if format == "html" { 1 } else { 2 });
+        assert!(p["warnings"].as_array().unwrap().iter().any(|w| w.as_str().unwrap().contains("experimental")));
+        assert_eq!(std::fs::read(&file).unwrap(), original);
+        assert!(env.ok(&["list"]).as_array().unwrap().is_empty());
+    }
+    env.ok(&["open", &file]);
+    let text = env.read("plan");
+    let heading = text.lines().find_map(|line| line.strip_prefix("# ")).unwrap();
+    env.ok(&["edit", "plan", "--rev", "1", "--old", heading, "--new", "HANJI_PREVIEW_REVISION_TWO"]);
+    let history = env.ok(&["history", "plan"]);
+    std::fs::remove_file(&file).unwrap();
+    for (rev, edited) in [("1", false), ("2", true)] {
+        let p = env.ok(&["preview", "plan", "--rev", rev, "--format", "svg", "--out", &out]);
+        let content: String = p["files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|file| {
+                let svg = std::fs::read(file.as_str().unwrap()).unwrap();
+                hanji_package::xml::parse(&svg).unwrap().root.text_of(&["text", "tspan"])
+            })
+            .collect();
+        assert_eq!(content.contains("HANJI_PREVIEW_REVISION_TWO"), edited, "{content}");
+        assert_eq!(env.ok(&["history", "plan"]), history);
+    }
+}
+
+fn xlsx_fixture(env: &Env, name: &str, sheet: &str) -> String {
+    let path = env.path(name);
+    std::fs::write(&path, xlsx_grid::build(sheet, "", xlsx_grid::STYLES, &[])).unwrap();
+    path
+}
+
+fn cell<'a>(preview: &'a Value, address: &str) -> &'a Value {
+    preview["cells"].as_array().unwrap().iter().find(|c| c["address"] == address).unwrap()
+}
+
+#[test]
+fn xlsx_file_preview_formats_are_read_only_and_report_cached_results() {
+    let env = Env::new("xlsx-preview-formats");
+    let path = xlsx_fixture(&env, "Quarter <one>.xlsx", xlsx_grid::GRID);
+    let before = std::fs::read(&path).unwrap();
+    for format in ["svg", "png", "html"] {
+        let v = env.ok(&["preview", &path, "--sheet", "매출 & Sales", "--range", "a1:b4", "--format", format]);
+        assert_eq!(v["doc_id"], "quarter-one");
+        assert_eq!(v["source_kind"], "file");
+        assert_eq!(v["revision"], 1);
+        assert_eq!(v["sheet"]["index"], 0);
+        assert_eq!(v["range"], "A1:B4");
+        assert_eq!(cell(&v, "B2")["display"], "1,234.50");
+        assert_eq!(cell(&v, "A3")["formula_result"], "cached-unverified");
+        assert_eq!(cell(&v, "B3")["formula_result"], "missing");
+        assert_eq!(cell(&v, "B3")["display"], "#UNEVALUATED");
+        assert_eq!(cell(&v, "A4")["display"], "");
+        assert_eq!(cell(&v, "B4")["formula_result"], "cached-unverified");
+        assert!(v["fonts"]["substituted"].is_array());
+        assert!(v["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|w| w.as_str().unwrap().contains("conditionalFormatting")));
+        assert!(v["diagnostics"].as_array().unwrap().iter().any(|d| d["path"] == "sheets[0].drawing"));
+        assert!(v["diagnostics"].as_array().unwrap().iter().any(|d| d["path"] == "sheets[0].cells[B3].clipping"));
+        let files = v["files"].as_array().unwrap();
+        assert_eq!(files.len(), 1);
+        let file = files[0].as_str().unwrap();
+        assert!(file.ends_with(&format!("quarter-one-r1-sheet-1-A1-B4.{format}")), "{file}");
+        let bytes = std::fs::read(file).unwrap();
+        if format == "png" {
+            assert_eq!(&bytes[..8], b"\x89PNG\r\n\x1a\n");
+            let width = u32::from_be_bytes(bytes[16..20].try_into().unwrap());
+            let height = u32::from_be_bytes(bytes[20..24].try_into().unwrap());
+            assert_eq!(width, (v["page"]["width"].as_f64().unwrap() * 96.0 / 72.0).round() as u32);
+            assert_eq!(height, (v["page"]["height"].as_f64().unwrap() * 96.0 / 72.0).round() as u32);
+        } else {
+            let text = String::from_utf8(bytes).unwrap();
+            assert!(text.contains("<svg"));
+            assert!(!text.contains("<script>"));
+            if format == "html" {
+                assert!(text.contains("매출 &amp; Sales"));
+                assert!(text.contains("cached formula results only"));
+            }
+        }
+    }
+    assert_eq!(std::fs::read(path).unwrap(), before);
+    assert!(env.ok(&["list"]).as_array().unwrap().is_empty());
+}
+
+#[test]
+fn xlsx_sheet_selection_defaults_and_window_refusals() {
+    let env = Env::new("xlsx-preview-boundaries");
+    let path = xlsx_fixture(&env, "big.xlsx", xlsx_grid::GRID);
+    let out = env.path("good");
+    let v = env.ok(&["preview", &path, "--out", &out]);
+    assert_eq!(v["range"], "A1:L40", "whole-sheet dimension must not select a huge window");
+    assert_eq!(v["sheet"]["name"], "매출 & Sales");
+    let v = env.ok(&["preview", &path, "--sheet-index", "2", "--out", &out, "--range", "A1"]);
+    assert_eq!(v["sheet"]["state"], "hidden");
+    assert_eq!(v["sheet"]["index"], 1);
+    let v = env.ok(&["preview", &path, "--range", "XFD1048576", "--out", &out, "--format", "svg"]);
+    assert_eq!(cell(&v, "XFD1048576")["display"], "LAST");
+    assert!(v["page"]["width"].as_f64().unwrap() < 200.0);
+    let refuse = env.path("refused");
+    for args in [
+        vec!["--sheet-index", "0"],
+        vec!["--sheet-index", "3"],
+        vec!["--sheet", "missing"],
+        vec!["--range", "A0"],
+        vec!["--range", "XFE1"],
+        vec!["--range", "A1:A1048577"],
+        vec!["--range", "A1:XFD1048576"],
+        vec!["--range", "A1:A513"],
+        vec!["--range", "A1:DY2"],
+        vec!["--range", "A1:DX257"],
+    ] {
+        let mut command = vec!["preview", &path, "--out", &refuse];
+        command.extend(args);
+        assert_eq!(env.err(&command)["code"], "bad_request");
+        assert!(!Path::new(&refuse).exists());
+    }
+    let e = env.err(&["preview", &path, "--range", "A1:A2", "--out", &refuse]);
+    assert!(e["message"].as_str().unwrap().contains("cuts merged range A1:B1"));
+    assert!(!Path::new(&refuse).exists());
+    let e = env.err(&["preview", &path, "--range", "A1:DX256", "--format", "png", "--out", &refuse]);
+    assert!(e["message"].as_str().unwrap().contains("pixel budget"));
+    assert!(!Path::new(&refuse).exists());
+    assert_eq!(env.err(&["preview", &path, "--rev", "1"])["code"], "bad_request");
+    let conflict = env.cmd().args(["preview", &path, "--sheet", "Hidden", "--sheet-index", "2"]).output().unwrap();
+    assert!(!conflict.status.success());
+    assert!(String::from_utf8(conflict.stderr).unwrap().contains("cannot be used with"));
+}
+
+#[test]
+fn xlsx_default_skips_hidden_sheets_and_non_worksheets() {
+    use hanji_package::package;
+    let env = Env::new("xlsx-preview-visible");
+    let path = xlsx_fixture(&env, "hidden.xlsx", xlsx_grid::GRID);
+    let mut parts = package::read(&std::fs::read(&path).unwrap()).unwrap();
+    let workbook = parts.iter_mut().find(|p| p.name == "xl/workbook.xml").unwrap();
+    workbook.data = String::from_utf8(workbook.data.clone())
+        .unwrap()
+        .replace("sheetId=\"1\"", "state=\"hidden\" sheetId=\"1\"")
+        .replace("state=\"hidden\"/></sheets>", "state=\"visible\"/></sheets>")
+        .into_bytes();
+    std::fs::write(&path, package::write(&parts).unwrap()).unwrap();
+    assert_eq!(env.ok(&["preview", &path])["sheet"]["index"], 1);
+    let rels = parts.iter_mut().find(|p| p.name == "xl/_rels/workbook.xml.rels").unwrap();
+    rels.data = String::from_utf8(rels.data.clone())
+        .unwrap()
+        .replace(
+            "relationships/worksheet\" Target=\"worksheets/sheet2.xml",
+            "relationships/chartsheet\" Target=\"worksheets/sheet2.xml",
+        )
+        .into_bytes();
+    std::fs::write(&path, package::write(&parts).unwrap()).unwrap();
+    assert!(env.err(&["preview", &path])["message"].as_str().unwrap().contains("no visible worksheet"));
+    assert_eq!(env.err(&["preview", &path, "--sheet-index", "2"])["code"], "unsupported");
+    assert_eq!(env.ok(&["preview", &path, "--sheet", "매출 & Sales"])["sheet"]["state"], "hidden");
+}
+
+#[test]
+fn xlsx_stored_preview_uses_exported_revision_and_does_not_change_history() {
+    let env = Env::new("xlsx-preview-revisions");
+    let path = xlsx_fixture(&env, "book.xlsx", xlsx_grid::GRID);
+    let id = env.ok(&["open", &path])["doc_id"].as_str().unwrap().to_string();
+    // The source file is removed; a stored preview must use the revision bytes.
+    std::fs::remove_file(&path).unwrap();
+    env.ok(&["ops", &id, "--rev", "1", r#"[{"op":"set","range":"'매출 & Sales'!B2","values":[[42]]}]"#]);
+    let history = env.ok(&["history", &id]);
+    let out = env.path("revisions");
+    let current = env.ok(&["preview", &id, "--range", "A1:B4", "--format", "svg", "--out", &out]);
+    assert_eq!(current["revision"], 2);
+    assert_eq!(current["source_kind"], "revision");
+    assert_eq!(cell(&current, "B2")["display"], "42.00");
+    let old = env.ok(&["preview", &id, "--rev", "1", "--range", "A1:B4", "--format", "html", "--out", &out]);
+    assert_eq!(old["revision"], 1);
+    assert_eq!(cell(&old, "B2")["display"], "1,234.50");
+    assert_eq!(env.ok(&["history", &id]), history);
+}
+
+#[test]
+fn xlsx_preview_keeps_macros_and_external_formulas_inert() {
+    let env = Env::new("xlsx-preview-inert");
+    let sheet = r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="str"><f>WEBSERVICE("https://invalid.example/&lt;script&gt;")</f><v>stored result</v></c></row></sheetData></worksheet>"#;
+    let rels = br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="external" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://invalid.example" TargetMode="External"/></Relationships>"#;
+    let path = env.path("inert.xlsm");
+    std::fs::write(
+        &path,
+        xlsx_grid::build(
+            sheet,
+            r#"<calcPr forceFullCalc="1"/>"#,
+            xlsx_grid::STYLES,
+            &[("xl/vbaProject.bin", b"inert test bytes"), ("xl/worksheets/_rels/sheet1.xml.rels", rels)],
+        ),
+    )
+    .unwrap();
+    let v = env.ok(&["preview", &path, "--range", "A1", "--format", "html"]);
+    assert_eq!(cell(&v, "A1")["display"], "stored result");
+    assert_eq!(cell(&v, "A1")["formula_result"], "cached-possibly-stale");
+    for feature in ["workbook.macros", "workbook.externalLinks"] {
+        assert!(v["diagnostics"].as_array().unwrap().iter().any(|d| d["path"] == feature));
+    }
+    let html = std::fs::read_to_string(v["files"][0].as_str().unwrap()).unwrap();
+    assert!(!html.contains("https://invalid.example"));
+    assert!(!html.contains("<script>"));
+}
+
+#[test]
+fn xlsx_preview_json_and_svg_apply_inherited_number_formats() {
+    let env = Env::new("xlsx-preview-inherited-formats");
+    let path = env.path("inherited.xlsx");
+    std::fs::write(&path, xlsx_grid::build(xlsx_inherited::INHERITED_GRID, "", xlsx_inherited::INHERITED_STYLES, &[]))
+        .unwrap();
+    let v = env.ok(&["preview", &path, "--range", "A1:E6", "--format", "svg"]);
+    for (address, display) in [
+        ("A1", "50%"),
+        ("B1", "1900-01-02"),
+        ("C1", "$1,234.50"),
+        ("C3", "50%"),
+        ("E3", "0.500"),
+        ("B4", "1900-01-02"),
+        ("B5", "$1,234.50"),
+    ] {
+        assert_eq!(cell(&v, address)["display"], display, "{address}");
+    }
+    assert_eq!(cell(&v, "D3")["display"], "0.5", "explicit General overrides inherited percentage");
+    assert_eq!(cell(&v, "C3")["formula_result"], "cached-unverified");
+    let svg = std::fs::read_to_string(v["files"][0].as_str().unwrap()).unwrap();
+    for display in ["50%", "1900-01-02", "$1,234.50", "0.500"] {
+        assert!(svg.contains(&format!(">{display}</text>")), "{display}");
+    }
+}
+
+#[test]
+fn preview_help_documents_worksheet_defaults_and_limits() {
+    let env = Env::new("preview-help");
+    let output = env.cmd().args(["preview", "--help"]).output().unwrap();
+    assert!(output.status.success());
+    let help = String::from_utf8(output.stdout).unwrap();
+    for text in ["--sheet", "--sheet-index", "--range", "A1:L40", "1-based", "Cached formula results only", "512 rows"]
+    {
+        assert!(help.contains(text), "missing {text}: {help}");
+    }
 }
 
 #[test]

@@ -1,7 +1,7 @@
 {
   "name": "hanji",
   "displayName": "hanji",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Read and edit Word, PowerPoint, Excel and Hancom files (docx, pptx, xlsx, hwpx) as text, keeping everything the text does not show",
   "author": { "name": "sinteric", "url": "https://github.com/sinteric" },
   "homepage": "https://github.com/sinteric/hanji",

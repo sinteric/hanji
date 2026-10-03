@@ -3,7 +3,7 @@ resolver = "2"
 members = ["crates/*"]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/sinteric/hanji"
@@ -14,6 +14,16 @@ hanji-format = { path = "crates/hanji-format" }
 hanji-core = { path = "crates/hanji-core" }
 hanji-package = { path = "crates/hanji-package" }
 hanji-testkit = { path = "crates/hanji-testkit" }
+
+# One immutable renderer source keeps PPTX and DOCX layout types compatible.
+# rdocx includes the reviewed fontdb, vertical story-band, and pie/doughnut fixes.
+rdocx = { git = "https://github.com/sinteric/rdocx", rev = "f82067c72bb9d2dad82c57c448189a18d67cd6c0", default-features = false }
+rpptx = { git = "https://github.com/sinteric/rdocx", rev = "f82067c72bb9d2dad82c57c448189a18d67cd6c0", default-features = false }
+rpptx-render = { git = "https://github.com/sinteric/rdocx", rev = "f82067c72bb9d2dad82c57c448189a18d67cd6c0", default-features = false }
+rpptx-layout = { git = "https://github.com/sinteric/rdocx", rev = "f82067c72bb9d2dad82c57c448189a18d67cd6c0", default-features = false }
+oxml-layout = { git = "https://github.com/sinteric/rdocx", rev = "f82067c72bb9d2dad82c57c448189a18d67cd6c0", default-features = false }
+# Published rhwp candidate, including the reviewed layout and Rust 1.99 fixes.
+rhwp = { git = "https://github.com/sinteric/rhwp", rev = "fed548c9acc3858624320538be0ce96b6ca0c742", default-features = false }
 
 # The spreadsheet engine's tests read 100,000-row sheets (§2 rule 11) in
 # debug builds too: its parsers and calculator are optimised there.
@@ -31,3 +41,7 @@ opt-level = 2
 
 [profile.dev.package.ironcalc_base]
 opt-level = 2
+
+# Preserve the rhwp workspace's deterministic dependency patch in this consumer.
+[patch.crates-io]
+svg2pdf = { git = "https://github.com/edwardkim/svg2pdf", rev = "2caeb0a038f9128b79833d803b94c2667565c4da" }

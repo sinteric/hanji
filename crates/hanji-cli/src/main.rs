@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
-use hanji_preview::store::Output;
+use hanji_preview::store::{Output, XlsxSelection};
 use hanji_store::{
     Changed, DocType, Error, ExportOptions, Format, FsStorage, ImportReport, MemStorage, Result, TextEdit, Window,
     Workspace,
@@ -105,21 +105,31 @@ enum Cmd {
         #[arg(long)]
         tracked_changes: bool,
     },
-    /// Render a revision to check the look: an HTML viewer, or SVG or PNG per slide (pptx).
+    /// Render PPTX slides, experimental DOCX/HWPX pages or an XLSX window to HTML, SVG or PNG.
     Preview {
-        /// A document, or a .pptx file (rendered as hanji would export it; not stored).
+        /// A stored document or a .docx/.pptx/.xlsx/.hwpx file (file previews are not stored).
         doc: String,
         #[arg(long)]
         rev: Option<u32>,
         /// The directory to write to; by default the document's file's directory (or this one).
         #[arg(long)]
         out: Option<PathBuf>,
-        /// html (one viewer file), svg or png (one file per slide).
+        /// html (one viewer file), svg or png (one file per slide or worksheet window).
         #[arg(long, default_value = "html", value_parser = parse_output)]
         format: Output,
         /// A font directory or file, searched before $HANJI_FONT_DIR and the system fonts (repeatable).
         #[arg(long = "font-dir")]
         font_dirs: Vec<PathBuf>,
+        /// XLSX worksheet name (exact); by default the first visible worksheet.
+        #[arg(long, conflicts_with = "sheet_index")]
+        sheet: Option<String>,
+        /// XLSX sheet number, 1-based (including hidden/non-worksheet sheets).
+        #[arg(long, conflicts_with = "sheet")]
+        sheet_index: Option<usize>,
+        /// XLSX A1 window, e.g. A1:H40; default A1:L40. Cached formula results only.
+        /// Limits: 512 rows, 128 columns, 32768 cells; merges must fit the window.
+        #[arg(long)]
+        range: Option<String>,
     },
     /// Bring a person's edits of an exported file back in as a new revision.
     Reimport { doc: String, path: PathBuf },
@@ -170,7 +180,7 @@ fn parse_output(s: &str) -> std::result::Result<Output, String> {
     Output::parse(s).ok_or_else(|| format!("{s:?} is not a preview format: html, svg or png"))
 }
 
-/// `hanji preview`: a stored document, or a file imported in memory.
+/// Thin native adapter: selection, revision/file routing and output reporting.
 fn preview(
     ws: &Workspace<FsStorage>,
     doc: &str,
@@ -178,33 +188,72 @@ fn preview(
     out_dir: Option<PathBuf>,
     format: Output,
     font_dirs: Vec<PathBuf>,
+    selection: XlsxSelection,
 ) -> Result<Out> {
     let opts = hanji_preview::Options::with_font_dirs(font_dirs);
     let path = Path::new(doc);
-    let (mut p, preview, dir) = if path.is_file() && Format::of_name(doc).is_some() {
-        if rev.is_some() {
-            return Err(Error::bad("--rev names a revision of a stored document; a file is previewed as it is."));
+    let file_format = path.is_file().then(|| Format::of_name(doc)).flatten();
+    if file_format.is_some() && rev.is_some() {
+        return Err(Error::bad("--rev names a revision of a stored document; a file is previewed as it is."));
+    }
+    let input_format = match file_format {
+        Some(format) => format,
+        None => ws.doc(doc)?.format,
+    };
+    hanji_preview::store::check_format(input_format)?;
+    if input_format == Format::Xlsx {
+        let (mut p, window, dir) = if file_format.is_some() {
+            let (p, window) = hanji_preview::store::render_xlsx_file(path, &selection, &opts)?;
+            let parent = path
+                .parent()
+                .filter(|p| !p.as_os_str().is_empty())
+                .map_or_else(|| PathBuf::from("."), Path::to_path_buf);
+            (p, window, out_dir.unwrap_or(parent))
+        } else {
+            let (p, window) = hanji_preview::store::render_xlsx(ws, doc, rev, &selection, &opts)?;
+            let dir = out_dir.unwrap_or_else(|| hanji_preview::store::default_dir(ws, doc, Path::new(".")));
+            (p, window, dir)
+        };
+        hanji_preview::store::write_xlsx(&window, &mut p, format, &dir)?;
+        let mut t = p.files.iter().map(|f| format!("wrote {f}\n")).collect::<String>();
+        t.push_str(&format!(
+            "worksheet {:?} ({}), range {} from revision {} of {}; {}\n",
+            p.sheet.name,
+            p.sheet.index + 1,
+            p.range,
+            p.revision,
+            p.doc_id,
+            p.summary
+        ));
+        for w in &p.warnings {
+            t.push_str(&format!("warning: {w}\n"));
         }
-        hanji_preview::store::check_format(Format::of_name(doc).unwrap_or(Format::Pptx))?;
+        return Ok(out(&p, t));
+    }
+    if selection.is_requested() {
+        return Err(Error::bad("--sheet, --sheet-index and --range apply only to XLSX worksheet previews"));
+    }
+    let (mut p, preview, dir) = if file_format.is_some() {
         let mut mem = Workspace::new(MemStorage::new());
         let bytes = std::fs::read(path).map_err(|e| Error::io(format!("cannot read {}: {e}", path.display())))?;
         let name = path.file_name().map_or_else(|| doc.to_string(), |n| n.to_string_lossy().into_owned());
         let o = mem.open_bytes(&name, &bytes, None)?;
-        let (p, preview) = hanji_preview::store::render(&mem, &o.doc_id, None, &opts)?;
+        let (p, preview) = hanji_preview::store::render_document(&mem, &o.doc_id, None, &opts)?;
         let parent =
             path.parent().filter(|p| !p.as_os_str().is_empty()).map_or_else(|| PathBuf::from("."), Path::to_path_buf);
         (p, preview, out_dir.unwrap_or(parent))
     } else {
-        let (p, preview) = hanji_preview::store::render(ws, doc, rev, &opts)?;
+        let (p, preview) = hanji_preview::store::render_document(ws, doc, rev, &opts)?;
         let dir = out_dir.unwrap_or_else(|| hanji_preview::store::default_dir(ws, doc, Path::new(".")));
         (p, preview, dir)
     };
-    hanji_preview::store::write(&preview, &mut p, format, &dir)?;
+    hanji_preview::store::write_document(&preview, &mut p, format, &dir)?;
     let mut t = String::new();
     for f in &p.files {
         t.push_str(&format!("wrote {f}\n"));
     }
-    t.push_str(&format!("{} slides from revision {} of {}; {}\n", p.slides, p.revision, p.doc_id, p.summary));
+    let unit = if p.format == Format::Pptx { "slides" } else { "pages" };
+    t.push_str(&format!("{} {unit} from revision {} of {}; {}\n", p.pages, p.revision, p.doc_id, p.summary));
     for w in &p.warnings {
         t.push_str(&format!("warning: {w}\n"));
     }
@@ -375,7 +424,9 @@ fn run(cli: Cli) -> Result<Out> {
             }
             out(&e, t)
         }
-        Cmd::Preview { doc, rev, out, format, font_dirs } => preview(&ws, &doc, rev, out, format, font_dirs)?,
+        Cmd::Preview { doc, rev, out, format, font_dirs, sheet, sheet_index, range } => {
+            preview(&ws, &doc, rev, out, format, font_dirs, XlsxSelection { sheet, sheet_index, range })?
+        }
         Cmd::Reimport { doc, path } => {
             let r = ws.reimport(&doc, &path)?;
             let t = if r.unchanged {

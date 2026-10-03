@@ -6,7 +6,7 @@
 //! `HANJI_TEST_FONT_DIR`, else one under `/usr/share/fonts` (CI installs
 //! fonts-noto-cjk). Without one they are skipped, except on CI.
 
-#![cfg(not(target_family = "wasm"))]
+#![cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -14,7 +14,7 @@ use std::path::PathBuf;
 use base64::Engine as _;
 use hanji_preview::store::{self, Output};
 use hanji_preview::{fonts::Script, Options, Preview};
-use hanji_store::{Code, MemStorage, TextEdit, Workspace};
+use hanji_store::{MemStorage, TextEdit, Workspace};
 
 fn corpus(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../hanji-pptx/corpus").join(name)
@@ -151,10 +151,101 @@ fn the_shapes_deck_renders_every_slide() {
 }
 
 #[test]
+fn the_korean_font_can_be_supplied_as_bytes_without_host_discovery() {
+    let Some(font) = korean_font() else { return };
+    let package = std::fs::read(corpus("korean-deck.pptx")).unwrap();
+    let options = hanji_preview::FontOptions {
+        fonts: vec![hanji_preview::FontData::new(std::fs::read(font).unwrap())],
+        ..Default::default()
+    };
+    let p = hanji_preview::render_pptx_with_fonts(&package, &options).unwrap();
+    check_pages(&p, 7, 300 << 10);
+    assert_eq!(p.fonts.missing_glyphs_total, 0);
+    assert!(p
+        .fonts
+        .substituted
+        .iter()
+        .any(|f| f.script == Script::Hangul && f.source == Some(hanji_preview::fonts::Source::Supplied)));
+}
+
+#[test]
+fn chart_korean_and_mixed_legends_use_the_embedded_font_advances() {
+    use hanji_package::{package, xml};
+    let Some(font) = korean_font() else { return };
+    let options = hanji_preview::FontOptions {
+        fonts: vec![hanji_preview::FontData::new(std::fs::read(&font).unwrap())],
+        ..Default::default()
+    };
+    let mut db = fontdb::Database::new();
+    db.load_font_file(font).unwrap();
+    let family = db
+        .faces()
+        .find(|f| {
+            db.with_face_data(f.id, |d, i| ttf_parser::Face::parse(d, i).is_ok_and(|f| f.glyph_index('가').is_some()))
+                .unwrap_or(false)
+        })
+        .unwrap()
+        .families[0]
+        .0
+        .clone();
+    let original = include_bytes!("../../../prototype/preview/baseline/14-pptx-untouched-korean-report-deck.pptx");
+    for explicit in [None, Some(family.as_str()), Some("Hanji Missing Chart Face")] {
+        for label in ["라이선스", "라이선스 30%", "License 라이선스", "API 서비스"] {
+            let mut parts = package::read(original).unwrap();
+            let chart = parts.iter_mut().find(|p| p.name == "ppt/charts/chart1.xml").unwrap();
+            let mut xml = String::from_utf8(chart.data.clone()).unwrap().replace("라이선스", label);
+            if let Some(family) = explicit {
+                let properties = format!("<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz=\"900\"><a:latin typeface=\"{}\"/></a:defRPr></a:pPr></a:p></c:txPr></c:legend>", xml::escape_attr(family));
+                xml = xml.replace("</c:legend>", &properties);
+            }
+            chart.data = xml.into_bytes();
+            let p = hanji_preview::render_pptx_with_fonts(&package::write(&parts).unwrap(), &options).unwrap();
+            assert_eq!(p.fonts.missing_glyphs_total, 0);
+            let svg = p.slide_svg(5);
+            let root = xml::parse(svg.as_bytes()).unwrap().root;
+            let mut checked = false;
+            root.walk(&mut |e| {
+                if e.local() != "text" || e.text_of(&["text", "tspan"]) != label {
+                    return;
+                }
+                let family = e.get("font-family").unwrap();
+                let marker = format!("font-family:'{family}'");
+                let rules = svg.split_once(&marker).unwrap().1;
+                let fonts = embedded_fonts(rules);
+                let face = ttf_parser::Face::parse(&fonts[0], 0).unwrap();
+                let size: f64 = e.get("font-size").unwrap().parse().unwrap();
+                let positions: Vec<f64> = e.get("x").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect();
+                let chars: Vec<_> = label.chars().collect();
+                assert_eq!(positions.len(), chars.len(), "the chart label has positioned characters");
+                for (i, pair) in positions.windows(2).enumerate() {
+                    assert!(pair[1] > pair[0], "readable positioned characters");
+                    // Latin pairs may kern. Independent hmtx metrics validate the
+                    // precomposed Hangul that exposed the original crowding.
+                    if !hanji_preview::fonts::is_hangul(chars[i]) {
+                        continue;
+                    }
+                    let glyph = face.glyph_index(chars[i]).unwrap();
+                    let advance =
+                        f64::from(face.glyph_hor_advance(glyph).unwrap()) * size / f64::from(face.units_per_em());
+                    assert!(
+                        (pair[1] - pair[0] - advance).abs() < 0.02,
+                        "{label}: character {} uses advance {}, but the drawn font needs {advance}",
+                        chars[i],
+                        pair[1] - pair[0]
+                    );
+                }
+                checked = true;
+            });
+            assert!(checked, "the chart's own Korean/mixed category label is rendered");
+        }
+    }
+}
+
+#[test]
 fn rendering_diagnostics_reach_json_and_every_output_mode_without_refusing_the_deck() {
     let (ws, id) = opened("shapes.pptx");
     let (mut out, p) = store::render(&ws, &id, None, &no_fonts()).unwrap();
-    let message = "unsupported connector line style retained as visible default";
+    let message = "unsupported slide hyperlink action `ppaction://hlinksldjump`";
     assert_eq!(
         p.diagnostics.iter().filter(|d| d.message == message).count(),
         1,
@@ -241,10 +332,11 @@ fn a_revision_is_previewed_from_its_export_not_the_original() {
 }
 
 #[test]
-fn other_formats_are_not_supported_yet() {
+fn blank_documents_have_an_experimental_page_preview() {
     let mut ws = Workspace::new(MemStorage::new());
     let id = ws.create(hanji_store::DocType::Document, None, None).unwrap().doc_id;
-    let e = store::render(&ws, &id, None, &no_fonts()).err().unwrap();
-    assert_eq!(e.code, Code::Unsupported);
-    assert!(e.message.starts_with("preview not supported yet for docx"), "{}", e.message);
+    let (out, preview) = store::render(&ws, &id, None, &no_fonts()).unwrap();
+    assert!(preview.page_count() >= 1);
+    assert_eq!(out.pages, preview.page_count());
+    assert!(out.warnings.iter().any(|warning| warning.contains("experimental")));
 }
