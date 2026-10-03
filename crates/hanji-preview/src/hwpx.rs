@@ -160,12 +160,6 @@ fn text_request(element: &xml::Element) -> Option<(FontRequest, String)> {
     Some(((requested, Script::of(&text), bold, italic), text))
 }
 
-fn missing_count(font: &crate::fonts::ResolvedFont, chars: &BTreeSet<char>) -> usize {
-    ttf_parser::Face::parse(&font.font.data, font.font.face_index)
-        .map(|face| chars.iter().filter(|&&c| !c.is_whitespace() && face.glyph_index(c).is_none()).count())
-        .unwrap_or(chars.len())
-}
-
 fn finish(
     trees: Vec<xml::Doc>,
     mut diagnostics: Vec<Diagnostic>,
@@ -197,31 +191,14 @@ fn finish(
             let id = if let Some(id) = ids.get(&key) {
                 *id
             } else {
-                let resolved = resolver.resolve_font(&requested, script, bold, italic);
+                let needed: String = used_chars[&key].iter().collect();
+                let resolved = resolver.resolve_font_for_text(&requested, script, bold, italic, &needed);
                 let draws_script = resolved.is_some();
-                let Some(mut font) =
-                    resolved.or_else(|| resolver.resolve_font(&requested, Script::Latin, bold, italic))
+                let Some(font) = resolved.or_else(|| resolver.resolve_font(&requested, Script::Latin, bold, italic))
                 else {
                     error = Some(format!("no usable font for HWPX text requesting {requested}"));
                     return;
                 };
-                // A sparse bundled CJK face can be advertised under a Korean
-                // alias yet lack Latin digits. Use the complete request's
-                // character set, so an early letter does not cache that face
-                // for later numbers. Source/table geometry is retained.
-                let mut coverage_substitution = false;
-                if script == Script::Latin {
-                    let needed = &used_chars[&key];
-                    let missing = missing_count(&font, needed);
-                    if missing > 0 {
-                        if let Some(fallback) = resolver.resolve_font("Arial", script, bold, italic) {
-                            if missing_count(&fallback, needed) < missing {
-                                font = fallback;
-                                coverage_substitution = true;
-                            }
-                        }
-                    }
-                }
                 let id = faces.len();
                 let parsed = match ttf_parser::Face::parse(&font.font.data, font.font.face_index) {
                     Ok(face) => face,
@@ -255,7 +232,7 @@ fn finish(
                         drawn: draws_script.then_some(font.family),
                         source: draws_script.then_some(font.source),
                         // rhwp retains source/table geometry rather than laying out with the selected drawing font.
-                        metrics: if draws_script && !coverage_substitution && font.metrics == Metrics::Original {
+                        metrics: if draws_script && font.metrics == Metrics::Original {
                             Metrics::Original
                         } else {
                             Metrics::Substitute
@@ -277,8 +254,14 @@ fn finish(
             face.chars.extend(text.chars());
             chars.entry(id).or_default().extend(text.chars());
             if let Ok(parsed) = ttf_parser::Face::parse(&face.data, 0) {
+                if crate::fonts::last_resort(&parsed) {
+                    diagnostics.push(Diagnostic {
+                        path: format!("pages[{index}].fonts[{id}]"),
+                        message: crate::quality::GENERIC_FONT.into(),
+                    });
+                }
                 for c in text.chars().filter(|c| !c.is_whitespace()) {
-                    if parsed.glyph_index(c).is_none() {
+                    if crate::fonts::last_resort(&parsed) || parsed.glyph_index(c).is_none_or(|g| g.0 == 0) {
                         missing.entry(c).or_insert_with(|| (requested.clone(), BTreeSet::new())).1.insert(index + 1);
                     }
                 }
