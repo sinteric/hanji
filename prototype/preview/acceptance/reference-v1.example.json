@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "kind": "native-application",
+  "fixture_id": "synthetic-docx-v1",
+  "source_sha256": "9e2ff6456592063c2cc0c84bc6dfe61ce40a74720ade7439fd481474cd9da939",
+  "app": {
+    "name": "Word",
+    "version": "OWNER_MUST_SUPPLY_EXACT_VERSION_AND_BUILD",
+    "version_confirmed": false,
+    "os": "OWNER_MUST_SUPPLY_OS_AND_VERSION"
+  },
+  "export": {"mode": "no-markup", "repair_prompt": false, "fields_updated": false},
+  "rights": {"local_validation": false, "redistribution": false},
+  "fonts": [
+    {"family": "OWNER_MUST_IDENTIFY_ORIGINAL_FONT", "path": "fonts/original-font.ttf", "sha256": "OWNER_MUST_HASH_ACTUAL_FONT_BYTES"}
+  ],
+  "files": [
+    {"role": "native-pdf", "path": "synthetic-docx-v1.pdf", "sha256": "OWNER_MUST_HASH_NATIVE_EXPORT"},
+    {"role": "native-page-png", "page": 1, "path": "page-1.png", "sha256": "OWNER_MUST_HASH_REFERENCE_RASTER"}
+  ],
+  "visual_review": {
+    "decision": "pending",
+    "reviewer": null,
+    "candidate_output_sha256": {}
+  }
+}

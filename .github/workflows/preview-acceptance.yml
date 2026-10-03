@@ -1,0 +1,27 @@
+name: preview-acceptance
+on:
+  pull_request:
+    paths:
+      - 'prototype/preview/acceptance/**'
+      - 'prototype/preview/baseline/**'
+      - '.github/workflows/preview-acceptance.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'prototype/preview/acceptance/**'
+      - 'prototype/preview/baseline/**'
+      - '.github/workflows/preview-acceptance.yml'
+  workflow_dispatch:
+jobs:
+  acceptance-contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # deterministic generator reads the pinned blank parts
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python3 -m unittest discover -s prototype/preview/acceptance -v
+      - run: python3 prototype/preview/acceptance/generate_synthetic.py --out prototype/preview/acceptance/synthetic-inputs
+      - run: python3 prototype/preview/acceptance/acceptance.py inventory

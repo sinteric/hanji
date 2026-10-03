@@ -1,0 +1,4692 @@
+{
+  "schema_version": 1,
+  "kind": "hanji-preview-corpus",
+  "corpus_version": "1.0.0",
+  "base_commit": "e2182b04959008d2c2ef9d478dd0e5e68f28ef67",
+  "support_profiles": {
+    "experimental-regression-only": "self-rendered checks never establish native fidelity",
+    "synthetic-contract": "small authored semantic smoke/negative checks, no native oracle"
+  },
+  "historical_image_evidence": [
+    {
+      "path": "prototype/preview/diffs/rdocx-03-p2.png",
+      "sha256": "b34424f67d451446d5e58d5e60dc028de8c37aaa373314533966e5eab5404ca8",
+      "kind": "historical-composite-not-native-oracle"
+    },
+    {
+      "path": "prototype/preview/diffs/rdocx-04-p1.png",
+      "sha256": "c28e7c75cae85a1adfd25acb56612075dfa60b3a9340141bf05d3a5408b2c1bc",
+      "kind": "historical-composite-not-native-oracle"
+    },
+    {
+      "path": "prototype/preview/diffs/rhwp-25-p1.png",
+      "sha256": "30c98bf325bbbc35df7ed9ef5dbdb112723479c39bfc90d44bd5bcd518763ab7",
+      "kind": "historical-composite-not-native-oracle"
+    },
+    {
+      "path": "prototype/preview/diffs/rhwp-25-p5.png",
+      "sha256": "73462cb893ead367e6f37b9d764b895272e73752efde24113d71995c2b39b1fa",
+      "kind": "historical-composite-not-native-oracle"
+    },
+    {
+      "path": "prototype/preview/diffs/rhwp-28-p1.png",
+      "sha256": "0fa1344b732b33e903e8f75c5bfdbbb1d4850ebd43a81222939f26ac49c61983",
+      "kind": "historical-composite-not-native-oracle"
+    },
+    {
+      "path": "prototype/preview/diffs/rpptx-10-p2.png",
+      "sha256": "502df8574d1aa15767033e4635e863f3110d59d4d5c87ae7da4173b4e101059a",
+      "kind": "historical-composite-not-native-oracle"
+    }
+  ],
+  "fixtures": [
+    {
+      "id": "01-docx-untouched-korean-report",
+      "format": "docx",
+      "input": {
+        "path": "prototype/preview/baseline/01-docx-untouched-korean-report.docx",
+        "sha256": "579cd78748152a0af1ea12359055d9c37d8305aa11b7068285de2b2592a72c18",
+        "bytes": 11726
+      },
+      "features": [
+        "Korean text",
+        "styles",
+        "merged table",
+        "image",
+        "landscape section",
+        "header/footer"
+      ],
+      "provenance": {
+        "source": "prototype/remainder/corpus/korean-report.docx",
+        "built_by": "kit getput",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Word",
+        "recorded_version": "16.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "01-docx-untouched-korean-report.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 2,
+        "historical_first_page_size_pt": [
+          595.2,
+          841.9
+        ],
+        "font_identities": [
+          {
+            "family": "Batang",
+            "sha256": null
+          },
+          {
+            "family": "TimesNewRomanPS-BoldMT",
+            "sha256": null
+          },
+          {
+            "family": "TimesNewRomanPS-ItalicMT",
+            "sha256": null
+          },
+          {
+            "family": "TimesNewRomanPSMT",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "historical Word markup-view export; re-export No Markup"
+      },
+      "sets": [
+        "historical-30",
+        "release-12"
+      ],
+      "regression": {
+        "kind": "self-rendered-regression",
+        "renderer_pair": [
+          "f82067c72bb9d2dad82c57c448189a18d67cd6c0",
+          "fed548c9acc3858624320538be0ce96b6ca0c742"
+        ],
+        "pages": 2,
+        "dimensions_pt": [
+          [
+            595.3,
+            841.9
+          ],
+          [
+            841.9,
+            595.3
+          ]
+        ],
+        "diagnostics": {
+          "required": [
+            "DOCX\\ preview\\ is\\ experimental:\\ pagination\\ and\\ Word\\-specific\\ layout\\ may\\ differ\\ from\\ Word;\\ inspect\\ rendering\\ diagnostics\\.",
+            "multilingual\\ shaping\\ kept\\ searchable\\ text\\ with\\ browser\\-positioned\\ glyph\\ approximation\\ \\(281\\ occurrences;\\ first\\ at\\ pages\\[0\\]\\.elements\\[0\\]\\.children\\[0\\]\\)"
+          ],
+          "allow": [
+            "DOCX\\ preview\\ is\\ experimental:\\ pagination\\ and\\ Word\\-specific\\ layout\\ may\\ differ\\ from\\ Word;\\ inspect\\ rendering\\ diagnostics\\.",
+            "multilingual\\ shaping\\ kept\\ searchable\\ text\\ with\\ browser\\-positioned\\ glyph\\ approximation",
+            "multilingual\\ shaping\\ kept\\ searchable\\ text\\ with\\ browser\\-positioned\\ glyph\\ approximation\\ \\(281\\ occurrences;\\ first\\ at\\ pages\\[0\\]\\.elements\\[0\\]\\.children\\[0\\]\\)"
+          ]
+        },
+        "missing_glyphs": [],
+        "font_identities": {
+          "substituted": [
+            {
+              "requested": "Noto Sans CJK KR",
+              "script": "hangul",
+              "drawn": "Apple SD Gothic Neo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 187,
+              "pages": [
+                1,
+                2
+              ]
+            },
+            {
+              "requested": "Carlito",
+              "script": "latin",
+              "drawn": "Carlito",
+              "source": "bundled",
+              "metrics": "substitute",
+              "chars": 1,
+              "pages": [
+                1
+              ]
+            }
+          ],
+          "drawn_as_requested": [
+            {
+              "requested": "Liberation Serif",
+              "script": "latin",
+              "source": "bundled",
+              "chars": 52
+            }
+          ],
+          "missing_glyphs": []
+        },
+        "font_hash_scope": "embedded per-page subsets; original output font hashes were not recorded",
+        "font_subset_sha256": [
+          {
+            "hanji-font-0": "9dd4e0002fc65a4f0cd53eb8c6e0864875edcf8e4b64d88864fb2c0a01030c46",
+            "hanji-font-1": "3ea1412d98093038f4f63a92aa450c7110437801c067588b766de94bf60b6abb",
+            "hanji-font-2": "a76f58f32d8cf5c06508fcc90531a76eca6b03e248ad70e1bed4990c59a542eb",
+            "hanji-font-3": "19412da19e39234a9161a10128ec662e6111e2d3c090d8e93bf29837c3e9f76d",
+            "hanji-font-4": "79ad6da5d763bf729719061e4664309f3b95d7f22d0c44bb6c86c8597b714742",
+            "hanji-font-5": "77afeb5f14aa4086a270996771d58a854f0fc9658b8e98e3ea52f0c64969334d"
+          },
+          {
+            "hanji-font-2": "072841f7620011c5d77f9007a389a9f0e9f9bf47f53c4551e37313e7be3f87a5",
+            "hanji-font-3": "bd16f59c6b325aebb548c2c2f1f7a94caa73d7b0835e61b94fca6eb91bb49737"
+          }
+        ],
+        "output_sha256": {
+          "svg/01-docx-untouched-korean-report-r1-page-1.svg": "805d6291c93d40cec5648518cc454be2ffb6352975dcac11a6b4d5d8eb2173fb",
+          "svg/01-docx-untouched-korean-report-r1-page-2.svg": "0414657cabc71649fcac07c271c838da615bb31760dcbb3e30dd0c1b8db3eeea",
+          "png/01-docx-untouched-korean-report-r1-page-2.png": "7274214859e4ec3323fa8a5d94d57306cecfb126f4bd17a932f912f6fa8e7a2e",
+          "png/01-docx-untouched-korean-report-r1-page-1.png": "30a069c7d423a660638ae629b430d705ff2417178679bca3305205163d94832e",
+          "html/01-docx-untouched-korean-report-r1-preview.html": "3553c94d52357378e3e601ca66420c1a1549d6c4dd5b8ee47a4bb43182b9e7f1"
+        }
+      }
+    },
+    {
+      "id": "02-docx-untouched-sample-docx",
+      "format": "docx",
+      "input": {
+        "path": "prototype/preview/baseline/02-docx-untouched-sample-docx.docx",
+        "sha256": "493c69c146f3362f99060d6ab87be1f1d7a19cb56062bdf9fcd3536dd7257dc6",
+        "bytes": 138483
+      },
+      "features": [
+        "Latin; merged cells",
+        "lists",
+        "images",
+        "page breaks (~5 pages)"
+      ],
+      "provenance": {
+        "source": "prototype/remainder/corpus/sample-docx.docx",
+        "built_by": "kit getput",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Word",
+        "recorded_version": "16.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "02-docx-untouched-sample-docx.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 5,
+        "historical_first_page_size_pt": [
+          595.4,
+          841.9
+        ],
+        "font_identities": [
+          {
+            "family": "Arial-Black",
+            "sha256": null
+          },
+          {
+            "family": "ArialMT",
+            "sha256": null
+          },
+          {
+            "family": "Batang",
+            "sha256": null
+          },
+          {
+            "family": "Calibri",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Bold",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Italic",
+            "sha256": null
+          },
+          {
+            "family": "Cambria",
+            "sha256": null
+          },
+          {
+            "family": "Cambria-Bold",
+            "sha256": null
+          },
+          {
+            "family": "CourierNewPSMT",
+            "sha256": null
+          },
+          {
+            "family": "SymbolMT",
+            "sha256": null
+          },
+          {
+            "family": "Tahoma-Bold",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "historical Word markup-view export; re-export No Markup"
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "03-docx-untouched-docx4j-tables",
+      "format": "docx",
+      "input": {
+        "path": "prototype/preview/baseline/03-docx-untouched-docx4j-tables.docx",
+        "sha256": "bca2b1c8558d8a7554be44b437e9698928b002aefb9458abda9367eb8987855d",
+        "bytes": 292588
+      },
+      "features": [
+        "13 tables: merges",
+        "gridBefore/After",
+        "multi-paragraph cells"
+      ],
+      "provenance": {
+        "source": "prototype/remainder/corpus/docx4j-tables.docx",
+        "built_by": "kit getput",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Word",
+        "recorded_version": "16.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "03-docx-untouched-docx4j-tables.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 3,
+        "historical_first_page_size_pt": [
+          595.2,
+          841.9
+        ],
+        "font_identities": [
+          {
+            "family": "Arial-BoldMT",
+            "sha256": null
+          },
+          {
+            "family": "ArialMT",
+            "sha256": null
+          },
+          {
+            "family": "ArialNarrow",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30",
+        "release-12"
+      ],
+      "regression": {
+        "kind": "self-rendered-regression",
+        "renderer_pair": [
+          "f82067c72bb9d2dad82c57c448189a18d67cd6c0",
+          "fed548c9acc3858624320538be0ce96b6ca0c742"
+        ],
+        "pages": 3,
+        "dimensions_pt": [
+          [
+            595.3,
+            841.9
+          ],
+          [
+            595.3,
+            841.9
+          ],
+          [
+            595.3,
+            841.9
+          ]
+        ],
+        "diagnostics": {
+          "required": [
+            "DOCX\\ preview\\ is\\ experimental:\\ pagination\\ and\\ Word\\-specific\\ layout\\ may\\ differ\\ from\\ Word;\\ inspect\\ rendering\\ diagnostics\\."
+          ],
+          "allow": [
+            "DOCX\\ preview\\ is\\ experimental:\\ pagination\\ and\\ Word\\-specific\\ layout\\ may\\ differ\\ from\\ Word;\\ inspect\\ rendering\\ diagnostics\\."
+          ]
+        },
+        "missing_glyphs": [],
+        "font_identities": {
+          "substituted": [],
+          "drawn_as_requested": [
+            {
+              "requested": "Arial",
+              "script": "latin",
+              "source": "system",
+              "chars": 747
+            },
+            {
+              "requested": "Arial Narrow",
+              "script": "latin",
+              "source": "system",
+              "chars": 32
+            }
+          ],
+          "missing_glyphs": []
+        },
+        "font_hash_scope": "embedded per-page subsets; original output font hashes were not recorded",
+        "font_subset_sha256": [
+          {
+            "hanji-font-0": "209de6c44c05d513c125e7e9be7b34aa155568a82e37d5f10f40610067108bac",
+            "hanji-font-1": "836d048b3571bf898db7cf8e5d167116f195dae3775c2a54062e04241fc87c48"
+          },
+          {
+            "hanji-font-0": "87b365fc4642ca6f37f0df2f3d27ddfa96cfeada544948e57fe5a1c30606f431",
+            "hanji-font-2": "d65355384998439882d772648f2d25af40a60ba04c38625306852188988d2db7"
+          },
+          {
+            "hanji-font-0": "df93434ca9b799f24e3ebbe3188e5962cb16461190a7d3e1f4318a78879580fe"
+          }
+        ],
+        "output_sha256": {
+          "svg/03-docx-untouched-docx4j-tables-r1-page-1.svg": "138e12a4ff5eff2d56b4d894af82cf2052b7dc441c0ae537016a0f756607c8a3",
+          "svg/03-docx-untouched-docx4j-tables-r1-page-2.svg": "a9751cf6fe8c0d2ca7963a177f63ccb451cc226516c81f10bdaad8ee94b8f2e0",
+          "svg/03-docx-untouched-docx4j-tables-r1-page-3.svg": "ce359def56de71c7c8042a500594c8c06d95a746c11b5b3d4adcc84dd683df0f",
+          "png/03-docx-untouched-docx4j-tables-r1-page-3.png": "1b123eaa1572621eae8ed2e07f8d0b95da0d0344f72af09d8928b4beab97424f",
+          "png/03-docx-untouched-docx4j-tables-r1-page-2.png": "14c0d358471cdd5ad86ba14de3d13220501289bfccf3e3ba00e8a600729c8108",
+          "png/03-docx-untouched-docx4j-tables-r1-page-1.png": "68b0e707cc769186bd11930163a1b3f197fd7386ab26ac20f10ff4574f63ffac",
+          "html/03-docx-untouched-docx4j-tables-r1-preview.html": "8cb24a710cbf770bf63d948c877ba1def46c264393292c00a800026e9f5e1880"
+        }
+      }
+    },
+    {
+      "id": "04-docx-untouched-testword-various",
+      "format": "docx",
+      "input": {
+        "path": "prototype/preview/baseline/04-docx-untouched-testword-various.docx",
+        "sha256": "6abf192afda636a789bc8fcc623019c0df3e11d89ad5858657fba1e93711903d",
+        "bytes": 14094
+      },
+      "features": [
+        "direct formatting",
+        "section breaks",
+        "header/footer",
+        "table"
+      ],
+      "provenance": {
+        "source": "prototype/remainder/corpus/testWORD_various.docx",
+        "built_by": "kit getput",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Word",
+        "recorded_version": "16.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "04-docx-untouched-testword-various.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 2,
+        "historical_first_page_size_pt": [
+          612.0,
+          792.0
+        ],
+        "font_identities": [
+          {
+            "family": "ArialMT",
+            "sha256": null
+          },
+          {
+            "family": "Calibri",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Bold",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Italic",
+            "sha256": null
+          },
+          {
+            "family": "MS-Gothic",
+            "sha256": null
+          },
+          {
+            "family": "MS-Mincho",
+            "sha256": null
+          },
+          {
+            "family": "SegoeUIHistoric",
+            "sha256": null
+          },
+          {
+            "family": "SymbolMT",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30",
+        "release-12"
+      ],
+      "regression": {
+        "kind": "self-rendered-regression",
+        "renderer_pair": [
+          "f82067c72bb9d2dad82c57c448189a18d67cd6c0",
+          "fed548c9acc3858624320538be0ce96b6ca0c742"
+        ],
+        "pages": 5,
+        "dimensions_pt": [
+          [
+            612.0,
+            792.0
+          ],
+          [
+            612.0,
+            792.0
+          ],
+          [
+            612.0,
+            792.0
+          ],
+          [
+            612.0,
+            792.0
+          ],
+          [
+            612.0,
+            792.0
+          ]
+        ],
+        "diagnostics": {
+          "required": [
+            "DOCX\\ preview\\ is\\ experimental:\\ pagination\\ and\\ Word\\-specific\\ layout\\ may\\ differ\\ from\\ Word;\\ inspect\\ rendering\\ diagnostics\\.",
+            "complex\\ shaping\\ kept\\ searchable\\ text\\ with\\ total\\-advance\\ positioning\\ \\(2\\ occurrences;\\ first\\ at\\ pages\\[1\\]\\.elements\\[40\\]\\.children\\[0\\]\\)",
+            "multilingual\\ shaping\\ kept\\ searchable\\ text\\ with\\ browser\\-positioned\\ glyph\\ approximation\\ \\(315\\ occurrences;\\ first\\ at\\ pages\\[0\\]\\.elements\\[0\\]\\.children\\[0\\]\\)"
+          ],
+          "allow": [
+            "DOCX\\ preview\\ is\\ experimental:\\ pagination\\ and\\ Word\\-specific\\ layout\\ may\\ differ\\ from\\ Word;\\ inspect\\ rendering\\ diagnostics\\.",
+            "complex\\ shaping\\ kept\\ searchable\\ text\\ with\\ total\\-advance\\ positioning",
+            "complex\\ shaping\\ kept\\ searchable\\ text\\ with\\ total\\-advance\\ positioning\\ \\(2\\ occurrences;\\ first\\ at\\ pages\\[1\\]\\.elements\\[40\\]\\.children\\[0\\]\\)",
+            "multilingual\\ shaping\\ kept\\ searchable\\ text\\ with\\ browser\\-positioned\\ glyph\\ approximation",
+            "multilingual\\ shaping\\ kept\\ searchable\\ text\\ with\\ browser\\-positioned\\ glyph\\ approximation\\ \\(315\\ occurrences;\\ first\\ at\\ pages\\[0\\]\\.elements\\[0\\]\\.children\\[0\\]\\)"
+          ]
+        },
+        "missing_glyphs": [
+          "U+3005",
+          "U+F0B7",
+          "U+10332",
+          "U+10339",
+          "U+1033A",
+          "U+1033F",
+          "U+10343",
+          "U+10344"
+        ],
+        "font_identities": {
+          "substituted": [
+            {
+              "requested": "Calibri",
+              "script": "latin",
+              "drawn": "Carlito",
+              "source": "bundled",
+              "metrics": "compatible:Carlito",
+              "chars": 654,
+              "pages": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            {
+              "requested": "MS Mincho",
+              "script": "cjk",
+              "drawn": "Apple SD Gothic Neo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 12,
+              "pages": [
+                2
+              ]
+            },
+            {
+              "requested": "MS Gothic",
+              "script": "cjk",
+              "drawn": "Apple SD Gothic Neo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 5,
+              "pages": [
+                2
+              ]
+            },
+            {
+              "requested": "Carlito",
+              "script": "latin",
+              "drawn": "Carlito",
+              "source": "bundled",
+              "metrics": "substitute",
+              "chars": 1,
+              "pages": [
+                1
+              ]
+            }
+          ],
+          "drawn_as_requested": [
+            {
+              "requested": "Arial",
+              "script": "latin",
+              "source": "system",
+              "chars": 12
+            },
+            {
+              "requested": "Symbol",
+              "script": "latin",
+              "source": "system",
+              "chars": 3
+            }
+          ],
+          "missing_glyphs": [
+            {
+              "char": "U+3005",
+              "requested": "MS Mincho",
+              "pages": [
+                2
+              ]
+            },
+            {
+              "char": "U+F0B7",
+              "requested": "Symbol",
+              "pages": [
+                1
+              ]
+            },
+            {
+              "char": "U+10332",
+              "requested": "Arial",
+              "pages": [
+                2
+              ]
+            },
+            {
+              "char": "U+10339",
+              "requested": "Arial",
+              "pages": [
+                2
+              ]
+            },
+            {
+              "char": "U+1033A",
+              "requested": "Arial",
+              "pages": [
+                2
+              ]
+            },
+            {
+              "char": "U+1033F",
+              "requested": "Arial",
+              "pages": [
+                2
+              ]
+            },
+            {
+              "char": "U+10343",
+              "requested": "Arial",
+              "pages": [
+                2
+              ]
+            },
+            {
+              "char": "U+10344",
+              "requested": "Arial",
+              "pages": [
+                2
+              ]
+            }
+          ],
+          "missing_glyphs_total": 8
+        },
+        "font_hash_scope": "embedded per-page subsets; original output font hashes were not recorded",
+        "font_subset_sha256": [
+          {
+            "hanji-font-0": "c64916d94cdc32b3601b38d07abc0ec39f58e07eb67e040aab0c7a61e1f5a006",
+            "hanji-font-1": "0b3ff986f1e43d7634910d208ef356e05526936e7095111425f7ec13776d8585",
+            "hanji-font-2": "aa4730c0b72ea09194f4ecdc8d1794758bcf84302d2383848c37fe5019453203",
+            "hanji-font-3": "ec564807fa2ad7ce8ca690dcf0b91218cefb6473dc693c53f00d8d2af885dcca",
+            "hanji-font-42": "22d7947731210642c6a2aed8b5ad3403864e506268f324ffcec7a18c6a98a53b",
+            "hanji-font-51": "77afeb5f14aa4086a270996771d58a854f0fc9658b8e98e3ea52f0c64969334d"
+          },
+          {
+            "hanji-font-0": "7052aaaf406db3f6a963f204a9aa74e95dff9973ebac6bcf4476ecdb375d1ef5",
+            "hanji-font-1": "09e774b0623f871e77154fd49ff3a30fbd50e61159a4115029a9927635e15698",
+            "hanji-font-29": "de1a1113e067a38176cca685ca42691c90625550c7c1b60141775b8313c40751",
+            "hanji-font-42": "cf12cac9f0182bde5448c416ceacbe5826906638465157d3fbb9e46f8e232a63",
+            "hanji-font-46": "f7c0e74df8518c9ecda5af910a460399b05b6d4564f46f2c6d136851d4e51724"
+          },
+          {
+            "hanji-font-0": "ba7038f3b23163e4d7219f56d67078a094e90e6eb4fb25c542632e3452e86afd"
+          },
+          {
+            "hanji-font-0": "fa4293ba66f45831516605b5a3e0deacb99bcca912c61a1b0aaf9653023c90ea"
+          },
+          {
+            "hanji-font-0": "fa4293ba66f45831516605b5a3e0deacb99bcca912c61a1b0aaf9653023c90ea"
+          }
+        ],
+        "output_sha256": {
+          "svg/04-docx-untouched-testword-various-r1-page-4.svg": "4d3d76e915074e94706066c000e72fc187c04e667be216c5a4321a442d904425",
+          "svg/04-docx-untouched-testword-various-r1-page-5.svg": "4d1be838f5aea7746005c1197b4f19fd789850d4e99d5fe3e67a1a38a88f5e2c",
+          "svg/04-docx-untouched-testword-various-r1-page-2.svg": "5cd138e01fb514f28fb02a76bfa5d648337f43f8048867905f8f281d0a08fb30",
+          "svg/04-docx-untouched-testword-various-r1-page-3.svg": "9884c8efc2f8b8ea7cd331495ca555ce631ee4405435c367962115bde18bdf4c",
+          "svg/04-docx-untouched-testword-various-r1-page-1.svg": "fea0ecde627efc0c28e0818000982ca26015c39166deb07e933f48c6e06dd120",
+          "png/04-docx-untouched-testword-various-r1-page-1.png": "c2cde8fddb1f3e95191b0fab8c11c2bb112d5613fff5a036cee8c4180f62bb71",
+          "png/04-docx-untouched-testword-various-r1-page-3.png": "7b386e39f9c3e08df9318ae1c3beef41e9e43834b28803b8f996bc0562e1e1ee",
+          "png/04-docx-untouched-testword-various-r1-page-2.png": "f1b551c3f110909d3466e7bc2d212312aa509d7224982cf4395ddbdc5b007860",
+          "png/04-docx-untouched-testword-various-r1-page-5.png": "9baf5a3a6a9d521d959b01b5ebccb4af5695fbe26bad2fbbaa3df1f727db7d5e",
+          "png/04-docx-untouched-testword-various-r1-page-4.png": "9baf5a3a6a9d521d959b01b5ebccb4af5695fbe26bad2fbbaa3df1f727db7d5e",
+          "html/04-docx-untouched-testword-various-r1-preview.html": "30ea8c5aa7a1eedfabe98c165995c69654e015fd66ef9f5de1d57f0804903eef"
+        }
+      }
+    },
+    {
+      "id": "05-docx-untouched-loadandsave",
+      "format": "docx",
+      "input": {
+        "path": "prototype/preview/baseline/05-docx-untouched-loadandsave.docx",
+        "sha256": "78cf1eede6eb638e1da90a09566de6ce710b63c78f7dabf92c2a5a6f55619a95",
+        "bytes": 51866
+      },
+      "features": [
+        "page breaks",
+        "drawings",
+        "math",
+        "footnotes",
+        "header"
+      ],
+      "provenance": {
+        "source": "prototype/remainder/corpus/loadAndSave.docx",
+        "built_by": "kit getput",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Word",
+        "recorded_version": "16.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "05-docx-untouched-loadandsave.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 3,
+        "historical_first_page_size_pt": [
+          419.5,
+          595.2
+        ],
+        "font_identities": [
+          {
+            "family": "Aptos",
+            "sha256": null
+          },
+          {
+            "family": "Aptos-Bold",
+            "sha256": null
+          },
+          {
+            "family": "Aptos-BoldItalic",
+            "sha256": null
+          },
+          {
+            "family": "Aptos-Italic",
+            "sha256": null
+          },
+          {
+            "family": "AptosDisplay",
+            "sha256": null
+          },
+          {
+            "family": "AptosDisplay-Bold",
+            "sha256": null
+          },
+          {
+            "family": "ArialMT",
+            "sha256": null
+          },
+          {
+            "family": "Batang",
+            "sha256": null
+          },
+          {
+            "family": "CambriaMath",
+            "sha256": null
+          },
+          {
+            "family": "TimesNewRomanPSMT",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "historical Word markup-view export; re-export No Markup"
+      },
+      "sets": [
+        "historical-30",
+        "release-12"
+      ],
+      "regression": {
+        "kind": "self-rendered-regression",
+        "renderer_pair": [
+          "f82067c72bb9d2dad82c57c448189a18d67cd6c0",
+          "fed548c9acc3858624320538be0ce96b6ca0c742"
+        ],
+        "pages": 5,
+        "dimensions_pt": [
+          [
+            419.55,
+            595.3
+          ],
+          [
+            419.55,
+            595.3
+          ],
+          [
+            419.55,
+            595.3
+          ],
+          [
+            419.55,
+            595.3
+          ],
+          [
+            419.55,
+            595.3
+          ]
+        ],
+        "diagnostics": {
+          "required": [
+            "DOCX\\ preview\\ is\\ experimental:\\ pagination\\ and\\ Word\\-specific\\ layout\\ may\\ differ\\ from\\ Word;\\ inspect\\ rendering\\ diagnostics\\.",
+            "VML\\ watermark\\ colour\\ \"e00\"\\ is\\ unsupported\\ \\(2\\ occurrences;\\ first\\ at\\ layout\\.diagnostics\\[1\\]\\)",
+            "complex\\ shaping\\ kept\\ searchable\\ text\\ with\\ total\\-advance\\ positioning\\ \\(2\\ occurrences;\\ first\\ at\\ pages\\[1\\]\\.elements\\[47\\]\\.children\\[0\\]\\)",
+            "layout\\.diagnostics\\[0\\]:\\ OfficeMath\\ content\\ at\\ paragraph/run\\-boundary/0/raw\\-child/0\\ was\\ preserved\\ but\\ could\\ not\\ be\\ rendered",
+            "multilingual\\ shaping\\ kept\\ searchable\\ text\\ with\\ browser\\-positioned\\ glyph\\ approximation\\ \\(5\\ occurrences;\\ first\\ at\\ pages\\[1\\]\\.elements\\[43\\]\\.children\\[0\\]\\)"
+          ],
+          "allow": [
+            "DOCX\\ preview\\ is\\ experimental:\\ pagination\\ and\\ Word\\-specific\\ layout\\ may\\ differ\\ from\\ Word;\\ inspect\\ rendering\\ diagnostics\\.",
+            "OfficeMath\\ content\\ at\\ paragraph/run\\-boundary/0/raw\\-child/0\\ was\\ preserved\\ but\\ could\\ not\\ be\\ rendered",
+            "VML\\ watermark\\ colour\\ \"e00\"\\ is\\ unsupported",
+            "VML\\ watermark\\ colour\\ \"e00\"\\ is\\ unsupported\\ \\(2\\ occurrences;\\ first\\ at\\ layout\\.diagnostics\\[1\\]\\)",
+            "complex\\ shaping\\ kept\\ searchable\\ text\\ with\\ total\\-advance\\ positioning",
+            "complex\\ shaping\\ kept\\ searchable\\ text\\ with\\ total\\-advance\\ positioning\\ \\(2\\ occurrences;\\ first\\ at\\ pages\\[1\\]\\.elements\\[47\\]\\.children\\[0\\]\\)",
+            "layout\\.diagnostics\\[0\\]:\\ OfficeMath\\ content\\ at\\ paragraph/run\\-boundary/0/raw\\-child/0\\ was\\ preserved\\ but\\ could\\ not\\ be\\ rendered",
+            "multilingual\\ shaping\\ kept\\ searchable\\ text\\ with\\ browser\\-positioned\\ glyph\\ approximation",
+            "multilingual\\ shaping\\ kept\\ searchable\\ text\\ with\\ browser\\-positioned\\ glyph\\ approximation\\ \\(5\\ occurrences;\\ first\\ at\\ pages\\[1\\]\\.elements\\[43\\]\\.children\\[0\\]\\)"
+          ]
+        },
+        "missing_glyphs": [],
+        "font_identities": {
+          "substituted": [
+            {
+              "requested": "Carlito",
+              "script": "latin",
+              "drawn": "Carlito",
+              "source": "bundled",
+              "metrics": "substitute",
+              "chars": 26,
+              "pages": [
+                1,
+                4,
+                5
+              ]
+            },
+            {
+              "requested": "Cambria Math",
+              "script": "cjk",
+              "drawn": "Apple SD Gothic Neo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 22,
+              "pages": [
+                2
+              ]
+            }
+          ],
+          "drawn_as_requested": [
+            {
+              "requested": "Aptos",
+              "script": "latin",
+              "source": "system",
+              "chars": 425
+            },
+            {
+              "requested": "Aptos Display",
+              "script": "latin",
+              "source": "system",
+              "chars": 63
+            }
+          ],
+          "missing_glyphs": []
+        },
+        "font_hash_scope": "embedded per-page subsets; original output font hashes were not recorded",
+        "font_subset_sha256": [
+          {
+            "hanji-font-0": "412dfe3f6ea6cb6a3b47d18b9020a2e1c72c2e9e4a24dd7165f5dd371ed2d388",
+            "hanji-font-1": "3a0922cb57378061713d62c96cc43e6bbdcdb2df4b96ba540df92b24ad5747ba",
+            "hanji-font-2": "220bf7398a08950e243a4b072267693cbe4d0347a017361b7148dfa556d5da0b",
+            "hanji-font-3": "2b7186686a48e1627030d0f2a26274cb4a4997ad102f3390ab4b8de02c172812",
+            "hanji-font-4": "e7dab9104908b070519bb5bce13eb6ca3b5854b3d0b691b960604228d4ad07db",
+            "hanji-font-5": "da547f10eb47a599dfd25871ffa5f852d27570321d68657c18530c4637c08aa5",
+            "hanji-font-10": "c7a73478e695aca927766c25d08f1c471fa05b3e25f2e1d6660a166187642808"
+          },
+          {
+            "hanji-font-5": "9b1fce7b277d1e5b100cc0aa8550ab4ac89bf5a2a9fef751fa74a0648433e1d5",
+            "hanji-font-6": "59a3abd281e8633dc4b91b8e3a10047ecfedbaf4208858665799dc821cec4fb7",
+            "hanji-font-7": "56f7926f50dee1d3f162c07921247be59a3d2211d7c1f12e307155002a329022"
+          },
+          {
+            "hanji-font-0": "470fdb498cc3656ab756c8e8096ee6078c3084d3a77e6698090423009e874317",
+            "hanji-font-5": "b946b2d3c2b57a1f03f72578d8dba96401eda29a17f4933688f921091d39cc94"
+          },
+          {
+            "hanji-font-0": "7bff5d5bbb5566b119c853871c32413ccdc3c5f78847e24847b70b9d134ae27c",
+            "hanji-font-5": "b946b2d3c2b57a1f03f72578d8dba96401eda29a17f4933688f921091d39cc94",
+            "hanji-font-9": "dc191998938f94f687de10c317155d599147e917be27e441f75836071dd4ca90"
+          },
+          {
+            "hanji-font-5": "d22dd267e735e8253a73315f461718b5174bce5eda50a2f8ed1846f625387ca5",
+            "hanji-font-10": "c7a73478e695aca927766c25d08f1c471fa05b3e25f2e1d6660a166187642808"
+          }
+        ],
+        "output_sha256": {
+          "svg/05-docx-untouched-loadandsave-r1-page-3.svg": "ad8081e4b604e8839342ece5b594375aadb5c2d6197df471ed2b9652ee332648",
+          "svg/05-docx-untouched-loadandsave-r1-page-2.svg": "7743cce9ae4dc645257e1e793a9c93bf4db7b00bac657f9ef593f7f8c318b773",
+          "svg/05-docx-untouched-loadandsave-r1-page-1.svg": "edb3137dab05ad2e6e503dfa448abe2a125d4ea11fec9cc463240c51a6387be4",
+          "svg/05-docx-untouched-loadandsave-r1-page-5.svg": "e109556a5d00e21ea11e61df34e1291c3fef9b99a62b7beaa88e79f72e8c627d",
+          "svg/05-docx-untouched-loadandsave-r1-page-4.svg": "2362b43327e76668453503eee55d2adb2504d9cad4327683b0a8f2408239f7fb",
+          "png/05-docx-untouched-loadandsave-r1-page-4.png": "107cf956bf2e4737bf2f52da01318485245f752286066a2fffb8d0c9078da3e3",
+          "png/05-docx-untouched-loadandsave-r1-page-5.png": "9bff7747f1e7fe04775149b9abb77806556486ab0265c6995319c2378c41d437",
+          "png/05-docx-untouched-loadandsave-r1-page-1.png": "0221ac2333c7e7b6f1104968ca79f2fa6546409dfea737c87911685c9aac6c6e",
+          "png/05-docx-untouched-loadandsave-r1-page-2.png": "a6189b15b5f283ba571126ec6a32b9a843a58f9ba9e7a943d77296a8e7978668",
+          "png/05-docx-untouched-loadandsave-r1-page-3.png": "dc79bf2302ee14c94a0155c040f017094269a16a837c5b02d06e887da3b7a6b9",
+          "html/05-docx-untouched-loadandsave-r1-preview.html": "e0e8a1b234b8428210e27d52ecb212d4216c046a9be96420026de00462994784"
+        }
+      }
+    },
+    {
+      "id": "06-docx-edited-korean-report-e10",
+      "format": "docx",
+      "input": {
+        "path": "prototype/preview/baseline/06-docx-edited-korean-report-e10.docx",
+        "sha256": "36eacabef3b2cb6f8aabba240966a337db1f96eafad01583ba60f3e9a1d6536d",
+        "bytes": 11800
+      },
+      "features": [
+        "Korean",
+        "edited"
+      ],
+      "provenance": {
+        "source": "prototype/remainder/corpus/korean-report.docx",
+        "built_by": "kit e10",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156",
+        "edits_file": "edits/06-docx-edited-korean-report-e10.edits.md",
+        "edit": "E1-E9 + F1-F4 in one revision, direct (not tracked): figure change, inserted/deleted/moved/split/merged paragraphs, restyle, table cell edit, first-line indent, Heading 2 restyled, new Callout style, header-row fill"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Word",
+        "recorded_version": "16.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "06-docx-edited-korean-report-e10.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 2,
+        "historical_first_page_size_pt": [
+          595.2,
+          841.9
+        ],
+        "font_identities": [
+          {
+            "family": "Batang",
+            "sha256": null
+          },
+          {
+            "family": "TimesNewRomanPS-BoldMT",
+            "sha256": null
+          },
+          {
+            "family": "TimesNewRomanPS-ItalicMT",
+            "sha256": null
+          },
+          {
+            "family": "TimesNewRomanPSMT",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "historical Word markup-view export; re-export No Markup"
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "07-docx-edited-sample-docx-e10",
+      "format": "docx",
+      "input": {
+        "path": "prototype/preview/baseline/07-docx-edited-sample-docx-e10.docx",
+        "sha256": "040a2691b1292d950c1ab0eeffb4352284ceb186a8e92296809c08c4c43d9360",
+        "bytes": 138581
+      },
+      "features": [
+        "Latin",
+        "edited",
+        "multi-page"
+      ],
+      "provenance": {
+        "source": "prototype/remainder/corpus/sample-docx.docx",
+        "built_by": "kit e10",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156",
+        "edits_file": "edits/07-docx-edited-sample-docx-e10.edits.md",
+        "edit": "E1-E9 + F1-F4 in one revision, direct (not tracked): incl. a section moved, edit across a run boundary, Heading 1 restyled, Callout style, header-row fill"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Word",
+        "recorded_version": "16.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "07-docx-edited-sample-docx-e10.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 4,
+        "historical_first_page_size_pt": [
+          595.4,
+          841.9
+        ],
+        "font_identities": [
+          {
+            "family": "Arial-Black",
+            "sha256": null
+          },
+          {
+            "family": "ArialMT",
+            "sha256": null
+          },
+          {
+            "family": "Batang",
+            "sha256": null
+          },
+          {
+            "family": "Calibri",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Bold",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Italic",
+            "sha256": null
+          },
+          {
+            "family": "Cambria",
+            "sha256": null
+          },
+          {
+            "family": "Cambria-Bold",
+            "sha256": null
+          },
+          {
+            "family": "CourierNewPSMT",
+            "sha256": null
+          },
+          {
+            "family": "SymbolMT",
+            "sha256": null
+          },
+          {
+            "family": "Tahoma-Bold",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "historical Word markup-view export; re-export No Markup"
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "08-docx-new-report-en",
+      "format": "docx",
+      "input": {
+        "path": "prototype/preview/baseline/08-docx-new-report-en.docx",
+        "sha256": "d19f0bd5bceb991c3dea15cc8d2d7f5b65a3e653c434977ebf04cb66830cc173",
+        "bytes": 3979
+      },
+      "features": [
+        "new",
+        "Latin"
+      ],
+      "provenance": {
+        "source": "hanji-store blank docx (crates/hanji-store) + validation/office-kit NEW_EN text",
+        "built_by": "kit new",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156",
+        "edits_file": "edits/08-docx-new-report-en.edits.md",
+        "edit": "new report: headings, lists, emphasis, a merged table"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Word",
+        "recorded_version": "16.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "08-docx-new-report-en.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 1,
+        "historical_first_page_size_pt": [
+          595.2,
+          841.9
+        ],
+        "font_identities": [
+          {
+            "family": "ArialMT",
+            "sha256": null
+          },
+          {
+            "family": "Calibri",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Bold",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Italic",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30",
+        "release-12"
+      ],
+      "regression": {
+        "kind": "self-rendered-regression",
+        "renderer_pair": [
+          "f82067c72bb9d2dad82c57c448189a18d67cd6c0",
+          "fed548c9acc3858624320538be0ce96b6ca0c742"
+        ],
+        "pages": 1,
+        "dimensions_pt": [
+          [
+            595.3,
+            841.9
+          ]
+        ],
+        "diagnostics": {
+          "required": [
+            "DOCX\\ preview\\ is\\ experimental:\\ pagination\\ and\\ Word\\-specific\\ layout\\ may\\ differ\\ from\\ Word;\\ inspect\\ rendering\\ diagnostics\\."
+          ],
+          "allow": [
+            "DOCX\\ preview\\ is\\ experimental:\\ pagination\\ and\\ Word\\-specific\\ layout\\ may\\ differ\\ from\\ Word;\\ inspect\\ rendering\\ diagnostics\\."
+          ]
+        },
+        "missing_glyphs": [],
+        "font_identities": {
+          "substituted": [
+            {
+              "requested": "Calibri",
+              "script": "latin",
+              "drawn": "Carlito",
+              "source": "bundled",
+              "metrics": "compatible:Carlito",
+              "chars": 275,
+              "pages": [
+                1
+              ]
+            }
+          ],
+          "drawn_as_requested": [
+            {
+              "requested": "Arial",
+              "script": "latin",
+              "source": "system",
+              "chars": 7
+            }
+          ],
+          "missing_glyphs": []
+        },
+        "font_hash_scope": "embedded per-page subsets; original output font hashes were not recorded",
+        "font_subset_sha256": [
+          {
+            "hanji-font-0": "9c3d29c19394e67c4227cdf7646e0b0bab24a51fbd35e10251d58fe384daa726",
+            "hanji-font-1": "38a71c1ac7d1ea6c49ba714b2ae90424b05728d1699141c13999800ad5f00090",
+            "hanji-font-2": "b5b414f2d415a1d80588686a8ca4af033b479d2b6ae604568384a1dd1314f400",
+            "hanji-font-3": "c3c157c204f124bdaf3d3224188ac7f35ca4778469cad53226c7fd128912f539"
+          }
+        ],
+        "output_sha256": {
+          "svg/08-docx-new-report-en-r1-page-1.svg": "cffd293708de5f6da97499a9fa4a22e12691087d8088a894cc85fd5a2722881b",
+          "png/08-docx-new-report-en-r1-page-1.png": "a99b927edb1f393cd9e3bd4d132d4e31fa75f12cc625e5d5382828aec14c5f41",
+          "html/08-docx-new-report-en-r1-preview.html": "99097acd1e235da24882041eec75874fb12cca2f580492b279aec03ce4fc7711"
+        }
+      }
+    },
+    {
+      "id": "09-docx-new-report-ko",
+      "format": "docx",
+      "input": {
+        "path": "prototype/preview/baseline/09-docx-new-report-ko.docx",
+        "sha256": "22578bb890e5f15f6b5c9cb6856e8258d4569f637c7c582da0b3994ce8cc76b5",
+        "bytes": 4044
+      },
+      "features": [
+        "new",
+        "Korean"
+      ],
+      "provenance": {
+        "source": "hanji-store blank docx (crates/hanji-store) + validation/office-kit NEW_KO text",
+        "built_by": "kit new",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156",
+        "edits_file": "edits/09-docx-new-report-ko.edits.md",
+        "edit": "new Korean report (DESIGN.md 5.2 example)"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Word",
+        "recorded_version": "16.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "09-docx-new-report-ko.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 1,
+        "historical_first_page_size_pt": [
+          595.2,
+          841.9
+        ],
+        "font_identities": [
+          {
+            "family": "ArialMT",
+            "sha256": null
+          },
+          {
+            "family": "Calibri",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Bold",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Italic",
+            "sha256": null
+          },
+          {
+            "family": "MalgunGothic",
+            "sha256": null
+          },
+          {
+            "family": "MalgunGothicBold",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "10-pptx-untouched-korean-deck",
+      "format": "pptx",
+      "input": {
+        "path": "prototype/preview/baseline/10-pptx-untouched-korean-deck.pptx",
+        "sha256": "b2bd8243ffb47e159039e0e92b6a9f02833191292c8ede507edeae54e2cc91c8",
+        "bytes": 42057
+      },
+      "features": [
+        "Korean",
+        "7 slides",
+        "bullets",
+        "table",
+        "picture"
+      ],
+      "provenance": {
+        "source": "crates/hanji-pptx/corpus/korean-deck.pptx",
+        "built_by": "kit getput",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "PowerPoint",
+        "recorded_version": "6.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "PowerPoint/Excel leading major version conflicts with SPIKE.md; owner confirmation required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "10-pptx-untouched-korean-deck.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 7,
+        "historical_first_page_size_pt": [
+          720.0,
+          540.0
+        ],
+        "font_identities": [
+          {
+            "family": "ArialMT",
+            "sha256": null
+          },
+          {
+            "family": "Calibri",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Bold",
+            "sha256": null
+          },
+          {
+            "family": "MalgunGothic",
+            "sha256": null
+          },
+          {
+            "family": "MalgunGothicBold",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "11-pptx-untouched-shapes",
+      "format": "pptx",
+      "input": {
+        "path": "prototype/preview/baseline/11-pptx-untouched-shapes.pptx",
+        "sha256": "ec44fe23b9f192e8afeb006053e67e07841c77764160c128a41025f09b697fc6",
+        "bytes": 63930
+      },
+      "features": [
+        "groups",
+        "tables",
+        "a picture (6 slides)"
+      ],
+      "provenance": {
+        "source": "crates/hanji-pptx/corpus/shapes.pptx",
+        "built_by": "kit getput",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "PowerPoint",
+        "recorded_version": "6.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "PowerPoint/Excel leading major version conflicts with SPIKE.md; owner confirmation required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "11-pptx-untouched-shapes.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 6,
+        "historical_first_page_size_pt": [
+          720.0,
+          540.0
+        ],
+        "font_identities": [
+          {
+            "family": "Calibri",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Bold",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "12-pptx-untouched-onlyoffice-sample",
+      "format": "pptx",
+      "input": {
+        "path": "prototype/preview/baseline/12-pptx-untouched-onlyoffice-sample.pptx",
+        "sha256": "fc0ecda4a1377cffef344db76c77e47ca3aa496694d7d3a0261a7907fb29bcb6",
+        "bytes": 82357
+      },
+      "features": [
+        "designed template: 210 objects",
+        "nested groups",
+        "rotation",
+        "theme fills",
+        "chart"
+      ],
+      "provenance": {
+        "source": "crates/hanji-pptx/corpus/audit/onlyoffice-sample.pptx",
+        "built_by": "kit getput",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "PowerPoint",
+        "recorded_version": "6.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "PowerPoint/Excel leading major version conflicts with SPIKE.md; owner confirmation required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "12-pptx-untouched-onlyoffice-sample.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 7,
+        "historical_first_page_size_pt": [
+          959.8,
+          540.0
+        ],
+        "font_identities": [
+          {
+            "family": "Arial-BoldItalicMT",
+            "sha256": null
+          },
+          {
+            "family": "Arial-BoldMT",
+            "sha256": null
+          },
+          {
+            "family": "Arial-ItalicMT",
+            "sha256": null
+          },
+          {
+            "family": "ArialMT",
+            "sha256": null
+          },
+          {
+            "family": "CourierNewPSMT",
+            "sha256": null
+          },
+          {
+            "family": "OpenSans-Bold",
+            "sha256": null
+          },
+          {
+            "family": "TimesNewRomanPS-BoldItalicMT",
+            "sha256": null
+          },
+          {
+            "family": "TimesNewRomanPS-BoldMT",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30",
+        "release-12"
+      ],
+      "regression": {
+        "kind": "self-rendered-regression",
+        "renderer_pair": [
+          "f82067c72bb9d2dad82c57c448189a18d67cd6c0",
+          "fed548c9acc3858624320538be0ce96b6ca0c742"
+        ],
+        "pages": 7,
+        "dimensions_pt": [
+          [
+            960.0,
+            540.0
+          ],
+          [
+            960.0,
+            540.0
+          ],
+          [
+            960.0,
+            540.0
+          ],
+          [
+            960.0,
+            540.0
+          ],
+          [
+            960.0,
+            540.0
+          ],
+          [
+            960.0,
+            540.0
+          ],
+          [
+            960.0,
+            540.0
+          ]
+        ],
+        "diagnostics": {
+          "required": [
+            "1\\ text\\ runs\\ in\\ groups\\ retain\\ rpptx's\\ precomputed\\ line\\ breaks\\ and\\ origins;\\ ordinary\\ glyph\\ runs\\ use\\ the\\ selected\\ drawing\\ font's\\ advances",
+            "layout\\.diagnostics\\[4\\]:\\ unsupported\\ chart\\ rendered\\ as\\ labelled\\ placeholder:\\ ChartML\\ c:ser\\[0\\]\\ direct\\ fill\\ paint\\ has\\ invalid\\ value:\\ unsupported\\ gradient\\ paint",
+            "layout\\.diagnostics\\[5\\]:\\ unsupported\\ chart\\ content\\ retained\\ as\\ bounds",
+            "preset\\ geometry\\ `round2SameRect`\\ evaluation\\ failed:\\ cannot\\ resolve\\ preset\\ geometry\\ to\\ a\\ concrete\\ value:\\ arc\\ radii\\ must\\ be\\ positive;\\ retained\\ as\\ shape\\ bounds\\ \\(7\\ occurrences;\\ first\\ at\\ layout\\.diagnostics\\[0\\]\\)"
+          ],
+          "allow": [
+            "1\\ text\\ runs\\ in\\ groups\\ retain\\ rpptx's\\ precomputed\\ line\\ breaks\\ and\\ origins;\\ ordinary\\ glyph\\ runs\\ use\\ the\\ selected\\ drawing\\ font's\\ advances",
+            "layout\\.diagnostics\\[4\\]:\\ unsupported\\ chart\\ rendered\\ as\\ labelled\\ placeholder:\\ ChartML\\ c:ser\\[0\\]\\ direct\\ fill\\ paint\\ has\\ invalid\\ value:\\ unsupported\\ gradient\\ paint",
+            "layout\\.diagnostics\\[5\\]:\\ unsupported\\ chart\\ content\\ retained\\ as\\ bounds",
+            "preset\\ geometry\\ `round2SameRect`\\ evaluation\\ failed:\\ cannot\\ resolve\\ preset\\ geometry\\ to\\ a\\ concrete\\ value:\\ arc\\ radii\\ must\\ be\\ positive;\\ retained\\ as\\ shape\\ bounds",
+            "preset\\ geometry\\ `round2SameRect`\\ evaluation\\ failed:\\ cannot\\ resolve\\ preset\\ geometry\\ to\\ a\\ concrete\\ value:\\ arc\\ radii\\ must\\ be\\ positive;\\ retained\\ as\\ shape\\ bounds\\ \\(7\\ occurrences;\\ first\\ at\\ layout\\.diagnostics\\[0\\]\\)",
+            "unsupported\\ chart\\ content\\ retained\\ as\\ bounds",
+            "unsupported\\ chart\\ rendered\\ as\\ labelled\\ placeholder:\\ ChartML\\ c:ser\\[0\\]\\ direct\\ fill\\ paint\\ has\\ invalid\\ value:\\ unsupported\\ gradient\\ paint"
+          ]
+        },
+        "missing_glyphs": [],
+        "font_identities": {
+          "substituted": [
+            {
+              "requested": "Open Sans",
+              "script": "latin",
+              "drawn": "Carlito",
+              "source": "bundled",
+              "metrics": "substitute",
+              "chars": 5,
+              "pages": [
+                4
+              ]
+            }
+          ],
+          "drawn_as_requested": [
+            {
+              "requested": "Arial",
+              "script": "latin",
+              "source": "system",
+              "chars": 2483
+            },
+            {
+              "requested": "Carlito",
+              "script": "latin",
+              "source": "bundled",
+              "chars": 16
+            },
+            {
+              "requested": "Courier New",
+              "script": "latin",
+              "source": "system",
+              "chars": 12
+            },
+            {
+              "requested": "Times New Roman",
+              "script": "latin",
+              "source": "system",
+              "chars": 63
+            }
+          ],
+          "missing_glyphs": []
+        },
+        "font_hash_scope": "embedded per-page subsets; original output font hashes were not recorded",
+        "font_subset_sha256": [
+          {
+            "hanji-font-2": "067b81ea3eaa813a2c415d2c90fe58091da488acbe11635a05b8d8aa29f24de7",
+            "hanji-font-3": "acab278d17368dc1e29768f51343ed714e5cafa606a3b947560482fa98508c15",
+            "hanji-font-4": "6279964dc8427a06d54113a429826ed662a7cd74440a6ed491cac22260d2fcd6"
+          },
+          {
+            "hanji-font-2": "fad49540be92643ef30ce5ea48b75db95187ce5ef140a989fdc824a895226ba6",
+            "hanji-font-3": "34d2f5c5bd169c0df197c59daa38e2de2461aac93274c0eba5f60cccabc315e0",
+            "hanji-font-5": "d6e42a8c2371ec5a9cfc76c8a3d949365f8be1ea7fa6f135404b09c0696f6439",
+            "hanji-font-6": "ef4662969827cc5c1e751b0cb3c3fd8209e18f4fab09bb9c45134e99e6d3bbb6",
+            "hanji-font-7": "214c8fb92edba58f4858f446a003b0bf222ce9efb61f5cf4af8518776cf5a27c",
+            "hanji-font-8": "2802b33fa592ccab944bd75c94e3b669926d850c7d3acebf54b46f0212eb034c"
+          },
+          {
+            "hanji-font-2": "34d9dfc9b6ad7b8c2be928af157a6415214015c23a1fad702d8fc81dc05441f4",
+            "hanji-font-3": "34d2f5c5bd169c0df197c59daa38e2de2461aac93274c0eba5f60cccabc315e0",
+            "hanji-font-5": "d6e42a8c2371ec5a9cfc76c8a3d949365f8be1ea7fa6f135404b09c0696f6439",
+            "hanji-font-6": "ef4662969827cc5c1e751b0cb3c3fd8209e18f4fab09bb9c45134e99e6d3bbb6",
+            "hanji-font-7": "214c8fb92edba58f4858f446a003b0bf222ce9efb61f5cf4af8518776cf5a27c"
+          },
+          {
+            "hanji-font-1": "96e9d9581002b6a1f943c9a4589f59d713f1cc90fc979604c0a6b730f04a9695",
+            "hanji-font-2": "84313c0b9d7a8dbbc38088d12da83420844c83fbab5e18d21e2bc438fdd5b59e",
+            "hanji-font-3": "34d2f5c5bd169c0df197c59daa38e2de2461aac93274c0eba5f60cccabc315e0",
+            "hanji-font-5": "d3307b690f8d64adb7622804c596a121439fb5512d3970dd81f7b0b06fdb2b07",
+            "hanji-font-6": "ef4662969827cc5c1e751b0cb3c3fd8209e18f4fab09bb9c45134e99e6d3bbb6",
+            "hanji-font-7": "a725d08228f68bc5b6227eb874878a06ca9c15d4bcd8b4f9c581b391309c24f5",
+            "hanji-font-9": "ebef0d3f095f5feae2966d55902abd786b3bdc7c4f4147d2f0c171bbc631d5b6"
+          },
+          {
+            "hanji-font-2": "5481bcda97ca44a17f7362ab6c7bb309285deb2e5c58d8d032daa3aa5fbf14f7",
+            "hanji-font-3": "34d2f5c5bd169c0df197c59daa38e2de2461aac93274c0eba5f60cccabc315e0",
+            "hanji-font-5": "c806f6b562c0815cb52c74cde4606b4da90a188e75dd5345d3b29823c8a31abf",
+            "hanji-font-6": "ef4662969827cc5c1e751b0cb3c3fd8209e18f4fab09bb9c45134e99e6d3bbb6",
+            "hanji-font-7": "42389c89657b69f5b4f0952db77cbb6f4615eafc3c30372583fc095c12d24d61"
+          },
+          {
+            "hanji-font-2": "1e14bf531c2ea7e21a99075906cf1887a541f33779c56a85688e0b41e82187cd",
+            "hanji-font-3": "34d2f5c5bd169c0df197c59daa38e2de2461aac93274c0eba5f60cccabc315e0",
+            "hanji-font-5": "6bf56f123d958bd7096d8f30818ea6b6920b3fb616bf5cf5de1fea8fd04105f3",
+            "hanji-font-7": "247641f66821f08f4c246e5bc36ebe35c271d8cffbd8b5f792fcbffef82e9b9b"
+          },
+          {
+            "hanji-font-2": "61fc2092c1bda68654fc8e0cbed7efafda0956d8042a19c38a3ff0a74ff557d9",
+            "hanji-font-3": "2169158f22e3892dc32b662dfd43c8cf9352a408b258b18100e208724b88313c",
+            "hanji-font-5": "09d1acfee3071ae0b9be39ac480c875dd3e4937c420ce1702c5007634f3e9d7d",
+            "hanji-font-10": "8a6d1467d07e9dd61abbd893ae001d34556024146f368375f5ed7eb4b8655549"
+          }
+        ],
+        "output_sha256": {
+          "svg/12-pptx-untouched-onlyoffice-sample-r1-slide-1.svg": "e4ad04cd6e8a28692c82ff52c53817803ee42d1faf4074f43c47c793953bbf9b",
+          "svg/12-pptx-untouched-onlyoffice-sample-r1-slide-2.svg": "2cf5d489422c9e65b8c66d08b624df459ee310d63f350a09112207f5585ea2ea",
+          "svg/12-pptx-untouched-onlyoffice-sample-r1-slide-3.svg": "33762a3ce89bb318a09d645c6498fe3af8c4dcb044899c859affedb382c52474",
+          "svg/12-pptx-untouched-onlyoffice-sample-r1-slide-7.svg": "b41901ed1089c37227f6a98159870c1c7173b3bd377cf29ad7540f53ca1d27d6",
+          "svg/12-pptx-untouched-onlyoffice-sample-r1-slide-6.svg": "20f217dc5f37caf8bf24fd29fa8dc5f8f1e909f3e2d05b16b9947375ee753671",
+          "svg/12-pptx-untouched-onlyoffice-sample-r1-slide-4.svg": "24e11317edcb7a76f461bdc6eeaf39a3d46c334087f674e505f6052c1813eac5",
+          "svg/12-pptx-untouched-onlyoffice-sample-r1-slide-5.svg": "eb3214b0a4bd8c49c87d76fa016c18c7301716825458f097b0c1389d0e6c8cc0",
+          "png/12-pptx-untouched-onlyoffice-sample-r1-slide-5.png": "12d9c75b967f1c73de003079f76c5d2bf79b3681d80623861ef7608e46e0f93b",
+          "png/12-pptx-untouched-onlyoffice-sample-r1-slide-4.png": "c7b6bfd6f81a08ae8f675a70083272e671723246852acec209e1acd1221febb0",
+          "png/12-pptx-untouched-onlyoffice-sample-r1-slide-6.png": "a3a092e1eb4b2dc494ff228609bb934c212de8a27332ad1f4a43680799367b8b",
+          "png/12-pptx-untouched-onlyoffice-sample-r1-slide-7.png": "ab1d41c62df0db574bc547208e585af5a0570cc06bcda602550578fe4d07a199",
+          "png/12-pptx-untouched-onlyoffice-sample-r1-slide-3.png": "355aef14fa8100c18aeceab5678ea4e29109ca6fb47a18485eba59c76f359f87",
+          "png/12-pptx-untouched-onlyoffice-sample-r1-slide-2.png": "9212e3cb30477d9e062590bf631b47332d86f252bd41381c1915fc327ad90cc6",
+          "png/12-pptx-untouched-onlyoffice-sample-r1-slide-1.png": "2bc01269ab9799fc0c46698ab317fcd3a4955b1ca393836f1330fa664184e7ab",
+          "html/12-pptx-untouched-onlyoffice-sample-r1-preview.html": "ec12b5dad1a1ed22c11a8e198fa3f742fc5a66190f65242eb8a23aaf0f8ca14d"
+        }
+      }
+    },
+    {
+      "id": "13-pptx-untouched-modern-pitch",
+      "format": "pptx",
+      "input": {
+        "path": "prototype/preview/baseline/13-pptx-untouched-modern-pitch.pptx",
+        "sha256": "4e5538e7e37206c6a219817637d48d14d31c21df8a293754c51d3b8d5ed9f390",
+        "bytes": 83405
+      },
+      "features": [
+        "full-bleed photo",
+        "cropped/masked pictures",
+        "shadows",
+        "rotation",
+        "groups"
+      ],
+      "provenance": {
+        "source": "crates/hanji-pptx/corpus/audit/synth-modern-pitch.pptx",
+        "built_by": "kit getput",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "PowerPoint",
+        "recorded_version": "6.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "PowerPoint/Excel leading major version conflicts with SPIKE.md; owner confirmation required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "13-pptx-untouched-modern-pitch.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 8,
+        "historical_first_page_size_pt": [
+          959.8,
+          540.0
+        ],
+        "font_identities": [
+          {
+            "family": "Calibri",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Bold",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "14-pptx-untouched-korean-report-deck",
+      "format": "pptx",
+      "input": {
+        "path": "prototype/preview/baseline/14-pptx-untouched-korean-report-deck.pptx",
+        "sha256": "e903070887783604e00d2b5a019ea9d71ca6ebd408aef8ba417cc28ad4cee085",
+        "bytes": 47096
+      },
+      "features": [
+        "Korean (맑은 고딕)",
+        "chevrons",
+        "org chart with connectors",
+        "masked photo",
+        "doughnut chart"
+      ],
+      "provenance": {
+        "source": "crates/hanji-pptx/corpus/audit/synth-korean-report.pptx",
+        "built_by": "cli open+export (--acknowledge-surfaced: core.xml lastModifiedBy)",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [
+        {
+          "id": "category-0",
+          "page": 6,
+          "value": "구독",
+          "minimum_count": 1
+        },
+        {
+          "id": "category-1",
+          "page": 6,
+          "value": "라이선스",
+          "minimum_count": 1
+        },
+        {
+          "id": "category-2",
+          "page": 6,
+          "value": "서비스",
+          "minimum_count": 1
+        }
+      ],
+      "critical_assertions_status": "curated_chart_category_checks_only",
+      "native_reference": {
+        "app": "PowerPoint",
+        "recorded_version": "6.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "PowerPoint/Excel leading major version conflicts with SPIKE.md; owner confirmation required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "14-pptx-untouched-korean-report-deck.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 6,
+        "historical_first_page_size_pt": [
+          959.8,
+          540.0
+        ],
+        "font_identities": [
+          {
+            "family": "ArialMT",
+            "sha256": null
+          },
+          {
+            "family": "Calibri",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Bold",
+            "sha256": null
+          },
+          {
+            "family": "MalgunGothic",
+            "sha256": null
+          },
+          {
+            "family": "MalgunGothicBold",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30",
+        "release-12"
+      ],
+      "regression": {
+        "kind": "self-rendered-regression",
+        "renderer_pair": [
+          "f82067c72bb9d2dad82c57c448189a18d67cd6c0",
+          "fed548c9acc3858624320538be0ce96b6ca0c742"
+        ],
+        "pages": 6,
+        "dimensions_pt": [
+          [
+            960.0,
+            540.0
+          ],
+          [
+            960.0,
+            540.0
+          ],
+          [
+            960.0,
+            540.0
+          ],
+          [
+            960.0,
+            540.0
+          ],
+          [
+            960.0,
+            540.0
+          ],
+          [
+            960.0,
+            540.0
+          ]
+        ],
+        "diagnostics": {
+          "required": [
+            "3\\ text\\ runs\\ in\\ groups\\ retain\\ rpptx's\\ precomputed\\ line\\ breaks\\ and\\ origins;\\ ordinary\\ glyph\\ runs\\ use\\ the\\ selected\\ drawing\\ font's\\ advances"
+          ],
+          "allow": [
+            "3\\ text\\ runs\\ in\\ groups\\ retain\\ rpptx's\\ precomputed\\ line\\ breaks\\ and\\ origins;\\ ordinary\\ glyph\\ runs\\ use\\ the\\ selected\\ drawing\\ font's\\ advances"
+          ]
+        },
+        "missing_glyphs": [],
+        "font_identities": {
+          "substituted": [
+            {
+              "requested": "맑은 고딕",
+              "script": "hangul",
+              "drawn": "Apple SD Gothic Neo",
+              "source": "system",
+              "metrics": "table",
+              "chars": 124,
+              "pages": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            {
+              "requested": "Calibri",
+              "script": "latin",
+              "drawn": "Carlito",
+              "source": "bundled",
+              "metrics": "compatible:Carlito",
+              "chars": 24,
+              "pages": [
+                2,
+                3,
+                4
+              ]
+            },
+            {
+              "requested": "Carlito",
+              "script": "hangul",
+              "drawn": "Apple SD Gothic Neo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 9,
+              "pages": [
+                6
+              ]
+            }
+          ],
+          "drawn_as_requested": [
+            {
+              "requested": "Arial",
+              "script": "latin",
+              "source": "system",
+              "chars": 4
+            },
+            {
+              "requested": "Noto Sans Arabic",
+              "script": "latin",
+              "source": "bundled",
+              "chars": 19
+            },
+            {
+              "requested": "Pretendard",
+              "script": "latin",
+              "source": "system",
+              "chars": 8
+            }
+          ],
+          "missing_glyphs": []
+        },
+        "font_hash_scope": "embedded per-page subsets; original output font hashes were not recorded",
+        "font_subset_sha256": [
+          {
+            "hanji-font-4": "fe62ef359fdcc41f07fe4867e715a67e58516b6ebaeaf66b9cff514d03b1361a",
+            "hanji-font-5": "3e79780c60f4fea4ba574c4c2a03eb18cde32fe85b9e6b4ae079bfc685ef2dce",
+            "hanji-font-6": "aa2d3d47356db3d0939c0c934845e623f1aa652892fb50064296ecdc35e581cf",
+            "hanji-font-8": "70e9d152ba48ac4b2037d332ce64abb5357ea7dec6746cf41e020a37b5c90328"
+          },
+          {
+            "hanji-font-5": "d38965dc252e408f79240030d4641fcfaeb0976510fe698335c2acc5476cb8cc",
+            "hanji-font-6": "0376c9f1f2ee653830897971d0a52871aa4152f045b2273986baf7f638ecb8f7",
+            "hanji-font-9": "2b087cbc849a55620ea027f3605c4fac6c377613c3bdb29efac5bbdcf6fe5175",
+            "hanji-font-10": "b48f09dbca5e5692dc352bba533c73ec2339e4d17157712418fa0e27ed622016"
+          },
+          {
+            "hanji-font-2": "7c677e95021aafc35d3201a652083cf66368913f159efa5acdb0c9147f30cbbd",
+            "hanji-font-6": "f8aa4cbea2fc3c50fe0b5db6732da33395f13598c252b73ab6ef8ee0e69b950f"
+          },
+          {
+            "hanji-font-2": "db0df4c9cb9f52271c0eff820a09d218ad014e2b91f27d23eac47ac5db58f8b6",
+            "hanji-font-6": "cd1570933de51b6d16fb1878323f335bbf35a39a5c676cddd87944b3bad93efa",
+            "hanji-font-11": "80ac5cf529b633ddd3c071a2e5602470b7d5b916713b052a55263fee10b3f15f"
+          },
+          {
+            "hanji-font-5": "7fe260371fd66478e21b515f2a889417c9ccadec2b8359613e66a8b14a0d02ee",
+            "hanji-font-6": "81e61215262a4a6be0bea33a2fa0f6b7af646de8ca738dcfd891b0c5adff9f0e"
+          },
+          {
+            "hanji-font-1": "790740ba2bd3bc5fc0b2958d6ae39704fff9cc7711a25b6df50df3eae83a55dd",
+            "hanji-font-6": "bc1bce501d8363531e534d279d333fd9aa0353bba362640b1a3cddbe51d632ac",
+            "hanji-font-8": "d142e89d268fa56b5e21818286f4304b67b6ef4607379953886967e267f0bce3"
+          }
+        ],
+        "output_sha256": {
+          "svg/14-pptx-untouched-korean-report-deck-r1-slide-5.svg": "6b0389930ad552fadaf2f909f0a3bb5a06c5eb8d581068c204a7f24b210b7e1b",
+          "svg/14-pptx-untouched-korean-report-deck-r1-slide-4.svg": "d9606518a2716b921d1f9ecb6cb3960575ab1508a7a67759b8f0d5f275bb1747",
+          "svg/14-pptx-untouched-korean-report-deck-r1-slide-6.svg": "0eb88a0ddfb8ee054622fa47463cc4e1805063ab390264e6bced25045108fd93",
+          "svg/14-pptx-untouched-korean-report-deck-r1-slide-3.svg": "0fd5222efcecd79df9e4edc98d1711777aa44a7f7dec198dc12bcac6f50297ea",
+          "svg/14-pptx-untouched-korean-report-deck-r1-slide-2.svg": "2d8808f36cf938de054b011d8ce5c3b0918bc82806b871fc4ace2e897581ca74",
+          "svg/14-pptx-untouched-korean-report-deck-r1-slide-1.svg": "468799c6593ba196d2d0a026a683cea1f159cbc5601f6125048b7573c13e746d",
+          "png/14-pptx-untouched-korean-report-deck-r1-slide-1.png": "9b826e6a3208b483ffdb26fbfba62e97b51baf3f58c469542b0cbae91771258e",
+          "png/14-pptx-untouched-korean-report-deck-r1-slide-2.png": "63a232d5b48822b7addab380ea7a9abd912d799021d6d31fac8b2c8954b40e73",
+          "png/14-pptx-untouched-korean-report-deck-r1-slide-3.png": "c67f15c96eebe511ebcf5068003e5b9006ca60cc6894f81368bf5cac74b602e7",
+          "png/14-pptx-untouched-korean-report-deck-r1-slide-6.png": "4b0e33ba0e2e34a4807cb8b49258f1f1c6565821aff468a87b4d08ae00379527",
+          "png/14-pptx-untouched-korean-report-deck-r1-slide-4.png": "da3f3dd0997c209563af43d971d51cfb8ae55d55f945778496423fbf5f409fd9",
+          "png/14-pptx-untouched-korean-report-deck-r1-slide-5.png": "b89d33d9dc1e4497cfbf1724ab6758cfe86f40b4616006c63f22442962d53385",
+          "html/14-pptx-untouched-korean-report-deck-r1-preview.html": "0630a20f615cdc18910b309cde7d9fd98fe246f56e0f5ef866f7cdf889babb61"
+        }
+      },
+      "non_overlap": [
+        [
+          "category-0",
+          "category-1"
+        ],
+        [
+          "category-1",
+          "category-2"
+        ]
+      ]
+    },
+    {
+      "id": "15-pptx-edited-korean-deck-pset",
+      "format": "pptx",
+      "input": {
+        "path": "prototype/preview/baseline/15-pptx-edited-korean-deck-pset.pptx",
+        "sha256": "e9346c0a35856e23e48b1aa5da64745c232b2e2415c6f4a81f217739e5680105",
+        "bytes": 41181
+      },
+      "features": [
+        "Korean",
+        "edited"
+      ],
+      "provenance": {
+        "source": "crates/hanji-pptx/corpus/korean-deck.pptx",
+        "built_by": "kit pset",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156",
+        "edits_file": "edits/15-pptx-edited-korean-deck-pset.edits.md",
+        "edit": "pptx edit set: title/bullet/notes edits, slide added/deleted/moved, layout changed, table deleted, z-order, shape moved, picture resized/cropped/ellipse-masked, text box added, run 24pt coral, font changed, fill set/cleared, dashed outline, shadow"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "PowerPoint",
+        "recorded_version": "6.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "PowerPoint/Excel leading major version conflicts with SPIKE.md; owner confirmation required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "15-pptx-edited-korean-deck-pset.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 7,
+        "historical_first_page_size_pt": [
+          720.0,
+          540.0
+        ],
+        "font_identities": [
+          {
+            "family": "ArialMT",
+            "sha256": null
+          },
+          {
+            "family": "Calibri",
+            "sha256": null
+          },
+          {
+            "family": "MalgunGothic",
+            "sha256": null
+          },
+          {
+            "family": "MalgunGothicBold",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "16-pptx-edited-modern-pitch-pset",
+      "format": "pptx",
+      "input": {
+        "path": "prototype/preview/baseline/16-pptx-edited-modern-pitch-pset.pptx",
+        "sha256": "bdce6e997474d14f4db343f00862727e7784ad5128ba66dd5c07f81bd59db90e",
+        "bytes": 82857
+      },
+      "features": [
+        "edited",
+        "shapes/pictures/connectors"
+      ],
+      "provenance": {
+        "source": "crates/hanji-pptx/corpus/audit/synth-modern-pitch.pptx",
+        "built_by": "kit pset",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156",
+        "edits_file": "edits/16-pptx-edited-modern-pitch-pset.edits.md",
+        "edit": "pptx edit set: slides added/deleted/moved, geometry (move, resize, align), crop + ellipse mask, group text edit, outline, arrowhead, roundRect, bent connector, connector follow/re-attach, effects removed/shadow"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "PowerPoint",
+        "recorded_version": "6.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "PowerPoint/Excel leading major version conflicts with SPIKE.md; owner confirmation required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "16-pptx-edited-modern-pitch-pset.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 8,
+        "historical_first_page_size_pt": [
+          959.8,
+          540.0
+        ],
+        "font_identities": [
+          {
+            "family": "ArialMT",
+            "sha256": null
+          },
+          {
+            "family": "Calibri",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Bold",
+            "sha256": null
+          },
+          {
+            "family": "MalgunGothic",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "17-pptx-new-deck-ko",
+      "format": "pptx",
+      "input": {
+        "path": "prototype/preview/baseline/17-pptx-new-deck-ko.pptx",
+        "sha256": "f511042afe3a0af814f859792ab0c522a2808fb0e55ee2eedf1c00fb09f57a53",
+        "bytes": 16720
+      },
+      "features": [
+        "new",
+        "mixed Korean/Latin"
+      ],
+      "provenance": {
+        "source": "hanji-store blank pptx (crates/hanji-store)",
+        "built_by": "cli new presentation + write",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156",
+        "edits_file": "edits/17-pptx-new-deck-ko.input.md",
+        "edit": "new 4-slide deck: Title Slide, Title and Content (nested bullets, bold/italic, red run), Two Content (bullets + numbered), Title Only; Korean/Latin mixed"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "PowerPoint",
+        "recorded_version": "6.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "PowerPoint/Excel leading major version conflicts with SPIKE.md; owner confirmation required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "17-pptx-new-deck-ko.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 4,
+        "historical_first_page_size_pt": [
+          959.8,
+          540.0
+        ],
+        "font_identities": [
+          {
+            "family": "ArialMT",
+            "sha256": null
+          },
+          {
+            "family": "Calibri",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Bold",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Italic",
+            "sha256": null
+          },
+          {
+            "family": "Calibri-Light",
+            "sha256": null
+          },
+          {
+            "family": "MalgunGothic",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "18-xlsx-untouched-korean-sales",
+      "format": "xlsx",
+      "input": {
+        "path": "prototype/preview/baseline/18-xlsx-untouched-korean-sales.xlsx",
+        "sha256": "6c54e923ffeb683033c25158629ba9ef3a31e44a97e876b563f5f3f3dac2b94d",
+        "bytes": 12650
+      },
+      "features": [
+        "Korean",
+        "table with calculated column",
+        "number formats",
+        "3 sheets"
+      ],
+      "provenance": {
+        "source": "crates/hanji-xlsx/corpus/korean-sales.xlsx",
+        "built_by": "kit getput",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Excel",
+        "recorded_version": "6.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "PowerPoint/Excel leading major version conflicts with SPIKE.md; owner confirmation required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "18-xlsx-untouched-korean-sales.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 5,
+        "historical_first_page_size_pt": [
+          595.3,
+          841.9
+        ],
+        "font_identities": [
+          {
+            "family": "MalgunGothic",
+            "sha256": null
+          },
+          {
+            "family": "MalgunGothicBold",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "window": {
+        "sheet": "매출",
+        "range": "A1:H20",
+        "mode": "cached-value-worksheet-window",
+        "historical_print_pdf_is_window_reference": false
+      },
+      "sets": [
+        "historical-30",
+        "release-12"
+      ],
+      "regression": {
+        "kind": "self-rendered-regression",
+        "renderer_pair": [
+          "f82067c72bb9d2dad82c57c448189a18d67cd6c0",
+          "fed548c9acc3858624320538be0ce96b6ca0c742"
+        ],
+        "pages": 1,
+        "dimensions_pt": [
+          [
+            420.06,
+            318.0
+          ]
+        ],
+        "diagnostics": {
+          "required": [
+            "cell\\ text\\ exceeds\\ its\\ stored\\ size\\ and\\ is\\ clipped;\\ leading\\ digits\\ of\\ right\\-aligned\\ values\\ may\\ be\\ hidden;\\ cells\\[\\]\\.display\\ retains\\ the\\ complete\\ value\\ \\(34\\ occurrences;\\ first\\ at\\ sheets\\[0\\]\\.cells\\[A1\\]\\.clipping\\)",
+            "fonts\\[1\\]:\\ font\\ collection\\ face\\ index\\ cannot\\ be\\ selected\\ by\\ SVG\\ and\\ uses\\ the\\ default\\ face",
+            "formula\\ has\\ no\\ cached\\ result;\\ shown\\ as\\ \\#UNEVALUATED;\\ no\\ evaluation\\ was\\ performed\\ \\(17\\ occurrences;\\ first\\ at\\ sheets\\[0\\]\\.cells\\[F4\\]\\.formula\\)",
+            "sheets\\[0\\]\\.cells\\[A1\\]\\.font:\\ requested\\ bold/italic\\ face\\ is\\ unavailable;\\ the\\ selected\\ face\\ is\\ drawn\\ without\\ synthetic\\ styling",
+            "sheets\\[0\\]\\.conditionalFormatting:\\ conditionalFormatting\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.dataValidations:\\ dataValidations\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.drawing:\\ drawing\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.grid:\\ worksheet\\ window\\ only:\\ column\\ widths\\ use\\ a\\ 7\\-pixel\\ maximum\\-digit\\ approximation;\\ text\\ wraps\\ by\\ character,\\ clips\\ to\\ cells,\\ and\\ stored\\ row\\ heights\\ are\\ not\\ auto\\-fitted;\\ rich\\-text\\ runs\\ use\\ the\\ cell\\ font;\\ print\\ pagination\\ is\\ not\\ applied",
+            "sheets\\[0\\]\\.hyperlinks:\\ hyperlinks\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.legacyDrawing:\\ legacyDrawing\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.pageMargins:\\ pageMargins\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.sheetViews:\\ sheetViews\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.tableParts:\\ tableParts\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "theme/indexed/tinted\\ or\\ invalid\\ color\\ uses\\ the\\ default\\ color\\ \\(3\\ occurrences;\\ first\\ at\\ sheets\\[0\\]\\.styles\\[0\\]\\)",
+            "workbook\\.externalLinks:\\ external\\ relationships\\ are\\ not\\ fetched,\\ activated\\ or\\ refreshed"
+          ],
+          "allow": [
+            "cell\\ text\\ exceeds\\ its\\ stored\\ size\\ and\\ is\\ clipped;\\ leading\\ digits\\ of\\ right\\-aligned\\ values\\ may\\ be\\ hidden;\\ cells\\[\\]\\.display\\ retains\\ the\\ complete\\ value",
+            "cell\\ text\\ exceeds\\ its\\ stored\\ size\\ and\\ is\\ clipped;\\ leading\\ digits\\ of\\ right\\-aligned\\ values\\ may\\ be\\ hidden;\\ cells\\[\\]\\.display\\ retains\\ the\\ complete\\ value\\ \\(34\\ occurrences;\\ first\\ at\\ sheets\\[0\\]\\.cells\\[A1\\]\\.clipping\\)",
+            "conditionalFormatting\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "dataValidations\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "drawing\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "external\\ relationships\\ are\\ not\\ fetched,\\ activated\\ or\\ refreshed",
+            "font\\ collection\\ face\\ index\\ cannot\\ be\\ selected\\ by\\ SVG\\ and\\ uses\\ the\\ default\\ face",
+            "fonts\\[1\\]:\\ font\\ collection\\ face\\ index\\ cannot\\ be\\ selected\\ by\\ SVG\\ and\\ uses\\ the\\ default\\ face",
+            "formula\\ has\\ no\\ cached\\ result;\\ shown\\ as\\ \\#UNEVALUATED;\\ no\\ evaluation\\ was\\ performed",
+            "formula\\ has\\ no\\ cached\\ result;\\ shown\\ as\\ \\#UNEVALUATED;\\ no\\ evaluation\\ was\\ performed\\ \\(17\\ occurrences;\\ first\\ at\\ sheets\\[0\\]\\.cells\\[F4\\]\\.formula\\)",
+            "hyperlinks\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "legacyDrawing\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "pageMargins\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "requested\\ bold/italic\\ face\\ is\\ unavailable;\\ the\\ selected\\ face\\ is\\ drawn\\ without\\ synthetic\\ styling",
+            "sheetViews\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.cells\\[A1\\]\\.font:\\ requested\\ bold/italic\\ face\\ is\\ unavailable;\\ the\\ selected\\ face\\ is\\ drawn\\ without\\ synthetic\\ styling",
+            "sheets\\[0\\]\\.conditionalFormatting:\\ conditionalFormatting\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.dataValidations:\\ dataValidations\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.drawing:\\ drawing\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.grid:\\ worksheet\\ window\\ only:\\ column\\ widths\\ use\\ a\\ 7\\-pixel\\ maximum\\-digit\\ approximation;\\ text\\ wraps\\ by\\ character,\\ clips\\ to\\ cells,\\ and\\ stored\\ row\\ heights\\ are\\ not\\ auto\\-fitted;\\ rich\\-text\\ runs\\ use\\ the\\ cell\\ font;\\ print\\ pagination\\ is\\ not\\ applied",
+            "sheets\\[0\\]\\.hyperlinks:\\ hyperlinks\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.legacyDrawing:\\ legacyDrawing\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.pageMargins:\\ pageMargins\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.sheetViews:\\ sheetViews\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.tableParts:\\ tableParts\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "tableParts\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "theme/indexed/tinted\\ or\\ invalid\\ color\\ uses\\ the\\ default\\ color",
+            "theme/indexed/tinted\\ or\\ invalid\\ color\\ uses\\ the\\ default\\ color\\ \\(3\\ occurrences;\\ first\\ at\\ sheets\\[0\\]\\.styles\\[0\\]\\)",
+            "workbook\\.externalLinks:\\ external\\ relationships\\ are\\ not\\ fetched,\\ activated\\ or\\ refreshed",
+            "worksheet\\ window\\ only:\\ column\\ widths\\ use\\ a\\ 7\\-pixel\\ maximum\\-digit\\ approximation;\\ text\\ wraps\\ by\\ character,\\ clips\\ to\\ cells,\\ and\\ stored\\ row\\ heights\\ are\\ not\\ auto\\-fitted;\\ rich\\-text\\ runs\\ use\\ the\\ cell\\ font;\\ print\\ pagination\\ is\\ not\\ applied"
+          ]
+        },
+        "missing_glyphs": [],
+        "font_identities": {
+          "substituted": [
+            {
+              "requested": "Calibri",
+              "script": "latin",
+              "drawn": "Carlito",
+              "source": "bundled",
+              "metrics": "compatible:Carlito",
+              "chars": 684,
+              "pages": [
+                1
+              ]
+            },
+            {
+              "requested": "Calibri",
+              "script": "hangul",
+              "drawn": "Apple SD Gothic Neo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 106,
+              "pages": [
+                1
+              ]
+            }
+          ],
+          "drawn_as_requested": [],
+          "missing_glyphs": []
+        },
+        "font_hash_scope": "embedded per-page subsets; original output font hashes were not recorded",
+        "font_subset_sha256": [
+          {
+            "hanji-font-0": "6d669d68a83dfd5a9fd1160359241a38a133f904c86e0e712d60710d74446bbd",
+            "hanji-font-1": "e64edcbb0ff0e51592716291d72f947055f5333daa9c3d538a916f563679aef9",
+            "hanji-font-2": "bbf4db6024d53851ce706997297669f21c82b020d2623506a9bd333781bcf9c0"
+          }
+        ],
+        "output_sha256": {
+          "svg/18-xlsx-untouched-korean-sales-r1-sheet-1-A1-H20.svg": "213d9da557a88927f9941e95dc035ce4dc5ca66e9986bafdb0992578bad50787",
+          "png/18-xlsx-untouched-korean-sales-r1-sheet-1-A1-H20.png": "7f2c63ebc9c8d649a9f59eaefeb9c71e3d9f1a0fd85844fe1922a10654346cac",
+          "html/18-xlsx-untouched-korean-sales-r1-sheet-1-A1-H20.html": "f80e1c64dc19cacf415adaf868e93848151dc2d2115ca506bf0d3091d788a8e1"
+        }
+      }
+    },
+    {
+      "id": "19-xlsx-untouched-monthly-budget",
+      "format": "xlsx",
+      "input": {
+        "path": "prototype/preview/baseline/19-xlsx-untouched-monthly-budget.xlsx",
+        "sha256": "e2bd0d4db208bc836f598360af970daeb96e40b10cdc1fc8d42d133c8b884880",
+        "bytes": 15348
+      },
+      "features": [
+        "two tables",
+        "chart",
+        "shape",
+        "merged cells",
+        "conditional format",
+        "currency formats"
+      ],
+      "provenance": {
+        "source": "crates/hanji-xlsx/corpus/simple-monthly-budget.xlsx",
+        "built_by": "kit getput",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Excel",
+        "recorded_version": "6.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "PowerPoint/Excel leading major version conflicts with SPIKE.md; owner confirmation required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "19-xlsx-untouched-monthly-budget.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 2,
+        "historical_first_page_size_pt": [
+          792.0,
+          612.0
+        ],
+        "font_identities": [
+          {
+            "family": "CenturyGothic",
+            "sha256": null
+          },
+          {
+            "family": "Georgia",
+            "sha256": null
+          },
+          {
+            "family": "Georgia-Italic",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "window": {
+        "sheet": "OWNER_SELECTION_REQUIRED",
+        "range": "A1:H20",
+        "mode": "cached-value-worksheet-window",
+        "historical_print_pdf_is_window_reference": false
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "20-xlsx-untouched-tables-forms",
+      "format": "xlsx",
+      "input": {
+        "path": "prototype/preview/baseline/20-xlsx-untouched-tables-forms.xlsx",
+        "sha256": "8ed91ccb318711a08ce7fc7e1574ba1af669cc966cbef6e5cb6dbf4ca30e348d",
+        "bytes": 46366
+      },
+      "features": [
+        "12 sheets of forms",
+        "wide (up to col Q)",
+        "73 merged ranges",
+        "formulas"
+      ],
+      "provenance": {
+        "source": "crates/hanji-xlsx/corpus/Tables.xlsx",
+        "built_by": "cli open+export (--acknowledge-surfaced: core.xml lastModifiedBy)",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Excel",
+        "recorded_version": "6.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "PowerPoint/Excel leading major version conflicts with SPIKE.md; owner confirmation required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "20-xlsx-untouched-tables-forms.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 21,
+        "historical_first_page_size_pt": [
+          841.9,
+          595.3
+        ],
+        "font_identities": [
+          {
+            "family": "TimesNewRomanPS-BoldMT",
+            "sha256": null
+          },
+          {
+            "family": "TimesNewRomanPS-ItalicMT",
+            "sha256": null
+          },
+          {
+            "family": "TimesNewRomanPSMT",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "window": {
+        "sheet": "OWNER_SELECTION_REQUIRED",
+        "range": "A1:H20",
+        "mode": "cached-value-worksheet-window",
+        "historical_print_pdf_is_window_reference": false
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "21-xlsx-edited-korean-sales-ops",
+      "format": "xlsx",
+      "input": {
+        "path": "prototype/preview/baseline/21-xlsx-edited-korean-sales-ops.xlsx",
+        "sha256": "19a29b1cb7386d62fa123da23e053637ca4543f9f74fc14e1b626c7eb8349b9a",
+        "bytes": 13228
+      },
+      "features": [
+        "Korean",
+        "edited"
+      ],
+      "provenance": {
+        "source": "crates/hanji-xlsx/corpus/korean-sales.xlsx",
+        "built_by": "kit ops",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156",
+        "edits_file": "edits/21-xlsx-edited-korean-sales-ops.edits.md",
+        "edit": "set 매출!D5=18420000; append a row to table Sales; format 매출!A3:F3 fill #D9D9D9 bold bottom border (export recomputes cached values; none left to Excel)"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Excel",
+        "recorded_version": "6.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "PowerPoint/Excel leading major version conflicts with SPIKE.md; owner confirmation required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "21-xlsx-edited-korean-sales-ops.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 5,
+        "historical_first_page_size_pt": [
+          595.3,
+          841.9
+        ],
+        "font_identities": [
+          {
+            "family": "MalgunGothic",
+            "sha256": null
+          },
+          {
+            "family": "MalgunGothicBold",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "window": {
+        "sheet": "매출",
+        "range": "A1:H20",
+        "mode": "cached-value-worksheet-window",
+        "historical_print_pdf_is_window_reference": false
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "22-xlsx-new-sales-ko",
+      "format": "xlsx",
+      "input": {
+        "path": "prototype/preview/baseline/22-xlsx-new-sales-ko.xlsx",
+        "sha256": "e5f086df6993b589d968ac3137c271d66591e862ded7c46d3021ab9f7e51c670",
+        "bytes": 5153
+      },
+      "features": [
+        "new",
+        "Korean/Latin",
+        "number formats"
+      ],
+      "provenance": {
+        "source": "hanji-store blank xlsx (crates/hanji-store)",
+        "built_by": "cli new spreadsheet + ops",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156",
+        "edits_file": "edits/22-xlsx-new-sales-ko.input.json",
+        "edit": "new workbook: sheet 매출 with table Sales (date yyyy-mm, #,##0, 0.0% formula columns, leading-zero text codes), header fill/bold/white, column fill, outline; Sheet1 title cell 14pt bold"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Excel",
+        "recorded_version": "6.113.1 (26091740)",
+        "version_confirmed": false,
+        "version_note": "PowerPoint/Excel leading major version conflicts with SPIKE.md; owner confirmation required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "22-xlsx-new-sales-ko.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 2,
+        "historical_first_page_size_pt": [
+          595.3,
+          841.9
+        ],
+        "font_identities": [
+          {
+            "family": "MalgunGothic",
+            "sha256": null
+          },
+          {
+            "family": "MalgunGothicBold",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "window": {
+        "sheet": "OWNER_SELECTION_REQUIRED",
+        "range": "A1:H20",
+        "mode": "cached-value-worksheet-window",
+        "historical_print_pdf_is_window_reference": false
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "23-hwpx-untouched-fdi-2025q2",
+      "format": "hwpx",
+      "input": {
+        "path": "prototype/preview/baseline/23-hwpx-untouched-fdi-2025q2.hwpx",
+        "sha256": "8612441c4936543eb7f94bca2716a1838c9b54daf075a1ac7a0c6ddfcdbf6177",
+        "bytes": 113997
+      },
+      "features": [
+        "press release: 2 sections",
+        "26 tables with merges",
+        "logo",
+        "page breaks"
+      ],
+      "provenance": {
+        "source": "crates/hanji-hwpx/corpus/fdi-2025q2.hwpx",
+        "built_by": "kit getput",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Hancom",
+        "recorded_version": "12.30.0 (6523)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "23-hwpx-untouched-fdi-2025q2.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 9,
+        "historical_first_page_size_pt": [
+          595.0,
+          842.0
+        ],
+        "font_identities": [
+          {
+            "family": "DotumChe",
+            "sha256": null
+          },
+          {
+            "family": "Gulim",
+            "sha256": null
+          },
+          {
+            "family": "H2hdrM",
+            "sha256": null
+          },
+          {
+            "family": "HCRBatang",
+            "sha256": null
+          },
+          {
+            "family": "HCRDotum-Bold",
+            "sha256": null
+          },
+          {
+            "family": "HMKMM",
+            "sha256": null
+          },
+          {
+            "family": "Haansoft-Batang",
+            "sha256": null
+          },
+          {
+            "family": "MalgunGothic-Regular",
+            "sha256": null
+          },
+          {
+            "family": "PalatinoLinotype-Roman",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "24-hwpx-untouched-hy-002",
+      "format": "hwpx",
+      "input": {
+        "path": "prototype/preview/baseline/24-hwpx-untouched-hy-002.hwpx",
+        "sha256": "9ed2328b3a80a859c3d20fb5d13697fae6a9e0e860f459610e454bf84db51638",
+        "bytes": 103547
+      },
+      "features": [
+        "press release: tables",
+        "pictures and shapes"
+      ],
+      "provenance": {
+        "source": "crates/hanji-hwpx/corpus/hy-002.hwpx",
+        "built_by": "kit getput",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Hancom",
+        "recorded_version": "12.30.0 (6523)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "24-hwpx-untouched-hy-002.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 2,
+        "historical_first_page_size_pt": [
+          595.0,
+          842.0
+        ],
+        "font_identities": [
+          {
+            "family": "DotumChe",
+            "sha256": null
+          },
+          {
+            "family": "HCRBatang",
+            "sha256": null
+          },
+          {
+            "family": "HCRDotum-Bold",
+            "sha256": null
+          },
+          {
+            "family": "HMKMM",
+            "sha256": null
+          },
+          {
+            "family": "PalatinoLinotype-Roman",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30",
+        "release-12"
+      ],
+      "regression": {
+        "kind": "self-rendered-regression",
+        "renderer_pair": [
+          "f82067c72bb9d2dad82c57c448189a18d67cd6c0",
+          "fed548c9acc3858624320538be0ce96b6ca0c742"
+        ],
+        "pages": 2,
+        "dimensions_pt": [
+          [
+            595.28,
+            841.86
+          ],
+          [
+            595.28,
+            841.86
+          ]
+        ],
+        "diagnostics": {
+          "required": [
+            "HWPX\\ preview\\ is\\ experimental:\\ rhwp\\ uses\\ source/table\\ font\\ geometry;\\ drawing\\ substitutions\\ can\\ differ\\ from\\ Hancom,\\ and\\ complex\\ controls\\ or\\ table\\ reflow\\ need\\ visual\\ review\\."
+          ],
+          "allow": [
+            "HWPX\\ preview\\ is\\ experimental:\\ rhwp\\ uses\\ source/table\\ font\\ geometry;\\ drawing\\ substitutions\\ can\\ differ\\ from\\ Hancom,\\ and\\ complex\\ controls\\ or\\ table\\ reflow\\ need\\ visual\\ review\\."
+          ]
+        },
+        "missing_glyphs": [
+          "U+FF62",
+          "U+FF63",
+          "U+FF65"
+        ],
+        "font_identities": {
+          "substituted": [
+            {
+              "requested": "돋움체",
+              "script": "hangul",
+              "drawn": "Apple SD Gothic Neo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 144,
+              "pages": [
+                1,
+                2
+              ]
+            },
+            {
+              "requested": "함초롬바탕",
+              "script": "hangul",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 61,
+              "pages": [
+                1
+              ]
+            },
+            {
+              "requested": "돋움체",
+              "script": "hangul",
+              "drawn": "Apple SD Gothic Neo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 14,
+              "pages": [
+                1
+              ]
+            },
+            {
+              "requested": "돋움체",
+              "script": "latin",
+              "drawn": "Arial",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 2,
+              "pages": [
+                1
+              ]
+            },
+            {
+              "requested": "돋움체",
+              "script": "latin",
+              "drawn": "Arial",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 129,
+              "pages": [
+                1,
+                2
+              ]
+            },
+            {
+              "requested": "함초롬돋움",
+              "script": "hangul",
+              "drawn": "Apple SD Gothic Neo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 22,
+              "pages": [
+                1
+              ]
+            },
+            {
+              "requested": "함초롬돋움",
+              "script": "latin",
+              "drawn": "Arial",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 3,
+              "pages": [
+                1
+              ]
+            },
+            {
+              "requested": "함초롬바탕",
+              "script": "latin",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 4,
+              "pages": [
+                1
+              ]
+            },
+            {
+              "requested": "함초롬바탕",
+              "script": "cjk",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 6,
+              "pages": [
+                1
+              ]
+            },
+            {
+              "requested": "휴먼명조",
+              "script": "hangul",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 1017,
+              "pages": [
+                1,
+                2
+              ]
+            },
+            {
+              "requested": "휴먼명조",
+              "script": "latin",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 43,
+              "pages": [
+                1,
+                2
+              ]
+            },
+            {
+              "requested": "한양신명조",
+              "script": "cjk",
+              "drawn": "Apple SD Gothic Neo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 14,
+              "pages": [
+                1
+              ]
+            },
+            {
+              "requested": "한양신명조",
+              "script": "latin",
+              "drawn": "Carlito",
+              "source": "bundled",
+              "metrics": "substitute",
+              "chars": 1,
+              "pages": [
+                1
+              ]
+            },
+            {
+              "requested": "휴먼명조",
+              "script": "cjk",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 1,
+              "pages": [
+                1
+              ]
+            }
+          ],
+          "drawn_as_requested": [
+            {
+              "requested": "Palatino Linotype",
+              "script": "latin",
+              "source": "system",
+              "chars": 22
+            },
+            {
+              "requested": "Arial",
+              "script": "latin",
+              "source": "system",
+              "chars": 8
+            }
+          ],
+          "missing_glyphs": [
+            {
+              "char": "U+FF62",
+              "requested": "함초롬바탕",
+              "pages": [
+                1
+              ]
+            },
+            {
+              "char": "U+FF63",
+              "requested": "함초롬바탕",
+              "pages": [
+                1
+              ]
+            },
+            {
+              "char": "U+FF65",
+              "requested": "휴먼명조",
+              "pages": [
+                1
+              ]
+            }
+          ],
+          "missing_glyphs_total": 3
+        },
+        "font_hash_scope": "embedded per-page subsets; original output font hashes were not recorded",
+        "font_subset_sha256": [
+          {
+            "hanji-page-0-font-0": "8689d4d3e8835fbe974c2ddedac079654f62b5d85949722a0bfdfad1ebb8a50c",
+            "hanji-page-0-font-1": "a375464ff3294662261ccdf6e647d31f3e02778452aca7449429ad2d5526d587",
+            "hanji-page-0-font-2": "eef888e56330913b9c1ef052e057d100c6ec18432c06bf6fe6873512f8f8a512",
+            "hanji-page-0-font-3": "db74d403db6b4fa0d2b825ac65c4e8cd26e6d66ef5ce6e15908e9f0dd1e2e971",
+            "hanji-page-0-font-4": "716650ad0f1eb42fadace604ef5726561d67bbf01e60a62fdf1dd908a7220cbc",
+            "hanji-page-0-font-5": "26c0c532f2d90f02ace874821734c20563b1871920446b2e86a6b39fe5fe384d",
+            "hanji-page-0-font-6": "fa76d30970d3e6c2b192beebe901af12c422598aad262ead6a9e1b90ff75d8cc",
+            "hanji-page-0-font-7": "8abec31fac36fdc9b041dfca47bebac06d9c161d74487c3117bad2b96cd81235",
+            "hanji-page-0-font-8": "4df9d74076dfab2ff337c62a11047aae8b8f145812cdbe2de1dd4583b79d177e",
+            "hanji-page-0-font-9": "c78fb8588002909d9ae1793df61f32503a7808ac39217dea13195be01989f147",
+            "hanji-page-0-font-10": "d87b7936e8244efce7411b5bd4afa3eb542b5f7d5363907f448619e38bd174a0",
+            "hanji-page-0-font-11": "a96be3ffd83498380ed7d3d767dd533388639cc526fe17df4f568d9766a2db33",
+            "hanji-page-0-font-12": "f490459109b75ec76f03d9abddc756176a882cad36b3b930327d3a5a494efe6c",
+            "hanji-page-0-font-13": "90dcc08338ce535f3563bf098dd8b99aa79552b29d1918fdeca7655c1e2ea28b",
+            "hanji-page-0-font-14": "be3774f61d3720581a814e9290327881855c48cd60a2351eb28c46bdcf1febfe",
+            "hanji-page-0-font-15": "946e0ddd45a274309dd13b0f6cf224444738b3a990ce1db26951e724896c637e"
+          },
+          {
+            "hanji-page-1-font-0": "a6b52a8c64e03bfd73dc3b75f5f8f923a1dbdd75686957eab47b3ae67b3859c1",
+            "hanji-page-1-font-4": "3deecd01388e0cfa8d4227c51499802c76d7befe6d7b241d7a055a10f36c6ead",
+            "hanji-page-1-font-9": "621bd464a96f7d884ddd62414d0568568563ff55a92ed49c128221243220cf70",
+            "hanji-page-1-font-10": "76d1bc4283e47a6762cb1a14628e80a347168a7c944747db09b1da931838f698",
+            "hanji-page-1-font-13": "cea2c610ffe177062724b931f5306abf92f0d95c4b144443a501402968d5a7ad",
+            "hanji-page-1-font-14": "be3774f61d3720581a814e9290327881855c48cd60a2351eb28c46bdcf1febfe"
+          }
+        ],
+        "output_sha256": {
+          "svg/24-hwpx-untouched-hy-002-r1-page-1.svg": "cfb55a413f11f68bc6c2748fbe996fa407c85f364719dfffd098f4d834f0724a",
+          "svg/24-hwpx-untouched-hy-002-r1-page-2.svg": "3477c76b872202a9cf8fb7425f59336276f3d4a5efd665fc83b93c3ef0eba5ad",
+          "png/24-hwpx-untouched-hy-002-r1-page-2.png": "8d83ebcc0fdbdee3bc77a062d9b4851982ad5514d86b47f7b34fa7aeb447e7da",
+          "png/24-hwpx-untouched-hy-002-r1-page-1.png": "1cad5201fd3ebb97dc11a6454442d22a379ea3c19245f5e87be4520ba1067d88",
+          "html/24-hwpx-untouched-hy-002-r1-preview.html": "57a66604164e66de9a3cd753678b11702180f6c1436c5d0fff8d5a94c7e4df1b"
+        }
+      }
+    },
+    {
+      "id": "25-hwpx-untouched-hcar-001",
+      "format": "hwpx",
+      "input": {
+        "path": "prototype/preview/baseline/25-hwpx-untouched-hcar-001.hwpx",
+        "sha256": "a2916c0ff8b12ab5bfc9d31a31999ce0727373e791038e5bdbaba95f032f07aa",
+        "bytes": 103344
+      },
+      "features": [
+        "government form: 3 sections",
+        "nested/side-by-side tables",
+        "merges"
+      ],
+      "provenance": {
+        "source": "crates/hanji-hwpx/corpus/hcar-001.hwpx",
+        "built_by": "kit getput",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Hancom",
+        "recorded_version": "12.30.0 (6523)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "25-hwpx-untouched-hcar-001.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 6,
+        "historical_first_page_size_pt": [
+          595.0,
+          842.0
+        ],
+        "font_identities": [
+          {
+            "family": "DotumChe",
+            "sha256": null
+          },
+          {
+            "family": "GulimChe",
+            "sha256": null
+          },
+          {
+            "family": "H2hdrM",
+            "sha256": null
+          },
+          {
+            "family": "HCRDotum",
+            "sha256": null
+          },
+          {
+            "family": "HCRDotum-Bold",
+            "sha256": null
+          },
+          {
+            "family": "Haansoft-Dotum",
+            "sha256": null
+          },
+          {
+            "family": "HancomGothicBold",
+            "sha256": null
+          },
+          {
+            "family": "HancomGothicRegular",
+            "sha256": null
+          },
+          {
+            "family": "MalgunGothic-Regular",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "26-hwpx-untouched-footnote-01",
+      "format": "hwpx",
+      "input": {
+        "path": "prototype/preview/baseline/26-hwpx-untouched-footnote-01.hwpx",
+        "sha256": "d4e89abed904ba774075c33ca4afa3bcf6643593ba7bbbb7408e991b2b6cd292",
+        "bytes": 63234
+      },
+      "features": [
+        "footnotes",
+        "35 bullet/numbered items",
+        "tables",
+        "page breaks"
+      ],
+      "provenance": {
+        "source": "crates/hanji-hwpx/corpus/footnote-01.hwpx",
+        "built_by": "kit getput",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Hancom",
+        "recorded_version": "12.30.0 (6523)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "26-hwpx-untouched-footnote-01.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 6,
+        "historical_first_page_size_pt": [
+          595.0,
+          842.0
+        ],
+        "font_identities": [
+          {
+            "family": "HCRBatang",
+            "sha256": null
+          },
+          {
+            "family": "HCRDotum",
+            "sha256": null
+          },
+          {
+            "family": "HMKMM",
+            "sha256": null
+          },
+          {
+            "family": "HYmjrE",
+            "sha256": null
+          },
+          {
+            "family": "NanumGothic",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30",
+        "release-12"
+      ],
+      "regression": {
+        "kind": "self-rendered-regression",
+        "renderer_pair": [
+          "f82067c72bb9d2dad82c57c448189a18d67cd6c0",
+          "fed548c9acc3858624320538be0ce96b6ca0c742"
+        ],
+        "pages": 6,
+        "dimensions_pt": [
+          [
+            595.28,
+            841.88
+          ],
+          [
+            595.28,
+            841.88
+          ],
+          [
+            595.28,
+            841.88
+          ],
+          [
+            595.28,
+            841.88
+          ],
+          [
+            595.28,
+            841.88
+          ],
+          [
+            595.28,
+            841.88
+          ]
+        ],
+        "diagnostics": {
+          "required": [
+            "HWPX\\ preview\\ is\\ experimental:\\ rhwp\\ uses\\ source/table\\ font\\ geometry;\\ drawing\\ substitutions\\ can\\ differ\\ from\\ Hancom,\\ and\\ complex\\ controls\\ or\\ table\\ reflow\\ need\\ visual\\ review\\."
+          ],
+          "allow": [
+            "HWPX\\ preview\\ is\\ experimental:\\ rhwp\\ uses\\ source/table\\ font\\ geometry;\\ drawing\\ substitutions\\ can\\ differ\\ from\\ Hancom,\\ and\\ complex\\ controls\\ or\\ table\\ reflow\\ need\\ visual\\ review\\."
+          ]
+        },
+        "missing_glyphs": [
+          "U+2024",
+          "U+2027",
+          "U+274D",
+          "U+274F"
+        ],
+        "font_identities": {
+          "substituted": [
+            {
+              "requested": "HY견명조",
+              "script": "latin",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 6,
+              "pages": [
+                1,
+                2
+              ]
+            },
+            {
+              "requested": "HY견명조",
+              "script": "hangul",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 55,
+              "pages": [
+                1,
+                2
+              ]
+            },
+            {
+              "requested": "HY견명조",
+              "script": "latin",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 2,
+              "pages": [
+                1,
+                2
+              ]
+            },
+            {
+              "requested": "휴먼명조",
+              "script": "latin",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 8,
+              "pages": [
+                1,
+                2,
+                3
+              ]
+            },
+            {
+              "requested": "휴먼명조",
+              "script": "hangul",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 33,
+              "pages": [
+                1,
+                2,
+                3
+              ]
+            },
+            {
+              "requested": "휴먼명조",
+              "script": "latin",
+              "drawn": "Arial",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 126,
+              "pages": [
+                1,
+                2,
+                3,
+                4
+              ]
+            },
+            {
+              "requested": "휴먼명조",
+              "script": "hangul",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 1117,
+              "pages": [
+                1,
+                2,
+                3,
+                4
+              ]
+            },
+            {
+              "requested": "함초롬바탕",
+              "script": "latin",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 20,
+              "pages": [
+                1,
+                2,
+                3
+              ]
+            },
+            {
+              "requested": "함초롬바탕",
+              "script": "hangul",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 95,
+              "pages": [
+                1,
+                2,
+                3
+              ]
+            },
+            {
+              "requested": "바탕",
+              "script": "latin",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 18,
+              "pages": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            }
+          ],
+          "drawn_as_requested": [
+            {
+              "requested": "나눔고딕",
+              "script": "latin",
+              "source": "system",
+              "chars": 2
+            },
+            {
+              "requested": "나눔고딕",
+              "script": "hangul",
+              "source": "system",
+              "chars": 11
+            }
+          ],
+          "missing_glyphs": [
+            {
+              "char": "U+2024",
+              "requested": "휴먼명조",
+              "pages": [
+                3
+              ]
+            },
+            {
+              "char": "U+2027",
+              "requested": "휴먼명조",
+              "pages": [
+                2
+              ]
+            },
+            {
+              "char": "U+274D",
+              "requested": "휴먼명조",
+              "pages": [
+                1,
+                2,
+                3,
+                4
+              ]
+            },
+            {
+              "char": "U+274F",
+              "requested": "휴먼명조",
+              "pages": [
+                1,
+                2,
+                3
+              ]
+            }
+          ],
+          "missing_glyphs_total": 4
+        },
+        "font_hash_scope": "embedded per-page subsets; original output font hashes were not recorded",
+        "font_subset_sha256": [
+          {
+            "hanji-page-0-font-0": "341a64ffab7171e82c2e7175149e43c52e06de1f30b07cb3a85d9edf5671b23a",
+            "hanji-page-0-font-1": "20352bed9f1e9c17ce00f32e2dd685ecbc911473910d52f51339a61ffe748df0",
+            "hanji-page-0-font-2": "319ffeba107abc52887cacbf76d4681796255e63a8f459bf476a5764ba96fafc",
+            "hanji-page-0-font-3": "59a1e756a548e692578e8e963e825eb7e66eab800362caf62e9dbcf56dc12d7c",
+            "hanji-page-0-font-4": "df531dd5be7648db31cd9809d109d448040edcff092b8f5013d80f35b7424284",
+            "hanji-page-0-font-5": "9431c10328cc209afb63d229b2416aea47aec92f018ada70034c1e304c239da8",
+            "hanji-page-0-font-6": "f9573e84a9e57cd89e0df89ff05753a5eaf8d4dad57e1e74f3e265fa1aa83980",
+            "hanji-page-0-font-7": "ff2827e6b26b4f936551faa5945a0ee0a5673bfb71a4f702407ab264beaaf4b5",
+            "hanji-page-0-font-8": "73ad75c942525cb7743f71ed78424f8dc8d5153238bfbce661a9b26043cb6aa6",
+            "hanji-page-0-font-9": "ddc3881d99654b9195459ef8095020f75445545c84f077060e97c44f74028fcf"
+          },
+          {
+            "hanji-page-1-font-0": "cb721b2485ce524c730e9fa3c156bab56cc1360463c6faa947d5b554b3df30c7",
+            "hanji-page-1-font-1": "b2086ab5ea32e4bceabbff9c7a3e12fefacc05a8db06bb3a002f4c6b37891329",
+            "hanji-page-1-font-2": "d4fbd5fed8d5971f118e014897ee024e34088de058465e64ac0734c79434150b",
+            "hanji-page-1-font-3": "20a50e8b29470e1ae8fbe809d1a036641581814871ea748336a042960e444d39",
+            "hanji-page-1-font-4": "8528146366f13d3482b2b0086c64de2756e7d959b4ab111a32d68907db97342d",
+            "hanji-page-1-font-5": "f6e262de987539983a0a92f20222f3fae13b80c86ac58de7e740e15a07620c9f",
+            "hanji-page-1-font-6": "9b3a8eca832eaa6f28b117875d6fbe0220eb4d1c81901769227f449dfd3a12dd",
+            "hanji-page-1-font-7": "94fef345d1900ba5d407c519ffadafc908b3714c240b337421382c7313b8b3c0",
+            "hanji-page-1-font-8": "2b487897311a795d4175a6ddc585543cd58ff9cc412ae30fde7540301f280fe7",
+            "hanji-page-1-font-9": "64e9102cf6d72195cc5bd47bc3291761807fd4b6cb20dc70dae3e34290df6e40"
+          },
+          {
+            "hanji-page-2-font-3": "20a50e8b29470e1ae8fbe809d1a036641581814871ea748336a042960e444d39",
+            "hanji-page-2-font-4": "de6612c4f2beb666155308550aa4fcee2710e2f88fe5606d524d6d0d243b9c74",
+            "hanji-page-2-font-5": "948f40409f7c7ffb007b3a1f9c0a0b8fb6d6909c7f089e1dac2734fa33f4eed1",
+            "hanji-page-2-font-6": "28359d8fc46915d14ef03acdc7b051ed828c77b8a09ebd8b6d4b7844ea2e80b6",
+            "hanji-page-2-font-7": "31b959a05c03407cea4ab7ef3807204df2b02bf3a0a45bb5e987aa2c1dab58b7",
+            "hanji-page-2-font-8": "99aeca91113f1d7933cbd518874af56b8240d0b40f1664ba1d8c8fb7fa321630",
+            "hanji-page-2-font-9": "0c984694893d4885aedc1ab98e527857f461b5cd6f46ee377d9846aded4e5be2"
+          },
+          {
+            "hanji-page-3-font-5": "e7aa57aa0e219c2dab517d2ff8bac231698abfd774afd5d9980ffa70200ecf5f",
+            "hanji-page-3-font-6": "be88ea6b9b20ac9347856a5fa1f2811011d2b5a1f8e8212725ffd34d7a6627bb",
+            "hanji-page-3-font-9": "f53936a65894c81fc7a942a37d17d51eb207f77772c16915945e638ed36eee86"
+          },
+          {
+            "hanji-page-4-font-9": "ac192ff71784d4fc53e8cac8717ceb0442e99e1504a18d841b7a059181f2551c",
+            "hanji-page-4-font-10": "80f2ecb2a446dc49a6c92fe240b620b83ff1a73f1ac8a86370276cb05f849510",
+            "hanji-page-4-font-11": "ae2af1042301278cf94ed2aebd3321c293a9859c08e762dea976ee003f8b16df"
+          },
+          {
+            "hanji-page-5-font-9": "e66da84df7ad753c24ac52f190ceaeb15fdb714fa8914abec2747d36aaeea802"
+          }
+        ],
+        "output_sha256": {
+          "svg/26-hwpx-untouched-footnote-01-r1-page-1.svg": "0da8be87d1def16dbf7d329586b721c54bd91f790a0f8a0eac1828a9bf7ec366",
+          "svg/26-hwpx-untouched-footnote-01-r1-page-2.svg": "854e5d8e5b8ad9c0b7e5115c68b554c24c6761a9e988a2b85c794e2541ab77a2",
+          "svg/26-hwpx-untouched-footnote-01-r1-page-3.svg": "3407540f5dd8197a243bbd03001cbe9c2bfd7942ab2d207251dcb7f6944c0222",
+          "svg/26-hwpx-untouched-footnote-01-r1-page-6.svg": "4b2df1ff4f7381ec9a77b073a2eb76ec63a28258acb8093dad3a463b750425d8",
+          "svg/26-hwpx-untouched-footnote-01-r1-page-4.svg": "9a869f5c495eaf4135c93aba4e48a7ae632178c4c8411f043c21f950e9eb7f1e",
+          "svg/26-hwpx-untouched-footnote-01-r1-page-5.svg": "1c0720bab4e83334febcf73f1548b3f5711d9e47bcde1a5cbad83fc687eaee61",
+          "png/26-hwpx-untouched-footnote-01-r1-page-5.png": "170fbda99af961cf28507f7c3987073f7c2294851c4f9b1d50d759e1a82405de",
+          "png/26-hwpx-untouched-footnote-01-r1-page-4.png": "5b002d90124f672eb6fb8fecb418d7f90471db35c4e962d92e9a7affd998dcba",
+          "png/26-hwpx-untouched-footnote-01-r1-page-6.png": "3893f6793c313805aad278d74504c08025937884be8a2d7b3900792cad5fb9a7",
+          "png/26-hwpx-untouched-footnote-01-r1-page-3.png": "d5375f222f4e7b5c1c43f9f98c4c5f601ae2eb4ed8563116b0e9ce675e30e760",
+          "png/26-hwpx-untouched-footnote-01-r1-page-2.png": "18544fb8f90851c714fe875b578d4f3dbfc5427393b678d1955e9cab4a067f6d",
+          "png/26-hwpx-untouched-footnote-01-r1-page-1.png": "ff40ed6ad9898a0a350cf6bb93694cfbb81e0af69d5b94952f2ebd276b33c470",
+          "html/26-hwpx-untouched-footnote-01-r1-preview.html": "de6a83c15ce460246a9f88a9c5064e113d905d2922e145ea6f07c10b39ea70e7"
+        }
+      }
+    },
+    {
+      "id": "27-hwpx-untouched-para-001",
+      "format": "hwpx",
+      "input": {
+        "path": "prototype/preview/baseline/27-hwpx-untouched-para-001.hwpx",
+        "sha256": "1ed5eb8ab362dc02c168f87219ea2a166f239ccac6110a372f27adfc8b0efd94",
+        "bytes": 74810
+      },
+      "features": [
+        "paragraph and character shapes"
+      ],
+      "provenance": {
+        "source": "crates/hanji-hwpx/corpus/para-001.hwpx",
+        "built_by": "kit getput",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Hancom",
+        "recorded_version": "12.30.0 (6523)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "27-hwpx-untouched-para-001.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 3,
+        "historical_first_page_size_pt": [
+          595.0,
+          842.0
+        ],
+        "font_identities": [
+          {
+            "family": "HCRBatang",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "28-hwpx-edited-footnote-01-e10",
+      "format": "hwpx",
+      "input": {
+        "path": "prototype/preview/baseline/28-hwpx-edited-footnote-01-e10.hwpx",
+        "sha256": "68a225dbdc51435e875215188b5723eae8873f9773d9f7265ca3bf720de05c2a",
+        "bytes": 62702
+      },
+      "features": [
+        "Korean",
+        "edited",
+        "lists"
+      ],
+      "provenance": {
+        "source": "crates/hanji-hwpx/corpus/footnote-01.hwpx",
+        "built_by": "kit e10",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156",
+        "edits_file": "edits/28-hwpx-edited-footnote-01-e10.edits.md",
+        "edit": "E-set + F2/F4 + banner fill to light blue + 10pt first-line indent on sub-level list items"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Hancom",
+        "recorded_version": "12.30.0 (6523)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "28-hwpx-edited-footnote-01-e10.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 7,
+        "historical_first_page_size_pt": [
+          595.0,
+          842.0
+        ],
+        "font_identities": [
+          {
+            "family": "HCRBatang",
+            "sha256": null
+          },
+          {
+            "family": "HCRDotum",
+            "sha256": null
+          },
+          {
+            "family": "HMKMM",
+            "sha256": null
+          },
+          {
+            "family": "HYmjrE",
+            "sha256": null
+          },
+          {
+            "family": "NanumGothic",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30",
+        "release-12"
+      ],
+      "regression": {
+        "kind": "self-rendered-regression",
+        "renderer_pair": [
+          "f82067c72bb9d2dad82c57c448189a18d67cd6c0",
+          "fed548c9acc3858624320538be0ce96b6ca0c742"
+        ],
+        "pages": 6,
+        "dimensions_pt": [
+          [
+            595.28,
+            841.88
+          ],
+          [
+            595.28,
+            841.88
+          ],
+          [
+            595.28,
+            841.88
+          ],
+          [
+            595.28,
+            841.88
+          ],
+          [
+            595.28,
+            841.88
+          ],
+          [
+            595.28,
+            841.88
+          ]
+        ],
+        "diagnostics": {
+          "required": [
+            "HWPX\\ preview\\ is\\ experimental:\\ rhwp\\ uses\\ source/table\\ font\\ geometry;\\ drawing\\ substitutions\\ can\\ differ\\ from\\ Hancom,\\ and\\ complex\\ controls\\ or\\ table\\ reflow\\ need\\ visual\\ review\\."
+          ],
+          "allow": [
+            "HWPX\\ preview\\ is\\ experimental:\\ rhwp\\ uses\\ source/table\\ font\\ geometry;\\ drawing\\ substitutions\\ can\\ differ\\ from\\ Hancom,\\ and\\ complex\\ controls\\ or\\ table\\ reflow\\ need\\ visual\\ review\\."
+          ]
+        },
+        "missing_glyphs": [
+          "U+2024",
+          "U+2027",
+          "U+274D",
+          "U+274F"
+        ],
+        "font_identities": {
+          "substituted": [
+            {
+              "requested": "HY견명조",
+              "script": "latin",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 7,
+              "pages": [
+                1,
+                3
+              ]
+            },
+            {
+              "requested": "HY견명조",
+              "script": "hangul",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 55,
+              "pages": [
+                1,
+                3
+              ]
+            },
+            {
+              "requested": "HY견명조",
+              "script": "latin",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 2,
+              "pages": [
+                1,
+                3
+              ]
+            },
+            {
+              "requested": "휴먼명조",
+              "script": "latin",
+              "drawn": "Arial",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 122,
+              "pages": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            {
+              "requested": "휴먼명조",
+              "script": "hangul",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 1080,
+              "pages": [
+                1,
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            {
+              "requested": "바탕",
+              "script": "latin",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 18,
+              "pages": [
+                1,
+                2,
+                3,
+                4,
+                5,
+                6
+              ]
+            },
+            {
+              "requested": "휴먼명조",
+              "script": "latin",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 8,
+              "pages": [
+                2,
+                3,
+                4
+              ]
+            },
+            {
+              "requested": "휴먼명조",
+              "script": "hangul",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 33,
+              "pages": [
+                2,
+                3,
+                4
+              ]
+            },
+            {
+              "requested": "함초롬바탕",
+              "script": "latin",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 20,
+              "pages": [
+                2,
+                3,
+                4
+              ]
+            },
+            {
+              "requested": "함초롬바탕",
+              "script": "hangul",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 95,
+              "pages": [
+                2,
+                3,
+                4
+              ]
+            }
+          ],
+          "drawn_as_requested": [
+            {
+              "requested": "나눔고딕",
+              "script": "latin",
+              "source": "system",
+              "chars": 2
+            },
+            {
+              "requested": "나눔고딕",
+              "script": "hangul",
+              "source": "system",
+              "chars": 11
+            }
+          ],
+          "missing_glyphs": [
+            {
+              "char": "U+2024",
+              "requested": "휴먼명조",
+              "pages": [
+                5
+              ]
+            },
+            {
+              "char": "U+2027",
+              "requested": "휴먼명조",
+              "pages": [
+                3
+              ]
+            },
+            {
+              "char": "U+274D",
+              "requested": "휴먼명조",
+              "pages": [
+                2,
+                3,
+                4,
+                5
+              ]
+            },
+            {
+              "char": "U+274F",
+              "requested": "휴먼명조",
+              "pages": [
+                1,
+                2,
+                3,
+                4
+              ]
+            }
+          ],
+          "missing_glyphs_total": 4
+        },
+        "font_hash_scope": "embedded per-page subsets; original output font hashes were not recorded",
+        "font_subset_sha256": [
+          {
+            "hanji-page-0-font-0": "b32f82594ccc15c2adf0999cddf5e6d1df22e59f2a08182dd7b36ba4e034ab11",
+            "hanji-page-0-font-1": "20352bed9f1e9c17ce00f32e2dd685ecbc911473910d52f51339a61ffe748df0",
+            "hanji-page-0-font-2": "319ffeba107abc52887cacbf76d4681796255e63a8f459bf476a5764ba96fafc",
+            "hanji-page-0-font-3": "281c4f5dd08cbd02968ca1858f5859d727040dfac459c57f915d9ab1d222f822",
+            "hanji-page-0-font-4": "5dca9f1f8657667a6af8d05eb5a691759356295c192dae382c6dff0229e18417",
+            "hanji-page-0-font-5": "18a389d15f4506a782409e6599c10fa88c889f05991bad4b054d7320ac5c4f8a"
+          },
+          {
+            "hanji-page-1-font-3": "3ef09f382c7f0499fc140dcee9f94fb8827f67f9a642d900884221ffb6f21253",
+            "hanji-page-1-font-4": "932e3d5a68ada2e47e9d34e95ab835e2ff6f5ded5492d6d1666d732519f0b512",
+            "hanji-page-1-font-5": "f8838355871b2f3cf050f6fbc2d15682c5bfb7d01506a3ee08288ece67fcef14",
+            "hanji-page-1-font-6": "ea7e908de6e29882e4b8939c0d129350db0eccb9eee91b578f7f80a84b8eac4b",
+            "hanji-page-1-font-7": "7b7d6e5fc6662a03f489a727602f5deab52a17bab465d1832c81022a6cf6bdff",
+            "hanji-page-1-font-8": "1a20471369d7afd60d5cf0d109d36390d9dca31cefc9bf29d8017d92be340778",
+            "hanji-page-1-font-9": "eaaec3d75c1ca990981978945924714893d6912fe749474551037628f638e148",
+            "hanji-page-1-font-10": "a3dc71d2a4f7cb0ba2b2124930607f7b6b809f5e89bdb44bb9cd362387c64032",
+            "hanji-page-1-font-11": "15f2e5a7430d4eb5bdf05998713bd5098f07345ca89e4a7b22504c0935759990"
+          },
+          {
+            "hanji-page-2-font-0": "cb721b2485ce524c730e9fa3c156bab56cc1360463c6faa947d5b554b3df30c7",
+            "hanji-page-2-font-1": "b2086ab5ea32e4bceabbff9c7a3e12fefacc05a8db06bb3a002f4c6b37891329",
+            "hanji-page-2-font-2": "d4fbd5fed8d5971f118e014897ee024e34088de058465e64ac0734c79434150b",
+            "hanji-page-2-font-3": "51c3afae7767de47a524cb3a2033f8240353d32c2eeb145e708cb30a14d8dd5a",
+            "hanji-page-2-font-4": "dc90faa0960b44c302d70be674ac99c3da356cf08f2d28c7f29b4a501a94e2f4",
+            "hanji-page-2-font-5": "defbf4505f1a3cbdc466f0f342a94757e0d7be02ed0db18a8027a82c9ee7cb8c",
+            "hanji-page-2-font-8": "4df9d74076dfab2ff337c62a11047aae8b8f145812cdbe2de1dd4583b79d177e",
+            "hanji-page-2-font-9": "27e77bd9f67a1fce277ff6b0b4f7744794d84e4e2d2a2a79178f1ed3e623d54d",
+            "hanji-page-2-font-10": "9613298fcf40a35f016789b748e4999a1f0d85357840de9e24a8ad6bd28f6ab2",
+            "hanji-page-2-font-11": "70988d71f08d67fd2bf283643a7d46da1cb9f2a57126f4cf67e3319abf0b2a05"
+          },
+          {
+            "hanji-page-3-font-3": "3321ea3c04fbdb439abe14ef9a79500d4d68dff75d34ed4b674cab5463ae6830",
+            "hanji-page-3-font-4": "0dedd5dfb294ac014fdde02d6656a7357fb9b6fcb53e875471080d9f001eabfa",
+            "hanji-page-3-font-5": "0ed1bf6a84d77c05a38702aa7c95d2acb92cbbfe83f28d76927c0273a7cadd8a",
+            "hanji-page-3-font-8": "4df9d74076dfab2ff337c62a11047aae8b8f145812cdbe2de1dd4583b79d177e",
+            "hanji-page-3-font-9": "cfcac553d5c441bd8c74fe4df7096c36a016cab0fe6237ac43859e3b289f4404",
+            "hanji-page-3-font-10": "ad0b094b167e2fb3737b4f28f189d108bb8d320ab2667ea4ea8c8f717d0c5b52",
+            "hanji-page-3-font-11": "ad039206451059d13f06009afe32b27a230c02dda7a2953a293f717b4b9e79f2"
+          },
+          {
+            "hanji-page-4-font-3": "8a7f44562a7e18f84fd355a79e45efcb1110449f187d8bcc85f7392f9536eea6",
+            "hanji-page-4-font-4": "f978b011af8701b4f8dbb375cdf1f827392deae3b926a6f1ee5ceb9194991adb",
+            "hanji-page-4-font-5": "6888dadf641f8dec71f28663f456bb8b82c5b03ceebd902231ad05e38c9fab91"
+          },
+          {
+            "hanji-page-5-font-5": "1f0026c300d6e3f548633029883e52731ac4f029efed9ad5a9ce9123469b953b"
+          }
+        ],
+        "output_sha256": {
+          "svg/28-hwpx-edited-footnote-01-e10-r1-page-6.svg": "a235273dbefe748f687fe21327f1d793c41082e1d74ae316d6ae84ff28b0ade9",
+          "svg/28-hwpx-edited-footnote-01-e10-r1-page-5.svg": "4935a72b0df2cc12c69c0dd3a893832b8b6a90846552e22118931ab2b59d5060",
+          "svg/28-hwpx-edited-footnote-01-e10-r1-page-4.svg": "e58fd8ce03404ee8e81889ac54d5b27819c8d2a0dc452bcc3016ebd97000080d",
+          "svg/28-hwpx-edited-footnote-01-e10-r1-page-1.svg": "f9ec72427aaa0cf9607519da39fb56ef12c24dcef14e0fcc5366b88d3bc944fd",
+          "svg/28-hwpx-edited-footnote-01-e10-r1-page-3.svg": "006711bceee8540acbd5d0989fb6025aa3520d1bdc0c018c884829034437f09d",
+          "svg/28-hwpx-edited-footnote-01-e10-r1-page-2.svg": "fe2391ef40c535a52cf2f7db0d7c3c3befabb6ecf45a4d75d0019423fc2d55bc",
+          "png/28-hwpx-edited-footnote-01-e10-r1-page-2.png": "97cc38b8a470d1fe81274fc9228ddc207dde64b9b763ab937b6b0df2b0751042",
+          "png/28-hwpx-edited-footnote-01-e10-r1-page-3.png": "ba58860e54116f42fc6505842bd34393fb70e6d7889ca37392df00f89ff161d5",
+          "png/28-hwpx-edited-footnote-01-e10-r1-page-1.png": "d7001359c4858cfcfb3958ef7d3d0fb6bb29257aec132e961e6e993e9f7fba8d",
+          "png/28-hwpx-edited-footnote-01-e10-r1-page-4.png": "34e9b40dbfca53fcca7cc9a21ba1a97df089a0d44c2bcb215e842a54eba3387c",
+          "png/28-hwpx-edited-footnote-01-e10-r1-page-5.png": "daf9348f8b6ea5743031b519acfcecdba0b54ce45d6fef9c14e6f433944e8d70",
+          "png/28-hwpx-edited-footnote-01-e10-r1-page-6.png": "3893f6793c313805aad278d74504c08025937884be8a2d7b3900792cad5fb9a7",
+          "html/28-hwpx-edited-footnote-01-e10-r1-preview.html": "ab0ce4a34a823c7bcce50989750d66b8fa05fa112ff1a6a020243b2e096d2765"
+        }
+      }
+    },
+    {
+      "id": "29-hwpx-edited-hy-002-e10",
+      "format": "hwpx",
+      "input": {
+        "path": "prototype/preview/baseline/29-hwpx-edited-hy-002-e10.hwpx",
+        "sha256": "a6bf4577844179ab683a539e0c225003689e8980a49a3c521ae99c89175617f4",
+        "bytes": 103603
+      },
+      "features": [
+        "Korean",
+        "edited"
+      ],
+      "provenance": {
+        "source": "crates/hanji-hwpx/corpus/hy-002.hwpx",
+        "built_by": "kit e10",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156",
+        "edits_file": "edits/29-hwpx-edited-hy-002-e10.edits.md",
+        "edit": "E1-E9 + F1/F3/F4: inserted/deleted/moved/split/merged paragraphs, restyle, cell edit, run-boundary edit, first-line indent, new Callout style, header-row fill"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Hancom",
+        "recorded_version": "12.30.0 (6523)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "29-hwpx-edited-hy-002-e10.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 3,
+        "historical_first_page_size_pt": [
+          595.0,
+          842.0
+        ],
+        "font_identities": [
+          {
+            "family": "DotumChe",
+            "sha256": null
+          },
+          {
+            "family": "HCRBatang",
+            "sha256": null
+          },
+          {
+            "family": "HCRDotum-Bold",
+            "sha256": null
+          },
+          {
+            "family": "HMKMM",
+            "sha256": null
+          },
+          {
+            "family": "PalatinoLinotype-Roman",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30"
+      ]
+    },
+    {
+      "id": "30-hwpx-new-plan-ko",
+      "format": "hwpx",
+      "input": {
+        "path": "prototype/preview/baseline/30-hwpx-new-plan-ko.hwpx",
+        "sha256": "5950a159901cbe6c1969c3ecb9143bf4099a11641e1c20ed9839e095be89d3cf",
+        "bytes": 8397
+      },
+      "features": [
+        "new",
+        "Korean",
+        "merges",
+        "page break"
+      ],
+      "provenance": {
+        "source": "hanji-store blank hwpx (crates/hanji-store)",
+        "built_by": "cli new document --format hwpx + write",
+        "hanji_commit": "0024cc315de4ef859f14ca4d7e116c49e480b156",
+        "edits_file": "edits/30-hwpx-new-plan-ko.input.md",
+        "edit": "new Korean/Latin plan: headings (개요), nested bullets, numbered list, table with vertical (^^) and horizontal (|||) merges, page break, second table"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "unverified",
+        "basis": "existing tracked fixture, authorized local acceptance; no new input/reference/font binaries published"
+      },
+      "support_profile": "experimental-regression-only",
+      "critical_text": [],
+      "critical_assertions_status": "owner_selection_required",
+      "native_reference": {
+        "app": "Hancom",
+        "recorded_version": "12.30.0 (6523)",
+        "version_confirmed": false,
+        "version_note": "historical record only; fresh owner-confirmed export required",
+        "os": "mac OS 27.0(26A428)",
+        "expected_filename": "30-hwpx-new-plan-ko.pdf",
+        "status": "historical-metadata-only",
+        "sha256": null,
+        "historical_pages": 2,
+        "historical_first_page_size_pt": [
+          595.0,
+          842.0
+        ],
+        "font_identities": [
+          {
+            "family": "HCRBatang",
+            "sha256": null
+          },
+          {
+            "family": "HCRBatang-Bold",
+            "sha256": null
+          }
+        ],
+        "geometry_usable": false,
+        "quality_note": "native PDF absent; historical dimensions are not current acceptance"
+      },
+      "sets": [
+        "historical-30",
+        "release-12"
+      ],
+      "regression": {
+        "kind": "self-rendered-regression",
+        "renderer_pair": [
+          "f82067c72bb9d2dad82c57c448189a18d67cd6c0",
+          "fed548c9acc3858624320538be0ce96b6ca0c742"
+        ],
+        "pages": 2,
+        "dimensions_pt": [
+          [
+            595.28,
+            841.86
+          ],
+          [
+            595.28,
+            841.86
+          ]
+        ],
+        "diagnostics": {
+          "required": [
+            "HWPX\\ preview\\ is\\ experimental:\\ rhwp\\ uses\\ source/table\\ font\\ geometry;\\ drawing\\ substitutions\\ can\\ differ\\ from\\ Hancom,\\ and\\ complex\\ controls\\ or\\ table\\ reflow\\ need\\ visual\\ review\\."
+          ],
+          "allow": [
+            "HWPX\\ preview\\ is\\ experimental:\\ rhwp\\ uses\\ source/table\\ font\\ geometry;\\ drawing\\ substitutions\\ can\\ differ\\ from\\ Hancom,\\ and\\ complex\\ controls\\ or\\ table\\ reflow\\ need\\ visual\\ review\\."
+          ]
+        },
+        "missing_glyphs": [],
+        "font_identities": {
+          "substituted": [
+            {
+              "requested": "함초롬바탕",
+              "script": "latin",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 231,
+              "pages": [
+                1,
+                2
+              ]
+            },
+            {
+              "requested": "함초롬바탕",
+              "script": "hangul",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 249,
+              "pages": [
+                1,
+                2
+              ]
+            },
+            {
+              "requested": "함초롬바탕",
+              "script": "latin",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 3,
+              "pages": [
+                1
+              ]
+            },
+            {
+              "requested": "함초롬바탕",
+              "script": "latin",
+              "drawn": "AppleMyungjo",
+              "source": "system",
+              "metrics": "substitute",
+              "chars": 2,
+              "pages": [
+                1
+              ]
+            }
+          ],
+          "drawn_as_requested": [
+            {
+              "requested": "Arial",
+              "script": "latin",
+              "source": "system",
+              "chars": 1
+            }
+          ],
+          "missing_glyphs": []
+        },
+        "font_hash_scope": "embedded per-page subsets; original output font hashes were not recorded",
+        "font_subset_sha256": [
+          {
+            "hanji-page-0-font-0": "87efe93cd86edad123963fedc5557190e17fc4883d87a06e669bb5cc88a828a1",
+            "hanji-page-0-font-1": "403949fa6f71df9c80e6b3a382e8e9e1c37b22ce5b7cfda9d67229d55e3b79dd",
+            "hanji-page-0-font-2": "1dd33aeec9d39ba161f36c4d57ff9033e4b81c52593caab5a0eaed3f9af9f54a",
+            "hanji-page-0-font-3": "2b1e591244f96794db8ba7a36bb2ffe8c4eb245e0ed1398b81885f02281d1771",
+            "hanji-page-0-font-4": "54d0a2dc60a5c9fe01976878cb3aaeb8bcaf647480b2ebc8e5be8438285e6f54"
+          },
+          {
+            "hanji-page-1-font-0": "e4ffe9524041b3d758f5602d5683f899cdaa37a183aaa4032709bcf32517dfe0",
+            "hanji-page-1-font-1": "8959894ac2c316f6c52f1653c4276412c5531045b027bb06f75bf6e21e07f565"
+          }
+        ],
+        "output_sha256": {
+          "svg/30-hwpx-new-plan-ko-r1-page-1.svg": "884815beab3185a53d73bd96579ebf0d929a8294d54cb624e12a06c707d16ea3",
+          "svg/30-hwpx-new-plan-ko-r1-page-2.svg": "2e41a0b245a4e57f1e25d9299fe5080fc99b81bacffd0b99de78c2323b0fc039",
+          "png/30-hwpx-new-plan-ko-r1-page-2.png": "9a0ba27981eb1cc96f1f93c5118fe8f70ec7af1f351813d086dcda18b0db9f5e",
+          "png/30-hwpx-new-plan-ko-r1-page-1.png": "f911fd2e5f48585397523fbd27bf78edc59703e7cb6b0b47f637d1bdcf82a3f8",
+          "html/30-hwpx-new-plan-ko-r1-preview.html": "3232f5479463737aa7c5bd3615f409484635eae95c6135117e6cdd61b1ea4153"
+        }
+      }
+    },
+    {
+      "id": "synthetic-docx-v1",
+      "format": "docx",
+      "input": {
+        "path": "prototype/preview/acceptance/synthetic-inputs/synthetic-docx-v1.docx",
+        "sha256": "9e2ff6456592063c2cc0c84bc6dfe61ce40a74720ade7439fd481474cd9da939",
+        "bytes": 12243
+      },
+      "features": [
+        "critical text",
+        "digits",
+        "source immutability",
+        "complete enumeration"
+      ],
+      "provenance": {
+        "generator": "generate_synthetic.py",
+        "blank_parts_commit": "e2182b04959008d2c2ef9d478dd0e5e68f28ef67",
+        "authored_for": "acceptance harness"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "MIT",
+        "basis": "Hanji MIT blank parts and newly authored synthetic content"
+      },
+      "support_profile": "synthetic-contract",
+      "sets": [
+        "synthetic-4"
+      ],
+      "critical_text": [
+        {
+          "id": "body",
+          "page": 1,
+          "value": "HANJI DOCX 42"
+        }
+      ],
+      "native_reference": {
+        "app": "Word",
+        "status": "missing",
+        "sha256": null,
+        "font_identities": []
+      },
+      "regression": {
+        "kind": "self-rendered-regression",
+        "renderer_pair": [
+          "f82067c72bb9d2dad82c57c448189a18d67cd6c0",
+          "fed548c9acc3858624320538be0ce96b6ca0c742"
+        ],
+        "pages": 1,
+        "dimensions_pt": [
+          [
+            595.3,
+            841.9
+          ]
+        ],
+        "diagnostics": {
+          "required": [
+            "DOCX\\ preview\\ is\\ experimental:\\ pagination\\ and\\ Word\\-specific\\ layout\\ may\\ differ\\ from\\ Word;\\ inspect\\ rendering\\ diagnostics\\."
+          ],
+          "allow": [
+            "DOCX\\ preview\\ is\\ experimental:\\ pagination\\ and\\ Word\\-specific\\ layout\\ may\\ differ\\ from\\ Word;\\ inspect\\ rendering\\ diagnostics\\."
+          ]
+        },
+        "missing_glyphs": [],
+        "font_identities": {
+          "substituted": [
+            {
+              "requested": "Calibri",
+              "script": "latin",
+              "drawn": "Carlito",
+              "source": "bundled",
+              "metrics": "compatible:Carlito",
+              "chars": 11,
+              "pages": [
+                1
+              ]
+            }
+          ],
+          "drawn_as_requested": [],
+          "missing_glyphs": []
+        },
+        "font_hash_scope": "embedded per-page subsets; original output font hashes were not recorded",
+        "font_subset_sha256": [
+          {
+            "hanji-font-0": "22d788bda95a8c3e073f710d49e0a7f6a0d4177aa8851141ec909ffb94ea9e10"
+          }
+        ],
+        "output_sha256": {
+          "svg/synthetic-docx-v1-r1-page-1.svg": "5565d153ade03e6b58f90b7c8ba6a06e3bc7883a0d6b940c5e11861d91c7ee49",
+          "png/synthetic-docx-v1-r1-page-1.png": "8ceddf1608aed1606c25d950dc9ecf792fc813f26313e0bae170d00f8ced43df",
+          "html/synthetic-docx-v1-r1-preview.html": "344a108636a259d1de073709be882ee66d098e03f6d20727f5805085c00e7a37"
+        }
+      }
+    },
+    {
+      "id": "synthetic-hwpx-v1",
+      "format": "hwpx",
+      "input": {
+        "path": "prototype/preview/acceptance/synthetic-inputs/synthetic-hwpx-v1.hwpx",
+        "sha256": "246b9de4d8bdd2d23f9d37ab4cca6aef5e183d76c6a7078daf74fc5217bba019",
+        "bytes": 49437
+      },
+      "features": [
+        "critical text",
+        "digits",
+        "source immutability",
+        "complete enumeration"
+      ],
+      "provenance": {
+        "generator": "generate_synthetic.py",
+        "blank_parts_commit": "e2182b04959008d2c2ef9d478dd0e5e68f28ef67",
+        "authored_for": "acceptance harness"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "MIT",
+        "basis": "Hanji MIT blank parts and newly authored synthetic content"
+      },
+      "support_profile": "synthetic-contract",
+      "sets": [
+        "synthetic-4"
+      ],
+      "critical_text": [
+        {
+          "id": "body",
+          "page": 1,
+          "value": "HANJI HWPX 42"
+        }
+      ],
+      "native_reference": {
+        "app": "Hancom",
+        "status": "missing",
+        "sha256": null,
+        "font_identities": []
+      },
+      "regression": {
+        "kind": "self-rendered-regression",
+        "renderer_pair": [
+          "f82067c72bb9d2dad82c57c448189a18d67cd6c0",
+          "fed548c9acc3858624320538be0ce96b6ca0c742"
+        ],
+        "pages": 1,
+        "dimensions_pt": [
+          [
+            595.28,
+            841.86
+          ]
+        ],
+        "diagnostics": {
+          "required": [
+            "HWPX\\ preview\\ is\\ experimental:\\ rhwp\\ uses\\ source/table\\ font\\ geometry;\\ drawing\\ substitutions\\ can\\ differ\\ from\\ Hancom,\\ and\\ complex\\ controls\\ or\\ table\\ reflow\\ need\\ visual\\ review\\."
+          ],
+          "allow": [
+            "HWPX\\ preview\\ is\\ experimental:\\ rhwp\\ uses\\ source/table\\ font\\ geometry;\\ drawing\\ substitutions\\ can\\ differ\\ from\\ Hancom,\\ and\\ complex\\ controls\\ or\\ table\\ reflow\\ need\\ visual\\ review\\."
+          ]
+        },
+        "missing_glyphs": [],
+        "font_identities": {
+          "substituted": [],
+          "drawn_as_requested": [
+            {
+              "requested": "Arial",
+              "script": "latin",
+              "source": "system",
+              "chars": 11
+            }
+          ],
+          "missing_glyphs": []
+        },
+        "font_hash_scope": "embedded per-page subsets; original output font hashes were not recorded",
+        "font_subset_sha256": [
+          {
+            "hanji-page-0-font-0": "b9daf133e2a2aad810df75553d06725824caa0c0ca6fa6b77f31e901b25e2813"
+          }
+        ],
+        "output_sha256": {
+          "svg/synthetic-hwpx-v1-r1-page-1.svg": "c735a68a2f49b0b1fe514f13edd6278cbd4b177312f07c2d0c3f89f3b0fcc086",
+          "png/synthetic-hwpx-v1-r1-page-1.png": "fbb119a2945ee2a315d03520f51340cfcbcca8b0ebe13bd851204640abcc6c9c",
+          "html/synthetic-hwpx-v1-r1-preview.html": "6ff8c9cef7e716103bfb9aeda79c376054720775cba13e88d47f1da72d05d7b2"
+        }
+      }
+    },
+    {
+      "id": "synthetic-pptx-v1",
+      "format": "pptx",
+      "input": {
+        "path": "prototype/preview/acceptance/synthetic-inputs/synthetic-pptx-v1.pptx",
+        "sha256": "debbea0b92273418bca6188869e30cc87e944af4f3e1817249dcb0762059ebd6",
+        "bytes": 35920
+      },
+      "features": [
+        "critical text",
+        "digits",
+        "source immutability",
+        "complete enumeration"
+      ],
+      "provenance": {
+        "generator": "generate_synthetic.py",
+        "blank_parts_commit": "e2182b04959008d2c2ef9d478dd0e5e68f28ef67",
+        "authored_for": "acceptance harness"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "MIT",
+        "basis": "Hanji MIT blank parts and newly authored synthetic content"
+      },
+      "support_profile": "synthetic-contract",
+      "sets": [
+        "synthetic-4"
+      ],
+      "critical_text": [
+        {
+          "id": "body",
+          "page": 1,
+          "value": "HANJI PPTX 42"
+        }
+      ],
+      "native_reference": {
+        "app": "PowerPoint",
+        "status": "missing",
+        "sha256": null,
+        "font_identities": []
+      },
+      "regression": {
+        "kind": "self-rendered-regression",
+        "renderer_pair": [
+          "f82067c72bb9d2dad82c57c448189a18d67cd6c0",
+          "fed548c9acc3858624320538be0ce96b6ca0c742"
+        ],
+        "pages": 1,
+        "dimensions_pt": [
+          [
+            960.0,
+            540.0
+          ]
+        ],
+        "diagnostics": {
+          "required": [],
+          "allow": []
+        },
+        "missing_glyphs": [],
+        "font_identities": {
+          "substituted": [
+            {
+              "requested": "Calibri Light",
+              "script": "latin",
+              "drawn": "Carlito",
+              "source": "bundled",
+              "metrics": "compatible:Carlito",
+              "chars": 11,
+              "pages": [
+                1
+              ]
+            }
+          ],
+          "drawn_as_requested": [],
+          "missing_glyphs": []
+        },
+        "font_hash_scope": "embedded per-page subsets; original output font hashes were not recorded",
+        "font_subset_sha256": [
+          {
+            "hanji-font-0": "023a8e7b93805ee3d40931ca767a92aeea1f820504485526225d5ce9d113a230"
+          }
+        ],
+        "output_sha256": {
+          "svg/synthetic-pptx-v1-r1-slide-1.svg": "d5a56c35e82473590fa33cffdc22ede2d87bc07572e068be0d797a82ec89061b",
+          "png/synthetic-pptx-v1-r1-slide-1.png": "d7ccbebd3a613c27615512defe7358c744629a75a28a54a0bf7e87b43481ebe3",
+          "html/synthetic-pptx-v1-r1-preview.html": "cf6276ce8a1f3fb5b5f7be6aa524bf2e067c457cb58b677f61542b1b4cc61c86"
+        }
+      }
+    },
+    {
+      "id": "synthetic-xlsx-v1",
+      "format": "xlsx",
+      "input": {
+        "path": "prototype/preview/acceptance/synthetic-inputs/synthetic-xlsx-v1.xlsx",
+        "sha256": "01f2a3e898335e63aaea8c8a2f9886877d3709f5803d75981d9394e7f3d40368",
+        "bytes": 4527
+      },
+      "features": [
+        "critical text",
+        "digits",
+        "source immutability",
+        "complete enumeration",
+        "cached formula",
+        "clipping",
+        "embedded font coverage"
+      ],
+      "provenance": {
+        "generator": "generate_synthetic.py",
+        "blank_parts_commit": "e2182b04959008d2c2ef9d478dd0e5e68f28ef67",
+        "authored_for": "acceptance harness"
+      },
+      "rights": {
+        "local_validation": true,
+        "redistribution": "MIT",
+        "basis": "Hanji MIT blank parts and newly authored synthetic content"
+      },
+      "support_profile": "synthetic-contract",
+      "sets": [
+        "synthetic-4"
+      ],
+      "critical_text": [
+        {
+          "id": "body",
+          "page": 1,
+          "value": "HANJI XLSX"
+        }
+      ],
+      "native_reference": {
+        "app": "Excel",
+        "status": "missing",
+        "sha256": null,
+        "font_identities": []
+      },
+      "regression": {
+        "kind": "self-rendered-regression",
+        "renderer_pair": [
+          "f82067c72bb9d2dad82c57c448189a18d67cd6c0",
+          "fed548c9acc3858624320538be0ce96b6ca0c742"
+        ],
+        "pages": 1,
+        "dimensions_pt": [
+          [
+            132.015,
+            51.0
+          ]
+        ],
+        "diagnostics": {
+          "required": [
+            "sheets\\[0\\]\\.cells\\[A1\\]\\.clipping:\\ cell\\ text\\ exceeds\\ its\\ stored\\ size\\ and\\ is\\ clipped;\\ leading\\ digits\\ of\\ right\\-aligned\\ values\\ may\\ be\\ hidden;\\ cells\\[\\]\\.display\\ retains\\ the\\ complete\\ value",
+            "sheets\\[0\\]\\.cells\\[A2\\]\\.formula:\\ stored\\ formula\\ result\\ shown;\\ cache\\ freshness\\ is\\ unverified;\\ no\\ evaluation\\ was\\ performed",
+            "sheets\\[0\\]\\.grid:\\ worksheet\\ window\\ only:\\ column\\ widths\\ use\\ a\\ 7\\-pixel\\ maximum\\-digit\\ approximation;\\ text\\ wraps\\ by\\ character,\\ clips\\ to\\ cells,\\ and\\ stored\\ row\\ heights\\ are\\ not\\ auto\\-fitted;\\ rich\\-text\\ runs\\ use\\ the\\ cell\\ font;\\ print\\ pagination\\ is\\ not\\ applied",
+            "sheets\\[0\\]\\.pageMargins:\\ pageMargins\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.sheetViews:\\ sheetViews\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)"
+          ],
+          "allow": [
+            "cell\\ text\\ exceeds\\ its\\ stored\\ size\\ and\\ is\\ clipped;\\ leading\\ digits\\ of\\ right\\-aligned\\ values\\ may\\ be\\ hidden;\\ cells\\[\\]\\.display\\ retains\\ the\\ complete\\ value",
+            "pageMargins\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheetViews\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.cells\\[A1\\]\\.clipping:\\ cell\\ text\\ exceeds\\ its\\ stored\\ size\\ and\\ is\\ clipped;\\ leading\\ digits\\ of\\ right\\-aligned\\ values\\ may\\ be\\ hidden;\\ cells\\[\\]\\.display\\ retains\\ the\\ complete\\ value",
+            "sheets\\[0\\]\\.cells\\[A2\\]\\.formula:\\ stored\\ formula\\ result\\ shown;\\ cache\\ freshness\\ is\\ unverified;\\ no\\ evaluation\\ was\\ performed",
+            "sheets\\[0\\]\\.grid:\\ worksheet\\ window\\ only:\\ column\\ widths\\ use\\ a\\ 7\\-pixel\\ maximum\\-digit\\ approximation;\\ text\\ wraps\\ by\\ character,\\ clips\\ to\\ cells,\\ and\\ stored\\ row\\ heights\\ are\\ not\\ auto\\-fitted;\\ rich\\-text\\ runs\\ use\\ the\\ cell\\ font;\\ print\\ pagination\\ is\\ not\\ applied",
+            "sheets\\[0\\]\\.pageMargins:\\ pageMargins\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "sheets\\[0\\]\\.sheetViews:\\ sheetViews\\ semantics\\ are\\ not\\ applied\\ in\\ the\\ worksheet\\ grid\\ \\(charts/images,\\ rules,\\ table\\ styles,\\ filters,\\ protection,\\ links,\\ freeze\\ panes\\ and\\ print\\ settings\\ are\\ separate\\ work\\)",
+            "stored\\ formula\\ result\\ shown;\\ cache\\ freshness\\ is\\ unverified;\\ no\\ evaluation\\ was\\ performed",
+            "worksheet\\ window\\ only:\\ column\\ widths\\ use\\ a\\ 7\\-pixel\\ maximum\\-digit\\ approximation;\\ text\\ wraps\\ by\\ character,\\ clips\\ to\\ cells,\\ and\\ stored\\ row\\ heights\\ are\\ not\\ auto\\-fitted;\\ rich\\-text\\ runs\\ use\\ the\\ cell\\ font;\\ print\\ pagination\\ is\\ not\\ applied"
+          ]
+        },
+        "missing_glyphs": [
+          "U+0032",
+          "U+0034",
+          "U+0041",
+          "U+0048",
+          "U+0049",
+          "U+004A",
+          "U+004C",
+          "U+004E",
+          "U+0053",
+          "U+0058"
+        ],
+        "font_identities": {
+          "substituted": [
+            {
+              "requested": "맑은 고딕",
+              "script": "latin",
+              "drawn": "Noto Sans KR",
+              "source": "bundled",
+              "metrics": "substitute",
+              "chars": 13,
+              "pages": [
+                1
+              ]
+            },
+            {
+              "requested": "Calibri",
+              "script": "latin",
+              "drawn": "Carlito",
+              "source": "bundled",
+              "metrics": "compatible:Carlito",
+              "chars": 4,
+              "pages": [
+                1
+              ]
+            }
+          ],
+          "drawn_as_requested": [],
+          "missing_glyphs": [
+            {
+              "char": "U+0032",
+              "requested": "맑은 고딕",
+              "pages": [
+                1
+              ]
+            },
+            {
+              "char": "U+0034",
+              "requested": "맑은 고딕",
+              "pages": [
+                1
+              ]
+            },
+            {
+              "char": "U+0041",
+              "requested": "맑은 고딕",
+              "pages": [
+                1
+              ]
+            },
+            {
+              "char": "U+0048",
+              "requested": "맑은 고딕",
+              "pages": [
+                1
+              ]
+            },
+            {
+              "char": "U+0049",
+              "requested": "맑은 고딕",
+              "pages": [
+                1
+              ]
+            },
+            {
+              "char": "U+004A",
+              "requested": "맑은 고딕",
+              "pages": [
+                1
+              ]
+            },
+            {
+              "char": "U+004C",
+              "requested": "맑은 고딕",
+              "pages": [
+                1
+              ]
+            },
+            {
+              "char": "U+004E",
+              "requested": "맑은 고딕",
+              "pages": [
+                1
+              ]
+            },
+            {
+              "char": "U+0053",
+              "requested": "맑은 고딕",
+              "pages": [
+                1
+              ]
+            },
+            {
+              "char": "U+0058",
+              "requested": "맑은 고딕",
+              "pages": [
+                1
+              ]
+            }
+          ],
+          "missing_glyphs_total": 10
+        },
+        "font_hash_scope": "embedded per-page subsets; original output font hashes were not recorded",
+        "font_subset_sha256": [
+          {
+            "hanji-font-0": "91110ffaa6d08c3eb40ccf1f57744beb876b772168ad7151a087321f033afefb",
+            "hanji-font-1": "af54f1875f61f4ffc8874be676b2a7c02844551fb4f6998132c95796b10a3037"
+          }
+        ],
+        "output_sha256": {
+          "svg/synthetic-xlsx-v1-r1-sheet-1-A1-B2.svg": "e4d427f74704d542d5a611b1cfe56d4dd69f923e1f954bafaba5b839251c78c7",
+          "png/synthetic-xlsx-v1-r1-sheet-1-A1-B2.png": "58f38453e638f0778cdfb082eb2e156f634579692f54e2f084bad333f97fdff1",
+          "html/synthetic-xlsx-v1-r1-sheet-1-A1-B2.html": "0a3b2c9211a35009fe7f84c112afd588c045c11c5a2b72183bc875e9112ae6f0"
+        }
+      },
+      "window": {
+        "sheet": "Sheet1",
+        "range": "A1:B2",
+        "mode": "cached-value-worksheet-window"
+      },
+      "critical_cells": {
+        "B1": {
+          "display": "42",
+          "formula_result": "not-formula"
+        },
+        "A2": {
+          "display": "42",
+          "formula_result": "cached-unverified"
+        }
+      },
+      "known_failure": "v0.3.0 selected embedded cell font cmap contains only SPACE; JSON reports 10 missing glyphs, and critical rendered text fails embedded cmap coverage. Long A1 text also clips."
+    }
+  ]
+}
