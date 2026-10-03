@@ -58,6 +58,10 @@ false: this report is evidence for an explicit later support-profile decision.
    disappearing diagnostics require review. Every emitted character is also
    checked against its actual embedded SFNT cmap; missing subset characters
    fail even if `cells[].display` or the JSON glyph report is complete.
+   `font_coverage` retains that codepoint/advance contract. Independently,
+   `font_glyph_evidence` rejects embedded generic LastResort faces, empty mapped
+   outlines, invalid TrueType data and letter/digit outlines duplicating
+   `.notdef` tofu. A clean CLI report and nonzero cmap cannot rescue these.
 5. SVG IDs/fragment resolution and document-wide HTML ID uniqueness. Critical
    text advance boxes, declared bounds, rectangular clip origins, and declared
    pairs of non-overlapping semantic regions are checked independently.
@@ -72,8 +76,30 @@ remain inside is **blocked ink verification**, not a proven clipping failure.
 Complex clips, arbitrary drawing-path collisions, shaping clusters, `tspan`
 positioning and non-supported transforms require further verification. This
 does not certify general picture/table/shape overlap or browser layout.
+The glyph evidence check aligns with PR #70's OpenType
+[`head.flags` bit 14](https://learn.microsoft.com/en-us/typography/opentype/spec/head):
+generic codepoint-range symbols do not establish character support. It also
+checks embedded family/full/PostScript names for LastResort, independently of
+SVG aliases and JSON family claims. TrueType checks use
+[`glyf`/`loca` records](https://learn.microsoft.com/en-us/typography/opentype/spec/glyf),
+simple contour points and bounded composite references. Empty positioning
+components are allowed when another valid component draws the glyph. Tofu
+comparison ignores hint bytes/padding and targets letters/digits; an authored
+square or replacement symbol is not rejected solely for resembling `.notdef`.
+
+Nonempty outlines are **structural drawing evidence**, not proof that arbitrary
+contours have the correct character shape or that PNG/browser rasterization is
+correct. CFF, bitmap/SVG glyph containers and inspection-budget exhaustion
+remain blocked, not credited as verified ink. Native source/font provenance,
+critical text/geometry and exact-candidate visual review are still required.
+The additional glyph tests use tiny authored in-memory font/outline doubles,
+not native references or fonts copied from installed applications.
+
 The harness budget is 512 pages, 64 MiB per file, and 16 MiB per SVG; these are
 tool budgets, not Hanji product caps. Capture refuses under 256 MiB free disk.
+Glyph inspection is bounded to 4,096 simple contours, 16 composite levels and
+128 components per glyph, with at most 4,096 outline record inspections per
+character before blocking repeated reference work; these are harness budgets.
 
 XLSX is one named, bounded cached-value **worksheet window**, not workbook
 print pagination. A historical entire-workbook Excel PDF is not a matching

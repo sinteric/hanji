@@ -140,7 +140,7 @@ def intersection(a, b):
 
 
 class FontMetrics:
-    """Read embedded SFNT cmap/hmtx; this is advance geometry, not ink bounds."""
+    """Read cmap/advances plus bounded glyph evidence, not raster/native fidelity."""
     def __init__(self, data):
         if len(data) < 12 or data[:4] not in (b'OTTO', b'\0\1\0\0'):
             raise ValueError('unsupported embedded font container')
@@ -152,6 +152,24 @@ class FontMetrics:
             self.tables[tag.decode()] = data[offset:offset+size]
         self.units = struct.unpack_from('>H', self.tables['head'], 18)[0]
         self.metrics = struct.unpack_from('>H', self.tables['hhea'], 34)[0]
+        # PR70 uses this same OpenType flag. SVG aliases and CLI coverage
+        # reports cannot erase the generic-symbol semantics of embedded bytes.
+        self.generic_reasons = []
+        if struct.unpack_from('>H',self.tables['head'],16)[0] & (1 << 14):
+            self.generic_reasons.append('head.flags bit 14: generic LastResort symbols')
+        names = self.tables.get('name',b'')
+        if names:
+            _,count,start = struct.unpack_from('>3H',names)
+            for i in range(count):
+                platform,_,_,name_id,size,offset = struct.unpack_from('>6H',names,6+12*i)
+                if name_id not in (1,4,6,16):
+                    continue
+                raw = names[start+offset:start+offset+size]
+                name = raw.decode('utf-16-be' if platform in (0,3) else 'mac_roman',errors='replace')
+                if re.sub('[^a-z]','',name.lower()).startswith('lastresort'):
+                    self.generic_reasons.append('embedded LastResort name: '+name)
+        self.glyph_cache = {}
+        self.inspection_work = 0
         cmap = self.tables['cmap']; candidates = []
         for i in range(struct.unpack_from('>H', cmap, 2)[0]):
             platform, encoding, offset = struct.unpack_from('>HHI', cmap, 4+8*i)
@@ -162,7 +180,7 @@ class FontMetrics:
             raise ValueError('font lacks supported metrics/cmap')
         self.form, self.cmap = max(candidates, key=lambda x: x[0])
 
-    def advance(self, char, size):
+    def glyph(self, char):
         cp = ord(char); c = self.cmap; glyph = 0
         if self.form == 12:
             for i in range(struct.unpack_from('>I', c, 12)[0]):
@@ -181,10 +199,151 @@ class FontMetrics:
                     if offset and glyph:
                         glyph = (glyph+delta)&65535
                     break
+        return glyph
+
+    def advance(self, char, size):
+        glyph = self.glyph(char)
         if not glyph:
             return None
         advance = struct.unpack_from('>H', self.tables['hmtx'], min(glyph,self.metrics-1)*4)[0]
         return advance*size/self.units
+
+    def outline(self, glyph):
+        """Inspect TrueType records only; CFF/bitmap/SVG outlines stay unverified."""
+        if any(t in self.tables for t in ('CFF ','CFF2','COLR','CBDT','EBDT','sbix','SVG ')):
+            return None
+        if not all(t in self.tables for t in ('glyf','loca','maxp')):
+            return None
+        count = struct.unpack_from('>H',self.tables['maxp'],4)[0]
+        if not 0 <= glyph < count:
+            raise ValueError('cmap glyph exceeds maxp glyph count')
+        fmt = struct.unpack_from('>h',self.tables['head'],50)[0]
+        if fmt not in (0,1):
+            raise ValueError('unsupported loca offset format')
+        code,width,mult = ('H',2,2) if fmt == 0 else ('I',4,1)
+        first,last = struct.unpack_from('>2'+code,self.tables['loca'],glyph*width)
+        first *= mult; last *= mult
+        if not 0 <= first <= last <= len(self.tables['glyf']):
+            raise ValueError('glyph outline exceeds glyf bytes')
+        return self.tables['glyf'][first:last]
+
+    def glyph_evidence(self, char):
+        if self.generic_reasons:
+            return 'failed','; '.join(self.generic_reasons)
+        glyph = self.glyph(char)
+        key = (glyph,char.isalnum())
+        if key in self.glyph_cache:
+            return self.glyph_cache[key]
+        self.inspection_work = 0
+        result = self.inspect_glyph(glyph,char.isalnum(),())
+        self.glyph_cache[key] = result
+        return result
+
+    def inspect_glyph(self, glyph, letter_digit, visiting):
+        if self.inspection_work >= 4096:
+            return 'blocked','glyph reference work exceeds inspection budget'
+        self.inspection_work += 1
+        if glyph in visiting:
+            return 'failed','cyclic composite outline'
+        if len(visiting) >= 16:
+            return 'blocked','composite depth exceeds inspection budget'
+        if not glyph:
+            result = ('failed','missing cmap glyph')
+        else:
+            try:
+                outline = self.outline(glyph)
+                if outline is None:
+                    result = ('blocked','outline container is outside TrueType inspection coverage')
+                elif len(outline) < 10:
+                    result = ('empty','nonprinting component') if visiting else ('failed','mapped glyph has no outline record')
+                else:
+                    contours,x1,y1,x2,y2 = struct.unpack_from('>5h',outline)
+                    if contours == 0 or x1 >= x2 or y1 >= y2:
+                        result = ('empty','nonprinting component') if visiting else ('failed','mapped glyph has no nonempty outline bounds')
+                    elif contours < 0:
+                        result = self.inspect_components(outline,letter_digit,(*visiting,glyph))
+                    elif contours > 4096:
+                        result = ('blocked','simple contour count exceeds inspection budget')
+                    else:
+                        shape = simple_shape(outline)
+                        xs,ys = zip(*shape[2])
+                        notdef = self.outline(0)
+                        if min(xs) == max(xs) or min(ys) == max(ys):
+                            result = ('empty','nonprinting component') if visiting else ('failed','mapped simple outline has no two-dimensional points')
+                        elif letter_digit and notdef and struct.unpack_from('>h',notdef)[0] > 0 and shape == simple_shape(notdef):
+                            # Compare contours, not padding or hint instructions.
+                            # Authored square/replacement symbols are not failed
+                            # solely because they resemble .notdef.
+                            result = ('failed','mapped letter/digit duplicates the .notdef tofu outline')
+                        else:
+                            result = ('passed','nonempty simple TrueType outline; semantic/raster review unverified')
+            except (ValueError,struct.error,KeyError,IndexError) as error:
+                result = ('failed','invalid outline data: '+str(error))
+        return result
+
+    def inspect_components(self, data, letter_digit, visiting):
+        cursor = 10; children = []
+        for _ in range(128):
+            flags,glyph = struct.unpack_from('>2H',data,cursor); cursor += 4
+            cursor += 4 if flags & 1 else 2
+            size = 4 if flags & 128 else 2 if flags & 64 else 1 if flags & 8 else 0
+            values = struct.unpack_from('>'+str(size)+'h',data,cursor) if size else ()
+            cursor += 2*size
+            if cursor > len(data):
+                raise ValueError('truncated composite arguments')
+            determinant = values[0]*values[3]-values[1]*values[2] if size == 4 else values[0]*values[-1] if size else 1
+            if determinant == 0:
+                return 'failed','composite transform collapses the outline'
+            if not glyph and letter_digit:
+                return 'failed','mapped letter/digit composite uses .notdef tofu'
+            children.append(self.inspect_glyph(glyph,letter_digit,visiting))
+            if not flags & 32:
+                break
+        else:
+            return 'blocked','composite component count exceeds inspection budget'
+        if flags & 256:
+            length = struct.unpack_from('>H',data,cursor)[0]
+            if cursor+2+length > len(data):
+                raise ValueError('truncated composite instructions')
+        bad = next((r for r in children if r[0] == 'failed'),None)
+        unknown = next((r for r in children if r[0] == 'blocked'),None)
+        return bad or unknown or (('passed','nonempty TrueType component outlines; semantic/raster review unverified')
+                                  if any(r[0] == 'passed' for r in children) else ('failed','composite has no drawing components'))
+
+
+def simple_shape(data):
+    """Bounded TrueType simple contours, omitting hint instructions and padding."""
+    contours = struct.unpack_from('>h',data)[0]
+    if not 0 < contours <= 4096:
+        raise ValueError('simple contour count outside inspection budget')
+    ends = struct.unpack_from('>'+str(contours)+'H',data,10)
+    if any(a >= b for a,b in zip(ends,ends[1:])):
+        raise ValueError('invalid simple contour endpoints')
+    count = ends[-1]+1; cursor = 10+2*contours
+    instructions = struct.unpack_from('>H',data,cursor)[0]
+    cursor += 2+instructions
+    flags = []
+    while len(flags) < count:
+        flag = data[cursor]; cursor += 1
+        repeat = 1
+        if flag & 8:
+            repeat += data[cursor]; cursor += 1
+        if len(flags)+repeat > count:
+            raise ValueError('simple point flags exceed endpoint count')
+        flags.extend([flag]*repeat)
+    coordinates = []
+    for short,same in ((2,16),(4,32)):
+        values = []; value = 0
+        for flag in flags:
+            if flag & short:
+                delta = data[cursor] * (1 if flag & same else -1); cursor += 1
+            elif flag & same:
+                delta = 0
+            else:
+                delta = struct.unpack_from('>h',data,cursor)[0]; cursor += 2
+            value += delta; values.append(value)
+        coordinates.append(values)
+    return ends,tuple(f & 1 for f in flags),tuple(zip(*coordinates))
 
 
 def svg_page(path):
@@ -224,7 +383,7 @@ def svg_page(path):
                     except (ValueError, KeyError, struct.error):
                         issues.append('unsupported embedded font metrics '+family[1])
     issues.extend('unresolved SVG fragment '+r for r in refs if r not in ids)
-    chars = []; clip_issues = []; embedded_missing = set(); unverified_fonts = set()
+    chars = []; clip_issues = []; embedded_missing = set(); unverified_fonts = set(); glyph_evidence = {}
 
     def walk(e, matrix, clips, inherited):
         tag = local(e.tag)
@@ -251,6 +410,8 @@ def svg_page(path):
             for i, char in enumerate(text):
                 if not char.isspace():
                     advance = face.advance(char,size) if face else None
+                    evidence = face.glyph_evidence(char) if face else ('blocked','drawing face is unavailable')
+                    glyph_evidence[(attrs.get('font-family',''),char)] = evidence
                     if face and advance is None:
                         embedded_missing.add(f'U+{ord(char):04X}')
                     box = rect(matrix,[x[min(i,len(x)-1)],y-size,advance or 0,size*1.25])
@@ -262,6 +423,7 @@ def svg_page(path):
     walk(root,scale,[],{})
     return {'width_pt':width,'height_pt':height,'text':''.join(c['char'] for c in chars),
             'chars':chars,'font_subset_sha256':font_hashes,'embedded_missing_glyphs':sorted(embedded_missing),'unverified_fonts':sorted(unverified_fonts),'issues':issues,'clip_issues':clip_issues,
+            'glyph_evidence':[{'face':family,'char':f'U+{ord(char):04X}','status':result[0],'reason':result[1]} for (family,char),result in sorted(glyph_evidence.items())],
             'sha256':hashlib.sha256(data).hexdigest(),'path':str(path)}
 
 
@@ -496,6 +658,10 @@ def audit(fixture, repo, artifacts, reference_root=None, hashes=False, overlay=N
     embedded_missing = sorted({c for p in pages for c in p['embedded_missing_glyphs']})
     unverified_fonts = sorted({f for p in pages for f in p['unverified_fonts']})
     checks.append(layer('font_coverage','failed' if embedded_missing or missing != sorted(expected.get('missing_glyphs',[])) else 'blocked' if unverified_fonts else 'passed',{'missing_glyphs':missing,'embedded_missing_glyphs':embedded_missing,'unverified_fonts':unverified_fonts,'embedded_subset_hashes':[p['font_subset_sha256'] for p in pages],'native_font_hashes_verified':False}))
+    evidence = [{'page':i,**e} for i,p in enumerate(pages,1) for e in p['glyph_evidence']]
+    checks.append(layer('font_glyph_evidence',status(evidence) if evidence else 'blocked',{
+        'issues':[e for e in evidence if e['status'] != 'passed'],
+        'checked_characters':len(evidence),'coverage':'embedded generic metadata and simple TrueType outlines; not rasterized ink or native character fidelity'}))
     actual_hashes = {str(p.relative_to(folder)):sha(p) for paths in files.values() for p in paths}
     golden = expected.get('output_sha256',{})
     hash_ok = bool(golden) and actual_hashes == golden
