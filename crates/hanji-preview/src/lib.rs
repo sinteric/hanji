@@ -202,6 +202,76 @@ fn group_runs(elements: &mut [PositionedElement], f: &mut dyn FnMut(&mut FontId,
     }
 }
 
+// Rebind complete ordinary runs, retaining authored spacing when the old and
+// new glyph-to-character contracts agree. Rich runs retain their exact engine
+// face and cluster/positioning vectors until that contract can be relaid out.
+fn rebind_group_text(
+    elements: &mut [PositionedElement],
+    stock_fonts: &HashMap<FontId, (String, bool, bool)>,
+    originals: &HashMap<FontId, FontId>,
+    requests: &Requests,
+    fonts: &mut oxml_layout::FontManager,
+) -> Result<usize, String> {
+    let mut retained = 0;
+    for element in elements {
+        match element {
+            PositionedElement::Text(run) => {
+                let old_id = run.font_id;
+                let Some(&original) = originals.get(&old_id) else { continue };
+                let Some((family, bold, italic)) = stock_fonts.get(&old_id) else { continue };
+                let selected = requests
+                    .index
+                    .get(&(family.clone(), Script::of(&run.text)))
+                    .and_then(|&i| fonts.resolve_font(Some(&label(i)), *bold, *italic).ok());
+                let Some(selected) = selected else {
+                    run.font_id = original;
+                    retained += 1;
+                    continue;
+                };
+                let before = fonts
+                    .shape_text(original, &run.text, run.font_size)
+                    .map_err(|e| format!("cannot inspect original group shaping: {e}"))?;
+                let mut after = fonts
+                    .shape_text(selected, &run.text, run.font_size)
+                    .map_err(|e| format!("cannot shape group text with its drawing font: {e}"))?;
+                let original_matches = before.glyph_ids == run.glyph_ids && before.advances.len() == run.advances.len();
+                let spacing: Vec<f64> = run.advances.iter().zip(&before.advances).map(|(a, b)| a - b).collect();
+                let has_spacing = spacing.iter().any(|x| x.abs() > 1e-8);
+                let same_character_mapping = run.text.chars().count() == before.glyph_ids.len()
+                    && before.glyph_ids.len() == after.glyph_ids.len()
+                    && run.text.chars().all(|c| c.is_ascii() || prep::is_east_asian(c));
+                if !original_matches || (has_spacing && !same_character_mapping) {
+                    run.font_id = original;
+                    retained += 1;
+                    continue;
+                }
+                if has_spacing {
+                    for (advance, extra) in after.advances.iter_mut().zip(spacing) {
+                        *advance += extra;
+                    }
+                }
+                run.font_id = selected;
+                run.glyph_ids = after.glyph_ids;
+                run.advances = after.advances;
+            }
+            PositionedElement::MultilingualText(run) => {
+                if let Some(&original) = originals.get(&run.font_id) {
+                    run.font_id = original;
+                    retained += 1;
+                }
+            }
+            PositionedElement::Group(group) => {
+                retained += rebind_group_text(&mut group.children, stock_fonts, originals, requests, fonts)?
+            }
+            PositionedElement::MarkedContent { children, .. } => {
+                retained += rebind_group_text(children, stock_fonts, originals, requests, fonts)?
+            }
+            _ => {}
+        }
+    }
+    Ok(retained)
+}
+
 /// What the layout's face `FontId` stands for.
 #[derive(Clone, Debug)]
 struct FaceInfo {
@@ -570,11 +640,20 @@ fn layout_preview(
     let stock_fonts: HashMap<FontId, (String, bool, bool)> =
         stock.fonts.iter().map(|f| (f.id, (f.family.clone(), f.bold, f.italic))).collect();
     let mut grouped = 0;
+    let mut group_faces = BTreeMap::new();
     for shape in input.slides.iter_mut().flat_map(|s| &mut s.shapes) {
         if let ResolvedContent::Group(g) = &mut shape.content {
             group_runs(&mut g.children, &mut |id, text| {
                 if let Some((family, bold, italic)) = stock_fonts.get(id) {
                     req.label(family.clone(), text, *bold, *italic);
+                    group_faces
+                        .entry(*id)
+                        .and_modify(|script| {
+                            if Script::of(text) != Script::Latin {
+                                *script = Script::of(text);
+                            }
+                        })
+                        .or_insert(Script::of(text));
                     grouped += 1;
                 }
             });
@@ -582,7 +661,7 @@ fn layout_preview(
     }
     if grouped > 0 {
         warnings.push(format!(
-            "{grouped} text runs in groups were laid out by rpptx with its built-in fonts (rpptx 0.12.1 lays out group content before the preview's fonts apply)"
+            "{grouped} text runs in groups retain rpptx's precomputed line breaks and origins; ordinary glyph runs use the selected drawing font's advances"
         ));
     }
 
@@ -636,18 +715,58 @@ fn layout_preview(
         warnings.push(NO_KOREAN_FONT.to_string());
     }
 
+    // Preserve exact engine faces for original-shaping comparisons and rich
+    // runs. Unique labels avoid name/fallback differences and TTC face-index
+    // ambiguity; no horizontal metrics are changed in these copies.
+    let mut original_labels = HashMap::new();
+    for (id, script) in group_faces {
+        let Some(font) = stock.fonts.iter().find(|font| font.id == id) else { continue };
+        let face = ttf_parser::Face::parse(&font.data, font.face_index)
+            .map_err(|e| format!("original group font {}: {e}", font.family))?;
+        let family = format!("hanji-group-original-{}", id.0);
+        let data = sfnt::build(
+            &font.data,
+            font.face_index,
+            &sfnt::Adjust {
+                family: family.clone(),
+                bold: face.is_bold(),
+                italic: face.is_italic(),
+                line_em: None,
+                ea_advance: None,
+            },
+        )?;
+        original_labels.insert(id, family.clone());
+        files.push(FontFile { family, data });
+        file_faces.push(FaceInfo {
+            requested: font.family.clone(),
+            script,
+            drawn: Some(font.family.clone()),
+            source: Some(if input.fonts.iter().any(|f| f.data.as_slice() == font.data.as_ref()) {
+                Source::Embedded
+            } else {
+                Source::Bundled
+            }),
+            metrics: Metrics::Original,
+        });
+    }
     let mut fm = oxml_layout::FontManager::new_deterministic().map_err(|e| format!("fonts: {e}"))?;
     fm.load_additional_fonts(&files);
+    let originals: HashMap<_, _> = original_labels
+        .into_iter()
+        .map(|(old, family)| {
+            fm.resolve_font(Some(&family), false, false)
+                .map(|new| (old, new))
+                .map_err(|e| format!("original group font: {e}"))
+        })
+        .collect::<Result<_, _>>()?;
+    let mut retained = 0;
     for shape in input.slides.iter_mut().flat_map(|s| &mut s.shapes) {
         if let ResolvedContent::Group(g) = &mut shape.content {
-            group_runs(&mut g.children, &mut |id, text| {
-                let Some((family, bold, italic)) = stock_fonts.get(id) else { return };
-                let l = req.index.get(&(family.clone(), Script::of(text))).map(|&i| label(i));
-                if let Some(new) = l.and_then(|l| fm.resolve_font(Some(&l), *bold, *italic).ok()) {
-                    *id = new;
-                }
-            });
+            retained += rebind_group_text(&mut g.children, &stock_fonts, &originals, &req, &mut fm)?;
         }
+    }
+    if retained > 0 {
+        warnings.push(format!("{retained} grouped text runs retain the original engine font and positioning to preserve multilingual clusters or authored spacing; font substitution was not applied to these runs"));
     }
     let layout = rpptx_render::layout_presentation_with_font_manager(&input, fm)
         .map_err(|e| format!("rpptx cannot lay out the deck: {e}"))?;
@@ -1073,6 +1192,128 @@ impl svg::Hooks for PageHooks<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
+    #[test]
+    fn actual_korean_chart_runs_match_their_full_drawing_font() {
+        let bytes = include_bytes!("../../../prototype/preview/baseline/14-pptx-untouched-korean-report-deck.pptx");
+        let p = render_pptx(bytes, &Options::default()).unwrap();
+        if p.fonts.missing_glyphs_total > 0 {
+            assert!(std::env::var_os("CI").is_none(), "CI needs its installed Korean font");
+            return;
+        }
+        let mut checked = 0;
+        oxml_layout::walk(&p.layout.pages[5].elements, &mut |e, _| {
+            let PositionedElement::Text(run) = e else { return };
+            if !["구독", "라이선스", "서비스"].contains(&run.text.as_str()) {
+                return;
+            }
+            let font = p.layout.fonts.iter().find(|f| f.id == run.font_id).unwrap();
+            let face = ttf_parser::Face::parse(&font.data, font.face_index).unwrap();
+            assert_eq!(run.glyph_ids.len(), run.text.chars().count());
+            for (i, c) in run.text.chars().enumerate() {
+                let glyph = face.glyph_index(c).unwrap();
+                assert_ne!(glyph.0, 0);
+                assert_eq!(run.glyph_ids[i], glyph.0, "{c} uses the selected full font's glyph");
+                let advance =
+                    f64::from(face.glyph_hor_advance(glyph).unwrap()) * run.font_size / f64::from(face.units_per_em());
+                assert!((run.advances[i] - advance).abs() < 1e-6, "{c} uses the selected font's advance");
+            }
+            checked += 1;
+        });
+        assert_eq!(checked, 3);
+    }
+
+    #[test]
+    fn group_rebinding_preserves_word_spacing_and_rich_clusters() {
+        fn first_text(elements: &[PositionedElement]) -> Option<oxml_layout::GlyphRun> {
+            elements.iter().find_map(|e| match e {
+                PositionedElement::Text(r) => Some(r.clone()),
+                PositionedElement::Group(g) => first_text(&g.children),
+                _ => None,
+            })
+        }
+        let mut fonts = oxml_layout::FontManager::new_deterministic().unwrap();
+        let old = fonts.resolve_font(Some("Carlito"), false, false).unwrap();
+        let selected = fonts.resolve_font(Some("Caladea"), false, false).unwrap();
+        let mut requests = Requests::default();
+        let requested = requests.label("Carlito".into(), "A A", false, false);
+        let original = "original-group-test";
+        let originals_data =
+            [(fonts.font_data(old).unwrap(), original), (fonts.font_data(selected).unwrap(), requested.as_str())];
+        let mut additions = vec![];
+        for (font, family) in originals_data {
+            let data = sfnt::build(
+                &font.data,
+                font.face_index,
+                &sfnt::Adjust { family: family.into(), bold: false, italic: false, line_em: None, ea_advance: None },
+            )
+            .unwrap();
+            additions.push(FontFile { family: family.into(), data });
+        }
+        fonts.load_additional_fonts(&additions);
+        let old = fonts.resolve_font(Some("Carlito"), false, false).unwrap();
+        let original = fonts.resolve_font(Some(original), false, false).unwrap();
+        let selected = fonts.resolve_font(Some(&requested), false, false).unwrap();
+        let mut run = first_text(&deck().layout.pages[0].elements).unwrap();
+        run.font_id = old;
+        run.text = "A A".into();
+        run.font_size = 9.0;
+        run.bold = false;
+        run.italic = false;
+        let shaped = fonts.shape_text(old, &run.text, run.font_size).unwrap();
+        run.glyph_ids = shaped.glyph_ids;
+        run.advances = shaped.advances;
+        run.advances[1] += 3.0; // Authored extra word spacing survives substitution.
+        let rich = oxml_layout::MultilingualGlyphRun {
+            origin: run.origin,
+            font_id: old,
+            font_size: run.font_size,
+            glyph_ids: run.glyph_ids.clone(),
+            x_advances: run.advances.clone(),
+            y_advances: vec![0.0; 3],
+            x_offsets: vec![0.0, 0.25, 0.0],
+            y_offsets: vec![0.0; 3],
+            clusters: (0..3)
+                .map(|i| oxml_layout::GlyphCluster { glyph_start: i, glyph_end: i + 1, char_start: i, char_end: i + 1 })
+                .collect(),
+            logical_text: run.text.clone(),
+            logical_index: 7,
+            source: run.source,
+            script: oxml_layout::TextScript::Latin,
+            language: Some("en".into()),
+            direction: oxml_layout::TextDirection::LeftToRight,
+            bidi_level: 0,
+            color: run.color,
+            bold: false,
+            italic: false,
+            field_kind: run.field_kind,
+            field_source: run.field_source,
+            note: run.note,
+        };
+        assert!(rich.is_valid());
+        let mut children =
+            vec![PositionedElement::Text(run.clone()), PositionedElement::MultilingualText(rich.clone())];
+        let stock = HashMap::from([(old, ("Carlito".into(), false, false))]);
+        let originals = HashMap::from([(old, original)]);
+        assert_eq!(rebind_group_text(&mut children, &stock, &originals, &requests, &mut fonts).unwrap(), 1);
+        let PositionedElement::Text(rebound) = &children[0] else { panic!("text") };
+        assert_eq!(rebound.origin, run.origin);
+        assert_eq!(rebound.font_id, selected);
+        let font = fonts.font_data(selected).unwrap();
+        let face = ttf_parser::Face::parse(&font.data, font.face_index).unwrap();
+        for (i, c) in run.text.chars().enumerate() {
+            let glyph = face.glyph_index(c).unwrap();
+            assert_eq!(rebound.glyph_ids[i], glyph.0);
+            let width = f64::from(face.glyph_hor_advance(glyph).unwrap()) * 9.0 / f64::from(face.units_per_em());
+            assert!((rebound.advances[i] - width - if c == ' ' { 3.0 } else { 0.0 }).abs() < 1e-6);
+        }
+        let PositionedElement::MultilingualText(rebound) = &children[1] else { panic!("rich text") };
+        let mut expected = rich;
+        expected.font_id = original;
+        assert_eq!(rebound, &expected, "rich glyph IDs, offsets, clusters, spacing and bidi metadata survive");
+        assert!(rebound.is_valid());
+    }
 
     fn deck() -> Preview {
         let bytes = include_bytes!("../../hanji-pptx/corpus/shapes.pptx");

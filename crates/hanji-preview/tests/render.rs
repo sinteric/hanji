@@ -169,6 +169,79 @@ fn the_korean_font_can_be_supplied_as_bytes_without_host_discovery() {
 }
 
 #[test]
+fn chart_korean_and_mixed_legends_use_the_embedded_font_advances() {
+    use hanji_package::{package, xml};
+    let Some(font) = korean_font() else { return };
+    let options = hanji_preview::FontOptions {
+        fonts: vec![hanji_preview::FontData::new(std::fs::read(&font).unwrap())],
+        ..Default::default()
+    };
+    let mut db = fontdb::Database::new();
+    db.load_font_file(font).unwrap();
+    let family = db
+        .faces()
+        .find(|f| {
+            db.with_face_data(f.id, |d, i| ttf_parser::Face::parse(d, i).is_ok_and(|f| f.glyph_index('가').is_some()))
+                .unwrap_or(false)
+        })
+        .unwrap()
+        .families[0]
+        .0
+        .clone();
+    let original = include_bytes!("../../../prototype/preview/baseline/14-pptx-untouched-korean-report-deck.pptx");
+    for explicit in [None, Some(family.as_str()), Some("Hanji Missing Chart Face")] {
+        for label in ["라이선스", "라이선스 30%", "License 라이선스", "API 서비스"] {
+            let mut parts = package::read(original).unwrap();
+            let chart = parts.iter_mut().find(|p| p.name == "ppt/charts/chart1.xml").unwrap();
+            let mut xml = String::from_utf8(chart.data.clone()).unwrap().replace("라이선스", label);
+            if let Some(family) = explicit {
+                let properties = format!("<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz=\"900\"><a:latin typeface=\"{}\"/></a:defRPr></a:pPr></a:p></c:txPr></c:legend>", xml::escape_attr(family));
+                xml = xml.replace("</c:legend>", &properties);
+            }
+            chart.data = xml.into_bytes();
+            let p = hanji_preview::render_pptx_with_fonts(&package::write(&parts).unwrap(), &options).unwrap();
+            assert_eq!(p.fonts.missing_glyphs_total, 0);
+            let svg = p.slide_svg(5);
+            let root = xml::parse(svg.as_bytes()).unwrap().root;
+            let mut checked = false;
+            root.walk(&mut |e| {
+                if e.local() != "text" || e.text_of(&["text", "tspan"]) != label {
+                    return;
+                }
+                let family = e.get("font-family").unwrap();
+                let marker = format!("font-family:'{family}'");
+                let rules = svg.split_once(&marker).unwrap().1;
+                let fonts = embedded_fonts(rules);
+                let face = ttf_parser::Face::parse(&fonts[0], 0).unwrap();
+                let size: f64 = e.get("font-size").unwrap().parse().unwrap();
+                let positions: Vec<f64> = e.get("x").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect();
+                let chars: Vec<_> = label.chars().collect();
+                assert_eq!(positions.len(), chars.len(), "the chart label has positioned characters");
+                for (i, pair) in positions.windows(2).enumerate() {
+                    assert!(pair[1] > pair[0], "readable positioned characters");
+                    // Latin pairs may kern. Independent hmtx metrics validate the
+                    // precomposed Hangul that exposed the original crowding.
+                    if !hanji_preview::fonts::is_hangul(chars[i]) {
+                        continue;
+                    }
+                    let glyph = face.glyph_index(chars[i]).unwrap();
+                    let advance =
+                        f64::from(face.glyph_hor_advance(glyph).unwrap()) * size / f64::from(face.units_per_em());
+                    assert!(
+                        (pair[1] - pair[0] - advance).abs() < 0.02,
+                        "{label}: character {} uses advance {}, but the drawn font needs {advance}",
+                        chars[i],
+                        pair[1] - pair[0]
+                    );
+                }
+                checked = true;
+            });
+            assert!(checked, "the chart's own Korean/mixed category label is rendered");
+        }
+    }
+}
+
+#[test]
 fn rendering_diagnostics_reach_json_and_every_output_mode_without_refusing_the_deck() {
     let (ws, id) = opened("shapes.pptx");
     let (mut out, p) = store::render(&ws, &id, None, &no_fonts()).unwrap();

@@ -8,7 +8,7 @@ application fidelity target.
 
 | Input | Native CLI | Portable library | Fidelity and limits |
 |---|---|---|---|
-| PPTX | `hanji preview deck.pptx --format png --out DIR` | `render_pptx_with_fonts`, `render_pptx_with_resolver`, or `render_document_with_fonts(DocumentKind::Pptx, ...)` | Every slide. Group text can retain engine font geometry; charts and other advanced visuals can be placeholders or approximations. Rendering diagnostics identify reported omissions. |
+| PPTX | `hanji preview deck.pptx --format png --out DIR` | `render_pptx_with_fonts`, `render_pptx_with_resolver`, or `render_document_with_fonts(DocumentKind::Pptx, ...)` | Every slide. Groups retain engine line breaks/origins; ordinary glyphs use the selected drawing font and preserve compatible authored spacing. Rich group runs retain their original font/cluster positioning with a warning. Charts and other advanced visuals can be placeholders or approximations. Rendering diagnostics identify reported omissions. |
 | DOCX | `hanji preview report.docx --format svg --out DIR` | `docx::render_with_fonts` or `render_document_with_fonts(DocumentKind::Docx, ...)` | Experimental, every page. Paragraphs, tables, images, headings, sections and headers/footers are exercised by actual files. Word pagination, vertical text, OfficeMath and legacy VML features can differ or be omitted. |
 | HWPX | `hanji preview plan.hwpx --format html --out DIR` | `hwpx::render_with_fonts` or `render_document_with_fonts(DocumentKind::Hwpx, ...)`, with feature `hwpx` | Experimental, every page. rhwp supplies source/table geometry, images and controls; Hanji selects drawing fonts and embeds subsets. Substitution does not trigger exact-font reflow. Table overflow/overlap counters are reported; the integration does not have comprehensive diagnostics for every unsupported Hancom control. |
 | XLSX/XLSM | `hanji preview book.xlsx --sheet NAME --range A1:H40 --format png --out DIR` | `xlsx::open_xlsx`, then `render_window_with_fonts` / `render_window_with_resolver` | One bounded worksheet window, not printed pages. Cached formula values only. No formula calculation, macros or external-link refresh. Charts, images, conditional formatting and print layout are omitted with diagnostics. |
@@ -105,8 +105,11 @@ PPTX `12`, and clipping/missing formula caches in XLSX `18`. PPTX `14`, slide
 6, now draws the 55/30/15 doughnut wedges in three theme colors and shows
 구독, 라이선스 and 서비스 in the chart’s own legend. A real-file regression
 checks the curved wedges and category labels separately from the slide’s
-manual percentage legend. Group text still reports the engine’s built-in
-font geometry warning. A coverage-based
+manual percentage legend. The legend’s Korean glyph IDs and 7.785-point advances now match its actual
+9-point drawing font. Regressions cover mixed Latin/Korean labels, explicit
+font/fallback cases and extra word spacing. Group line breaks/origins remain
+engine geometry; rich multilingual clusters retain their original engine font
+and positioning when substitution cannot preserve that contract. A coverage-based
 Latin fallback restores digits and punctuation in HWPX `24`, reducing its
 missing-character count from 17 to three (`U+FF62`, `U+FF63`, `U+FF65`). HWPX
 `26` and `28` each retain four missing symbols; `30` has none. The drawing-font

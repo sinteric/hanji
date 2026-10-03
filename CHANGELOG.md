@@ -13,7 +13,9 @@
 - Use immutable fork sources for the compatible rdocx/rpptx/oxml-layout family
   and rhwp. Enable HWPX by default and cover it in byte-only CI checks.
 - Correct varied pie/doughnut category colors and category legends through
-  the pinned renderer, with a real Korean-deck regression.
+  the pinned renderer, with a real Korean-deck regression. Rebind grouped
+  ordinary glyphs with their drawing font’s IDs/advances while preserving
+  compatible word spacing; retain rich cluster positioning with a warning.
 - Preserve usable DOCX vertical-page bounds around tall headers and footers.
   Select HWPX Latin drawing fallbacks by actual character coverage so sparse
   Korean alias fonts do not lose digits and punctuation.
