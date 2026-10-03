@@ -211,11 +211,10 @@ mod tests {
 
     #[test]
     fn a_package_is_prepared_and_the_original_is_untouched() {
-        let deck =
-            std::fs::read(concat!(env!("CARGO_MANIFEST_DIR"), "/../hanji-pptx/corpus/korean-deck.pptx")).unwrap();
-        let out = prepare(&deck).unwrap();
+        let deck = include_bytes!("../../hanji-pptx/corpus/korean-deck.pptx");
+        let out = prepare(deck).unwrap();
         let parts = hanji_package::package::read(&out).unwrap();
-        let before = hanji_package::package::read(&deck).unwrap();
+        let before = hanji_package::package::read(deck).unwrap();
         assert_eq!(parts.len(), before.len());
         for p in &parts {
             if p.name.starts_with("ppt/slides/slide") {

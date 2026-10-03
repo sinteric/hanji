@@ -81,6 +81,15 @@ later runs start at once.
    file or image reader. Without `--out` the files go next to the original,
    so pass a scratch directory. Mention substituted fonts that change the
    look.
+   For a spreadsheet, `hanji preview DOC --sheet NAME --range A1:H40
+   --format png --out /abs/scratch/dir` writes one bounded worksheet window.
+   `--sheet-index N` is 1-based; the default is the first visible worksheet
+   and A1:L40. File paths are accepted and stay unstored. Formula results are
+   stored caches only; missing caches show #UNEVALUATED. Use `--json` for
+   cell cache status, fonts and unsupported-feature diagnostics. A range
+   cutting a merged cell is refused with the complete merge address. Mention
+   omitted charts, images, conditional formatting and print layout when those
+   diagnostics occur.
 6. `hanji export DOC /abs/out.docx` to a path the person chose, next to the
    original unless they said otherwise; do not overwrite the original
    without asking. If export is refused over surfaced items (comments,

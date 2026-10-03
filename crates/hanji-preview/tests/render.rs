@@ -6,7 +6,7 @@
 //! `HANJI_TEST_FONT_DIR`, else one under `/usr/share/fonts` (CI installs
 //! fonts-noto-cjk). Without one they are skipped, except on CI.
 
-#![cfg(not(target_family = "wasm"))]
+#![cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 
 use std::collections::BTreeSet;
 use std::path::PathBuf;
@@ -148,6 +148,24 @@ fn the_shapes_deck_renders_every_slide() {
     let total: usize = p.fonts.substituted.iter().map(|s| s.chars).sum::<usize>()
         + p.fonts.drawn_as_requested.iter().map(|s| s.chars).sum::<usize>();
     assert!(total > 100, "{:?}", p.fonts);
+}
+
+#[test]
+fn the_korean_font_can_be_supplied_as_bytes_without_host_discovery() {
+    let Some(font) = korean_font() else { return };
+    let package = std::fs::read(corpus("korean-deck.pptx")).unwrap();
+    let options = hanji_preview::FontOptions {
+        fonts: vec![hanji_preview::FontData::new(std::fs::read(font).unwrap())],
+        ..Default::default()
+    };
+    let p = hanji_preview::render_pptx_with_fonts(&package, &options).unwrap();
+    check_pages(&p, 7, 300 << 10);
+    assert_eq!(p.fonts.missing_glyphs_total, 0);
+    assert!(p
+        .fonts
+        .substituted
+        .iter()
+        .any(|f| f.script == Script::Hangul && f.source == Some(hanji_preview::fonts::Source::Supplied)));
 }
 
 #[test]

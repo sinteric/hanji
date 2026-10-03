@@ -311,6 +311,12 @@ fn slug(name: &str) -> String {
     }
 }
 
+/// The base document id derived from a filename, before store collision suffixes.
+/// Stateless preview adapters use the same safe filename policy as `open_bytes`.
+pub fn id_from_name(name: &str) -> String {
+    slug(name)
+}
+
 fn valid_id(id: &str) -> bool {
     !id.is_empty() && id.len() <= 200 && id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_')
 }
