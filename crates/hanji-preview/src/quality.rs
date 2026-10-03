@@ -215,11 +215,20 @@ fn bracket_index(path: &str, prefix: &str) -> Option<usize> {
     path.strip_prefix(prefix)?.split_once(']')?.0.parse().ok()
 }
 fn location(path: &str) -> DiagnosticLocation {
+    let cell = path.split_once(".cells[").and_then(|(_, s)| s.split_once(']')).map(|(s, _)| s.to_owned());
+    // Report-array indices and aggregate HWPX table/image counters do not
+    // identify a document object. Preserve their legacy path without inventing one.
+    let object_known = cell.is_some()
+        || path.contains(".elements[")
+        || path.ends_with(".background")
+        || path.contains(".styles[")
+        || path.contains(".fonts[")
+        || path.starts_with("fonts[");
     DiagnosticLocation {
         page_index: bracket_index(path, "pages["),
         sheet_index: bracket_index(path, "sheets["),
-        cell: path.split_once(".cells[").and_then(|(_, s)| s.split_once(']')).map(|(s, _)| s.to_owned()),
-        object_path: Some(path.to_owned()),
+        cell,
+        object_path: object_known.then(|| path.to_owned()),
         ..Default::default()
     }
 }

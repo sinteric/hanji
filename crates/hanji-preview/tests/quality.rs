@@ -62,8 +62,29 @@ fn opaque_upstream_and_future_diagnostics_never_become_critical_by_keyword_guess
     assert_eq!(report.diagnostics[0].code, DiagnosticCode::LayoutReport);
     assert_eq!(report.diagnostics[1].code, DiagnosticCode::UnclassifiedDiagnostic);
     assert!(report.diagnostics.iter().all(|d| d.severity == Severity::Warning));
+    assert!(report.diagnostics.iter().all(|d| d.location.object_path.is_none() && d.location.page_index.is_none()));
     assert!(report.enforce(Strictness::CriticalLosses).is_ok());
     assert!(!report.coverage.complete);
+}
+
+#[test]
+fn hancom_aggregate_counters_have_page_locations_without_invented_table_or_cell_objects() {
+    let legacy = [
+        Diagnostic {
+            path: "pages[2].tables".into(),
+            message: "rhwp reports 3 overflowing cell lines; table content may be clipped".into(),
+        },
+        Diagnostic { path: "pages[2].tables".into(), message: "rhwp reports 2 table overlaps".into() },
+    ];
+    let report = QualityReport::inspect(PreviewSource::Hwpx, &legacy, &FontsReport::default(), &[]);
+    assert_eq!(report.diagnostics[0].code, DiagnosticCode::TableOverflow);
+    assert_eq!(report.diagnostics[1].code, DiagnosticCode::TableOverlap);
+    for d in &report.diagnostics {
+        assert_eq!(d.location.page_index, Some(2));
+        assert_eq!(d.location.object_path, None);
+        assert_eq!(d.location.cell, None);
+    }
+    assert!(report.enforce(Strictness::CriticalLosses).is_ok()); // Heuristic counters alone do not prove a critical loss.
 }
 
 #[test]
