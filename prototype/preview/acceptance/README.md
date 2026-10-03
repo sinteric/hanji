@@ -98,7 +98,8 @@ not native references or fonts copied from installed applications.
 The harness budget is 512 pages, 64 MiB per file, and 16 MiB per SVG; these are
 tool budgets, not Hanji product caps. Capture refuses under 256 MiB free disk.
 Glyph inspection is bounded to 4,096 simple contours, 16 composite levels and
-128 components per glyph; these are also harness budgets.
+128 components per glyph, with at most 4,096 outline record inspections per
+character before blocking repeated reference work; these are harness budgets.
 
 XLSX is one named, bounded cached-value **worksheet window**, not workbook
 print pagination. A historical entire-workbook Excel PDF is not a matching

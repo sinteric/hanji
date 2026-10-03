@@ -190,6 +190,17 @@ class HarnessTests(unittest.TestCase):
             with patch.object(metrics,'outline',side_effect=lambda i:record if i == glyph else original(i)):
                 self.assertEqual(metrics.glyph_evidence('C')[0],'failed')
 
+    def test_repeated_composite_graph_work_is_bounded_and_blocked(self):
+        metrics = a.FontMetrics(metric_stub()); original = metrics.outline; glyph = metrics.glyph('C')
+        def record(child):
+            return struct.pack('>5h',-1,0,0,500,700)+b''.join(
+                struct.pack('>4H',35 if i < 127 else 3,child,0,0) for i in range(128))
+        with patch.object(metrics,'outline',side_effect=lambda i:record(2) if i == glyph else record(3) if i == 2 else original(i)):
+            result = metrics.glyph_evidence('C')
+        self.assertEqual(result[0],'blocked')
+        self.assertIn('work exceeds',result[1])
+        self.assertEqual(metrics.inspection_work,4096)
+
     def test_critical_text_outside_page_fails(self):
         self.write_artifacts(svg(x=90))
         self.assertEqual(self.check('critical_geometry')['status'],'failed')

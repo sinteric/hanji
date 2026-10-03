@@ -169,6 +169,7 @@ class FontMetrics:
                 if re.sub('[^a-z]','',name.lower()).startswith('lastresort'):
                     self.generic_reasons.append('embedded LastResort name: '+name)
         self.glyph_cache = {}
+        self.inspection_work = 0
         cmap = self.tables['cmap']; candidates = []
         for i in range(struct.unpack_from('>H', cmap, 2)[0]):
             platform, encoding, offset = struct.unpack_from('>HHI', cmap, 4+8*i)
@@ -231,11 +232,15 @@ class FontMetrics:
         key = (glyph,char.isalnum())
         if key in self.glyph_cache:
             return self.glyph_cache[key]
+        self.inspection_work = 0
         result = self.inspect_glyph(glyph,char.isalnum(),())
         self.glyph_cache[key] = result
         return result
 
     def inspect_glyph(self, glyph, letter_digit, visiting):
+        if self.inspection_work >= 4096:
+            return 'blocked','glyph reference work exceeds inspection budget'
+        self.inspection_work += 1
         if glyph in visiting:
             return 'failed','cyclic composite outline'
         if len(visiting) >= 16:
