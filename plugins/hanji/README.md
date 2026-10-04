@@ -51,7 +51,8 @@ tool's `PATH`, but claude.ai and Cowork refuse a plugin that has one.
 
 ## The binary
 
-No Rust toolchain is needed. The launcher runs, in order:
+For a plugin version with published release assets, no Rust toolchain is
+needed. The launcher runs, in order:
 
 1. `$HANJI_BIN`, if set;
 2. `hanji` on `PATH`, for example after
@@ -63,16 +64,31 @@ No Rust toolchain is needed. The launcher runs, in order:
    release's `SHA256SUMS`. It needs `curl` or `wget`, and `tar`.
 
 The download happens on the first command, which waits for it (the launcher
-says so on stderr); later commands run the cached binary at once. If the
-download is blocked (Codex's default sandbox has no network; cloud sandboxes
-may block GitHub's release hosts), the launcher prints one line with the URL
-that failed and the fixes: allow network access for the first run
-(github.com and release-assets.githubusercontent.com), set `HANJI_BIN`, or
-put `hanji` on `PATH`. The skill tells the agent to show that line to the
-person rather than work around it.
+says so on stderr); later commands run the cached binary at once. On failure,
+the launcher prints the failed URL and guidance for its cause. HTTP 404
+means the release or the requested asset is unavailable; other HTTP errors
+retain their status. Connection failures keep the network-access guidance
+(github.com and release-assets.githubusercontent.com). The skill tells the
+agent to show that line to the person.
 
 The release is made by `.github/workflows/release.yml` when a `v*` tag that
-matches the plugin's version is pushed. Until the tag exists, use 1 or 2.
+matches the plugin's version is pushed. A main-branch plugin can be ahead of
+the published releases. Until the matching release assets are available,
+use a source build or a plugin version with published assets. The launcher
+keeps its version pin and checksum verification; it never downloads an older
+version automatically.
+
+For a source checkout matching the plugin, run from the repository root:
+
+```sh
+cargo build --locked -p hanji-cli
+export HANJI_BIN="$PWD/target/debug/hanji"
+sh plugins/hanji/skills/office-documents/scripts/hanji --version
+```
+
+On Windows under Git Bash, use `target/debug/hanji.exe`. Set `HANJI_BIN` in
+the environment of the Claude Code or Codex process that will run the
+launcher. The absolute path works even when commands run in another project.
 
 Documents are kept in `.hanji/` in the directory the agent runs hanji from
 (the project's), or in `$HANJI_STORE`. Paths are given to hanji as absolute
@@ -87,6 +103,9 @@ agent the format with `hanji guide`; `hanji --help` lists the commands.
 
 - Try a local checkout: `claude --plugin-dir plugins/hanji`, or
   `codex plugin marketplace add .` then `codex plugin add hanji@hanji`.
+- `python3 scripts/test-launcher.py` checks download failures, the source
+  build override, checksums and caching using fake curl/wget responses. It
+  needs no Rust build or network access and runs in CI's `plugins` job.
 - `scripts/check-plugins.py` (CI job `plugins`) checks that the manifests,
   the marketplace, the workspace version and the launcher agree, that the
   plugin ships no MCP server and no top-level `bin/`, and that the launcher
