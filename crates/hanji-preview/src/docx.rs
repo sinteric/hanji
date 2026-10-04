@@ -6,24 +6,45 @@ use hanji_package::{package, xml};
 use oxml_layout::{FontFile, FontId};
 
 use crate::fonts::{FontResolver, Fonts, Metrics, Script, Source};
-use crate::{finish_preview, sfnt, FaceInfo, FontOptions, FontsReport, Preview};
+use crate::{finish_preview_with_limits, sfnt, FaceInfo, FontOptions, FontsReport, ImageLimits, Preview};
 
 /// DOCX preview with caller font bytes and deterministic bundled fallbacks.
 /// Layout uses the accepted revision view. No document is edited or saved.
 pub fn render_with_fonts(bytes: &[u8], options: &FontOptions) -> Result<Preview, String> {
+    render_with_fonts_and_limits(bytes, options, ImageLimits::default())
+}
+
+/// Portable DOCX preview with configurable embedded-image decoded-byte budgets.
+pub fn render_with_fonts_and_limits(
+    bytes: &[u8],
+    options: &FontOptions,
+    limits: ImageLimits,
+) -> Result<Preview, String> {
+    limits.validate()?;
     let document = rdocx::Document::from_bytes(bytes).map_err(|e| format!("rdocx cannot open the document: {e}"))?;
     let embedded = embedded_fonts(&document);
     let fonts = Fonts::from_bytes(&options.fonts, &embedded, options.aliases.clone())?;
-    render(&document, bytes, &fonts)
+    render(&document, bytes, &fonts, limits)
 }
 
 /// DOCX preview using the optional native font-directory/system adapter.
 #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 pub fn render_native(bytes: &[u8], options: &crate::Options) -> Result<Preview, String> {
+    render_native_with_limits(bytes, options, ImageLimits::default())
+}
+
+/// Native DOCX preview with configurable embedded-image decoded-byte budgets.
+#[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
+pub fn render_native_with_limits(
+    bytes: &[u8],
+    options: &crate::Options,
+    limits: ImageLimits,
+) -> Result<Preview, String> {
+    limits.validate()?;
     let document = rdocx::Document::from_bytes(bytes).map_err(|e| format!("rdocx cannot open the document: {e}"))?;
     let embedded = embedded_fonts(&document);
     let fonts = Fonts::load(&options.font_dirs, &embedded, options.system_fonts);
-    render(&document, bytes, &fonts)
+    render(&document, bytes, &fonts, limits)
 }
 
 fn embedded_fonts(document: &rdocx::Document) -> Vec<FontFile> {
@@ -177,7 +198,12 @@ fn prefer_script(left: Script, right: Script) -> Script {
     }
 }
 
-fn render(document: &rdocx::Document, bytes: &[u8], resolver: &dyn FontResolver) -> Result<Preview, String> {
+fn render(
+    document: &rdocx::Document,
+    bytes: &[u8],
+    resolver: &dyn FontResolver,
+    limits: ImageLimits,
+) -> Result<Preview, String> {
     let mut files = Vec::new();
     let mut infos = Vec::new();
     let mut warnings = resolver.warnings().to_vec();
@@ -297,16 +323,21 @@ fn render(document: &rdocx::Document, bytes: &[u8], resolver: &dyn FontResolver)
     if faces.values().any(|f| f.script == Script::Hangul && f.drawn.is_none()) {
         warnings.push(crate::NO_KOREAN_FONT.into());
     }
-    finish_preview(Preview {
-        layout,
-        faces,
-        chars: vec![],
-        page_subsets: vec![],
-        document_subsets: vec![],
-        fonts: FontsReport::default(),
-        warnings,
-        diagnostics: vec![],
-    })
+    finish_preview_with_limits(
+        Preview {
+            layout,
+            image_limits: ImageLimits::default(),
+            image_plan: crate::images::ImagePlan::default(),
+            faces,
+            chars: vec![],
+            page_subsets: vec![],
+            document_subsets: vec![],
+            fonts: FontsReport::default(),
+            warnings,
+            diagnostics: vec![],
+        },
+        limits,
+    )
 }
 
 #[cfg(test)]

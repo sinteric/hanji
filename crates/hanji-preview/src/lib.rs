@@ -20,6 +20,7 @@ pub mod docx;
 pub mod fonts;
 #[cfg(feature = "hwpx")]
 pub mod hwpx;
+mod images;
 pub mod prep;
 pub mod quality;
 pub mod sfnt;
@@ -30,6 +31,7 @@ mod svg;
 pub mod xlsx;
 
 pub use fonts::{FontData, FontResolver, ResolvedFont};
+pub use images::ImageLimits;
 /// A nonfatal rendering or font-embedding fallback and its source path.
 pub use svg::SvgDiagnostic as Diagnostic;
 
@@ -300,6 +302,8 @@ impl FaceInfo {
 /// A rendered deck.
 pub struct Preview {
     layout: LayoutResult,
+    image_limits: ImageLimits,
+    image_plan: images::ImagePlan,
     faces: HashMap<FontId, FaceInfo>,
     /// Characters drawn per page and face.
     chars: Vec<BTreeMap<FontId, BTreeSet<char>>>,
@@ -611,31 +615,64 @@ const LINE_EM: f64 = 1.2;
 /// Renders a pptx package (the bytes export wrote).
 #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 pub fn render_pptx(package: &[u8], opts: &Options) -> Result<Preview, String> {
+    render_pptx_with_limits(package, opts, ImageLimits::default())
+}
+
+/// Native PPTX preview with configurable embedded-image decoded-byte budgets.
+#[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
+pub fn render_pptx_with_limits(package: &[u8], opts: &Options, limits: ImageLimits) -> Result<Preview, String> {
+    limits.validate()?;
     let p = {
         let (input, stock) = resolve_pptx(package)?;
         let fonts = Fonts::load(&opts.font_dirs, &input.fonts, opts.system_fonts);
         layout_preview(input, stock, &fonts)?
     };
-    finish_preview(p)
+    finish_preview_with_limits(p, limits)
 }
 
 /// One document job using caller fonts, package fonts, then bundled faces.
 /// Neither this function nor its built-in resolver reads host files or environment variables.
 pub fn render_pptx_with_fonts(package: &[u8], opts: &FontOptions) -> Result<Preview, String> {
+    render_pptx_with_fonts_and_limits(package, opts, ImageLimits::default())
+}
+
+/// Portable PPTX preview with configurable embedded-image budgets. Over-budget
+/// images are omitted consistently from SVG, HTML and PNG with path diagnostics.
+pub fn render_pptx_with_fonts_and_limits(
+    package: &[u8],
+    opts: &FontOptions,
+    limits: ImageLimits,
+) -> Result<Preview, String> {
+    limits.validate()?;
     let p = {
         let (input, stock) = resolve_pptx(package)?;
         let fonts = Fonts::from_bytes(&opts.fonts, &input.fonts, opts.aliases.clone())?;
         layout_preview(input, stock, &fonts)?
     };
-    finish_preview(p)
+    finish_preview_with_limits(p, limits)
 }
 
 /// One document job with caller-defined font selection. The resolver owns its full
 /// selection/fallback policy; use [`render_pptx_with_fonts`] for the built-in policy.
 /// Resolver calls stay inside Rust, not at the platform/FFI boundary.
 pub fn render_pptx_with_resolver(package: &[u8], resolver: &dyn FontResolver) -> Result<Preview, String> {
+    render_pptx_with_resolver_and_limits(package, resolver, ImageLimits::default())
+}
+
+/// Caller-defined fonts and embedded-image budgets; no host/FFI decoding hooks.
+pub fn render_pptx_with_resolver_and_limits(
+    package: &[u8],
+    resolver: &dyn FontResolver,
+    limits: ImageLimits,
+) -> Result<Preview, String> {
+    limits.validate()?;
     let (input, stock) = resolve_pptx(package)?;
-    finish_preview(layout_preview(input, stock, resolver)?)
+    finish_preview_with_limits(layout_preview(input, stock, resolver)?, limits)
+}
+
+fn finish_preview_with_limits(mut p: Preview, limits: ImageLimits) -> Result<Preview, String> {
+    p.image_limits = limits;
+    finish_preview(p)
 }
 
 // Layout temporaries and built-in font databases have been released before preflight.
@@ -825,6 +862,8 @@ fn layout_preview(
         .collect();
     let p = Preview {
         layout,
+        image_limits: ImageLimits::default(),
+        image_plan: images::ImagePlan::default(),
         faces,
         chars: vec![],
         page_subsets: vec![],
@@ -850,6 +889,10 @@ fn runs<'a>(elements: &'a [PositionedElement], out: &mut Vec<(FontId, &'a str)>)
 }
 
 impl Preview {
+    /// The budgets used to preflight this immutable job's embedded PNG/JPEG images.
+    pub fn image_limits(&self) -> ImageLimits {
+        self.image_limits
+    }
     /// A separate, versioned report; the legacy diagnostic/result types stay
     /// source-compatible. `kind` must match this PPTX/DOCX input job.
     pub fn quality(&self, kind: DocumentKind) -> quality::QualityReport {
@@ -1014,6 +1057,7 @@ impl Preview {
     }
 
     fn prepare_output_with_cache_budget(&mut self, mut cache_remaining: usize) -> Result<(), String> {
+        self.image_plan = images::ImagePlan::inspect(&self.layout, self.image_limits)?;
         fn append_unique(out: &mut Vec<Diagnostic>, seen: &mut BTreeSet<(String, String)>, ds: Vec<Diagnostic>) {
             for d in ds {
                 if seen.insert((d.path.clone(), d.message.clone())) {
@@ -1039,7 +1083,7 @@ impl Preview {
         append_unique(&mut self.diagnostics, &mut seen, diagnostics);
         append_unique(&mut self.diagnostics, &mut seen, svg::layout_diagnostics(&self.layout));
         for k in 0..self.slide_count() {
-            let diagnostics = svg::page_diagnostics(&self.layout, k)
+            let diagnostics = svg::page_diagnostics(&self.layout, k, &self.image_plan)
                 .ok_or_else(|| format!("cannot render slide {}: the layout page is absent", k + 1))?;
             append_unique(&mut self.diagnostics, &mut seen, diagnostics);
         }
@@ -1085,7 +1129,7 @@ impl Preview {
 
     fn page_svg(&self, k: usize, css: String, marks: bool) -> String {
         let hooks = PageHooks { preview: self, css, marks };
-        svg::render_page(&self.layout, k, &hooks).expect("the slide's layout page exists").svg
+        svg::render_page(&self.layout, k, &hooks, &self.image_plan).expect("the slide's layout page exists").svg
     }
 
     /// Slide `k` (0-based) as a standalone SVG with its fonts subset to the
@@ -1243,6 +1287,8 @@ mod tests {
         );
         Preview {
             layout: LayoutResult::new(vec![Arc::new(page)], vec![], None, vec![]),
+            image_limits: ImageLimits::default(),
+            image_plan: images::ImagePlan::default(),
             faces: HashMap::new(),
             chars: vec![BTreeMap::new()],
             page_subsets: vec![vec![]],
@@ -1280,6 +1326,183 @@ mod tests {
         }
         for width in [0.0, -1.0, f64::NAN, f64::INFINITY] {
             assert!(red_page(width, 72.0).slide_png(0, 72.0).unwrap_err().contains("dimensions must be finite"));
+        }
+    }
+
+    const IMAGE_RED: &[u8] = include_bytes!("../tests/fixtures/images/red.png");
+    const IMAGE_GRAY: &[u8] = include_bytes!("../tests/fixtures/images/gray.jpg");
+
+    fn embedded_image(data: &[u8], x: f64) -> PositionedElement {
+        PositionedElement::Image {
+            rect: oxml_layout::Rect { x, y: 0.0, width: 1.0, height: 1.0 },
+            data: data.to_vec(),
+            content_type: String::new(),
+            media_id: oxml_layout::MediaId::from_bytes(data),
+        }
+    }
+
+    fn image_job(pages: Vec<Vec<PositionedElement>>, limits: ImageLimits) -> Preview {
+        let pages = pages
+            .into_iter()
+            .enumerate()
+            .map(|(index, elements)| Arc::new(oxml_layout::PageFrame::new(index + 1, 2.0, 1.0, elements)))
+            .collect();
+        finish_preview_with_limits(
+            Preview {
+                layout: LayoutResult::new(pages, vec![], None, vec![]),
+                image_limits: ImageLimits::default(),
+                image_plan: images::ImagePlan::default(),
+                faces: HashMap::new(),
+                chars: vec![],
+                page_subsets: vec![],
+                document_subsets: vec![],
+                fonts: FontsReport::default(),
+                warnings: vec![],
+                diagnostics: vec![],
+            },
+            limits,
+        )
+        .unwrap()
+    }
+
+    fn image_pixels(preview: &Preview, page: usize) -> Vec<[u8; 4]> {
+        let png = preview.slide_png(page, 72.0).unwrap();
+        resvg::tiny_skia::Pixmap::decode_png(&png).unwrap().data().as_chunks::<4>().0.to_vec()
+    }
+
+    #[test]
+    fn embedded_image_budget_refuses_large_metadata_before_all_formats() {
+        // These files contain tiny payloads with adversarial dimensions. Their
+        // source pixels must never be decoded; only the safe 2x1 output is drawn.
+        for data in [
+            include_bytes!("../tests/fixtures/images/huge.png").as_slice(),
+            include_bytes!("../tests/fixtures/images/huge.jpg").as_slice(),
+            include_bytes!("../tests/fixtures/images/overflow.png").as_slice(),
+            include_bytes!("../tests/fixtures/images/zero.png").as_slice(),
+            b"\x89PNG\r\n\x1a\n".as_slice(),
+            b"\xff\xd8\xff".as_slice(),
+        ] {
+            let p = image_job(vec![vec![embedded_image(data, 0.0)]], ImageLimits::default());
+            assert_eq!(p.diagnostics.len(), 1);
+            assert_eq!(p.diagnostics[0].path, "pages[0].elements[0]");
+            assert!(p.diagnostics[0].message.contains("embedded image"));
+            assert!(!p.slide_svg(0).contains("<image"));
+            let html = p.html("image budget");
+            assert!(!html.contains("<image"));
+            assert!(html.contains(&p.diagnostics[0].message));
+            assert_eq!(image_pixels(&p, 0), [[255; 4]; 2]);
+            let rendered = p.render_page(0, PageFormat::Svg).unwrap();
+            assert_eq!(rendered.diagnostics, p.diagnostics);
+            assert!(p.quality(DocumentKind::Pptx).enforce(quality::Strictness::CriticalLosses).is_err());
+        }
+    }
+
+    #[test]
+    fn embedded_image_budget_preserves_ordinary_png_jpeg_pixels() {
+        for (data, mime, pixel) in
+            [(IMAGE_RED, "image/png", [255, 0, 0, 255]), (IMAGE_GRAY, "image/jpeg", [128, 128, 128, 255])]
+        {
+            let p = image_job(vec![vec![embedded_image(data, 0.0)]], ImageLimits::default());
+            assert!(p.diagnostics.is_empty());
+            assert!(p.slide_svg(0).contains(&format!("data:{mime};base64,")));
+            assert!(p.html("owned images").contains(&format!("data:{mime};base64,")));
+            assert_eq!(image_pixels(&p, 0), [pixel, [255; 4]]);
+        }
+    }
+
+    #[test]
+    fn embedded_image_budget_counts_nested_occurrences_and_resets_pages() {
+        let nested = PositionedElement::Group(oxml_layout::GroupElement {
+            transform: oxml_layout::Transform::IDENTITY,
+            clip: None,
+            opacity: 1.0,
+            effects: vec![],
+            children: vec![embedded_image(IMAGE_RED, 0.0)],
+        });
+        let page = vec![nested, embedded_image(IMAGE_RED, 1.0)];
+        let limits =
+            ImageLimits { max_image_decoded_bytes: 4, max_page_decoded_bytes: 4, max_document_decoded_bytes: 8 };
+        let p = image_job(vec![page.clone(), page], limits);
+        assert_eq!(p.diagnostics.len(), 2);
+        for index in 0..2 {
+            assert_eq!(p.diagnostics[index].path, format!("pages[{index}].elements[1]"));
+            assert!(p.diagnostics[index].message.contains("page decoded-image"));
+            assert_eq!(image_pixels(&p, index), [[255, 0, 0, 255], [255; 4]]);
+        }
+        // An individually refused image consumes no budget for the next image.
+        let p = image_job(
+            vec![vec![
+                embedded_image(include_bytes!("../tests/fixtures/images/huge.png"), 0.0),
+                embedded_image(IMAGE_RED, 1.0),
+            ]],
+            limits,
+        );
+        assert_eq!(p.diagnostics.len(), 1);
+        assert_eq!(image_pixels(&p, 0), [[255; 4], [255, 0, 0, 255]]);
+    }
+
+    #[test]
+    fn embedded_image_budget_document_total_is_configurable_and_structured() {
+        let pages = vec![vec![embedded_image(IMAGE_RED, 0.0)]; 2];
+        let limits =
+            ImageLimits { max_image_decoded_bytes: 4, max_page_decoded_bytes: 4, max_document_decoded_bytes: 4 };
+        let p = image_job(pages.clone(), limits);
+        assert_eq!(p.image_limits(), limits);
+        assert_eq!(p.diagnostics.len(), 1);
+        assert_eq!(p.diagnostics[0].path, "pages[1].elements[0]");
+        assert!(p.diagnostics[0].message.contains("document decoded-image"));
+        assert_eq!(image_pixels(&p, 1), [[255; 4]; 2]);
+        let report = p.quality(DocumentKind::Docx);
+        assert_eq!(report.diagnostics[0].code, quality::DiagnosticCode::ImageResourceLimit);
+        assert_eq!(report.diagnostics[0].location.page_index, Some(1));
+        let p = image_job(pages, ImageLimits { max_document_decoded_bytes: 8, ..limits });
+        assert!(p.diagnostics.is_empty());
+        assert_eq!(image_pixels(&p, 1), [[255, 0, 0, 255], [255; 4]]);
+    }
+
+    #[test]
+    fn embedded_image_budget_uses_exact_png_dimensions_and_checks_arithmetic() {
+        let data = include_bytes!("../tests/fixtures/images/rounding.png");
+        let p = image_job(vec![vec![embedded_image(data, 0.0)]], ImageLimits::default());
+        assert_eq!(p.diagnostics.len(), 1); // 16,777,217 x 1 cannot round into the default allowance.
+        let p = image_job(
+            vec![vec![embedded_image(data, 0.0)]],
+            ImageLimits {
+                max_image_decoded_bytes: 67_108_868,
+                max_page_decoded_bytes: 67_108_868,
+                ..ImageLimits::default()
+            },
+        );
+        assert!(p.diagnostics.is_empty());
+        assert!(p.slide_svg(0).contains("<image")); // Metadata only: do not rasterize this fixture.
+        let p = image_job(
+            vec![vec![embedded_image(include_bytes!("../tests/fixtures/images/overflow.png"), 0.0)]],
+            ImageLimits {
+                max_image_decoded_bytes: u64::MAX,
+                max_page_decoded_bytes: u64::MAX,
+                max_document_decoded_bytes: u64::MAX,
+            },
+        );
+        assert!(p.diagnostics[0].message.contains("overflow"));
+        assert!(!p.slide_svg(0).contains("<image"));
+    }
+
+    #[test]
+    fn embedded_image_budget_rejects_invalid_configuration_before_import() {
+        let default = ImageLimits::default();
+        for limits in [
+            ImageLimits { max_image_decoded_bytes: 0, ..default },
+            ImageLimits { max_page_decoded_bytes: 0, ..default },
+            ImageLimits { max_document_decoded_bytes: 0, ..default },
+        ] {
+            assert_eq!(
+                render_pptx_with_fonts_and_limits(b"not a package", &FontOptions::default(), limits).err().unwrap(),
+                "embedded image budgets must be positive"
+            );
+            assert_eq!(
+                docx::render_with_fonts_and_limits(b"not a package", &FontOptions::default(), limits).err().unwrap(),
+                "embedded image budgets must be positive"
+            );
         }
     }
 
@@ -1574,11 +1797,11 @@ mod tests {
         });
         let hooks = PageHooks { preview: &p, css: String::new(), marks: false };
         for k in 0..p.slide_count() {
-            let inspected = svg::page_diagnostics(&p.layout, k).unwrap();
-            let rendered = svg::render_page(&p.layout, k, &hooks).unwrap();
+            let inspected = svg::page_diagnostics(&p.layout, k, &p.image_plan).unwrap();
+            let rendered = svg::render_page(&p.layout, k, &hooks, &p.image_plan).unwrap();
             assert_eq!(inspected, rendered.diagnostics);
         }
-        let inspected = svg::page_diagnostics(&p.layout, 0).unwrap();
+        let inspected = svg::page_diagnostics(&p.layout, 0, &p.image_plan).unwrap();
         for message in [
             "tile paint",
             "complex shaping",
