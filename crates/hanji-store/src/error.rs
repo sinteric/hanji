@@ -16,8 +16,8 @@ pub enum Code {
     NotFound,
     /// The request itself is malformed (a window, an argument).
     BadRequest,
-    /// The edit names a revision that is not the current one, and a model
-    /// edit came after it: read again.
+    /// The edit names a revision that is not current and a model edit came
+    /// after it, or a re-import's exported base is no longer current.
     StaleRevision,
     /// `old` does not occur in the revision.
     NoMatch,

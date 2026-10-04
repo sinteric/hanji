@@ -382,7 +382,7 @@ fn a_person_s_edits_come_back_in_and_a_pending_edit_is_merged_or_refused() {
     let (_, exported) = ws.export_bytes(&o.doc_id, None, &ACK).unwrap();
     // The person changes a word in Word and saves.
     let polished = person_edits(&exported, "word/document.xml", ">분기에는 <", ">분기부터는 <");
-    let r = ws.reimport_bytes(&o.doc_id, "korean-report.docx", &polished).unwrap();
+    let r = ws.reimport_bytes_at_revision(&o.doc_id, 1, "korean-report.docx", &polished).unwrap();
     assert_eq!((r.parent, r.revision), (1, 2));
     assert!(
         r.diff.contains("-4분기에는 [부산]{color=#C00000}과 [대구]{color=#C00000}에 지점을 연다.\n+4분기부터는 [부산]{color=#C00000}과 [대구]{color=#C00000}에 지점을 연다."),
@@ -402,7 +402,7 @@ fn a_person_s_edits_come_back_in_and_a_pending_edit_is_merged_or_refused() {
     assert_eq!(e.code, Code::StaleRevision, "revision 3 is a model edit: stale, not merged");
     let (_, exported) = ws.export_bytes(&o.doc_id, None, &ACK).unwrap();
     let polished = person_edits(&exported, "word/document.xml", ">대구<", ">대구, 광주<");
-    ws.reimport_bytes(&o.doc_id, "korean-report.docx", &polished).unwrap();
+    ws.reimport_bytes_at_revision(&o.doc_id, 3, "korean-report.docx", &polished).unwrap();
     let e = ws
         .edit(
             &o.doc_id,
@@ -421,7 +421,7 @@ fn a_person_s_edits_come_back_in_and_a_pending_edit_is_merged_or_refused() {
     assert!(t.contains("[부산]{color=#C00000}과 [대구, 광주]{color=#C00000}에") && t.contains("(2026년)"));
     // Re-importing the same file again changes nothing.
     let (_, exported) = ws.export_bytes(&o.doc_id, None, &ACK).unwrap();
-    let r = ws.reimport_bytes(&o.doc_id, "korean-report.docx", &exported).unwrap();
+    let r = ws.reimport_bytes_at_revision(&o.doc_id, c.revision, "korean-report.docx", &exported).unwrap();
     assert!(r.unchanged && r.diff.is_empty());
     assert_eq!(ws.reimport_bytes(&o.doc_id, "x.pptx", &exported).unwrap_err().code, Code::BadRequest);
 }
