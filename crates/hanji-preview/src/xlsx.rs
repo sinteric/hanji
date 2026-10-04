@@ -465,18 +465,9 @@ impl Window {
     }
     pub fn render(&self, format: PageFormat) -> Result<RenderedPage, String> {
         if let PageFormat::Png { dpi } = format {
-            if !dpi.is_finite() || dpi <= 0.0 {
-                return Err("PNG DPI must be finite and positive".into());
-            }
             let p = self.page_info();
-            let w = (p.width * dpi / 72.0).round().max(1.0);
-            let h = (p.height * dpi / 72.0).round().max(1.0);
-            if !w.is_finite()
-                || !h.is_finite()
-                || w > u32::MAX as f64
-                || h > u32::MAX as f64
-                || w * h > self.max_png_pixels as f64
-            {
+            let (w, h) = crate::png_dimensions(p.width, p.height, dpi)?;
+            if u64::from(w) * u64::from(h) > self.max_png_pixels {
                 return Err(
                     "worksheet PNG exceeds the configured pixel budget; lower DPI or request a smaller window".into()
                 );
