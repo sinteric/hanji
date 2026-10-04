@@ -298,3 +298,30 @@ fn docx_selected_story_pages_restore_continuation_room_and_preserve_body_text() 
     }
     assert_eq!(horizontal_second_pages[0], horizontal_second_pages[1]);
 }
+
+#[test]
+fn fractional_landscape_docx_tables_use_selected_story_bands() {
+    let bytes = docx_vertical::fractional_landscape();
+    let p = render_document_with_fonts(DocumentKind::Docx, &bytes, &FontOptions::default()).unwrap();
+    assert_eq!(p.page_count(), 2);
+    let mut body = String::new();
+    for page in 0..p.page_count() {
+        let PageData::Svg(svg) = p.render_page(page, PageFormat::Svg).unwrap().data else { panic!("SVG") };
+        let text = hanji_package::xml::parse(svg.as_bytes()).unwrap().root.text_of(&["text", "tspan"]);
+        assert!(text.contains(if page == 0 { "First header" } else { "Default header" }));
+        assert!(text.contains("Shared footer"));
+        body.push_str(&text);
+        let tree = resvg::usvg::Tree::from_str(&svg, &Default::default()).unwrap();
+        let mut bounds = Vec::new();
+        table_bounds(tree.root(), &mut bounds);
+        assert_eq!(bounds.len(), 1);
+        let to_points = p.page_info(page).unwrap().height / f64::from(tree.size().height());
+        let top = if page == 0 { 36.0 + 300.05 } else { 36.0 + 400.05 };
+        let bottom = 612.0 - 36.0 - 100.1;
+        assert!((f64::from(bounds[0].top()) * to_points - top).abs() < 0.01);
+        assert!((f64::from(bounds[0].bottom()) * to_points - bottom).abs() < 0.01);
+    }
+    for text in ["Page one body", "Page one table", "Page two body", "Page two table"] {
+        assert_eq!(body.matches(text).count(), 1);
+    }
+}

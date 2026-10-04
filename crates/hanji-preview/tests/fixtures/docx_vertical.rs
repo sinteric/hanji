@@ -64,3 +64,37 @@ pub fn selected_story(first_height: u32, vertical: bool, overflow: bool) -> Vec<
     }).collect::<Vec<_>>();
     package::write(&parts).unwrap()
 }
+
+/// Owned landscape case whose selected measure rounds during transposition.
+pub fn fractional_landscape() -> Vec<u8> {
+    let mut parts = package::read(&selected_story(120, true, false)).unwrap();
+    let r = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    for part in &mut parts {
+        let text = std::str::from_utf8(&part.data).unwrap();
+        let replacement = match part.name.as_str() {
+            "word/document.xml" => text
+                .replace("w:w=\"12240\" w:h=\"15840\"", "w:w=\"15840\" w:h=\"12240\"")
+                .replace("<w:pgSz", "<w:footerReference w:type=\"default\" r:id=\"footer\"/><w:footerReference w:type=\"first\" r:id=\"footer\"/><w:pgSz"),
+            "word/header1.xml" => story("hdr", "Default header", 8001),
+            "word/header2.xml" => story("hdr", "First header", 6001),
+            "word/_rels/document.xml.rels" => text.replace(
+                "</Relationships>",
+                &format!(r#"<Relationship Id="footer" Type="{r}/footer" Target="footer1.xml"/></Relationships>"#),
+            ),
+            "[Content_Types].xml" => text.replace(
+                "</Types>",
+                r#"<Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/></Types>"#,
+            ),
+            _ => continue,
+        };
+        part.data = replacement.into_bytes();
+    }
+    parts.push(hanji_core::Part {
+        name: "word/footer1.xml".to_owned(),
+        data: story("ftr", "Shared footer", 2002).into_bytes(),
+        dos_time: 0,
+        external_attr: 0,
+        deflate: true,
+    });
+    package::write(&parts).unwrap()
+}

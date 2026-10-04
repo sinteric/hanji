@@ -17,11 +17,11 @@ hanji-testkit = { path = "crates/hanji-testkit" }
 
 # One immutable renderer source keeps PPTX and DOCX layout types compatible.
 # Reviewed source adds selected-story vertical continuation to the Hanji table/font fixes.
-rdocx = { git = "https://github.com/sinteric/rdocx", rev = "79e8ab8991b3086e7820b3346c28a53575fa97c4", default-features = false }
-rpptx = { git = "https://github.com/sinteric/rdocx", rev = "79e8ab8991b3086e7820b3346c28a53575fa97c4", default-features = false }
-rpptx-render = { git = "https://github.com/sinteric/rdocx", rev = "79e8ab8991b3086e7820b3346c28a53575fa97c4", default-features = false }
-rpptx-layout = { git = "https://github.com/sinteric/rdocx", rev = "79e8ab8991b3086e7820b3346c28a53575fa97c4", default-features = false }
-oxml-layout = { git = "https://github.com/sinteric/rdocx", rev = "79e8ab8991b3086e7820b3346c28a53575fa97c4", default-features = false }
+rdocx = { git = "https://github.com/sinteric/rdocx", rev = "ddbac9401f5b1032f75bd791bb15c60f03e865c7", default-features = false }
+rpptx = { git = "https://github.com/sinteric/rdocx", rev = "ddbac9401f5b1032f75bd791bb15c60f03e865c7", default-features = false }
+rpptx-render = { git = "https://github.com/sinteric/rdocx", rev = "ddbac9401f5b1032f75bd791bb15c60f03e865c7", default-features = false }
+rpptx-layout = { git = "https://github.com/sinteric/rdocx", rev = "ddbac9401f5b1032f75bd791bb15c60f03e865c7", default-features = false }
+oxml-layout = { git = "https://github.com/sinteric/rdocx", rev = "ddbac9401f5b1032f75bd791bb15c60f03e865c7", default-features = false }
 # Published rhwp candidate, including the reviewed layout and Rust 1.99 fixes.
 rhwp = { git = "https://github.com/sinteric/rhwp", rev = "fed548c9acc3858624320538be0ce96b6ca0c742", default-features = false }
 

@@ -126,6 +126,9 @@ changes. Six source-owned API cases check restored later-page space, seven-page
 overflow with all 4,000 words preserved, and unchanged horizontal output. The
 renderer also checks split table cells, numbering, source ranges and cold/warm
 equality. Split cells carry percentage spacing to the selected page measure.
+An owned fractional landscape case verifies exact table-variant selection before
+vertical transposition can round the prepared story measure. Both selected
+table bands and all body labels are preserved.
 These checks do not establish native Word fidelity. Existing whole-row
 limits for merged, rotated, anchored, nested or exactly clipped cells remain.
 
