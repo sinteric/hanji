@@ -774,6 +774,8 @@ impl<'a> GridBuilder<'a> {
     }
     fn finish(self, width: f64, height: f64) -> Result<Preview, String> {
         let p = Preview {
+            image_limits: crate::ImageLimits::default(),
+            image_plan: crate::images::ImagePlan::default(),
             layout: LayoutResult::new(
                 vec![Arc::new(PageFrame::new(1, width, height, self.elements))],
                 self.fonts,

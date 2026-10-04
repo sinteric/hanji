@@ -10,6 +10,7 @@
 use std::collections::HashSet;
 use std::fmt::Write as _;
 
+use crate::images::ImagePlan;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
 use oxml_layout::{
@@ -45,9 +46,14 @@ pub trait Hooks {
     fn mark(&self, font: FontId) -> Option<String>;
 }
 
-pub fn render_page(layout: &LayoutResult, page_index: usize, hooks: &dyn Hooks) -> Option<SvgRenderResult> {
+pub(crate) fn render_page(
+    layout: &LayoutResult,
+    page_index: usize,
+    hooks: &dyn Hooks,
+    images: &ImagePlan,
+) -> Option<SvgRenderResult> {
     let page = layout.pages.get(page_index)?;
-    let mut state = SvgState::new(layout, Some(hooks), page_index, page.width, page.height);
+    let mut state = SvgState::new(layout, Some(hooks), page_index, page.width, page.height, images);
 
     let mut used_fonts = Vec::new();
     let mut seen_fonts = HashSet::new();
@@ -108,9 +114,13 @@ pub fn layout_diagnostics(layout: &LayoutResult) -> Vec<SvgDiagnostic> {
 }
 
 /// Use the same fallback checks as serialization, without XML/font/image encoding.
-pub fn page_diagnostics(layout: &LayoutResult, page_index: usize) -> Option<Vec<SvgDiagnostic>> {
+pub(crate) fn page_diagnostics(
+    layout: &LayoutResult,
+    page_index: usize,
+    images: &ImagePlan,
+) -> Option<Vec<SvgDiagnostic>> {
     let page = layout.pages.get(page_index)?;
-    let mut state = SvgState::new(layout, None, page_index, page.width, page.height);
+    let mut state = SvgState::new(layout, None, page_index, page.width, page.height, images);
     if let Some(background) = &page.background {
         state.paint_attributes(background, "fill", &format!("pages[{page_index}].background"));
     }
@@ -131,6 +141,7 @@ struct SvgState<'a> {
     diagnostics: Vec<SvgDiagnostic>,
     next_definition: usize,
     diagnosed_fonts: HashSet<FontId>,
+    images: &'a ImagePlan,
 }
 
 impl<'a> SvgState<'a> {
@@ -140,6 +151,7 @@ impl<'a> SvgState<'a> {
         page_index: usize,
         page_width: f64,
         page_height: f64,
+        images: &'a ImagePlan,
     ) -> Self {
         Self {
             layout,
@@ -151,6 +163,7 @@ impl<'a> SvgState<'a> {
             diagnostics: vec![],
             next_definition: 0,
             diagnosed_fonts: HashSet::new(),
+            images,
         }
     }
 
@@ -357,6 +370,10 @@ impl<'a> SvgState<'a> {
             self.diagnose(path, "image bytes are neither PNG nor JPEG and were omitted");
             return;
         };
+        if let Some(message) = self.images.omission(path) {
+            self.diagnose(path, message);
+            return;
+        }
         if self.hooks.is_none() {
             return;
         }

@@ -46,6 +46,8 @@ pub enum DiagnosticCode {
     ElementOmitted,
     #[serde(rename = "svg.image-omitted")]
     ImageOmitted,
+    #[serde(rename = "svg.image-resource-limit")]
+    ImageResourceLimit,
     #[serde(rename = "svg.link-omitted")]
     LinkOmitted,
     #[serde(rename = "svg.paint-omitted")]
@@ -327,6 +329,19 @@ fn classify(source: PreviewSource, d: &Diagnostic) -> (DiagnosticCode, Severity,
     match d.message.as_str() {
         GENERIC_FONT => (FontGenericSymbols, Error, MissingText),
         "image bytes are neither PNG nor JPEG and were omitted" => (ImageOmitted, Error, UnsupportedOmission),
+        "embedded image exceeds the configured decoded-image byte budget and was omitted"
+        | "embedded image exceeds the configured page decoded-image byte budget and was omitted"
+        | "embedded image exceeds the configured document decoded-image byte budget and was omitted"
+        | "embedded image decoded bytes cannot be represented on this target and it was omitted"
+        | "embedded image page decoded-byte total overflowed and the image was omitted"
+        | "embedded image document decoded-byte total overflowed and the image was omitted"
+        | "embedded image dimensions overflow the decoded RGBA byte count and the image was omitted"
+        | "embedded image dimensions exceed the raster backend representation and the image was omitted" =>
+            (ImageResourceLimit, Error, UnsupportedOmission),
+        "embedded image dimensions must be positive and the image was omitted"
+        | "embedded image PNG dimensions could not be read and the image was omitted"
+        | "embedded image JPEG dimensions could not be read and the image was omitted" =>
+            (ImageOmitted, Error, UnsupportedOmission),
         "unsupported positioned element was omitted from SVG output" => (ElementOmitted, Error, UnsupportedOmission),
         "invalid multilingual glyph positioning was omitted from SVG output" => (InvalidPositioning, Error, MissingText),
         "text references font data that is absent from the layout result" => (FontDataMissing, Error, MissingText),

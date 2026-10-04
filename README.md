@@ -82,6 +82,10 @@ it had to substitute; `--font-dir DIR` or `$HANJI_FONT_DIR` adds fonts. Renderin
 fallbacks and font-embedding failures are warnings; `--json` also returns their
 `diagnostics` with source paths. The preview library exposes the same diagnostics
 before any output is requested. Add `--json` for machine-readable output.
+Shared PPTX/DOCX output also preflights decoded PNG/JPEG image resources: the
+defaults are 64 MiB per image/page and 1 GiB across the document. Images that
+exceed a budget are omitted with diagnostics in SVG, HTML and PNG. Library
+callers can configure these budgets; see [embedded image limits](crates/hanji-preview/IMAGE_LIMITS.md).
 For XLSX, `hanji preview DOC --sheet '매출' --range A1:H40 --format png
 --out /tmp/hanji-preview` writes one worksheet window. A `.xlsx`/`.xlsm`
 file can be previewed directly without opening or storing it. Stored documents
