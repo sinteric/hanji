@@ -41,8 +41,8 @@ do not discover host fonts. Native `Options` can load `--font-dir`,
 `HANJI_FONT_DIR` and installed fonts. Korean text needs an appropriate font;
 the output reports actual missing characters when one is unavailable.
 
-PPTX/DOCX share one immutable git source for rdocx 0.14.0 and the rpptx /
-oxml-layout 0.12.1 family. HWPX uses rhwp 0.8.6 from the sinteric fork.
+PPTX/DOCX share one immutable git source for rdocx 0.15.0 and the rpptx /
+oxml-layout 0.13.0 family. HWPX uses rhwp 0.8.6 from the sinteric fork.
 `Cargo.toml` records exact revision pins and `Cargo.lock` records the resolved
 source. A crate's version alone does not identify these fork patches.
 

@@ -127,7 +127,7 @@ copy above retains its original provenance independently of these pins.
 
 ## Fonts compiled into the binaries
 
-The `hanji` binary contains the fonts oxml-layout 0.12.1
+The `hanji` binary contains the fonts oxml-layout 0.13.0
 bundles (`fonts/` in the crate), which the preview draws with when nothing
 better is installed, and of which it embeds subsets in its SVG and HTML
 output:
@@ -137,11 +137,22 @@ output:
 - Liberation Sans, Serif and Mono: Digitized data copyright (c) 2010 Google
   Corporation with Reserved Font Arimo, Tinos and Cousine; Copyright (c) 2012
   Red Hat, Inc. with Reserved Font Name Liberation. SIL Open Font License 1.1.
-- Noto Sans Arabic, Devanagari and Thai, and a subset of Noto Sans SC:
+- Noto Sans Arabic, Devanagari and Thai, and subsets of Noto Sans SC,
+  Hebrew, KR and JP:
   Copyright 2022 The Noto Project Authors. SIL Open Font License 1.1.
 - Caladea: Copyright (c) 2012 Huerta Tipografia; Caladea is a trademark of
   Huerta Tipografia; original type designers Carolina Giovagnoli and Andres
   Torresi. Apache License 2.0 (`LICENSE-APACHE`).
+
+The Noto Sans SC, Hebrew, KR and JP faces are deterministic fixture subsets,
+not the full font families. Their source hashes, output hashes, repertoires
+and reproduction commands are recorded in `crates/oxml-layout/fonts/NOTICE-Noto`
+and `SUBSET-NotoSans*.md` at the immutable rdocx revision in `Cargo.toml`.
+The KR subset contains only space, comma and the syllables of
+"안녕하세요 세계"; the JP subset contains only space, comma and the characters
+of "こんにちは、カタカナ世界"; the Hebrew subset contains only space, comma
+and the letters of "שלום עולם". These bundled subsets do not provide general
+Korean, Japanese or Hebrew font coverage.
 
 ```text
 SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007

@@ -4,6 +4,54 @@ const ENGLISH: &[u8] = include_bytes!("../../../prototype/preview/baseline/08-do
 const KOREAN: &[u8] = include_bytes!("../../../prototype/preview/baseline/01-docx-untouched-korean-report.docx");
 
 #[test]
+fn renderer_upgrade_uses_the_pptx_shape_style_font_color() {
+    let bytes = include_bytes!("../../hanji-pptx/corpus/shapes.pptx");
+    let p = render_document_with_fonts(DocumentKind::Pptx, bytes, &FontOptions::default()).unwrap();
+    let PageData::Svg(svg) = p.render_page(0, PageFormat::Svg).unwrap().data else { panic!("SVG") };
+    let root = hanji_package::xml::parse(svg.as_bytes()).unwrap().root;
+    let mut colors = vec![];
+    root.walk(&mut |element| {
+        if element.local() == "text" && element.text_of(&["text", "tspan"]) == "Cloud" {
+            colors.push(element.get("fill"));
+        }
+    });
+    // The shape's fontRef chooses the white theme color. Older renderers
+    // inherited black instead, despite retaining the shape's geometry.
+    assert_eq!(colors, vec![Some("#FFFFFF".into())]);
+}
+
+#[test]
+fn renderer_upgrade_numbers_the_first_footnote_independently_of_its_storage_id() {
+    let parts = hanji_package::package::read(KOREAN).unwrap();
+    let document = hanji_package::package::get(&parts, "word/document.xml").unwrap();
+    let root = hanji_package::xml::parse(document).unwrap().root;
+    let mut storage_ids = vec![];
+    root.walk(&mut |element| {
+        if element.local() == "footnoteReference" {
+            storage_ids.push(element.get("w:id"));
+        }
+    });
+    assert_eq!(storage_ids, vec![Some("2".into())]);
+
+    let p = render_document_with_fonts(DocumentKind::Docx, KOREAN, &FontOptions::default()).unwrap();
+    let PageData::Svg(svg) = p.render_page(0, PageFormat::Svg).unwrap().data else { panic!("SVG") };
+    let root = hanji_package::xml::parse(svg.as_bytes()).unwrap().root;
+    let mut markers = vec![];
+    root.walk(&mut |element| {
+        if element.local() == "text"
+            && element.get("font-size").and_then(|size| size.parse::<f64>().ok()).is_some_and(|size| size < 6.0)
+        {
+            let text = element.text_of(&["text", "tspan"]);
+            if text.chars().all(|c| c.is_ascii_digit()) && !text.is_empty() {
+                markers.push(text);
+            }
+        }
+    });
+    // Both the body reference and the note marker use the visible label 1.
+    assert_eq!(markers, vec!["1", "1"]);
+}
+
+#[test]
 fn real_pptx_doughnut_has_distinct_wedges_and_category_legend() {
     use std::collections::BTreeSet;
 

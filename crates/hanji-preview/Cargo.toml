@@ -5,7 +5,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-# rpptx 0.12 needs 1.93.
+# rpptx 0.13 needs 1.93.
 rust-version = "1.93"
 
 [features]
