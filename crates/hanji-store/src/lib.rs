@@ -886,10 +886,46 @@ impl<S: Storage> Workspace<S> {
         Ok(hanji_docx::DocxEngine.export_with(h.text(), h.remainder(), &opts, Some(&h))?)
     }
 
-    /// A person's edits come back in (rule 7): the file, polished in the
-    /// native application, becomes a new revision.
+    /// Re-import an exported file only if its base revision is still current.
+    /// Pass the revision returned by export, not a freshly read head: the
+    /// imported text and remainder replace that revision. Already committed
+    /// changes are never merged; a stale base is refused without writes.
+    /// Pending text edits against the base can still be rebased afterwards
+    /// (rule 7).
+    pub fn reimport_bytes_at_revision(
+        &mut self,
+        id: &str,
+        base_revision: u32,
+        name: &str,
+        bytes: &[u8],
+    ) -> Result<Reimported> {
+        let doc = self.doc(id)?;
+        Self::check_rev(&doc, base_revision)?;
+        if base_revision != doc.head {
+            let mut e = Error::new(
+                Code::StaleRevision,
+                format!(
+                    "re-import of {name:?} names base revision {base_revision} of {}, but the current revision is {}. Re-import would replace already committed changes; nothing was changed. Reconcile the file with an export of revision {} before re-importing, or use --replace-head only to deliberately replace the current text and remainder.",
+                    doc.id, doc.head, doc.head
+                ),
+            );
+            e.detail.head = Some(doc.head);
+            return Err(e);
+        }
+        self.reimport_into(doc, name, bytes)
+    }
+
+    /// Authoritatively replace the current text and remainder with a file.
+    /// This compatibility API does not check the export's base revision or
+    /// merge already committed changes. Prefer
+    /// [`Workspace::reimport_bytes_at_revision`] unless replacement is intended.
+    /// Pending text edits may still be rebased over the new revision (rule 7).
     pub fn reimport_bytes(&mut self, id: &str, name: &str, bytes: &[u8]) -> Result<Reimported> {
-        let mut doc = self.doc(id)?;
+        let doc = self.doc(id)?;
+        self.reimport_into(doc, name, bytes)
+    }
+
+    fn reimport_into(&mut self, mut doc: DocRecord, name: &str, bytes: &[u8]) -> Result<Reimported> {
         if let Some(f) = Format::of_name(name).filter(|f| *f != doc.format) {
             return Err(Error::bad(format!(
                 "{} is a {} document; {name:?} is {}.",
@@ -1147,7 +1183,15 @@ mod native {
             Ok(out)
         }
 
-        /// Re-import the file at `path` (rule 7).
+        /// Re-import `path` if its exported base revision is still current
+        /// (see [`Workspace::reimport_bytes_at_revision`]).
+        pub fn reimport_at_revision(&mut self, id: &str, base_revision: u32, path: &Path) -> Result<Reimported> {
+            let bytes = read_file(path)?;
+            self.reimport_bytes_at_revision(id, base_revision, &name_of(path), &bytes)
+        }
+
+        /// Authoritatively replace the head with `path`
+        /// (see [`Workspace::reimport_bytes`]).
         pub fn reimport(&mut self, id: &str, path: &Path) -> Result<Reimported> {
             let bytes = read_file(path)?;
             self.reimport_bytes(id, &name_of(path), &bytes)

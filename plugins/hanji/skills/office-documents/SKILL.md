@@ -99,9 +99,16 @@ later runs start at once.
    without asking. If export is refused over surfaced items (comments,
    hidden text, tracked deletions, metadata), show them and export again
    with `--acknowledge-surfaced` only once the person agrees. For a Word
-   file a person will review, offer `--tracked-changes`.
+   file a person will review, offer `--tracked-changes`. Keep the revision
+   printed by export for a later re-import.
 7. If the person edits the exported file in Office or Hancom and wants you to
-   continue, `hanji reimport DOC /abs/edited.docx` and read again.
+   continue, run `hanji reimport DOC /abs/edited.docx --base-rev N`, using that
+   export's revision, and read again. A newer committed revision causes a
+   refusal: reconcile the file with a fresh export; do not substitute the
+   current revision to bypass the check. Use `--replace-head` only for a
+   deliberate replacement of the current text and remainder. Already
+   committed changes are not merged; only pending text edits submitted after
+   re-import can be rebased.
 
 `hanji history DOC` lists the revisions and `hanji diff DOC 1 4` diffs any
 two of them: use them to show the person what changed.

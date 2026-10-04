@@ -56,8 +56,10 @@ write and edit — while guaranteeing that everything else in the file survives.
 Found while testing the rules, and adopted:
 
 7. **A person's edits come back in.** A file polished in Office is re-imported;
-   changes to modelled parts appear in the text, and a concurrent model edit
-   is merged (on the text) or refused — never guessed.
+   changes to modelled parts appear in the text, and a pending model edit
+   is merged (on the text) or refused — never guessed. Re-import checks the
+   exported base revision and refuses if newer changes were committed,
+   unless authoritative replacement is explicitly requested.
 8. **The model sees what it cannot edit.** Unmodelled content appears in the
    text as a placeholder the model keeps; deleting one is an explicit act.
 9. **Preserved content can be unsafe.** Active and remote content is
@@ -125,8 +127,12 @@ package ─────────────────────► model
   visible IDs. A whole-file rewrite is aligned block-by-block by diff.
 - **Human polish.** A file edited in Office is re-imported as a new revision:
   modelled changes show up as a text diff; remainder changes are kept
-  silently. A model edit made in between is rebased as a text merge, or
-  refused when its target no longer exists.
+  silently. `reimport --base-rev N` names the revision exported for editing;
+  it must still be the head, or re-import refuses without changing the store.
+  The file's provenance is supplied by the caller. `--replace-head` explicitly
+  replaces the current text and remainder; neither mode merges already
+  committed revisions. A pending model edit submitted after re-import is
+  rebased as a text merge, or refused when its target no longer exists.
 - **Laws (from bidirectional transformations / lenses), as tests:**
   - *GetPut:* import then export with no edit returns the original —
     XML-equivalent per part (canonicalised), since byte identity does not

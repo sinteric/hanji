@@ -179,10 +179,22 @@ download. Later runs use the cached binary. For details, see
 | `hanji ops DOC --rev N OPS` | Write spreadsheet cells with JSON range operations (set, append/insert/delete rows, fill_formula, sort, add_table, format, …) |
 | `hanji validate FILE` | Check a text against the grammar, and with `--doc` the document's style, layout and placeholder names |
 | `hanji export DOC PATH` | Write a revision to a file. Refused until surfaced content (comments, hidden text, metadata) is acknowledged (`--acknowledge-surfaced`); `--tracked-changes` for docx |
-| `hanji reimport DOC PATH` | Bring back a file a person edited in Office or Hancom as a new revision, and merge or refuse concurrent edits |
+| `hanji reimport DOC PATH --base-rev N` | Bring back a file edited in Office or Hancom only if its exported base revision is still current; refuse if newer revisions were committed |
 | `hanji history DOC`, `hanji diff DOC A B` | List a document's revisions, and show the diff between two of them |
 | `hanji preview DOC` | Render PPTX slides, experimental DOCX/HWPX pages or a bounded XLSX worksheet window to HTML, SVG or PNG, with font and rendering diagnostics |
 | `hanji list`, `hanji guide` | List the stored documents; print the format summary for agents |
+
+For re-import, keep the revision printed by `export` and pass that number as
+`--base-rev`. This is the file's base, not a newly read current revision;
+hanji does not embed or infer export provenance. Re-import replaces the text
+and remainder. If the head has advanced, reconcile the file with a fresh
+export first. `--replace-head` is the explicit alternative for deliberately
+replacing the current contents, including already committed edits. Pending
+text edits submitted after a re-import can still be merged or refused;
+already committed edits are not automatically merged with an imported file.
+Library callers should use `reimport_bytes_at_revision` or
+`reimport_at_revision`; the original `reimport_bytes` and `reimport` methods
+retain authoritative replacement semantics for compatibility.
 
 ## Formats
 
