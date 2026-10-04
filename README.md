@@ -160,7 +160,10 @@ codex plugin marketplace add sinteric/hanji
 codex plugin add hanji@hanji
 ```
 
-You do not need a Rust toolchain for either plugin. The skill tells the agent
+You do not need a Rust toolchain for a plugin version with published release
+assets. A main-branch plugin may need a source build until its matching
+release is published; see the `HANJI_BIN` steps in
+[plugins/hanji](plugins/hanji/README.md#the-binary). The skill tells the agent
 to run `hanji` commands through its launcher, which uses `hanji` from `PATH`
 if it is there. Otherwise its first run downloads the release binary for your
 platform once and checks it against `SHA256SUMS`; the command waits for the
