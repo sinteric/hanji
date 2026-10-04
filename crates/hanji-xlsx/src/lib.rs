@@ -17,6 +17,7 @@
 
 pub mod book;
 pub mod calc;
+pub mod diff;
 pub mod drawing;
 pub mod format;
 pub mod model;
@@ -119,6 +120,15 @@ impl XlsxEngine {
     pub fn window(rem: &Remainder, of: &WindowOf) -> Result<String, EngineError> {
         let mut book = book_of(rem)?;
         view::window(&mut book, of).map_err(EngineError::Refused)
+    }
+
+    /// Values, formulas and stored formula caches changed between two
+    /// revisions, by sheet and cell address. The report includes at most
+    /// [`diff::MAX_CHANGES`] cells and counts any omitted changes; individual
+    /// states are bounded by [`diff::MAX_STATE_BYTES`]. Empty when cells agree.
+    /// This complements the structure text's diff; no formulas are evaluated.
+    pub fn cell_diff(before: &Remainder, after: &Remainder) -> Result<String, EngineError> {
+        diff::cells(before, after)
     }
 
     /// The structure with each table's first `rows` data rows as windows

@@ -135,7 +135,7 @@ enum Cmd {
     Reimport { doc: String, path: PathBuf },
     /// List a document's revisions.
     History { doc: String },
-    /// The text diff between two revisions.
+    /// Text and spreadsheet cell changes between two revisions.
     Diff { doc: String, from: u32, to: u32 },
     /// List the documents in the store.
     List,

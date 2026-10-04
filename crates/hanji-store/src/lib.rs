@@ -45,6 +45,8 @@ use merge::{line_of, Hunk, Merged};
 /// The date tracked changes carry: fixed, so the same revision exports the same bytes (§8).
 const TRACKED_DATE: &str = "2026-01-01T00:00:00Z";
 
+const XLSX_OTHER_CHANGES: &str = "No structural text or cell value/formula/cache changes detected; other preserved workbook data or representation differs.\n";
+
 /// How to work with hanji and the format, written for a model (`hanji
 /// guide`).
 pub const GUIDE: &str = include_str!("guide.md");
@@ -235,7 +237,8 @@ pub struct Reimported {
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub unchanged: bool,
     pub report: ImportReport,
-    /// The person's changes to the text, as a unified diff.
+    /// The person's changes to the text, as a unified diff, followed by
+    /// bounded cell value/formula/cache changes for a Spreadsheet.
     pub diff: String,
 }
 
@@ -902,7 +905,10 @@ impl<S: Storage> Workspace<S> {
         let imp = doc.format.engine().import(bytes, &opts)?;
         let parent = doc.head;
         let (text, rem) = self.revision(&doc, parent)?;
-        let diff = merge::unified(&text, &imp.text, &format!("revision {parent}"), name);
+        let mut diff = merge::unified(&text, &imp.text, &format!("revision {parent}"), name);
+        if doc.format == Format::Xlsx {
+            diff.push_str(&XlsxEngine::cell_diff(&rem, &imp.remainder)?);
+        }
         let report = (&imp.report).into();
         // Nothing changed when the two revisions make the same package.
         let engine = doc.format.engine();
@@ -914,6 +920,9 @@ impl<S: Storage> Workspace<S> {
         if text == imp.text && same(&text, &rem, &imp.text, &imp.remainder) {
             return Ok(Reimported { doc_id: doc.id, revision: parent, parent, unchanged: true, report, diff });
         }
+        if doc.format == Format::Xlsx && diff.is_empty() {
+            diff.push_str(XLSX_OTHER_CHANGES);
+        }
         let summary = format!("re-imported {name}");
         let revision = self.commit(&mut doc, RevOp::Reimport, summary, &imp.text, &imp.remainder)?;
         Ok(Reimported { doc_id: doc.id, revision, parent, unchanged: false, report, diff })
@@ -924,11 +933,19 @@ impl<S: Storage> Workspace<S> {
         Ok(History { doc_id: d.id, doc_type: d.doc_type, format: d.format, head: d.head, revisions: d.revisions })
     }
 
-    /// The text diff of revision `from` → `to` (unified, by lines).
+    /// The text diff of revision `from` → `to` (unified, by lines), followed
+    /// by bounded cell value/formula/cache changes for a Spreadsheet.
     pub fn diff(&self, id: &str, from: u32, to: u32) -> Result<Diff> {
         let doc = self.doc(id)?;
         let (a, b) = (self.text(&doc, from)?, self.text(&doc, to)?);
-        let diff = merge::unified(&a, &b, &format!("revision {from}"), &format!("revision {to}"));
+        let mut diff = merge::unified(&a, &b, &format!("revision {from}"), &format!("revision {to}"));
+        if doc.format == Format::Xlsx {
+            let ((_, ar), (_, br)) = (self.revision(&doc, from)?, self.revision(&doc, to)?);
+            diff.push_str(&XlsxEngine::cell_diff(&ar, &br)?);
+            if diff.is_empty() && ar != br {
+                diff.push_str(XLSX_OTHER_CHANGES);
+            }
+        }
         Ok(Diff { doc_id: doc.id, from, to, diff })
     }
 
