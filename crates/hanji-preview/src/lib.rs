@@ -333,6 +333,22 @@ pub enum PageFormat {
     Png { dpi: f64 },
 }
 
+/// Use the same rounded, nonzero pixel dimensions for validation, allocation and drawing.
+fn png_dimensions(width: f64, height: f64, dpi: f64) -> Result<(u32, u32), String> {
+    if !dpi.is_finite() || dpi <= 0.0 {
+        return Err("PNG DPI must be finite and positive".into());
+    }
+    if !width.is_finite() || !height.is_finite() || width <= 0.0 || height <= 0.0 {
+        return Err("PNG page dimensions must be finite and positive".into());
+    }
+    let scale = dpi / 72.0;
+    let (width, height) = ((width * scale).round().max(1.0), (height * scale).round().max(1.0));
+    if !width.is_finite() || !height.is_finite() || width > u32::MAX as f64 || height > u32::MAX as f64 {
+        return Err("PNG page dimensions cannot be rasterized at this DPI".into());
+    }
+    Ok((width as u32, height as u32))
+}
+
 /// Owned output buffers; adapters decide how to transfer/display them.
 #[derive(Debug)]
 pub enum PageData {
@@ -1127,9 +1143,7 @@ impl Preview {
     pub fn slide_png(&self, k: usize, dpi: f64) -> Result<Vec<u8>, String> {
         use resvg::{tiny_skia, usvg};
         let page = self.layout.pages.get(k).ok_or_else(|| format!("page index {k} is out of range"))?;
-        if !dpi.is_finite() || dpi <= 0.0 {
-            return Err("PNG DPI must be finite and positive".into());
-        }
+        let (w, h) = png_dimensions(page.width, page.height, dpi)?;
         let subsets = self.output_subsets(&self.page_subsets[k], &self.chars[k]);
         let svg = self.page_svg(k, String::new(), false);
         let mut options = usvg::Options::default();
@@ -1147,9 +1161,7 @@ impl Preview {
             select_fallback: Box::new(|_, _, _| None),
         };
         let tree = usvg::Tree::from_str(&svg, &options).map_err(|e| format!("usvg: {e}"))?;
-        let scale = dpi / 72.0;
-        let (w, h) = ((page.width * scale).round() as u32, (page.height * scale).round() as u32);
-        let mut pm = tiny_skia::Pixmap::new(w.max(1), h.max(1)).ok_or("the slide is too large to draw")?;
+        let mut pm = tiny_skia::Pixmap::new(w, h).ok_or("the slide is too large to draw")?;
         pm.fill(tiny_skia::Color::WHITE);
         let (sx, sy) = (w as f32 / tree.size().width(), h as f32 / tree.size().height());
         resvg::render(&tree, tiny_skia::Transform::from_scale(sx, sy), &mut pm.as_mut());
@@ -1262,6 +1274,60 @@ impl svg::Hooks for PageHooks<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn red_page(width: f64, height: f64) -> Preview {
+        let page = oxml_layout::PageFrame::new(
+            1,
+            width,
+            height,
+            vec![PositionedElement::FilledRect {
+                rect: oxml_layout::Rect { x: 0.0, y: 0.0, width, height },
+                color: oxml_layout::Color::from_hex("FF0000"),
+            }],
+        );
+        Preview {
+            layout: LayoutResult::new(vec![Arc::new(page)], vec![], None, vec![]),
+            image_limits: ImageLimits::default(),
+            image_plan: images::ImagePlan::default(),
+            faces: HashMap::new(),
+            chars: vec![BTreeMap::new()],
+            page_subsets: vec![vec![]],
+            document_subsets: vec![],
+            fonts: FontsReport::default(),
+            warnings: vec![],
+            diagnostics: vec![],
+        }
+    }
+
+    #[test]
+    fn minimum_png_pixel_retains_page_content() {
+        for (width, height, dpi, size) in [
+            (72.0, 72.0, 0.25, (1, 1)),
+            (7.2, 72.0, 1.0, (1, 1)),
+            (2.88, 72.0, 10.0, (1, 10)),
+            (72.0, 2.88, 10.0, (10, 1)),
+            (72.0, 72.0, f64::MIN_POSITIVE, (1, 1)),
+        ] {
+            let png = red_page(width, height).slide_png(0, dpi).unwrap();
+            let image = resvg::tiny_skia::Pixmap::decode_png(&png).unwrap();
+            assert_eq!((image.width(), image.height()), size);
+            assert!(
+                image.data().as_chunks::<4>().0.iter().all(|pixel| *pixel == [255, 0, 0, 255]),
+                "the red page fills every pixel at {dpi} DPI, including a rounded-up axis"
+            );
+        }
+    }
+
+    #[test]
+    fn png_dimensions_are_refused_before_unrepresentable_raster_allocation() {
+        let p = red_page(72.0, 72.0);
+        for dpi in [u32::MAX as f64 + 1.0, 1e30, f64::MAX] {
+            assert!(p.slide_png(0, dpi).unwrap_err().contains("dimensions cannot be rasterized"));
+        }
+        for width in [0.0, -1.0, f64::NAN, f64::INFINITY] {
+            assert!(red_page(width, 72.0).slide_png(0, 72.0).unwrap_err().contains("dimensions must be finite"));
+        }
+    }
 
     const IMAGE_RED: &[u8] = include_bytes!("../tests/fixtures/images/red.png");
     const IMAGE_GRAY: &[u8] = include_bytes!("../tests/fixtures/images/gray.jpg");
