@@ -116,10 +116,13 @@ when the person asks, never write a new one.
 
 The launcher says on stderr, in one line, what failed and how to fix it.
 Show that line to the person as it is, and do not work around it. Most often
-the first run could not download the binary: the network is off (Codex's
-default sandbox) or the release host is blocked. If your tool can rerun a
-command with network access, ask the person and rerun it once that way;
-otherwise the fixes are theirs: allow github.com and
+the first run could not download the binary. For HTTP 404, the plugin's
+release or the requested asset is unavailable: use a matching source
+checkout with `HANJI_BIN` as described in the plugin README, or a plugin
+version with published release assets. For connection failures, the network
+may be off (Codex's default sandbox) or the release host blocked. If your
+tool can rerun a command with network access, ask the person and rerun it
+once that way; otherwise the fixes are theirs: allow github.com and
 release-assets.githubusercontent.com, set `HANJI_BIN` to a `hanji` binary,
 or install hanji on `PATH` (`cargo install --locked --git
 https://github.com/sinteric/hanji hanji-cli`).

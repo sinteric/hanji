@@ -45,19 +45,37 @@ if [ ! -x "$bin" ]; then
   tmp=$(mktemp -d)
   trap 'rm -rf "$tmp"' EXIT
   fetch() {
+    http_status=
     if command -v curl >/dev/null 2>&1; then
-      curl -fsSL --retry 2 -o "$2" "$1"
+      if http_status=$(curl -fsSL --retry 2 --write-out '%{http_code}' -o "$2" "$1"); then
+        return 0
+      fi
     elif command -v wget >/dev/null 2>&1; then
-      wget -q -O "$2" "$1"
+      if wget -q -S -O "$2" "$1" 2>"$tmp/fetch.log"; then
+        return 0
+      fi
+      # Keep the final response, after any redirects to the asset host.
+      http_status=$(awk '$1 ~ /^HTTP\// { code = $2 } END { print code }' "$tmp/fetch.log")
     else
       say "needs curl or wget to download $1"
       return 1
     fi
+    case "$http_status" in
+      404)
+        say "release asset not found (HTTP 404): $1. This plugin requires v$version; the release or this asset may not be published yet. From a matching source checkout, run cargo build --locked -p hanji-cli and set HANJI_BIN to the absolute path of target/debug/hanji${exe:-}; or use a plugin version with published release assets."
+        ;;
+      [45][0-9][0-9])
+        say "could not download $1 (HTTP $http_status). Check release availability and access to this URL, or set HANJI_BIN to a locally built hanji binary."
+        ;;
+      *)
+        say "could not download $1. Fix one of: allow network access for this first run (github.com and release-assets.githubusercontent.com); set HANJI_BIN to a hanji binary; or put hanji on PATH (cargo install --locked --git https://github.com/$repo hanji-cli)."
+        ;;
+    esac
+    return 1
   }
   say "downloading $archive (once) from $base"
   for f in "$archive" SHA256SUMS; do
     if ! fetch "$base/$f" "$tmp/$f"; then
-      say "could not download $base/$f. Fix one of: allow network access for this first run (github.com and release-assets.githubusercontent.com); set HANJI_BIN to a hanji binary; or put hanji on PATH (cargo install --locked --git https://github.com/$repo hanji-cli)."
       exit 1
     fi
   done
