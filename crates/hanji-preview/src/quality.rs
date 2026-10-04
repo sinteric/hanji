@@ -340,7 +340,10 @@ fn classify(source: PreviewSource, d: &Diagnostic) -> (DiagnosticCode, Severity,
             (ImageResourceLimit, Error, UnsupportedOmission),
         "embedded image dimensions must be positive and the image was omitted"
         | "embedded image PNG dimensions could not be read and the image was omitted"
-        | "embedded image JPEG dimensions could not be read and the image was omitted" =>
+        | "embedded image JPEG dimensions could not be read and the image was omitted"
+        | "embedded image GIF dimensions could not be read and the image was omitted"
+        | "embedded image GIF first frame could not be decoded and the image was omitted"
+        | "embedded image GIF first frame does not cover its canvas and the image was omitted" =>
             (ImageOmitted, Error, UnsupportedOmission),
         "unsupported positioned element was omitted from SVG output" => (ElementOmitted, Error, UnsupportedOmission),
         "invalid multilingual glyph positioning was omitted from SVG output" => (InvalidPositioning, Error, MissingText),

@@ -1,4 +1,4 @@
-//! Metadata-only resource checks for the shared PNG/JPEG output path.
+//! Image resource checks and bounded GIF first-frame normalization for PNG/JPEG output.
 use std::{collections::BTreeMap, sync::Arc};
 
 use oxml_layout::{LayoutResult, PositionedElement};
@@ -43,6 +43,7 @@ impl ImageLimits {
 #[derive(Default)]
 pub(crate) struct ImagePlan {
     omitted: BTreeMap<String, String>,
+    normalized: BTreeMap<String, Vec<u8>>,
 }
 
 impl ImagePlan {
@@ -65,6 +66,10 @@ impl ImagePlan {
 
     pub(crate) fn omission(&self, path: &str) -> Option<&str> {
         self.omitted.get(path).map(String::as_str)
+    }
+
+    pub(crate) fn normalized(&self, path: &str) -> Option<&[u8]> {
+        self.normalized.get(path).map(Vec::as_slice)
     }
 
     fn inspect_elements(
@@ -99,12 +104,19 @@ impl ImagePlan {
                         if document_total > limits.max_document_decoded_bytes {
                             return Err("embedded image exceeds the configured document decoded-image byte budget and was omitted");
                         }
+                        let normalized = if is_gif(data) { Some(normalize_gif(data, bytes)?) } else { None };
                         *page_bytes = page_total;
                         *document_bytes = document_total;
-                        Ok(())
+                        Ok(normalized)
                     });
-                    if let Err(message) = result {
-                        self.omitted.insert(path, message.into());
+                    match result {
+                        Ok(Some(png)) => {
+                            self.normalized.insert(path, png);
+                        }
+                        Ok(None) => (),
+                        Err(message) => {
+                            self.omitted.insert(path, message.into());
+                        }
                     }
                 }
                 PositionedElement::Group(group) => self.inspect_elements(
@@ -148,6 +160,15 @@ fn decoded_bytes(data: &[u8]) -> Option<Result<u64, &'static str>> {
             Ok((
                 u32::from_be_bytes(data[16..20].try_into().unwrap()),
                 u32::from_be_bytes(data[20..24].try_into().unwrap()),
+            ))
+        }
+    } else if is_gif(data) {
+        if data.len() < 13 {
+            Err("embedded image GIF dimensions could not be read and the image was omitted")
+        } else {
+            Ok((
+                u32::from(u16::from_le_bytes(data[6..8].try_into().unwrap())),
+                u32::from(u16::from_le_bytes(data[8..10].try_into().unwrap())),
             ))
         }
     } else if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
@@ -198,4 +219,34 @@ fn jpeg_dimensions(data: &[u8]) -> Result<(u32, u32), &'static str> {
         None
     }
     size(tree.root()).ok_or("embedded image JPEG dimensions could not be read and the image was omitted")
+}
+
+fn is_gif(data: &[u8]) -> bool {
+    data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a")
+}
+
+fn normalize_gif(data: &[u8], bytes: u64) -> Result<Vec<u8>, &'static str> {
+    let invalid = "embedded image GIF first frame could not be decoded and the image was omitted";
+    let mut options = gif::DecodeOptions::new();
+    options.set_color_output(gif::ColorOutput::RGBA);
+    options.set_memory_limit(gif::MemoryLimit::Bytes(std::num::NonZeroU64::new(bytes).ok_or(invalid)?));
+    let mut decoder = options.read_info(data).map_err(|_| invalid)?;
+    let (width, height) = (decoder.width(), decoder.height());
+    let frame = decoder.next_frame_info().map_err(|_| invalid)?.ok_or(invalid)?;
+    // Offset/background compositing is outside this full-canvas first-frame slice.
+    if frame.left != 0 || frame.top != 0 || frame.width != width || frame.height != height {
+        return Err("embedded image GIF first frame does not cover its canvas and the image was omitted");
+    }
+    let mut pixels = Vec::new();
+    pixels.try_reserve_exact(bytes as usize).map_err(|_| invalid)?;
+    pixels.resize(bytes as usize, 0);
+    decoder.read_into_buffer(&mut pixels).map_err(|_| invalid)?;
+    // GIF alpha is binary. tiny-skia expects transparent pixels premultiplied.
+    for pixel in pixels.as_chunks_mut::<4>().0 {
+        if pixel[3] == 0 {
+            pixel.fill(0);
+        }
+    }
+    let size = resvg::tiny_skia::IntSize::from_wh(u32::from(width), u32::from(height)).ok_or(invalid)?;
+    resvg::tiny_skia::Pixmap::from_vec(pixels, size).ok_or(invalid)?.encode_png().map_err(|_| invalid)
 }

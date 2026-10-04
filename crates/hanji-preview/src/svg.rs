@@ -366,14 +366,15 @@ impl<'a> SvgState<'a> {
     }
 
     fn emit_image(&mut self, rect: Rect, data: &[u8], path: &str, output: &mut String) {
-        let Some(mime) = image_mime(data) else {
-            self.diagnose(path, "image bytes are neither PNG nor JPEG and were omitted");
-            return;
-        };
         if let Some(message) = self.images.omission(path) {
             self.diagnose(path, message);
             return;
         }
+        let data = self.images.normalized(path).unwrap_or(data);
+        let Some(mime) = image_mime(data) else {
+            self.diagnose(path, "image bytes are neither PNG nor JPEG and were omitted");
+            return;
+        };
         if self.hooks.is_none() {
             return;
         }
