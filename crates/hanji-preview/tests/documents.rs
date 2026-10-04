@@ -210,25 +210,25 @@ fn hwpx_html_clip_references_resolve_to_their_own_page_geometry() {
 #[path = "fixtures/docx_vertical.rs"]
 mod docx_vertical;
 
-#[test]
-fn vertical_docx_table_svg_stays_inside_the_header_footer_body_band() {
-    fn table_bounds(group: &resvg::usvg::Group, out: &mut Vec<resvg::usvg::Rect>) {
-        use resvg::usvg::{Node, Paint};
-        for node in group.children() {
-            match node {
-                Node::Group(group) => table_bounds(group, out),
-                Node::Path(path)
-                    if path.fill().is_some_and(|fill| {
-                        matches!(fill.paint(), Paint::Color(c)
+fn table_bounds(group: &resvg::usvg::Group, out: &mut Vec<resvg::usvg::Rect>) {
+    use resvg::usvg::{Node, Paint};
+    for node in group.children() {
+        match node {
+            Node::Group(group) => table_bounds(group, out),
+            Node::Path(path)
+                if path.fill().is_some_and(|fill| {
+                    matches!(fill.paint(), Paint::Color(c)
                         if (c.red, c.green, c.blue) == (0xCC, 0xEE, 0xFF))
-                    }) =>
-                {
-                    out.push(path.abs_bounding_box());
-                }
-                _ => {}
+                }) =>
+            {
+                out.push(path.abs_bounding_box());
             }
+            _ => {}
         }
     }
+}
+#[test]
+fn vertical_docx_table_svg_stays_inside_the_header_footer_body_band() {
     for alignment in ["left", "center", "right"] {
         for vertical_alignment in ["top", "center", "bottom"] {
             let bytes = docx_vertical::build(alignment, vertical_alignment);
@@ -252,4 +252,49 @@ fn vertical_docx_table_svg_stays_inside_the_header_footer_body_band() {
             }
         }
     }
+}
+
+#[test]
+fn docx_selected_story_pages_restore_continuation_room_and_preserve_body_text() {
+    let mut horizontal_second_pages = Vec::new();
+    for (vertical, overflow) in [(true, false), (false, false), (true, true)] {
+        for first_height in [12, 120] {
+            let bytes = docx_vertical::selected_story(first_height, vertical, overflow);
+            let p = render_document_with_fonts(DocumentKind::Docx, &bytes, &FontOptions::default()).unwrap();
+            assert_eq!(p.page_count(), if overflow { 7 } else { 2 });
+            let mut body = String::new();
+            for page in 0..p.page_count() {
+                let PageData::Svg(svg) = p.render_page(page, PageFormat::Svg).unwrap().data else { panic!("SVG") };
+                let text = hanji_package::xml::parse(svg.as_bytes()).unwrap().root.text_of(&["text", "tspan"]);
+                assert!(text.contains(if page == 0 { "First header" } else { "Default header" }));
+                body.push_str(&text);
+                if !overflow {
+                    assert!(text.contains(if page == 0 { "Page one body" } else { "Page two body" }));
+                    assert!(text.contains(if page == 0 { "Page one table" } else { "Page two table" }));
+                    let tree = resvg::usvg::Tree::from_str(&svg, &Default::default()).unwrap();
+                    let mut bounds = Vec::new();
+                    table_bounds(tree.root(), &mut bounds);
+                    assert_eq!(bounds.len(), 1);
+                    let to_points = p.page_info(page).unwrap().height / f64::from(tree.size().height());
+                    let rect = bounds[0];
+                    if vertical {
+                        let top = if page == 0 && first_height == 120 { 156.0 } else { 72.0 };
+                        assert!((f64::from(rect.top()) * to_points - top).abs() < 0.01);
+                        assert!((f64::from(rect.bottom()) * to_points - 720.0).abs() < 0.01);
+                    } else {
+                        assert!((f64::from(rect.left()) * to_points - 72.0).abs() < 0.01);
+                        assert!((f64::from(rect.right()) * to_points - 540.0).abs() < 0.01);
+                        if page == 1 {
+                            horizontal_second_pages.push(svg);
+                        }
+                    }
+                }
+            }
+            if overflow {
+                assert_eq!(body.matches("Word").count(), 4000);
+            }
+            assert!(!p.diagnostics().iter().any(|d| d.message.contains("largest active header/footer band")));
+        }
+    }
+    assert_eq!(horizontal_second_pages[0], horizontal_second_pages[1]);
 }

@@ -119,9 +119,14 @@ targeted renderer issues next.
 
 An additional DOCX regression exercises nine vertical table-alignment and
 page-alignment combinations with tall headers and footers. It checks the
-rendered table bounds against the page's usable story area. Vertical pages
-currently reserve the largest applicable story band, which can leave extra
-space when first/even/default headers or footers have different heights.
+rendered table bounds against the page's usable story area. Vertical paragraphs
+and percentage tables use the selected first/even/default story band on each
+page. Continuations retain logical text and objects once when the measure
+changes. Six source-owned API cases check restored later-page space, seven-page
+overflow with all 4,000 words preserved, and unchanged horizontal output. The
+renderer also checks split table cells, numbering, source ranges and cold/warm
+equality. These checks do not establish native Word fidelity. Existing whole-row
+limits for merged, rotated, anchored, nested or exactly clipped cells remain.
 
 The real six-page HWPX footnote document `26` reuses clip IDs across pages
 with different rectangle geometry. The HTML viewer namespaces page IDs and
