@@ -100,7 +100,7 @@ candidate renders six. The unavailable source PDFs cannot be rescored locally.
 Those pagination differences prevent a blanket native-fidelity claim.
 
 Observed limitations include missing Symbol/Gothic characters in DOCX `04`,
-OfficeMath/VML diagnostics in DOCX `05`, an unsupported chart placeholder in
+OfficeMath diagnostics in DOCX `05`, an unsupported chart placeholder in
 PPTX `12`, and clipping/missing formula caches in XLSX `18`. PPTX `14`, slide
 6, now draws the 55/30/15 doughnut wedges in three theme colors and shows
 구독, 라이선스 and 서비스 in the chart’s own legend. A real-file regression
@@ -131,6 +131,16 @@ vertical transposition can round the prepared story measure. Both selected
 table bands and all body labels are preserved.
 These checks do not establish native Word fidelity. Existing whole-row
 limits for merged, rotated, anchored, nested or exactly clipped cells remain.
+
+DOCX `05` now renders its `#e00` VML text watermarks through the shared renderer.
+Three-digit RGB expands by duplicating each digit. The unchanged real input
+remains five pages, with SAMPLE on pages one through four and none on page five.
+Its SVG, 96-DPI PNG and HTML exactly match a control changing only the three
+header colors to `#ee0000`. Ordinary text, coordinates and resolved font bytes
+are unchanged, and the OfficeMath and shaping diagnostics remain. An owned
+first/default header regression verifies all three output formats on native,
+byte-only and WASI paths. This does not establish general VML support or native
+Word fidelity.
 
 The real six-page HWPX footnote document `26` reuses clip IDs across pages
 with different rectangle geometry. The HTML viewer namespaces page IDs and
