@@ -1492,7 +1492,7 @@ mod tests {
         let mut bytes = owned_gif(true, false, false);
         let header = b",\0\0\0\0\x01\0\x01\0\0";
         let second = bytes.windows(header.len()).rposition(|window| window == header).unwrap();
-        // The second frame declares 17 GiB of RGBA pixels and has no compressed
+        // The second frame declares nearly 16 GiB of RGBA pixels and has no compressed
         // data. The static preview must only inspect its metadata, within 4 bytes.
         bytes[second + 5..second + 9].fill(0xff);
         bytes.truncate(second + header.len() + 2);
