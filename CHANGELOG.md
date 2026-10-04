@@ -2,6 +2,10 @@
 
 ## 0.3.0 — unreleased
 
+- Require `reimport --base-rev N` (the exported revision) or an explicit
+  `--replace-head`. A stale base refuses before changing the store, including
+  XLSX cell-only changes. Add checked re-import library APIs; retain the
+  original methods as documented authoritative replacements.
 - Add experimental DOCX and HWPX page previews through the reusable library
   and native CLI, with SVG, PNG and HTML output from exported revision bytes.
   File previews remain unstored and leave their source bytes unchanged.

@@ -601,7 +601,7 @@ fn reimport_of_a_file_a_person_changed() {
     let doc = parts.iter_mut().find(|p| p.name == "word/document.xml").unwrap();
     doc.data = String::from_utf8(doc.data.clone()).unwrap().replacen(">분기에는 <", ">분기부터는 <", 1).into_bytes();
     std::fs::write(&out, hanji_package::package::write(&parts).unwrap()).unwrap();
-    let r = env.ok(&["reimport", "korean-report", &out]);
+    let r = env.ok(&["reimport", "korean-report", &out, "--base-rev", "1"]);
     assert_eq!((r["parent"].as_u64(), r["revision"].as_u64()), (Some(1), Some(2)));
     assert!(
         r["diff"]
@@ -621,6 +621,39 @@ fn reimport_of_a_file_a_person_changed() {
     let h = env.cmd().args(["history", "korean-report"]).output().unwrap();
     let h = String::from_utf8(h.stdout).unwrap();
     assert!(h.contains("reimport") && h.lines().nth(2).unwrap().starts_with('*'), "{h}");
+}
+
+#[test]
+fn reimport_requires_an_export_base_or_deliberate_replacement() {
+    let env = Env::new("reimport-guard");
+    env.ok(&["open", &corpus("prototype/remainder/corpus/korean-report.docx")]);
+    let path = env.path("report.docx");
+    env.ok(&["export", "korean-report", &path, "--acknowledge-surfaced"]);
+    env.ok(&["edit", "korean-report", "--rev", "1", "--old", "| 합계 || 215 |", "--new", "| 합계 || 217 |"]);
+    let before = env.read("korean-report");
+    let history = env.ok(&["history", "korean-report"]);
+
+    let missing = env.cmd().args(["reimport", "korean-report", &path]).output().unwrap();
+    assert!(!missing.status.success());
+    assert!(String::from_utf8_lossy(&missing.stderr).contains("--base-rev"));
+    let help = env.cmd().args(["reimport", "--help"]).output().unwrap();
+    let help = String::from_utf8(help.stdout).unwrap();
+    assert!(help.contains("--base-rev") && help.contains("--replace-head"), "{help}");
+    let conflicting =
+        env.cmd().args(["reimport", "korean-report", &path, "--base-rev", "1", "--replace-head"]).output().unwrap();
+    assert!(!conflicting.status.success());
+
+    let e = env.err(&["reimport", "korean-report", &path, "--base-rev", "1"]);
+    assert_eq!(e["code"], "stale_revision");
+    assert_eq!(e["head"], 2);
+    assert!(e["message"].as_str().unwrap().contains("--replace-head"), "{e:#}");
+    assert_eq!(env.read("korean-report"), before);
+    assert_eq!(env.ok(&["history", "korean-report"]), history);
+
+    // The explicit override intentionally restores the old exported file.
+    let r = env.ok(&["reimport", "korean-report", &path, "--replace-head"]);
+    assert_eq!((r["parent"].as_u64(), r["revision"].as_u64()), (Some(2), Some(3)));
+    assert!(env.read("korean-report").contains("| 합계 || 215 |"));
 }
 
 #[test]

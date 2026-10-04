@@ -131,8 +131,17 @@ enum Cmd {
         #[arg(long)]
         range: Option<String>,
     },
-    /// Bring a person's edits of an exported file back in as a new revision.
-    Reimport { doc: String, path: PathBuf },
+    /// Bring a person's edits back in, checking the export's base or explicitly replacing the head.
+    Reimport {
+        doc: String,
+        path: PathBuf,
+        /// The revision exported for editing in Office; refuse if the head has changed since.
+        #[arg(long, required_unless_present = "replace_head", conflicts_with = "replace_head")]
+        base_rev: Option<u32>,
+        /// Deliberately replace the current text and remainder, without merging committed changes.
+        #[arg(long)]
+        replace_head: bool,
+    },
     /// List a document's revisions.
     History { doc: String },
     /// The text diff between two revisions.
@@ -431,8 +440,11 @@ fn run(cli: Cli) -> Result<Out> {
         Cmd::Preview { doc, rev, out, format, font_dirs, sheet, sheet_index, range } => {
             preview(&ws, &doc, rev, out, format, font_dirs, XlsxSelection { sheet, sheet_index, range })?
         }
-        Cmd::Reimport { doc, path } => {
-            let r = ws.reimport(&doc, &path)?;
+        Cmd::Reimport { doc, path, base_rev, replace_head: _ } => {
+            let r = match base_rev {
+                Some(rev) => ws.reimport_at_revision(&doc, rev, &path)?,
+                None => ws.reimport(&doc, &path)?,
+            };
             let t = if r.unchanged {
                 format!("{}: no changes in {}; still revision {}\n", r.doc_id, path.display(), r.revision)
             } else {
