@@ -78,7 +78,7 @@ impl Options {
     }
 }
 
-/// A run's font as rpptx picks it (`rpptx-render` 0.12.1 `typeface_for_text`):
+/// A run's font as rpptx picks it (`rpptx-render` 0.13.0 `typeface_for_text`):
 /// the symbol, East Asian, complex-script or Latin typeface by the text,
 /// then any other. rpptx draws a run with none in Arial.
 fn requested_typeface(style: &ResolvedRunStyle, text: &str) -> String {
