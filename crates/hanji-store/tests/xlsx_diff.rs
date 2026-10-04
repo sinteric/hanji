@@ -231,3 +231,54 @@ fn malformed_cell_rows_are_errors_instead_of_silently_empty_diffs() {
     part.data = std::str::from_utf8(&part.data).unwrap().replace("</v>", "</wrong>").into_bytes();
     assert!(XlsxEngine::cell_diff(&old, &new).is_err());
 }
+
+fn unicode_shared_workbook() -> Vec<u8> {
+    let shared = workbook(
+        r#"<row r="1"><c r="A1"><v>1</v></c><c r="B1"><f t="shared" si="0" ref="B1:B2">IF(A1&lt;매출!$A$1,1,0)</f><v>0</v></c></row><row r="2"><c r="A2"><v>2</v></c><c r="B2"><f t="shared" si="0"/><v>0</v></c></row>"#,
+    );
+    replace(&shared, "xl/workbook.xml", r#"name="Sheet1""#, r#"name="매출""#)
+}
+
+#[test]
+fn unicode_shared_formulas_are_equal_to_plain_formulas_without_panicking() {
+    let shared = unicode_shared_workbook();
+    let plain = replace(&shared, "xl/worksheets/sheet1.xml", r#"<f t="shared" si="0" ref="B1:B2">"#, "<f>");
+    let plain =
+        replace(&plain, "xl/worksheets/sheet1.xml", r#"<f t="shared" si="0"/>"#, "<f>IF(A2&lt;매출!$A$1,1,0)</f>");
+    assert!(XlsxEngine::cell_diff(&rem(&shared), &rem(&plain)).unwrap().is_empty());
+}
+
+#[test]
+fn unicode_shared_formulas_keep_identical_diff_and_checked_reimport_empty() {
+    let mut ws = Workspace::new(MemStorage::new());
+    let source = unicode_shared_workbook();
+    let o = ws.open_bytes("unicode.xlsx", &source, None).unwrap();
+    let r = ws.reimport_bytes_at_revision(&o.doc_id, 1, "unicode.xlsx", &source).unwrap();
+    assert!(r.unchanged && r.diff.is_empty());
+    assert_eq!(r.revision, 1);
+    assert!(ws.diff(&o.doc_id, 1, 1).unwrap().diff.is_empty());
+}
+
+#[test]
+fn checked_reimport_reports_unicode_shared_formula_changes_and_refuses_stale_exports() {
+    let mut ws = Workspace::new(MemStorage::new());
+    let source = unicode_shared_workbook();
+    let o = ws.open_bytes("unicode.xlsx", &source, None).unwrap();
+    let changed = replace(&source, "xl/worksheets/sheet1.xml", "A1&lt;", "A1&gt;");
+    let r = ws.reimport_bytes_at_revision(&o.doc_id, 1, "unicode.xlsx", &changed).unwrap();
+    assert_eq!((r.parent, r.revision), (1, 2));
+    assert!(r.diff.starts_with("Cell changes: 2 "), "{}", r.diff);
+    assert!(r.diff.contains(r#""text":"=IF(A2<매출!$A$1,1,0)""#), "{}", r.diff);
+    assert!(r.diff.contains(r#""text":"=IF(A2>매출!$A$1,1,0)""#), "{}", r.diff);
+    assert_eq!(r.diff, ws.diff(&o.doc_id, 1, 2).unwrap().diff);
+    let history = serde_json::to_value(ws.history(&o.doc_id).unwrap()).unwrap();
+    let exported = ws.export_bytes(&o.doc_id, None, &Default::default()).unwrap();
+    let err = ws.reimport_bytes_at_revision(&o.doc_id, 1, "unicode.xlsx", &source).unwrap_err();
+    assert_eq!((err.code, err.detail.head), (hanji_store::Code::StaleRevision, Some(2)));
+    assert_eq!(serde_json::to_value(ws.history(&o.doc_id).unwrap()).unwrap(), history);
+    let after = ws.export_bytes(&o.doc_id, None, &Default::default()).unwrap();
+    assert_eq!((after.0.revision, after.0.digest, after.1), (exported.0.revision, exported.0.digest, exported.1));
+    let r = ws.reimport_bytes_at_revision(&o.doc_id, 2, "unicode.xlsx", &changed).unwrap();
+    assert!(r.unchanged && r.diff.is_empty());
+    assert_eq!(r.revision, 2);
+}
