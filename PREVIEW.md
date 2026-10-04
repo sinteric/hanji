@@ -66,7 +66,10 @@ subset cache is a performance budget: uncached validated subsets are recreated
 on demand, without refusing pages. HWPX prepares page and whole-viewer subsets.
 DOCX embedded GIFs with a full-canvas first frame are normalized to PNG after
 image, page and document decoded-byte checks. SVG, HTML and PNG draw that same
-static first frame, including binary transparency. Malformed GIFs and first
+static first frame, including binary transparency. Animated GIFs report
+`svg.image-approximation`: animation is not played, and later frames are neither
+decoded nor validated. Only the next frame's metadata is inspected to detect
+animation. Malformed first frames or unreadable next-frame metadata and first
 frames requiring offset/background compositing are omitted with structured
 image-loss diagnostics. Source packages, image positions and text stay intact.
 PPTX GIF admission remains a separate renderer limitation.

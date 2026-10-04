@@ -43,7 +43,7 @@ impl ImageLimits {
 #[derive(Default)]
 pub(crate) struct ImagePlan {
     omitted: BTreeMap<String, String>,
-    normalized: BTreeMap<String, Vec<u8>>,
+    normalized: BTreeMap<String, (Vec<u8>, bool)>,
 }
 
 impl ImagePlan {
@@ -69,7 +69,11 @@ impl ImagePlan {
     }
 
     pub(crate) fn normalized(&self, path: &str) -> Option<&[u8]> {
-        self.normalized.get(path).map(Vec::as_slice)
+        self.normalized.get(path).map(|(png, _)| png.as_slice())
+    }
+
+    pub(crate) fn approximation(&self, path: &str) -> Option<&'static str> {
+        self.normalized.get(path).and_then(|(_, animated)| animated.then_some(crate::quality::GIF_FIRST_FRAME))
     }
 
     fn inspect_elements(
@@ -225,7 +229,7 @@ fn is_gif(data: &[u8]) -> bool {
     data.starts_with(b"GIF87a") || data.starts_with(b"GIF89a")
 }
 
-fn normalize_gif(data: &[u8], bytes: u64) -> Result<Vec<u8>, &'static str> {
+fn normalize_gif(data: &[u8], bytes: u64) -> Result<(Vec<u8>, bool), &'static str> {
     let invalid = "embedded image GIF first frame could not be decoded and the image was omitted";
     let mut options = gif::DecodeOptions::new();
     options.set_color_output(gif::ColorOutput::RGBA);
@@ -241,6 +245,11 @@ fn normalize_gif(data: &[u8], bytes: u64) -> Result<Vec<u8>, &'static str> {
     pixels.try_reserve_exact(bytes as usize).map_err(|_| invalid)?;
     pixels.resize(bytes as usize, 0);
     decoder.read_into_buffer(&mut pixels).map_err(|_| invalid)?;
+    // Inspect only the next frame's metadata; never allocate or decode its pixels.
+    let animated = decoder
+        .next_frame_info()
+        .map_err(|_| "embedded image GIF frame sequence could not be read and the image was omitted")?
+        .is_some();
     // GIF alpha is binary. tiny-skia expects transparent pixels premultiplied.
     for pixel in pixels.as_chunks_mut::<4>().0 {
         if pixel[3] == 0 {
@@ -248,5 +257,6 @@ fn normalize_gif(data: &[u8], bytes: u64) -> Result<Vec<u8>, &'static str> {
         }
     }
     let size = resvg::tiny_skia::IntSize::from_wh(u32::from(width), u32::from(height)).ok_or(invalid)?;
-    resvg::tiny_skia::Pixmap::from_vec(pixels, size).ok_or(invalid)?.encode_png().map_err(|_| invalid)
+    let png = resvg::tiny_skia::Pixmap::from_vec(pixels, size).ok_or(invalid)?.encode_png().map_err(|_| invalid)?;
+    Ok((png, animated))
 }

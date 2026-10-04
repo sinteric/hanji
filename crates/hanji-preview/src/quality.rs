@@ -11,6 +11,8 @@ pub(crate) const FORMULA_MISSING: &str =
     "formula has no cached result; shown as #UNEVALUATED; no evaluation was performed";
 pub(crate) const FORMULA_MARKER_OVERFLOW: &str = "missing formula cache marker does not fit its stored cell size; a question-mark indicator replaces the visible marker; cells[].display retains #UNEVALUATED";
 pub(crate) const GENERIC_FONT: &str = "selected font provides generic LastResort symbols, not character-specific glyphs; source text is preserved but character coverage is unavailable";
+pub(crate) const GIF_FIRST_FRAME: &str =
+    "animated GIF uses only its first frame; animation is not played and later frames are not decoded or validated";
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -48,6 +50,8 @@ pub enum DiagnosticCode {
     ImageOmitted,
     #[serde(rename = "svg.image-resource-limit")]
     ImageResourceLimit,
+    #[serde(rename = "svg.image-approximation")]
+    ImageApproximation,
     #[serde(rename = "svg.link-omitted")]
     LinkOmitted,
     #[serde(rename = "svg.paint-omitted")]
@@ -329,6 +333,7 @@ fn classify(source: PreviewSource, d: &Diagnostic) -> (DiagnosticCode, Severity,
     match d.message.as_str() {
         GENERIC_FONT => (FontGenericSymbols, Error, MissingText),
         "image bytes are neither PNG nor JPEG and were omitted" => (ImageOmitted, Error, UnsupportedOmission),
+        GIF_FIRST_FRAME => (ImageApproximation, Warning, Approximation),
         "embedded image exceeds the configured decoded-image byte budget and was omitted"
         | "embedded image exceeds the configured page decoded-image byte budget and was omitted"
         | "embedded image exceeds the configured document decoded-image byte budget and was omitted"
@@ -343,6 +348,7 @@ fn classify(source: PreviewSource, d: &Diagnostic) -> (DiagnosticCode, Severity,
         | "embedded image JPEG dimensions could not be read and the image was omitted"
         | "embedded image GIF dimensions could not be read and the image was omitted"
         | "embedded image GIF first frame could not be decoded and the image was omitted"
+        | "embedded image GIF frame sequence could not be read and the image was omitted"
         | "embedded image GIF first frame does not cover its canvas and the image was omitted" =>
             (ImageOmitted, Error, UnsupportedOmission),
         "unsupported positioned element was omitted from SVG output" => (ElementOmitted, Error, UnsupportedOmission),

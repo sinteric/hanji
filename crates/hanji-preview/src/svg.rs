@@ -370,6 +370,9 @@ impl<'a> SvgState<'a> {
             self.diagnose(path, message);
             return;
         }
+        if let Some(message) = self.images.approximation(path) {
+            self.diagnose(path, message);
+        }
         let data = self.images.normalized(path).unwrap_or(data);
         let Some(mime) = image_mime(data) else {
             self.diagnose(path, "image bytes are neither PNG nor JPEG and were omitted");
