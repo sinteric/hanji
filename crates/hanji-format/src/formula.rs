@@ -231,8 +231,8 @@ pub fn tokenize(f: &str) -> Vec<Token> {
                 }
             }
             '<' | '>' => {
-                let two = &f[i..(i + 2).min(f.len())];
-                let n = if matches!(two, "<=" | ">=" | "<>") { 2 } else { 1 };
+                let tail = &f[i..];
+                let n = if tail.starts_with("<=") || tail.starts_with(">=") || tail.starts_with("<>") { 2 } else { 1 };
                 push(&mut out, Tok::Op(f[i..i + n].to_string()), i + n);
                 i += n;
             }
@@ -897,6 +897,24 @@ mod tests {
         assert_eq!(kinds("Sheet1!#REF!"), ["ref:Sheet1!#REF!"]);
         assert_eq!(kinds("1.5E+3%"), ["Num", "Op(\"%\")"]);
         assert_eq!(kinds("_xlfn.XLOOKUP(1,A1:A3,B1:B3)")[0], "fn:_xlfn.XLOOKUP");
+    }
+
+    #[test]
+    fn comparison_operators_before_unicode_references_preserve_token_boundaries() {
+        for op in ["<", ">", "<=", ">=", "<>"] {
+            for sheet in ["매출", "café", "销售"] {
+                let formula = format!("IF(A1{op}{sheet}!$A$1,1,0)");
+                let tokens = tokenize(&formula);
+                assert!(tokens.iter().all(|t| formula.is_char_boundary(t.start) && formula.is_char_boundary(t.end)));
+                assert!(tokens.iter().any(|t| t.kind == Tok::Op(op.into())));
+                assert_eq!(
+                    rewrite_refs(&formula, &mut |t, _| Some(formula[t.start..t.end].replace("A1", "A2"))),
+                    format!("IF(A2{op}{sheet}!$A$1,1,0)")
+                );
+            }
+        }
+        assert_eq!(kinds("A1<"), ["ref:A1", "Op(\"<\")"]);
+        assert_eq!(kinds("A1>"), ["ref:A1", "Op(\">\")"]);
     }
 
     #[test]
