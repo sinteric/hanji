@@ -81,6 +81,7 @@ layout: Title and Content
 
 Spreadsheet (xlsx)
 The text is the workbook's structure; cells are not in it.
+`hanji diff DOC FROM TO` and re-import reports include both the structure's unified diff and cell changes with sheet/cell addresses, old/new values, formulas and stored formula caches. Cell changes are ordered by sheet name, row and column; at most 100 are shown, with the remaining count reported. Long cell states are truncated after 256 bytes and carry their full-state length and fingerprint. Read the affected ranges or inspect exported revisions for full content. A diff does not recalculate formulas. If only other preserved workbook data or its representation differs, the report says so; no detected structure/cell changes does not establish that the files are identical.
 <sheet name="매출" range="A1:G1201">
 
 <table name="Sales" range="A1:D1201">
