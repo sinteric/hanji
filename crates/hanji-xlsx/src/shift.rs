@@ -770,9 +770,9 @@ fn shift_chart(book: &Book, part: &str, name: &str, sh: &RowShift) -> Option<Vec
         if moved {
             // These optional caches describe the old source range. Let the
             // spreadsheet application rebuild them from the rewritten formula.
-            e.children.retain(|n| {
-                !matches!(n, Node::El(c) if matches!(c.local(), "numCache" | "strCache" | "multiLvlStrCache"))
-            });
+            e.children.retain(
+                |n| !matches!(n, Node::El(c) if matches!(c.local(), "numCache" | "strCache" | "multiLvlStrCache")),
+            );
             changed = true;
         }
     });
@@ -889,4 +889,3 @@ mod tests {
         assert_eq!(shift_vml(v, &ins).unwrap(), v.replace(">11<", ">13<"));
     }
 }
-
