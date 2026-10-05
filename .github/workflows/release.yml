@@ -17,6 +17,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: release-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     strategy:
@@ -32,6 +36,7 @@ jobs:
     defaults:
       run:
         shell: bash
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -53,18 +58,20 @@ jobs:
       - name: build
         run: cargo build --release --locked --target ${{ matrix.target }} -p hanji-cli
       - name: package
+        env:
+          RELEASE_TARGET: ${{ matrix.target }}
         run: |
           version=$(sed -n 's/^version=//p' plugins/hanji/skills/office-documents/scripts/hanji)
-          name=hanji-$version-${{ matrix.target }}
-          exe=; [[ ${{ matrix.target }} == *windows* ]] && exe=.exe
-          mkdir -p dist/$name
-          cp target/${{ matrix.target }}/release/hanji$exe dist/$name/
+          name="hanji-$version-$RELEASE_TARGET"
+          exe=; [[ "$RELEASE_TARGET" == *windows* ]] && exe=.exe
+          mkdir -p "dist/$name"
+          cp "target/$RELEASE_TARGET/release/hanji$exe" "dist/$name/"
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md "dist/$name/"
           cd dist
-          tar -czf $name.tar.gz $name
-          rm -r $name
-          if command -v sha256sum >/dev/null; then sha256sum $name.tar.gz; else shasum -a 256 $name.tar.gz; fi > $name.tar.gz.sha256
-          cat $name.tar.gz.sha256
+          tar -czf "$name.tar.gz" "$name"
+          rm -r -- "$name"
+          if command -v sha256sum >/dev/null; then sha256sum "$name.tar.gz"; else shasum -a 256 "$name.tar.gz"; fi > "$name.tar.gz.sha256"
+          cat "$name.tar.gz.sha256"
       - name: the plugin launcher downloads, checks and starts it
         if: matrix.check
         env:
@@ -87,6 +94,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: the tag is the plugin's version
@@ -102,11 +110,11 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cd dist
-          cat *.sha256 > SHA256SUMS
-          rm *.sha256
+          cat ./*.sha256 > SHA256SUMS
+          rm -- ./*.sha256
           # A release made by hand for the tag keeps its title and notes; it gets the assets.
           if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber *.tar.gz SHA256SUMS
+            gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --clobber ./*.tar.gz SHA256SUMS
           else
-            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "hanji $GITHUB_REF_NAME" --generate-notes *.tar.gz SHA256SUMS
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --title "hanji $GITHUB_REF_NAME" --generate-notes ./*.tar.gz SHA256SUMS
           fi
