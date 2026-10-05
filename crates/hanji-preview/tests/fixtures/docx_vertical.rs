@@ -98,3 +98,17 @@ pub fn fractional_landscape() -> Vec<u8> {
     });
     package::write(&parts).unwrap()
 }
+
+/// Source-owned first/default headers with equivalent short or expanded RGB.
+pub fn watermark(color: &str) -> Vec<u8> {
+    let mut parts = package::read(&selected_story(12, false, false)).unwrap();
+    let pict = format!(
+        r#"<w:p><w:r><w:pict><v:shape xmlns:v="urn:schemas-microsoft-com:vml" style="width:144pt;height:36pt;rotation:315" fillcolor="{color}"><v:fill opacity=".5"/><v:textpath string="SAMPLE" style="font-family:Calibri"/></v:shape></w:pict></w:r></w:p></w:hdr>"#
+    );
+    for part in &mut parts {
+        if matches!(part.name.as_str(), "word/header1.xml" | "word/header2.xml") {
+            part.data = std::str::from_utf8(&part.data).unwrap().replace("</w:hdr>", &pict).into_bytes();
+        }
+    }
+    package::write(&parts).unwrap()
+}
