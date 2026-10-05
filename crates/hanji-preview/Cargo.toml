@@ -30,6 +30,7 @@ oxml-layout.workspace = true
 fontdb = { version = "0.23", default-features = false, features = ["std"] }
 allsorts = { version = "0.17", default-features = false, features = ["flate2_zlib-rs"] }
 resvg = { version = "=0.48.1", default-features = false, features = ["text", "raster-images"] }
+gif = { version = "=0.14.2", default-features = false, features = ["std"] }
 base64 = "0.22"
 serde = { version = "1", features = ["derive"] }
 toml = { version = "1", default-features = false, features = ["parse", "serde"] }

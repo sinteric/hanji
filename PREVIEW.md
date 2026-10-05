@@ -64,6 +64,16 @@ copy: previews are static, and animations are not played.
 PPTX/DOCX validate font subsets and SVG lowering before output. Their 16 MiB
 subset cache is a performance budget: uncached validated subsets are recreated
 on demand, without refusing pages. HWPX prepares page and whole-viewer subsets.
+DOCX embedded GIFs with a full-canvas first frame are normalized to PNG after
+image, page and document decoded-byte checks. SVG, HTML and PNG draw that same
+static first frame, including binary transparency. Animated GIFs report
+`svg.image-approximation`: animation is not played, and later frames are neither
+decoded nor validated. Only the next frame's metadata is inspected to detect
+animation. Malformed first frames or unreadable next-frame metadata and first
+frames requiring offset/background compositing are omitted with structured
+image-loss diagnostics. Source packages, image positions and text stay intact.
+PPTX GIF admission remains a separate renderer limitation.
+
 A subset failure is a diagnostic; affected text can be missing. The missing
 character list shows at most 100 distinct characters, while
 `missing_glyphs_total` preserves the full distinct-character count. This is a
@@ -105,6 +115,17 @@ historical evidence: DOCX `05` had three native reference pages; the current
 candidate renders five. HWPX `28` had seven native reference pages; the current
 candidate renders six. The unavailable source PDFs cannot be rescored locally.
 Those pagination differences prevent a blanket native-fidelity claim.
+
+DOCX `02` and edited DOCX `07` each restore their formerly omitted GIF picture.
+Their five/four pages each retain all three images. Every 96-DPI PNG page exactly
+matches a source-only PNG control decoded independently by macOS ImageIO.
+SVG geometry and all 218/217 positioned text elements match those controls,
+with only encoded image carriers differing. Font reports and embedded font
+bytes remain equal, input hashes are unchanged and shaping diagnostics remain.
+Owned tests cover DOCX packages, first-frame pixels, transparency, malformed
+frames and repeated image/page/document budgets on native, byte-only and WASI.
+These checks do not establish native Word fidelity or general animated-image
+and partial-frame compositing support.
 
 The monthly-budget XLSX `19` window `A1:H23` preserves its dark theme text,
 green accent text and tinted light fills. SVG, 96-DPI PNG and HTML exactly match
