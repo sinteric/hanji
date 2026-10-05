@@ -1,14 +1,19 @@
 ## TL;DR
-<!-- Summarize the key change in one or two sentences. -->
+<!-- Summarize the outcome in one or two sentences. -->
 
 ## Why
-<!-- Explain the problem this PR addresses. -->
+<!-- Explain the problem or motivation; link the issue if there is one. -->
 
 ## How / What
-<!-- Describe what changed, where, and how. -->
+<!-- Describe the key changes and approach, including trade-offs worth reviewing. -->
 
-## Validation
-<!-- List checks and results. Distinguish unrun checks, failures, and limitations; include the tested commit and CI links when relevant. -->
+## Verification
+<!--
+List the exact commands or manual steps you actually ran and their results.
+Separate passed, failed, and unrun checks; explain why any relevant checks were not run and note limitations.
+For bug fixes, include evidence that the issue reproduces before and passes after the change, or explain what could not be verified.
+Include the tested commit and CI links when relevant.
+-->
 
-## Additional notes
-<!-- Include related issues, prerequisite PRs, caveats, or follow-ups when relevant. Remove this section if not needed. -->
+## Additional Context
+<!-- Optional: include UI screenshots, risks, migration or rollback steps, dependent PRs, or follow-ups only when relevant. Remove this section if not needed. -->
