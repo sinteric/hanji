@@ -921,14 +921,11 @@ pub fn write_styles(parts: &[Part], set: &mut StyleSet, text_lines: &[StyleLine]
         // Without a styles part, only the imported implicit values can be kept.
         for l in &lines {
             let Some(def) = set.paragraph_def(&l.name).filter(|d| !d.id.is_empty()) else {
-                return Err(
-                    "this file has no styles part (word/styles.xml), so a new style cannot be written".into(),
-                );
+                return Err("this file has no styles part (word/styles.xml), so a new style cannot be written".into());
             };
             if table.values(Some(&l.name)).only(style_keys()) != st.values(&def.id).only(style_keys()) {
                 return Err(
-                    "this file has no styles part (word/styles.xml), so changed style values cannot be written"
-                        .into(),
+                    "this file has no styles part (word/styles.xml), so changed style values cannot be written".into(),
                 );
             }
         }
