@@ -325,3 +325,30 @@ fn fractional_landscape_docx_tables_use_selected_story_bands() {
         assert_eq!(body.matches(text).count(), 1);
     }
 }
+
+#[test]
+fn short_hex_docx_watermarks_match_expanded_rgb_in_all_formats() {
+    let short = docx_vertical::watermark("#e00");
+    let expanded = docx_vertical::watermark("#ee0000");
+    let fonts = FontOptions::default();
+    let preview = render_document_with_fonts(DocumentKind::Docx, &short, &fonts).unwrap();
+    let control = render_document_with_fonts(DocumentKind::Docx, &expanded, &fonts).unwrap();
+    assert_eq!(preview.page_count(), 2);
+    assert_eq!(preview.page_count(), control.page_count());
+    for page in 0..preview.page_count() {
+        let PageData::Svg(svg) = preview.render_page(page, PageFormat::Svg).unwrap().data else { panic!("SVG") };
+        let PageData::Svg(expected) = control.render_page(page, PageFormat::Svg).unwrap().data else { panic!("SVG") };
+        assert_eq!(svg, expected);
+        assert_eq!(svg.matches("SAMPLE").count(), 1);
+        assert!(svg.contains("fill=\"#EE0000\""));
+        let PageData::Png(png) = preview.render_page(page, PageFormat::Png { dpi: 96.0 }).unwrap().data else {
+            panic!("PNG")
+        };
+        let PageData::Png(expected) = control.render_page(page, PageFormat::Png { dpi: 96.0 }).unwrap().data else {
+            panic!("PNG")
+        };
+        assert_eq!(png, expected);
+    }
+    assert_eq!(preview.html("watermark"), control.html("watermark"));
+    assert!(!preview.diagnostics().iter().any(|d| d.message.contains("VML watermark colour")));
+}
