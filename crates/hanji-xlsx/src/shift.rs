@@ -296,6 +296,32 @@ pub fn check(book: &mut Book, i: usize, sh: &RowShift, own_table: Option<usize>)
             ));
         }
     }
+    // A cross-sheet chart source cannot be represented by one rectangular
+    // reference if only some of its columns move. Refuse before mutating.
+    for part in chart_parts(book) {
+        let Some(d) = package::get(&book.parts, &part).and_then(|data| xml::parse(data).ok()) else { continue };
+        let mut split = None;
+        d.root.walk(&mut |e| {
+            if e.local() != "f" {
+                return;
+            }
+            let f = e.text_of(&[e.name.as_str()]);
+            for t in formula::tokenize(&f) {
+                let Tok::Ref(r) = &t.kind else { continue };
+                let Some(s) = &r.sheet else { continue };
+                if !s.external
+                    && s.to.is_none()
+                    && s.name.eq_ignore_ascii_case(&name)
+                    && ref_area(r).is_some_and(|area| sh.range(&area) == Moved::Split)
+                {
+                    split = Some(f.clone());
+                }
+            }
+        });
+        if let Some(f) = split {
+            return Err(format!("chart {part} source {f} would be split by rows that move"));
+        }
+    }
     // Pivot tables on the sheet.
     for r in book.rels_of(&book.sheets[i].part).iter().filter(|r| r.short_type() == "pivotTable" && !r.external) {
         let part = opc::resolve_target(&book.sheets[i].part, &r.target);
@@ -582,13 +608,6 @@ fn move_parts(book: &mut Book, i: usize, sh: &RowShift, out: &mut Vec<Notice>) -
                 if changed {
                     edits.push((target.clone(), xml::write_doc(&d)));
                 }
-                // Charts of the drawing read the sheet's cells.
-                for cr in book.rels_of(&target).iter().filter(|x| x.short_type() == "chart" && !x.external) {
-                    let cp = opc::resolve_target(&target, &cr.target);
-                    if let Some(new) = shift_chart(book, &cp, &name, sh) {
-                        edits.push((cp, new));
-                    }
-                }
             }
             "comments" => {
                 let Ok(mut d) = xml::parse(data) else { continue };
@@ -659,6 +678,13 @@ fn move_parts(book: &mut Book, i: usize, sh: &RowShift, out: &mut Vec<Notice>) -
                 }
             }
             _ => {}
+        }
+    }
+    // A chart's source may be on any sheet, independently of its anchor.
+    // Visit each related chart once, including charts on chart sheets.
+    for cp in chart_parts(book) {
+        if let Some(new) = shift_chart(book, &cp, &name, sh) {
+            edits.push((cp, new));
         }
     }
     // Pivot caches whose source is a range on the sheet: the range moves
@@ -732,17 +758,37 @@ fn shift_vml(text: &str, sh: &RowShift) -> Option<String> {
     changed.then_some(out)
 }
 
+/// Chart relationships anywhere in the package, independent of worksheet ownership.
+fn chart_parts(book: &Book) -> BTreeSet<String> {
+    let mut charts = BTreeSet::new();
+    for source in book.parts.iter().filter_map(|p| opc::source_of_rels(&p.name)) {
+        for r in book.rels_of(&source).iter().filter(|r| r.short_type() == "chart" && !r.external) {
+            charts.insert(opc::resolve_target(&source, &r.target));
+        }
+    }
+    charts
+}
+
 /// A chart's data references into sheet `name`, moved.
 fn shift_chart(book: &Book, part: &str, name: &str, sh: &RowShift) -> Option<Vec<u8>> {
     let mut d = xml::parse(package::get(&book.parts, part)?).ok()?;
     let mut changed = false;
     d.root.walk_mut(&mut |e| {
-        if e.local() == "f" {
-            let t = e.text_of(&[e.name.as_str()]);
+        let mut moved = false;
+        for f in e.elements_mut().filter(|f| f.local() == "f") {
+            let t = f.text_of(&[f.name.as_str()]);
             if let Some(new) = shift_formula(&t, "", name, sh) {
-                e.children = vec![Node::Text(xml::escape_text(&new))];
-                changed = true;
+                f.children = vec![Node::Text(xml::escape_text(&new))];
+                moved = true;
             }
+        }
+        if moved {
+            // These optional caches describe the old source range. Let the
+            // spreadsheet application rebuild them from the rewritten formula.
+            e.children.retain(
+                |n| !matches!(n, Node::El(c) if matches!(c.local(), "numCache" | "strCache" | "multiLvlStrCache")),
+            );
+            changed = true;
         }
     });
     changed.then(|| xml::write_doc(&d))
