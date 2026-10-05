@@ -79,6 +79,7 @@ pub struct CellInfo {
 pub struct Workbook {
     book: Book,
     styles: Vec<Style>,
+    normal_font: Style,
     options: XlsxOptions,
     possibly_stale: bool,
     pub sheets: Vec<SheetInfo>,
@@ -149,7 +150,7 @@ pub fn open_xlsx(bytes: &[u8], options: XlsxOptions) -> Result<Workbook, String>
         .into_iter()
         .find(|r| r.short_type() == "theme" && !r.external)
         .map(|r| opc::resolve_target(&book.wb_part, &r.target));
-    let styles = styles::parse(
+    let (styles, normal_font) = styles::parse(
         book.styles.part.as_deref().and_then(|p| package::get(&book.parts, p)),
         theme_part.as_deref().and_then(|p| package::get(&book.parts, p)),
         options.max_font_family_bytes,
@@ -171,7 +172,7 @@ pub fn open_xlsx(bytes: &[u8], options: XlsxOptions) -> Result<Workbook, String>
             is_worksheet: s.kind == SheetKind::Work,
         })
         .collect();
-    Ok(Workbook { book, styles, options, possibly_stale, sheets, diagnostics })
+    Ok(Workbook { book, styles, normal_font, options, possibly_stale, sheets, diagnostics })
 }
 
 impl Workbook {
@@ -320,7 +321,7 @@ impl Workbook {
         };
         let xs = offsets(&widths, 36.0);
         let ys = offsets(&heights, 18.0);
-        let mut builder = GridBuilder::new(fonts, self.options.max_window_text_bytes, diagnostics);
+        let mut builder = GridBuilder::new(fonts, &self.normal_font, self.options.max_window_text_bytes, diagnostics);
         for (ci, &w) in widths.iter().enumerate().filter(|(_, w)| **w > 0.0) {
             let rect = Rect { x: xs[ci], y: 0.0, width: w, height: 18.0 };
             builder.cell(rect, &col_letters(range.first.col + ci as u32), &Style::default(), false, false, "header")?;
@@ -544,6 +545,8 @@ fn finish_window(mut window: Window) -> Result<Window, String> {
 
 struct GridBuilder<'a> {
     resolver: &'a dyn FontResolver,
+    normal_font: &'a Style,
+    normal_space: Option<f64>,
     elements: Vec<PositionedElement>,
     fonts: Vec<oxml_layout::FontData>,
     faces: HashMap<FontId, FaceInfo>,
@@ -552,9 +555,16 @@ struct GridBuilder<'a> {
     remaining_text: usize,
 }
 impl<'a> GridBuilder<'a> {
-    fn new(resolver: &'a dyn FontResolver, remaining_text: usize, diagnostics: Vec<Diagnostic>) -> Self {
+    fn new(
+        resolver: &'a dyn FontResolver,
+        normal_font: &'a Style,
+        remaining_text: usize,
+        diagnostics: Vec<Diagnostic>,
+    ) -> Self {
         Self {
             resolver,
+            normal_font,
+            normal_space: None,
             elements: vec![],
             fonts: vec![],
             faces: HashMap::new(),
@@ -562,6 +572,44 @@ impl<'a> GridBuilder<'a> {
             diagnostics,
             remaining_text,
         }
+    }
+    fn indentation(&mut self, levels: u32) -> Result<f64, String> {
+        if levels == 0 {
+            return Ok(0.0);
+        }
+        let space = if let Some(space) = self.normal_space {
+            space
+        } else {
+            let s = self.normal_font;
+            let resolved = self
+                .resolver
+                .resolve_font_for_text(&s.family, Script::Latin, s.bold, s.italic, " ")
+                .or_else(|| self.resolver.resolve_font(&s.family, Script::Latin, s.bold, s.italic))
+                .ok_or("no font available to measure Normal style indentation")?;
+            let face = ttf_parser::Face::parse(&resolved.font.data, resolved.font.face_index)
+                .map_err(|e| format!("Normal style font: {e}"))?;
+            if matches!(resolved.metrics, crate::fonts::Metrics::Substitute | crate::fonts::Metrics::Table)
+                || resolved.ea_advance.is_some()
+                || (s.bold && !face.is_bold())
+                || (s.italic && !face.is_italic())
+            {
+                self.diagnostics.push(diagnostic("window.indentation", format!("Normal style font {:?} uses {:?} face advances for indentation; requested metrics/style may differ", s.family, resolved.family)));
+            }
+            let advance =
+                face.glyph_index(' ').and_then(|g| face.glyph_hor_advance(g)).map(f64::from).unwrap_or_else(|| {
+                    self.diagnostics.push(diagnostic(
+                        "window.indentation",
+                        "Normal style space advance is absent; indentation uses half an em per space",
+                    ));
+                    f64::from(face.units_per_em()) / 2.0
+                });
+            let space = advance * s.size / f64::from(face.units_per_em());
+            self.normal_space = Some(space);
+            space
+        };
+        // Multiply metrics, never synthesize indentation text or allocate a
+        // string proportional to the unsigned SpreadsheetML indent value.
+        Ok(f64::from(levels) * 3.0 * space)
     }
     fn font(&mut self, style: &Style, text: &str) -> Result<FontId, String> {
         let script = Script::of(text);
@@ -662,6 +710,12 @@ impl<'a> GridBuilder<'a> {
             ));
             return Ok(());
         }
+        let indent = self.indentation(style.indent)?;
+        let text_width = (rect.width - 4.0 - indent).max(0.0);
+        if style.indent != 0 && text_width <= 0.0 && !guarded {
+            self.diagnostics.push(diagnostic(format!("{path}.clipping"), "cell text is omitted because its visible size and indentation leave no text area; cells[].display retains the complete value"));
+            return Ok(());
+        }
         let id = self.font(style, text)?;
         let font = &self.fonts[id.0 as usize];
         let face = ttf_parser::Face::parse(&font.data, font.face_index).map_err(|e| format!("worksheet font: {e}"))?;
@@ -677,7 +731,7 @@ impl<'a> GridBuilder<'a> {
         for c in text.chars() {
             let glyph = face.glyph_index(c).unwrap_or(ttf_parser::GlyphId(0));
             let advance = f64::from(face.glyph_hor_advance(glyph).unwrap_or(face.units_per_em() / 2)) * scale;
-            if c == '\n' || (style.wrap && !guarded && width + advance > rect.width - 4.0 && !line.is_empty()) {
+            if c == '\n' || (style.wrap && !guarded && width + advance > text_width && !line.is_empty()) {
                 lines.push((std::mem::take(&mut line), std::mem::take(&mut glyphs), std::mem::take(&mut advances)));
                 width = 0.0;
             }
@@ -691,7 +745,7 @@ impl<'a> GridBuilder<'a> {
         lines.push((line, glyphs, advances));
         let line_height = style.size * 1.2;
         let content_height = lines.len() as f64 * line_height;
-        let mut clipped = content_height > rect.height;
+        let mut clipped = content_height > rect.height || (style.indent != 0 && text_width <= 0.0);
         let top = match style.vertical.as_str() {
             "top" => rect.y + 1.0,
             "center" => rect.y + ((rect.height - content_height) / 2.0).max(0.0),
@@ -702,9 +756,9 @@ impl<'a> GridBuilder<'a> {
             let width: f64 = advances.iter().sum();
             let x = match style.horizontal.as_str() {
                 "center" => rect.x + (rect.width - width) / 2.0,
-                "right" => rect.x + rect.width - width - 2.0,
+                "right" => rect.x + rect.width - width - 2.0 - indent,
                 "general" if numeric => rect.x + rect.width - width - 2.0,
-                _ => rect.x + 2.0,
+                _ => rect.x + 2.0 + indent,
             };
             clipped |= x < rect.x || x + width > rect.x + rect.width;
             if guarded {
