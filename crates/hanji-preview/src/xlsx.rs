@@ -145,8 +145,14 @@ pub fn open_xlsx(bytes: &[u8], options: XlsxOptions) -> Result<Workbook, String>
     if book.styles.fmts.values().any(|s| s.len() > options.max_number_format_bytes) {
         return Err("number format exceeds the configured metadata budget".into());
     }
+    let theme_part = book
+        .rels_of(&book.wb_part)
+        .into_iter()
+        .find(|r| r.short_type() == "theme" && !r.external)
+        .map(|r| opc::resolve_target(&book.wb_part, &r.target));
     let (styles, normal_font) = styles::parse(
         book.styles.part.as_deref().and_then(|p| package::get(&book.parts, p)),
+        theme_part.as_deref().and_then(|p| package::get(&book.parts, p)),
         options.max_font_family_bytes,
     )?;
     let possibly_stale = book.wb.root.elements().find(|e| e.local() == "calcPr").is_some_and(|c| {
