@@ -908,12 +908,6 @@ impl Styles {
 /// new styles are set in `set`.
 pub fn write_styles(parts: &[Part], set: &mut StyleSet, text_lines: &[StyleLine]) -> Result<Option<Vec<u8>>, String> {
     let st = Styles::read(parts);
-    let Some(mut doc) = st.doc.clone() else {
-        if text_lines.iter().any(|l| set.paragraph_def(&l.name).is_none_or(|d| d.id.is_empty())) {
-            return Err("this file has no styles part (word/styles.xml), so a new style cannot be written".into());
-        }
-        return Ok(None);
-    };
     let mut lines = set.lines();
     for l in text_lines {
         match lines.iter_mut().find(|x| x.name == l.name) {
@@ -922,6 +916,24 @@ pub fn write_styles(parts: &[Part], set: &mut StyleSet, text_lines: &[StyleLine]
         }
     }
     let table = StyleTable { default: Some(set.default_paragraph.clone()), lines: lines.clone() };
+    let Some(mut doc) = st.doc.clone() else {
+        // Edits may already be in the remainder, with no text_lines passed.
+        // Without a styles part, only the imported implicit values can be kept.
+        for l in &lines {
+            let Some(def) = set.paragraph_def(&l.name).filter(|d| !d.id.is_empty()) else {
+                return Err(
+                    "this file has no styles part (word/styles.xml), so a new style cannot be written".into(),
+                );
+            };
+            if table.values(Some(&l.name)).only(style_keys()) != st.values(&def.id).only(style_keys()) {
+                return Err(
+                    "this file has no styles part (word/styles.xml), so changed style values cannot be written"
+                        .into(),
+                );
+            }
+        }
+        return Ok(None);
+    };
     let default_id = set.default_paragraph_id().to_string();
     // New styles: ids from their names.
     let mut ids: Vec<String> = st.styles().filter_map(|s| s.get("w:styleId")).collect();

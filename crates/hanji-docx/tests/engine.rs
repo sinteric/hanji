@@ -40,6 +40,69 @@ fn p(text: &str) -> String {
     format!("<w:p><w:r><w:t xml:space=\"preserve\">{text}</w:t></w:r></w:p>")
 }
 
+fn docx_without_styles() -> Vec<u8> {
+    let mut parts = package::read(&docx(&p("hello"), vec![])).unwrap();
+    parts.retain(|p| p.name != "word/styles.xml");
+    package::write(&parts).unwrap()
+}
+
+#[test]
+fn missing_styles_part_keeps_ordinary_text_and_direct_formatting_edits() {
+    let imp = DocxEngine.import(&docx_without_styles(), &ImportOptions::default()).unwrap();
+    let unchanged = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert!(package::get(&package::read(&unchanged).unwrap(), "word/styles.xml").is_none());
+    assert_eq!(DocxEngine.import(&unchanged, &ImportOptions::default()).unwrap().text, imp.text);
+
+    for new in ["goodbye", "[hello]{size=24pt}"] {
+        let r = edit(&imp.remainder, &imp.text, "hello", new, CAPS).unwrap();
+        let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+        assert!(package::get(&package::read(&out).unwrap(), "word/styles.xml").is_none());
+        assert_eq!(
+            DocxEngine.import(&out, &ImportOptions::default()).unwrap().text,
+            DocxEngine::text_of(&r.new, &r.remainder, None),
+        );
+    }
+}
+
+#[test]
+fn missing_styles_part_refuses_changed_and_new_style_lines() {
+    let imp = DocxEngine.import(&docx_without_styles(), &ImportOptions::default()).unwrap();
+    let line = imp.text.lines().find(|l| l.starts_with("<style name=\"Normal\"")).unwrap();
+    let size = line.split_whitespace().find(|x| x.starts_with("size=")).unwrap().trim_end_matches("/>");
+    let changed = imp.text.replacen(line, &line.replacen(size, "size=24pt", 1), 1);
+    let added = imp.text.replacen(line, &format!("{line}\n<style name=\"Callout\" size=24pt/>"), 1);
+    let used = added.replace("\nhello\n", "\n<div style=\"Callout\">hello</div>\n");
+    assert_ne!(used, added);
+    for text in [changed, added, used] {
+        // Both entry points must refuse: direct export and an edit whose
+        // style changes have already been folded into the remainder.
+        let r = rewrite(&imp.remainder, &imp.text, &text, CAPS).unwrap();
+        for rem in [&imp.remainder, &r.remainder] {
+            match DocxEngine.export(&text, rem) {
+                Err(EngineError::Refused(m)) => assert!(m.contains("no styles part (word/styles.xml)"), "{m}"),
+                other => panic!("unrepresentable styles must be refused: {:?}", other.map(|_| ())),
+            }
+        }
+    }
+}
+
+#[test]
+fn an_existing_styles_part_still_accepts_style_edits() {
+    let imp = DocxEngine.import(&docx(&p("hello"), vec![]), &ImportOptions::default()).unwrap();
+    let line = imp.text.lines().find(|l| l.starts_with("<style name=\"Normal\"")).unwrap();
+    let size = line.split_whitespace().find(|x| x.starts_with("size=")).unwrap().trim_end_matches("/>");
+    let text = imp.text.replacen(line, &line.replacen(size, "size=24pt", 1), 1);
+    let r = rewrite(&imp.remainder, &imp.text, &text, CAPS).unwrap();
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine.import(&out, &ImportOptions::default()).unwrap().text,
+        DocxEngine::text_of(&r.new, &r.remainder, None),
+    );
+    let parts = package::read(&out).unwrap();
+    let styles = std::str::from_utf8(package::get(&parts, "word/styles.xml").unwrap()).unwrap();
+    assert!(styles.contains("<w:sz w:val=\"48\"/>"), "{styles}");
+}
+
 #[test]
 fn exact_edit_lands_and_refuses_ambiguous_old_text() {
     let body = format!(
