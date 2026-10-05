@@ -77,6 +77,21 @@ reason rather than silently truncating. A window cutting a merged cell is
 refused with the full merge address. These guards protect sparse-sheet and
 raster allocations; removing them does not implement Excel print layout.
 
+XLSX cell indentation is applied for explicit left/right horizontal alignment.
+Each level reserves three space advances in the workbook's Normal style font,
+identified by built-in style ID 0 through `cellStyleXfs`, including its size and
+bold/italic face. This follows the [SpreadsheetML alignment semantics](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.alignment).
+Indentation moves the text origin and reduces the wrapping width; it does not
+insert spaces into cell values. Zero indentation and `applyAlignment="0"` retain
+the existing layout. Numeric/date and missing-formula overflow indicators still
+replace the entire visible value when indentation leaves insufficient space.
+Malformed indentation, unresolved Normal font metrics, and indentation for
+general, center or unsupported distributed alignment are diagnosed. Missing
+Normal records use font 0 or the default font with a diagnostic. Reading order,
+bidirectional reordering, rotation, shrink-to-fit and relative indentation remain
+unsupported and diagnosed; explicit left/right indentation does not swap sides
+for RTL text. Existing cell, text, font-metadata and PNG budgets still apply.
+
 Inspect `fonts`, `warnings` and `diagnostics` before relying on a preview.
 Diagnostics are nonfatal reported approximations, not a completeness guarantee
 for all document features. Missing fonts, engine layout differences and

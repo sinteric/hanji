@@ -284,7 +284,11 @@ fn classify(source: PreviewSource, d: &Diagnostic) -> (DiagnosticCode, Severity,
         if d.path.contains(".styles[") {
             return (WorksheetStyleUnsupported, Warning, Approximation);
         }
-        if d.path.ends_with(".text") || d.path.ends_with(".font") || d.path.starts_with("window.fonts[") {
+        if d.path.ends_with(".text")
+            || d.path.ends_with(".font")
+            || d.path.starts_with("window.fonts[")
+            || d.path == "window.indentation"
+        {
             return (WorksheetTextApproximation, Warning, Approximation);
         }
         if d.path == "workbook.macros" || d.path == "workbook.externalLinks" {
