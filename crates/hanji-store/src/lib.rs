@@ -19,6 +19,7 @@
 //! …) are native only.
 
 pub mod blank;
+pub mod convert;
 pub mod error;
 pub mod formats;
 pub mod merge;
@@ -32,6 +33,7 @@ use hanji_format::sheet::WindowOf;
 use hanji_xlsx::XlsxEngine;
 use serde::{Deserialize, Serialize};
 
+pub use convert::Conversion;
 pub use error::{Code, Conflict, Detail, Diag, Error, Item, Loss, Result};
 pub use formats::{DocType, Format};
 #[cfg(not(target_family = "wasm"))]
@@ -213,6 +215,10 @@ pub struct ExportOptions {
     pub acknowledge_surfaced: bool,
     /// Write the model's edits as tracked changes (docx, §10.2).
     pub tracked_changes: bool,
+    /// Export as this format instead of the document's own: a Document's
+    /// other one (docx ↔ hwpx, §3), with a report of what did not cross.
+    /// Another type's format is refused.
+    pub format: Option<Format>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -227,6 +233,9 @@ pub struct Exported {
     pub digest: String,
     /// What leaves with the file that nobody may have reviewed (§8).
     pub surfaced: Vec<Item>,
+    /// An export in the document's other format: what it did not carry across.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub conversion: Option<Conversion>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -812,14 +821,32 @@ impl<S: Storage> Workspace<S> {
         self.store(&mut doc, RevOp::Ops, format!("{n} range operation{}", if n == 1 { "" } else { "s" }), next)
     }
 
-    /// Export a revision (the current one by default) to package bytes.
+    /// Export a revision (the current one by default) to package bytes, in
+    /// the document's format or, for a Document, its other one (`opts.format`,
+    /// with the report of what did not cross in `conversion`).
     /// Refused while the §8 surface list is not empty, unless acknowledged.
     pub fn export_bytes(&self, id: &str, revision: Option<u32>, opts: &ExportOptions) -> Result<(Exported, Vec<u8>)> {
         let doc = self.doc(id)?;
         let rev = revision.unwrap_or(doc.head);
         let (text, rem) = self.revision(&doc, rev)?;
-        let engine = doc.format.engine();
-        let bytes = if opts.tracked_changes { self.tracked_bytes(&doc, rev)? } else { engine.export(&text, &rem)? };
+        let target = opts.format.unwrap_or(doc.format);
+        let engine = target.engine();
+        let (bytes, conversion) = if target != doc.format {
+            convert::refuse_across(doc.format, target)?;
+            if opts.tracked_changes {
+                return Err(Error::bad(format!(
+                    "tracked changes are the edits since the file was opened, written into that file; {} exported as {} has no file to track them in: export without them.",
+                    doc.format.name(),
+                    target.name()
+                )));
+            }
+            let (bytes, conversion) = convert::export(&text, &rem, doc.format, target)?;
+            (bytes, Some(conversion))
+        } else if opts.tracked_changes {
+            (self.tracked_bytes(&doc, rev)?, None)
+        } else {
+            (engine.export(&text, &rem)?, None)
+        };
         // What leaves with the file is what the exported package holds.
         let back = engine.import(&bytes, &ImportOptions::default())?;
         let surfaced = items(&back.report.surface);
@@ -839,11 +866,12 @@ impl<S: Storage> Workspace<S> {
         let out = Exported {
             doc_id: doc.id,
             revision: rev,
-            format: doc.format,
+            format: target,
             path: None,
             bytes: bytes.len(),
             digest: format!("fnv1a64:{:016x}", fnv1a(bytes.iter().copied())),
             surfaced,
+            conversion,
         };
         Ok((out, bytes))
     }

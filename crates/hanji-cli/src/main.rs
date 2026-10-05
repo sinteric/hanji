@@ -104,6 +104,9 @@ enum Cmd {
         /// Write the edits since the file was opened or re-imported as tracked changes (docx).
         #[arg(long)]
         tracked_changes: bool,
+        /// Export a document in its other format (docx ↔ hwpx) instead of its own, and list what did not cross.
+        #[arg(long, value_parser = parse_format)]
+        format: Option<Format>,
     },
     /// Render PPTX slides, experimental DOCX/HWPX pages or an XLSX window to HTML, SVG or PNG.
     Preview {
@@ -422,8 +425,8 @@ fn run(cli: Cli) -> Result<Out> {
             o.ok = v.valid;
             o
         }
-        Cmd::Export { doc, path, rev, acknowledge_surfaced, tracked_changes } => {
-            let e = ws.export(&doc, rev, &path, &ExportOptions { acknowledge_surfaced, tracked_changes })?;
+        Cmd::Export { doc, path, rev, acknowledge_surfaced, tracked_changes, format } => {
+            let e = ws.export(&doc, rev, &path, &ExportOptions { acknowledge_surfaced, tracked_changes, format })?;
             let mut t = format!(
                 "wrote {} ({} bytes) from revision {} of {}; digest {}\n",
                 path.display(),
@@ -434,6 +437,9 @@ fn run(cli: Cli) -> Result<Out> {
             );
             for s in &e.surfaced {
                 t.push_str(&format!("left with the file (acknowledged): {} at {}: {}\n", s.kind, s.location, s.detail));
+            }
+            if let Some(c) = &e.conversion {
+                t.push_str(&format!("{c}\n"));
             }
             out(&e, t)
         }
