@@ -36,11 +36,7 @@ fn bottom_cells_refuse_insert_atomically() {
         let before = XlsxEngine.export(&imp.text, &imp.remainder).unwrap();
         let snapshot = format!("{:?}", imp.remainder);
         // A preceding valid edit in the batch must not escape the refusal.
-        let ops = insert(n).replacen(
-            '[',
-            r#"[{"op":"set","range":"Data!A2","values":[[99]]},"#,
-            1,
-        );
+        let ops = insert(n).replacen('[', r#"[{"op":"set","range":"Data!A2","values":[[99]]},"#, 1);
         let err = XlsxEngine::apply(&imp.text, &imp.remainder, &ops).unwrap_err().to_string();
         assert!(err.contains("worksheet row limit 1048576"), "{err}");
         assert!(err.contains(&format!("A{row}")), "{err}");
@@ -51,11 +47,9 @@ fn bottom_cells_refuse_insert_atomically() {
 
 #[test]
 fn exact_limit_and_cells_outside_the_shifted_columns_succeed() {
-    for (row, col, n, expected) in [
-        (MAX_ROW - 1, "A", 1, MAX_ROW),
-        (MAX_ROW - 3, "A", 3, MAX_ROW),
-        (MAX_ROW, "B", 3, MAX_ROW),
-    ] {
+    for (row, col, n, expected) in
+        [(MAX_ROW - 1, "A", 1, MAX_ROW), (MAX_ROW - 3, "A", 3, MAX_ROW), (MAX_ROW, "B", 3, MAX_ROW)]
+    {
         let imp = XlsxEngine.import(&workbook(row, col), &ImportOptions::default()).unwrap();
         let a = XlsxEngine::apply(&imp.text, &imp.remainder, &insert(n)).unwrap();
         let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
