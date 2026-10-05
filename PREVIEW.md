@@ -77,6 +77,13 @@ reason rather than silently truncating. A window cutting a merged cell is
 refused with the full merge address. These guards protect sparse-sheet and
 raster allocations; removing them does not implement Excel print layout.
 
+Worksheet font, solid-fill and border colors resolve the workbook's internal
+theme relationship, including `srgbClr` and system `lastClr` values. Finite
+SpreadsheetML tints adjust HLS luminance for theme and direct RGB colors.
+Indexed colors, unavailable or malformed themes, theme color transforms and
+invalid tints retain their default-color diagnostics. External themes are not
+fetched. These colors do not add chart, conditional-formatting or print support.
+
 Inspect `fonts`, `warnings` and `diagnostics` before relying on a preview.
 Diagnostics are nonfatal reported approximations, not a completeness guarantee
 for all document features. Missing fonts, engine layout differences and
@@ -98,6 +105,16 @@ historical evidence: DOCX `05` had three native reference pages; the current
 candidate renders five. HWPX `28` had seven native reference pages; the current
 candidate renders six. The unavailable source PDFs cannot be rescored locally.
 Those pagination differences prevent a blanket native-fidelity claim.
+
+The monthly-budget XLSX `19` window `A1:H23` preserves its dark theme text,
+green accent text and tinted light fills. SVG, 96-DPI PNG and HTML exactly match
+an independent control replacing only style theme/tint colors with explicit RGB.
+All 60 cell records, window dimensions, 80 positioned text elements apart from
+color, font reports and embedded font bytes remain unchanged. Only 34 color
+fallback diagnostics disappear. Other styling, clipping, formula-cache and
+unsupported-feature diagnostics remain. Owned worksheet regressions cover
+relocated/prefixed themes, direct RGB tints, malformed values and external themes.
+These controls do not establish native Excel fidelity.
 
 Observed limitations include missing Symbol/Gothic characters in DOCX `04`,
 OfficeMath diagnostics in DOCX `05`, an unsupported chart placeholder in
