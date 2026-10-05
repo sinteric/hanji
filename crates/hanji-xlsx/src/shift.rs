@@ -218,6 +218,21 @@ pub fn check(book: &mut Book, i: usize, sh: &RowShift, own_table: Option<usize>)
     }
     book.load_store(i)?;
     let st = book.store(i);
+    if let RowShift::Insert { at, n, .. } = *sh {
+        // Only the populated tail can cross the limit. Do not materialize the
+        // empty rows between a small table and a distant ordinary cell.
+        let first = at.max(MAX_ROW.saturating_sub(n).saturating_add(1));
+        for r in st.row_numbers().filter(|r| *r >= first) {
+            if let Some(row) = st.try_row(r)? {
+                if let Some(c) = row.cells.iter().find(|c| (c0..=c1).contains(&c.col)) {
+                    return Err(format!(
+                        "inserting {n} rows would move cell {} on sheet {name} past the worksheet row limit {MAX_ROW}",
+                        CellRef::new(c.col, r)
+                    ));
+                }
+            }
+        }
+    }
     let mut err = None;
     st.for_each_cell_if(&has_formula, &mut |r, c| {
         let Some(f) = &c.f else { return };
