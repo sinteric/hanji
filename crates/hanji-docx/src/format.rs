@@ -28,6 +28,10 @@ pub struct Theme {
     fonts: HashMap<&'static str, (String, String, String)>,
     /// `tx1`, `accent1`, … → `RRGGBB`.
     colors: HashMap<String, String>,
+    /// The scheme colour `tx1`, `bg1`, `tx2` and `bg2` stand for where the
+    /// document's `w:clrSchemeMapping` swaps them (a dark theme); absent:
+    /// themselves.
+    mapping: HashMap<&'static str, &'static str>,
 }
 
 impl Theme {
@@ -69,6 +73,24 @@ impl Theme {
             }
             _ => {}
         });
+        let settings = package::get(parts, "word/settings.xml").and_then(|d| xml::parse(d).ok()).map(|d| d.root);
+        if let Some(root) = settings {
+            root.walk(&mut |e| {
+                if e.local() != "clrSchemeMapping" {
+                    return;
+                }
+                for (attr, name) in [("w:t1", "tx1"), ("w:bg1", "bg1"), ("w:t2", "tx2"), ("w:bg2", "bg2")] {
+                    let to = match e.get(attr).as_deref() {
+                        Some("dark1") => "tx1",
+                        Some("light1") => "bg1",
+                        Some("dark2") => "tx2",
+                        Some("light2") => "bg2",
+                        _ => continue,
+                    };
+                    t.mapping.insert(name, to);
+                }
+            });
+        }
         t
     }
 
@@ -88,6 +110,67 @@ impl Theme {
     fn rgb(&self, name: &str) -> String {
         self.colors.get(name).cloned().unwrap_or_else(|| "000000".into())
     }
+
+    /// The RGB colour `c` stands for in this theme: a theme colour with its
+    /// lighter or darker percent applied as Office does (the luminance
+    /// scaled, in HSL), opacity kept. `None` for a colour that is not a
+    /// theme colour, one this theme lacks, and another transform, which a
+    /// theme cannot say.
+    pub fn resolve(&self, c: &Color) -> Option<Color> {
+        let ColorBase::Theme(name) = &c.base else { return None };
+        let name = match name.as_str() {
+            "dk1" => "tx1",
+            "lt1" => "bg1",
+            "dk2" => "tx2",
+            "lt2" => "bg2",
+            x => x,
+        };
+        let name = self.mapping.get(name).copied().unwrap_or(name);
+        let hex = self.colors.get(name).filter(|h| h.len() == 6)?;
+        let channel = |k: usize| u8::from_str_radix(&hex[k..k + 2], 16).ok();
+        let rgb = [channel(0)?, channel(2)?, channel(4)?];
+        let rgb = match c.tint {
+            Tint::None => rgb,
+            Tint::Lighter(p) => lum(rgb, |l| l * (1.0 - f64::from(p) / 100.0) + f64::from(p) / 100.0),
+            Tint::Darker(p) => lum(rgb, |l| l * (1.0 - f64::from(p) / 100.0)),
+            Tint::Other => return None,
+        };
+        Some(Color { base: ColorBase::Rgb(rgb), tint: Tint::None, alpha: c.alpha })
+    }
+}
+
+/// `rgb` with its HSL luminance changed by `f`.
+fn lum(rgb: [u8; 3], f: impl Fn(f64) -> f64) -> [u8; 3] {
+    let [r, g, b] = rgb.map(|v| f64::from(v) / 255.0);
+    let (max, min) = (r.max(g).max(b), r.min(g).min(b));
+    let l = (max + min) / 2.0;
+    let d = max - min;
+    let (h, s) = if d == 0.0 {
+        (0.0, 0.0)
+    } else {
+        let s = d / (1.0 - (2.0 * l - 1.0).abs());
+        let h = if max == r {
+            ((g - b) / d).rem_euclid(6.0)
+        } else if max == g {
+            (b - r) / d + 2.0
+        } else {
+            (r - g) / d + 4.0
+        };
+        (h, s)
+    };
+    let l = f(l).clamp(0.0, 1.0);
+    let c = (1.0 - (2.0 * l - 1.0).abs()) * s;
+    let x = c * (1.0 - (h % 2.0 - 1.0).abs());
+    let (r, g, b) = match h as u8 {
+        0 => (c, x, 0.0),
+        1 => (x, c, 0.0),
+        2 => (0.0, c, x),
+        3 => (0.0, x, c),
+        4 => (x, 0.0, c),
+        _ => (c, 0.0, x),
+    };
+    let m = l - c / 2.0;
+    [r, g, b].map(|v| ((v + m) * 255.0).round().clamp(0.0, 255.0) as u8)
 }
 
 // ---------------------------------------------------------------- reading
@@ -460,7 +543,8 @@ fn set_color(e: &mut Element, c: &Color, theme: &Theme, a: &ColorAttrs) -> Resul
     Ok(())
 }
 
-fn writable(k: Key, v: &Value) -> Result<(), String> {
+/// A value the text may write to a docx, or why not.
+pub fn writable(k: Key, v: &Value) -> Result<(), String> {
     if !v.is_writable() {
         return Err(format!(
             "{k}={v} is shown as the file has it and cannot be written anew (a gradient, pattern or picture, a border style other than solid, dashed, dotted, double, dash-dot or dash-dot-dot, or a theme colour with another transform): leave the value as it is, or write another"

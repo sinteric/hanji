@@ -30,7 +30,7 @@ impl SharedStorage {
     }
 }
 
-const ACK: ExportOptions = ExportOptions { acknowledge_surfaced: true, tracked_changes: false };
+const ACK: ExportOptions = ExportOptions { acknowledge_surfaced: true, tracked_changes: false, format: None };
 
 fn person_edits(bytes: &[u8], part: &str, from: &str, to: &str) -> Vec<u8> {
     let mut parts: Vec<Part> = package::read(bytes).unwrap();

@@ -73,6 +73,26 @@ error (invalid): the text is not valid:
 line 14, column 24: placeholder id="zzzzz" is not in this file. Placeholders come from the file: keep, move or delete them, but never create one.
 ```
 
+A Document can be exported in its other format, docx ↔ hwpx. The text and
+what the target can write cross; the export lists what did not (§5.5):
+
+```console
+$ hanji export korean-report out.hwpx --format hwpx --acknowledge-surfaced
+wrote out.hwpx (7821 bytes) from revision 2 of korean-report; digest fnv1a64:…
+converted docx → hwpx. Not carried across:
+- placeholders dropped, 4 (comment ×1, drawing ×1, footnote ×1, tracked-insert ×1):
+    comment ku25a (line 18): comment: 지방 수치 재확인 필요
+    …
+- properties hwpx cannot write, dropped:
+    table-align=left table-indent=0pt ×1 (line 26): hwpx has no table position (table-align, table-indent): the table sits where hwpx puts it
+- styles hwpx has under its own definition (its values differ):
+    Normal → 바탕글: align left → justify, line-spacing 100% → 160%, font Noto Sans CJK KR → 함초롬바탕, size 12pt → 10pt
+    Heading 1 → 개요 1: size 16pt → 10pt, bold yes → no
+    …
+- what the file held beyond the text, left behind:
+    …
+```
+
 Subcommands: `open`, `new`, `read`, `edit`, `write`, `ops`, `validate`,
 `export`, `preview`, `reimport`, `history`, `diff`, `list`, `guide`.
 `hanji preview DOC` writes an HTML viewer of the revision as it would
@@ -185,7 +205,7 @@ download. Later runs use the cached binary. For details, see
 | `hanji write DOC --rev N FILE` | Replace the whole text. hanji aligns the old and new text to find where unshown content goes |
 | `hanji ops DOC --rev N OPS` | Write spreadsheet cells with JSON range operations (set, append/insert/delete rows, fill_formula, sort, add_table, format, …) |
 | `hanji validate FILE` | Check a text against the grammar, and with `--doc` the document's style, layout and placeholder names |
-| `hanji export DOC PATH` | Write a revision to a file. Refused until surfaced content (comments, hidden text, metadata) is acknowledged (`--acknowledge-surfaced`); `--tracked-changes` for docx |
+| `hanji export DOC PATH` | Write a revision to a file. Refused until surfaced content (comments, hidden text, metadata) is acknowledged (`--acknowledge-surfaced`); `--tracked-changes` for docx; `--format hwpx` or `docx` writes a Document in its other format and lists what did not cross |
 | `hanji reimport DOC PATH --base-rev N` | Bring back a file edited in Office or Hancom only if its exported base revision is still current; refuse if newer revisions were committed |
 | `hanji history DOC`, `hanji diff DOC A B` | List a document's revisions, and show the diff between two of them |
 | `hanji preview DOC` | Render PPTX slides, experimental DOCX/HWPX pages or a bounded XLSX worksheet window to HTML, SVG or PNG, with font and rendering diagnostics |
