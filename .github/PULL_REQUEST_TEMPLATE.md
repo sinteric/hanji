@@ -1,14 +1,14 @@
 ## TL;DR
-<!-- 핵심 변경을 한두 문장으로 요약 -->
+<!-- Summarize the key change in one or two sentences. -->
 
 ## Why
-<!-- 어떤 문제를 해결하려고 올렸는지 -->
+<!-- Explain the problem this PR addresses. -->
 
 ## How / What
-<!-- 어디를 어떻게 바꿨는지 핵심만 -->
+<!-- Describe what changed, where, and how. -->
 
-## 검증
-<!-- 실행한 테스트·확인 방법과 결과. 미실행·실패·제한 사항은 구분하고, 필요하면 검증한 커밋과 CI 링크를 첨부 -->
+## Validation
+<!-- List checks and results. Distinguish unrun checks, failures, and limitations; include the tested commit and CI links when relevant. -->
 
-## 추가 사항
-<!-- 필요한 경우에만 관련 이슈·선행 PR·주의점·후속 작업을 작성. 없으면 이 섹션 삭제 -->
+## Additional notes
+<!-- Include related issues, prerequisite PRs, caveats, or follow-ups when relevant. Remove this section if not needed. -->
