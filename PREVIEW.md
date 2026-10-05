@@ -42,7 +42,7 @@ do not discover host fonts. Native `Options` can load `--font-dir`,
 the output reports actual missing characters when one is unavailable.
 
 PPTX/DOCX share one immutable git source for rdocx 0.15.0 and the rpptx /
-oxml-layout 0.13.0 family. HWPX uses rhwp 0.8.6 from the sinteric fork.
+oxml-layout 0.13.1 family. HWPX uses rhwp 0.8.6 from the sinteric fork.
 `Cargo.toml` records exact revision pins and `Cargo.lock` records the resolved
 source. A crate's version alone does not identify these fork patches.
 
@@ -141,6 +141,15 @@ are unchanged, and the OfficeMath and shaping diagnostics remain. An owned
 first/default header regression verifies all three output formats on native,
 byte-only and WASI paths. This does not establish general VML support or native
 Word fidelity.
+
+PPTX `12` retains its default `round2SameRect` rounded corners.
+The renderer accepts finite arcs with both radii zero as
+point no-ops, preserving the remaining curved corners. An owned byte-input
+API regression distinguishes the two curved and two square corners of both
+`round2SameRect` and `round2DiagRect` in PNG.
+Invalid or single-zero-radius arcs and positive-arc budgets retain their
+existing guards. Circular-arrow presets and advanced chart gradients retain
+their reported limitations. This does not establish native PowerPoint fidelity.
 
 The real six-page HWPX footnote document `26` reuses clip IDs across pages
 with different rectangle geometry. The HTML viewer namespaces page IDs and
