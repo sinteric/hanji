@@ -262,7 +262,123 @@ pub fn write_package(rem: &Remainder, out: Exported) -> Result<Vec<u8>, EngineEr
             }
         }
     }
+    if let Some(data) = out.styles {
+        if package::get(&parts, "word/styles.xml").is_none() {
+            add_styles_part(&mut parts, data)?;
+        }
+    }
     package::write(&parts).map_err(EngineError::Package)
+}
+
+/// Register a newly created styles part without replacing unrelated metadata.
+fn add_styles_part(parts: &mut Vec<hanji_core::Part>, data: Vec<u8>) -> Result<(), EngineError> {
+    use hanji_package::opc;
+    use xml::{Element, Node};
+
+    const NAME: &str = "word/styles.xml";
+    const TYPE: &str = "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml";
+    const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
+    const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/styles";
+    let strict = xml::parse(&data).is_ok_and(|d| d.root.get("xmlns:w").as_deref() == Some(W_NS_STRICT));
+    let relation = if strict { STRICT_REL } else { REL };
+    let parse = |name: &str, root: &str, ns: &str| -> Result<xml::Doc, EngineError> {
+        let d = package::get(parts, name).and_then(|bytes| xml::parse(bytes).ok());
+        d.filter(|d| {
+            let xmlns = d.root.name.split_once(':').map_or("xmlns".to_string(), |(p, _)| format!("xmlns:{p}"));
+            d.root.local() == root && d.root.get(&xmlns).as_deref() == Some(ns)
+        })
+        .ok_or_else(|| {
+            EngineError::Refused(format!(
+                "{name} is missing or cannot be parsed, so the styles part cannot be registered"
+            ))
+        })
+    };
+    let qualified = |root: &Element, name: &str| {
+        root.name.split_once(':').map_or_else(|| name.to_string(), |(prefix, _)| format!("{prefix}:{name}"))
+    };
+    let mut types = parse(opc::CT_PART, "Types", "http://schemas.openxmlformats.org/package/2006/content-types")?;
+    let rels_name = opc::rels_part(DOC_PART);
+    const REL_TYPE: &str = "application/vnd.openxmlformats-package.relationships+xml";
+    let mut added_types = vec![(NAME, TYPE)];
+    if package::get(parts, &rels_name).is_none()
+        && !types.root.elements().any(|e| {
+            e.local() == "Default"
+                && e.get("Extension").as_deref() == Some("rels")
+                && e.get("ContentType").as_deref() == Some(REL_TYPE)
+        })
+    {
+        added_types.push((rels_name.as_str(), REL_TYPE));
+    }
+    let mut changed_types = false;
+    for (part, expected) in added_types {
+        let path = format!("/{part}");
+        let content_type = types
+            .root
+            .elements()
+            .find(|e| e.local() == "Override" && e.get("PartName").as_deref() == Some(path.as_str()))
+            .map(|e| e.get("ContentType"));
+        if let Some(content_type) = content_type {
+            if content_type.as_deref() != Some(expected) {
+                return Err(EngineError::Refused(format!("[Content_Types].xml names another content type for {part}")));
+            }
+        } else {
+            let name = qualified(&types.root, "Override");
+            types
+                .root
+                .children
+                .push(Node::El(Element::new(&name).with_attr("PartName", &path).with_attr("ContentType", expected)));
+            changed_types = true;
+        }
+    }
+    let existing = opc::rels_of(parts, DOC_PART);
+    let styles_rels: Vec<_> = existing.iter().filter(|r| r.ty == REL || r.ty == STRICT_REL).collect();
+    if styles_rels.len() > 1
+        || styles_rels.iter().any(|r| r.external || opc::resolve_target(DOC_PART, &r.target) != NAME)
+    {
+        return Err(EngineError::Refused(format!("{rels_name} already names another styles target")));
+    }
+    let rels_data = if package::get(parts, &rels_name).is_some() {
+        let mut d = parse(&rels_name, "Relationships", opc::RELS_NS)?;
+        if styles_rels.is_empty() {
+            let name = qualified(&d.root, "Relationship");
+            d.root.children.push(Node::El(
+                Element::new(&name)
+                    .with_attr("Id", &opc::free_rel_id(&existing))
+                    .with_attr("Type", relation)
+                    .with_attr("Target", "styles.xml"),
+            ));
+            Some(xml::write_doc(&d))
+        } else {
+            None
+        }
+    } else {
+        Some(opc::write_rels(&[opc::Rel {
+            id: "rId1".into(),
+            ty: relation.into(),
+            target: "styles.xml".into(),
+            external: false,
+        }]))
+    };
+    let template = parts
+        .iter()
+        .find(|p| p.name == DOC_PART)
+        .ok_or_else(|| EngineError::Package("package has no word/document.xml".into()))?;
+    let (dos_time, external_attr) = (template.dos_time, template.external_attr);
+    let mut put = |name: &str, data: Vec<u8>| {
+        if let Some(p) = parts.iter_mut().find(|p| p.name == name) {
+            p.data = data;
+        } else {
+            parts.push(hanji_core::Part { name: name.into(), data, dos_time, external_attr, deflate: true });
+        }
+    };
+    if changed_types {
+        put(opc::CT_PART, xml::write_doc(&types));
+    }
+    if let Some(data) = rels_data {
+        put(&rels_name, data);
+    }
+    put(NAME, data);
+    Ok(())
 }
 
 /// `document.xml` (and numbering) for resolved blocks placed against `rem`.
@@ -287,6 +403,8 @@ pub(crate) fn written_styles(rem: &Remainder) -> Result<(hanji_core::StyleSet, O
     if !styles.formatting {
         return Ok((styles, None));
     }
-    let part = format::write_styles(&rem.parts, &mut styles, &[]).map_err(EngineError::Refused)?;
+    let namespace = rem.namespaces.iter().find(|(prefix, _)| prefix == "w").map_or(W_NS, |(_, uri)| uri.as_str());
+    let part =
+        format::write_styles_in_namespace(&rem.parts, &mut styles, &[], namespace).map_err(EngineError::Refused)?;
     Ok((styles, part))
 }
