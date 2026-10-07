@@ -1,3 +1,7 @@
+[settings]
+# Keep the selected runtimes first even in an already-activated shell.
+activate_aggressive = true
+
 [tools]
 node = "24.21.0"
 pnpm = "10.34.6"
