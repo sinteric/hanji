@@ -414,9 +414,13 @@ schema: 1
     `line-spacing` as a gap) is refused. A changed style line rewrites that
     `w:style` so its values are the line's, and a new one is a
     `w:customStyle` `w:style` based on the default style, its id from the
-    name's ASCII letters and digits. The line of a style the text does not
-    use is not shown; changing it (a line with other values, compared in
-    canonical form) is refused, so a style is used first and then changed.
+    name's ASCII letters and digits. A missing `word/styles.xml` is created
+    only when a style line changes or adds a style, with its document
+    relationship and content type. Unchanged styles and direct-format-only
+    edits leave the missing part absent.
+    The line of a style the text does not use is not shown; changing it
+    (a line with other values, compared in canonical form) is refused, so a
+    style is used first and then changed.
     A tracked-changes export (§10.2) writes paragraph and run property
     changes as `w:pPrChange`/`w:rPrChange` and refuses a style line or cell
     box change. A remainder fingerprint leaves out what the text shows.

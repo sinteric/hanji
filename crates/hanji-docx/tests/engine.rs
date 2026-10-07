@@ -65,7 +65,7 @@ fn missing_styles_part_keeps_ordinary_text_and_direct_formatting_edits() {
 }
 
 #[test]
-fn missing_styles_part_refuses_changed_and_new_style_lines() {
+fn missing_styles_part_creates_changed_and_new_style_lines() {
     let imp = DocxEngine.import(&docx_without_styles(), &ImportOptions::default()).unwrap();
     let line = imp.text.lines().find(|l| l.starts_with("<style name=\"Normal\"")).unwrap();
     let size = line.split_whitespace().find(|x| x.starts_with("size=")).unwrap().trim_end_matches("/>");
@@ -74,14 +74,179 @@ fn missing_styles_part_refuses_changed_and_new_style_lines() {
     let used = added.replace("\nhello\n", "\n<div style=\"Callout\">hello</div>\n");
     assert_ne!(used, added);
     for text in [changed, added, used] {
-        // Both entry points must refuse: direct export and an edit whose
-        // style changes have already been folded into the remainder.
+        // Both entry points must save the style: direct export and an edit
+        // whose style changes have already been folded into the remainder.
         let r = rewrite(&imp.remainder, &imp.text, &text, CAPS).unwrap();
         for rem in [&imp.remainder, &r.remainder] {
-            match DocxEngine.export(&text, rem) {
-                Err(EngineError::Refused(m)) => assert!(m.contains("no styles part (word/styles.xml)"), "{m}"),
-                other => panic!("unrepresentable styles must be refused: {:?}", other.map(|_| ())),
+            let out = DocxEngine.export(&text, rem).unwrap();
+            let parts = package::read(&out).unwrap();
+            assert_styles_registration(&parts);
+            let again = DocxEngine.import(&out, &ImportOptions::default()).unwrap();
+            for style in &r.remainder.styles.paragraph {
+                assert_eq!(again.remainder.styles.values(&style.name), r.remainder.styles.values(&style.name));
             }
+            if text.contains("<div style=\"Callout\">") {
+                assert!(again.text.contains("<div style=\"Callout\">hello</div>"), "{}", again.text);
+            }
+            let warm = DocxEngine.export(&again.text, &again.remainder).unwrap();
+            assert_eq!(
+                package::get(&package::read(&warm).unwrap(), "word/styles.xml"),
+                package::get(&parts, "word/styles.xml")
+            );
+        }
+    }
+}
+
+fn assert_styles_registration(parts: &[Part]) {
+    use hanji_package::{opc, xml};
+    let styles = xml::parse(package::get(parts, "word/styles.xml").unwrap()).unwrap();
+    let defaults: Vec<_> = styles.root.elements().filter(|e| e.get("w:default").as_deref() == Some("1")).collect();
+    assert_eq!(defaults.len(), 1);
+    assert_eq!(defaults[0].get("w:styleId").as_deref(), Some("Normal"));
+    let rels = opc::rels_of(parts, "word/document.xml");
+    let relation = if styles.root.get("xmlns:w").as_deref() == Some(hanji_docx::ooxml::W_NS_STRICT) {
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/styles".to_string()
+    } else {
+        format!("{R}/styles")
+    };
+    let rels: Vec<_> = rels.iter().filter(|r| r.ty == relation).collect();
+    assert_eq!(rels.len(), 1);
+    assert!(!rels[0].external);
+    assert_eq!(opc::resolve_target("word/document.xml", &rels[0].target), "word/styles.xml");
+    assert!(opc::reachable(parts).contains("word/styles.xml"));
+    let types = xml::parse(package::get(parts, "[Content_Types].xml").unwrap()).unwrap();
+    let entries: Vec<_> =
+        types.root.elements().filter(|e| e.get("PartName").as_deref() == Some("/word/styles.xml")).collect();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(
+        entries[0].get("ContentType").as_deref(),
+        Some("application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml")
+    );
+}
+
+fn new_style_text(text: &str, name: &str) -> String {
+    let line = text.lines().find(|l| l.starts_with("<style name=\"Normal\"")).unwrap();
+    text.replacen(line, &format!("{line}\n<style name=\"{name}\" size=24pt/>"), 1)
+}
+
+#[test]
+fn creating_styles_matches_a_strict_document_namespace() {
+    let mut source = package::read(&docx_without_styles()).unwrap();
+    let doc = source.iter_mut().find(|p| p.name == "word/document.xml").unwrap();
+    doc.data = std::str::from_utf8(&doc.data).unwrap().replace(W, hanji_docx::ooxml::W_NS_STRICT).into_bytes();
+    let imp = DocxEngine.import(&package::write(&source).unwrap(), &ImportOptions::default()).unwrap();
+    let out = DocxEngine.export(&new_style_text(&imp.text, "Callout"), &imp.remainder).unwrap();
+    let parts = package::read(&out).unwrap();
+    assert_styles_registration(&parts);
+    let styles = hanji_docx::xml::parse(package::get(&parts, "word/styles.xml").unwrap()).unwrap();
+    assert_eq!(styles.root.get("xmlns:w").as_deref(), Some(hanji_docx::ooxml::W_NS_STRICT));
+    assert!(DocxEngine
+        .import(&out, &ImportOptions::default())
+        .unwrap()
+        .remainder
+        .styles
+        .paragraph_id("Callout")
+        .is_some());
+}
+
+#[test]
+fn creating_styles_registers_relationship_part_without_a_rels_default() {
+    let mut source = package::read(&docx_without_styles()).unwrap();
+    let types = r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/_rels/.rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/></Types>"#;
+    source.iter_mut().find(|p| p.name == "[Content_Types].xml").unwrap().data = types.as_bytes().to_vec();
+    let imp = DocxEngine.import(&package::write(&source).unwrap(), &ImportOptions::default()).unwrap();
+    let out = DocxEngine.export(&new_style_text(&imp.text, "Callout"), &imp.remainder).unwrap();
+    let parts = package::read(&out).unwrap();
+    assert_styles_registration(&parts);
+    let types = hanji_docx::xml::parse(package::get(&parts, "[Content_Types].xml").unwrap()).unwrap();
+    let rel_type = types
+        .root
+        .elements()
+        .find(|e| e.get("PartName").as_deref() == Some("/word/_rels/document.xml.rels"))
+        .and_then(|e| e.get("ContentType"));
+    assert_eq!(rel_type.as_deref(), Some("application/vnd.openxmlformats-package.relationships+xml"));
+}
+
+#[test]
+fn creating_styles_preserves_package_metadata_and_avoids_existing_ids() {
+    use hanji_package::{opc, xml};
+    let mut source = package::read(&docx_without_styles()).unwrap();
+    let rels = format!(
+        r#"<?xml version="1.0"?><r:Relationships xmlns:r="{}"><!--keep--><r:Relationship Id="rId1" Type="{R}/theme" Target="theme/theme1.xml" TargetMode="Internal"/></r:Relationships>"#,
+        opc::RELS_NS
+    );
+    source.push(part("word/_rels/document.xml.rels", &rels));
+    source.push(part("word/theme/theme1.xml", r#"<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Owned"><a:themeElements><a:clrScheme name="Owned"/><a:fontScheme name="Owned"/><a:fmtScheme name="Owned"/></a:themeElements></a:theme>"#));
+    let types = r#"<ct:Types xmlns:ct="http://schemas.openxmlformats.org/package/2006/content-types"><!--keep--><ct:Default Extension="xml" ContentType="application/xml"/><ct:Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></ct:Types>"#;
+    source.iter_mut().find(|p| p.name == "[Content_Types].xml").unwrap().data = types.as_bytes().to_vec();
+    let imp = DocxEngine.import(&package::write(&source).unwrap(), &ImportOptions::default()).unwrap();
+    // "Norm al" would collide with the imported implicit Normal style's ID.
+    let text = new_style_text(&imp.text, "Norm al").replace("\nhello\n", "\n<div style=\"Norm al\">hello</div>\n");
+    let out = DocxEngine.export(&text, &imp.remainder).unwrap();
+    let parts = package::read(&out).unwrap();
+    assert_styles_registration(&parts);
+    let original_rels = xml::parse(rels.as_bytes()).unwrap();
+    let current_rels = xml::parse(package::get(&parts, "word/_rels/document.xml.rels").unwrap()).unwrap();
+    assert_eq!(original_rels.root.children[0..2], current_rels.root.children[0..2]);
+    assert_eq!(opc::rels_of(&parts, "word/document.xml")[1].id, "rId2");
+    let current_types = xml::parse(package::get(&parts, "[Content_Types].xml").unwrap()).unwrap();
+    assert_eq!(current_types.root.elements().last().unwrap().name, "ct:Override");
+    assert_eq!(current_rels.root.elements().last().unwrap().name, "r:Relationship");
+    for before in &imp.remainder.parts {
+        if !["word/document.xml", "word/_rels/document.xml.rels", "[Content_Types].xml"].contains(&before.name.as_str())
+        {
+            assert_eq!(package::get(&parts, &before.name).unwrap(), before.data);
+        }
+    }
+    let again = DocxEngine.import(&out, &ImportOptions::default()).unwrap();
+    assert_eq!(again.remainder.styles.paragraph_id("Normal"), Some("Normal"));
+    assert_eq!(again.remainder.styles.paragraph_id("Norm al"), Some("Normal1"));
+    assert!(again.text.contains("<div style=\"Norm al\">hello</div>"), "{}", again.text);
+}
+
+#[test]
+fn creating_styles_reuses_existing_registration_and_refuses_unreadable_parts() {
+    use hanji_package::opc;
+    let mut source = package::read(&docx_without_styles()).unwrap();
+    let rels = format!(
+        r#"<Relationships xmlns="{}"><Relationship Id="existing" Type="{R}/styles" Target="/word/styles.xml"/></Relationships>"#,
+        opc::RELS_NS
+    );
+    source.push(part("word/_rels/document.xml.rels", &rels));
+    let ct = source.iter_mut().find(|p| p.name == "[Content_Types].xml").unwrap();
+    ct.data = std::str::from_utf8(&ct.data).unwrap().replace("</Types>", r#"<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>"#).into_bytes();
+    let imp = DocxEngine.import(&package::write(&source).unwrap(), &ImportOptions::default()).unwrap();
+    let out = DocxEngine.export(&new_style_text(&imp.text, "Callout"), &imp.remainder).unwrap();
+    let parts = package::read(&out).unwrap();
+    assert_styles_registration(&parts);
+    for name in ["word/_rels/document.xml.rels", "[Content_Types].xml"] {
+        assert_eq!(package::get(&parts, name), package::get(&imp.remainder.parts, name));
+    }
+    for (name, data) in [
+        ("word/styles.xml", "<w:styles"),
+        ("word/_rels/document.xml.rels", "<Relationships"),
+        ("[Content_Types].xml", "<Types"),
+        (
+            "word/_rels/document.xml.rels",
+            &format!(
+                r#"<Relationships xmlns="{}"><Relationship Id="other" Type="{R}/styles" Target="other.xml"/></Relationships>"#,
+                opc::RELS_NS
+            ),
+        ),
+        (
+            "[Content_Types].xml",
+            r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/word/styles.xml" ContentType="application/xml"/></Types>"#,
+        ),
+    ] {
+        let mut bad = imp.remainder.clone();
+        if let Some(p) = bad.parts.iter_mut().find(|p| p.name == name) {
+            p.data = data.as_bytes().to_vec();
+        } else {
+            bad.parts.push(part(name, data));
+        }
+        match DocxEngine.export(&new_style_text(&imp.text, "Callout"), &bad) {
+            Err(EngineError::Refused(message)) => assert!(message.contains(name), "{message}"),
+            other => panic!("unreadable {name} must not be replaced: {:?}", other.map(|_| ())),
         }
     }
 }

@@ -888,6 +888,20 @@ pub fn apply(
 
 // ---------------------------------------------------------------- styles
 
+/// Match a newly created styles part to the document's WordprocessingML namespace.
+fn document_namespace(parts: &[Part]) -> &'static str {
+    let strict =
+        package::get(parts, crate::ooxml::DOC_PART).and_then(|bytes| xml::parse(bytes).ok()).is_some_and(|d| {
+            let key = d.root.name.split_once(':').map_or("xmlns".to_string(), |(p, _)| format!("xmlns:{p}"));
+            d.root.get(&key).as_deref() == Some(crate::ooxml::W_NS_STRICT)
+        });
+    if strict {
+        crate::ooxml::W_NS_STRICT
+    } else {
+        crate::ooxml::W_NS
+    }
+}
+
 /// Word's values where `docDefaults` and the styles set nothing.
 fn word_defaults(theme: &Theme) -> Props {
     let mut p = styled::implicit();
@@ -989,8 +1003,18 @@ impl Styles {
 /// remainder's where the text has none) and the default style's say is
 /// changed in its own `w:pPr` / `w:rPr`; a line with a name no style has is
 /// a new style based on the default. `None` when nothing changes. The ids of
-/// new styles are set in `set`.
+/// new styles are set in `set`. A missing part is created only for a style edit.
 pub fn write_styles(parts: &[Part], set: &mut StyleSet, text_lines: &[StyleLine]) -> Result<Option<Vec<u8>>, String> {
+    write_styles_in_namespace(parts, set, text_lines, document_namespace(parts))
+}
+
+/// Engine remainders keep the document namespace separately from its emptied part.
+pub(crate) fn write_styles_in_namespace(
+    parts: &[Part],
+    set: &mut StyleSet,
+    text_lines: &[StyleLine],
+    namespace: &str,
+) -> Result<Option<Vec<u8>>, String> {
     let st = Styles::read(parts);
     let mut lines = set.lines();
     for l in text_lines {
@@ -1000,24 +1024,37 @@ pub fn write_styles(parts: &[Part], set: &mut StyleSet, text_lines: &[StyleLine]
         }
     }
     let table = StyleTable { default: Some(set.default_paragraph.clone()), lines: lines.clone() };
-    let Some(mut doc) = st.doc.clone() else {
-        // Edits may already be in the remainder, with no text_lines passed.
-        // Without a styles part, only the imported implicit values can be kept.
-        for l in &lines {
-            let Some(def) = set.paragraph_def(&l.name).filter(|d| !d.id.is_empty()) else {
-                return Err("this file has no styles part (word/styles.xml), so a new style cannot be written".into());
-            };
-            if table.values(Some(&l.name)).only(style_keys()) != st.values(&def.id).only(style_keys()) {
-                return Err(
-                    "this file has no styles part (word/styles.xml), so changed style values cannot be written".into(),
-                );
+    let created = st.doc.is_none();
+    let mut doc = match st.doc.clone() {
+        Some(doc) => doc,
+        None => {
+            // Edits can already be in the remainder, with no text_lines passed.
+            let changed = lines.iter().any(|l| {
+                set.paragraph_def(&l.name).filter(|d| !d.id.is_empty()).is_none_or(|def| {
+                    table.values(Some(&l.name)).only(style_keys()) != st.values(&def.id).only(style_keys())
+                })
+            });
+            if !changed {
+                return Ok(None);
+            }
+            if package::get(parts, "word/styles.xml").is_some() {
+                return Err("word/styles.xml cannot be parsed, so its styles cannot be changed".into());
+            }
+            xml::Doc {
+                prolog: "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n".into(),
+                root: el("w:styles").with_attr("xmlns:w", namespace),
+                epilog: String::new(),
             }
         }
-        return Ok(None);
     };
     let default_id = set.default_paragraph_id().to_string();
     // New styles: ids from their names.
     let mut ids: Vec<String> = st.styles().filter_map(|s| s.get("w:styleId")).collect();
+    for d in &set.paragraph {
+        if !d.id.is_empty() && !ids.iter().any(|id| id.eq_ignore_ascii_case(&d.id)) {
+            ids.push(d.id.clone());
+        }
+    }
     for l in &lines {
         let Some(def) = set.paragraph.iter_mut().find(|d| d.name == l.name) else {
             let id = new_id(&l.name, &ids);
@@ -1038,6 +1075,9 @@ pub fn write_styles(parts: &[Part], set: &mut StyleSet, text_lines: &[StyleLine]
                 .with_attr("w:type", "paragraph")
                 .with_attr("w:customStyle", "1")
                 .with_attr("w:styleId", &id);
+            if created && id == default_id {
+                s.set("w:default", "1");
+            }
             s.children.push(Node::El(el("w:name").with_attr("w:val", &l.name)));
             if id != default_id {
                 s.children.push(Node::El(el("w:basedOn").with_attr("w:val", &default_id)));
