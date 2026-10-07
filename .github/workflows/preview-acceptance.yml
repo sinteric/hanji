@@ -12,9 +12,17 @@ on:
       - 'prototype/preview/baseline/**'
       - '.github/workflows/preview-acceptance.yml'
   workflow_dispatch:
+permissions:
+  contents: read
+
+concurrency:
+  group: preview-acceptance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   acceptance-contract:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:

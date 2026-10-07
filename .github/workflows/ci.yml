@@ -9,9 +9,17 @@ env:
   CARGO_PROFILE_DEV_DEBUG: "0"
   CARGO_PROFILE_TEST_DEBUG: "0"
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   rust:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -19,20 +27,22 @@ jobs:
           components: rustfmt, clippy
           targets: wasm32-unknown-unknown, wasm32-wasip1
       - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo fmt --all --check
-      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo clippy --locked --workspace --all-targets -- -D warnings
       # The preview's Korean tests draw with a Hangul font (crates/hanji-preview/tests/render.rs).
       - name: a Korean font for the preview tests
         run: fc-list :lang=ko file | grep -q /usr/share/fonts/ || { sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk; }
-      - run: cargo test --workspace
+      - run: cargo test --locked --workspace
       - name: byte-only preview without host fonts
         run: cargo test --locked -p hanji-preview --no-default-features --features hwpx
       # The CLI is native only (files, processes, stdio).
       - name: build for wasm32-unknown-unknown
-        run: cargo build --target wasm32-unknown-unknown --workspace --exclude hanji-cli
+        run: cargo build --locked --target wasm32-unknown-unknown --workspace --exclude hanji-cli
       - uses: bytecodealliance/actions/wasmtime/setup@v1
       - name: test on wasm32-wasip1 (wasmtime)
-        run: cargo test --target wasm32-wasip1 --workspace --exclude hanji-cli
+        run: cargo test --locked --target wasm32-wasip1 --workspace --exclude hanji-cli
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: wasmtime run --dir=${{ github.workspace }}
 
@@ -40,12 +50,14 @@ jobs:
   # schemas, with the rules outside them that Office enforces (validation/ooxml-schema).
   ooxml-schema:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: validation/office-kit
+          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -66,36 +78,39 @@ jobs:
   # the skill, and the hanji CLI run through the skill's launcher.
   plugins:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - name: offline launcher download and failure checks
         run: python3 scripts/test-launcher.py
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --locked -p hanji-cli
-      - uses: actions/setup-node@v4
         with:
-          node-version: 22
-      # Pinned: a new CLI release that changes the plugin format fails here
-      # only when these are bumped.
-      - run: npm install -g @anthropic-ai/claude-code@2.1.285 @openai/codex@0.159.2
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      - run: cargo build --locked -p hanji-cli
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
+        with:
+          version: '2026.9.14'
+      # CLI versions and transitive dependencies are pinned by package.json
+      # and pnpm-lock.yaml, without installing tools globally.
+      - run: mise run install
       - name: Claude Code validates the plugin and the marketplace
         run: |
-          claude plugin validate --strict plugins/hanji
-          claude plugin validate --strict .
+          pnpm exec claude plugin validate --strict plugins/hanji
+          pnpm exec claude plugin validate --strict .
       - name: Claude Code installs it and sees its skill and no MCP server
         run: |
-          claude plugin marketplace add "$PWD"
-          claude plugin install hanji@hanji
-          claude plugin details hanji | tee "$RUNNER_TEMP/details.txt"
+          pnpm exec claude plugin marketplace add "$PWD"
+          pnpm exec claude plugin install hanji@hanji
+          pnpm exec claude plugin details hanji | tee "$RUNNER_TEMP/details.txt"
           grep -E 'Skills \(1\) +office-documents' "$RUNNER_TEMP/details.txt"
           grep -E 'MCP servers \(0\)' "$RUNNER_TEMP/details.txt"
       - name: Codex installs it and sees its skill
         run: |
-          codex plugin marketplace add "$PWD"
-          codex plugin add hanji@hanji
-          codex debug prompt-input hi | grep -q 'hanji:office-documents'
-          if codex mcp get hanji; then exit 1; fi
+          pnpm exec codex plugin marketplace add "$PWD"
+          pnpm exec codex plugin add hanji@hanji
+          pnpm exec codex debug prompt-input hi | grep -q 'hanji:office-documents'
+          if pnpm exec codex mcp get hanji; then exit 1; fi
       - name: the skill's launcher runs the CLI, from the checkout and from each installed copy
         run: |
           launcher=skills/office-documents/scripts/hanji

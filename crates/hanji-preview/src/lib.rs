@@ -889,7 +889,7 @@ fn runs<'a>(elements: &'a [PositionedElement], out: &mut Vec<(FontId, &'a str)>)
 }
 
 impl Preview {
-    /// The budgets used to preflight this immutable job's embedded PNG/JPEG images.
+    /// The budgets used to preflight this immutable job's embedded PNG/JPEG and GIF first frames.
     pub fn image_limits(&self) -> ImageLimits {
         self.image_limits
     }
@@ -1397,6 +1397,184 @@ mod tests {
         }
     }
 
+    fn owned_gif(animated: bool, transparent: bool, partial: bool) -> Vec<u8> {
+        let mut bytes = Vec::new();
+        {
+            let mut encoder =
+                gif::Encoder::new(&mut bytes, if partial { 2 } else { 1 }, 1, &[255, 0, 0, 0, 0, 255]).unwrap();
+            let mut frame = gif::Frame {
+                width: 1,
+                height: 1,
+                buffer: std::borrow::Cow::Borrowed(&[0]),
+                transparent: transparent.then_some(0),
+                ..Default::default()
+            };
+            encoder.write_frame(&frame).unwrap();
+            if animated {
+                frame.buffer = std::borrow::Cow::Borrowed(&[1]);
+                encoder.write_frame(&frame).unwrap();
+            }
+        }
+        bytes
+    }
+
+    #[test]
+    fn embedded_gif_normalizes_the_first_full_frame_for_every_format() {
+        for animated in [false, true] {
+            let bytes = owned_gif(animated, false, false);
+            let original = bytes.clone();
+            let p = image_job(vec![vec![embedded_image(&bytes, 0.0)]], ImageLimits::default());
+            assert_eq!(p.diagnostics.len(), usize::from(animated), "{:?}", p.diagnostics);
+            if animated {
+                assert_eq!(p.diagnostics[0].message, quality::GIF_FIRST_FRAME);
+                let report = p.quality(DocumentKind::Docx);
+                let d = report.diagnostics.iter().find(|d| d.message == quality::GIF_FIRST_FRAME).unwrap();
+                assert_eq!(d.code, quality::DiagnosticCode::ImageApproximation);
+                assert_eq!(d.severity, quality::Severity::Warning);
+                assert_eq!(d.consequence, quality::Consequence::Approximation);
+                assert_eq!(d.location.page_index, Some(0));
+                assert!(report.enforce(quality::Strictness::CriticalLosses).is_ok());
+                assert!(p.html("static GIF").contains(quality::GIF_FIRST_FRAME));
+            }
+            let svg = p.slide_svg(0);
+            assert!(svg.contains("data:image/png;base64,"));
+            assert!(!svg.contains("data:image/gif"));
+            assert!(p.html("static GIF").contains("data:image/png;base64,"));
+            assert_eq!(image_pixels(&p, 0), [[255, 0, 0, 255], [255; 4]]);
+            assert_eq!(p.slide_svg(0), svg);
+            assert_eq!(bytes, original);
+        }
+        let p = image_job(vec![vec![embedded_image(&owned_gif(false, true, false), 0.0)]], ImageLimits::default());
+        assert!(p.diagnostics.is_empty());
+        assert_eq!(image_pixels(&p, 0), [[255; 4]; 2]);
+    }
+
+    #[test]
+    fn embedded_gif_limits_and_malformed_frames_remain_explicit() {
+        let bytes = owned_gif(false, false, false);
+        let mut bad_tail = bytes.clone();
+        assert_eq!(bad_tail.pop(), Some(b';'));
+        bad_tail.push(0xff);
+        for data in [
+            b"GIF89a".as_slice(),
+            owned_gif(false, false, true).as_slice(),
+            &bytes[..bytes.len() - 5],
+            bad_tail.as_slice(),
+        ] {
+            let p = image_job(vec![vec![embedded_image(data, 0.0)]], ImageLimits::default());
+            assert_eq!(p.diagnostics.len(), 1);
+            assert!(p.diagnostics[0].message.contains("GIF"));
+            assert!(!p.slide_svg(0).contains("<image"));
+            assert_eq!(image_pixels(&p, 0), [[255; 4]; 2]);
+            let report = p.quality(DocumentKind::Docx);
+            let d = report.diagnostics.iter().find(|d| d.message == p.diagnostics[0].message).unwrap();
+            assert_eq!(d.code, quality::DiagnosticCode::ImageOmitted);
+            assert_eq!(d.severity, quality::Severity::Error);
+            assert_eq!(d.consequence, quality::Consequence::UnsupportedOmission);
+            assert!(report.enforce(quality::Strictness::CriticalLosses).is_err());
+        }
+        let limits = ImageLimits { max_image_decoded_bytes: 3, ..ImageLimits::default() };
+        let p = image_job(vec![vec![embedded_image(&bytes, 0.0)]], limits);
+        assert!(p.diagnostics[0].message.contains("decoded-image byte budget"));
+        assert!(!p.html("limited GIF").contains("<image"));
+        assert_eq!(image_pixels(&p, 0), [[255; 4]; 2]);
+        let mut oversized = bytes;
+        oversized[6..10].fill(0xff);
+        let p = image_job(vec![vec![embedded_image(&oversized, 0.0)]], ImageLimits::default());
+        assert!(p.diagnostics[0].message.contains("decoded-image byte budget"));
+        let report = p.quality(DocumentKind::Docx);
+        assert!(report.diagnostics.iter().any(|d| d.code == quality::DiagnosticCode::ImageResourceLimit));
+        assert_eq!(image_pixels(&p, 0), [[255; 4]; 2]);
+    }
+
+    #[test]
+    fn embedded_gif_animation_never_decodes_later_frames() {
+        let mut bytes = owned_gif(true, false, false);
+        let header = b",\0\0\0\0\x01\0\x01\0\0";
+        let second = bytes.windows(header.len()).rposition(|window| window == header).unwrap();
+        // The second frame declares nearly 16 GiB of RGBA pixels and has no compressed
+        // data. The static preview must only inspect its metadata, within 4 bytes.
+        bytes[second + 5..second + 9].fill(0xff);
+        bytes.truncate(second + header.len() + 2);
+        let limits =
+            ImageLimits { max_image_decoded_bytes: 4, max_page_decoded_bytes: 4, max_document_decoded_bytes: 4 };
+        let p = image_job(vec![vec![embedded_image(&bytes, 0.0)]], limits);
+        assert_eq!(p.diagnostics.len(), 1);
+        assert_eq!(p.diagnostics[0].message, quality::GIF_FIRST_FRAME);
+        assert_eq!(image_pixels(&p, 0), [[255, 0, 0, 255], [255; 4]]);
+    }
+
+    #[test]
+    fn docx_gif_package_matches_the_existing_png_image_control() {
+        let mut parts = hanji_package::package::read(include_bytes!("../tests/fixtures/images/owned.docx")).unwrap();
+        let document = parts.iter_mut().find(|p| p.name == "word/document.xml").unwrap();
+        document.data = String::from_utf8(document.data.clone())
+            .unwrap()
+            .replace("<w:body>", "<w:body><w:p><w:r><w:t>before</w:t></w:r></w:p>")
+            .replace("<w:sectPr>", "<w:p><w:r><w:t>after</w:t></w:r></w:p><w:sectPr>")
+            .into_bytes();
+        let original = hanji_package::package::write(&parts).unwrap();
+        let media = parts.iter_mut().find(|p| p.name.starts_with("word/media/")).unwrap();
+        media.name = "word/media/image.gif".into();
+        media.data = owned_gif(false, false, false);
+        for part in &mut parts {
+            let replacement = match part.name.as_str() {
+                "word/_rels/document.xml.rels" => Some(("media/image.png", "media/image.gif")),
+                "[Content_Types].xml" => {
+                    Some(("</Types>", "<Default Extension=\"gif\" ContentType=\"image/gif\"/></Types>"))
+                }
+                _ => None,
+            };
+            if let Some((from, to)) = replacement {
+                part.data = String::from_utf8(part.data.clone()).unwrap().replace(from, to).into_bytes();
+            }
+        }
+        let bytes = hanji_package::package::write(&parts).unwrap();
+        let before = bytes.clone();
+        let gif = docx::render_with_fonts(&bytes, &FontOptions::default()).unwrap();
+        let png = docx::render_with_fonts(&original, &FontOptions::default()).unwrap();
+        assert_eq!(gif.page_count(), png.page_count());
+        assert_eq!(gif.page_info(0), png.page_info(0));
+        assert_eq!(gif.diagnostics, png.diagnostics);
+        let PageData::Png(a) = gif.render_page(0, PageFormat::Png { dpi: 96.0 }).unwrap().data else { panic!() };
+        let PageData::Png(b) = png.render_page(0, PageFormat::Png { dpi: 96.0 }).unwrap().data else { panic!() };
+        assert_eq!(a, b);
+        let PageData::Svg(svg) = gif.render_page(0, PageFormat::Svg).unwrap().data else { panic!() };
+        assert!(svg.contains("data:image/png;base64,"));
+        assert!(svg.contains("before") && svg.contains("after"));
+        assert!(!gif.html("static GIF").contains("data:image/gif"));
+        assert_eq!(bytes, before);
+    }
+
+    #[test]
+    fn embedded_gif_occurrences_charge_page_and_document_budgets_after_decode() {
+        let bytes = owned_gif(false, false, false);
+        let group = PositionedElement::Group(oxml_layout::GroupElement {
+            transform: oxml_layout::Transform::IDENTITY,
+            clip: None,
+            opacity: 1.0,
+            effects: vec![],
+            children: vec![embedded_image(&bytes, 0.0)],
+        });
+        let limits =
+            ImageLimits { max_image_decoded_bytes: 4, max_page_decoded_bytes: 4, max_document_decoded_bytes: 8 };
+        let page = vec![group, embedded_image(&bytes, 1.0)];
+        let p = image_job(vec![page.clone(), page], limits);
+        assert_eq!(p.diagnostics.len(), 2);
+        assert!(p.diagnostics.iter().all(|d| d.message.contains("page decoded-image")));
+        for k in 0..2 {
+            assert_eq!(image_pixels(&p, k), [[255, 0, 0, 255], [255; 4]]);
+        }
+        let limits = ImageLimits { max_page_decoded_bytes: 8, max_document_decoded_bytes: 4, ..limits };
+        let p = image_job(vec![vec![embedded_image(&bytes, 0.0)], vec![embedded_image(&bytes, 0.0)]], limits);
+        assert_eq!(p.diagnostics.len(), 1);
+        assert!(p.diagnostics[0].message.contains("document decoded-image"));
+        assert_eq!(image_pixels(&p, 1), [[255; 4]; 2]);
+        let p = image_job(vec![vec![embedded_image(b"GIF89a", 0.0), embedded_image(&bytes, 1.0)]], limits);
+        assert_eq!(p.diagnostics.len(), 1);
+        assert_eq!(image_pixels(&p, 0), [[255; 4], [255, 0, 0, 255]]);
+    }
+
     #[test]
     fn embedded_image_budget_preserves_ordinary_png_jpeg_pixels() {
         for (data, mime, pixel) in
@@ -1668,7 +1846,7 @@ mod tests {
         });
         reset_output(&mut p);
         p.prepare_output().unwrap();
-        let message = "image bytes are neither PNG nor JPEG and were omitted";
+        let message = "embedded image GIF dimensions could not be read and the image was omitted";
         assert!(p.diagnostics.iter().any(|d| d.path.starts_with("pages[0].elements[") && d.message == message));
         assert!(p.warnings.iter().any(|w| w.contains(message)));
         assert!(p.html("preview").contains(message));

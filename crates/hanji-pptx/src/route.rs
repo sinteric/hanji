@@ -169,14 +169,15 @@ pub fn write(
             Some(Attach { id, site, .. }) => {
                 let same = had[i] == Some((id, site));
                 let stored_end = if i == 0 { stored.from } else { stored.to };
-                let found = find(items, id, Frame::SLIDE);
-                let still =
-                    !moved.contains(&id) && !found.as_ref().is_some_and(|f| f.up.iter().any(|g| moved.contains(g)));
+                let why = |m: &str| format!("its {end} end is attached to s{id}.{site}, but {m}");
+                // An unchanged attachment still needs its target. A deleted
+                // object is not in `moved`, so test existence before the shortcut.
+                let f = find(items, id, Frame::SLIDE)
+                    .ok_or_else(|| why(&format!("there is no object s{id} on this slide")))?;
+                let still = !moved.contains(&id) && !f.up.iter().any(|g| moved.contains(g));
                 let p = if same && still && !created {
                     stored_end
                 } else {
-                    let why = |m: &str| format!("its {end} end is attached to s{id}.{site}, but {m}");
-                    let f = found.ok_or_else(|| why(&format!("there is no object s{id} on this slide")))?;
                     if f.turned {
                         return Err(why(
                             "it is in a turned or flipped group, whose objects' sites are not placed here",

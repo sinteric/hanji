@@ -213,7 +213,7 @@ pub fn render_xlsx<S: Storage>(
         return Err(Error::bad("worksheet selection requires an xlsx document"));
     }
     let (e, bytes) =
-        ws.export_bytes(id, revision, &ExportOptions { acknowledge_surfaced: true, tracked_changes: false })?;
+        ws.export_bytes(id, revision, &ExportOptions { acknowledge_surfaced: true, ..Default::default() })?;
     render_xlsx_bytes(&bytes, e.doc_id, e.revision, XlsxSource::Revision, selection, opts)
 }
 
@@ -274,7 +274,7 @@ pub fn render<S: Storage>(
     }
     // The preview stays on this machine: content to surface does not stop it.
     let (e, bytes) =
-        ws.export_bytes(id, revision, &ExportOptions { acknowledge_surfaced: true, tracked_changes: false })?;
+        ws.export_bytes(id, revision, &ExportOptions { acknowledge_surfaced: true, ..Default::default() })?;
     let p = match doc.format {
         Format::Pptx => render_pptx(&bytes, opts),
         Format::Docx => docx::render_native(&bytes, opts),
@@ -307,7 +307,7 @@ pub fn render_document<S: Storage>(
     #[cfg(feature = "hwpx")]
     if ws.doc(id)?.format == Format::Hwpx {
         let (e, bytes) =
-            ws.export_bytes(id, revision, &ExportOptions { acknowledge_surfaced: true, tracked_changes: false })?;
+            ws.export_bytes(id, revision, &ExportOptions { acknowledge_surfaced: true, ..Default::default() })?;
         let preview = crate::hwpx::render_native(&bytes, opts)
             .map_err(|m| Error::new(Code::Package, format!("cannot preview {id}: {m}")))?;
         let out = Previewed {

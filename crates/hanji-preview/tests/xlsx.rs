@@ -432,3 +432,143 @@ fn unsupported_font_advance_policy_does_not_claim_applied_metrics() {
     assert!(window.fonts().substituted.iter().all(|f| f.metrics == hanji_preview::fonts::Metrics::Substitute));
     assert!(window.render(PageFormat::Svg).unwrap().diagnostics.iter().any(|d| d.path.starts_with("window.fonts[")));
 }
+
+fn themed_book(styles: &str, theme: &str, target: &str, external: bool) -> Vec<u8> {
+    let bytes = fixture::build(fixture::GRID, "", styles, &[]);
+    let mut parts = hanji_package::package::read(&bytes).unwrap();
+    let rels = parts.iter_mut().find(|p| p.name == "xl/_rels/workbook.xml.rels").unwrap();
+    let mode = if external { " TargetMode=\"External\"" } else { "" };
+    let rel = format!(
+        r#"<Relationship Id="theme" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/theme" Target="{target}"{mode}/>"#
+    );
+    rels.data = String::from_utf8(rels.data.clone())
+        .unwrap()
+        .replace("</Relationships>", &format!("{rel}</Relationships>"))
+        .into_bytes();
+    parts.push(hanji_core::Part {
+        name: "custom/colors.xml".into(),
+        data: theme.as_bytes().to_vec(),
+        dos_time: 0,
+        external_attr: 0,
+        deflate: true,
+    });
+    hanji_package::package::write(&parts).unwrap()
+}
+
+const WORKSHEET_THEME: &str = r#"<d:theme xmlns:d="http://schemas.openxmlformats.org/drawingml/2006/main"><d:themeElements><d:clrScheme name="Owned"><d:accent1><d:srgbClr val="FF0000"/></d:accent1><d:dk2><d:srgbClr val="123456"/></d:dk2><d:lt2><d:srgbClr val="000000"/></d:lt2><d:lt1><d:sysClr val="window" lastClr="FFFFFF"/></d:lt1><d:dk1><d:sysClr val="windowText" lastClr="000000"/></d:dk1></d:clrScheme></d:themeElements></d:theme>"#;
+
+#[test]
+fn worksheet_theme_and_tint_colors_match_explicit_rgb_in_all_outputs() {
+    let themed = fixture::STYLES
+        .replace("rgb=\"FF000000\"", "theme=\"1\"")
+        .replace("rgb=\"FF123456\"", "theme=\"0\"")
+        .replace("rgb=\"FFCCEEDD\"", "theme=\"4\" tint=\"0.5\"")
+        .replace("rgb=\"FF005500\"", "theme=\"2\" tint=\"0.5\"");
+    let explicit =
+        fixture::STYLES.replace("FF123456", "FFFFFFFF").replace("FFCCEEDD", "FFFF8080").replace("FF005500", "FF808080");
+    let input = themed_book(&themed, WORKSHEET_THEME, "../custom/colors.xml", false);
+    let original = input.clone();
+    let mut a = open_xlsx(&input, XlsxOptions::default()).unwrap();
+    let mut b = open_xlsx(&fixture::build(fixture::GRID, "", &explicit, &[]), XlsxOptions::default()).unwrap();
+    let a = a.render_window_with_fonts(0, "A1:C5", &FontOptions::default()).unwrap();
+    let b = b.render_window_with_fonts(0, "A1:C5", &FontOptions::default()).unwrap();
+    assert_eq!(a.page_info(), b.page_info());
+    assert_eq!(serde_json::to_value(&a.cells).unwrap(), serde_json::to_value(&b.cells).unwrap());
+    assert_eq!(serde_json::to_value(a.fonts()).unwrap(), serde_json::to_value(b.fonts()).unwrap());
+    assert!(!a.diagnostics().iter().any(|d| d.message.contains("invalid color")));
+    for format in [PageFormat::Svg, PageFormat::Png { dpi: 96.0 }] {
+        let bytes = |window: &hanji_preview::xlsx::Window| match window.render(format).unwrap().data {
+            PageData::Svg(s) => s.into_bytes(),
+            PageData::Png(png) => png,
+        };
+        assert_eq!(bytes(&a), bytes(&b));
+        assert_eq!(bytes(&a), bytes(&a));
+    }
+    assert_eq!(a.html("owned"), b.html("owned"));
+    assert_eq!(input, original);
+}
+
+#[test]
+fn worksheet_rgb_tints_preserve_hue_and_cover_luminance_endpoints() {
+    for (base, tint, expected) in [
+        ("FFFF0000", "-0.5", "FF800000"),
+        ("FFFF0000", "0.5", "FFFF8080"),
+        ("FF008000", "0.5", "FF40FF40"),
+        ("FF808080", "0.5", "FFC0C0C0"),
+        ("FF123456", "0", "FF123456"),
+        ("FF123456", "-1", "FF000000"),
+        ("FF123456", "1", "FFFFFFFF"),
+        ("FF000000", "0.5", "FF808080"),
+        ("FFFFFFFF", "-0.5", "FF808080"),
+    ] {
+        let tinted = fixture::STYLES.replace("rgb=\"FF123456\"", &format!("rgb=\"{base}\" tint=\"{tint}\""));
+        let explicit = fixture::STYLES.replace("FF123456", expected);
+        let render = |styles: &str| {
+            let mut book = open_xlsx(&fixture::build(fixture::GRID, "", styles, &[]), XlsxOptions::default()).unwrap();
+            let window = book.render_window_with_fonts(0, "A1:C5", &FontOptions::default()).unwrap();
+            let PageData::Svg(svg) = window.render(PageFormat::Svg).unwrap().data else { panic!() };
+            svg
+        };
+        assert!(render(&tinted) == render(&explicit), "{base} tint={tint} must match {expected}");
+    }
+}
+
+#[test]
+fn unavailable_and_invalid_worksheet_colors_keep_diagnostics_and_defaults() {
+    let explicit = fixture::STYLES.replace("FF123456", "FF000000");
+    let mut control = open_xlsx(&fixture::build(fixture::GRID, "", &explicit, &[]), XlsxOptions::default()).unwrap();
+    let control = control.render_window_with_fonts(0, "A1:C5", &FontOptions::default()).unwrap();
+    let PageData::Svg(default_svg) = control.render(PageFormat::Svg).unwrap().data else { panic!() };
+    for color in [
+        "theme=\"12\"",
+        "theme=\"-1\"",
+        "theme=\"NaN\"",
+        "theme=\"6\"",
+        "indexed=\"64\"",
+        "rgb=\"GG123456\"",
+        "rgb=\"12345\"",
+        "rgb=\"00000Z\"",
+        "theme=\"4\" tint=\"NaN\"",
+        "theme=\"4\" tint=\"inf\"",
+        "theme=\"4\" tint=\"-inf\"",
+        "theme=\"4\" tint=\"1.00001\"",
+        "theme=\"4\" tint=\"-1.00001\"",
+        "theme=\"4\" tint=\"text\"",
+        "rgb=\"FF123456\" tint=\"NaN\"",
+    ] {
+        let styles = fixture::STYLES.replace("rgb=\"FF123456\"", color);
+        let mut book =
+            open_xlsx(&themed_book(&styles, WORKSHEET_THEME, "../custom/colors.xml", false), XlsxOptions::default())
+                .unwrap();
+        let window = book.render_window_with_fonts(0, "A1:C5", &FontOptions::default()).unwrap();
+        assert!(window.diagnostics().iter().any(|d| d.message.contains("invalid color")), "{color}");
+        let PageData::Svg(svg) = window.render(PageFormat::Svg).unwrap().data else { panic!() };
+        assert!(svg == default_svg, "{color} must retain the complete default-color control output");
+    }
+    let styles = fixture::STYLES.replace("rgb=\"FF123456\"", "theme=\"4\"");
+    for (theme, target, external) in [
+        (WORKSHEET_THEME, "https://invalid.example/colors.xml", true),
+        (WORKSHEET_THEME, "../custom/missing.xml", false),
+        ("malformed XML", "../custom/colors.xml", false),
+        ("<theme/>", "../custom/colors.xml", false),
+    ] {
+        let mut book = open_xlsx(&themed_book(&styles, theme, target, external), XlsxOptions::default()).unwrap();
+        let window = book.render_window_with_fonts(0, "A1:C5", &FontOptions::default()).unwrap();
+        assert!(window.diagnostics().iter().any(|d| d.message.contains("invalid color")));
+        if external {
+            assert!(window.diagnostics().iter().any(|d| d.message.contains("external relationships")));
+        }
+    }
+    for invalid in [
+        "<d:srgbClr val=\"GG0000\"/>",
+        "<d:srgbClr val=\"FFFF0000\"/>",
+        "<d:sysClr val=\"windowText\"/>",
+        "<d:srgbClr val=\"FF0000\"><d:tint val=\"50000\"/></d:srgbClr>",
+    ] {
+        let theme = WORKSHEET_THEME.replace("<d:srgbClr val=\"FF0000\"/>", invalid);
+        let mut book =
+            open_xlsx(&themed_book(&styles, &theme, "../custom/colors.xml", false), XlsxOptions::default()).unwrap();
+        let window = book.render_window_with_fonts(0, "A1:C5", &FontOptions::default()).unwrap();
+        assert!(window.diagnostics().iter().any(|d| d.message.contains("invalid color")), "{invalid}");
+    }
+}

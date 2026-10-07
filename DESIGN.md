@@ -92,7 +92,7 @@ WordprocessingML; reflowable), **Presentation** (deck), **Spreadsheet**
   Presentation using a Document as a source.
 - Not an Office editor, not a pixel-perfect renderer, not a macro runtime.
 - Conversion *within* a type (docx ↔ hwpx) is allowed, with a loss report for
-  whatever the remainder cannot carry across.
+  whatever the remainder cannot carry across (§5.5).
 
 ## 4. Architecture — the model is the truth, the remainder keeps the rest
 
@@ -967,6 +967,81 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
 - Formula results are computed by an engine before export (§7), so viewers
   that do not recalculate do not show 0.
 
+### 5.5 A Document in its other format
+
+*Built 2026-10-05, for Sinteric (SIN-177).* `hanji export DOC PATH --format
+hwpx` (or `docx`) writes a Document in the other home format; the store's
+`ExportOptions.format` and `Exported.conversion` are the same in the library.
+The stored document is not touched: no revision is made and nothing is
+stored. The path's extension must be the target's.
+
+- **What crosses is the text.** The remainder is anchored to the source
+  package (§4), so it does not move. The revision's text is parsed with the
+  source file's names, rewritten into a text the target accepts, and written
+  into the *target's blank package* as a whole-file rewrite (design C), then
+  exported by the target's engine. Every refusal the target has therefore
+  stays its own, and the converted file is an ordinary file of that format
+  (its text is what the export reads back, PutGet). No template carries over;
+  the target starts from its blank (docx: A4 with the Word styles; hwpx:
+  Hancom's defaults, 바탕글 and 개요 1–6).
+- **Across types: refused** (§3: `unsupported`, saying which formats the
+  type has), as is `tracked_changes` with another format (there is no file to
+  track the edits in).
+- **The report in JSON** (`--json`, or `Exported.conversion`; an empty list is
+  left out): `from`, `to`; `placeholder_kinds` (kind → count) and
+  `placeholders` (`id`, `kind`, `summary`, `location`: a line of the source
+  revision's text); `properties` (`property` as `key=value`, `reason`, `count`,
+  `at`: the first lines); `styles` (`name`, `fate`: `replaced` or `created`,
+  `target`, `detail`); `resolved_colours` (`from`, `to`, `count`);
+  `not_carried` (`what`, `count`, `parts`). `Conversion::is_lossless` is true
+  when nothing was dropped or replaced.
+- **Nothing is dropped without a line in the report** (`Conversion`; a
+  people-readable text for the CLI):
+  - *placeholders* — each `<keep/>`, with its kind, summary (a footnote's
+    text, a tracked insertion's words, a field's result) and source line.
+    The kinds are counted. A converted file has none.
+  - *properties the target cannot write* — each, with the target's own
+    reason and the lines where it was: a gradient or pattern fill (shown
+    only), an hwpx's table style and `table-align`/`table-indent`, a colour
+    with no form in the target. Grouped, with counts.
+  - *styles* — the target's default style, its Heading 1–6 and any style of
+    the same name (case aside) keep **the target's own definition**; the
+    report names each with the values the source style set that the target's
+    has differently (`size 16pt → 10pt`). A style the target lacks is
+    written as a new one with its line as the source had it, as a model
+    would create it, and only when a paragraph uses it. *Why the target's
+    wins:* the style section of the blank accepts a change to a style only
+    after a paragraph shows it, and the text of a converted file is the
+    target's to keep consistent; carrying the values over is a second pass
+    (use, then change the line) and is left as a decision (§10).
+  - *theme colours* are **resolved to `#RRGGBB`** from the source theme
+    (docx: `word/theme`, through `w:clrSchemeMapping`; Office's lighter and
+    darker percents applied to the luminance) and listed, so they are not
+    lost where the target has no themes. The percents the text holds are
+    whole, so a value can differ from Word's own precomputed one by 2 in a
+    channel (`tx2+90%`: D4E4FF, Word D2E3FF). Opacity, and a theme colour
+    with another transform, are properties the target cannot write.
+  - *what the file held beyond the text*, counted by what it is: paragraph,
+    run, table, row and cell properties the text does not show; bookmarks
+    and comment ranges; tracked-move ranges; hyperlink addresses; section
+    properties (page size, orientation, margins, headers and footers) and
+    section breaks; and the package's headers and footers, pictures, charts
+    and embedded objects, document properties (author, dates), custom XML
+    and building blocks, by part name. The converted file has the target's
+    own blank page.
+- **§8:** nothing hidden leaves, since the file is made from the text alone:
+  comments, tracked changes and author metadata are in the report (as
+  placeholders and as document properties), not in the file, so the export
+  needs no acknowledgement.
+- **Measured (2026-10-05):** the 13 docx and 16 hwpx corpus files convert
+  to the other format and back again, the words of each text the same at each
+  step (placeholders aside; `hanji-store/tests/convert.rs`); the same revision
+  gives the same bytes. Properties dropped in that corpus: a pattern fill ×13
+  (one docx), a gradient fill ×3 (one hwpx), a table position (three docx) and
+  a table style (two of them); theme colours resolved in four docx. Not run:
+  rhwp's re-open of the converted hwpx (`hanji-hwpx/validate`, which fetches
+  rhwp from git), and Word and Hancom opening the files (§9).
+
 ## 6. Fluency — designed for, then measured
 
 What a model (self-report, to be verified) handles well: CommonMark/GFM;
@@ -1628,6 +1703,17 @@ side.
     #31), as round 6's fix round did for U+2007 but not U+F076, and F2s
     could be retried against that. The kit's formatting reader is its own, not the
     engines'.
+11. **A Document in its other format (built 2026-10-05, §5.5)** — decided: the
+    text crosses through the target's blank package, the target's own styles
+    keep their definitions, and every loss is in a report. Open: whether the
+    values of the source's default style and headings should be written onto
+    the target's styles (a second pass: use the style, then change its line),
+    so a converted Word heading keeps its size and colour in Hancom. Not done
+    because it makes the converted file look like the source and unlike the
+    target's own defaults, which a person may not want; the report names the
+    values so either can be chosen. Open too: page setup, headers and footers
+    do not cross (neither engine writes section properties from the text), and
+    the report says so.
 
 ## 11. Blind spots
 

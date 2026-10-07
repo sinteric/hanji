@@ -1,0 +1,11 @@
+[settings]
+# Keep the selected runtimes first even in an already-activated shell.
+activate_aggressive = true
+
+[tools]
+node = "24.21.0"
+pnpm = "10.34.6"
+
+[tasks.install]
+description = "Install the pinned plugin-validation CLIs from the lockfile"
+run = "pnpm install --frozen-lockfile"

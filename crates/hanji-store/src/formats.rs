@@ -3,7 +3,8 @@
 
 use hanji_core::{Block, Capabilities, DocumentModel, Engine, Remainder, TextModel};
 use hanji_docx::DocxEngine;
-use hanji_format::{Diagnostic, Names};
+use hanji_format::vocab::{Border, Fill};
+use hanji_format::{Diagnostic, Key, Names, Value};
 use hanji_hwpx::HwpxEngine;
 use hanji_pptx::{PptxEngine, PptxModel};
 use hanji_xlsx::XlsxEngine;
@@ -128,6 +129,28 @@ impl Format {
             Format::Docx | Format::Hwpx => Some(&DocumentModel),
             Format::Pptx => Some(&PptxModel),
             Format::Xlsx => None,
+        }
+    }
+
+    /// Whether the engine can write `value` for `key` anew, or why not (the
+    /// reason says what to write instead).
+    pub fn writes(self, key: Key, value: &Value) -> Result<(), String> {
+        let colour = match value {
+            Value::Color(c) | Value::Fill(Fill::Color(c)) | Value::Border(Border::Line { color: c, .. }) => Some(c),
+            _ => None,
+        };
+        match self {
+            Format::Docx => {
+                hanji_docx::format::writable(key, value)?;
+                match colour {
+                    Some(c) if c.alpha.is_some() => Err(format!(
+                        "{key}={value}: a Word document has no transparent text or shading colours; write the colour without /NN%"
+                    )),
+                    _ => Ok(()),
+                }
+            }
+            Format::Hwpx => hanji_hwpx::format::writable(key, value),
+            Format::Pptx | Format::Xlsx => Ok(()),
         }
     }
 

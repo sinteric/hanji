@@ -99,8 +99,16 @@ later runs start at once.
    without asking. If export is refused over surfaced items (comments,
    hidden text, tracked deletions, metadata), show them and export again
    with `--acknowledge-surfaced` only once the person agrees. For a Word
-   file a person will review, offer `--tracked-changes`. Keep the revision
-   printed by export for a later re-import.
+   file a person will review, offer `--tracked-changes`. To hand over a
+   Word file as Hancom's (or the reverse), export with `--format hwpx` (or
+   `docx`) to a path with that extension: the text crosses, and the command
+   prints what did not (pictures, fields, comments and tracked changes as
+   `<keep/>` lines, properties and styles the other format has no form for,
+   headers, footers and page setup). Tell the person that list; the
+   document itself is unchanged, and the converted file is another file:
+   open it as a new document to edit it. A deck or workbook has no other
+   format. Keep the revision printed by export for a later re-import (of a
+   file in the document's own format).
 7. If the person edits the exported file in Office or Hancom and wants you to
    continue, run `hanji reimport DOC /abs/edited.docx --base-rev N`, using that
    export's revision, and read again. A newer committed revision causes a

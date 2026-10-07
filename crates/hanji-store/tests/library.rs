@@ -34,7 +34,7 @@ fn one(old: &str, new: &str) -> Vec<TextEdit> {
     vec![TextEdit { old: old.into(), new: new.into() }]
 }
 
-const ACK: ExportOptions = ExportOptions { acknowledge_surfaced: true, tracked_changes: false };
+const ACK: ExportOptions = ExportOptions { acknowledge_surfaced: true, tracked_changes: false, format: None };
 
 /// Export the current revision, open the bytes as a new document, and check
 /// PutGet: the reopened text is the revision's text. Returns the bytes.

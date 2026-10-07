@@ -42,7 +42,7 @@ do not discover host fonts. Native `Options` can load `--font-dir`,
 the output reports actual missing characters when one is unavailable.
 
 PPTX/DOCX share one immutable git source for rdocx 0.15.0 and the rpptx /
-oxml-layout 0.13.0 family. HWPX uses rhwp 0.8.6 from the sinteric fork.
+oxml-layout 0.13.1 family. HWPX uses rhwp 0.8.6 from the sinteric fork.
 `Cargo.toml` records exact revision pins and `Cargo.lock` records the resolved
 source. A crate's version alone does not identify these fork patches.
 
@@ -64,6 +64,16 @@ copy: previews are static, and animations are not played.
 PPTX/DOCX validate font subsets and SVG lowering before output. Their 16 MiB
 subset cache is a performance budget: uncached validated subsets are recreated
 on demand, without refusing pages. HWPX prepares page and whole-viewer subsets.
+DOCX embedded GIFs with a full-canvas first frame are normalized to PNG after
+image, page and document decoded-byte checks. SVG, HTML and PNG draw that same
+static first frame, including binary transparency. Animated GIFs report
+`svg.image-approximation`: animation is not played, and later frames are neither
+decoded nor validated. Only the next frame's metadata is inspected to detect
+animation. Malformed first frames or unreadable next-frame metadata and first
+frames requiring offset/background compositing are omitted with structured
+image-loss diagnostics. Source packages, image positions and text stay intact.
+PPTX GIF admission remains a separate renderer limitation.
+
 A subset failure is a diagnostic; affected text can be missing. The missing
 character list shows at most 100 distinct characters, while
 `missing_glyphs_total` preserves the full distinct-character count. This is a
@@ -76,6 +86,28 @@ Library callers can set budgets explicitly. Budget overruns refuse with a
 reason rather than silently truncating. A window cutting a merged cell is
 refused with the full merge address. These guards protect sparse-sheet and
 raster allocations; removing them does not implement Excel print layout.
+
+XLSX cell indentation is applied for explicit left/right horizontal alignment.
+Each level reserves three space advances in the workbook's Normal style font,
+identified by built-in style ID 0 through `cellStyleXfs`, including its size and
+bold/italic face. This follows the [SpreadsheetML alignment semantics](https://learn.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.alignment).
+Indentation moves the text origin and reduces the wrapping width; it does not
+insert spaces into cell values. Zero indentation and `applyAlignment="0"` retain
+the existing layout. Numeric/date and missing-formula overflow indicators still
+replace the entire visible value when indentation leaves insufficient space.
+Malformed indentation, unresolved Normal font metrics, and indentation for
+general, center or unsupported distributed alignment are diagnosed. Missing
+Normal records use font 0 or the default font with a diagnostic. Reading order,
+bidirectional reordering, rotation, shrink-to-fit and relative indentation remain
+unsupported and diagnosed; explicit left/right indentation does not swap sides
+for RTL text. Existing cell, text, font-metadata and PNG budgets still apply.
+
+Worksheet font, solid-fill and border colors resolve the workbook's internal
+theme relationship, including `srgbClr` and system `lastClr` values. Finite
+SpreadsheetML tints adjust HLS luminance for theme and direct RGB colors.
+Indexed colors, unavailable or malformed themes, theme color transforms and
+invalid tints retain their default-color diagnostics. External themes are not
+fetched. These colors do not add chart, conditional-formatting or print support.
 
 Inspect `fonts`, `warnings` and `diagnostics` before relying on a preview.
 Diagnostics are nonfatal reported approximations, not a completeness guarantee
@@ -99,8 +131,29 @@ candidate renders five. HWPX `28` had seven native reference pages; the current
 candidate renders six. The unavailable source PDFs cannot be rescored locally.
 Those pagination differences prevent a blanket native-fidelity claim.
 
+DOCX `02` and edited DOCX `07` each restore their formerly omitted GIF picture.
+Their five/four pages each retain all three images. Every 96-DPI PNG page exactly
+matches a source-only PNG control decoded independently by macOS ImageIO.
+SVG geometry and all 218/217 positioned text elements match those controls,
+with only encoded image carriers differing. Font reports and embedded font
+bytes remain equal, input hashes are unchanged and shaping diagnostics remain.
+Owned tests cover DOCX packages, first-frame pixels, transparency, malformed
+frames and repeated image/page/document budgets on native, byte-only and WASI.
+These checks do not establish native Word fidelity or general animated-image
+and partial-frame compositing support.
+
+The monthly-budget XLSX `19` window `A1:H23` preserves its dark theme text,
+green accent text and tinted light fills. SVG, 96-DPI PNG and HTML exactly match
+an independent control replacing only style theme/tint colors with explicit RGB.
+All 60 cell records, window dimensions, 80 positioned text elements apart from
+color, font reports and embedded font bytes remain unchanged. Only 34 color
+fallback diagnostics disappear. Other styling, clipping, formula-cache and
+unsupported-feature diagnostics remain. Owned worksheet regressions cover
+relocated/prefixed themes, direct RGB tints, malformed values and external themes.
+These controls do not establish native Excel fidelity.
+
 Observed limitations include missing Symbol/Gothic characters in DOCX `04`,
-OfficeMath/VML diagnostics in DOCX `05`, an unsupported chart placeholder in
+OfficeMath diagnostics in DOCX `05`, an unsupported chart placeholder in
 PPTX `12`, and clipping/missing formula caches in XLSX `18`. PPTX `14`, slide
 6, now draws the 55/30/15 doughnut wedges in three theme colors and shows
 구독, 라이선스 and 서비스 in the chart’s own legend. A real-file regression
@@ -131,6 +184,25 @@ vertical transposition can round the prepared story measure. Both selected
 table bands and all body labels are preserved.
 These checks do not establish native Word fidelity. Existing whole-row
 limits for merged, rotated, anchored, nested or exactly clipped cells remain.
+
+DOCX `05` now renders its `#e00` VML text watermarks through the shared renderer.
+Three-digit RGB expands by duplicating each digit. The unchanged real input
+remains five pages, with SAMPLE on pages one through four and none on page five.
+Its SVG, 96-DPI PNG and HTML exactly match a control changing only the three
+header colors to `#ee0000`. Ordinary text, coordinates and resolved font bytes
+are unchanged, and the OfficeMath and shaping diagnostics remain. An owned
+first/default header regression verifies all three output formats on native,
+byte-only and WASI paths. This does not establish general VML support or native
+Word fidelity.
+
+PPTX `12` retains its default `round2SameRect` rounded corners.
+The renderer accepts finite arcs with both radii zero as
+point no-ops, preserving the remaining curved corners. An owned byte-input
+API regression distinguishes the two curved and two square corners of both
+`round2SameRect` and `round2DiagRect` in PNG.
+Invalid or single-zero-radius arcs and positive-arc budgets retain their
+existing guards. Circular-arrow presets and advanced chart gradients retain
+their reported limitations. This does not establish native PowerPoint fidelity.
 
 The real six-page HWPX footnote document `26` reuses clip IDs across pages
 with different rectangle geometry. The HTML viewer namespaces page IDs and

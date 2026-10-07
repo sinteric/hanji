@@ -695,3 +695,55 @@ fn edits_from_files_and_lists() {
     let g = env.cmd().arg("guide").output().unwrap();
     assert!(String::from_utf8(g.stdout).unwrap().contains("range operations"));
 }
+
+/// A Document in its other format, with the list of what did not cross (§3).
+#[test]
+fn a_document_exported_in_its_other_format_lists_what_did_not_cross() {
+    let env = Env::new("convert");
+    env.ok(&["open", &corpus("prototype/remainder/corpus/korean-report.docx")]);
+    let out = env.path("out.hwpx");
+    let e = env.ok(&["export", "korean-report", &out, "--acknowledge-surfaced", "--format", "hwpx"]);
+    assert_eq!(e["format"], "hwpx");
+    let c = &e["conversion"];
+    assert_eq!((c["from"].as_str(), c["to"].as_str()), (Some("docx"), Some("hwpx")));
+    assert_eq!(c["placeholder_kinds"]["footnote"], 1);
+    assert_eq!(c["placeholders"][0]["kind"], "footnote");
+    assert!(c["placeholders"][0]["summary"].as_str().unwrap().contains("내부 집계 기준"));
+    assert_eq!(c["properties"][0]["property"], "table-align=left table-indent=0pt");
+    assert!(c["properties"][0]["reason"].as_str().unwrap().contains("hwpx has no table position"));
+    let normal = c["styles"].as_array().unwrap().iter().find(|s| s["name"] == "Normal").unwrap();
+    assert_eq!((normal["fate"].as_str(), normal["target"].as_str()), (Some("replaced"), Some("바탕글")));
+    // The file is an hwpx, and its text is the document's.
+    let back = env.ok(&["open", &out]);
+    assert_eq!((back["format"].as_str(), back["doc_type"].as_str()), (Some("hwpx"), Some("document")));
+    let text = env.read(back["doc_id"].as_str().unwrap());
+    assert!(text.contains("# 3분기 영업 보고") && !text.contains("<keep "), "{text}");
+    // People read the list on stdout, after the line that says what was written.
+    let o = env
+        .cmd()
+        .args(["export", "korean-report", &env.path("again.hwpx"), "--acknowledge-surfaced", "--format", "hwpx"])
+        .output()
+        .unwrap();
+    let said = String::from_utf8(o.stdout).unwrap();
+    assert!(said.starts_with("wrote "), "{said}");
+    assert!(said.contains("converted docx → hwpx. Not carried across:"), "{said}");
+    assert!(
+        said.contains("placeholders dropped, 4 (comment ×1, drawing ×1, footnote ×1, tracked-insert ×1)"),
+        "{said}"
+    );
+    // Naming the document's own format is an ordinary export: no list.
+    let e = env.ok(&["export", "korean-report", &env.path("same.docx"), "--acknowledge-surfaced", "--format", "docx"]);
+    assert!(e.get("conversion").is_none(), "{e:#}");
+    // Another type is refused, and so is a file name of another format than the one asked for.
+    let e = env.err(&["export", "korean-report", &env.path("x.pptx"), "--format", "pptx"]);
+    assert_eq!(e["code"], "unsupported");
+    assert!(e["message"].as_str().unwrap().contains("a document is exported as docx or hwpx"), "{e:#}");
+    let e =
+        env.err(&["export", "korean-report", &env.path("wrong.docx"), "--acknowledge-surfaced", "--format", "hwpx"]);
+    assert_eq!(e["code"], "bad_request");
+    assert!(!env.dir.join("wrong.docx").exists(), "nothing is written");
+    env.ok(&["open", &corpus("crates/hanji-pptx/corpus/60810.pptx")]);
+    let e = env.err(&["export", "60810", &env.path("deck.docx"), "--format", "docx"]);
+    assert_eq!(e["code"], "unsupported");
+    assert!(e["message"].as_str().unwrap().contains("a presentation is exported as pptx"), "{e:#}");
+}

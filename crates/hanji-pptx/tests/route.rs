@@ -152,3 +152,78 @@ fn what_cannot_be_rerouted_is_refused() {
     let m = refused(&imp, &[(ELBOW, &ELBOW.replace("s2.1", "s2.9"))]);
     assert!(m.contains("no connection site 9"), "{m}");
 }
+
+/// A small XML fixture exercises both endpoint directions without a corpus file.
+fn synthetic_connector(end: &str) -> hanji_package::xml::Element {
+    hanji_package::xml::fragment(&format!(
+        "<p:cxnSp><p:nvCxnSpPr><p:cNvPr id=\"9\" name=\"Attached\"/><p:cNvCxnSpPr><a:{end}Cxn id=\"2\" idx=\"1\"/></p:cNvCxnSpPr></p:nvCxnSpPr><p:spPr><a:xfrm><a:off x=\"0\" y=\"0\"/><a:ext cx=\"100\" cy=\"100\"/></a:xfrm><a:prstGeom prst=\"line\"/></p:spPr></p:cxnSp>"
+    ))
+}
+
+#[test]
+fn unchanged_attachments_require_an_existing_target_before_preserving_geometry() {
+    use hanji_format::Attach;
+    use hanji_package::xml::fragment;
+    use hanji_pptx::{geom, route};
+
+    for end in ["st", "end"] {
+        let mut connector = synthetic_connector(end);
+        let before = connector.clone();
+        let mut want = geom::ends_of(&geom::own(&connector).unwrap());
+        let attach = Some(Attach { group: false, id: 2, site: 1 });
+        if end == "st" {
+            want.from_at = attach;
+        } else {
+            want.to_at = attach;
+        }
+        let message = route::write(&mut connector, &want, &[], &[], &[], false).unwrap_err();
+        assert!(message.contains("s2.1") && message.contains("no object s2"), "{message}");
+        assert_eq!(connector, before, "missing-target refusal leaves the connector untouched");
+
+        // Existing targets with unevaluated geometry retain their exact stored end.
+        // Checking existence must not force a new site calculation on this path.
+        let target = fragment(
+            "<p:sp><p:nvSpPr><p:cNvPr id=\"2\" name=\"Custom\"/></p:nvSpPr><p:spPr><a:xfrm><a:off x=\"100\" y=\"100\"/><a:ext cx=\"100\" cy=\"100\"/></a:xfrm><a:custGeom/></p:spPr></p:sp>",
+        );
+        assert!(!route::write(&mut connector, &want, &[&target], &[], &[2], false).unwrap());
+        assert_eq!(connector, before);
+        let message = route::write(&mut connector, &want, &[&target], &[2], &[2], false).unwrap_err();
+        assert!(message.contains("custom geometry"), "{message}");
+    }
+}
+
+#[test]
+fn deleting_a_target_requires_removing_or_detaching_its_connector() {
+    let imp = import(&deck("shapes.pptx"));
+    let picture = imp.text.lines().find(|l| l.contains(PIC)).unwrap();
+    let connector = imp.text.lines().find(|l| l.starts_with(ELBOW)).unwrap();
+    let snapshot = imp.remainder.clone();
+    let r = edit_in(&PptxModel, &imp.remainder, &imp.text, picture, "", CAPS).unwrap();
+    let edited_snapshot = r.remainder.clone();
+    let message = match PptxEngine.export(&r.text, &r.remainder) {
+        Err(EngineError::Refused(message)) => message,
+        other => panic!("expected missing-target refusal, got {:?}", other.map(|_| ())),
+    };
+    assert!(message.contains("Elbow Connector 9") && message.contains("no object s2"), "{message}");
+    assert_eq!(r.remainder, edited_snapshot);
+    assert_eq!(imp.remainder, snapshot);
+    // No output package was returned, and the original import remains exportable.
+    PptxEngine.export(&imp.text, &imp.remainder).unwrap();
+
+    let r = edit_in(&PptxModel, &r.remainder, &r.text, connector, "", CAPS).unwrap();
+    let out = PptxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(import(&out).text, canonical(&r.text, &r.remainder), "PutGet");
+    let parts = package::read(&out).unwrap();
+    let slide = slide1(&parts);
+    assert!(!slide.contains("name=\"Picture 1\"") && !slide.contains("name=\"Elbow Connector 9\""));
+
+    // Detach while the target exists, then export/reimport before deleting it.
+    // Same-edit detachment/deletion needs separate original-visibility handling.
+    let (_, detached) = edited(&imp, &[(ELBOW, &ELBOW.replace("s2.1", "300 300"))]);
+    let picture = detached.text.lines().find(|l| l.contains(PIC)).unwrap();
+    let r = edit_in(&PptxModel, &detached.remainder, &detached.text, picture, "", CAPS).unwrap();
+    let out = PptxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(import(&out).text, canonical(&r.text, &r.remainder), "PutGet");
+    let parts = package::read(&out).unwrap();
+    assert!(!object(&slide1(&parts), "Elbow Connector 9").contains("endCxn"));
+}
