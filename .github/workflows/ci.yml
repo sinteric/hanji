@@ -88,29 +88,29 @@ jobs:
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - run: cargo build --locked -p hanji-cli
-      - uses: actions/setup-node@v4
+      - uses: jdx/mise-action@c2a87611a18de5b3828c5652fe268e992400cb5c # v4
         with:
-          node-version: 22
-      # Pinned: a new CLI release that changes the plugin format fails here
-      # only when these are bumped.
-      - run: npm install -g @anthropic-ai/claude-code@2.1.285 @openai/codex@0.159.2
+          version: '2026.9.14'
+      # CLI versions and transitive dependencies are pinned by package.json
+      # and pnpm-lock.yaml, without installing tools globally.
+      - run: mise run install
       - name: Claude Code validates the plugin and the marketplace
         run: |
-          claude plugin validate --strict plugins/hanji
-          claude plugin validate --strict .
+          pnpm exec claude plugin validate --strict plugins/hanji
+          pnpm exec claude plugin validate --strict .
       - name: Claude Code installs it and sees its skill and no MCP server
         run: |
-          claude plugin marketplace add "$PWD"
-          claude plugin install hanji@hanji
-          claude plugin details hanji | tee "$RUNNER_TEMP/details.txt"
+          pnpm exec claude plugin marketplace add "$PWD"
+          pnpm exec claude plugin install hanji@hanji
+          pnpm exec claude plugin details hanji | tee "$RUNNER_TEMP/details.txt"
           grep -E 'Skills \(1\) +office-documents' "$RUNNER_TEMP/details.txt"
           grep -E 'MCP servers \(0\)' "$RUNNER_TEMP/details.txt"
       - name: Codex installs it and sees its skill
         run: |
-          codex plugin marketplace add "$PWD"
-          codex plugin add hanji@hanji
-          codex debug prompt-input hi | grep -q 'hanji:office-documents'
-          if codex mcp get hanji; then exit 1; fi
+          pnpm exec codex plugin marketplace add "$PWD"
+          pnpm exec codex plugin add hanji@hanji
+          pnpm exec codex debug prompt-input hi | grep -q 'hanji:office-documents'
+          if pnpm exec codex mcp get hanji; then exit 1; fi
       - name: the skill's launcher runs the CLI, from the checkout and from each installed copy
         run: |
           launcher=skills/office-documents/scripts/hanji

@@ -1,0 +1,5 @@
+packages: []
+
+allowBuilds:
+  "@anthropic-ai/claude-code@2.1.285": true
+  "@openai/codex@0.159.2": true

@@ -301,3 +301,12 @@ keep their own licences, which each corpus's `SOURCES.md` names.
 Unless you explicitly state otherwise, any contribution you intentionally
 submit for inclusion in the work, as defined in the Apache-2.0 license, is
 dual licensed as above, without any additional terms or conditions.
+
+## Plugin validation tooling
+
+The plugin CI uses the Node.js and pnpm versions in `.mise.toml` and the CLI
+versions in `package.json`. From the repository root, run `mise trust`,
+`mise install`, then `mise run install`. Run the local manifest checks with
+`mise exec -- pnpm exec claude plugin validate --strict plugins/hanji` and
+`mise exec -- pnpm exec claude plugin validate --strict .`. The Rust build
+remains the prerequisite for checks that execute the hanji CLI.
