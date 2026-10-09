@@ -124,6 +124,27 @@ fn joiner_controls_keep_the_authored_face_and_source_text() {
             .any(|d| { d.code == hanji_preview::quality::DiagnosticCode::MissingGlyphs }));
         assert!(preview.diagnostics().iter().any(|d| d.message.contains("complex-script shaping")));
     }
+    // Numeric values are right-aligned and check glyph ink bounds. A trailing
+    // joiner's absent cmap glyph must not turn a fitting value into overflow.
+    let numeric = |text: &str| {
+        let sheet = r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData></worksheet>"#;
+        let styles = format!(
+            r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;{text}&quot;"/></numFmts><fonts count="1"><font><name val="Joiner Test"/><sz val="11"/></font></fonts><cellXfs count="1"><xf fontId="0" numFmtId="164"/></cellXfs></styleSheet>"#
+        );
+        let bytes = fixture::build(sheet, "", &styles, &[]);
+        let mut book = hanji_preview::xlsx::open_xlsx(&bytes, Default::default()).unwrap();
+        book.render_window_with_fonts(0, "A1", &options).unwrap()
+    };
+    let PageData::Png(plain_png) = numeric("AB").render(PageFormat::Png { dpi: 96.0 }).unwrap().data else { panic!() };
+    for text in ["AB\u{200C}", "AB\u{200D}"] {
+        let preview = numeric(text);
+        assert_eq!(preview.cells[0].display, text);
+        assert!(!preview.diagnostics().iter().any(|d| d.message.contains("overflow indicator")));
+        let PageData::Svg(svg) = preview.render(PageFormat::Svg).unwrap().data else { panic!() };
+        assert!(svg.contains(text), "numeric joining controls retain the drawn source text");
+        let PageData::Png(png) = preview.render(PageFormat::Png { dpi: 96.0 }).unwrap().data else { panic!() };
+        assert!(png == plain_png, "a trailing joining control has no ink bounds");
+    }
     // Some format characters have visible glyphs; do not exempt the whole Cf category.
     assert!(!fonts
         .resolve_font_for_text("Joiner Test", Script::Latin, false, false, "A\u{0601}B")

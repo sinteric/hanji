@@ -767,8 +767,11 @@ impl<'a> GridBuilder<'a> {
             clipped |= x < rect.x || x + width > rect.x + rect.width;
             if guarded {
                 let mut pen = x;
-                for (&glyph, &advance) in glyph_ids.iter().zip(&advances) {
-                    if let Some(bounds) = face.glyph_bounding_box(ttf_parser::GlyphId(glyph)) {
+                for (c, (&glyph, &advance)) in text.chars().zip(glyph_ids.iter().zip(&advances)) {
+                    if let Some(bounds) = (!crate::fonts::is_joining_control(c))
+                        .then(|| face.glyph_bounding_box(ttf_parser::GlyphId(glyph)))
+                        .flatten()
+                    {
                         let baseline = top + style.size + i as f64 * line_height;
                         clipped |= pen + f64::from(bounds.x_min) * scale < rect.x
                             || pen + f64::from(bounds.x_max) * scale > rect.x + rect.width
