@@ -682,7 +682,7 @@ impl<'a> GridBuilder<'a> {
     ) -> Result<(), String> {
         self.remaining_text =
             self.remaining_text.checked_sub(text.len()).ok_or("worksheet window exceeds the configured text budget")?;
-        if text.chars().any(|c| matches!(c as u32, 0x0300..=0x036F | 0x0590..=0x10FF | 0x1780..=0x17FF | 0x200E..=0x200F | 0x202A..=0x202E | 0x2066..=0x2069)) {
+        if text.chars().any(|c| matches!(c as u32, 0x0300..=0x036F | 0x0590..=0x10FF | 0x1780..=0x17FF | 0x200C..=0x200F | 0x202A..=0x202E | 0x2066..=0x2069)) {
             self.diagnostics.push(diagnostic(format!("{path}.text"), "complex-script shaping and bidirectional reordering are not performed; scalar-positioned text may differ"));
         }
         if let Some(color) = style.fill {
@@ -730,7 +730,11 @@ impl<'a> GridBuilder<'a> {
         let (mut line, mut glyphs, mut advances, mut width) = (String::new(), vec![], vec![], 0.0);
         for c in text.chars() {
             let glyph = face.glyph_index(c).unwrap_or(ttf_parser::GlyphId(0));
-            let advance = f64::from(face.glyph_hor_advance(glyph).unwrap_or(face.units_per_em() / 2)) * scale;
+            let advance = if crate::fonts::is_joining_control(c) {
+                0.0
+            } else {
+                f64::from(face.glyph_hor_advance(glyph).unwrap_or(face.units_per_em() / 2)) * scale
+            };
             if c == '\n' || (style.wrap && !guarded && width + advance > text_width && !line.is_empty()) {
                 lines.push((std::mem::take(&mut line), std::mem::take(&mut glyphs), std::mem::take(&mut advances)));
                 width = 0.0;

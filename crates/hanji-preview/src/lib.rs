@@ -944,7 +944,7 @@ impl Preview {
                 let Some(info) = self.faces.get(&id) else { continue };
                 // Spaces go into the subsets (a renderer without them draws `.notdef`), not into the counts.
                 per_font.entry(id).or_default().extend(text.chars().filter(|c| !c.is_control()));
-                let drawn: Vec<char> = text.chars().filter(|c| !c.is_whitespace() && !c.is_control()).collect();
+                let drawn: Vec<char> = text.chars().filter(|c| fonts::requires_glyph(*c)).collect();
                 if drawn.is_empty() {
                     continue;
                 }
