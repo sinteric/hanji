@@ -242,13 +242,20 @@ fn private_use(c: char) -> bool {
     matches!(c as u32, 0xE000..=0xF8FF | 0xF0000..=0xFFFFD | 0x100000..=0x10FFFD)
 }
 
+/// Joining controls affect shaping, but need no independent visible cmap glyph.
+/// Keep them in source text and subsets, rather than stripping them from runs.
+pub(crate) fn is_joining_control(c: char) -> bool {
+    matches!(c, '\u{200C}' | '\u{200D}')
+}
+
+pub(crate) fn requires_glyph(c: char) -> bool {
+    !c.is_whitespace() && !c.is_control() && !is_joining_control(c)
+}
+
 pub(crate) fn covers_text(data: &[u8], index: u32, text: &str) -> bool {
     ttf_parser::Face::parse(data, index).is_ok_and(|face| {
         !last_resort(&face)
-            && text
-                .chars()
-                .filter(|c| !c.is_whitespace() && !c.is_control())
-                .all(|c| face.glyph_index(c).is_some_and(|g| g.0 != 0))
+            && text.chars().filter(|c| requires_glyph(*c)).all(|c| face.glyph_index(c).is_some_and(|g| g.0 != 0))
     })
 }
 
@@ -480,7 +487,7 @@ impl FontResolver for Fonts {
         }
         // Preserve the existing Latin coverage fallback before considering
         // other available families. Never rescue one character by dropping
-        // another: every non-control, non-whitespace character must be covered.
+        // another: every character requiring a visible glyph must be covered.
         if script == Script::Latin {
             if let Some(mut font) = self.resolve_font("Arial", script, bold, italic) {
                 if covers_text(&font.font.data, font.font.face_index, text) {

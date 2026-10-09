@@ -75,6 +75,82 @@ fn complete_faces_and_styles_are_preserved_and_unavailable_private_symbols_are_n
         .is_none());
 }
 
+#[test]
+fn joiner_controls_keep_the_authored_face_and_source_text() {
+    let data = named(&hanji_preview::subset::subset(carlito(), 0, &BTreeSet::from(['A', 'B'])).unwrap(), "Joiner Test");
+    let face = ttf_parser::Face::parse(&data, 0).unwrap();
+    for control in ['\u{200C}', '\u{200D}'] {
+        assert!(face.glyph_index(control).is_none(), "the fixture has no standalone joiner glyph");
+    }
+    let options = FontOptions { fonts: vec![FontData::new(data)], ..Default::default() };
+    let fonts = Fonts::from_bytes(&options.fonts, &[], None).unwrap();
+    let render = |text: &str| {
+        let sheet = format!(
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1" t="inlineStr"><is><t>{text}</t></is></c></row></sheetData></worksheet>"#
+        );
+        let styles = fixture::STYLES.replace("Calibri", "Joiner Test");
+        let bytes = fixture::build(&sheet, "", &styles, &[]);
+        let mut book = hanji_preview::xlsx::open_xlsx(&bytes, Default::default()).unwrap();
+        book.render_window_with_fonts(0, "A1", &options).unwrap()
+    };
+    let plain = render("AB");
+    let PageData::Png(plain_png) = plain.render(PageFormat::Png { dpi: 96.0 }).unwrap().data else { panic!() };
+    for text in ["A\u{200C}B", "A\u{200D}B"] {
+        let selected = fonts.resolve_font_for_text("Joiner Test", Script::Latin, false, false, text).unwrap();
+        assert_eq!(selected.family, "Joiner Test", "joining controls must not force a different physical face");
+        assert_eq!(selected.metrics, Metrics::Original);
+        let preview = render(text);
+        assert_eq!(preview.cells[0].display, text);
+        let PageData::Svg(svg) = preview.render(PageFormat::Svg).unwrap().data else { panic!() };
+        let root = hanji_package::xml::parse(svg.as_bytes()).unwrap().root;
+        let mut source = Vec::new();
+        root.walk(&mut |element| {
+            if element.local() == "text" {
+                source.push(element.text_of(&["text", "tspan"]));
+            }
+        });
+        assert!(source.iter().any(|s| s == text), "joining controls remain searchable source text");
+        assert!(preview.html("joiners").contains(text));
+        // Neither A nor B has a joining variant in this font. A joiner is
+        // invisible here, even though its scalar has no standalone cmap glyph.
+        let PageData::Png(png) = preview.render(PageFormat::Png { dpi: 96.0 }).unwrap().data else { panic!() };
+        assert!(png == plain_png, "joining controls must not paint an independent glyph");
+        assert!(preview.fonts().drawn_as_requested.iter().any(|f| f.requested == "Joiner Test" && f.chars == 2));
+        assert_eq!(preview.fonts().missing_glyphs_total, 0, "{text:?}");
+        assert!(!preview
+            .quality()
+            .diagnostics
+            .iter()
+            .any(|d| { d.code == hanji_preview::quality::DiagnosticCode::MissingGlyphs }));
+        assert!(preview.diagnostics().iter().any(|d| d.message.contains("complex-script shaping")));
+    }
+    // Numeric values are right-aligned and check glyph ink bounds. A trailing
+    // joiner's absent cmap glyph must not turn a fitting value into overflow.
+    let numeric = |text: &str| {
+        let sheet = r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData></worksheet>"#;
+        let styles = format!(
+            r#"<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><numFmts count="1"><numFmt numFmtId="164" formatCode="&quot;{text}&quot;"/></numFmts><fonts count="1"><font><name val="Joiner Test"/><sz val="11"/></font></fonts><cellXfs count="1"><xf fontId="0" numFmtId="164"/></cellXfs></styleSheet>"#
+        );
+        let bytes = fixture::build(sheet, "", &styles, &[]);
+        let mut book = hanji_preview::xlsx::open_xlsx(&bytes, Default::default()).unwrap();
+        book.render_window_with_fonts(0, "A1", &options).unwrap()
+    };
+    let PageData::Png(plain_png) = numeric("AB").render(PageFormat::Png { dpi: 96.0 }).unwrap().data else { panic!() };
+    for text in ["AB\u{200C}", "AB\u{200D}"] {
+        let preview = numeric(text);
+        assert_eq!(preview.cells[0].display, text);
+        assert!(!preview.diagnostics().iter().any(|d| d.message.contains("overflow indicator")));
+        let PageData::Svg(svg) = preview.render(PageFormat::Svg).unwrap().data else { panic!() };
+        assert!(svg.contains(text), "numeric joining controls retain the drawn source text");
+        let PageData::Png(png) = preview.render(PageFormat::Png { dpi: 96.0 }).unwrap().data else { panic!() };
+        assert!(png == plain_png, "a trailing joining control has no ink bounds");
+    }
+    // Some format characters have visible glyphs; do not exempt the whole Cf category.
+    assert!(!fonts
+        .resolve_font_for_text("Joiner Test", Script::Latin, false, false, "A\u{0601}B")
+        .is_some_and(|font| font.family == "Joiner Test"));
+}
+
 fn generic_metadata_double() -> Vec<u8> {
     let mut data = named(carlito(), "Generic Metadata Double");
     let face = ttf_parser::RawFace::parse(&data, 0).unwrap();
