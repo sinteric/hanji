@@ -304,6 +304,11 @@ dual licensed as above, without any additional terms or conditions.
 
 ## Plugin validation tooling
 
+Rust development and CI use the compiler pinned in `.mise.toml` and
+`rust-toolchain.toml`; direct Cargo commands also select its formatting, lint
+and WebAssembly components. This development pin is independent of the
+`rust-version` declaration in `Cargo.toml`.
+
 The plugin CI uses the Node.js and pnpm versions in `.mise.toml` and the CLI
 versions in `package.json`. From the repository root, run `mise trust`,
 `mise install`, then `mise run install`. Run the local manifest checks with
