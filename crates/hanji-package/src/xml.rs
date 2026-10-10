@@ -131,14 +131,16 @@ impl Element {
         });
         out
     }
-    /// Concatenated decoded text of `w:t`-like descendants.
+    /// Concatenated decoded text of `w:t`-like descendants, including literal CDATA.
     pub fn text_of(&self, names: &[&str]) -> String {
         let mut s = String::new();
         self.walk(&mut |e| {
             if names.contains(&e.name.as_str()) {
                 for n in &e.children {
-                    if let Node::Text(t) = n {
-                        s.push_str(&unescape(t));
+                    match n {
+                        Node::Text(t) => s.push_str(&unescape(t)),
+                        Node::CData(t) => s.push_str(t),
+                        _ => {}
                     }
                 }
             }
@@ -511,6 +513,14 @@ mod tests {
         let out = String::from_utf8(write_doc(&d)).unwrap();
         assert_eq!(out, src.replace("a='x\"y'", "a=\"x&quot;y\""));
         assert_eq!(d.root.child("w:t").unwrap().text_of(&["w:t"]), " a & b A");
+    }
+
+    #[test]
+    fn text_of_preserves_cdata_and_decodes_only_ordinary_text() {
+        let src = r#"<w:p xmlns:w="urn:w"><w:t>앞&amp;<![CDATA[한글 😀 <&amp;>]]>&#x41;<!--ignored--><?ignored data?><![CDATA[]]></w:t><w:other>skip</w:other><w:r><w:t>끝</w:t></w:r></w:p>"#;
+        let d = parse(src.as_bytes()).unwrap();
+        assert_eq!(d.root.text_of(&["w:t"]), "앞&한글 😀 <&amp;>A끝");
+        assert_eq!(write_doc(&d), src.as_bytes());
     }
 
     #[test]
