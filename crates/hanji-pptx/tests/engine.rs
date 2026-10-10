@@ -76,6 +76,41 @@ fn slide_span(text: &str, k: usize) -> (usize, usize) {
 }
 
 #[test]
+fn cdata_text_survives_import_noop_export_and_edits() {
+    use hanji_package::xml::{self, Node};
+    let mut parts = package::read(&deck("korean-deck.pptx")).unwrap();
+    let first = slides(&parts)[0].clone();
+    let slide = parts.iter_mut().find(|p| p.name == first).unwrap();
+    let mut doc = xml::parse(&slide.data).unwrap();
+    let mut replaced = false;
+    doc.root.walk_mut(&mut |e| {
+        if !replaced && e.name == "a:t" {
+            e.children =
+                vec![Node::Text("앞&amp;".into()), Node::CData("한글 😀 &amp;".into()), Node::Text("&#x41;".into())];
+            replaced = true;
+        }
+    });
+    assert!(replaced);
+    slide.data = xml::write_doc(&doc);
+    let source = package::write(&parts).unwrap();
+    let imp = import(&source);
+    assert!(imp.text.contains("앞&한글 😀 &amp;A"), "{}", imp.text);
+
+    let unchanged = export(&imp.text, &imp.remainder);
+    assert_eq!(
+        xml::canon_part(package::get(&parts, &first).unwrap()).unwrap(),
+        xml::canon_part(package::get(&unchanged, &first).unwrap()).unwrap()
+    );
+    let r = edit_in(&PptxModel, &imp.remainder, &imp.text, "한글 😀", "바뀐 😀", CAPS).unwrap();
+    assert!(r.report.refused.is_empty(), "{:?}", r.report);
+    let out = export(&r.text, &r.remainder);
+    let doc = xml::parse(package::get(&out, &first).unwrap()).unwrap();
+    let text = doc.root.text_of(&["a:t"]);
+    assert!(text.contains("앞&바뀐 😀 &amp;A"), "{text}");
+    assert!(!text.contains("한글 😀"), "{text}");
+}
+
+#[test]
 fn a_title_edit_keeps_the_run_formatting_and_everything_else() {
     let pkg = deck("korean-deck.pptx");
     let imp = import(&pkg);

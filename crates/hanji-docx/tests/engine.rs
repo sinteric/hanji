@@ -40,6 +40,38 @@ fn p(text: &str) -> String {
     format!("<w:p><w:r><w:t xml:space=\"preserve\">{text}</w:t></w:r></w:p>")
 }
 
+#[test]
+fn cdata_text_survives_import_noop_export_and_edits() {
+    use hanji_package::xml;
+    let source = docx(&p("앞&amp;<![CDATA[한글 😀 &amp;]]>&#x41;"), vec![]);
+    let imp = DocxEngine.import(&source, &ImportOptions::default()).unwrap();
+    assert!(imp.text.contains("앞&한글 😀 &amp;A"), "{}", imp.text);
+
+    let unchanged = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    let before = package::read(&source).unwrap();
+    let after = package::read(&unchanged).unwrap();
+    assert_eq!(
+        xml::canon_part(package::get(&before, "word/document.xml").unwrap()).unwrap(),
+        xml::canon_part(package::get(&after, "word/document.xml").unwrap()).unwrap()
+    );
+    assert_eq!(DocxEngine.import(&unchanged, &ImportOptions::default()).unwrap().text, imp.text);
+
+    let r = edit(&imp.remainder, &imp.text, "한글 😀", "바뀐 😀", CAPS).unwrap();
+    assert!(r.report.refused.is_empty(), "{:?}", r.report);
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    let parts = package::read(&out).unwrap();
+    let doc = xml::parse(package::get(&parts, "word/document.xml").unwrap()).unwrap();
+    assert_eq!(doc.root.text_of(&["w:t"]), "앞&바뀐 😀 &amp;A");
+    assert_eq!(DocxEngine.import(&out, &ImportOptions::default()).unwrap().text, r.text);
+}
+
+#[test]
+fn hidden_cdata_text_is_in_the_surface_report() {
+    let source = docx("<w:p><w:r><w:rPr><w:vanish/></w:rPr><w:t><![CDATA[숨김 &amp;]]></w:t></w:r></w:p>", vec![]);
+    let imp = DocxEngine.import(&source, &ImportOptions::default()).unwrap();
+    assert!(imp.report.surface.iter().any(|n| n.kind == "hidden-text" && n.detail.contains("숨김 &amp;")));
+}
+
 fn docx_without_styles() -> Vec<u8> {
     let mut parts = package::read(&docx(&p("hello"), vec![])).unwrap();
     parts.retain(|p| p.name != "word/styles.xml");
