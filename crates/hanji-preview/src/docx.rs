@@ -102,11 +102,7 @@ fn requested_fonts(bytes: &[u8]) -> Result<RequestedFonts, String> {
                         == Some("Symbol");
             }
             if element.local() == "t" {
-                for node in &element.children {
-                    if let xml::Node::Text(value) = node {
-                        chars.extend(xml::unescape(value).chars());
-                    }
-                }
+                chars.extend(element.text_of(&[&element.name]).chars());
             } else if element.local() == "lvlText" {
                 if let Some(value) = attr(element, "val") {
                     chars.extend(value.chars());
@@ -116,11 +112,7 @@ fn requested_fonts(bytes: &[u8]) -> Result<RequestedFonts, String> {
                 let mut text = String::new();
                 element.walk(&mut |child| {
                     if child.local() == "t" {
-                        for node in &child.children {
-                            if let xml::Node::Text(value) = node {
-                                text.push_str(&xml::unescape(value));
-                            }
-                        }
+                        text.push_str(&child.text_of(&[&child.name]));
                     }
                 });
                 has_hangul |= text.chars().any(crate::fonts::is_hangul);
@@ -343,6 +335,57 @@ fn render(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn font_discovery_package(text_xml: &str) -> Vec<u8> {
+        // Use a nonstandard prefix so discovery keeps matching local names.
+        let document = format!(
+            r#"<x:document xmlns:x="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><x:body><x:p><x:r><x:rPr><x:rFonts x:eastAsia="Run East Asian"/></x:rPr>{text_xml}</x:r></x:p></x:body></x:document>"#
+        );
+        let styles = r#"<x:styles xmlns:x="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><x:docDefaults><x:rPrDefault><x:rPr><x:rFonts x:eastAsia="Inherited East Asian"/></x:rPr></x:rPrDefault></x:docDefaults></x:styles>"#;
+        let parts = [("word/document.xml", document.as_bytes()), ("word/styles.xml", styles.as_bytes())]
+            .into_iter()
+            .map(|(name, data)| hanji_core::Part {
+                name: name.into(),
+                data: data.into(),
+                dos_time: 0,
+                external_attr: 0,
+                deflate: false,
+            })
+            .collect::<Vec<_>>();
+        package::write(&parts).unwrap()
+    }
+
+    #[test]
+    fn cdata_only_hangul_requests_run_and_inherited_hangul_fonts() {
+        let bytes = font_discovery_package("<x:t><![CDATA[한글]]></x:t>");
+        let original = bytes.clone();
+        let requested = requested_fonts(&bytes).unwrap();
+        assert_eq!(requested.chars, "한글".chars().collect());
+        assert_eq!(requested.families.get("Run East Asian"), Some(&Script::Hangul));
+        assert_eq!(requested.families.get("Inherited East Asian"), Some(&Script::Hangul));
+        assert_eq!(bytes, original);
+    }
+
+    #[test]
+    fn mixed_text_and_cdata_contribute_coverage_and_run_script() {
+        let bytes = font_discovery_package(
+            "<x:t>日&amp;<![CDATA[한😀]]>&#x41;<!--ignored--><?ignored data?><![CDATA[]]></x:t><x:t><![CDATA[글]]>끝</x:t>",
+        );
+        let requested = requested_fonts(&bytes).unwrap();
+        assert_eq!(requested.chars, "日&한😀A글끝".chars().collect());
+        assert_eq!(requested.families.get("Run East Asian"), Some(&Script::Hangul));
+        assert_eq!(requested.families.get("Inherited East Asian"), Some(&Script::Hangul));
+    }
+
+    #[test]
+    fn cdata_entity_spelling_stays_literal_for_coverage_and_script() {
+        let bytes = font_discovery_package("<x:t><![CDATA[&amp; &#xAC00; &#65; <tag>]]>&amp;&#66;</x:t>");
+        let requested = requested_fonts(&bytes).unwrap();
+        assert_eq!(requested.chars, "&amp; &#xAC00; &#65; <tag>&B".chars().collect());
+        assert!(!requested.chars.contains(&'가'));
+        assert_eq!(requested.families.get("Run East Asian"), Some(&Script::Cjk));
+        assert_eq!(requested.families.get("Inherited East Asian"), Some(&Script::Cjk));
+    }
 
     #[test]
     fn japanese_runs_do_not_request_a_hangul_font() {

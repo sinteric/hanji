@@ -74,6 +74,17 @@ frames requiring offset/background compositing are omitted with structured
 image-loss diagnostics. Source packages, image positions and text stay intact.
 PPTX GIF admission remains a separate renderer limitation.
 
+DOCX font discovery includes ordinary text and literal CDATA in `w:t` for
+source glyph coverage and run-script selection. Ordinary XML entities are
+decoded once. Entity spellings inside CDATA stay literal, and discovery leaves
+the source package unchanged. This does not fix the renderer's separate text
+parser: the pinned rdocx `CT_R` uses `read_text` plus `decode_escaped`, retaining
+CDATA delimiters and decoding entity spellings inside them. For example,
+`<![CDATA[&amp; &#xAC00;]]>` is parsed as `<![CDATA[& 가]]>` instead of the
+literal `&amp; &#xAC00;`. The same parser gap remains in the S90 fork main
+(`fe904c464201629384e52ebe103312ddbd60a9d3`). Font discovery tests do not
+establish correct end-to-end CDATA rendering, and the renderer pin is unchanged.
+
 A subset failure is a diagnostic; affected text can be missing. The missing
 character list shows at most 100 distinct characters, while
 `missing_glyphs_total` preserves the full distinct-character count. This is a
