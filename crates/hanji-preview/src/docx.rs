@@ -388,6 +388,64 @@ mod tests {
     }
 
     #[test]
+    fn cdata_preview_matches_equivalent_escaped_text() {
+        fn document_bytes(text: &str) -> Vec<u8> {
+            let mut parts =
+                package::read(include_bytes!("../../../prototype/preview/baseline/08-docx-new-report-en.docx"))
+                    .unwrap();
+            let xml = format!(
+                r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t xml:space="preserve">{text}</w:t></w:r></w:p></w:body></w:document>"#
+            );
+            parts.iter_mut().find(|part| part.name == "word/document.xml").unwrap().data = xml.into_bytes();
+            package::write(&parts).unwrap()
+        }
+
+        for (payload, escaped, expected) in [
+            ("<![CDATA[한글]]>", "한글", "한글"),
+            ("日&amp;<![CDATA[한😀]]>&#x41;", "日&amp;한😀A", "日&한😀A"),
+            (
+                "<![CDATA[&amp; &#xAC00; &#65; <tag>]]>",
+                "&amp;amp; &amp;#xAC00; &amp;#65; &lt;tag&gt;",
+                "&amp; &#xAC00; &#65; <tag>",
+            ),
+            ("\u{feff}text", "&#xFEFF;text", "\u{feff}text"),
+            ("<![CDATA[\u{feff}text]]>", "&#xFEFF;text", "\u{feff}text"),
+            ("<![CDATA[]]>\u{feff}text", "&#xFEFF;text", "\u{feff}text"),
+            ("&lt;![CDATA[&amp;amp;]]&gt;", "&lt;![CDATA[&amp;amp;]]&gt;", "<![CDATA[&amp;]]>"),
+            ("<![CDATA[]]>ordinary &amp; text", "ordinary &amp; text", "ordinary & text"),
+        ] {
+            let bytes = document_bytes(payload);
+            let original = bytes.clone();
+            let parsed = rdocx::Document::from_bytes(&bytes).unwrap();
+            assert_eq!(parsed.paragraphs()[0].text(), expected, "{payload:?}");
+            let options = FontOptions::default();
+            let preview = render_with_fonts(&bytes, &options).unwrap();
+            let control = render_with_fonts(&document_bytes(escaped), &options).unwrap();
+            assert_eq!(preview.page_count(), control.page_count());
+            assert_eq!(preview.fonts.missing_glyphs_total, control.fonts.missing_glyphs_total);
+            assert_eq!(serde_json::to_value(&preview.fonts).unwrap(), serde_json::to_value(&control.fonts).unwrap());
+            assert_eq!(preview.html("CDATA control"), control.html("CDATA control"));
+            for page in 0..preview.page_count() {
+                for format in [crate::PageFormat::Svg, crate::PageFormat::Png { dpi: 72.0 }] {
+                    let output = preview.render_page(page, format).unwrap();
+                    let expected_output = control.render_page(page, format).unwrap();
+                    match (output.data, expected_output.data) {
+                        (crate::PageData::Svg(actual), crate::PageData::Svg(expected)) => {
+                            assert_eq!(actual, expected, "{payload:?}");
+                        }
+                        (crate::PageData::Png(actual), crate::PageData::Png(expected)) => {
+                            assert_eq!(actual, expected, "{payload:?}");
+                        }
+                        _ => panic!("control returned a different output format"),
+                    }
+                }
+            }
+            assert_eq!(bytes, original);
+            assert_eq!(package::read(&bytes).unwrap(), package::read(&original).unwrap());
+        }
+    }
+
+    #[test]
     fn japanese_runs_do_not_request_a_hangul_font() {
         let bytes = include_bytes!("../../../prototype/preview/baseline/04-docx-untouched-testword-various.docx");
         let requested = requested_fonts(bytes).unwrap().families;

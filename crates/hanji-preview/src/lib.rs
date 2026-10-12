@@ -1781,6 +1781,7 @@ mod tests {
             field_kind: run.field_kind,
             field_source: run.field_source,
             note: run.note,
+            note_reference_source: run.note_reference_source,
         };
         assert!(rich.is_valid());
         let mut children =

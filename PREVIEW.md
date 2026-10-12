@@ -41,8 +41,11 @@ do not discover host fonts. Native `Options` can load `--font-dir`,
 `HANJI_FONT_DIR` and installed fonts. Korean text needs an appropriate font;
 the output reports actual missing characters when one is unavailable.
 
-PPTX/DOCX share one immutable git source for rdocx 0.15.0 and the rpptx /
-oxml-layout 0.13.1 family. HWPX uses rhwp 0.8.6 from the sinteric fork.
+PPTX/DOCX share one immutable git source for rdocx 0.16.0 and the rpptx /
+oxml-layout 0.14.0 family. The pinned `061fd745295e6f417945d6bd8500a35b5041830a`
+includes S90's field, note and table-layout changes alongside the literal CDATA
+parser correction. This is a renderer-family update, not an isolated syntax
+patch. HWPX uses rhwp 0.8.6 from the sinteric fork.
 `Cargo.toml` records exact revision pins and `Cargo.lock` records the resolved
 source. A crate's version alone does not identify these fork patches.
 
@@ -77,13 +80,14 @@ PPTX GIF admission remains a separate renderer limitation.
 DOCX font discovery includes ordinary text and literal CDATA in `w:t` for
 source glyph coverage and run-script selection. Ordinary XML entities are
 decoded once. Entity spellings inside CDATA stay literal, and discovery leaves
-the source package unchanged. This does not fix the renderer's separate text
-parser: the pinned rdocx `CT_R` uses `read_text` plus `decode_escaped`, retaining
-CDATA delimiters and decoding entity spellings inside them. For example,
-`<![CDATA[&amp; &#xAC00;]]>` is parsed as `<![CDATA[& 가]]>` instead of the
-literal `&amp; &#xAC00;`. The same parser gap remains in the S90 fork main
-(`fe904c464201629384e52ebe103312ddbd60a9d3`). Font discovery tests do not
-establish correct end-to-end CDATA rendering, and the renderer pin is unchanged.
+the source package unchanged. The pinned rdocx run parser now uses XML events
+to preserve the same character-data semantics. For example,
+`<![CDATA[&amp; &#xAC00;]]>` remains the literal `&amp; &#xAC00;`, without CDATA
+delimiters or another entity-decoding pass. A leading U+FEFF remains element
+content. A byte-only library regression compares parsed text, page and font
+reports, SVG, PNG and HTML against equivalent escaped-text controls while
+keeping input bytes intact. These checks do not establish native Word fidelity
+or browser/Flutter integration.
 
 A subset failure is a diagnostic; affected text can be missing. The missing
 character list shows at most 100 distinct characters, while
