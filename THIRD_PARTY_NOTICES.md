@@ -127,7 +127,7 @@ copy above retains its original provenance independently of these pins.
 
 ## Fonts compiled into the binaries
 
-The `hanji` binary contains the fonts oxml-layout 0.13.0
+The `hanji` binary contains the fonts oxml-layout 0.14.0
 bundles (`fonts/` in the crate), which the preview draws with when nothing
 better is installed, and of which it embeds subsets in its SVG and HTML
 output:
