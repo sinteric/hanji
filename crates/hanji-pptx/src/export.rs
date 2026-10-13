@@ -538,7 +538,10 @@ impl<'a> Exporter<'a> {
         // Connectors (§5.3): an attached end goes where its object's site now is.
         if !attached.is_empty() {
             let moved_ids: Vec<u32> = moved.iter().map(|m| m.0).collect();
-            let visible = visible_ids(&items, |it| self.head(it));
+            let mut visible = visible_ids(&items, |it| self.head(it));
+            // A target removed in this edit was still shown at import. Its
+            // connector's point must detach it, unlike an unshown attachment.
+            visible.extend(&info.attachment_targets);
             for &n in &attached {
                 let Some(Place::Line(w)) = &self.head(items[n]).place else { continue };
                 let mut e = out_items[n].clone();

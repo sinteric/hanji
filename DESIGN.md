@@ -789,6 +789,11 @@ layout: Two Content
       stored point, so an unchanged connector stays byte-exact.
     - An end written as a point comes loose (its `stCxn`/`endCxn` goes). A
       new line may be drawn attached, `<line from="s4.2" to="s2.1"/>`.
+      This also works when the target is deleted before the same export:
+      the slide remainder retains the target ids shown at import. Hidden
+      attachments to slots or `<keep/>` objects stay as stored. Older
+      serialized remainders without this provenance remain readable; a
+      fresh import supplies it for combined detachment and target deletion.
     - The connector's fingerprint leaves its attachments out. Refused, with
       the connector and the reason named: rerouting a curved or other
       connector, an object whose sites are not known (another preset,

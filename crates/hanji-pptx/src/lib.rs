@@ -406,6 +406,7 @@ impl PptxEngine {
                 sld_id: sld.to_xml(),
                 layout: lpart.clone(),
                 ids: vec![],
+                attachment_targets: vec![],
                 named: vec![],
             };
             let notes = notes_of.get(part).map(|n| {
