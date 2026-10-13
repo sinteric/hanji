@@ -141,8 +141,8 @@ fn set_cxn(cxn: &mut Element, name: &str, at: Option<(u32, u32)>) {
 /// end on its object's site (the stored end kept where neither the
 /// attachment nor the object's box changed); a point as the text writes it.
 /// `items` are the slide's written objects, `moved` the ids whose boxes
-/// changed, `visible` the ids the text shows (an attachment to one the text
-/// does not show stays as it is). Returns whether the connector's box was
+/// changed, `visible` the ids the text shows or showed at import (an attachment
+/// the text never showed stays as it is). Returns whether the connector's box was
 /// written.
 pub fn write(
     cxn: &mut Element,

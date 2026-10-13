@@ -68,6 +68,10 @@ pub struct SlideInfo {
     pub layout: String,
     /// Every shape id (`p:cNvPr id`) the slide had.
     pub ids: Vec<u32>,
+    /// Shape ids whose connector attachments the imported text showed.
+    /// Kept even when an edit deletes the target's remainder entry.
+    #[serde(default)]
+    pub attachment_targets: Vec<u32>,
     /// Every relationship id the slide's XML named (`r:embed`, `r:id`, …):
     /// one the export no longer names goes, with what only it reached.
     #[serde(default)]
@@ -344,10 +348,10 @@ impl Importer<'_> {
                 }
             }
         }
-        show_attachments(&mut self.blocks[bi..], &attached, bi);
+        let attachment_targets = show_attachments(&mut self.blocks[bi..], &attached, bi);
         let fpv = canon(&without_stand_ins(&skel), &self.scope);
         let named = named_rel_ids(root).into_iter().collect();
-        let aux = vec![serde_json::to_string(&SlideInfo { ids, named, ..info }).unwrap()];
+        let aux = vec![serde_json::to_string(&SlideInfo { ids, attachment_targets, named, ..info }).unwrap()];
         let meta = Meta { tag: "slide".into(), aux, part: Some(self.part.clone()), ..Default::default() };
         self.entry(Kind::Slide, vec![skel.to_xml()], fpv, &[bi], None, None, meta);
         if let Some((ni, nroot, bullets)) = notes {
@@ -1088,7 +1092,7 @@ fn summary(el: &Element) -> String {
 /// A connector's end attached to an object the text shows by its id shows
 /// as that object's connection site (§5.3), `s3.2`; one attached to a slot or
 /// an object shown as `<keep/>` shows its point.
-fn show_attachments(blocks: &mut [Block], attached: &[(usize, geom::Attachments)], base: usize) {
+fn show_attachments(blocks: &mut [Block], attached: &[(usize, geom::Attachments)], base: usize) -> Vec<u32> {
     fn ids(items: &[SlideItem], out: &mut Vec<(bool, u32)>) {
         for it in items {
             match it {
@@ -1127,4 +1131,5 @@ fn show_attachments(blocks: &mut [Block], attached: &[(usize, geom::Attachments)
         };
         (e.from_at, e.to_at) = (at(st), at(en));
     }
+    shown.into_iter().map(|(_, id)| id).collect()
 }

@@ -218,7 +218,7 @@ fn deleting_a_target_requires_removing_or_detaching_its_connector() {
     assert!(!slide.contains("name=\"Picture 1\"") && !slide.contains("name=\"Elbow Connector 9\""));
 
     // Detach while the target exists, then export/reimport before deleting it.
-    // Same-edit detachment/deletion needs separate original-visibility handling.
+    // The same-edit variant is covered below.
     let (_, detached) = edited(&imp, &[(ELBOW, &ELBOW.replace("s2.1", "300 300"))]);
     let picture = detached.text.lines().find(|l| l.contains(PIC)).unwrap();
     let r = edit_in(&PptxModel, &detached.remainder, &detached.text, picture, "", CAPS).unwrap();
@@ -226,4 +226,138 @@ fn deleting_a_target_requires_removing_or_detaching_its_connector() {
     assert_eq!(import(&out).text, canonical(&r.text, &r.remainder), "PutGet");
     let parts = package::read(&out).unwrap();
     assert!(!object(&slide1(&parts), "Elbow Connector 9").contains("endCxn"));
+}
+
+#[test]
+fn a_connector_can_be_detached_while_deleting_its_target() {
+    use hanji_format::shown_pt;
+    use hanji_package::xml;
+    use hanji_pptx::geom;
+
+    for (id, target_name) in [(2, "Picture 1"), (4, "TextBox 3")] {
+        for (end, attr) in [("st", "from"), ("end", "to")] {
+            let mut original = package::read(&deck("shapes.pptx")).unwrap();
+            let part = original.iter_mut().find(|p| p.name == "ppt/slides/slide1.xml").unwrap();
+            let source = String::from_utf8(part.data.clone()).unwrap();
+            part.data = source
+                .replace("<a:endCxn id=\"2\" idx=\"1\"/>", &format!("<a:{end}Cxn id=\"{id}\" idx=\"1\"/>"))
+                .into_bytes();
+            let root = xml::parse(&part.data).unwrap().root;
+            let tree = root.child("p:cSld").unwrap().child("p:spTree").unwrap();
+            let connector = tree.elements().find(|e| geom::shape_id(e) == Some(10)).unwrap();
+            let stored = geom::ends_of(&geom::own(connector).unwrap());
+            let point = if end == "st" { stored.from } else { stored.to };
+            let stored_point = format!("{} {}", shown_pt(point.0), shown_pt(point.1));
+            let imp = import(&package::write(&original).unwrap());
+            let target = imp.text.lines().find(|l| l.contains(&format!("name=\"{target_name}\""))).unwrap();
+            let attached = format!("{attr}=\"s{id}.1\"");
+            assert!(imp.text.contains(&attached));
+            let snapshot = imp.remainder.clone();
+
+            for point in [stored_point.as_str(), "300 300"] {
+                let r = edit_in(&PptxModel, &imp.remainder, &imp.text, target, "", CAPS).unwrap();
+                let r = edit_in(&PptxModel, &r.remainder, &r.text, &attached, &format!("{attr}=\"{point}\""), CAPS)
+                    .unwrap();
+                assert!(r.report.refused.is_empty());
+                // Provenance must survive an edit and a serialized-remainder round trip.
+                let rem = serde_json::from_slice(&serde_json::to_vec(&r.remainder).unwrap()).unwrap();
+                let out = PptxEngine.export(&r.text, &rem).unwrap();
+                let back = import(&out);
+                assert_eq!(back.text, canonical(&r.text, &rem), "PutGet");
+                let parts = package::read(&out).unwrap();
+                let slide = slide1(&parts);
+                assert!(!slide.contains(&format!("name=\"{target_name}\"")));
+                let written = xml::parse(slide.as_bytes()).unwrap().root;
+                let written_tree = written.child("p:cSld").unwrap().child("p:spTree").unwrap();
+                let written_connector = written_tree.elements().find(|e| geom::shape_id(e) == Some(10)).unwrap();
+                assert_eq!(geom::attachments(written_connector), [None, None], "dangling attachment");
+                assert!(back.text.contains(&format!("{attr}=\"{point}\"")));
+                if point == stored_point {
+                    assert_eq!(written_connector, &hanji_pptx::route::without_attachments(connector));
+                }
+                for el in tree.elements().filter(|e| !matches!(geom::shape_id(e), Some(n) if n == id || n == 10)) {
+                    assert!(written_tree.elements().any(|e| e == el), "untouched slide object: {}", el.to_xml());
+                }
+                assert_eq!(rem, r.remainder);
+                assert_eq!(imp.remainder, snapshot);
+            }
+        }
+    }
+}
+
+#[test]
+fn attachments_hidden_by_slots_or_keep_objects_stay_byte_exact() {
+    use hanji_package::xml::{self, fragment, Node};
+    use hanji_pptx::geom;
+
+    for (id, slot) in [(2, false), (4, true)] {
+        for end in ["st", "end"] {
+            let mut parts = package::read(&deck("shapes.pptx")).unwrap();
+            if slot {
+                let shell = hanji_pptx::DeckShell::of(&import(&package::write(&parts).unwrap()).remainder).unwrap();
+                let layout = shell.deck.layouts.iter().find(|l| l.slots.iter().any(|s| s.name == "title")).unwrap();
+                let rels = parts.iter_mut().find(|p| p.name == "ppt/slides/_rels/slide1.xml.rels").unwrap();
+                let mut doc = xml::parse(&rels.data).unwrap();
+                for rel in
+                    doc.root.elements_mut().filter(|e| e.get("Type").is_some_and(|t| t.ends_with("/slideLayout")))
+                {
+                    rel.set("Target", &hanji_package::opc::relative_target("ppt/slides/slide1.xml", &layout.part));
+                }
+                rels.data = xml::write_doc(&doc);
+            }
+            let part = parts.iter_mut().find(|p| p.name == "ppt/slides/slide1.xml").unwrap();
+            let mut doc = xml::parse(&part.data).unwrap();
+            doc.root.walk_mut(&mut |el| {
+                if !slot && el.is("a:blip") {
+                    // An opaque picture shows as <keep/>, so its attachment is hidden.
+                    el.children.push(Node::El(fragment(
+                        "<a:duotone><a:srgbClr val=\"000000\"/><a:srgbClr val=\"FFFFFF\"/></a:duotone>",
+                    )));
+                }
+                if el.is("a:endCxn") {
+                    el.name = format!("a:{end}Cxn");
+                    el.set("id", &id.to_string());
+                }
+                if slot && geom::shape_id(el) == Some(4) && el.is("p:sp") {
+                    el.child_mut("p:nvSpPr")
+                        .unwrap()
+                        .child_mut("p:nvPr")
+                        .unwrap()
+                        .children
+                        .push(Node::El(fragment("<p:ph type=\"title\"/>")));
+                }
+            });
+            part.data = xml::write_doc(&doc);
+            let before = part.data.clone();
+            let imp = import(&package::write(&parts).unwrap());
+            assert!(!imp.text.contains(&format!("s{id}.1")));
+            if slot {
+                assert!(imp.text.contains("::title"));
+            }
+            let out = PptxEngine.export(&imp.text, &imp.remainder).unwrap();
+            let out_parts = package::read(&out).unwrap();
+            assert_eq!(package::get(&out_parts, "ppt/slides/slide1.xml").unwrap(), before);
+            let root = xml::parse(&before).unwrap().root;
+            let tree = root.child("p:cSld").unwrap().child("p:spTree").unwrap();
+            let connector = tree.elements().find(|e| geom::shape_id(e) == Some(10)).unwrap();
+            // An unrelated text edit must also leave the hidden attachment untouched.
+            let (out_parts, _) = edited(&imp, &[("Learning PPTX", "Still learning PPTX")]);
+            let root = xml::parse(package::get(&out_parts, "ppt/slides/slide1.xml").unwrap()).unwrap().root;
+            let tree = root.child("p:cSld").unwrap().child("p:spTree").unwrap();
+            assert_eq!(tree.elements().find(|e| geom::shape_id(e) == Some(10)).unwrap(), connector);
+        }
+    }
+}
+
+#[test]
+fn older_slide_metadata_still_exports_unchanged_attachments() {
+    let imp = import(&deck("shapes.pptx"));
+    let mut rem = imp.remainder.clone();
+    for entry in rem.entries.iter_mut().filter(|e| e.kind == hanji_core::Kind::Slide && e.meta.tag == "slide") {
+        let mut info: serde_json::Value = serde_json::from_str(&entry.meta.aux[0]).unwrap();
+        info.as_object_mut().unwrap().remove("attachment_targets");
+        entry.meta.aux[0] = serde_json::to_string(&info).unwrap();
+    }
+    let expected = PptxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(PptxEngine.export(&imp.text, &rem).unwrap(), expected);
 }
