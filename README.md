@@ -163,7 +163,7 @@ x86_64 and arm64 (static, musl), macOS x86_64 and arm64, and Windows x86_64,
 plus `SHA256SUMS`. (v0.1.0 also had `hanji-mcp`, an MCP server, which has
 since been removed: agents run the CLI.)
 
-**From source** (Rust 1.93 or later):
+**From source** (Rust 1.99 or later):
 
 ```sh
 cargo install --locked --git https://github.com/sinteric/hanji hanji-cli

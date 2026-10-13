@@ -585,7 +585,7 @@ fn chain(pairs: &[(usize, usize)], weight: &dyn Fn(usize) -> u64, n_new: usize) 
         let mut i = b + 1;
         while i <= n_new {
             tree[i] = tree[i].max(here);
-            i += i & i.wrapping_neg();
+            i += i.isolate_lowest_one();
         }
     }
     let mut out = vec![];

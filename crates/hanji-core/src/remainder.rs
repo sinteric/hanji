@@ -237,7 +237,7 @@ mod base64 {
 
     pub fn decode(s: &str) -> Result<Vec<u8>, String> {
         let s = s.as_bytes();
-        if s.len() % 4 != 0 {
+        if !s.len().is_multiple_of(4) {
             return Err("base64 length is not a multiple of 4".into());
         }
         let val = |b: u8| ABC.iter().position(|&x| x == b).map(|v| v as u32);

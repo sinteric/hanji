@@ -16,6 +16,9 @@
   status, explicit resource budgets and diagnostics for omitted features.
 - Use immutable fork sources for the compatible rdocx/rpptx/oxml-layout family
   and rhwp. Enable HWPX by default and cover it in byte-only CI checks.
+- Bump rhwp from sinteric/rhwp `fed548c` (0.8.6) to main `260c6df` (0.8.7 plus
+  Hanji fork contracts). Set workspace `rust-version` to 1.99 to match the
+  pinned toolchain.
 - Correct varied pie/doughnut category colors and category legends through
   the pinned renderer, with a real Korean-deck regression. Rebind grouped
   ordinary glyphs with their drawing font’s IDs/advances while preserving

@@ -45,7 +45,8 @@ PPTX/DOCX share one immutable git source for rdocx 0.16.0 and the rpptx /
 oxml-layout 0.14.0 family. The pinned `061fd745295e6f417945d6bd8500a35b5041830a`
 includes S90's field, note and table-layout changes alongside the literal CDATA
 parser correction. This is a renderer-family update, not an isolated syntax
-patch. HWPX uses rhwp 0.8.6 from the sinteric fork.
+patch. HWPX uses rhwp 0.8.7 from sinteric/rhwp main
+(`260c6df57f7655875be83f6d23acc83499a0a2a4`).
 `Cargo.toml` records exact revision pins and `Cargo.lock` records the resolved
 source. A crate's version alone does not identify these fork patches.
 
