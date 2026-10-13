@@ -583,6 +583,9 @@ impl Alignment {
 
 // ------------------------------------------------------------------ placement
 
+/// A new character's run, and its offset among the old characters when kept.
+type Owned = (Option<u64>, Option<usize>);
+
 pub struct Placer<'a> {
     old: &'a [Block],
     new: &'a [Block],
@@ -591,7 +594,7 @@ pub struct Placer<'a> {
     out: HashMap<u64, Outcome>,
     handled: HashSet<u64>,
     by_path: HashMap<Path, Vec<&'a Entry>>,
-    owners: HashMap<(Path, Path), Vec<Option<u64>>>,
+    owners: HashMap<(Path, Path), Vec<Owned>>,
 }
 
 fn top_paras<'b>(blocks: &'b [Block], same: &HashSet<usize>) -> Vec<(Path, &'b Inline)> {
@@ -1037,18 +1040,18 @@ impl<'a> Placer<'a> {
                     let own = owners_after(ops, new_len)
                         .into_iter()
                         .map(|src| match src {
-                            None => None,
-                            Some((k, true)) => owner.get(k).copied().flatten(),
-                            Some((k, false)) => resolve_owner(&owner, k),
+                            None => (None, None),
+                            Some((k, true)) => (owner.get(k).copied().flatten(), Some(k)),
+                            Some((k, false)) => (resolve_owner(&owner, k), None),
                         })
                         .collect();
                     self.owners.insert(key.clone(), own);
                 }
-                let chars: Vec<(Path, usize)> = self.owners[&key]
+                let chars: Vec<(Path, usize, Option<usize>)> = self.owners[&key]
                     .iter()
                     .enumerate()
-                    .filter(|(_, o)| **o == Some(e.id))
-                    .map(|(c, _)| (npath.clone(), c))
+                    .filter(|(_, o)| o.0 == Some(e.id))
+                    .map(|(c, o)| (npath.clone(), c, o.1.and_then(|k| k.checked_sub(s))))
                     .collect();
                 self.place_run(e, chars);
             }
@@ -1057,19 +1060,31 @@ impl<'a> Placer<'a> {
     }
 
     /// `chars`: new characters owned by run `e` → one entry, maybe in pieces.
-    fn place_run(&mut self, e: &Entry, chars: Vec<(Path, usize)>) {
+    /// Each character also names its offset in `e` when it is one of `e`'s
+    /// own kept characters, so `aux` tied to characters follows them.
+    fn place_run(&mut self, e: &Entry, chars: Vec<(Path, usize, Option<usize>)>) {
         if chars.is_empty() {
             self.set(e, Status::Removed("all of its text was deleted".into()));
             return;
         }
+        let mut x = e.clone();
+        if !e.meta.aux_at.is_empty() {
+            (x.meta.aux, x.meta.aux_at) = (vec![], vec![]);
+            for (n, (_, _, old)) in chars.iter().enumerate() {
+                let Some(old) = old else { continue };
+                if let Some(i) = e.meta.aux_at.iter().position(|a| a == old) {
+                    x.meta.aux.push(e.meta.aux[i].clone());
+                    x.meta.aux_at.push(n);
+                }
+            }
+        }
         let mut pieces: Vec<(Path, usize, usize)> = vec![];
-        for (path, c) in chars {
+        for (path, c, _) in chars {
             match pieces.last_mut() {
                 Some(last) if last.0 == path && last.2 == c => last.2 = c + 1,
                 _ => pieces.push((path, c, c + 1)),
             }
         }
-        let mut x = e.clone();
         (x.path, x.start, x.end) = (pieces[0].0.clone(), Some(pieces[0].1), Some(pieces[0].2));
         if pieces.len() == 1 {
             pieces.clear();
@@ -1112,9 +1127,11 @@ impl<'a> Placer<'a> {
                         self.out.insert(e.id, o);
                     }
                     _ => {
-                        let chars: Vec<(Path, usize)> = (s..en)
+                        let chars: Vec<(Path, usize, Option<usize>)> = (s..en)
                             .filter_map(|c| {
-                                segs.iter().find(|g| g.0 <= c && c < g.1).map(|g| (g.2.clone(), c - g.0 + g.3))
+                                segs.iter()
+                                    .find(|g| g.0 <= c && c < g.1)
+                                    .map(|g| (g.2.clone(), c - g.0 + g.3, Some(c - s)))
                             })
                             .collect();
                         self.place_run(e, chars);
@@ -1146,10 +1163,12 @@ impl<'a> Placer<'a> {
             }
         }
         let mut new_owner: Vec<Option<u64>> = vec![None; new.text.len()];
+        let mut new_src: Vec<Option<usize>> = vec![None; new.text.len()];
         for o in ops {
             for j in o.j1..o.j2 {
                 if o.tag == Tag::Equal {
                     new_owner[j] = old_owner[o.i1 + (j - o.j1)];
+                    new_src[j] = Some(o.i1 + (j - o.j1));
                     continue;
                 }
                 let mut src = if o.tag == Tag::Replace { o.i1 as isize } else { o.i1 as isize - 1 };
@@ -1167,11 +1186,21 @@ impl<'a> Placer<'a> {
                 new_owner[j] = resolve_in(&old_owner, src, lo, lo + old.lens[&p]);
             }
         }
-        let mut owned: HashMap<u64, Vec<(Path, usize)>> = HashMap::new();
+        let starts: HashMap<u64, usize> = self
+            .entries
+            .iter()
+            .filter(|e| e.kind == Kind::Run)
+            .filter_map(|e| Some((e.id, old.base.get(&e.path)? + e.start?)))
+            .collect();
+        let mut owned: HashMap<u64, Vec<(Path, usize, Option<usize>)>> = HashMap::new();
         for (j, o) in new_owner.iter().enumerate() {
             if let (Some(o), true) = (o, new.text[j] != SEP) {
-                if let Some(loc) = new.char_at(j) {
-                    owned.entry(*o).or_default().push(loc);
+                if let Some((p, c)) = new.char_at(j) {
+                    // Its offset in its run, when it is one of the run's own kept characters.
+                    let at = new_src[j]
+                        .filter(|&k| old_owner[k] == Some(*o))
+                        .and_then(|k| starts.get(o).and_then(|&b| k.checked_sub(b)));
+                    owned.entry(*o).or_default().push((p, c, at));
                 }
             }
         }
@@ -1237,8 +1266,18 @@ pub fn placed_entries(entries: &[Entry], outcomes: &HashMap<u64, Outcome>, next_
             out.push(entry.clone());
             continue;
         }
+        let mut from = 0;
         for (k, (path, s, en)) in pieces.iter().enumerate() {
             let mut x = moved(entry, path.clone(), Some(*s), Some(*en));
+            if !entry.meta.aux_at.is_empty() {
+                // Each piece keeps the items of its own characters.
+                let to = from + (en - s);
+                let mine: Vec<usize> =
+                    (0..entry.meta.aux_at.len()).filter(|&i| (from..to).contains(&entry.meta.aux_at[i])).collect();
+                x.meta.aux = mine.iter().map(|&i| entry.meta.aux[i].clone()).collect();
+                x.meta.aux_at = mine.iter().map(|&i| entry.meta.aux_at[i] - from).collect();
+                from = to;
+            }
             if k > 0 {
                 x.id = *next_id;
                 *next_id += 1;

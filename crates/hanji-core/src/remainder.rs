@@ -84,6 +84,12 @@ pub struct Meta {
     /// Engine data (docx: the run's original `w:t` elements).
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub aux: Vec<String>,
+    /// Where each `aux` item sits when it belongs to one of the run's
+    /// characters (hwpx: a tab's `hp:tab`): its offset from the run's start.
+    /// Placement realigns it, so an item stays with its character when text
+    /// around it is edited. Empty: `aux` is not tied to characters.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub aux_at: Vec<usize>,
     /// The package part whose relationships the entry's XML refers to
     /// (`r:` attributes): the entry cannot be placed in another part.
     #[serde(skip_serializing_if = "Option::is_none")]

@@ -803,3 +803,59 @@ fn a_package_that_is_not_hwpx_is_refused() {
         matches!(edit(&ambiguous.remainder, &ambiguous.text, "반복", "x", CAPS), Err(Refusal::Edit(m)) if m.contains("occurs 2 times"))
     );
 }
+
+/// #90: each surviving tab keeps its own stored `hp:tab`, whichever tabs
+/// around it are deleted or inserted.
+#[test]
+fn tabs_keep_their_own_xml_when_another_tab_is_edited() {
+    let t1 = r#"<hp:tab width="1111" leader="1" type="1"/>"#;
+    let t2 = r#"<hp:tab width="2222" leader="2" type="2"/>"#;
+    let t3 = r#"<hp:tab width="3333" leader="3" type="3"/>"#;
+    let para = format!(
+        r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:t>A{t1}B{t2}C{t3}D</hp:t></hp:run></hp:p>"#
+    );
+    let pkg = hwpx(&[para]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("A\tB\tC\tD"), "{}", imp.text);
+    // An edit as the store makes it: entries placed against the new text.
+    let out = |text: &str| {
+        let r = rewrite(&imp.remainder, &imp.text, text, CAPS).unwrap();
+        section(&export(&r.text, &r.remainder))
+    };
+    let tabs = |text: &str| {
+        let s = out(text);
+        [t1, t2, t3].iter().filter(|t| s.contains(**t)).map(|t| t.to_string()).collect::<Vec<_>>()
+    };
+    let all = [t1, t2, t3];
+    // No edit and an ordinary text edit keep every tab.
+    assert_eq!(tabs(&imp.text), all);
+    assert_eq!(tabs(&imp.text.replace("A\tB\tC\tD", "Ax\tB\tC\tD")), all);
+    // Deleting the first, middle or last tab keeps the others' own XML.
+    assert_eq!(tabs(&imp.text.replace("A\tB\tC\tD", "AB\tC\tD")), [t2, t3]);
+    assert_eq!(tabs(&imp.text.replace("A\tB\tC\tD", "A\tBC\tD")), [t1, t3]);
+    assert_eq!(tabs(&imp.text.replace("A\tB\tC\tD", "A\tB\tCD")), [t1, t2]);
+    // A tab inserted before a surviving one is new; the old ones keep theirs.
+    let s = out(&imp.text.replace("A\tB\tC\tD", "\tA\tB\tC\tD"));
+    assert!(s.contains(&format!("<hp:tab/>A{t1}B{t2}C{t3}D")), "{s}");
+    // A paragraph split between the tabs keeps each tab with its text.
+    let s = out(&imp.text.replace("A\tB\tC\tD", "A\tB\n\nC\tD"));
+    assert!(s.contains(&format!("A{t1}B")) && s.contains(&format!("C{t3}D")) && !s.contains(t2), "{s}");
+}
+
+/// A remainder stored before tabs carried their places still exports its
+/// tabs in order.
+#[test]
+fn older_remainders_without_tab_places_keep_their_tabs() {
+    let t1 = r#"<hp:tab width="1111" leader="1" type="1"/>"#;
+    let t2 = r#"<hp:tab width="2222" leader="2" type="2"/>"#;
+    let para = format!(
+        r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0"><hp:run charPrIDRef="0"><hp:t>A{t1}B{t2}C</hp:t></hp:run></hp:p>"#
+    );
+    let imp = import(&hwpx(&[para]));
+    let mut rem = imp.remainder.clone();
+    for e in &mut rem.entries {
+        e.meta.aux_at.clear();
+    }
+    let rem: hanji_core::Remainder = serde_json::from_slice(&serde_json::to_vec(&rem).unwrap()).unwrap();
+    assert_eq!(canon(&export(&imp.text, &rem)), canon(&export(&imp.text, &imp.remainder)));
+}
