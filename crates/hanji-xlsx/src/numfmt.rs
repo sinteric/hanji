@@ -391,7 +391,7 @@ fn group(int: &str) -> String {
     let b = int.as_bytes();
     let mut out = String::new();
     for (k, c) in b.iter().enumerate() {
-        if k > 0 && (b.len() - k) % 3 == 0 {
+        if k > 0 && (b.len() - k).is_multiple_of(3) {
             out.push(',');
         }
         out.push(*c as char);
