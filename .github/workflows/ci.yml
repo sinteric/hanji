@@ -13,11 +13,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  # Supersede older PR runs, but keep every main-branch run distinct.
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  rust:
+  rust-native:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -38,6 +39,23 @@ jobs:
       - run: cargo test --locked --workspace
       - name: byte-only preview without host fonts
         run: cargo test --locked -p hanji-preview --no-default-features --features hwpx
+
+  rust-wasm:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.0
+          targets: wasm32-unknown-unknown, wasm32-wasip1
+      # rust-cache includes the job ID in its key, keeping native and WASM separate.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # Keep the font precondition of the original combined Rust job.
+      - name: a Korean font for the preview tests
+        run: fc-list :lang=ko file | grep -q /usr/share/fonts/ || { sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk; }
       # The CLI is native only (files, processes, stdio).
       - name: build for wasm32-unknown-unknown
         run: cargo build --locked --target wasm32-unknown-unknown --workspace --exclude hanji-cli
@@ -46,6 +64,21 @@ jobs:
         run: cargo test --locked --target wasm32-wasip1 --workspace --exclude hanji-cli
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: wasmtime run --dir=${{ github.workspace }}
+
+  # Preserve the existing required-check name and reject any incomplete platform.
+  rust:
+    if: ${{ always() }}
+    needs: [rust-native, rust-wasm]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require both Rust platforms
+        env:
+          NATIVE_RESULT: ${{ needs.rust-native.result }}
+          WASM_RESULT: ${{ needs.rust-wasm.result }}
+        run: |
+          test "$NATIVE_RESULT" = success
+          test "$WASM_RESULT" = success
 
   # Every corpus source and every Office check kit file against the ISO/IEC 29500 transitional
   # schemas, with the rules outside them that Office enforces (validation/ooxml-schema).
