@@ -740,6 +740,13 @@ impl<'a> Exporter<'a> {
                             let stored = (*ch == '\t')
                                 .then(|| {
                                     let o = own?;
+                                    if !o.meta.aux_at.is_empty() {
+                                        // The tab's own stored element, by its place in the run.
+                                        let at = c.checked_sub(o.start?)?;
+                                        let i = o.meta.aux_at.iter().position(|&x| x == at)?;
+                                        return o.meta.aux.get(i).map(|s| fragment(s));
+                                    }
+                                    // An older remainder: its tabs in order.
                                     let k = tabs.entry(o.id).or_default();
                                     *k += 1;
                                     o.meta.aux.get(*k - 1).map(|s| fragment(s))

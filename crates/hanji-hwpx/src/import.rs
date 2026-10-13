@@ -656,7 +656,7 @@ impl<'a> Importer<'a> {
                         Node::El(x) => match t_char(&x.name) {
                             Some(ch) => {
                                 if ch == '\t' {
-                                    tabs.push(x.to_xml());
+                                    tabs.push((self.buf.len() - start, x.to_xml()));
                                 }
                                 self.push(Atom::Char(ch), marks);
                             }
@@ -711,7 +711,7 @@ impl<'a> Importer<'a> {
         self.unit_cp.resize(end, cp);
         let e = &mut self.entries[idx];
         e.end = Some(end);
-        e.meta.aux = tabs;
+        (e.meta.aux_at, e.meta.aux) = tabs.into_iter().unzip();
         Ok(())
     }
 }
