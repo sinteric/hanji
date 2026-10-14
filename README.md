@@ -315,3 +315,21 @@ versions in `package.json`. From the repository root, run `mise trust`,
 `mise exec -- pnpm exec claude plugin validate --strict plugins/hanji` and
 `mise exec -- pnpm exec claude plugin validate --strict .`. The Rust build
 remains the prerequisite for checks that execute the hanji CLI.
+
+## CI validation scope
+
+Standard hosted CI exposes normal unit/core document contracts and static checks
+as named steps. Rust test schedulers use one. The existing native byte/font and
+WASI checks protect actual export/runtime behavior, and the reviewed OOXML/Office
+kit validates schema constraints that a mocked lens test cannot establish. They
+use bounded deterministic public fixtures without a browser, DB, provider or model.
+The Rust, schema and plugin jobs run in sequence. Plugin packaging/install/launcher
+checks protect the actual distribution boundary and remain core source validation.
+
+Additional component/integration/race/E2E needs a protected critical failure,
+insufficient smaller checks, necessity on each relevant PR and stable isolated
+cost. Other relevant checks run locally at PR submission with exact SHA,
+environment, commands, scope, results and skipped/untested boundaries in the
+PR body/comment. No manual Actions/nightly substitute is added. Diagnose queue,
+setup, fixture/build/test cost and resources before adding test workers or shards.
+Compiler parallelism and application concurrency remain separate.
