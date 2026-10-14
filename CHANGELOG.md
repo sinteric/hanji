@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.4.0 — 2026-10-14
+
 - Export a Document in its other format (`docx` ↔ `hwpx`) through the CLI
   and store API, with a conversion report of what did not cross.
 - Preserve PNG page content at very low resolutions. Bound decoded image
