@@ -1,6 +1,34 @@
 # Changelog
 
-## 0.3.0 — unreleased
+## Unreleased
+
+- Export a Document in its other format (`docx` ↔ `hwpx`) through the CLI
+  and store API, with a conversion report of what did not cross.
+- Preserve PNG page content at very low resolutions. Bound decoded image
+  resources in DOCX and shared preview output. Draw DOCX GIF first frames as
+  static previews and diagnose animation as a first-frame approximation.
+- Restore later-page vertical space for selected DOCX stories. Preserve DOCX
+  shorthand-RGB watermarks and rounded PPTX preset corners through the pinned
+  renderer.
+- Preserve worksheet theme colors and tints, authored indentation, and
+  ZWNJ/ZWJ joiners without fallback spacing or extra numeric overflow.
+- Create missing DOCX style tables when paragraph-style edits require them.
+  Keep each HWPX tab’s stored XML with that tab when nearby tabs change.
+- Preserve CDATA text in DOCX and PPTX imports. Discover DOCX preview fonts
+  from CDATA runs. Parse literal CDATA in the pinned renderer instead of
+  treating markup as text.
+- Refuse unchanged PPTX connectors whose targets were deleted. Detach a
+  connector in the same export when its attached target is deleted and the
+  endpoint is rewritten as a point.
+- Refuse XLSX row insertions that would overflow ordinary cells. Update
+  cross-sheet chart sources when worksheet rows move.
+- Bump rhwp from sinteric/rhwp `fed548c` (0.8.6) to main `260c6df` (0.8.7 plus
+  Hanji fork contracts). Advance the rdocx/rpptx/oxml-layout family through
+  S90. Pin the workspace `rust-version` and toolchain at 1.99.
+- Bound hosted CI concurrency and Rust cache writes. Manage plugin-validation
+  tools through mise and pnpm.
+
+## 0.3.0 — 2026-10-04
 
 - Require `reimport --base-rev N` (the exported revision) or an explicit
   `--replace-head`. A stale base refuses before changing the store, including
@@ -16,9 +44,6 @@
   status, explicit resource budgets and diagnostics for omitted features.
 - Use immutable fork sources for the compatible rdocx/rpptx/oxml-layout family
   and rhwp. Enable HWPX by default and cover it in byte-only CI checks.
-- Bump rhwp from sinteric/rhwp `fed548c` (0.8.6) to main `260c6df` (0.8.7 plus
-  Hanji fork contracts). Set workspace `rust-version` to 1.99 to match the
-  pinned toolchain.
 - Correct varied pie/doughnut category colors and category legends through
   the pinned renderer, with a real Korean-deck regression. Rebind grouped
   ordinary glyphs with their drawing font’s IDs/advances while preserving
