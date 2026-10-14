@@ -30,26 +30,30 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - run: cargo fmt --all --check
-      - run: cargo clippy --locked --workspace --all-targets -- -D warnings
+      - name: Rust formatting
+        run: cargo fmt --all --check
+      - name: Static Rust checks
+        run: cargo clippy --locked --workspace --all-targets -- -D warnings
       # The preview's Korean tests draw with a Hangul font (crates/hanji-preview/tests/render.rs).
       - name: a Korean font for the preview tests
         run: fc-list :lang=ko file | grep -q /usr/share/fonts/ || { sudo apt-get update -qq && sudo apt-get install -y -qq --no-install-recommends fonts-noto-cjk; }
-      - run: cargo test --locked --workspace
+      - name: Unit and core document contracts
+        run: cargo test --locked --workspace -- --test-threads=1
       - name: byte-only preview without host fonts
-        run: cargo test --locked -p hanji-preview --no-default-features --features hwpx
+        run: cargo test --locked -p hanji-preview --no-default-features --features hwpx -- --test-threads=1
       # The CLI is native only (files, processes, stdio).
       - name: build for wasm32-unknown-unknown
         run: cargo build --locked --target wasm32-unknown-unknown --workspace --exclude hanji-cli
       - uses: bytecodealliance/actions/wasmtime/setup@v1
       - name: test on wasm32-wasip1 (wasmtime)
-        run: cargo test --locked --target wasm32-wasip1 --workspace --exclude hanji-cli
+        run: cargo test --locked --target wasm32-wasip1 --workspace --exclude hanji-cli -- --test-threads=1
         env:
           CARGO_TARGET_WASM32_WASIP1_RUNNER: wasmtime run --dir=${{ github.workspace }}
 
   # Every corpus source and every Office check kit file against the ISO/IEC 29500 transitional
   # schemas, with the rules outside them that Office enforces (validation/ooxml-schema).
   ooxml-schema:
+    needs: rust
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -80,6 +84,7 @@ jobs:
   # The Claude Code and Codex plugin (plugins/hanji): manifests, marketplace,
   # the skill, and the hanji CLI run through the skill's launcher.
   plugins:
+    needs: ooxml-schema
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
