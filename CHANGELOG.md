@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `6725e96` (S92).
+- Size the wasm32 linear stack at 16 MiB so S92 table-style parsing does not
+  trap in debug wasmtime.
+
 ## 0.4.0 — 2026-10-14
 
 - Export a Document in its other format (`docx` ↔ `hwpx`) through the CLI

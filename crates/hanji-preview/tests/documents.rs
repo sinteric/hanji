@@ -39,7 +39,7 @@ fn renderer_upgrade_numbers_the_first_footnote_independently_of_its_storage_id()
     let mut markers = vec![];
     root.walk(&mut |element| {
         if element.local() == "text"
-            && element.get("font-size").and_then(|size| size.parse::<f64>().ok()).is_some_and(|size| size < 6.0)
+            && element.get("font-size").and_then(|size| size.parse::<f64>().ok()).is_some_and(|size| size < 8.0)
         {
             let text = element.text_of(&["text", "tspan"]);
             if text.chars().all(|c| c.is_ascii_digit()) && !text.is_empty() {
@@ -47,7 +47,8 @@ fn renderer_upgrade_numbers_the_first_footnote_independently_of_its_storage_id()
             }
         }
     });
-    // Both the body reference and the note marker use the visible label 1.
+    // Storage id 2 still draws as visible label 1 on both the body reference
+    // (~7pt in S92) and the note marker.
     assert_eq!(markers, vec!["1", "1"]);
 }
 

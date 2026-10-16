@@ -41,11 +41,10 @@ do not discover host fonts. Native `Options` can load `--font-dir`,
 `HANJI_FONT_DIR` and installed fonts. Korean text needs an appropriate font;
 the output reports actual missing characters when one is unavailable.
 
-PPTX/DOCX share one immutable git source for rdocx 0.16.0 and the rpptx /
-oxml-layout 0.14.0 family. The pinned `061fd745295e6f417945d6bd8500a35b5041830a`
-includes S90's field, note and table-layout changes alongside the literal CDATA
-parser correction. This is a renderer-family update, not an isolated syntax
-patch. HWPX uses rhwp 0.8.7 from sinteric/rhwp main
+PPTX/DOCX share one immutable git source for rdocx 0.16.1 and the rpptx /
+oxml-layout 0.14.1 family. The pinned `6725e96f9ff2c445536593ba7f6c3a20fdde7698`
+includes S92's upstream sync and the fork CI doctest wrapper. This is a
+renderer-family update, not an isolated syntax patch. HWPX uses rhwp 0.8.7 from sinteric/rhwp main
 (`260c6df57f7655875be83f6d23acc83499a0a2a4`).
 `Cargo.toml` records exact revision pins and `Cargo.lock` records the resolved
 source. A crate's version alone does not identify these fork patches.
@@ -347,8 +346,10 @@ implement general symbol-font encoding or certify native Word layout.
 On the connected Mac's existing fonts, the targeted synthetic XLSX has zero
 missing characters after previously missing ten ASCII characters. HWPX `24`,
 `26` and `28` also have zero reported/embedded missing characters after previously
-missing three/four/four. DOCX `04` recovers its Gothic and CJK characters; its
-remaining Symbol code (`U+F0B7`) is addressed only by the verified bridge above.
+missing three/four/four. DOCX `04` recovers its Gothic and CJK characters. S92
+may substitute an uncovered Symbol numbering bullet as `U+2022`; Hanji's cmap
+alias still requires the verified bridge above, and other private-use text
+remains missing.
 Input hashes, drawn character
 counts and page enumeration are preserved. This is character-coverage evidence,
 not a native Office/Hancom visual approval or a golden update. Other font

@@ -651,6 +651,9 @@ impl<'a> GridBuilder<'a> {
             face_index: face.font.face_index,
             bold: parsed.is_bold(),
             italic: parsed.is_italic(),
+            variations: Vec::new(),
+            synthetic_bold: false,
+            synthetic_italic: false,
         });
         self.faces.insert(
             id,
