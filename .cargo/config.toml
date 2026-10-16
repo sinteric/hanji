@@ -1,8 +1,9 @@
 # S92's DrawingML table-style values are large enough that debug wasm
 # copies overflow the default 1 MiB linear stack (wasmtime reports a
 # linear-memory OOB around 0x1_000xxxxx from CT_TableStyle::from_element).
-# PPTX preview still parses those styles; give wasm32 a 16 MiB stack
-# instead of dropping the path.
+# This is wasm-ld's in-module stack (`__stack_pointer`), not wasmtime's
+# host `--max-wasm-stack`. PPTX preview still parses those styles; give
+# wasm32 a 16 MiB linear stack instead of dropping the path.
 [target.wasm32-wasip1]
 rustflags = ["-C", "link-arg=-zstack-size=16777216"]
 

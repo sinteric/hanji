@@ -8,11 +8,7 @@ import sys
 import wasmtime
 
 wasm, args = sys.argv[1], sys.argv[1:]
-config = wasmtime.Config()
-# Match .cargo/config.toml's 16 MiB wasm32 linear stack. This is wasmtime's
-# host call-stack limit; keep it at least as large.
-config.max_wasm_stack = 16 * 1024 * 1024
-engine = wasmtime.Engine(config)
+engine = wasmtime.Engine()
 store = wasmtime.Store(engine)
 wasi = wasmtime.WasiConfig()
 wasi.argv = args

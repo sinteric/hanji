@@ -48,9 +48,7 @@ jobs:
       - name: test on wasm32-wasip1 (wasmtime)
         run: cargo test --locked --target wasm32-wasip1 --workspace --exclude hanji-cli -- --test-threads=1
         env:
-          # Linear stack size is set in .cargo/config.toml. max-wasm-stack is
-          # wasmtime's host call-stack limit; keep it at least as large.
-          CARGO_TARGET_WASM32_WASIP1_RUNNER: wasmtime run --dir=${{ github.workspace }} --max-wasm-stack=16777216
+          CARGO_TARGET_WASM32_WASIP1_RUNNER: wasmtime run --dir=${{ github.workspace }}
 
   # Every corpus source and every Office check kit file against the ISO/IEC 29500 transitional
   # schemas, with the rules outside them that Office enforces (validation/ooxml-schema).
