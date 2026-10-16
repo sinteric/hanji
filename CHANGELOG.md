@@ -4,14 +4,15 @@
 
 - Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `66611b3`
   (S94, including zip 9.0.3+, plus S93 and sinteric/rdocx#20).
+- Bump rhwp from sinteric/rhwp `260c6df` to main `d2fdbebf` (zip 9.0.4).
 - Warn when a pie or doughnut category legend is omitted because the chart is
   too small, in DOCX and PPTX preview JSON/HTML and the CLI, without changing
   the source document.
 - Bump the pinned Rust toolchain from 1.99.0 to 1.99.1 (`rust-toolchain.toml`,
   `.mise.toml`, and CI). The workspace `rust-version` remains 1.99.
-- Move hanji-package, hanji-docx, the rdocx family, and `validation/office-kit`
-  from yanked zip 8.6.0 to zip 9.0.3+ (lockfiles resolve 9.0.4; CI still uses
-  `--locked`). rhwp 0.8.7 still requires locked yanked zip 8.6.0.
+- Move hanji-package, hanji-docx, the rdocx family, rhwp, and
+  `validation/office-kit` from yanked zip 8.6.0 to zip 9.0.3+ (lockfiles resolve
+  9.0.4; CI still uses `--locked`).
 - Size the wasm32 linear stack at 16 MiB so S92 table-style parsing does not
   trap in debug wasmtime.
 

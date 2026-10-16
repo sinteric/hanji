@@ -1106,7 +1106,7 @@ dependencies = [
  "hanji-testkit",
  "serde",
  "serde_json",
- "zip 9.0.4",
+ "zip",
 ]
 
 [[package]]
@@ -1135,7 +1135,7 @@ version = "0.4.0"
 dependencies = [
  "hanji-core",
  "quick-xml 0.42.0",
- "zip 9.0.4",
+ "zip",
 ]
 
 [[package]]
@@ -1857,7 +1857,7 @@ source = "git+https://github.com/sinteric/rdocx?rev=66611b3fcbd55884005cf62657f0
 dependencies = [
  "quick-xml 0.41.0",
  "thiserror",
- "zip 9.0.4",
+ "zip",
 ]
 
 [[package]]
@@ -2352,7 +2352,7 @@ dependencies = [
  "sha2",
  "thiserror",
  "ttf-parser",
- "zip 9.0.4",
+ "zip",
 ]
 
 [[package]]
@@ -2494,7 +2494,7 @@ dependencies = [
 [[package]]
 name = "rhwp"
 version = "0.8.7"
-source = "git+https://github.com/sinteric/rhwp?rev=260c6df57f7655875be83f6d23acc83499a0a2a4#260c6df57f7655875be83f6d23acc83499a0a2a4"
+source = "git+https://github.com/sinteric/rhwp?rev=d2fdbebf32e5182bb7f2e365ed9642bf7f5a9924#d2fdbebf32e5182bb7f2e365ed9642bf7f5a9924"
 dependencies = [
  "aes",
  "argon2",
@@ -2546,13 +2546,13 @@ dependencies = [
  "wasm-bindgen",
  "web-sys",
  "zeroize",
- "zip 8.6.0",
+ "zip",
 ]
 
 [[package]]
 name = "rhwp-contracts"
 version = "0.1.0"
-source = "git+https://github.com/sinteric/rhwp?rev=260c6df57f7655875be83f6d23acc83499a0a2a4#260c6df57f7655875be83f6d23acc83499a0a2a4"
+source = "git+https://github.com/sinteric/rhwp?rev=d2fdbebf32e5182bb7f2e365ed9642bf7f5a9924#d2fdbebf32e5182bb7f2e365ed9642bf7f5a9924"
 dependencies = [
  "serde_json",
 ]
@@ -2560,7 +2560,7 @@ dependencies = [
 [[package]]
 name = "rhwp-ooxml-chart"
 version = "0.1.0"
-source = "git+https://github.com/sinteric/rhwp?rev=260c6df57f7655875be83f6d23acc83499a0a2a4#260c6df57f7655875be83f6d23acc83499a0a2a4"
+source = "git+https://github.com/sinteric/rhwp?rev=d2fdbebf32e5182bb7f2e365ed9642bf7f5a9924#d2fdbebf32e5182bb7f2e365ed9642bf7f5a9924"
 dependencies = [
  "quick-xml 0.42.0",
 ]
@@ -2568,7 +2568,7 @@ dependencies = [
 [[package]]
 name = "rhwp-password-crypto"
 version = "0.1.0"
-source = "git+https://github.com/sinteric/rhwp?rev=260c6df57f7655875be83f6d23acc83499a0a2a4#260c6df57f7655875be83f6d23acc83499a0a2a4"
+source = "git+https://github.com/sinteric/rhwp?rev=d2fdbebf32e5182bb7f2e365ed9642bf7f5a9924#d2fdbebf32e5182bb7f2e365ed9642bf7f5a9924"
 dependencies = [
  "aes",
  "base64 0.23.1",
@@ -2583,7 +2583,7 @@ dependencies = [
  "roxmltree 0.21.1",
  "sha1",
  "sha2",
- "zip 8.6.0",
+ "zip",
 ]
 
 [[package]]
@@ -2626,7 +2626,7 @@ dependencies = [
  "thiserror",
  "tiff",
  "tiny-skia 0.12.0",
- "zip 9.0.4",
+ "zip",
  "zune-jpeg 0.5.15",
 ]
 
@@ -2956,7 +2956,7 @@ version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "287f59010008f0d7cf5e3b03196d666c1acc46c8d3e9cf34c28a1a7157601e72"
 dependencies = [
- "heck 0.5.0",
+ "heck 0.4.1",
  "proc-macro2",
  "quote",
  "syn 2.0.119",
@@ -3836,20 +3836,6 @@ dependencies = [
 
 [[package]]
 name = "zip"
-version = "8.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d04a6b5381502aa6087c94c669499eb1602eb9c5e8198e534de571f7154809b"
-dependencies = [
- "crc32fast",
- "flate2",
- "indexmap",
- "memchr",
- "typed-path",
- "zopfli",
-]
-
-[[package]]
-name = "zip"
 version = "9.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a954114b47a54df49f83d2722814e86b23d4bb1b54a1b90fb7d92b41619ddc22"
@@ -3860,6 +3846,7 @@ dependencies = [
  "memchr",
  "nix",
  "typed-path",
+ "zopfli",
 ]
 
 [[package]]

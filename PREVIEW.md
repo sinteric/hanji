@@ -46,7 +46,7 @@ oxml-layout 0.14.1 family. The pinned `66611b3fcbd55884005cf62657f0af560f4ac82a`
 includes S94 (zip 9.0.3) together with S93 and the chart-legend-omitted layout
 diagnostic (sinteric/rdocx#20).
 This is a renderer-family update, not an isolated syntax patch. HWPX uses rhwp 0.8.7 from sinteric/rhwp main
-(`260c6df57f7655875be83f6d23acc83499a0a2a4`).
+(`d2fdbebf32e5182bb7f2e365ed9642bf7f5a9924`, zip 9.0.4).
 `Cargo.toml` records exact revision pins and `Cargo.lock` records the resolved
 source. A crate's version alone does not identify these fork patches.
 

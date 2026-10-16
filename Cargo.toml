@@ -22,8 +22,8 @@ rpptx = { git = "https://github.com/sinteric/rdocx", rev = "66611b3fcbd55884005c
 rpptx-render = { git = "https://github.com/sinteric/rdocx", rev = "66611b3fcbd55884005cf62657f0af560f4ac82a", default-features = false }
 rpptx-layout = { git = "https://github.com/sinteric/rdocx", rev = "66611b3fcbd55884005cf62657f0af560f4ac82a", default-features = false }
 oxml-layout = { git = "https://github.com/sinteric/rdocx", rev = "66611b3fcbd55884005cf62657f0af560f4ac82a", default-features = false }
-# sinteric/rhwp main (0.8.7 plus Hanji fork contracts).
-rhwp = { git = "https://github.com/sinteric/rhwp", rev = "260c6df57f7655875be83f6d23acc83499a0a2a4", default-features = false }
+# sinteric/rhwp main (0.8.7 plus Hanji fork contracts and zip 9.0.4).
+rhwp = { git = "https://github.com/sinteric/rhwp", rev = "d2fdbebf32e5182bb7f2e365ed9642bf7f5a9924", default-features = false }
 
 # The spreadsheet engine's tests read 100,000-row sheets (§2 rule 11) in
 # debug builds too: its parsers and calculator are optimised there.
