@@ -21,24 +21,23 @@ pub fn read_limited(bytes: &[u8], limit: u64) -> Result<Vec<Part>, String> {
     let mut parts = vec![];
     let mut left = limit;
     for i in 0..z.len() {
-        let f = z.by_index(i).map_err(|e| format!("zip entry {i}: {e}"))?;
+        let mut f = z.by_index(i).map_err(|e| format!("zip entry {i}: {e}"))?;
         if f.is_dir() {
             continue;
         }
-        let name = f.name().to_string();
+        let name = f.name().map_err(|e| format!("zip entry {i}: {e}"))?.into_owned();
         let mut data = vec![];
         // The declared size can lie; the limit applies to the bytes actually inflated.
-        let mut f = f.take(left + 1);
-        f.read_to_end(&mut data).map_err(|e| format!("{name}: {e}"))?;
+        let mut limited = (&mut f).take(left + 1);
+        limited.read_to_end(&mut data).map_err(|e| format!("{name}: {e}"))?;
         if data.len() as u64 > left {
             return Err(format!("the package expands to more than {limit} bytes ({name})"));
         }
         left -= data.len() as u64;
-        let f = f.into_inner();
         let dt = f.last_modified().unwrap_or_default();
         let (d, t): (u16, u16) = dt.into();
         parts.push(Part {
-            name: f.name().to_string(),
+            name,
             data,
             dos_time: ((d as u32) << 16) | t as u32,
             external_attr: f.unix_mode().unwrap_or(0),

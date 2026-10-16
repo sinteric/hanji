@@ -42,8 +42,9 @@ do not discover host fonts. Native `Options` can load `--font-dir`,
 the output reports actual missing characters when one is unavailable.
 
 PPTX/DOCX share one immutable git source for rdocx 0.16.1 and the rpptx /
-oxml-layout 0.14.1 family. The pinned `0516079ebe12114e0044e807a1224fab8b098e98`
-includes S93 and the chart-legend-omitted layout diagnostic (sinteric/rdocx#20).
+oxml-layout 0.14.1 family. The pinned `66611b3fcbd55884005cf62657f0af560f4ac82a`
+includes S94 (zip 9.0.3) together with S93 and the chart-legend-omitted layout
+diagnostic (sinteric/rdocx#20).
 This is a renderer-family update, not an isolated syntax patch. HWPX uses rhwp 0.8.7 from sinteric/rhwp main
 (`260c6df57f7655875be83f6d23acc83499a0a2a4`).
 `Cargo.toml` records exact revision pins and `Cargo.lock` records the resolved
