@@ -53,7 +53,7 @@ Native and WASM compile/runtime checks have separate purposes. Browser WASM
 requires JavaScript glue for wasm-bindgen dependencies and an application
 adapter; compilation or a WASI test does not validate browser or Flutter Web
 integration. No platform bridge is shipped by this change.
-Local release validation uses Rust 1.99.0. The declared crate minimum Rust
+Local release validation uses Rust 1.99.1. The declared crate minimum Rust
 versions are retained and were not separately validated by these runs.
 
 ## Resource guards and renderer limitations
