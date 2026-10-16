@@ -621,7 +621,7 @@ impl<'a> SvgState<'a> {
                 self.diagnose_gradient_extension(*extend, path)
             }
             Paint::Tile { .. } => self.diagnose(path, "tile paint was omitted because its carrier has no media bytes"),
-            Paint::Solid(_) => {}
+            Paint::Solid(_) | Paint::Grid { .. } => {}
         }
         self.hooks?;
         match paint {
@@ -656,6 +656,43 @@ impl<'a> SvgState<'a> {
                 );
                 emit_stops(stops, &mut definition);
                 definition.push_str("</radialGradient>");
+                self.defs.push_str(&definition);
+                Some(format!("{property}=\"url(#{id})\""))
+            }
+            Paint::Grid { bounds, columns, rows, colors } => {
+                Paint::grid(*bounds, *columns, *rows, colors.clone())?;
+                let id = self.definition_id();
+                let dx = bounds.width / f64::from(*columns);
+                let dy = bounds.height / f64::from(*rows);
+                let mut definition = format!(
+                    "<pattern id=\"{id}\" patternUnits=\"userSpaceOnUse\" x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\">",
+                    number(bounds.x),
+                    number(bounds.y),
+                    number(bounds.width),
+                    number(bounds.height)
+                );
+                for row in 0..usize::from(*rows) {
+                    let mut col = 0;
+                    while col < usize::from(*columns) {
+                        let color = colors[row * usize::from(*columns) + col];
+                        let mut end = col + 1;
+                        while end < usize::from(*columns) && colors[row * usize::from(*columns) + end] == color {
+                            end += 1;
+                        }
+                        let _ = write!(
+                            definition,
+                            "<rect x=\"{}\" y=\"{}\" width=\"{}\" height=\"{}\" fill=\"{}\" fill-opacity=\"{}\"/>",
+                            number(col as f64 * dx),
+                            number(row as f64 * dy),
+                            number((end - col) as f64 * dx),
+                            number(dy),
+                            color_hex(color),
+                            number(color.a)
+                        );
+                        col = end;
+                    }
+                }
+                definition.push_str("</pattern>");
                 self.defs.push_str(&definition);
                 Some(format!("{property}=\"url(#{id})\""))
             }
