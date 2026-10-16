@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `6725e96` (S92).
+
 ## 0.4.0 — 2026-10-14
 
 - Export a Document in its other format (`docx` ↔ `hwpx`) through the CLI
