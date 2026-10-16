@@ -4,6 +4,8 @@
 
 - Bump the pinned Rust toolchain from 1.99.0 to 1.99.1 (`rust-toolchain.toml`,
   `.mise.toml`, and CI). The workspace `rust-version` remains 1.99.
+- Commit `validation/office-kit/Cargo.lock` so CI can keep using yanked zip
+  8.6.0 after crates.io yanked the 8.x line.
 - Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `6725e96` (S92).
 - Size the wasm32 linear stack at 16 MiB so S92 table-style parsing does not
   trap in debug wasmtime.

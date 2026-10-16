@@ -77,7 +77,7 @@ jobs:
       - name: corpus sources
         run: python3 validation/ooxml-schema/validate.py -q crates/hanji-pptx/corpus crates/hanji-xlsx/corpus prototype/remainder/corpus
       - name: build the Office check kit
-        run: cargo run --release --manifest-path validation/office-kit/Cargo.toml
+        run: cargo run --release --locked --manifest-path validation/office-kit/Cargo.toml
       - name: kit files
         run: python3 validation/ooxml-schema/validate.py -q target/office-kit
 
