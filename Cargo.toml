@@ -42,6 +42,11 @@ opt-level = 2
 [profile.dev.package.ironcalc_base]
 opt-level = 2
 
+# S92 table-style XML is a large value; unoptimised debug copies overflow
+# the default wasm stack while PPTX preview still parses those styles.
+[profile.dev.package.oxml-drawing]
+opt-level = 2
+
 # Preserve the rhwp workspace's deterministic dependency patch in this consumer.
 [patch.crates-io]
 svg2pdf = { git = "https://github.com/edwardkim/svg2pdf", rev = "2caeb0a038f9128b79833d803b94c2667565c4da" }
