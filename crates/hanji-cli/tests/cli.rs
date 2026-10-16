@@ -747,3 +747,82 @@ fn a_document_exported_in_its_other_format_lists_what_did_not_cross() {
     assert_eq!(e["code"], "unsupported");
     assert!(e["message"].as_str().unwrap().contains("a presentation is exported as pptx"), "{e:#}");
 }
+
+fn oversized_korean_pie() -> rdocx::ChartData {
+    rdocx::ChartData {
+        categories: [
+            "구독 서비스 매출",
+            "라이선스",
+            "유지보수 및 기술 지원",
+            "교육",
+            "컨설팅 프로젝트",
+            "기타 수익",
+            "하드웨어 판매",
+            "클라우드 호스팅",
+            "광고",
+            "파트너 수수료",
+        ]
+        .map(str::to_owned)
+        .to_vec(),
+        series: vec![("매출".to_owned(), (1..=10).map(f64::from).collect())],
+        ..rdocx::ChartData::default()
+    }
+}
+
+#[test]
+fn preview_warns_when_a_pie_legend_is_omitted_and_leaves_the_file_unchanged() {
+    let env = Env::new("chart-legend");
+    let data = oversized_korean_pie();
+    let mut document = rdocx::Document::new();
+    document.add_chart(rdocx::ChartKind::Pie, rdocx::Length::pt(200.0), rdocx::Length::pt(140.0), &data).unwrap();
+    let docx = env.path("small-pie.docx");
+    let docx_bytes = document.to_bytes().unwrap();
+    std::fs::write(&docx, &docx_bytes).unwrap();
+
+    let mut deck =
+        rpptx::Presentation::from_bytes(&std::fs::read(corpus("crates/hanji-pptx/corpus/shapes.pptx")).unwrap())
+            .unwrap();
+    deck.add_chart(
+        0,
+        rpptx::ChartKind::Pie,
+        rpptx::Emu(0),
+        rpptx::Emu(0),
+        rpptx::Emu(2_540_000),
+        rpptx::Emu(1_778_000),
+        &data,
+    )
+    .unwrap();
+    let pptx = env.path("small-pie.pptx");
+    let pptx_bytes = deck.to_bytes().unwrap();
+    std::fs::write(&pptx, &pptx_bytes).unwrap();
+
+    let out = env.path("pages");
+    for (file, original, format) in [(&docx, docx_bytes, "docx"), (&pptx, pptx_bytes, "pptx")] {
+        let json = env.ok(&["preview", file, "--format", "svg", "--out", &out]);
+        assert_eq!(json["format"], format);
+        assert!(
+            json["diagnostics"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|d| { d["message"].as_str().unwrap().starts_with("chart-legend-omitted") }),
+            "{json:#}"
+        );
+        assert!(
+            json["warnings"].as_array().unwrap().iter().any(|w| {
+                w.as_str().unwrap().contains("chart too small, legend omitted; enlarge the chart to show it")
+            }),
+            "{json:#}"
+        );
+        let text = env.cmd().args(["preview", file, "--format", "svg", "--out", &out]).output().unwrap();
+        assert!(text.status.success());
+        let text = String::from_utf8(text.stdout).unwrap();
+        assert!(
+            text.contains("warning: ")
+                && text.contains("chart too small, legend omitted; enlarge the chart to show it"),
+            "{text}"
+        );
+        assert_eq!(std::fs::read(file).unwrap(), original);
+        assert!(env.ok(&["list"]).as_array().unwrap().is_empty());
+    }
+}

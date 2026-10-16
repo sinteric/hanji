@@ -2,7 +2,11 @@
 
 ## Unreleased
 
-- Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `6725e96` (S92).
+- Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `0516079`
+  (S93 plus sinteric/rdocx#20).
+- Warn when a pie or doughnut category legend is omitted because the chart is
+  too small, in DOCX and PPTX preview JSON/HTML and the CLI, without changing
+  the source document.
 - Size the wasm32 linear stack at 16 MiB so S92 table-style parsing does not
   trap in debug wasmtime.
 

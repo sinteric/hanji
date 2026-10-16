@@ -42,9 +42,9 @@ do not discover host fonts. Native `Options` can load `--font-dir`,
 the output reports actual missing characters when one is unavailable.
 
 PPTX/DOCX share one immutable git source for rdocx 0.16.1 and the rpptx /
-oxml-layout 0.14.1 family. The pinned `6725e96f9ff2c445536593ba7f6c3a20fdde7698`
-includes S92's upstream sync and the fork CI doctest wrapper. This is a
-renderer-family update, not an isolated syntax patch. HWPX uses rhwp 0.8.7 from sinteric/rhwp main
+oxml-layout 0.14.1 family. The pinned `0516079ebe12114e0044e807a1224fab8b098e98`
+includes S93 and the chart-legend-omitted layout diagnostic (sinteric/rdocx#20).
+This is a renderer-family update, not an isolated syntax patch. HWPX uses rhwp 0.8.7 from sinteric/rhwp main
 (`260c6df57f7655875be83f6d23acc83499a0a2a4`).
 `Cargo.toml` records exact revision pins and `Cargo.lock` records the resolved
 source. A crate's version alone does not identify these fork patches.
@@ -175,7 +175,11 @@ PPTX `12`, and clipping/missing formula caches in XLSX `18`. PPTX `14`, slide
 checks the curved wedges and category labels separately from the slide’s
 manual percentage legend. The legend’s Korean glyph IDs and 7.785-point advances now match its actual
 9-point drawing font. Regressions cover mixed Latin/Korean labels, explicit
-font/fallback cases and extra word spacing. Group line breaks/origins remain
+font/fallback cases and extra word spacing. When a pie or doughnut category
+legend does not fit, preview keeps the source bytes unchanged, still draws the
+plot, and reports `chart-legend-omitted` through the existing diagnostics
+channel plus a warning: "chart too small, legend omitted; enlarge the chart to
+show it". Group line breaks/origins remain
 engine geometry; rich multilingual clusters retain their original engine font
 and positioning when substitution cannot preserve that contract. A coverage-based
 Latin fallback restores digits and punctuation in HWPX `24`, reducing its

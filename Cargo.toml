@@ -16,12 +16,12 @@ hanji-package = { path = "crates/hanji-package" }
 hanji-testkit = { path = "crates/hanji-testkit" }
 
 # One immutable renderer source keeps PPTX and DOCX layout types compatible.
-# S92 includes the upstream sync and the fork CI doctest wrapper.
-rdocx = { git = "https://github.com/sinteric/rdocx", rev = "6725e96f9ff2c445536593ba7f6c3a20fdde7698", default-features = false }
-rpptx = { git = "https://github.com/sinteric/rdocx", rev = "6725e96f9ff2c445536593ba7f6c3a20fdde7698", default-features = false }
-rpptx-render = { git = "https://github.com/sinteric/rdocx", rev = "6725e96f9ff2c445536593ba7f6c3a20fdde7698", default-features = false }
-rpptx-layout = { git = "https://github.com/sinteric/rdocx", rev = "6725e96f9ff2c445536593ba7f6c3a20fdde7698", default-features = false }
-oxml-layout = { git = "https://github.com/sinteric/rdocx", rev = "6725e96f9ff2c445536593ba7f6c3a20fdde7698", default-features = false }
+# S93 plus the chart-legend-omitted layout diagnostic (sinteric/rdocx#20).
+rdocx = { git = "https://github.com/sinteric/rdocx", rev = "0516079ebe12114e0044e807a1224fab8b098e98", default-features = false }
+rpptx = { git = "https://github.com/sinteric/rdocx", rev = "0516079ebe12114e0044e807a1224fab8b098e98", default-features = false }
+rpptx-render = { git = "https://github.com/sinteric/rdocx", rev = "0516079ebe12114e0044e807a1224fab8b098e98", default-features = false }
+rpptx-layout = { git = "https://github.com/sinteric/rdocx", rev = "0516079ebe12114e0044e807a1224fab8b098e98", default-features = false }
+oxml-layout = { git = "https://github.com/sinteric/rdocx", rev = "0516079ebe12114e0044e807a1224fab8b098e98", default-features = false }
 # sinteric/rhwp main (0.8.7 plus Hanji fork contracts).
 rhwp = { git = "https://github.com/sinteric/rhwp", rev = "260c6df57f7655875be83f6d23acc83499a0a2a4", default-features = false }
 

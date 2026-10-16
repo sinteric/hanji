@@ -23,3 +23,5 @@ serde_json = "1"
 assert_cmd = "2"
 hanji-package.workspace = true
 hanji-core.workspace = true
+rdocx.workspace = true
+rpptx.workspace = true

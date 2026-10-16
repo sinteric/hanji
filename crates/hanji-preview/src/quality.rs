@@ -38,6 +38,8 @@ impl From<DocumentKind> for PreviewSource {
 pub enum DiagnosticCode {
     #[serde(rename = "renderer.layout-report")]
     LayoutReport,
+    #[serde(rename = "renderer.chart-legend-omitted")]
+    ChartLegendOmitted,
     #[serde(rename = "svg.text-approximation")]
     TextApproximation,
     #[serde(rename = "svg.invalid-text-replaced")]
@@ -251,6 +253,9 @@ fn classify(source: PreviewSource, d: &Diagnostic) -> (DiagnosticCode, Severity,
     if d.path.ends_with(".subset") {
         return (FontEmbeddingFailed, Error, MissingText);
     }
+    if rdocx::ChartLegendOmitted::from_diagnostic_message(&d.message).is_some() {
+        return (ChartLegendOmitted, Warning, Approximation);
+    }
     if d.path.starts_with("layout.diagnostics[") {
         return (LayoutReport, Warning, Unclassified);
     }
@@ -440,7 +445,9 @@ impl QualityReport {
             });
         }
         for warning in warnings {
-            if legacy.iter().any(|d| warning.contains(&d.message)) {
+            if legacy.iter().any(|d| {
+                warning.contains(&d.message) || warning.contains(crate::warning_text_for_diagnostic(&d.message))
+            }) {
                 continue;
             }
             let experimental = warning.starts_with("DOCX preview is experimental:")
