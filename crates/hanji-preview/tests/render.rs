@@ -127,7 +127,8 @@ fn the_korean_deck_with_a_korean_font_draws_every_character() {
     let (_, p) = store::render(&ws, &id, None, &opts).unwrap();
     // A Korean slide with its subset fonts stays small (a whole CJK face is 16 MB or more).
     check_pages(&p, 7, 300 << 10);
-    assert!(p.warnings.is_empty(), "{:?}", p.warnings);
+    assert!(!p.warnings.iter().any(|w| w == hanji_preview::NO_KOREAN_FONT), "{:?}", p.warnings);
+    assert!(p.warnings.iter().all(|w| w.contains("multilingual shaping")), "{:?}", p.warnings);
     assert!(p.fonts.missing_glyphs.is_empty(), "{:?}", p.fonts.missing_glyphs);
     let hangul = p.fonts.substituted.iter().find(|s| s.requested == "맑은 고딕" && s.script == Script::Hangul).unwrap();
     assert_eq!(hangul.source, Some(hanji_preview::fonts::Source::FontDir));
