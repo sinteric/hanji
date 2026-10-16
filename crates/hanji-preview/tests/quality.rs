@@ -50,6 +50,33 @@ fn known_omission_has_stable_code_source_object_page_and_opt_in_refusal() {
 }
 
 #[test]
+fn chart_legend_omitted_is_a_classified_warning_not_a_critical_loss() {
+    let legacy = Diagnostic {
+        path: "layout.diagnostics[0]".into(),
+        message:
+            "chart-legend-omitted reason=entries-exceed-height width_pt=200 height_pt=140 entries=10 source=slide:rId2"
+                .into(),
+    };
+    let notice = rdocx::ChartLegendOmitted::from_diagnostic_message(&legacy.message).unwrap();
+    assert_eq!(notice.reason.as_str(), "entries-exceed-height");
+    assert_eq!(notice.entry_count, 10);
+    let report = QualityReport::inspect(
+        PreviewSource::Docx,
+        std::slice::from_ref(&legacy),
+        &FontsReport::default(),
+        &[format!("layout.diagnostics[0]: {}", hanji_preview::CHART_LEGEND_OMITTED_WARNING)],
+    );
+    assert_eq!(report.diagnostics.len(), 1);
+    assert_eq!(report.diagnostics[0].code, DiagnosticCode::ChartLegendOmitted);
+    assert_eq!(report.diagnostics[0].severity, Severity::Warning);
+    assert_eq!(report.diagnostics[0].consequence, Consequence::Approximation);
+    assert_eq!(report.status, QualityStatus::Degraded);
+    assert!(report.enforce(Strictness::CriticalLosses).is_ok());
+    let serialized = serde_json::to_value(&report.diagnostics[0]).unwrap();
+    assert_eq!(serialized["code"], "renderer.chart-legend-omitted");
+}
+
+#[test]
 fn opaque_upstream_and_future_diagnostics_never_become_critical_by_keyword_guess() {
     let legacy = [
         Diagnostic {

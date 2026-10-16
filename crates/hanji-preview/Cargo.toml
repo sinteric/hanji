@@ -40,3 +40,5 @@ hanji-store = { path = "../hanji-store", optional = true }
 
 [dev-dependencies]
 serde_json = "1"
+rdocx.workspace = true
+rpptx = { workspace = true, features = ["render"] }

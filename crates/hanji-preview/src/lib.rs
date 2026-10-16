@@ -609,6 +609,18 @@ impl FontsReport {
 /// The message for Korean text no face here draws.
 pub const NO_KOREAN_FONT: &str = "no Korean font was found, so Hangul is drawn as empty boxes. Install Noto Sans CJK KR (Linux: the fonts-noto-cjk package; or from https://github.com/notofonts/noto-cjk), or pass --font-dir DIR (or set HANJI_FONT_DIR) with a Korean font such as 맑은 고딕.";
 
+/// User-visible warning when a pie or doughnut category legend does not fit.
+pub const CHART_LEGEND_OMITTED_WARNING: &str = "chart too small, legend omitted; enlarge the chart to show it";
+
+/// Map a renderer diagnostic message onto the warning text shown in preview/CLI.
+pub(crate) fn warning_text_for_diagnostic(message: &str) -> &str {
+    if rdocx::ChartLegendOmitted::from_diagnostic_message(message).is_some() {
+        CHART_LEGEND_OMITTED_WARNING
+    } else {
+        message
+    }
+}
+
 /// PowerPoint's single line, in em.
 const LINE_EM: f64 = 1.2;
 
@@ -1089,7 +1101,8 @@ impl Preview {
         }
         let mut summaries: BTreeMap<&str, (usize, &str)> = BTreeMap::new();
         for d in &self.diagnostics {
-            let summary = summaries.entry(&d.message).or_insert((0, &d.path));
+            let message = warning_text_for_diagnostic(&d.message);
+            let summary = summaries.entry(message).or_insert((0, &d.path));
             summary.0 += 1;
         }
         for (message, (count, path)) in summaries {
@@ -1834,6 +1847,38 @@ mod tests {
         assert!(p.warnings.iter().any(|w| w.contains("could not be subset") && w.contains("text may be missing")));
         assert!(p.html("preview").contains("could not be subset"));
         assert!(!p.page_subsets[0].iter().any(|(font, _)| *font == id));
+    }
+
+    #[test]
+    fn chart_legend_omitted_layout_diagnostic_is_a_user_visible_warning() {
+        let mut p = red_page(72.0, 72.0);
+        p.layout.diagnostics = vec![oxml_layout::Diagnostic {
+            message: format!(
+                "{} reason=chart-too-small width_pt=200 height_pt=140 entries=10 source=word:rId4",
+                rdocx::CHART_LEGEND_OMITTED
+            ),
+        }];
+        reset_output(&mut p);
+        p.prepare_output().unwrap();
+        let diagnostic = p
+            .diagnostics
+            .iter()
+            .find(|d| d.path.starts_with("layout.diagnostics[") && d.message.starts_with(rdocx::CHART_LEGEND_OMITTED))
+            .unwrap_or_else(|| panic!("layout diagnostic missing: {:?}", p.diagnostics));
+        let notice = rdocx::ChartLegendOmitted::from_diagnostic_message(&diagnostic.message).unwrap();
+        assert_eq!(notice.reason, rdocx::LegendOmissionReason::ChartTooSmall);
+        assert_eq!(notice.reason.as_str(), "chart-too-small");
+        assert_eq!((notice.width_pt, notice.height_pt, notice.entry_count), (200.0, 140.0, 10));
+        assert!(diagnostic.message.contains("source=word:rId4"));
+        assert!(p.warnings.iter().any(|w| w.contains(CHART_LEGEND_OMITTED_WARNING) && w.contains(&diagnostic.path)));
+        assert!(p.html("preview").contains(CHART_LEGEND_OMITTED_WARNING));
+        let quality = p.quality(DocumentKind::Pptx);
+        assert_eq!(
+            quality.diagnostics.iter().filter(|d| d.code == quality::DiagnosticCode::ChartLegendOmitted).count(),
+            1
+        );
+        assert!(!quality.diagnostics.iter().any(|d| d.code == quality::DiagnosticCode::UnclassifiedWarning
+            && d.message.contains(CHART_LEGEND_OMITTED_WARNING)));
     }
 
     #[test]
