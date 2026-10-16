@@ -189,22 +189,22 @@ fn declared_symbol_numbering_retains_the_private_code_and_actual_legacy_glyph() 
 }
 
 #[test]
-fn absent_or_disagreeing_legacy_mapping_retains_a_critical_missing_character() {
+fn absent_or_disagreeing_legacy_mapping_does_not_preserve_the_private_code() {
     for font in [named(oxml_layout::bundled_fonts::bundled_font_data()[0].1, "Symbol"), encoding_fixture('A')] {
         let preview = hanji_preview::docx::render_with_fonts(
             &document("02", "Symbol", true),
             &FontOptions { fonts: vec![FontData::new(font)], ..Default::default() },
         )
         .unwrap();
-        assert!(preview.fonts.missing_glyphs.iter().any(|g| g.char == "U+F0B7"));
-        assert!(preview
-            .quality(hanji_preview::DocumentKind::Docx)
-            .diagnostics
-            .iter()
-            .any(|d| d.code == hanji_preview::quality::DiagnosticCode::MissingGlyphs
-                && d.severity == hanji_preview::quality::Severity::Error));
         let PageData::Svg(svg) = preview.render_page(0, PageFormat::Svg).unwrap().data else { panic!() };
-        assert!(svg.contains('\u{F0B7}'));
+        // Hanji's cmap alias still requires a verified Macintosh B7 mapping.
+        // S92 remaps an uncovered Symbol numbering bullet to U+2022 instead of
+        // leaving the original private code missing.
+        assert!(preview.fonts.missing_glyphs.iter().all(|g| g.char != "U+F0B7"));
+        assert!(svg.contains('\u{2022}') && !svg.contains('\u{F0B7}'));
+        assert!(embedded_fonts(&svg)
+            .iter()
+            .all(|data| Face::parse(data, 0).unwrap().glyph_index('\u{F0B7}').is_none()));
     }
 }
 
@@ -217,6 +217,14 @@ fn a_family_name_or_unrelated_private_text_is_insufficient_to_activate_the_bridg
             &FontOptions { fonts: vec![FontData::new(encoding_fixture('\u{2022}'))], ..Default::default() },
         )
         .unwrap();
+        let PageData::Svg(svg) = preview.render_page(0, PageFormat::Svg).unwrap().data else { panic!() };
+        if family.eq_ignore_ascii_case("Symbol") && numbered {
+            // Charset 00 is not the Hanji bridge, but S92 still substitutes a
+            // Symbol numbering bullet that lacks original-code coverage.
+            assert!(preview.fonts.missing_glyphs.iter().all(|g| g.char != "U+F0B7"));
+            assert!(svg.contains('\u{2022}') && !svg.contains('\u{F0B7}'));
+            continue;
+        }
         assert!(preview.fonts.missing_glyphs.iter().any(|g| g.char == "U+F0B7"));
         assert!(preview
             .quality(hanji_preview::DocumentKind::Docx)
@@ -224,5 +232,6 @@ fn a_family_name_or_unrelated_private_text_is_insufficient_to_activate_the_bridg
             .iter()
             .any(|d| d.code == hanji_preview::quality::DiagnosticCode::MissingGlyphs
                 && d.severity == hanji_preview::quality::Severity::Error));
+        assert!(svg.contains('\u{F0B7}'));
     }
 }
