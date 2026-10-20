@@ -4,6 +4,10 @@
 
 - Stop the formula tokenizer from panicking on an unclosed `[` in model-written
   formulas and in imported XLSX defined names or cell formulas.
+- Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `562aefb`
+  (S95 and S95.11: Word authoring APIs, stricter Word/PowerPoint value
+  validation, typed content controls, imported chart types). PPTX previews now
+  also hide master shapes when the slide itself sets `showMasterSp="0"`.
 - Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `66611b3`
   (S94, including zip 9.0.3+, plus S93 and sinteric/rdocx#20).
 - Bump rhwp from sinteric/rhwp `260c6df` to main `d2fdbebf` (zip 9.0.4).
