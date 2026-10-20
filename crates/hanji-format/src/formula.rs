@@ -361,6 +361,10 @@ fn bracket_end(f: &str, i: usize) -> usize {
 
 /// `[1]Sheet1!A1` or `[Book.xlsx]Sheet1!A1`.
 fn external_ref(f: &str, i: usize, end: usize) -> Option<(Reference, usize)> {
+    // An unclosed `[` runs to the end of the formula: no workbook prefix.
+    if !f[i..end].ends_with(']') {
+        return None;
+    }
     let inner = &f[i + 1..end - 1];
     if inner.contains('[') || inner.starts_with('@') || inner.starts_with('#') {
         return None;
@@ -951,5 +955,70 @@ mod tests {
         assert_eq!(model_formula_problem("=HYPERLINK(\"https://e.com/a\",\"site\")"), None);
         assert_eq!(model_formula_problem("=SUM([@a]"), Some(FormulaProblem::Unbalanced));
         assert!(matches!(safety_problem("=cmd|'/c calc'!A0"), Some(FormulaProblem::Dde(_))));
+    }
+
+    /// Every token of `f` starts and ends on a character boundary, the tokens
+    /// follow each other, and the last ends the formula.
+    fn assert_token_spans(f: &str) {
+        let tokens = tokenize(f);
+        let mut at = if f.starts_with('=') { 1 } else { 0 };
+        for t in &tokens {
+            assert!(f.is_char_boundary(t.start) && f.is_char_boundary(t.end), "{f:?}: {t:?}");
+            assert!(t.start == at && t.start < t.end, "{f:?}: {t:?}");
+            at = t.end;
+        }
+        assert_eq!(at, f.len(), "{f:?}");
+    }
+
+    #[test]
+    fn unclosed_brackets() {
+        for f in ["[", "=[", "=[가", "=SUM([", "=[ab", "=[1]Sheet1!A1", "=T[", "=T[가", "=[[]", "=[']"] {
+            assert_token_spans(f);
+        }
+        assert_eq!(kinds("=[가"), ["st:[가"]);
+        assert_eq!(kinds("=SUM(["), ["fn:SUM", "Open", "st:["]);
+        assert_eq!(structured_refs("=[ab")[0].columns, Some(("[ab".into(), "[ab".into())));
+        assert_eq!(kinds("=[1]Sheet1!A1"), ["ref:[1]Sheet1!A1"]);
+        let _ = model_formula_problem("=[");
+        let _ = model_formula_problem("=[가");
+        assert_eq!(safety_problem("["), None);
+        assert_eq!(safety_problem("=\"|\"&["), None);
+    }
+
+    /// Every formula up to four characters over an alphabet of the characters
+    /// the tokenizer treats specially: no panic, and token spans on character boundaries.
+    #[test]
+    fn short_formulas_never_panic() {
+        const ALPHABET: [char; 18] =
+            ['[', ']', '\'', '"', '=', '!', '가', '1', 'A', ':', '@', '#', '(', ')', ',', '$', ' ', '|'];
+        let mut f = String::new();
+        let mut idx: Vec<usize> = vec![];
+        loop {
+            f.clear();
+            f.extend(idx.iter().map(|&k| ALPHABET[k]));
+            assert_token_spans(&f);
+            let _ = safety_problem(&f);
+            let _ = model_formula_problem(&f);
+            let _ = structured_refs(&f);
+            let _ = to_short_form(&f, "T");
+            let _ = to_file_form(&f, "T");
+            let _ = rewrite_refs(&f, &mut |t, r| Some(r.write(prefix_text(&f, t))));
+            let _ = sheet_prefix(&f);
+            let _ = escape_col(&f);
+            // The next string: count in base ALPHABET.len(), growing by one character on overflow.
+            let mut k = 0;
+            while k < idx.len() && idx[k] + 1 == ALPHABET.len() {
+                idx[k] = 0;
+                k += 1;
+            }
+            if k == idx.len() {
+                if idx.len() == 4 {
+                    break;
+                }
+                idx.push(0);
+            } else {
+                idx[k] += 1;
+            }
+        }
     }
 }

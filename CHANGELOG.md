@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Stop the formula tokenizer from panicking on an unclosed `[` in model-written
+  formulas and in imported XLSX defined names or cell formulas.
 - Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `66611b3`
   (S94, including zip 9.0.3+, plus S93 and sinteric/rdocx#20).
 - Bump rhwp from sinteric/rhwp `260c6df` to main `d2fdbebf` (zip 9.0.4).
