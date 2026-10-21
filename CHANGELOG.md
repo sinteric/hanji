@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.5.0 — 2026-10-21
+
 - Stop XLSX fraction formats with long denominators (`?/??????????`) from
   panicking or spinning for minutes per cell in display text and previews.
 - Stop the formula tokenizer from panicking on an unclosed `[` in model-written
@@ -12,6 +14,8 @@
   also hide master shapes when the slide itself sets `showMasterSp="0"`.
 - Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `66611b3`
   (S94, including zip 9.0.3+, plus S93 and sinteric/rdocx#20).
+- Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `6725e96`
+  (S92).
 - Bump rhwp from sinteric/rhwp `260c6df` to main `d2fdbebf` (zip 9.0.4).
 - Warn when a pie or doughnut category legend is omitted because the chart is
   too small, in DOCX and PPTX preview JSON/HTML and the CLI, without changing
