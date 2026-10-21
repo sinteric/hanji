@@ -621,7 +621,8 @@ fn fraction(x: f64, toks: &[Tk]) -> String {
     let neg = x < 0.0;
     let a = x.abs();
     let (whole, f) = if has_whole { (a.trunc(), a.fract()) } else { (0.0, a) };
-    let max_den = 10u64.pow(den_digits.len().max(1) as u32) - 1;
+    // Past 15 digits an f64 has no more to tell.
+    let max_den = 10u64.pow(den_digits.len().clamp(1, 15) as u32) - 1;
     let (mut n, d) = match fixed {
         Some(d) => ((f * d as f64).round() as u64, d),
         None => best_fraction(f, max_den),
@@ -651,18 +652,43 @@ fn fraction(x: f64, toks: &[Tk]) -> String {
     out
 }
 
+/// The fraction closest to `f` with a denominator up to `max_den`, the smaller
+/// denominator unless a larger one is closer by more than 1e-12. It walks the
+/// continued fraction of `f`, so a nine-digit `?????????` denominator takes a
+/// few dozen steps rather than one per candidate.
 fn best_fraction(f: f64, max_den: u64) -> (u64, u64) {
-    let (mut best_n, mut best_d, mut best_e) = (0, 1, f);
-    for d in 1..=max_den {
-        let n = (f * d as f64).round() as u64;
-        let e = (f - n as f64 / d as f64).abs();
-        if e < best_e - 1e-12 {
-            best_n = n;
-            best_d = d;
-            best_e = e;
+    let whole = f.floor();
+    let x = f - whole;
+    // k·x − h with one rounding, so its sign is exact: h ≤ k ≤ max_den < 2^53.
+    let side = |h: u64, k: u64| (k as f64).mul_add(x, -(h as f64));
+    let err = |h: u64, k: u64| (x - h as f64 / k as f64).abs();
+    // Successive convergents h0/k0 and h1/k1 of x, from 1/0 and 0/1.
+    let (mut h0, mut k0, mut h1, mut k1) = (1u64, 0u64, 0u64, 1u64);
+    while side(h1, k1) != 0.0 {
+        // The next partial quotient a: the most steps of h1/k1 from h0/k0
+        // that stay on h0/k0's side of x, at most `room` to keep k ≤ max_den
+        // (fewer makes the last a semiconvergent). The float estimate is
+        // corrected with exact side tests.
+        let room = (max_den - k0) / k1;
+        let below = side(h0, k0) < 0.0;
+        let keeps_side = |a: u64| {
+            let s = side(h0 + a * h1, k0 + a * k1);
+            s == 0.0 || (s < 0.0) == below
+        };
+        let mut a = (-side(h0, k0) / side(h1, k1)).floor().min(room as f64) as u64;
+        while a > 0 && !keeps_side(a) {
+            a -= 1;
         }
+        while a < room && keeps_side(a + 1) {
+            a += 1;
+        }
+        let (h, k) = (h0 + a * h1, k0 + a * k1);
+        if a == 0 || err(h, k) >= err(h1, k1) - 1e-12 {
+            break;
+        }
+        (h0, k0, h1, k1) = (h1, k1, h, k);
     }
-    (best_n, best_d)
+    ((whole as u64).saturating_mul(k1).saturating_add(h1), k1)
 }
 
 /// Civil date of a serial (the 1900 system counts the phantom 1900-02-29).
@@ -905,6 +931,54 @@ mod tests {
         assert_eq!(n(5.0, "#.##"), "5.");
         assert_eq!(n(1234.0, "_-* #,##0_-;-* #,##0_-;_-* \"-\"_-;_-@_-"), " 1,234 ");
         assert_eq!(n(7.0, "[Red][<=9999999]###-####;(###) ###-####"), "-7");
+    }
+
+    /// The linear search `best_fraction` replaced: one candidate per denominator.
+    fn best_fraction_linear(f: f64, max_den: u64) -> (u64, u64) {
+        let (mut best_n, mut best_d, mut best_e) = (0, 1, f);
+        for d in 1..=max_den {
+            let n = (f * d as f64).round() as u64;
+            let e = (f - n as f64 / d as f64).abs();
+            if e < best_e - 1e-12 {
+                best_n = n;
+                best_d = d;
+                best_e = e;
+            }
+        }
+        (best_n, best_d)
+    }
+
+    #[test]
+    fn best_fraction_matches_linear_search() {
+        let mut fs: Vec<f64> = (0..=3000).map(|i| i as f64 / 1000.0).collect();
+        for d in 1..=120u32 {
+            for n in 0..=d {
+                let q = n as f64 / d as f64;
+                fs.extend([q, q + 1e-9, (q - 1e-9).max(0.0), q + 1e-4, (q - 1e-4).max(0.0)]);
+            }
+        }
+        fs.extend([std::f64::consts::PI, std::f64::consts::E, std::f64::consts::SQRT_2, 0.1 + 0.2, 1.0 / 3.0]);
+        fs.extend([2.0 / 3.0 + 1e-13, 0.123456789, 0.999999, 0.000001, 7.0 / 9.0, 32769.0 / 65536.0]);
+        for max_den in [9, 99, 999] {
+            for &f in &fs {
+                assert_eq!(best_fraction(f, max_den), best_fraction_linear(f, max_den), "f = {f}, max_den = {max_den}");
+            }
+        }
+    }
+
+    #[test]
+    fn long_fraction_denominators() {
+        // Twenty `?` used to overflow 10^20, and nine or more to loop for
+        // minutes per cell.
+        assert_eq!(n(0.3, "?/????????????????????"), "3/10");
+        assert_eq!(n(0.75, "# ?????????/?????????"), "3/4");
+        assert_eq!(n(0.000123, "?/???????"), "123/1000000");
+        assert_eq!(n(2.0 + 32769.0 / 65536.0, "# ?????/?????"), "2 32769/65536");
+        assert_eq!(n(1.0 / 3.0, "?/?????????"), "1/3");
+        assert_eq!(n(0.1 + 0.2, "?/????????"), "3/10");
+        // The first convergent of π within 1e-12.
+        assert_eq!(n(std::f64::consts::PI, "# ??????????/??????????"), "3 192583/1360120");
+        assert_eq!(n(0.0, "# ????????/????????"), "0");
     }
 
     #[test]

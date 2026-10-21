@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Stop XLSX fraction formats with long denominators (`?/??????????`) from
+  panicking or spinning for minutes per cell in display text and previews.
 - Stop the formula tokenizer from panicking on an unclosed `[` in model-written
   formulas and in imported XLSX defined names or cell formulas.
 - Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `562aefb`
