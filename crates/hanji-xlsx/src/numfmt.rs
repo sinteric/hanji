@@ -691,7 +691,8 @@ fn best_fraction(f: f64, max_den: u64) -> (u64, u64) {
     ((whole as u64).saturating_mul(k1).saturating_add(h1), k1)
 }
 
-/// Civil date of a serial (the 1900 system counts the phantom 1900-02-29).
+/// Civil date of a serial (the 1900 system counts the phantom 1900-02-29),
+/// none before the epoch or after 9999-12-31, as Excel shows `####` there.
 pub fn civil(serial: f64, date1904: bool) -> Option<(i64, u32, u32)> {
     let days = serial.floor() as i64;
     if !date1904 && days == 60 {
@@ -704,7 +705,7 @@ pub fn civil(serial: f64, date1904: bool) -> Option<(i64, u32, u32)> {
     } else {
         days_from_civil(1899, 12, 30)
     };
-    (days >= 0).then(|| civil_from_days(base + days))
+    (days >= 0 && base + days <= days_from_civil(9999, 12, 31)).then(|| civil_from_days(base + days))
 }
 
 /// Days from 1970-01-01 of a civil date.
@@ -762,21 +763,25 @@ fn date(x: f64, toks: &[Tk], date1904: bool) -> String {
     if x < 0.0 {
         return "#".repeat(11);
     }
-    // Fractional seconds shown: the count of 0s after `s.`.
+    // Fractional seconds shown: the count of 0s after `s.`. Past microseconds,
+    // more than a present-day serial holds, the digits show as 0s and 10^digits
+    // stays finite.
     let codes: Vec<char> = toks.iter().filter_map(|t| if let Tk::Code(c) = t { Some(*c) } else { None }).collect();
     let low: String = codes.iter().collect::<String>().to_ascii_lowercase();
     let sub_digits = low.find("s.").map_or(0, |k| low[k + 2..].chars().take_while(|c| *c == '0').count());
-    let unit = 86_400.0 * 10f64.powi(sub_digits as i32);
+    let sub_shown = sub_digits.min(6);
+    let sub_unit = 10f64.powi(sub_shown as i32);
+    let unit = 86_400.0 * sub_unit;
     let ticks = (x * unit).round();
     let day = (ticks / unit).floor();
     let rem = ticks - day * unit;
-    let total_secs = rem / 10f64.powi(sub_digits as i32);
+    let total_secs = rem / sub_unit;
     let (hh, mm, ss) = (
         (total_secs / 3600.0).floor() as u64,
         ((total_secs % 3600.0) / 60.0).floor() as u64,
         (total_secs % 60.0).floor() as u64,
     );
-    let sub = (rem % 10f64.powi(sub_digits as i32)) as u64;
+    let sub = (rem % sub_unit) as u64;
     let Some((y, mo, d)) = civil(day, date1904) else { return "#".repeat(11) };
     let ampm = low.contains("am/pm") || low.contains("a/p");
     let weekday = ((days_from_civil(y, mo, d) % 7 + 11) % 7) as usize; // 1970-01-01 was a Thursday
@@ -874,7 +879,8 @@ fn date(x: f64, toks: &[Tk], date1904: bool) -> String {
                     }
                     '.' if sub_digits > 0 && low.contains("s.") && matches!(toks.get(k + 1), Some(Tk::Code('0'))) => {
                         out.push('.');
-                        out.push_str(&format!("{:0w$}", sub, w = sub_digits));
+                        out.push_str(&format!("{:0w$}", sub, w = sub_shown));
+                        out.push_str(&"0".repeat(sub_digits - sub_shown));
                         k += 1 + sub_digits;
                         continue;
                     }
@@ -1008,6 +1014,33 @@ mod tests {
         assert_eq!(n(61.0, "yyyy-mm-dd"), "1900-03-01");
         assert_eq!(n(1.0, "yyyy-mm-dd"), "1900-01-01");
         assert_eq!(serial_of(1900, 1, 1, false), 1.0);
+    }
+
+    #[test]
+    fn dates_out_of_range() {
+        // Huge serials used to overflow civil_from_days (a panic in debug
+        // builds, a wrapped year in release).
+        assert_eq!(n(1e300, "yyyy-mm-dd"), "#".repeat(11));
+        assert_eq!(n(1e300, "[h]:mm"), "#".repeat(11));
+        assert_eq!(n(2_958_465.5, "yyyy-mm-dd"), "9999-12-31");
+        assert_eq!(n(2_958_466.0, "yyyy-mm-dd"), "#".repeat(11));
+        assert_eq!(display(&CellValue::Number(2_957_003.0), "yyyy-mm-dd", true), "9999-12-31");
+        assert_eq!(display(&CellValue::Number(2_957_004.0), "yyyy-mm-dd", true), "#".repeat(11));
+    }
+
+    #[test]
+    fn long_fractional_seconds() {
+        let x = 46082.0 + (12.0 * 3600.0 + 34.0 * 60.0 + 56.789) / 86_400.0;
+        assert_eq!(n(x, "hh:mm:ss.000"), "12:34:56.789");
+        assert_eq!(n(x, "hh:mm:ss.000000"), "12:34:56.789000");
+        // Past six digits the rest are 0s: ten used to show float noise
+        // (56.7889993728), twenty a saturated u64, and 300 overflowed the
+        // date, showing 1899-12-31 or panicking.
+        assert_eq!(n(x, "hh:mm:ss.0000000000"), "12:34:56.7890000000");
+        assert_eq!(
+            n(x, &format!("yyyy-mm-dd hh:mm:ss.{}", "0".repeat(400))),
+            format!("2026-03-01 12:34:56.789{}", "0".repeat(397))
+        );
     }
 
     #[test]

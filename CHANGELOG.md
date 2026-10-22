@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Show `###########` for XLSX date and time formats on serials past
+  9999-12-31, as Excel does, instead of panicking on huge values (`1e300` as
+  `yyyy-mm-dd`), and stop long `ss.000…` runs from showing float noise or the
+  wrong date.
+
 ## 0.5.0 — 2026-10-21
 
 - Stop XLSX fraction formats with long denominators (`?/??????????`) from
