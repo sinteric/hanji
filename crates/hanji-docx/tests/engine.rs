@@ -1634,3 +1634,141 @@ fn splitting_a_paragraph_at_an_empty_bookmark_keeps_its_start_before_its_end() {
         }
     }
 }
+
+/// A complex field `instr` whose cached result is the run `result`.
+fn field(instr: &str, result: &str) -> String {
+    format!(
+        "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText xml:space=\"preserve\"> {instr} </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:rPr><w:noProof/></w:rPr><w:t>{result}</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r>"
+    )
+}
+
+fn field_docx() -> Vec<u8> {
+    let body = format!(
+        "<w:p><w:r><w:t xml:space=\"preserve\">Table </w:t></w:r>{}<w:r><w:t xml:space=\"preserve\"> totals</w:t></w:r></w:p><w:p><w:r><w:t xml:space=\"preserve\">page </w:t></w:r><w:fldSimple w:instr=\" PAGE \"><w:r><w:t>7</w:t></w:r></w:fldSimple></w:p>",
+        field("SEQ Table \\* ARABIC", "12")
+    );
+    docx(&body, vec![])
+}
+
+#[test]
+fn a_field_result_is_text_and_exports_unchanged() {
+    use hanji_package::xml;
+    let source = field_docx();
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("Table 12 totals"), "{}", imp.text);
+    assert!(imp.text.contains("page 7"), "{}", imp.text);
+    assert!(!imp.text.contains("<keep"), "{}", imp.text);
+    let unchanged = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    let before = package::read(&source).unwrap();
+    let after = package::read(&unchanged).unwrap();
+    assert_eq!(
+        xml::canon_part(package::get(&before, "word/document.xml").unwrap()).unwrap(),
+        xml::canon_part(package::get(&after, "word/document.xml").unwrap()).unwrap()
+    );
+}
+
+#[test]
+fn editing_a_field_result_replaces_the_cached_result_and_keeps_the_instruction() {
+    let imp = DocxEngine
+        .import(&field_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = edit(&imp.remainder, &imp.text, "Table 12", "Table 13", CAPS).unwrap();
+    let r = edit(&r.remainder, &r.text, "page 7", "page 8", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(
+        xml.contains(
+            "<w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:rPr><w:noProof/></w:rPr><w:t>13</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r><w:r><w:t xml:space=\"preserve\"> totals"
+        ),
+        "{xml}"
+    );
+    assert!(xml.contains("SEQ Table"), "{xml}");
+    assert!(
+        xml.contains("<w:fldSimple w:instr=\" PAGE \"><w:r><w:t>8</w:t></w:r></w:fldSimple>"),
+        "{xml}"
+    );
+}
+
+#[test]
+fn deleting_a_field_result_removes_the_field_and_says_so() {
+    let imp = DocxEngine
+        .import(&field_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "Table 12 totals",
+        "Table totals",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.1 == Kind::Wrap && x.2.contains("all of its text")),
+        "{:?}",
+        r.report
+    );
+    let xml = doc_xml(&DocxEngine.export(&r.text, &r.remainder).unwrap());
+    assert!(!xml.contains("SEQ") && !xml.contains("fldChar"), "{xml}");
+}
+
+#[test]
+fn a_field_result_split_across_paragraphs_is_refused() {
+    let imp = DocxEngine
+        .import(&field_docx(), &ImportOptions::default())
+        .unwrap();
+    let new = imp.text.replace("Table 12 totals", "Table 1\n\n2 totals");
+    match rewrite(&imp.remainder, &imp.text, &new, CAPS) {
+        Err(Refusal::Unplaceable(r)) => assert!(
+            r.refused
+                .iter()
+                .any(|x| x.1 == Kind::Wrap && x.2.contains("different paragraphs")),
+            "{r:?}"
+        ),
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn fields_without_a_text_result_stay_placeholders() {
+    let form = "<w:r><w:fldChar w:fldCharType=\"begin\"><w:ffData><w:name w:val=\"Text1\"/><w:textInput/></w:ffData></w:fldChar></w:r><w:r><w:instrText> FORMTEXT </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>name</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r>";
+    let nested = format!(
+        "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText> IF 1 = 1 </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>{}<w:r><w:fldChar w:fldCharType=\"end\"/></w:r>",
+        field("PAGE", "3")
+    );
+    let shared = "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText> PAGE </w:instrText><w:fldChar w:fldCharType=\"separate\"/><w:t>4</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r>";
+    let body = [
+        form.to_string(),
+        field("XE \"index\"", " "),
+        nested,
+        shared.to_string(),
+    ]
+    .iter()
+    .map(|f| format!("<w:p><w:r><w:t>a</w:t></w:r>{f}</w:p>"))
+    .collect::<String>();
+    let imp = DocxEngine
+        .import(&docx(&body, vec![]), &ImportOptions::default())
+        .unwrap();
+    assert_eq!(
+        imp.text.matches("kind=\"field\"").count(),
+        4,
+        "{}",
+        imp.text
+    );
+}

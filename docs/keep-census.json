@@ -34,7 +34,7 @@
     "files": 102,
     "failed": 0,
     "with_keeps": 64,
-    "keeps": 387
+    "keeps": 374
   },
   "formats": [
     {
@@ -42,7 +42,7 @@
       "files": 13,
       "failed": 0,
       "with_keeps": 13,
-      "keeps": 225
+      "keeps": 212
     },
     {
       "format": "hwpx",
@@ -70,8 +70,8 @@
     {
       "format": "docx",
       "kind": "field",
-      "keeps": 85,
-      "files": 7
+      "keeps": 72,
+      "files": 3
     },
     {
       "format": "docx",
@@ -315,9 +315,8 @@
     {
       "path": "prototype/remainder/corpus/delins.docx",
       "format": "docx",
-      "keeps": 17,
+      "keeps": 15,
       "kinds": {
-        "field": 2,
         "tracked-delete": 2,
         "tracked-insert": 13
       }
@@ -334,10 +333,9 @@
     {
       "path": "prototype/remainder/corpus/fdo76098.docx",
       "format": "docx",
-      "keeps": 3,
+      "keeps": 2,
       "kinds": {
-        "drawing": 2,
-        "field": 1
+        "drawing": 2
       }
     },
     {
@@ -365,13 +363,12 @@
     {
       "path": "prototype/remainder/corpus/loadAndSave.docx",
       "format": "docx",
-      "keeps": 9,
+      "keeps": 8,
       "kinds": {
         "comment": 1,
         "content-control": 1,
         "drawing": 3,
         "endnote": 1,
-        "field": 1,
         "footnote": 1,
         "math": 1
       }
@@ -399,24 +396,24 @@
     {
       "path": "prototype/remainder/corpus/tdf154481.docx",
       "format": "docx",
-      "keeps": 21,
+      "keeps": 15,
       "kinds": {
         "comment": 12,
         "content-control": 1,
         "drawing": 1,
-        "field": 7
+        "field": 1
       }
     },
     {
       "path": "prototype/remainder/corpus/testWORD_2006ml.docx",
       "format": "docx",
-      "keeps": 53,
+      "keeps": 51,
       "kinds": {
         "comment": 1,
         "content-control": 9,
         "drawing": 5,
         "endnote": 1,
-        "field": 4,
+        "field": 2,
         "field-part": 12,
         "footnote": 1,
         "math": 1,
@@ -430,10 +427,9 @@
     {
       "path": "prototype/remainder/corpus/testWORD_various.docx",
       "format": "docx",
-      "keeps": 3,
+      "keeps": 2,
       "kinds": {
         "drawing": 1,
-        "field": 1,
         "footnote": 1
       }
     },

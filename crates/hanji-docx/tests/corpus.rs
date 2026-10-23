@@ -9,7 +9,9 @@ mod review;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use hanji_core::{Block, Engine, EngineError, Entry, ImportOptions, ImportReport, Kind, Remainder};
+use hanji_core::{
+    edit, Block, Engine, EngineError, Entry, ImportOptions, ImportReport, Kind, Remainder,
+};
 use hanji_docx::{
     export_document, package, write_package, xml, DocxEngine, ExportOptions, History, Reviewer,
 };
@@ -554,4 +556,70 @@ fn edit_chain(text: &str, rem: &Remainder, with_move: bool) -> Vec<hanji_core::R
         out.push(r);
     }
     out
+}
+
+/// Field results read as text in the corpus files that have them, export
+/// unchanged, and take an edit to the cached result (DESIGN.md §5.1).
+/// (testWORD_2006ml's are covered by the harness's GetPut: its OLE object
+/// is neutralised on import, so its part is not compared here.)
+#[test]
+fn corpus_field_results_are_text() {
+    let files = corpus();
+    let file = |stem: &str| {
+        files
+            .iter()
+            .find(|f| f.0.starts_with(stem))
+            .unwrap_or_else(|| panic!("{stem} is not in the corpus"))
+            .1
+            .clone()
+    };
+    for (stem, shown) in [
+        ("loadAndSave", "Field: 6:25 PM"),
+        ("testWORD_various", "Figure 1 This is a caption"),
+        (
+            "delins",
+            "[<u>Apache Tika</u>]{color=#0000FF} is a subproject",
+        ),
+        (
+            "tdf154481",
+            "Xxxxxxxxx (]{font=\"Times New Roman\"}Xxxxxxxxx 4[):]",
+        ),
+    ] {
+        let pkg = file(stem);
+        let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+        assert!(imp.text.contains(shown), "{stem}: {}", imp.text);
+        let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+        let (a, b) = (package::read(&pkg).unwrap(), package::read(&out).unwrap());
+        assert_eq!(
+            xml::canon_part(package::get(&a, "word/document.xml").unwrap()).unwrap(),
+            xml::canon_part(package::get(&b, "word/document.xml").unwrap()).unwrap(),
+            "{stem}"
+        );
+    }
+    let pkg = file("loadAndSave");
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    let r = edit(&imp.remainder, &imp.text, "6:25 PM", "7:40 AM", CAPS).unwrap();
+    assert!(
+        r.report.removed.is_empty() && r.report.refused.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let doc = String::from_utf8(
+        package::get(&package::read(&out).unwrap(), "word/document.xml")
+            .unwrap()
+            .to_vec(),
+    )
+    .unwrap();
+    assert!(
+        doc.contains("TIME  \\* MERGEFORMAT </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r w:rsidR=\"00FE4D65\"><w:rPr><w:noProof/></w:rPr><w:t>7:40 AM</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r>"),
+        "{doc}"
+    );
 }

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Read a DOCX field's cached result as text when it is text in one paragraph
+  (page numbers, caption `SEQ` numbers, cross-references, `HYPERLINK` fields)
+  instead of a `<keep kind="field"/>` placeholder. Editing it replaces the
+  cached result and keeps the instruction; deleting all of it removes the
+  field and is reported; splitting it across paragraphs, and tracked changes
+  inside it, are refused. Legacy form fields, fields with no or a blank
+  result, and fields spanning paragraphs stay placeholders. Corpus keeps:
+  387 → 374 (DOCX `field` 85 → 72; `field-part` 12 unchanged).
 - Show `###########` for XLSX date and time formats on serials past
   9999-12-31, as Excel does, instead of panicking on huge values (`1e300` as
   `yyyy-mm-dd`), and stop long `ss.000…` runs from showing float noise or the

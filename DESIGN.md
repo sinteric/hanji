@@ -217,6 +217,21 @@ links, footnote references `[^1]`, math `$…$` or `<math>…</math>` (→ OMML 
 HWP equation), line break `<br/>`, `<field name=…>value</field>` (Word
 content controls, HWP form fields), inline `<keep/>`.
 
+- **Fields (docx):** a field whose cached result is text in one paragraph (a
+  page number, a caption's `SEQ`, a cross-reference, a `HYPERLINK` field) is
+  read as that text, as a hyperlink's text is; the instruction and the
+  field's parts stay in the remainder around it (a `Wrap` entry: `w:fldChar`
+  runs from `begin` to `separate`, and the `end` run; or the `w:fldSimple`
+  element). Editing the text replaces the cached result and keeps the
+  instruction, so Word may compute it again when it updates fields.
+  Deleting all of it removes the field, and the report says so; a result
+  split across paragraphs is refused, and so is any tracked change inside
+  a field (§10.2). A field stays a `<keep/>` when its result is not text to
+  edit: a legacy form field (`w:ffData` holds its state; an empty text
+  field's value is spaces that would hide it), no result or a blank one
+  (an index entry), a field in the result, parts sharing a run with the
+  result, or a field spanning paragraphs (a table of contents, whose result
+  is already text and whose parts stay as `field-part` keeps).
 - **Line break:** `<br/>` is a line break inside one paragraph (docx `w:br`,
   the HWP line break). It is valid in paragraphs, headings, list items and
   table cells, and it never starts a paragraph: a line holding only `<br/>`
@@ -1032,7 +1047,8 @@ stored. The path's extension must be the target's.
     with another transform, are properties the target cannot write.
   - *what the file held beyond the text*, counted by what it is: paragraph,
     run, table, row and cell properties the text does not show; bookmarks
-    and comment ranges; tracked-move ranges; hyperlink addresses; section
+    and comment ranges; tracked-move ranges; hyperlink addresses; field
+    instructions (a field's result stays as text); section
     properties (page size, orientation, margins, headers and footers) and
     section breaks; and the package's headers and footers, pictures, charts
     and embedded objects, document properties (author, dates), custom XML

@@ -36,7 +36,7 @@ use hanji_format::{Atom, Cell, CellPara, Inline, Marks, Props, Unit};
 
 use crate::export::{with_marks, Exporter};
 use crate::numbering::Numbering;
-use crate::ooxml::{insert_ordered, remove_child, PPR_ORDER};
+use crate::ooxml::{insert_ordered, is_shown_field, remove_child, PPR_ORDER};
 use crate::xml::{self, fragment, Element, Node, Scope};
 use crate::{write_package, DocShell, DocxEngine, Exported};
 
@@ -1356,6 +1356,37 @@ impl<'a> Merge<'a> {
         Some((mp.clone(), self.lens[mp]))
     }
 
+    /// A field whose result shows as text (`e`, at `x` in the merged model)
+    /// stays as it was imported: its result's text unchanged, so no tracked
+    /// change lands inside the field.
+    fn check_field(&self, e: &Entry, x: &Entry) -> Result<(), String> {
+        let changed = || {
+            "the edit changes the result of a field, which cannot be tracked; update the field in Office instead"
+                .to_string()
+        };
+        let old = self
+            .old
+            .rem
+            .entries
+            .iter()
+            .find(|o| o.id == e.id)
+            .ok_or_else(changed)?;
+        let (s, en) = (old.start.unwrap_or(0), old.end.unwrap_or(0));
+        if en <= s {
+            return Err(changed());
+        }
+        let (Some((p, a)), Some((q, b))) =
+            (self.old_pos(&old.path, s), self.old_pos(&old.path, en - 1))
+        else {
+            return Err(changed());
+        };
+        let same = p == q && p == x.path && x.start == Some(a) && x.end == Some(b + 1);
+        if !same || !(a..=b).all(|k| self.units[&p][k].st == St::Eq) {
+            return Err(changed());
+        }
+        Ok(())
+    }
+
     /// A block-level path (a block, row, cell or cell paragraph, or one past
     /// the last of them) of a new (`new`) or old table → merged.
     fn block_path(&self, path: &Path, new: bool) -> Option<Path> {
@@ -1452,6 +1483,9 @@ impl<'a> Merge<'a> {
                         );
                     }
                     (x.path, x.start, x.end) = (p, Some(a), Some(b));
+                    if is_shown_field(e) {
+                        self.check_field(e, &x)?;
+                    }
                 }
                 _ => {
                     let (p, s) = at(self.new_pos(&e.path, e.start.unwrap_or(0)))?;
@@ -1515,6 +1549,11 @@ impl<'a> Merge<'a> {
                         continue;
                     }
                     (x.path, x.start, x.end) = (p, Some(s), Some(s + 1));
+                }
+                Kind::Wrap if is_shown_field(e) && !live.contains(&e.id) => {
+                    return Err(
+                        "the edit deletes a field: edits to fields cannot be tracked".into(),
+                    );
                 }
                 Kind::Wrap if !live.contains(&e.id) => {
                     let (s, en) = (e.start.unwrap(), e.end.unwrap());
