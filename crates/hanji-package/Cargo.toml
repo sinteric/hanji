@@ -11,3 +11,6 @@ rust-version.workspace = true
 hanji-core.workspace = true
 quick-xml = "0.42"
 zip = { version = "9.0.3", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
+[lints]
+workspace = true

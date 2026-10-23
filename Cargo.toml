@@ -9,6 +9,12 @@ license = "MIT OR Apache-2.0"
 repository = "https://github.com/sinteric/hanji"
 rust-version = "1.99"
 
+# The lints that hold a rule of hanji's Rust style (STYLE.md). A lint is added
+# here only once the tree meets it.
+[workspace.lints.clippy]
+undocumented_unsafe_blocks = "deny"
+needless_for_each = "warn"
+
 [workspace.dependencies]
 hanji-format = { path = "crates/hanji-format" }
 hanji-core = { path = "crates/hanji-core" }

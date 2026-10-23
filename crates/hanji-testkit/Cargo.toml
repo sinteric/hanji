@@ -12,3 +12,6 @@ publish = false
 hanji-format.workspace = true
 hanji-core.workspace = true
 hanji-package.workspace = true
+
+[lints]
+workspace = true

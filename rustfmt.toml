@@ -1,2 +1,7 @@
-max_width = 120
-use_small_heuristics = "Max"
+# The formatting half of hanji's Rust style (STYLE.md). The three options below
+# are nightly-only: run `python3 scripts/fmt.py`, which uses the pinned nightly
+# rustfmt, not stable `cargo fmt`. Everything else is rustfmt's default,
+# including `max_width = 100`.
+imports_granularity = "Module"
+hex_literal_case = "Lower"
+format_macro_matchers = true

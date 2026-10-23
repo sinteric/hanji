@@ -11,3 +11,6 @@ rust-version.workspace = true
 hanji-format.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+[lints]
+workspace = true

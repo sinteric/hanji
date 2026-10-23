@@ -17,3 +17,6 @@ zip = { version = "9.0.3", default-features = false, features = ["deflate-flate2
 
 [dev-dependencies]
 hanji-testkit.workspace = true
+
+[lints]
+workspace = true
