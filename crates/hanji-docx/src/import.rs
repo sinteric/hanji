@@ -747,11 +747,21 @@ impl<'a> Importer<'a> {
                 _ => return Err(format!("text directly inside <{}>", container.name)),
             }
         }
-        let groups = field_groups(&kids);
+        self.walk_kids(&kids, path, pb)
+    }
+
+    /// [`Importer::walk`] over a paragraph's or wrapper's children.
+    fn walk_kids(&mut self, kids: &[&Element], path: &[usize], pb: bool) -> Result<(), String> {
+        let groups = field_groups(kids);
         let mut i = 0;
         while i < kids.len() {
             let k = kids[i];
             if let Some(&end) = groups.get(&i) {
+                if let Some(sep) = shown_field(kids, i, end) {
+                    self.field(kids, (i, sep, end), path, pb)?;
+                    i = end + 1;
+                    continue;
+                }
                 let pos = self.pos();
                 let keep = self.keep_entry(Kind::Keep, &kids[i..=end], path, Some(pos), None);
                 self.push(Atom::Keep(keep), Marks::NONE);
@@ -761,7 +771,7 @@ impl<'a> Importer<'a> {
             let name = k.name.as_str();
             if name == "w:r" {
                 self.run(k, path, pb)?;
-            } else if WRAPPERS.contains(&name) {
+            } else if WRAPPERS.contains(&name) || (name == "w:fldSimple" && shown_simple_field(k)) {
                 let mut shell = k.shell();
                 shell.children = k
                     .children
@@ -771,15 +781,16 @@ impl<'a> Importer<'a> {
                     .collect();
                 let (x, f) = (self.frag(&shell), self.fp(&[Some(&shell)]));
                 let at = self.pos();
-                let idx = self.entry(
-                    Kind::Wrap,
-                    vec![x],
-                    f,
-                    path,
-                    Some(at),
-                    None,
-                    Meta::default(),
-                );
+                // A simple field's tag tells conversion reports what it was.
+                let meta = Meta {
+                    tag: if name == "w:fldSimple" {
+                        name.into()
+                    } else {
+                        String::new()
+                    },
+                    ..Default::default()
+                };
+                let idx = self.entry(Kind::Wrap, vec![x], f, path, Some(at), None, meta);
                 let saved = self.inherited.len();
                 self.inherit(k);
                 self.walk(k, path, pb)?;
@@ -806,6 +817,38 @@ impl<'a> Importer<'a> {
             }
             i += 1;
         }
+        Ok(())
+    }
+
+    /// A complex field whose cached result shows as text (DESIGN.md §5.1):
+    /// a [`Kind::Wrap`] over the result, holding the runs from `begin` to
+    /// `separate` (`xml`) and the `end` run (`meta.aux`), which export writes
+    /// around the result's runs as they were.
+    fn field(
+        &mut self,
+        kids: &[&Element],
+        (begin, sep, end): (usize, usize, usize),
+        path: &[usize],
+        pb: bool,
+    ) -> Result<(), String> {
+        let open: Vec<&Element> = kids[begin..=sep].to_vec();
+        let parts: Vec<Option<&Element>> =
+            open.iter().chain([&kids[end]]).map(|e| Some(*e)).collect();
+        let f = self.fp(&parts);
+        let meta = Meta {
+            tag: "w:fldChar".into(),
+            aux: vec![self.frag(kids[end])],
+            ..Default::default()
+        };
+        let xml = open.iter().map(|e| self.frag(e)).collect();
+        let at = self.pos();
+        let idx = self.entry(Kind::Wrap, xml, f, path, Some(at), None, meta);
+        self.walk_kids(&kids[sep + 1..end], path, pb)?;
+        let end = self.pos();
+        let close = self.seq();
+        let e = &mut self.entries[idx];
+        e.end = Some(end);
+        e.meta.seq_close = close;
         Ok(())
     }
 
@@ -1051,6 +1094,71 @@ fn field_groups(kids: &[&Element]) -> HashMap<usize, usize> {
         i += 1;
     }
     groups
+}
+
+/// The `separate` of the complex field `kids[begin..=end]` (a group of
+/// [`field_groups`]) when its cached result can show as text: the index of
+/// the run it ends. Otherwise the field stays a placeholder: a legacy form
+/// field (`w:ffData`: its value is form state, and a text field's empty
+/// value is spaces that would hide the field), a field without a result or
+/// whose result is blank (the text would not show it), a result holding
+/// another field, or parts that share a run with the result.
+fn shown_field(kids: &[&Element], begin: usize, end: usize) -> Option<usize> {
+    let fld =
+        |e: &Element, t: &str| e.is("w:fldChar") && e.get("w:fldCharType").as_deref() == Some(t);
+    fn content(r: &Element) -> Vec<&Element> {
+        r.elements().filter(|c| !c.is("w:rPr")).collect()
+    }
+    let mut depth = 0;
+    let mut sep = None;
+    for (j, k) in kids.iter().enumerate().take(end).skip(begin) {
+        if !k.is("w:r") {
+            return None;
+        }
+        for f in k.descendants("w:fldChar") {
+            match f.get("w:fldCharType").as_deref() {
+                Some("begin") => depth += 1,
+                Some("end") => depth -= 1,
+                Some("separate") if depth == 1 => sep = Some(j),
+                _ => {}
+            }
+            if f.child("w:ffData").is_some() {
+                return None;
+            }
+        }
+        if sep.is_some() {
+            break;
+        }
+    }
+    let sep = sep?;
+    if !content(kids[sep])
+        .last()
+        .is_some_and(|c| fld(c, "separate"))
+    {
+        return None;
+    }
+    let close = content(kids[end]);
+    if close.len() != 1 || !fld(close[0], "end") {
+        return None;
+    }
+    let result = &kids[sep + 1..end];
+    if result
+        .iter()
+        .any(|k| !k.descendants("w:fldChar").is_empty() || !k.descendants("w:fldSimple").is_empty())
+    {
+        return None;
+    }
+    let text: String = result.iter().map(|k| k.text_of(&["w:t"])).collect();
+    text.chars().any(|c| !c.is_whitespace()).then_some(sep)
+}
+
+/// A `w:fldSimple` whose result shows as text: runs and markers only, with
+/// text that is not blank (as [`shown_field`]).
+fn shown_simple_field(f: &Element) -> bool {
+    let kids: Vec<&Element> = f.elements().collect();
+    kids.iter().all(|k| {
+        (k.is("w:r") || MARKERS.contains(&k.name.as_str())) && k.descendants("w:fldChar").is_empty()
+    }) && f.text_of(&["w:t"]).chars().any(|c| !c.is_whitespace())
 }
 
 /// The shown result of a complex field: text between `separate` and `end`.

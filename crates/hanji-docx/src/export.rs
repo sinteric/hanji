@@ -508,16 +508,30 @@ impl<'a> Exporter<'a> {
         let mut stack: Vec<(Option<u64>, Element)> = vec![(None, std::mem::take(&mut pel))];
         for (_, _, _, it) in items {
             match it {
+                // A complex field's parts are siblings of its result's runs:
+                // they are gathered in a holder that closing unwraps.
+                It::Open(w) if is_field(w) => {
+                    let mut holder = el("w:fldChar");
+                    holder.children = w.xml.iter().map(|x| node(fragment(x))).collect();
+                    stack.push((Some(w.id), holder));
+                }
                 It::Open(w) => stack.push((Some(w.id), fragment(&w.xml[0]))),
                 It::Close(w) => {
                     if !stack.iter().any(|s| s.0 == Some(w.id)) {
                         return Err("a wrapper closes before it opens".into());
                     }
-                    let (id, e) = stack.pop().unwrap();
+                    let (id, mut e) = stack.pop().unwrap();
                     if id != Some(w.id) {
                         return Err("wrappers are mis-nested".into());
                     }
-                    stack.last_mut().unwrap().1.children.push(node(e));
+                    let parent = &mut stack.last_mut().unwrap().1.children;
+                    if is_field(w) {
+                        e.children
+                            .extend(w.meta.aux.iter().map(|x| node(fragment(x))));
+                        parent.append(&mut e.children);
+                    } else {
+                        parent.push(node(e));
+                    }
                 }
                 It::Marker(m) => stack
                     .last_mut()

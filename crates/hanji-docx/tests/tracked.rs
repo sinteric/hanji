@@ -270,3 +270,21 @@ fn what_cannot_be_tracked_is_refused_with_the_reason() {
         other => panic!("{other:?}"),
     }
 }
+
+#[test]
+fn a_field_result_shown_as_text_is_not_tracked() {
+    let refused = |r: Result<String, EngineError>| match r {
+        Err(EngineError::Refused(m)) => m,
+        other => panic!("{other:?}"),
+    };
+    let field = r#"<w:p><w:r><w:t xml:space="preserve">page </w:t></w:r><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r><w:r><w:t>12</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r><w:r><w:t xml:space="preserve"> of 20</w:t></w:r></w:p>"#;
+    let xml = run(field, &[("page ", "Page "), (" of 20", " of 21")]).unwrap();
+    assert!(xml.contains("<w:t>12</w:t>"), "{xml}");
+    let m = refused(run(field, &[("12", "13")]));
+    assert!(m.contains("the result of a field"), "{m}");
+    let m = refused(run(field, &[("page 12 of", "page of")]));
+    assert!(m.contains("deletes a field"), "{m}");
+    let simple = r#"<w:p><w:r><w:t xml:space="preserve">page </w:t></w:r><w:fldSimple w:instr=" PAGE "><w:r><w:t>7</w:t></w:r></w:fldSimple></w:p>"#;
+    let m = refused(run(simple, &[("page 7", "page 8")]));
+    assert!(m.contains("the result of a field"), "{m}");
+}

@@ -1,5 +1,7 @@
 //! WordprocessingML names and small helpers shared by import and export.
 
+use hanji_core::{Entry, Kind};
+
 use crate::xml::Element;
 pub use crate::xml::{fp, insert_ordered, remove_child};
 
@@ -10,6 +12,17 @@ pub const DOC_PART: &str = "word/document.xml";
 
 /// Inline wrappers whose text the model edits.
 pub const WRAPPERS: &[&str] = &["w:hyperlink", "w:smartTag", "w:customXml", "w:dir", "w:bdo"];
+
+/// A complex field whose cached result shows as text: a wrapper whose
+/// parts (`begin` to `separate`, then `end`) are siblings of its runs.
+pub(crate) fn is_field(e: &Entry) -> bool {
+    e.kind == Kind::Wrap && e.meta.tag == "w:fldChar"
+}
+
+/// A field whose result shows as text: complex, or a `w:fldSimple`.
+pub(crate) fn is_shown_field(e: &Entry) -> bool {
+    is_field(e) || (e.kind == Kind::Wrap && e.meta.tag == "w:fldSimple")
+}
 
 /// Zero-width inline elements.
 pub const MARKERS: &[&str] = &[

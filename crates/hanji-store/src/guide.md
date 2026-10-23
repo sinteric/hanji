@@ -21,6 +21,7 @@ Canonical form: one paragraph per line (no hard wraps), a blank line between blo
 Inline: **bold**, *italic*, ~~strike~~, <u>underline</u>, <br/> (a line break inside a paragraph).
 docx, hwpx, pptx and xlsx texts show their formatting (below).
 <keep id="k3" kind="drawing" summary="…"/> stands for something the text does not model (a picture, chart, footnote, comment, merged cells, …). Leave it as it is; you may move it or delete its line, never create or change one.
+In docx, a field's shown result (a page number, a caption number, a cross-reference) is that text: editing it replaces the cached result and keeps the instruction; Word may compute it again when it updates fields. Form fields and fields with no shown result stay placeholders.
 
 Document (docx, hwpx)
 - `#` … `######`: the file's Heading 1–6.

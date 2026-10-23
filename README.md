@@ -3,7 +3,7 @@
 hanji reads Word, PowerPoint, Excel and Hancom files (docx, pptx, xlsx,
 hwpx) as a Markdown-like text, and writes your edits to that text back into
 the original file. Anything the text does not show (formatting, pictures,
-charts, comments, fields) is kept in the file. It is built for coding agents,
+charts, comments, field instructions) is kept in the file. It is built for coding agents,
 and it also works as a command-line tool.
 
 Two lens laws hold for every file:
@@ -272,7 +272,12 @@ These are not supported yet:
   and its objects move only within its box. Pictures, charts and tables
   cannot be created.
 - Links, fields, footnotes and math in documents. They are read as
-  placeholders, and the docx engine refuses new ones on export.
+  placeholders, and the docx engine refuses new ones on export. In docx, a
+  hyperlink's text and a field's shown result (a page number, a caption
+  number, a cross-reference) are text: editing it keeps the address or the
+  field instruction, and Word may compute an edited result again when it
+  updates fields. Form fields and fields without a shown result stay
+  placeholders.
 - Editing header, footer and section text.
 - Nested tables. They stay placeholders.
 - hwpx: a table's own position (`table-align`, `table-indent`), which docx

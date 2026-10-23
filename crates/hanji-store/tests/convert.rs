@@ -181,7 +181,7 @@ fn the_report_names_each_placeholder_by_kind_with_its_line() {
     );
     let c = out.conversion.unwrap();
     let source = full_text(&ws, &id);
-    assert_eq!(c.placeholders.len(), 53);
+    assert_eq!(c.placeholders.len(), 51);
     let kinds: Vec<(&str, usize)> = c
         .placeholder_kinds
         .iter()
@@ -194,7 +194,7 @@ fn the_report_names_each_placeholder_by_kind_with_its_line() {
             ("content-control", 9),
             ("drawing", 5),
             ("endnote", 1),
-            ("field", 4),
+            ("field", 2),
             ("field-part", 12),
             ("footnote", 1),
             ("math", 1),
@@ -527,7 +527,11 @@ fn a_report_has_a_text_for_people() {
         "{t}"
     );
     assert!(
-        t.contains("placeholders dropped, 53 (comment ×1, content-control ×9,"),
+        t.contains("placeholders dropped, 51 (comment ×1, content-control ×9,"),
+        "{t}"
+    );
+    assert!(
+        t.contains("fields (the result's text stays, the instruction does not) ×2"),
         "{t}"
     );
     assert!(t.contains("Normal → 바탕글:"), "{t}");
