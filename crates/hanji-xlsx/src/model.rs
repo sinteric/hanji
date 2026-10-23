@@ -8,9 +8,10 @@ use std::collections::{BTreeMap, HashMap};
 use hanji_core::cells::{parse_sqref, CellRange, CellRef};
 use hanji_core::{Entry, KeepIds, Kind, Meta};
 use hanji_format::cellfmt::{self, CellFormat, FormatLine};
-use hanji_format::formula;
-use hanji_format::sheet::{format_kind, ColumnDecl, FormatKind, SheetDecl, SheetItem, Spreadsheet, TableDecl};
-use hanji_format::{FrontMatter, Keep};
+use hanji_format::sheet::{
+    format_kind, ColumnDecl, FormatKind, SheetDecl, SheetItem, Spreadsheet, TableDecl,
+};
+use hanji_format::{formula, FrontMatter, Keep};
 use hanji_package::clip;
 use hanji_package::xml::{self, Element, Node};
 
@@ -52,14 +53,19 @@ pub fn extract_entries(book: &mut Book, i: usize, next_id: &mut u64) -> Result<(
             continue;
         };
         let l = e.local();
-        let spec = RANGE_ELEMENTS.iter().find(|(c, child, _)| c.map_or(*child == l, |c| c == l));
+        let spec = RANGE_ELEMENTS
+            .iter()
+            .find(|(c, child, _)| c.map_or(*child == l, |c| c == l));
         let Some(&(container, child, anchor)) = spec else {
             kept.push(n);
             continue;
         };
         let items: Vec<Element> = if container.is_some() {
             containers.insert(l.to_string(), e.shell().to_xml());
-            e.elements().filter(|x| x.local() == child).cloned().collect()
+            e.elements()
+                .filter(|x| x.local() == child)
+                .cloned()
+                .collect()
         } else {
             vec![e.clone()]
         };
@@ -69,7 +75,9 @@ pub fn extract_entries(book: &mut Book, i: usize, next_id: &mut u64) -> Result<(
         for it in items {
             let range = it.get(anchor).unwrap_or_default();
             if parse_sqref(&range).is_none() {
-                return Err(format!("{part}: <{child}> has no cell range ({anchor}=\"{range}\")"));
+                return Err(format!(
+                    "{part}: <{child}> has no cell range ({anchor}=\"{range}\")"
+                ));
             }
             found.push(Entry {
                 id: *next_id,
@@ -80,7 +88,11 @@ pub fn extract_entries(book: &mut Book, i: usize, next_id: &mut u64) -> Result<(
                 start: None,
                 end: None,
                 seq,
-                meta: Meta { tag: child.to_string(), range: Some(range), ..Default::default() },
+                meta: Meta {
+                    tag: child.to_string(),
+                    range: Some(range),
+                    ..Default::default()
+                },
             });
             *next_id += 1;
             seq += 1;
@@ -97,12 +109,21 @@ pub fn extract_entries(book: &mut Book, i: usize, next_id: &mut u64) -> Result<(
 /// Put worksheet `i`'s range entries back into its skeleton, at their current ranges.
 pub fn restore_entries(book: &mut Book, i: usize) -> Result<(), String> {
     let part = book.sheets[i].part.clone();
-    let mine: Vec<Entry> =
-        book.entries.iter().filter(|e| e.kind == Kind::Range && e.path.first() == Some(&i)).cloned().collect();
+    let mine: Vec<Entry> = book
+        .entries
+        .iter()
+        .filter(|e| e.kind == Kind::Range && e.path.first() == Some(&i))
+        .cloned()
+        .collect();
     if mine.is_empty() {
         return Ok(());
     }
-    let containers = book.shell.containers.get(&part).cloned().unwrap_or_default();
+    let containers = book
+        .shell
+        .containers
+        .get(&part)
+        .cloned()
+        .unwrap_or_default();
     let st = book.store_mut(i)?;
     let prefix = st.prefix.clone();
     for &(container, child, anchor) in RANGE_ELEMENTS {
@@ -157,13 +178,22 @@ pub fn keeps(book: &Book) -> Vec<(usize, Keep)> {
             let n = seen.entry(kind.to_string()).or_insert(0);
             *n += 1;
             let id = ids.next(&format!("{}|{kind}|{n}", s.part));
-            out.push((i, Keep { id, kind: kind.into(), summary: clip(&summary, 160) }));
+            out.push((
+                i,
+                Keep {
+                    id,
+                    kind: kind.into(),
+                    summary: clip(&summary, 160),
+                },
+            ));
         };
         for &(_, child, _) in RANGE_ELEMENTS {
             let ranges: Vec<&str> = book
                 .entries
                 .iter()
-                .filter(|e| e.kind == Kind::Range && e.path.first() == Some(&i) && e.meta.tag == child)
+                .filter(|e| {
+                    e.kind == Kind::Range && e.path.first() == Some(&i) && e.meta.tag == child
+                })
                 .filter_map(|e| e.meta.range.as_deref())
                 .collect();
             if !ranges.is_empty() {
@@ -179,7 +209,10 @@ pub fn keeps(book: &Book) -> Vec<(usize, Keep)> {
             SheetKind::Chart => {
                 let rels = book.rels_of(&s.part);
                 for r in rels.iter().filter(|r| r.short_type() == "drawing") {
-                    for o in drawing::drawing_objects(book, &hanji_package::opc::resolve_target(&s.part, &r.target)) {
+                    for o in drawing::drawing_objects(
+                        book,
+                        &hanji_package::opc::resolve_target(&s.part, &r.target),
+                    ) {
                         push(&o.kind, o.summary, &mut out);
                     }
                 }
@@ -193,7 +226,11 @@ pub fn keeps(book: &Book) -> Vec<(usize, Keep)> {
 fn list_summary(ranges: &[&str]) -> String {
     let mut s = String::new();
     for (k, r) in ranges.iter().enumerate() {
-        let next = if s.is_empty() { r.to_string() } else { format!("{s}, {r}") };
+        let next = if s.is_empty() {
+            r.to_string()
+        } else {
+            format!("{s}, {r}")
+        };
         if next.chars().count() > 120 {
             s.push_str(&format!(" (+{} more)", ranges.len() - k));
             return s;
@@ -215,7 +252,11 @@ pub fn table_decl(book: &Book, t: &TableInfo) -> TableDecl {
     let mut first_style: Vec<Option<u32>> = vec![None; n];
     if first <= last {
         book.store(t.sheet).for_each_row_in(first, last, &mut |r| {
-            for cell in r.cells.iter().filter(|c| c.col >= c0 && ((c.col - c0) as usize) < n) {
+            for cell in r
+                .cells
+                .iter()
+                .filter(|c| c.col >= c0 && ((c.col - c0) as usize) < n)
+            {
                 let k = (cell.col - c0) as usize;
                 first_style[k].get_or_insert(cell.style());
                 match book.kind(cell) {
@@ -260,9 +301,18 @@ pub fn table_decl(book: &Book, t: &TableInfo) -> TableDecl {
             .as_ref()
             .map(|f| formula::to_short_form(&format!("={}", f.trim_start_matches('=')), &t.name))
             .unwrap_or_default();
-        columns.push(ColumnDecl { name: c.name.clone(), ty: ty.into(), format, formula });
+        columns.push(ColumnDecl {
+            name: c.name.clone(),
+            ty: ty.into(),
+            format,
+            formula,
+        });
     }
-    TableDecl { name: t.name.clone(), range: t.range.to_string(), columns }
+    TableDecl {
+        name: t.name.clone(),
+        range: t.range.to_string(),
+        columns,
+    }
 }
 
 /// The structure text of the book (§5.4). Loads every worksheet.
@@ -286,18 +336,35 @@ pub fn structure(book: &mut Book, template: Option<&str>) -> Result<Spreadsheet,
             }
             let st = book.store(i);
             range = st.used().map(|(c0, r0, c1, r1)| {
-                CellRange::new(hanji_core::cells::CellRef::new(c0, r0), hanji_core::cells::CellRef::new(c1, r1))
-                    .to_string()
+                CellRange::new(
+                    hanji_core::cells::CellRef::new(c0, r0),
+                    hanji_core::cells::CellRef::new(c1, r1),
+                )
+                .to_string()
             });
             for t in book.tables.iter().filter(|t| t.sheet == i) {
                 items.push(SheetItem::Table(table_decl(book, t)));
             }
         }
-        items.extend(keeps.iter().filter(|(k, _)| *k == i).map(|(_, k)| SheetItem::Keep(k.clone())));
-        sheets.push(SheetDecl { name: s.name.clone(), range, formats, items });
+        items.extend(
+            keeps
+                .iter()
+                .filter(|(k, _)| *k == i)
+                .map(|(_, k)| SheetItem::Keep(k.clone())),
+        );
+        sheets.push(SheetDecl {
+            name: s.name.clone(),
+            range,
+            formats,
+            items,
+        });
     }
     let default_format = shown.then(|| normal.diff(&CellFormat::implicit()));
-    Ok(Spreadsheet { front: FrontMatter::spreadsheet("xlsx", template), default_format, sheets })
+    Ok(Spreadsheet {
+        front: FrontMatter::spreadsheet("xlsx", template),
+        default_format,
+        sheets,
+    })
 }
 
 /// Sheet `i`'s formatted cells (§5.4): one line per rectangle of cells with
@@ -347,7 +414,11 @@ pub fn keep_entries(book: &Book, next_id: &mut u64) -> Vec<Entry> {
                 start: None,
                 end: None,
                 seq: 0,
-                meta: Meta { tag: k.kind.clone(), keep: Some(k), ..Default::default() },
+                meta: Meta {
+                    tag: k.kind.clone(),
+                    keep: Some(k),
+                    ..Default::default()
+                },
             };
             *next_id += 1;
             e

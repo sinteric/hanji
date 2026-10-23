@@ -69,7 +69,10 @@ impl CellRef {
             return None;
         }
         let row: u32 = rest.parse().ok()?;
-        (row <= MAX_ROW).then_some(CellRef { col: col_index(letters)?, row })
+        (row <= MAX_ROW).then_some(CellRef {
+            col: col_index(letters)?,
+            row,
+        })
     }
 }
 
@@ -108,7 +111,8 @@ impl CellRange {
     }
 
     pub fn contains(&self, c: CellRef) -> bool {
-        (self.first.col..=self.last.col).contains(&c.col) && (self.first.row..=self.last.row).contains(&c.row)
+        (self.first.col..=self.last.col).contains(&c.col)
+            && (self.first.row..=self.last.row).contains(&c.row)
     }
 
     pub fn intersects(&self, o: &CellRange) -> bool {
@@ -121,7 +125,10 @@ impl CellRange {
     /// The smallest range holding both.
     pub fn union(&self, o: &CellRange) -> CellRange {
         CellRange {
-            first: CellRef::new(self.first.col.min(o.first.col), self.first.row.min(o.first.row)),
+            first: CellRef::new(
+                self.first.col.min(o.first.col),
+                self.first.row.min(o.first.row),
+            ),
             last: CellRef::new(self.last.col.max(o.last.col), self.last.row.max(o.last.row)),
         }
     }
@@ -144,7 +151,11 @@ pub fn parse_sqref(s: &str) -> Option<Vec<CellRange>> {
 }
 
 pub fn write_sqref(ranges: &[CellRange]) -> String {
-    ranges.iter().map(|r| r.to_string()).collect::<Vec<_>>().join(" ")
+    ranges
+        .iter()
+        .map(|r| r.to_string())
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Rows of a span of columns (`cols`, inclusive, 0-based) moving on one sheet.
@@ -153,7 +164,11 @@ pub enum RowShift {
     /// `n` new rows at sheet row `at`; the rows from `at` down move down by `n`.
     Insert { cols: (u32, u32), at: u32, n: u32 },
     /// Rows `first..=last` go; the rows below move up.
-    Delete { cols: (u32, u32), first: u32, last: u32 },
+    Delete {
+        cols: (u32, u32),
+        first: u32,
+        last: u32,
+    },
 }
 
 /// Where a range goes under a [`RowShift`].
@@ -231,8 +246,15 @@ impl RowShift {
         let end = |row| CellRef::new(r.last.col, row);
         match *self {
             RowShift::Insert { at: a, n, .. } => {
-                let first = if r.first.row >= a { r.first.row + n } else { r.first.row };
-                let to = CellRange { first: at(first), last: end(r.last.row + n) };
+                let first = if r.first.row >= a {
+                    r.first.row + n
+                } else {
+                    r.first.row
+                };
+                let to = CellRange {
+                    first: at(first),
+                    last: end(r.last.row + n),
+                };
                 if to.last.row > MAX_ROW {
                     return Moved::Split;
                 }
@@ -250,8 +272,15 @@ impl RowShift {
                 } else {
                     first
                 };
-                let nl = if r.last.row > last { r.last.row - cnt } else { first - 1 };
-                Moved::To(CellRange { first: at(nf), last: end(nl) })
+                let nl = if r.last.row > last {
+                    r.last.row - cnt
+                } else {
+                    first - 1
+                };
+                Moved::To(CellRange {
+                    first: at(nf),
+                    last: end(nl),
+                })
             }
         }
     }
@@ -267,7 +296,14 @@ mod tests {
 
     #[test]
     fn addresses() {
-        for (c, s) in [(0, "A"), (25, "Z"), (26, "AA"), (701, "ZZ"), (702, "AAA"), (16383, "XFD")] {
+        for (c, s) in [
+            (0, "A"),
+            (25, "Z"),
+            (26, "AA"),
+            (701, "ZZ"),
+            (702, "AAA"),
+            (16383, "XFD"),
+        ] {
             assert_eq!(col_letters(c), s);
             assert_eq!(col_index(s), Some(c));
         }
@@ -276,12 +312,19 @@ mod tests {
         assert_eq!(CellRef::parse("B0"), None);
         assert_eq!(CellRef::parse("B07"), None);
         assert_eq!(r("C3:A1").to_string(), "A1:C3");
-        assert_eq!(parse_sqref("A1:B2 D4").map(|v| write_sqref(&v)).as_deref(), Some("A1:B2 D4"));
+        assert_eq!(
+            parse_sqref("A1:B2 D4").map(|v| write_sqref(&v)).as_deref(),
+            Some("A1:B2 D4")
+        );
     }
 
     #[test]
     fn inserted_rows_move_grow_or_split() {
-        let s = RowShift::Insert { cols: (0, 5), at: 10, n: 2 };
+        let s = RowShift::Insert {
+            cols: (0, 5),
+            at: 10,
+            n: 2,
+        };
         assert_eq!(s.range(&r("A2:F9")), Moved::Same);
         assert_eq!(s.range(&r("B10:C12")), Moved::To(r("B12:C14")));
         assert_eq!(s.range(&r("A2:F20")), Moved::To(r("A2:F22")));
@@ -294,7 +337,11 @@ mod tests {
 
     #[test]
     fn deleted_rows_take_ranges_or_shrink_them() {
-        let s = RowShift::Delete { cols: (0, 5), first: 10, last: 12 };
+        let s = RowShift::Delete {
+            cols: (0, 5),
+            first: 10,
+            last: 12,
+        };
         assert_eq!(s.range(&r("A10:F12")), Moved::Gone);
         assert_eq!(s.range(&r("A11")), Moved::Gone);
         assert_eq!(s.range(&r("A2:A20")), Moved::To(r("A2:A17")));

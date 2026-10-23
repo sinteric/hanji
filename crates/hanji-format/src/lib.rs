@@ -24,9 +24,12 @@ pub mod vocab;
 pub use ast::*;
 pub use diag::Diagnostic;
 pub use names::{Layout, Names};
-pub use parse::{merge_problem, parse, parse_with, BlockMap, BlockMapKind, ParaMap, Parsed, SourceMap};
+pub use parse::{
+    merge_problem, parse, parse_with, BlockMap, BlockMapKind, ParaMap, Parsed, SourceMap,
+};
 pub use pres::{
-    parse_presentation, serialize_presentation, HeadMap, ItemMap, ParsedPresentation, PresentationMap, SlideMap,
+    parse_presentation, serialize_presentation, HeadMap, ItemMap, ParsedPresentation,
+    PresentationMap, SlideMap,
 };
 pub use serialize::{serialize, serialize_inline};
 pub use sheet::{parse_spreadsheet, serialize_spreadsheet, window_text, Spreadsheet, WindowOf};

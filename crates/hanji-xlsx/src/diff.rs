@@ -80,7 +80,10 @@ fn masters(store: &Store) -> Result<Masters, String> {
             let Some(f) = &c.f else { continue };
             if f.get("t").as_deref() == Some("shared") && f.get("ref").is_some() {
                 let si = f.get("si").ok_or("a shared formula has no si")?;
-                if out.insert(si.clone(), (r, c.col, c.formula().unwrap_or_default())).is_some() {
+                if out
+                    .insert(si.clone(), (r, c.col, c.formula().unwrap_or_default()))
+                    .is_some()
+                {
                     return Err(format!("shared formula {si:?} has more than one master"));
                 }
             }
@@ -89,18 +92,40 @@ fn masters(store: &Store) -> Result<Masters, String> {
     Ok(out)
 }
 
-fn content(book: &Book, shared: &Masters, row: u32, cell: Option<&Cell>) -> Result<Content, String> {
-    let Some(c) = cell else { return Ok(Content::default()) };
+fn content(
+    book: &Book,
+    shared: &Masters,
+    row: u32,
+    cell: Option<&Cell>,
+) -> Result<Content, String> {
+    let Some(c) = cell else {
+        return Ok(Content::default());
+    };
     let v = c.v.as_deref().map(xml::unescape);
-    let raw = || Value::Raw { kind: c.ty().into(), value: v.clone() };
+    let raw = || Value::Raw {
+        kind: c.ty().into(),
+        value: v.clone(),
+    };
     let value = match c.ty() {
         "s" => match v.as_deref().and_then(|v| v.trim().parse::<usize>().ok()) {
-            Some(i) => book.sst.as_ref().and_then(|s| s.get(i)).map(|v| Value::Text(v.into())).unwrap_or_else(raw),
+            Some(i) => book
+                .sst
+                .as_ref()
+                .and_then(|s| s.get(i))
+                .map(|v| Value::Text(v.into()))
+                .unwrap_or_else(raw),
             None if v.is_none() => Value::Empty,
             None => raw(),
         },
-        "str" => v.as_deref().map(|v| Value::Text(sst::decode_xstring(v))).unwrap_or_default(),
-        "inlineStr" => c.is.as_ref().map(|v| Value::Text(sst::rich_text(v))).unwrap_or_default(),
+        "str" => v
+            .as_deref()
+            .map(|v| Value::Text(sst::decode_xstring(v)))
+            .unwrap_or_default(),
+        "inlineStr" => {
+            c.is.as_ref()
+                .map(|v| Value::Text(sst::rich_text(v)))
+                .unwrap_or_default()
+        }
         "b" => match v.as_deref().map(str::trim) {
             None => Value::Empty,
             Some(v) if v == "1" || v.eq_ignore_ascii_case("true") => Value::Bool(true),
@@ -119,10 +144,17 @@ fn content(book: &Book, shared: &Masters, row: u32, cell: Option<&Cell>) -> Resu
         let shared_formula = f.get("t").as_deref() == Some("shared");
         let text = if shared_formula {
             let si = f.get("si").ok_or("a shared formula has no si")?;
-            let (r, col, text) = shared
-                .get(&si)
-                .ok_or_else(|| format!("shared formula {si:?} at {}{row} has no master", col_letters(c.col)))?;
-            shared_text(text, i64::from(row) - i64::from(*r), i64::from(c.col) - i64::from(*col))
+            let (r, col, text) = shared.get(&si).ok_or_else(|| {
+                format!(
+                    "shared formula {si:?} at {}{row} has no master",
+                    col_letters(c.col)
+                )
+            })?;
+            shared_text(
+                text,
+                i64::from(row) - i64::from(*r),
+                i64::from(c.col) - i64::from(*col),
+            )
         } else {
             c.formula().unwrap_or_default()
         };
@@ -131,11 +163,17 @@ fn content(book: &Book, shared: &Masters, row: u32, cell: Option<&Cell>) -> Resu
         let mut attributes: Vec<_> = f
             .attrs
             .iter()
-            .filter(|(k, v)| !(shared_formula && matches!(k.as_str(), "t" | "si" | "ref") || k == "t" && v == "normal"))
+            .filter(|(k, v)| {
+                !(shared_formula && matches!(k.as_str(), "t" | "si" | "ref")
+                    || k == "t" && v == "normal")
+            })
             .map(|(k, v)| (k.clone(), xml::unescape(v)))
             .collect();
         attributes.sort();
-        Some(Formula { text: format!("={text}"), attributes })
+        Some(Formula {
+            text: format!("={text}"),
+            attributes,
+        })
     } else {
         None
     };
@@ -167,7 +205,11 @@ impl Write for Prefix {
 }
 
 fn shown(value: &(impl Serialize + ?Sized)) -> String {
-    let mut out = Prefix { bytes: vec![], total: 0, hash: 0xcbf2_9ce4_8422_2325 };
+    let mut out = Prefix {
+        bytes: vec![],
+        total: 0,
+        hash: 0xcbf2_9ce4_8422_2325,
+    };
     serde_json::to_writer(&mut out, value).expect("cell content serializes to an infallible sink");
     // The prefix may end in the middle of a UTF-8 character.
     while std::str::from_utf8(&out.bytes).is_err() {
@@ -175,7 +217,10 @@ fn shown(value: &(impl Serialize + ?Sized)) -> String {
     }
     let mut text = String::from_utf8(out.bytes).expect("the prefix is UTF-8");
     if out.total > MAX_STATE_BYTES {
-        text.push_str(&format!("… [truncated; {} bytes; fnv1a64:{:016x}]", out.total, out.hash));
+        text.push_str(&format!(
+            "… [truncated; {} bytes; fnv1a64:{:016x}]",
+            out.total, out.hash
+        ));
     }
     text
 }
@@ -209,12 +254,22 @@ pub(crate) fn cells(before: &Remainder, after: &Remainder) -> Result<String, Eng
     // Names identify sheets, independently of their order and part names.
     // A renamed sheet appears as removed/added; its rename is in the text diff.
     let mut sheets: BTreeMap<&str, (Option<usize>, Option<usize>)> = BTreeMap::new();
-    for (i, s) in a.sheets.iter().enumerate().filter(|(_, s)| s.kind == SheetKind::Work) {
+    for (i, s) in a
+        .sheets
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| s.kind == SheetKind::Work)
+    {
         if sheets.entry(&s.name).or_default().0.replace(i).is_some() {
             return Err(pkg(format!("more than one worksheet named {:?}", s.name)));
         }
     }
-    for (i, s) in b.sheets.iter().enumerate().filter(|(_, s)| s.kind == SheetKind::Work) {
+    for (i, s) in b
+        .sheets
+        .iter()
+        .enumerate()
+        .filter(|(_, s)| s.kind == SheetKind::Work)
+    {
         if sheets.entry(&s.name).or_default().1.replace(i).is_some() {
             return Err(pkg(format!("more than one worksheet named {:?}", s.name)));
         }
@@ -224,18 +279,46 @@ pub(crate) fn cells(before: &Remainder, after: &Remainder) -> Result<String, Eng
     for (name, (ai, bi)) in sheets {
         // Drop each pair after comparison instead of keeping all sheets parsed.
         let (ast, bst) = (sheet(&a, ai).map_err(pkg)?, sheet(&b, bi).map_err(pkg)?);
-        let am = ast.as_ref().map(masters).transpose().map_err(pkg)?.unwrap_or_default();
-        let bm = bst.as_ref().map(masters).transpose().map_err(pkg)?.unwrap_or_default();
+        let am = ast
+            .as_ref()
+            .map(masters)
+            .transpose()
+            .map_err(pkg)?
+            .unwrap_or_default();
+        let bm = bst
+            .as_ref()
+            .map(masters)
+            .transpose()
+            .map_err(pkg)?
+            .unwrap_or_default();
         let mut ar = ast.iter().flat_map(Store::row_numbers).peekable();
         let mut br = bst.iter().flat_map(Store::row_numbers).peekable();
         while let Some(row) = next_number(&mut ar, &mut br) {
-            let old = ast.as_ref().map(|s| s.try_row(row)).transpose().map_err(pkg)?.flatten();
-            let new = bst.as_ref().map(|s| s.try_row(row)).transpose().map_err(pkg)?.flatten();
-            let mut ac = old.iter().flat_map(|r| r.cells.iter().map(|c| c.col)).peekable();
-            let mut bc = new.iter().flat_map(|r| r.cells.iter().map(|c| c.col)).peekable();
+            let old = ast
+                .as_ref()
+                .map(|s| s.try_row(row))
+                .transpose()
+                .map_err(pkg)?
+                .flatten();
+            let new = bst
+                .as_ref()
+                .map(|s| s.try_row(row))
+                .transpose()
+                .map_err(pkg)?
+                .flatten();
+            let mut ac = old
+                .iter()
+                .flat_map(|r| r.cells.iter().map(|c| c.col))
+                .peekable();
+            let mut bc = new
+                .iter()
+                .flat_map(|r| r.cells.iter().map(|c| c.col))
+                .peekable();
             while let Some(col) = next_number(&mut ac, &mut bc) {
-                let old = content(&a, &am, row, old.as_ref().and_then(|r| r.cell(col))).map_err(pkg)?;
-                let new = content(&b, &bm, row, new.as_ref().and_then(|r| r.cell(col))).map_err(pkg)?;
+                let old =
+                    content(&a, &am, row, old.as_ref().and_then(|r| r.cell(col))).map_err(pkg)?;
+                let new =
+                    content(&b, &bm, row, new.as_ref().and_then(|r| r.cell(col))).map_err(pkg)?;
                 if old == new {
                     continue;
                 }
@@ -255,7 +338,8 @@ pub(crate) fn cells(before: &Remainder, after: &Remainder) -> Result<String, Eng
     if count == 0 {
         return Ok(String::new());
     }
-    let mut out = format!("Cell changes: {count} (value is the stored cache when formula is present)\n");
+    let mut out =
+        format!("Cell changes: {count} (value is the stored cache when formula is present)\n");
     out.push_str(&changes);
     if count > MAX_CHANGES {
         out.push_str(&format!(

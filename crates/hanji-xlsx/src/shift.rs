@@ -11,9 +11,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use hanji_core::cells::{parse_sqref, write_sqref, CellRange, CellRef, Moved, RowShift, MAX_ROW};
 use hanji_core::{notice, Kind, Notice};
 use hanji_format::formula::{self, Corner, Reference, Tok};
-use hanji_package::opc;
-use hanji_package::package;
 use hanji_package::xml::{self, Element, Node};
+use hanji_package::{opc, package};
 
 use crate::book::{Book, SheetKind};
 use crate::drawing;
@@ -24,11 +23,17 @@ use crate::store::{has_formula, holds_any_case, sheet_needle, Cell, Row};
 fn ref_area(r: &Reference) -> Option<CellRange> {
     let a = r.first?;
     let b = r.last.unwrap_or(a);
-    Some(CellRange::new(CellRef::new(a.col?, a.row?), CellRef::new(b.col?, b.row?)))
+    Some(CellRange::new(
+        CellRef::new(a.col?, a.row?),
+        CellRef::new(b.col?, b.row?),
+    ))
 }
 
 fn with_rows(c: Corner, row: u32) -> Corner {
-    Corner { row: Some(row), ..c }
+    Corner {
+        row: Some(row),
+        ..c
+    }
 }
 
 fn write_ref(prefix: &str, r: &Reference, to: CellRange) -> String {
@@ -38,7 +43,10 @@ fn write_ref(prefix: &str, r: &Reference, to: CellRange) -> String {
     let first = with_rows(a, if top_first { to.first.row } else { to.last.row });
     match b {
         None => format!("{prefix}{first}"),
-        Some(b) => format!("{prefix}{first}:{}", with_rows(b, if top_first { to.last.row } else { to.first.row })),
+        Some(b) => format!(
+            "{prefix}{first}:{}",
+            with_rows(b, if top_first { to.last.row } else { to.first.row })
+        ),
     }
 }
 
@@ -85,11 +93,17 @@ pub fn translate(f: &str, dr: i64, dc: i64) -> String {
         let prefix = formula::prefix_text(f, t);
         let mv = |c: Corner| -> Option<Corner> {
             let col = match c.col {
-                Some(x) if !c.abs_col => Some(u32::try_from(x as i64 + dc).ok().filter(|v| *v < 16_384)?),
+                Some(x) if !c.abs_col => {
+                    Some(u32::try_from(x as i64 + dc).ok().filter(|v| *v < 16_384)?)
+                }
                 x => x,
             };
             let row = match c.row {
-                Some(x) if !c.abs_row => Some(u32::try_from(x as i64 + dr).ok().filter(|v| *v >= 1 && *v <= MAX_ROW)?),
+                Some(x) if !c.abs_row => Some(
+                    u32::try_from(x as i64 + dr)
+                        .ok()
+                        .filter(|v| *v >= 1 && *v <= MAX_ROW)?,
+                ),
                 x => x,
             };
             Some(Corner { col, row, ..c })
@@ -106,7 +120,8 @@ pub fn translate(f: &str, dr: i64, dc: i64) -> String {
 }
 
 fn shared_attr(f: &Element) -> Option<(String, Option<String>)> {
-    (f.get("t").as_deref() == Some("shared")).then(|| (f.get("si").unwrap_or_default(), f.get("ref")))
+    (f.get("t").as_deref() == Some("shared"))
+        .then(|| (f.get("si").unwrap_or_default(), f.get("ref")))
 }
 
 /// A plain `<f>` with `text`.
@@ -146,9 +161,14 @@ pub fn unshare(book: &mut Book, i: usize) -> Result<bool, String> {
     for r in rows {
         let row = st.row_mut(r);
         for c in &mut row.cells {
-            let Some((si, _)) = c.f.as_ref().and_then(shared_attr) else { continue };
+            let Some((si, _)) = c.f.as_ref().and_then(shared_attr) else {
+                continue;
+            };
             let Some((mr, mc, text)) = masters.get(&si) else {
-                return Err(format!("a shared formula at {}{r} has no master", hanji_core::cells::col_letters(c.col)));
+                return Err(format!(
+                    "a shared formula at {}{r} has no master",
+                    hanji_core::cells::col_letters(c.col)
+                ));
             };
             let t = translate(text, r as i64 - *mr as i64, c.col as i64 - *mc as i64);
             let mut f = f_element(&prefix, &t);
@@ -168,7 +188,12 @@ pub fn unshare(book: &mut Book, i: usize) -> Result<bool, String> {
 /// column, new text if its references move, new `ref` if its span moves).
 type Rewrite = (usize, u32, u32, Option<String>, Option<String>);
 
-fn formulas_to_rewrite(book: &mut Book, target: &str, i: usize, sh: &RowShift) -> Result<Vec<Rewrite>, String> {
+fn formulas_to_rewrite(
+    book: &mut Book,
+    target: &str,
+    i: usize,
+    sh: &RowShift,
+) -> Result<Vec<Rewrite>, String> {
     let mut out = vec![];
     let needle = sheet_needle(target);
     for k in 0..book.sheets.len() {
@@ -181,13 +206,16 @@ fn formulas_to_rewrite(book: &mut Book, target: &str, i: usize, sh: &RowShift) -
         let pre = |b: &[u8]| has_formula(b) && (own || holds_any_case(b, &needle));
         book.store(k).for_each_cell_if(&pre, &mut |r, c| {
             let Some(f) = &c.f else { return };
-            let text = c.formula().and_then(|t| shift_formula(&t, &own_name, target, sh));
-            let span = (k == i).then(|| f.get("ref").and_then(|x| CellRange::parse(&x))).flatten().and_then(|rr| {
-                match sh.range(&rr) {
+            let text = c
+                .formula()
+                .and_then(|t| shift_formula(&t, &own_name, target, sh));
+            let span = (k == i)
+                .then(|| f.get("ref").and_then(|x| CellRange::parse(&x)))
+                .flatten()
+                .and_then(|rr| match sh.range(&rr) {
                     Moved::To(to) => Some(to.to_string()),
                     _ => None,
-                }
-            });
+                });
             if text.is_some() || span.is_some() {
                 out.push((k, r, c.col, text, span));
             }
@@ -197,14 +225,27 @@ fn formulas_to_rewrite(book: &mut Book, target: &str, i: usize, sh: &RowShift) -
 }
 
 /// Why `sh` on sheet `i` would tear something, if it would.
-pub fn check(book: &mut Book, i: usize, sh: &RowShift, own_table: Option<usize>) -> Result<(), String> {
+pub fn check(
+    book: &mut Book,
+    i: usize,
+    sh: &RowShift,
+    own_table: Option<usize>,
+) -> Result<(), String> {
     let name = book.sheets[i].name.clone();
     let (c0, c1) = sh.cols();
-    let span = format!("columns {}–{}", hanji_core::cells::col_letters(c0), hanji_core::cells::col_letters(c1));
+    let span = format!(
+        "columns {}–{}",
+        hanji_core::cells::col_letters(c0),
+        hanji_core::cells::col_letters(c1)
+    );
     let why = |what: &str, r: &str| {
         format!("{what} {r} on sheet {name} reaches outside {span}, into rows that move; it would be torn in two")
     };
-    for e in book.entries.iter().filter(|e| e.kind == Kind::Range && e.path.first() == Some(&i)) {
+    for e in book
+        .entries
+        .iter()
+        .filter(|e| e.kind == Kind::Range && e.path.first() == Some(&i))
+    {
         for r in parse_sqref(e.meta.range.as_deref().unwrap_or("")).unwrap_or_default() {
             if sh.range(&r) == Moved::Split {
                 return Err(why(&describe(&e.meta.tag), &r.to_string()));
@@ -265,7 +306,11 @@ pub fn check(book: &mut Book, i: usize, sh: &RowShift, own_table: Option<usize>)
     if let Some(e) = err {
         return Err(e);
     }
-    if let Some(af) = st.child("autoFilter").and_then(|a| a.get("ref")).and_then(|r| CellRange::parse(&r)) {
+    if let Some(af) = st
+        .child("autoFilter")
+        .and_then(|a| a.get("ref"))
+        .and_then(|r| CellRange::parse(&r))
+    {
         if sh.range(&af) == Moved::Split {
             return Err(why("the sheet's filter", &af.to_string()));
         }
@@ -299,7 +344,10 @@ pub fn check(book: &mut Book, i: usize, sh: &RowShift, own_table: Option<usize>)
     // A cross-sheet chart source cannot be represented by one rectangular
     // reference if only some of its columns move. Refuse before mutating.
     for part in chart_parts(book) {
-        let Some(d) = package::get(&book.parts, &part).and_then(|data| xml::parse(data).ok()) else { continue };
+        let Some(d) = package::get(&book.parts, &part).and_then(|data| xml::parse(data).ok())
+        else {
+            continue;
+        };
         let mut split = None;
         d.root.walk(&mut |e| {
             if e.local() != "f" {
@@ -319,13 +367,21 @@ pub fn check(book: &mut Book, i: usize, sh: &RowShift, own_table: Option<usize>)
             }
         });
         if let Some(f) = split {
-            return Err(format!("chart {part} source {f} would be split by rows that move"));
+            return Err(format!(
+                "chart {part} source {f} would be split by rows that move"
+            ));
         }
     }
     // Pivot tables on the sheet.
-    for r in book.rels_of(&book.sheets[i].part).iter().filter(|r| r.short_type() == "pivotTable" && !r.external) {
+    for r in book
+        .rels_of(&book.sheets[i].part)
+        .iter()
+        .filter(|r| r.short_type() == "pivotTable" && !r.external)
+    {
         let part = opc::resolve_target(&book.sheets[i].part, &r.target);
-        let Some(d) = package::get(&book.parts, &part).and_then(|d| xml::parse(d).ok()) else { continue };
+        let Some(d) = package::get(&book.parts, &part).and_then(|d| xml::parse(d).ok()) else {
+            continue;
+        };
         let loc = d
             .root
             .elements()
@@ -336,7 +392,11 @@ pub fn check(book: &mut Book, i: usize, sh: &RowShift, own_table: Option<usize>)
             match sh.range(&loc) {
                 Moved::Same => {}
                 Moved::To(to) if to.rows() == loc.rows() => {}
-                _ => return Err(format!("the pivot table at {loc} on sheet {name} would be torn by rows that move")),
+                _ => {
+                    return Err(format!(
+                        "the pivot table at {loc} on sheet {name} would be torn by rows that move"
+                    ))
+                }
             }
         }
     }
@@ -371,9 +431,12 @@ pub fn apply(
                 book.load_store(k)?;
                 let mut hit = false;
                 let needle = sheet_needle(&name);
-                book.store(k).for_each_cell_if(&|b| has_formula(b) && holds_any_case(b, &needle), &mut |_, c| {
-                    hit |= c.f.as_ref().and_then(shared_attr).is_some();
-                });
+                book.store(k).for_each_cell_if(
+                    &|b| has_formula(b) && holds_any_case(b, &needle),
+                    &mut |_, c| {
+                        hit |= c.f.as_ref().and_then(shared_attr).is_some();
+                    },
+                );
                 hit
             };
             if reads {
@@ -385,7 +448,13 @@ pub fn apply(
     let mut rewritten = vec![];
     for (k, r, col, text, span) in formulas_to_rewrite(book, &name, i, sh)? {
         let st = book.store_mut(k)?;
-        let Some(f) = st.row_mut(r).cells.iter_mut().find(|c| c.col == col).and_then(|c| c.f.as_mut()) else {
+        let Some(f) = st
+            .row_mut(r)
+            .cells
+            .iter_mut()
+            .find(|c| c.col == col)
+            .and_then(|c| c.f.as_mut())
+        else {
             continue;
         };
         if let Some(new) = text {
@@ -403,7 +472,11 @@ pub fn apply(
     for e in book.entries.iter_mut().filter(|e| e.kind == Kind::Range) {
         let sheet_of = e.path.first().copied().unwrap_or(usize::MAX);
         if e.meta.tag != "hyperlink" {
-            let own = book.sheets.get(sheet_of).map(|s| s.name.clone()).unwrap_or_default();
+            let own = book
+                .sheets
+                .get(sheet_of)
+                .map(|s| s.name.clone())
+                .unwrap_or_default();
             let mut x = xml::fragment(&e.xml[0]);
             let mut changed = false;
             x.walk_mut(&mut |el| {
@@ -453,7 +526,12 @@ pub fn apply(
     }
     // Defined names.
     let mut wb_changed = false;
-    if let Some(names) = book.wb.root.elements_mut().find(|e| e.local() == "definedNames") {
+    if let Some(names) = book
+        .wb
+        .root
+        .elements_mut()
+        .find(|e| e.local() == "definedNames")
+    {
         for d in names.elements_mut() {
             let t = d.text_of(&[d.name.as_str()]);
             let own = String::new();
@@ -505,7 +583,10 @@ pub fn apply(
 pub(crate) fn is_plain(row: &Row) -> bool {
     row.cells.is_empty()
         && row.extra.is_empty()
-        && row.attrs.iter().all(|a| matches!(a.0.as_str(), "r" | "spans" | "x14ac:dyDescent"))
+        && row
+            .attrs
+            .iter()
+            .all(|a| matches!(a.0.as_str(), "r" | "spans" | "x14ac:dyDescent"))
 }
 
 /// Move the cells of the shifted columns, one row at a time: a row's other
@@ -535,7 +616,10 @@ fn move_cells(book: &mut Book, i: usize, sh: &RowShift) -> Result<(), String> {
         let mut row = row?;
         let r = row.r;
         flush(&mut pending, r.saturating_sub(lag), st);
-        let (inside, outside): (Vec<Cell>, Vec<Cell>) = row.cells.drain(..).partition(|c| (c0..=c1).contains(&c.col));
+        let (inside, outside): (Vec<Cell>, Vec<Cell>) = row
+            .cells
+            .drain(..)
+            .partition(|c| (c0..=c1).contains(&c.col));
         row.cells = outside;
         // Cells moved here earlier (an insert) join the row's own.
         if let Some(early) = pending.remove(&r) {
@@ -572,21 +656,33 @@ fn put_cell(row: &mut Row, c: Cell) {
 }
 
 /// Anchors outside the worksheet part: drawings, notes, charts' data, pivot caches, the calc chain.
-fn move_parts(book: &mut Book, i: usize, sh: &RowShift, out: &mut Vec<Notice>) -> Result<(), String> {
+fn move_parts(
+    book: &mut Book,
+    i: usize,
+    sh: &RowShift,
+    out: &mut Vec<Notice>,
+) -> Result<(), String> {
     let name = book.sheets[i].name.clone();
     let part = book.sheets[i].part.clone();
     let rels = book.rels_of(&part);
     let mut edits: Vec<(String, Vec<u8>)> = vec![];
     for r in rels.iter().filter(|r| !r.external) {
         let target = opc::resolve_target(&part, &r.target);
-        let Some(data) = package::get(&book.parts, &target) else { continue };
+        let Some(data) = package::get(&book.parts, &target) else {
+            continue;
+        };
         match r.short_type() {
             "drawing" => {
-                let Ok(mut d) = xml::parse(data) else { continue };
+                let Ok(mut d) = xml::parse(data) else {
+                    continue;
+                };
                 let mut changed = false;
                 for a in d.root.elements_mut() {
                     let (c0, c1) = sh.cols();
-                    let from_col = a.elements().find(|e| e.local() == "from").and_then(|f| num(f, "col"));
+                    let from_col = a
+                        .elements()
+                        .find(|e| e.local() == "from")
+                        .and_then(|f| num(f, "col"));
                     if !from_col.is_some_and(|c| (c0..=c1).contains(&c)) {
                         continue;
                     }
@@ -610,14 +706,23 @@ fn move_parts(book: &mut Book, i: usize, sh: &RowShift, out: &mut Vec<Notice>) -
                 }
             }
             "comments" => {
-                let Ok(mut d) = xml::parse(data) else { continue };
+                let Ok(mut d) = xml::parse(data) else {
+                    continue;
+                };
                 let mut changed = false;
                 if let Some(list) = d.root.elements_mut().find(|e| e.local() == "commentList") {
                     list.children.retain(|n| {
                         let Node::El(c) = n else { return true };
-                        let Some(cr) = c.get("ref").and_then(|x| CellRef::parse(&x)) else { return true };
+                        let Some(cr) = c.get("ref").and_then(|x| CellRef::parse(&x)) else {
+                            return true;
+                        };
                         if sh.row(cr.col, cr.row).is_none() {
-                            notice(out, "removed", format!("{name}!{cr}"), "the note went with its deleted row");
+                            notice(
+                                out,
+                                "removed",
+                                format!("{name}!{cr}"),
+                                "the note went with its deleted row",
+                            );
                             changed = true;
                             return false;
                         }
@@ -639,7 +744,9 @@ fn move_parts(book: &mut Book, i: usize, sh: &RowShift, out: &mut Vec<Notice>) -
                 }
             }
             "threadedComment" => {
-                let Ok(mut d) = xml::parse(data) else { continue };
+                let Ok(mut d) = xml::parse(data) else {
+                    continue;
+                };
                 let mut changed = false;
                 for c in d.root.elements_mut() {
                     if let Some(cr) = c.get("ref").and_then(|x| CellRef::parse(&x)) {
@@ -663,7 +770,9 @@ fn move_parts(book: &mut Book, i: usize, sh: &RowShift, out: &mut Vec<Notice>) -
                 }
             }
             "pivotTable" => {
-                let Ok(mut d) = xml::parse(data) else { continue };
+                let Ok(mut d) = xml::parse(data) else {
+                    continue;
+                };
                 let mut changed = false;
                 if let Some(loc) = d.root.elements_mut().find(|e| e.local() == "location") {
                     if let Some(rr) = loc.get("ref").and_then(|x| CellRange::parse(&x)) {
@@ -690,13 +799,26 @@ fn move_parts(book: &mut Book, i: usize, sh: &RowShift, out: &mut Vec<Notice>) -
     // Pivot caches whose source is a range on the sheet: the range moves
     // (`refresh_pivots` then marks them to refresh when opened).
     let wb = book.wb_part.clone();
-    for r in book.rels_of(&wb).iter().filter(|r| r.short_type() == "pivotCacheDefinition" && !r.external) {
+    for r in book
+        .rels_of(&wb)
+        .iter()
+        .filter(|r| r.short_type() == "pivotCacheDefinition" && !r.external)
+    {
         let cp = opc::resolve_target(&wb, &r.target);
-        let Some(mut d) = package::get(&book.parts, &cp).and_then(|d| xml::parse(d).ok()) else { continue };
+        let Some(mut d) = package::get(&book.parts, &cp).and_then(|d| xml::parse(d).ok()) else {
+            continue;
+        };
         let mut changed = false;
         d.root.walk_mut(&mut |e| {
-            if e.local() == "worksheetSource" && e.get("sheet").is_some_and(|s| s.eq_ignore_ascii_case(&name)) {
-                if let Some(Moved::To(to)) = e.get("ref").and_then(|x| CellRange::parse(&x)).map(|rr| sh.range(&rr)) {
+            if e.local() == "worksheetSource"
+                && e.get("sheet")
+                    .is_some_and(|s| s.eq_ignore_ascii_case(&name))
+            {
+                if let Some(Moved::To(to)) = e
+                    .get("ref")
+                    .and_then(|x| CellRange::parse(&x))
+                    .map(|rr| sh.range(&rr))
+                {
                     e.set("ref", &to.to_string());
                     changed = true;
                 }
@@ -716,7 +838,9 @@ fn move_parts(book: &mut Book, i: usize, sh: &RowShift, out: &mut Vec<Notice>) -
 }
 
 fn num(e: &Element, local: &str) -> Option<u32> {
-    e.elements().find(|x| x.local() == local).and_then(|x| x.text_of(&[x.name.as_str()]).trim().parse().ok())
+    e.elements()
+        .find(|x| x.local() == local)
+        .and_then(|x| x.text_of(&[x.name.as_str()]).trim().parse().ok())
 }
 
 fn set_num(e: &mut Element, local: &str, v: u32) {
@@ -731,12 +855,16 @@ fn shift_vml(text: &str, sh: &RowShift) -> Option<String> {
     let mut changed = false;
     // Each x:ClientData block with x:Row and x:Column.
     while let Some(k) = rest.find("<x:ClientData") {
-        let Some(end) = rest[k..].find("</x:ClientData>").map(|e| k + e) else { break };
+        let Some(end) = rest[k..].find("</x:ClientData>").map(|e| k + e) else {
+            break;
+        };
         let block = &rest[k..end];
         let get = |tag: &str| {
             block.find(&format!("<x:{tag}>")).and_then(|a| {
                 let s = a + tag.len() + 4;
-                block[s..].find('<').map(|b| (s, s + b, block[s..s + b].trim().parse::<u32>().ok()))
+                block[s..]
+                    .find('<')
+                    .map(|b| (s, s + b, block[s..s + b].trim().parse::<u32>().ok()))
             })
         };
         let mut new_block = block.to_string();
@@ -761,8 +889,16 @@ fn shift_vml(text: &str, sh: &RowShift) -> Option<String> {
 /// Chart relationships anywhere in the package, independent of worksheet ownership.
 fn chart_parts(book: &Book) -> BTreeSet<String> {
     let mut charts = BTreeSet::new();
-    for source in book.parts.iter().filter_map(|p| opc::source_of_rels(&p.name)) {
-        for r in book.rels_of(&source).iter().filter(|r| r.short_type() == "chart" && !r.external) {
+    for source in book
+        .parts
+        .iter()
+        .filter_map(|p| opc::source_of_rels(&p.name))
+    {
+        for r in book
+            .rels_of(&source)
+            .iter()
+            .filter(|r| r.short_type() == "chart" && !r.external)
+        {
             charts.insert(opc::resolve_target(&source, &r.target));
         }
     }
@@ -823,11 +959,21 @@ pub fn refers_into(f: &str, own: &str, sheet: &str, area: &CellRange) -> bool {
 /// are otherwise stale.
 pub fn refresh_pivots(book: &mut Book, changed: &crate::calc::Changed, out: &mut Vec<Notice>) {
     let wb = book.wb_part.clone();
-    let sheet_of = |name: &str| book.sheets.iter().position(|s| s.name.eq_ignore_ascii_case(name));
+    let sheet_of = |name: &str| {
+        book.sheets
+            .iter()
+            .position(|s| s.name.eq_ignore_ascii_case(name))
+    };
     let mut edits = vec![];
-    for r in book.rels_of(&wb).iter().filter(|r| r.short_type() == "pivotCacheDefinition" && !r.external) {
+    for r in book
+        .rels_of(&wb)
+        .iter()
+        .filter(|r| r.short_type() == "pivotCacheDefinition" && !r.external)
+    {
         let cp = opc::resolve_target(&wb, &r.target);
-        let Some(mut d) = package::get(&book.parts, &cp).and_then(|d| xml::parse(d).ok()) else { continue };
+        let Some(mut d) = package::get(&book.parts, &cp).and_then(|d| xml::parse(d).ok()) else {
+            continue;
+        };
         let mut stale = false;
         d.root.walk_mut(&mut |e| {
             if e.local() != "worksheetSource" {
@@ -836,15 +982,21 @@ pub fn refresh_pivots(book: &mut Book, changed: &crate::calc::Changed, out: &mut
             if let Some(n) = e.get("name") {
                 stale |= changed.tables.iter().any(|t| t.eq_ignore_ascii_case(&n));
             }
-            let (Some(i), Some(rr)) =
-                (e.get("sheet").and_then(|s| sheet_of(&s)), e.get("ref").and_then(|x| CellRange::parse(&x)))
-            else {
+            let (Some(i), Some(rr)) = (
+                e.get("sheet").and_then(|s| sheet_of(&s)),
+                e.get("ref").and_then(|x| CellRange::parse(&x)),
+            ) else {
                 return;
             };
             let inside = |row: u32, col: u32| {
-                (rr.first.row..=rr.last.row).contains(&row) && (rr.first.col..=rr.last.col).contains(&col)
+                (rr.first.row..=rr.last.row).contains(&row)
+                    && (rr.first.col..=rr.last.col).contains(&col)
             };
-            stale |= changed.cells.iter().chain(&changed.formulas).any(|&(k, row, col)| k == i && inside(row, col))
+            stale |= changed
+                .cells
+                .iter()
+                .chain(&changed.formulas)
+                .any(|&(k, row, col)| k == i && inside(row, col))
                 || changed.areas.iter().chain(&changed.moved).any(|(k, a)| {
                     *k == i
                         && a.first.row <= rr.last.row
@@ -877,22 +1029,51 @@ mod tests {
 
     #[test]
     fn formulas_follow_their_rows() {
-        let ins = RowShift::Insert { cols: (0, 5), at: 10, n: 2 };
-        assert_eq!(shift_formula("SUM(D2:D20)", "매출", "매출", &ins).as_deref(), Some("SUM(D2:D22)"));
+        let ins = RowShift::Insert {
+            cols: (0, 5),
+            at: 10,
+            n: 2,
+        };
+        assert_eq!(
+            shift_formula("SUM(D2:D20)", "매출", "매출", &ins).as_deref(),
+            Some("SUM(D2:D22)")
+        );
         assert_eq!(shift_formula("SUM(D2:D9)", "매출", "매출", &ins), None);
         assert_eq!(shift_formula("$D$12*2", "요약", "매출", &ins), None);
-        assert_eq!(shift_formula("매출!$D$12*2", "요약", "매출", &ins).as_deref(), Some("매출!$D$14*2"));
-        assert_eq!(shift_formula("'매출'!D12", "요약", "매출", &ins).as_deref(), Some("'매출'!D14"));
-        assert_eq!(shift_formula("H12+D12", "매출", "매출", &ins).as_deref(), Some("H12+D14"));
-        let del = RowShift::Delete { cols: (0, 5), first: 10, last: 12 };
-        assert_eq!(shift_formula("D11+D13", "s", "s", &del).as_deref(), Some("#REF!+D10"));
-        assert_eq!(shift_formula("SUM(D2:D20)", "s", "s", &del).as_deref(), Some("SUM(D2:D17)"));
+        assert_eq!(
+            shift_formula("매출!$D$12*2", "요약", "매출", &ins).as_deref(),
+            Some("매출!$D$14*2")
+        );
+        assert_eq!(
+            shift_formula("'매출'!D12", "요약", "매출", &ins).as_deref(),
+            Some("'매출'!D14")
+        );
+        assert_eq!(
+            shift_formula("H12+D12", "매출", "매출", &ins).as_deref(),
+            Some("H12+D14")
+        );
+        let del = RowShift::Delete {
+            cols: (0, 5),
+            first: 10,
+            last: 12,
+        };
+        assert_eq!(
+            shift_formula("D11+D13", "s", "s", &del).as_deref(),
+            Some("#REF!+D10")
+        );
+        assert_eq!(
+            shift_formula("SUM(D2:D20)", "s", "s", &del).as_deref(),
+            Some("SUM(D2:D17)")
+        );
         assert_eq!(shift_formula("Sales[매출]", "s", "s", &del), None);
     }
 
     #[test]
     fn copies_move_relative_references() {
-        assert_eq!(translate("A2*2+$B$1+B$1+Sheet2!C3", 3, 1), "B5*2+$B$1+C$1+Sheet2!D6");
+        assert_eq!(
+            translate("A2*2+$B$1+B$1+Sheet2!C3", 3, 1),
+            "B5*2+$B$1+C$1+Sheet2!D6"
+        );
         assert_eq!(translate("A1", -1, 0), "#REF!");
         assert_eq!(translate("SUM(A:A)", 5, 0), "SUM(A:A)");
     }
@@ -900,7 +1081,11 @@ mod tests {
     #[test]
     fn note_boxes_move() {
         let v = "<x:ClientData ObjectType=\"Note\"><x:Row>11</x:Row><x:Column>1</x:Column></x:ClientData>";
-        let ins = RowShift::Insert { cols: (0, 5), at: 10, n: 2 };
+        let ins = RowShift::Insert {
+            cols: (0, 5),
+            at: 10,
+            n: 2,
+        };
         assert_eq!(shift_vml(v, &ins).unwrap(), v.replace(">11<", ">13<"));
     }
 }

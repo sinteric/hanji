@@ -66,7 +66,12 @@ pub struct Para {
 
 impl Para {
     pub fn new(style: String, content: Inline, item: Option<ListItem>) -> Para {
-        Para { style, content, item, props: Props::default() }
+        Para {
+            style,
+            content,
+            item,
+            props: Props::default(),
+        }
     }
 }
 
@@ -115,7 +120,11 @@ pub struct StyleDef {
 
 impl StyleDef {
     pub fn new(id: impl Into<String>, name: impl Into<String>) -> StyleDef {
-        StyleDef { id: id.into(), name: name.into(), ..Default::default() }
+        StyleDef {
+            id: id.into(),
+            name: name.into(),
+            ..Default::default()
+        }
     }
 }
 
@@ -144,10 +153,15 @@ pub struct StyleSet {
 impl StyleSet {
     /// The style of a list item that names none.
     pub fn item_style(&self) -> &str {
-        self.default_item.as_deref().unwrap_or(&self.default_paragraph)
+        self.default_item
+            .as_deref()
+            .unwrap_or(&self.default_paragraph)
     }
     pub fn heading_level(&self, name: &str) -> Option<u8> {
-        self.headings.iter().position(|h| h.as_deref() == Some(name)).map(|k| k as u8 + 1)
+        self.headings
+            .iter()
+            .position(|h| h.as_deref() == Some(name))
+            .map(|k| k as u8 + 1)
     }
     pub fn paragraph_names(&self) -> Vec<String> {
         self.paragraph.iter().map(|s| s.name.clone()).collect()
@@ -156,20 +170,33 @@ impl StyleSet {
         self.table.iter().map(|s| s.name.clone()).collect()
     }
     pub fn paragraph_id(&self, name: &str) -> Option<&str> {
-        self.paragraph.iter().find(|s| s.name == name).map(|s| s.id.as_str())
+        self.paragraph
+            .iter()
+            .find(|s| s.name == name)
+            .map(|s| s.id.as_str())
     }
     pub fn paragraph_name(&self, id: &str) -> Option<&str> {
-        self.paragraph.iter().find(|s| s.id == id).map(|s| s.name.as_str())
+        self.paragraph
+            .iter()
+            .find(|s| s.id == id)
+            .map(|s| s.name.as_str())
     }
     pub fn table_id(&self, name: &str) -> Option<&str> {
-        self.table.iter().find(|s| s.name == name).map(|s| s.id.as_str())
+        self.table
+            .iter()
+            .find(|s| s.name == name)
+            .map(|s| s.id.as_str())
     }
     pub fn table_name(&self, id: &str) -> Option<&str> {
-        self.table.iter().find(|s| s.id == id).map(|s| s.name.as_str())
+        self.table
+            .iter()
+            .find(|s| s.id == id)
+            .map(|s| s.name.as_str())
     }
     /// The id of the default paragraph style (`Normal` when the file names none).
     pub fn default_paragraph_id(&self) -> &str {
-        self.paragraph_id(&self.default_paragraph).unwrap_or("Normal")
+        self.paragraph_id(&self.default_paragraph)
+            .unwrap_or("Normal")
     }
     /// The text's name for table style `id`: `None` for the default table
     /// style; an id missing from the style set stands for itself.
@@ -186,15 +213,25 @@ impl StyleSet {
     pub fn lines(&self) -> Vec<fmt::StyleLine> {
         let d = self.paragraph_def(&self.default_paragraph);
         d.into_iter()
-            .chain(self.paragraph.iter().filter(|s| s.name != self.default_paragraph))
-            .map(|s| fmt::StyleLine { name: s.name.clone(), props: s.props.clone() })
+            .chain(
+                self.paragraph
+                    .iter()
+                    .filter(|s| s.name != self.default_paragraph),
+            )
+            .map(|s| fmt::StyleLine {
+                name: s.name.clone(),
+                props: s.props.clone(),
+            })
             .collect()
     }
 
     /// The values of style `name` (the default style's when it has no line).
     pub fn values(&self, name: &str) -> Props {
-        fmt::styled::StyleTable { default: Some(self.default_paragraph.clone()), lines: self.lines() }
-            .values(Some(name))
+        fmt::styled::StyleTable {
+            default: Some(self.default_paragraph.clone()),
+            lines: self.lines(),
+        }
+        .values(Some(name))
     }
 }
 
@@ -212,11 +249,17 @@ pub struct Capabilities {
 }
 
 /// An empty paragraph's content.
-pub(crate) static EMPTY: Inline = Inline { units: Vec::new(), spans: Vec::new() };
+pub(crate) static EMPTY: Inline = Inline {
+    units: Vec::new(),
+    spans: Vec::new(),
+};
 
 /// Content of one unmarked atom.
 fn single(atom: Atom) -> Inline {
-    Inline { units: vec![fmt::Unit::new(atom, fmt::Marks::NONE)], spans: vec![] }
+    Inline {
+        units: vec![fmt::Unit::new(atom, fmt::Marks::NONE)],
+        spans: vec![],
+    }
 }
 
 /// Where a resolved block is in the text.
@@ -251,15 +294,21 @@ pub fn block_maps(parsed: &fmt::Parsed) -> Vec<BlockSrc> {
 /// The sources of one parsed block: one per list item, else one.
 pub(crate) fn push_block_map(out: &mut Vec<BlockSrc>, m: &fmt::BlockMap) {
     match &m.kind {
-        fmt::BlockMapKind::List(items) => {
-            out.extend(items.iter().map(|(s, e, pm)| BlockSrc { start: *s, end: *e, kind: SrcKind::Para(pm.clone()) }))
-        }
-        fmt::BlockMapKind::Para(pm) => {
-            out.push(BlockSrc { start: m.start, end: m.end, kind: SrcKind::Para(pm.clone()) })
-        }
-        fmt::BlockMapKind::Table(t) => {
-            out.push(BlockSrc { start: m.start, end: m.end, kind: SrcKind::Table(t.clone()) })
-        }
+        fmt::BlockMapKind::List(items) => out.extend(items.iter().map(|(s, e, pm)| BlockSrc {
+            start: *s,
+            end: *e,
+            kind: SrcKind::Para(pm.clone()),
+        })),
+        fmt::BlockMapKind::Para(pm) => out.push(BlockSrc {
+            start: m.start,
+            end: m.end,
+            kind: SrcKind::Para(pm.clone()),
+        }),
+        fmt::BlockMapKind::Table(t) => out.push(BlockSrc {
+            start: m.start,
+            end: m.end,
+            kind: SrcKind::Table(t.clone()),
+        }),
     }
 }
 
@@ -281,7 +330,13 @@ pub fn resolve(
     for (b, m) in parsed.doc.blocks.iter().zip(&parsed.map.blocks) {
         line += text[counted..m.start].matches('\n').count();
         counted = m.start;
-        let mut err = |msg: String| errs.push(Diagnostic { line, col: 1, message: msg });
+        let mut err = |msg: String| {
+            errs.push(Diagnostic {
+                line,
+                col: 1,
+                message: msg,
+            })
+        };
         let para = |style: String, content: Inline| Block::Para(Para::new(style, content, None));
         match b {
             fmt::Block::Para(p) => {
@@ -290,8 +345,10 @@ pub fn resolve(
                     fmt::ParaStyle::Heading(n) => match &styles.headings[*n as usize - 1] {
                         Some(s) => s.clone(),
                         None => {
-                            let have: Vec<String> =
-                                (1..=6).filter(|k| styles.headings[k - 1].is_some()).map(|k| "#".repeat(k)).collect();
+                            let have: Vec<String> = (1..=6)
+                                .filter(|k| styles.headings[k - 1].is_some())
+                                .map(|k| "#".repeat(k))
+                                .collect();
                             err(format!("this file has no Heading {n} style; its heading levels are: {}. Use one of them or a <div style=\"Name\">.", if have.is_empty() { "none".into() } else { have.join(", ") }));
                             continue;
                         }
@@ -300,16 +357,28 @@ pub fn resolve(
                 };
                 check_inline(&p.content, caps, is_block_keep, &mut err);
                 check_props(&p.props, &p.content, caps, &mut err);
-                out.push(Block::Para(Para { style, content: p.content.clone(), item: None, props: p.props.clone() }));
+                out.push(Block::Para(Para {
+                    style,
+                    content: p.content.clone(),
+                    item: None,
+                    props: p.props.clone(),
+                }));
             }
             fmt::Block::Keep(k) => match is_block_keep(&k.id) {
                 Some(true) => out.push(Block::Keep(k.id.clone())),
-                Some(false) => out.push(para(styles.default_paragraph.clone(), single(Atom::Keep(k.clone())))),
-                None => {
-                    err(format!("placeholder id=\"{}\" is not in this file; placeholders are never created.", k.id))
-                }
+                Some(false) => out.push(para(
+                    styles.default_paragraph.clone(),
+                    single(Atom::Keep(k.clone())),
+                )),
+                None => err(format!(
+                    "placeholder id=\"{}\" is not in this file; placeholders are never created.",
+                    k.id
+                )),
             },
-            fmt::Block::PageBreak => out.push(para(styles.default_paragraph.clone(), single(Atom::PageBreak))),
+            fmt::Block::PageBreak => out.push(para(
+                styles.default_paragraph.clone(),
+                single(Atom::PageBreak),
+            )),
             fmt::Block::Table(t) => {
                 let mut rows = t.rows.clone();
                 if !caps.formatting && t.boxes.iter().flatten().any(|b| !b.is_empty()) {
@@ -327,11 +396,19 @@ pub fn resolve(
                     }
                 }
                 // The default table style named is no style line (canonical form).
-                let style = t.style.clone().filter(|s| Some(s) != styles.default_table.as_ref());
+                let style = t
+                    .style
+                    .clone()
+                    .filter(|s| Some(s) != styles.default_table.as_ref());
                 if !caps.table_place && !t.place.is_empty() {
                     err(NO_TABLE_PLACE.into());
                 }
-                out.push(Block::Table(Table { style, rows, boxes: t.boxes.clone(), place: t.place.clone() }));
+                out.push(Block::Table(Table {
+                    style,
+                    rows,
+                    boxes: t.boxes.clone(),
+                    place: t.place.clone(),
+                }));
             }
             fmt::Block::List(items) => {
                 let mut margin = None;
@@ -344,7 +421,11 @@ pub fn resolve(
                     // An item at the margin of the other kind starts a new list,
                     // as in GFM (§5.2); canonical form puts a blank line before it.
                     let first = it.level == 0 && margin.replace(it.ordered) != Some(it.ordered);
-                    let item = ListItem { ordered: it.ordered, level: it.level, first };
+                    let item = ListItem {
+                        ordered: it.ordered,
+                        level: it.level,
+                        first,
+                    };
                     // A list item names its style where the file shows formatting;
                     // elsewhere its style stays in the remainder.
                     let style = match &it.style {
@@ -393,24 +474,44 @@ fn check_props(p: &Props, content: &Inline, caps: Capabilities, err: &mut dyn Fn
 /// name already taken (in another case, or a table style's) is refused,
 /// and so is a line for a style the text did not show, unless it repeats
 /// that style's values.
-fn check_styles(parsed: &fmt::Parsed, text: &str, styles: &StyleSet, caps: Capabilities, errs: &mut Vec<Diagnostic>) {
+fn check_styles(
+    parsed: &fmt::Parsed,
+    text: &str,
+    styles: &StyleSet,
+    caps: Capabilities,
+    errs: &mut Vec<Diagnostic>,
+) {
     let lines = &parsed.doc.styles;
     if lines.is_empty() {
         return;
     }
     let at = |name: &str| {
         let needle = format!("name=\"{}\"", fmt::serialize::attr_value(name));
-        text.lines().position(|l| l.trim_start().starts_with("<style") && l.contains(&needle)).map_or(1, |k| k + 1)
+        text.lines()
+            .position(|l| l.trim_start().starts_with("<style") && l.contains(&needle))
+            .map_or(1, |k| k + 1)
     };
-    let mut err = |name: &str, message: String| errs.push(Diagnostic { line: at(name), col: 1, message });
+    let mut err = |name: &str, message: String| {
+        errs.push(Diagnostic {
+            line: at(name),
+            col: 1,
+            message,
+        })
+    };
     if !caps.formatting {
         err(&lines[0].name, NO_FORMATTING.into());
         return;
     }
     // A line is compared in canonical form: what it says beyond the default.
-    let table = fmt::styled::StyleTable { default: Some(styles.default_paragraph.clone()), lines: styles.lines() };
+    let table = fmt::styled::StyleTable {
+        default: Some(styles.default_paragraph.clone()),
+        lines: styles.lines(),
+    };
     let same = |d: &StyleDef, l: &fmt::StyleLine| {
-        table.canonical(&fmt::StyleLine { name: d.name.clone(), props: d.props.clone() }) == table.canonical(l)
+        table.canonical(&fmt::StyleLine {
+            name: d.name.clone(),
+            props: d.props.clone(),
+        }) == table.canonical(l)
     };
     for l in lines {
         match styles.paragraph_def(&l.name) {
@@ -493,24 +594,27 @@ fn check_inline(
 ) {
     for s in &i.spans {
         match &s.kind {
-            fmt::SpanKind::Link(_) if !caps.links => {
-                err("links cannot be written to this file format yet; write the link text only.".into())
-            }
-            fmt::SpanKind::Field(n) if !caps.fields => {
-                err(format!("<field name=\"{n}\"> cannot be written to this file format yet."))
-            }
+            fmt::SpanKind::Link(_) if !caps.links => err(
+                "links cannot be written to this file format yet; write the link text only.".into(),
+            ),
+            fmt::SpanKind::Field(n) if !caps.fields => err(format!(
+                "<field name=\"{n}\"> cannot be written to this file format yet."
+            )),
             _ => {}
         }
     }
     for u in &i.units {
         match &u.atom {
-            Atom::Math(_) if !caps.math => err("math cannot be written to this file format yet.".into()),
-            Atom::NoteRef(l) if !caps.footnotes => {
-                err(format!("footnote [^{l}] cannot be written to this file format yet."))
+            Atom::Math(_) if !caps.math => {
+                err("math cannot be written to this file format yet.".into())
             }
-            Atom::Keep(k) if is_block_keep(&k.id) == Some(true) => {
-                err(format!("placeholder id=\"{}\" stands for a whole block; keep it alone on its own line.", k.id))
-            }
+            Atom::NoteRef(l) if !caps.footnotes => err(format!(
+                "footnote [^{l}] cannot be written to this file format yet."
+            )),
+            Atom::Keep(k) if is_block_keep(&k.id) == Some(true) => err(format!(
+                "placeholder id=\"{}\" stands for a whole block; keep it alone on its own line.",
+                k.id
+            )),
             _ => {}
         }
     }
@@ -526,14 +630,23 @@ pub fn unresolve(
     let mut out = vec![];
     // What differs from a paragraph's style, in canonical form (an edit that
     // restyles a paragraph may leave it values its new style has).
-    let table = fmt::styled::StyleTable { default: Some(styles.default_paragraph.clone()), lines: styles.lines() };
+    let table = fmt::styled::StyleTable {
+        default: Some(styles.default_paragraph.clone()),
+        lines: styles.lines(),
+    };
     let mut values: std::collections::HashMap<String, Props> = Default::default();
     let mut canon = |style: &str, props: &Props, content: &Inline| -> (Props, Inline) {
         if !styles.formatting {
             return (props.clone(), content.clone());
         }
-        let style = if style.is_empty() { styles.default_paragraph.as_str() } else { style };
-        let v = values.entry(style.to_string()).or_insert_with(|| table.values(Some(style)));
+        let style = if style.is_empty() {
+            styles.default_paragraph.as_str()
+        } else {
+            style
+        };
+        let v = values
+            .entry(style.to_string())
+            .or_insert_with(|| table.values(Some(style)));
         let text = v.only(&fmt::Key::TEXT);
         let mut c = content.clone();
         for u in &mut c.units {
@@ -548,15 +661,22 @@ pub fn unresolve(
         .map(|b| match b {
             Block::Para(p) => {
                 let (props, content) = canon(&p.style, &p.props, &p.content);
-                Block::Para(Para { props, content, ..p.clone() })
+                Block::Para(Para {
+                    props,
+                    content,
+                    ..p.clone()
+                })
             }
             Block::Table(t) => {
                 let mut t = t.clone();
                 for c in t.rows.iter_mut().flatten() {
                     if let Cell::Text(ps) = c {
                         for p in ps {
-                            let (props, content) =
-                                canon(p.style.as_deref().unwrap_or(&styles.default_paragraph), &p.props, &p.content);
+                            let (props, content) = canon(
+                                p.style.as_deref().unwrap_or(&styles.default_paragraph),
+                                &p.props,
+                                &p.content,
+                            );
                             (p.props, p.content) = (props, content);
                         }
                     }
@@ -568,7 +688,13 @@ pub fn unresolve(
         .collect();
     let blocks = &blocks[..];
     for b in blocks {
-        if let Block::Para(Para { content, item: Some(it), style, props }) = b {
+        if let Block::Para(Para {
+            content,
+            item: Some(it),
+            style,
+            props,
+        }) = b
+        {
             let named = (!style.is_empty() && style != styles.item_style()).then(|| style.clone());
             let fi = fmt::Item {
                 ordered: it.ordered,
@@ -600,10 +726,16 @@ pub fn unresolve(
                 let blank = p.content.units.iter().all(|u| u.atom.is_space());
                 let style = match styles.heading_level(&p.style) {
                     Some(n) if !blank => fmt::ParaStyle::Heading(n),
-                    _ if p.style == styles.default_paragraph && (empty || !blank) => fmt::ParaStyle::Plain,
+                    _ if p.style == styles.default_paragraph && (empty || !blank) => {
+                        fmt::ParaStyle::Plain
+                    }
                     _ => fmt::ParaStyle::Named(p.style.clone()),
                 };
-                fmt::Block::Para(fmt::Para { style, content: p.content.clone(), props: p.props.clone() })
+                fmt::Block::Para(fmt::Para {
+                    style,
+                    content: p.content.clone(),
+                    props: p.props.clone(),
+                })
             }
         });
     }
@@ -614,12 +746,19 @@ pub fn unresolve(
         used_styles(blocks, styles)
             .iter()
             .filter_map(|n| styles.paragraph_def(n))
-            .map(|s| fmt::StyleLine { name: s.name.clone(), props: s.props.clone() })
+            .map(|s| fmt::StyleLine {
+                name: s.name.clone(),
+                props: s.props.clone(),
+            })
             .collect()
     } else {
         vec![]
     };
-    let mut d = fmt::Document { front, styles: lines, blocks: out };
+    let mut d = fmt::Document {
+        front,
+        styles: lines,
+        blocks: out,
+    };
     d.normalize();
     d
 }
@@ -638,9 +777,11 @@ pub fn paras(blocks: &[Block]) -> Vec<(Path, Option<&Inline>)> {
                 for (r, row) in t.rows.iter().enumerate() {
                     for (c, cell) in row.iter().enumerate() {
                         match cell {
-                            Cell::Text(ps) => {
-                                out.extend(ps.iter().enumerate().map(|(k, p)| (vec![j, r, c, k], Some(&p.content))))
-                            }
+                            Cell::Text(ps) => out.extend(
+                                ps.iter()
+                                    .enumerate()
+                                    .map(|(k, p)| (vec![j, r, c, k], Some(&p.content))),
+                            ),
                             Cell::Up => out.push((vec![j, r, c, 0], Some(&EMPTY))),
                             Cell::Left => {}
                         }

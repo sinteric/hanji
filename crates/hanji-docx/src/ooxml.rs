@@ -199,17 +199,26 @@ pub const TCPR_ORDER: &[&str] = &[
 
 /// `w:gridSpan` of a cell (1 when absent).
 pub fn grid_span(tcpr: Option<&Element>) -> usize {
-    tcpr.and_then(|t| t.child("w:gridSpan")).and_then(|g| g.get("w:val")).and_then(|v| v.parse().ok()).unwrap_or(1)
+    tcpr.and_then(|t| t.child("w:gridSpan"))
+        .and_then(|g| g.get("w:val"))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(1)
 }
 
 /// A `w:vMerge` cell other than `restart`: covered by the cell above.
 pub fn v_merged(tcpr: Option<&Element>) -> bool {
-    tcpr.and_then(|t| t.child("w:vMerge")).is_some_and(|v| v.get("w:val").as_deref() != Some("restart"))
+    tcpr.and_then(|t| t.child("w:vMerge"))
+        .is_some_and(|v| v.get("w:val").as_deref() != Some("restart"))
 }
 
 /// `w:b`-style toggle: present and not `0`/`false`/`off`.
 pub fn on(e: Option<&Element>) -> bool {
-    e.is_some_and(|e| !matches!(e.get("w:val").as_deref(), Some("0") | Some("false") | Some("off")))
+    e.is_some_and(|e| {
+        !matches!(
+            e.get("w:val").as_deref(),
+            Some("0") | Some("false") | Some("off")
+        )
+    })
 }
 
 /// Underline is on unless absent or `none`.

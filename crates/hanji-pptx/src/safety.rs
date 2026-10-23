@@ -16,7 +16,10 @@ use crate::pml::CT_MAIN;
 
 /// Macro-enabled main parts and what they become.
 const MACRO_MAINS: &[(&str, &str)] = &[
-    ("application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml", CT_MAIN),
+    (
+        "application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml",
+        CT_MAIN,
+    ),
     (
         "application/vnd.ms-powerpoint.slideshow.macroEnabled.main+xml",
         "application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml",
@@ -28,7 +31,14 @@ const MACRO_MAINS: &[(&str, &str)] = &[
 ];
 
 /// Elements that exist only to reach what a removed relationship pointed at.
-const REACHES: &[&str] = &["p:control", "a:videoFile", "a:audioFile", "a:quickTimeFile", "p14:media", "c:externalData"];
+const REACHES: &[&str] = &[
+    "p:control",
+    "a:videoFile",
+    "a:audioFile",
+    "a:quickTimeFile",
+    "p14:media",
+    "c:externalData",
+];
 
 struct Removed {
     source: String,
@@ -45,10 +55,18 @@ pub fn neutralise(
     let out = &mut report.neutralised;
     let mut removed: Vec<Removed> = vec![];
     let mut drop_parts: BTreeSet<String> = BTreeSet::new();
-    let macro_parts: BTreeSet<String> = parts.iter().filter(|p| is_macro_package(p)).map(|p| p.name.clone()).collect();
+    let macro_parts: BTreeSet<String> = parts
+        .iter()
+        .filter(|p| is_macro_package(p))
+        .map(|p| p.name.clone())
+        .collect();
     for part in parts.iter_mut().filter(|p| p.name.ends_with(".rels")) {
-        let Some(source) = opc::source_of_rels(&part.name) else { continue };
-        let Ok(mut d) = xml::parse(&part.data) else { continue };
+        let Some(source) = opc::source_of_rels(&part.name) else {
+            continue;
+        };
+        let Ok(mut d) = xml::parse(&part.data) else {
+            continue;
+        };
         let before = d.root.children.len();
         let from_slide = source.starts_with("ppt/slides/")
             || source.starts_with("ppt/slideLayouts/")
@@ -75,8 +93,16 @@ pub fn neutralise(
                 _ => None,
             };
             let Some(kind) = kind else { return true };
-            notice(out, kind, format!("{} {}", part.name, r.get("Id").unwrap_or_default()), target.clone());
-            removed.push(Removed { source: source.clone(), id: r.get("Id").unwrap_or_default() });
+            notice(
+                out,
+                kind,
+                format!("{} {}", part.name, r.get("Id").unwrap_or_default()),
+                target.clone(),
+            );
+            removed.push(Removed {
+                source: source.clone(),
+                id: r.get("Id").unwrap_or_default(),
+            });
             if !external {
                 drop_parts.insert(resolved);
             }
@@ -88,14 +114,26 @@ pub fn neutralise(
     }
     // The XML that pointed at them, and OLE objects, ActiveX controls and
     // click actions wherever they are.
-    let sources: BTreeSet<String> = removed.iter().map(|r| r.source.clone()).chain(split.keys().cloned()).collect();
+    let sources: BTreeSet<String> = removed
+        .iter()
+        .map(|r| r.source.clone())
+        .chain(split.keys().cloned())
+        .collect();
     for src in &sources {
-        let ids: BTreeSet<&str> = removed.iter().filter(|r| &r.source == src).map(|r| r.id.as_str()).collect();
+        let ids: BTreeSet<&str> = removed
+            .iter()
+            .filter(|r| &r.source == src)
+            .map(|r| r.id.as_str())
+            .collect();
         match split.get_mut(src) {
             Some(root) => clean(root, &ids, out, src),
             None => {
-                let Some(p) = parts.iter_mut().find(|p| &p.name == src) else { continue };
-                let Ok(mut d) = xml::parse(&p.data) else { continue };
+                let Some(p) = parts.iter_mut().find(|p| &p.name == src) else {
+                    continue;
+                };
+                let Ok(mut d) = xml::parse(&p.data) else {
+                    continue;
+                };
                 let before = d.root.clone();
                 clean(&mut d.root, &ids, out, src);
                 if d.root != before {
@@ -106,7 +144,12 @@ pub fn neutralise(
     }
     for name in &macro_parts {
         if !drop_parts.contains(name) {
-            notice(out, "macro-package", name.clone(), "embedded package that can carry macros");
+            notice(
+                out,
+                "macro-package",
+                name.clone(),
+                "embedded package that can carry macros",
+            );
             drop_parts.insert(name.clone());
         }
     }
@@ -123,7 +166,10 @@ pub fn neutralise(
             let n = d.root.children.len();
             d.root.children.retain(|c| !matches!(c, Node::El(e) if e.local() == "Override" && e.get("PartName").is_some_and(|p| gone.contains(p.trim_start_matches('/')))));
             let mut changed = d.root.children.len() != n;
-            if gone.iter().any(|g| g.to_ascii_lowercase().ends_with("vbaproject.bin")) {
+            if gone
+                .iter()
+                .any(|g| g.to_ascii_lowercase().ends_with("vbaproject.bin"))
+            {
                 for e in d.root.elements_mut() {
                     let ct = e.get("ContentType").unwrap_or_default();
                     if let Some((_, plain)) = MACRO_MAINS.iter().find(|m| m.0 == ct) {
@@ -145,7 +191,9 @@ pub fn neutralise(
 /// that run something.
 fn clean(root: &mut Element, ids: &BTreeSet<&str>, out: &mut Vec<Notice>, part: &str) {
     fn refers(e: &Element, ids: &BTreeSet<&str>) -> bool {
-        e.attrs.iter().any(|a| a.0.starts_with("r:") && ids.contains(xml::unescape(&a.1).as_str()))
+        e.attrs
+            .iter()
+            .any(|a| a.0.starts_with("r:") && ids.contains(xml::unescape(&a.1).as_str()))
     }
     fn rec(e: &mut Element, ids: &BTreeSet<&str>, out: &mut Vec<Notice>, part: &str) {
         let mut k = 0;
@@ -182,8 +230,10 @@ fn clean(root: &mut Element, ids: &BTreeSet<&str>, out: &mut Vec<Notice>, part: 
             }
             let drop = (REACHES.contains(&c.name.as_str()) && refers(c, ids))
                 || c.is("p:controls")
-                || (matches!(c.name.as_str(), "a:hlinkClick" | "a:hlinkHover" | "a:hlinkMouseOver")
-                    && runs_something(c))
+                || (matches!(
+                    c.name.as_str(),
+                    "a:hlinkClick" | "a:hlinkHover" | "a:hlinkMouseOver"
+                ) && runs_something(c))
                 || (c.is("mc:AlternateContent")
                     && c.descendants("p:controls").len() + c.descendants("p:control").len() > 0);
             if drop {
@@ -194,7 +244,9 @@ fn clean(root: &mut Element, ids: &BTreeSet<&str>, out: &mut Vec<Notice>, part: 
                 } else {
                     "reference-removed"
                 };
-                let detail = c.get("action").map_or_else(|| format!("<{}> removed", c.name), |a| clip(&a, 60));
+                let detail = c
+                    .get("action")
+                    .map_or_else(|| format!("<{}> removed", c.name), |a| clip(&a, 60));
                 notice(out, kind, format!("{part} <{}>", c.name), detail);
                 e.children.remove(k);
                 continue;
@@ -203,9 +255,15 @@ fn clean(root: &mut Element, ids: &BTreeSet<&str>, out: &mut Vec<Notice>, part: 
         }
         for c in e.elements_mut() {
             let before = c.attrs.len();
-            c.attrs.retain(|a| !(a.0.starts_with("r:") && ids.contains(xml::unescape(&a.1).as_str())));
+            c.attrs
+                .retain(|a| !(a.0.starts_with("r:") && ids.contains(xml::unescape(&a.1).as_str())));
             if c.attrs.len() != before {
-                notice(out, "reference-removed", format!("{part} <{}>", c.name), "points at a removed relationship");
+                notice(
+                    out,
+                    "reference-removed",
+                    format!("{part} <{}>", c.name),
+                    "points at a removed relationship",
+                );
             }
             rec(c, ids, out, part);
         }
@@ -216,7 +274,9 @@ fn clean(root: &mut Element, ids: &BTreeSet<&str>, out: &mut Vec<Notice>, part: 
 /// A click action that runs a program, a macro or an object's verb.
 fn runs_something(h: &Element) -> bool {
     h.get("action").is_some_and(|a| {
-        a.starts_with("ppaction://program") || a.starts_with("ppaction://macro") || a.starts_with("ppaction://ole")
+        a.starts_with("ppaction://program")
+            || a.starts_with("ppaction://macro")
+            || a.starts_with("ppaction://ole")
     })
 }
 
@@ -231,18 +291,28 @@ fn ole_preview(e: &Element) -> Option<Option<Element>> {
         e.descendants("p:oleObj").first().map(|_| e.clone())
     };
     let frames: Vec<Element> = if e.is("mc:AlternateContent") {
-        e.elements().flat_map(|c| c.elements().filter_map(frame_of).collect::<Vec<_>>()).collect()
+        e.elements()
+            .flat_map(|c| c.elements().filter_map(frame_of).collect::<Vec<_>>())
+            .collect()
     } else {
         frame_of(e).into_iter().collect()
     };
     let first = frames.first()?;
     let pic = frames
         .iter()
-        .find_map(|f| f.descendants("p:oleObj").first().and_then(|o| o.child("p:pic")).cloned())
+        .find_map(|f| {
+            f.descendants("p:oleObj")
+                .first()
+                .and_then(|o| o.child("p:pic"))
+                .cloned()
+        })
         .map(|mut p| {
             if let (Some(src), Some(dst)) = (
-                first.child("p:nvGraphicFramePr").and_then(|n| n.child("p:cNvPr")),
-                p.child_mut("p:nvPicPr").and_then(|n| n.child_mut("p:cNvPr")),
+                first
+                    .child("p:nvGraphicFramePr")
+                    .and_then(|n| n.child("p:cNvPr")),
+                p.child_mut("p:nvPicPr")
+                    .and_then(|n| n.child_mut("p:cNvPr")),
             ) {
                 *dst = src.clone();
             }
@@ -263,34 +333,64 @@ pub fn surface(parts: &[Part], slides: &[(String, &Element)], report: &mut Impor
     let out = &mut report.surface;
     for (k, (name, root)) in slides.iter().enumerate() {
         if root.get("show").as_deref() == Some("0") {
-            notice(out, "hidden-slide", format!("slide {} ({name})", k + 1), "the slide is hidden in the slide show");
+            notice(
+                out,
+                "hidden-slide",
+                format!("slide {} ({name})", k + 1),
+                "the slide is hidden in the slide show",
+            );
         }
         root.walk(&mut |e| {
             if e.is("p:cNvPr") && e.get("hidden").as_deref() == Some("1") {
-                notice(out, "hidden-shape", format!("slide {} ({name})", k + 1), e.get("name").unwrap_or_default());
+                notice(
+                    out,
+                    "hidden-shape",
+                    format!("slide {} ({name})", k + 1),
+                    e.get("name").unwrap_or_default(),
+                );
             }
         });
     }
     let authors: BTreeMap<String, String> = package::get(parts, "ppt/commentAuthors.xml")
         .and_then(|d| xml::parse(d).ok())
-        .map(|d| d.root.elements().filter_map(|a| Some((a.get("id")?, a.get("name").unwrap_or_default()))).collect())
+        .map(|d| {
+            d.root
+                .elements()
+                .filter_map(|a| Some((a.get("id")?, a.get("name").unwrap_or_default())))
+                .collect()
+        })
         .unwrap_or_default();
-    for p in parts.iter().filter(|p| p.name.starts_with("ppt/comments/") && p.name.ends_with(".xml")) {
+    for p in parts
+        .iter()
+        .filter(|p| p.name.starts_with("ppt/comments/") && p.name.ends_with(".xml"))
+    {
         let Ok(d) = xml::parse(&p.data) else { continue };
         d.root.walk(&mut |e| {
             if e.local() == "cm" {
-                let who =
-                    e.get("authorId").and_then(|a| authors.get(&a).cloned().or(Some(a))).unwrap_or_else(|| "?".into());
+                let who = e
+                    .get("authorId")
+                    .and_then(|a| authors.get(&a).cloned().or(Some(a)))
+                    .unwrap_or_else(|| "?".into());
                 let text = e.text_of(&["p:text", "a:t"]);
-                notice(out, "comment", p.name.clone(), format!("{who}: {}", clip(&text, 60)));
+                notice(
+                    out,
+                    "comment",
+                    p.name.clone(),
+                    format!("{who}: {}", clip(&text, 60)),
+                );
             }
         });
     }
     for (part, tags) in [
-        ("docProps/core.xml", &["dc:creator", "cp:lastModifiedBy"][..]),
+        (
+            "docProps/core.xml",
+            &["dc:creator", "cp:lastModifiedBy"][..],
+        ),
         ("docProps/app.xml", &["Company", "Manager"][..]),
     ] {
-        let Some(d) = package::get(parts, part).and_then(|d| xml::parse(d).ok()) else { continue };
+        let Some(d) = package::get(parts, part).and_then(|d| xml::parse(d).ok()) else {
+            continue;
+        };
         for tag in tags {
             for e in d.root.elements().filter(|e| e.name == *tag) {
                 let v = e.text_of(&[tag]);

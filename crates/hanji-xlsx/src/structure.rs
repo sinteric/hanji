@@ -28,15 +28,29 @@ fn spec(c: &hanji_format::sheet::ColumnDecl) -> ColumnSpec {
 }
 
 fn tables(items: &[SheetItem]) -> Vec<&TableDecl> {
-    items.iter().filter_map(|i| if let SheetItem::Table(t) = i { Some(t) } else { None }).collect()
+    items
+        .iter()
+        .filter_map(|i| {
+            if let SheetItem::Table(t) = i {
+                Some(t)
+            } else {
+                None
+            }
+        })
+        .collect()
 }
 
 /// The operations `new` asks for against `old`, and the placeholders it deleted.
-pub fn reconcile(new: &Spreadsheet, old: &Spreadsheet) -> Result<(Vec<RangeOp>, Vec<String>), String> {
+pub fn reconcile(
+    new: &Spreadsheet,
+    old: &Spreadsheet,
+) -> Result<(Vec<RangeOp>, Vec<String>), String> {
     let mut ops = vec![];
     let mut drops = vec![];
     if new.default_format != old.default_format {
-        return Err(format_refusal("the line <format default …/> is not the workbook's"));
+        return Err(format_refusal(
+            "the line <format default …/> is not the workbook's",
+        ));
     }
     if new.sheets.len() < old.sheets.len() {
         let gone: Vec<&str> = old
@@ -53,9 +67,14 @@ pub fn reconcile(new: &Spreadsheet, old: &Spreadsheet) -> Result<(Vec<RangeOp>, 
     for (k, ns) in new.sheets.iter().enumerate() {
         let Some(os) = old.sheets.get(k) else {
             if !ns.formats.is_empty() {
-                return Err(format_refusal(&format!("new sheet {} has format lines", ns.name)));
+                return Err(format_refusal(&format!(
+                    "new sheet {} has format lines",
+                    ns.name
+                )));
             }
-            ops.push(RangeOp::AddSheet { name: ns.name.clone() });
+            ops.push(RangeOp::AddSheet {
+                name: ns.name.clone(),
+            });
             for t in tables(&ns.items) {
                 ops.push(new_table(&ns.name, t)?);
             }
@@ -77,7 +96,10 @@ pub fn reconcile(new: &Spreadsheet, old: &Spreadsheet) -> Result<(Vec<RangeOp>, 
                 .find(|f| !os.formats.contains(f))
                 .map(|f| f.line())
                 .or_else(|| {
-                    os.formats.iter().find(|f| !ns.formats.contains(f)).map(|f| format!("{} is missing", f.line()))
+                    os.formats
+                        .iter()
+                        .find(|f| !ns.formats.contains(f))
+                        .map(|f| format!("{} is missing", f.line()))
                 })
                 .unwrap_or_else(|| "the format lines are in another order".into());
             return Err(format_refusal(&format!("sheet {}: {changed}", ns.name)));
@@ -102,10 +124,16 @@ pub fn reconcile(new: &Spreadsheet, old: &Spreadsheet) -> Result<(Vec<RangeOp>, 
             for (ci, c) in t.columns.iter().enumerate() {
                 let Some(oc) = o.columns.get(ci) else {
                     if !c.formula.is_empty() || c.ty != "mixed" {
-                        ops.push(RangeOp::AddColumn { table: t.name.clone(), column: spec(c) });
+                        ops.push(RangeOp::AddColumn {
+                            table: t.name.clone(),
+                            column: spec(c),
+                        });
                         continue;
                     }
-                    ops.push(RangeOp::AddColumn { table: t.name.clone(), column: spec(c) });
+                    ops.push(RangeOp::AddColumn {
+                        table: t.name.clone(),
+                        column: spec(c),
+                    });
                     continue;
                 };
                 if c.name != oc.name {
@@ -141,7 +169,13 @@ pub fn reconcile(new: &Spreadsheet, old: &Spreadsheet) -> Result<(Vec<RangeOp>, 
         let nk: Vec<&str> = ns
             .items
             .iter()
-            .filter_map(|i| if let SheetItem::Keep(k) = i { Some(k.id.as_str()) } else { None })
+            .filter_map(|i| {
+                if let SheetItem::Keep(k) = i {
+                    Some(k.id.as_str())
+                } else {
+                    None
+                }
+            })
             .collect();
         for i in &os.items {
             if let SheetItem::Keep(k) = i {
@@ -161,7 +195,8 @@ pub fn reconcile(new: &Spreadsheet, old: &Spreadsheet) -> Result<(Vec<RangeOp>, 
 }
 
 fn chart_refusal() -> String {
-    "adding a chart with <chart …/> is not supported yet; the workbook's charts are placeholders".into()
+    "adding a chart with <chart …/> is not supported yet; the workbook's charts are placeholders"
+        .into()
 }
 
 fn new_table(sheet: &str, t: &TableDecl) -> Result<RangeOp, String> {

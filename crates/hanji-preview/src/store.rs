@@ -10,7 +10,8 @@ use hanji_store::{Code, Error, ExportOptions, Format, Result, Storage, Workspace
 use serde::Serialize;
 
 use crate::{
-    docx, render_pptx, xlsx, Diagnostic, DocumentPreview, FontsReport, Options, PageData, PageFormat, PageInfo, Preview,
+    docx, render_pptx, xlsx, Diagnostic, DocumentPreview, FontsReport, Options, PageData,
+    PageFormat, PageInfo, Preview,
 };
 
 /// What the preview writes.
@@ -112,7 +113,12 @@ impl Previewed {
             Format::Hwpx => crate::quality::PreviewSource::Hwpx,
             Format::Xlsx => crate::quality::PreviewSource::Xlsx,
         };
-        crate::quality::QualityReport::inspect(source, &self.diagnostics, &self.fonts, &self.warnings)
+        crate::quality::QualityReport::inspect(
+            source,
+            &self.diagnostics,
+            &self.fonts,
+            &self.warnings,
+        )
     }
 }
 impl XlsxPreviewed {
@@ -135,33 +141,55 @@ fn render_xlsx_bytes(
     opts: &Options,
 ) -> Result<(XlsxPreviewed, xlsx::Window)> {
     if selection.sheet.is_some() && selection.sheet_index.is_some() {
-        return Err(Error::bad("choose --sheet NAME or --sheet-index N, not both"));
+        return Err(Error::bad(
+            "choose --sheet NAME or --sheet-index N, not both",
+        ));
     }
     let mut book = xlsx::open_xlsx(bytes, xlsx::XlsxOptions::default())
         .map_err(|m| Error::new(Code::Package, format!("cannot preview {id}: {m}")))?;
     let index = if let Some(name) = &selection.sheet {
-        book.sheets.iter().position(|s| &s.name == name).ok_or_else(|| {
-            Error::bad(format!(
-                "worksheet {name:?} not found; available sheets: {}",
-                book.sheets.iter().map(|s| format!("{:?}", s.name)).collect::<Vec<_>>().join(", ")
-            ))
-        })?
+        book.sheets
+            .iter()
+            .position(|s| &s.name == name)
+            .ok_or_else(|| {
+                Error::bad(format!(
+                    "worksheet {name:?} not found; available sheets: {}",
+                    book.sheets
+                        .iter()
+                        .map(|s| format!("{:?}", s.name))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ))
+            })?
     } else if let Some(index) = selection.sheet_index {
         index
             .checked_sub(1)
             .filter(|&i| i < book.sheets.len())
-            .ok_or_else(|| Error::bad(format!("--sheet-index is 1-based; choose 1 through {}", book.sheets.len())))?
+            .ok_or_else(|| {
+                Error::bad(format!(
+                    "--sheet-index is 1-based; choose 1 through {}",
+                    book.sheets.len()
+                ))
+            })?
     } else {
         book.sheets.iter().position(|s| s.is_worksheet && s.state == "visible").ok_or_else(|| {
             Error::bad("no visible worksheet; select a worksheet explicitly with --sheet or --sheet-index")
         })?
     };
     if !book.sheets[index].is_worksheet {
-        return Err(Error::new(Code::Unsupported, "chart/macro/dialog sheets do not have a worksheet grid preview"));
+        return Err(Error::new(
+            Code::Unsupported,
+            "chart/macro/dialog sheets do not have a worksheet grid preview",
+        ));
     }
     let window = book
         .render_window(index, selection.range.as_deref().unwrap_or("A1:L40"), opts)
-        .map_err(|m| Error::bad(format!("cannot preview worksheet {:?}: {m}", book.sheets[index].name)))?;
+        .map_err(|m| {
+            Error::bad(format!(
+                "cannot preview worksheet {:?}: {m}",
+                book.sheets[index].name
+            ))
+        })?;
     let out = XlsxPreviewed {
         doc_id: id,
         revision,
@@ -195,10 +223,19 @@ pub fn render_xlsx_file(
         .and_then(|f| f.take(limit + 1).read_to_end(&mut bytes))
         .map_err(|e| Error::io(format!("cannot read {}: {e}", path.display())))?;
     if bytes.len() as u64 > limit {
-        return Err(Error::bad("XLSX preview file exceeds the 64 MiB raw-file budget"));
+        return Err(Error::bad(
+            "XLSX preview file exceeds the 64 MiB raw-file budget",
+        ));
     }
     let name = path.file_name().unwrap_or_default().to_string_lossy();
-    render_xlsx_bytes(&bytes, hanji_store::id_from_name(&name), 1, XlsxSource::File, selection, opts)
+    render_xlsx_bytes(
+        &bytes,
+        hanji_store::id_from_name(&name),
+        1,
+        XlsxSource::File,
+        selection,
+        opts,
+    )
 }
 
 /// Preview the bytes exported from a stored revision, never its original file.
@@ -212,34 +249,73 @@ pub fn render_xlsx<S: Storage>(
     if ws.doc(id)?.format != Format::Xlsx {
         return Err(Error::bad("worksheet selection requires an xlsx document"));
     }
-    let (e, bytes) =
-        ws.export_bytes(id, revision, &ExportOptions { acknowledge_surfaced: true, ..Default::default() })?;
-    render_xlsx_bytes(&bytes, e.doc_id, e.revision, XlsxSource::Revision, selection, opts)
+    let (e, bytes) = ws.export_bytes(
+        id,
+        revision,
+        &ExportOptions {
+            acknowledge_surfaced: true,
+            ..Default::default()
+        },
+    )?;
+    render_xlsx_bytes(
+        &bytes,
+        e.doc_id,
+        e.revision,
+        XlsxSource::Revision,
+        selection,
+        opts,
+    )
 }
 
 /// Render before creating output files, so window/raster budget refusals do not
 /// leave an empty output directory. Names distinguish sheet and canonical range.
-pub fn write_xlsx(window: &xlsx::Window, out: &mut XlsxPreviewed, output: Output, dir: &Path) -> Result<()> {
-    let stem =
-        format!("{}-r{}-sheet-{}-{}", out.doc_id, out.revision, out.sheet.index + 1, out.range.replace(':', "-"));
+pub fn write_xlsx(
+    window: &xlsx::Window,
+    out: &mut XlsxPreviewed,
+    output: Output,
+    dir: &Path,
+) -> Result<()> {
+    let stem = format!(
+        "{}-r{}-sheet-{}-{}",
+        out.doc_id,
+        out.revision,
+        out.sheet.index + 1,
+        out.range.replace(':', "-")
+    );
     let (ext, bytes) = match output {
         Output::Html => {
-            let title = format!("{} · revision {} · {} · {}", out.doc_id, out.revision, out.sheet.name, out.range);
+            let title = format!(
+                "{} · revision {} · {} · {}",
+                out.doc_id, out.revision, out.sheet.name, out.range
+            );
             ("html", window.html(&title).into_bytes())
         }
         Output::Svg | Output::Png => {
-            let format = if output == Output::Svg { PageFormat::Svg } else { PageFormat::Png { dpi: PNG_DPI } };
-            match window.render(format).map_err(|m| Error::bad(format!("cannot render worksheet window: {m}")))?.data {
+            let format = if output == Output::Svg {
+                PageFormat::Svg
+            } else {
+                PageFormat::Png { dpi: PNG_DPI }
+            };
+            match window
+                .render(format)
+                .map_err(|m| Error::bad(format!("cannot render worksheet window: {m}")))?
+                .data
+            {
                 PageData::Svg(svg) => ("svg", svg.into_bytes()),
                 PageData::Png(png) => ("png", png),
             }
         }
     };
-    std::fs::create_dir_all(dir).map_err(|e| Error::io(format!("cannot make {}: {e}", dir.display())))?;
+    std::fs::create_dir_all(dir)
+        .map_err(|e| Error::io(format!("cannot make {}: {e}", dir.display())))?;
     let path = dir.join(format!("{stem}.{ext}"));
-    std::fs::write(&path, bytes).map_err(|e| Error::io(format!("cannot write {}: {e}", path.display())))?;
+    std::fs::write(&path, bytes)
+        .map_err(|e| Error::io(format!("cannot write {}: {e}", path.display())))?;
     out.output = output;
-    out.files = vec![std::path::absolute(&path).unwrap_or(path).display().to_string()];
+    out.files = vec![std::path::absolute(&path)
+        .unwrap_or(path)
+        .display()
+        .to_string()];
     Ok(())
 }
 
@@ -270,11 +346,19 @@ pub fn render<S: Storage>(
     let doc = ws.doc(id)?;
     check_format(doc.format)?;
     if !matches!(doc.format, Format::Pptx | Format::Docx) {
-        return Err(Error::bad("use render_document for HWPX pages or render_xlsx for a worksheet window"));
+        return Err(Error::bad(
+            "use render_document for HWPX pages or render_xlsx for a worksheet window",
+        ));
     }
     // The preview stays on this machine: content to surface does not stop it.
-    let (e, bytes) =
-        ws.export_bytes(id, revision, &ExportOptions { acknowledge_surfaced: true, ..Default::default() })?;
+    let (e, bytes) = ws.export_bytes(
+        id,
+        revision,
+        &ExportOptions {
+            acknowledge_surfaced: true,
+            ..Default::default()
+        },
+    )?;
     let p = match doc.format {
         Format::Pptx => render_pptx(&bytes, opts),
         Format::Docx => docx::render_native(&bytes, opts),
@@ -286,7 +370,11 @@ pub fn render<S: Storage>(
         revision: e.revision,
         format: e.format,
         output: Output::Html,
-        slides: if e.format == Format::Pptx { p.slide_count() } else { 0 },
+        slides: if e.format == Format::Pptx {
+            p.slide_count()
+        } else {
+            0
+        },
         pages: p.slide_count(),
         files: vec![],
         summary: p.fonts.summary(),
@@ -306,8 +394,14 @@ pub fn render_document<S: Storage>(
 ) -> Result<(Previewed, DocumentPreview)> {
     #[cfg(feature = "hwpx")]
     if ws.doc(id)?.format == Format::Hwpx {
-        let (e, bytes) =
-            ws.export_bytes(id, revision, &ExportOptions { acknowledge_surfaced: true, ..Default::default() })?;
+        let (e, bytes) = ws.export_bytes(
+            id,
+            revision,
+            &ExportOptions {
+                acknowledge_surfaced: true,
+                ..Default::default()
+            },
+        )?;
         let preview = crate::hwpx::render_native(&bytes, opts)
             .map_err(|m| Error::new(Code::Package, format!("cannot preview {id}: {m}")))?;
         let out = Previewed {
@@ -325,11 +419,17 @@ pub fn render_document<S: Storage>(
         };
         return Ok((out, DocumentPreview::Hwpx(preview)));
     }
-    render(ws, id, revision, opts).map(|(out, preview)| (out, DocumentPreview::Layout(Box::new(preview))))
+    render(ws, id, revision, opts)
+        .map(|(out, preview)| (out, DocumentPreview::Layout(Box::new(preview))))
 }
 
 /// Write shared page-job output. Presentation names remain unchanged.
-pub fn write_document(p: &DocumentPreview, out: &mut Previewed, output: Output, dir: &Path) -> Result<()> {
+pub fn write_document(
+    p: &DocumentPreview,
+    out: &mut Previewed,
+    output: Output,
+    dir: &Path,
+) -> Result<()> {
     match p {
         DocumentPreview::Layout(p) => write(p, out, output, dir),
         #[cfg(feature = "hwpx")]
@@ -340,17 +440,24 @@ pub fn write_document(p: &DocumentPreview, out: &mut Previewed, output: Output, 
                 files.push((
                     format!("{stem}-preview.html"),
                     crate::quality::add_html_notice(
-                        p.html(&format!("{} · revision {} · preview", out.doc_id, out.revision)),
+                        p.html(&format!(
+                            "{} · revision {} · preview",
+                            out.doc_id, out.revision
+                        )),
                         &out.quality(),
                     )
                     .into_bytes(),
                 ));
             } else {
-                let format = if output == Output::Svg { PageFormat::Svg } else { PageFormat::Png { dpi: PNG_DPI } };
+                let format = if output == Output::Svg {
+                    PageFormat::Svg
+                } else {
+                    PageFormat::Png { dpi: PNG_DPI }
+                };
                 for index in 0..p.page_count() {
-                    let rendered = p
-                        .render_page(index, format)
-                        .map_err(|m| Error::new(Code::Package, format!("page {}: {m}", index + 1)))?;
+                    let rendered = p.render_page(index, format).map_err(|m| {
+                        Error::new(Code::Package, format!("page {}: {m}", index + 1))
+                    })?;
                     let (ext, data) = match rendered.data {
                         PageData::Svg(s) => ("svg", s.into_bytes()),
                         PageData::Png(p) => ("png", p),
@@ -358,14 +465,18 @@ pub fn write_document(p: &DocumentPreview, out: &mut Previewed, output: Output, 
                     files.push((format!("{stem}-page-{}.{ext}", index + 1), data));
                 }
             }
-            std::fs::create_dir_all(dir).map_err(|e| Error::io(format!("cannot make {}: {e}", dir.display())))?;
+            std::fs::create_dir_all(dir)
+                .map_err(|e| Error::io(format!("cannot make {}: {e}", dir.display())))?;
             out.files = files
                 .into_iter()
                 .map(|(name, data)| {
                     let path = dir.join(name);
                     std::fs::write(&path, data)
                         .map_err(|e| Error::io(format!("cannot write {}: {e}", path.display())))?;
-                    Ok(std::path::absolute(&path).unwrap_or(path).display().to_string())
+                    Ok(std::path::absolute(&path)
+                        .unwrap_or(path)
+                        .display()
+                        .to_string())
                 })
                 .collect::<Result<_>>()?;
             out.output = output;
@@ -388,13 +499,22 @@ pub fn default_dir<S: Storage>(ws: &Workspace<S>, id: &str, fallback: &Path) -> 
 /// Writes `p` as `output` into `dir`: `<doc>-r<rev>-preview.html`, or
 /// `<doc>-r<rev>-slide-<n>.svg` / `.png`.
 pub fn write(p: &Preview, out: &mut Previewed, output: Output, dir: &Path) -> Result<()> {
-    std::fs::create_dir_all(dir).map_err(|e| Error::io(format!("cannot make {}: {e}", dir.display())))?;
+    std::fs::create_dir_all(dir)
+        .map_err(|e| Error::io(format!("cannot make {}: {e}", dir.display())))?;
     let stem = format!("{}-r{}", out.doc_id, out.revision);
-    let unit = if out.format == Format::Pptx { "slide" } else { "page" };
+    let unit = if out.format == Format::Pptx {
+        "slide"
+    } else {
+        "page"
+    };
     let put = |name: String, data: &[u8]| -> Result<String> {
         let path = dir.join(name);
-        std::fs::write(&path, data).map_err(|e| Error::io(format!("cannot write {}: {e}", path.display())))?;
-        Ok(std::path::absolute(&path).unwrap_or(path).display().to_string())
+        std::fs::write(&path, data)
+            .map_err(|e| Error::io(format!("cannot write {}: {e}", path.display())))?;
+        Ok(std::path::absolute(&path)
+            .unwrap_or(path)
+            .display()
+            .to_string())
     };
     out.output = output;
     out.files = match output {
@@ -406,12 +526,18 @@ pub fn write(p: &Preview, out: &mut Previewed, output: Output, dir: &Path) -> Re
             )?]
         }
         Output::Svg => (0..p.slide_count())
-            .map(|k| put(format!("{stem}-{unit}-{}.svg", k + 1), p.slide_svg(k).as_bytes()))
+            .map(|k| {
+                put(
+                    format!("{stem}-{unit}-{}.svg", k + 1),
+                    p.slide_svg(k).as_bytes(),
+                )
+            })
             .collect::<Result<_>>()?,
         Output::Png => (0..p.slide_count())
             .map(|k| {
-                let png =
-                    p.slide_png(k, PNG_DPI).map_err(|m| Error::new(Code::Package, format!("{unit} {}: {m}", k + 1)))?;
+                let png = p
+                    .slide_png(k, PNG_DPI)
+                    .map_err(|m| Error::new(Code::Package, format!("{unit} {}: {m}", k + 1)))?;
                 put(format!("{stem}-{unit}-{}.png", k + 1), &png)
             })
             .collect::<Result<_>>()?,

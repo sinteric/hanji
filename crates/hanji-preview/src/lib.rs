@@ -41,7 +41,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use oxml_layout::{FontFile, FontId, LayoutResult, PositionedElement};
-use rpptx_layout::{ResolvedBullet, ResolvedContent, ResolvedRunStyle, ResolvedTextBody, ResolvedTextRun};
+use rpptx_layout::{
+    ResolvedBullet, ResolvedContent, ResolvedRunStyle, ResolvedTextBody, ResolvedTextRun,
+};
 use serde::Serialize;
 
 use fonts::{Fonts, Metrics, Script, Source};
@@ -67,7 +69,10 @@ pub struct Options {
 #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 impl Default for Options {
     fn default() -> Options {
-        Options { font_dirs: vec![], system_fonts: true }
+        Options {
+            font_dirs: vec![],
+            system_fonts: true,
+        }
     }
 }
 
@@ -76,7 +81,10 @@ impl Options {
     /// `font_dirs` (`--font-dir`), then `HANJI_FONT_DIR`, then system fonts.
     pub fn with_font_dirs(mut font_dirs: Vec<PathBuf>) -> Options {
         font_dirs.extend(fonts::env_font_dirs());
-        Options { font_dirs, system_fonts: true }
+        Options {
+            font_dirs,
+            system_fonts: true,
+        }
     }
 }
 
@@ -132,16 +140,29 @@ impl Requests {
     /// The label for `requested` drawing `text`, noting the style.
     fn label(&mut self, requested: String, text: &str, bold: bool, italic: bool) -> String {
         let script = Script::of(text);
-        let i = *self.index.entry((requested.clone(), script)).or_insert_with(|| {
-            self.list.push(Request { requested, script, drawn: BTreeMap::new(), styles: BTreeSet::new() });
-            self.list.len() - 1
-        });
+        let i = *self
+            .index
+            .entry((requested.clone(), script))
+            .or_insert_with(|| {
+                self.list.push(Request {
+                    requested,
+                    script,
+                    drawn: BTreeMap::new(),
+                    styles: BTreeSet::new(),
+                });
+                self.list.len() - 1
+            });
         self.list[i].styles.insert((bold, italic));
         label(i)
     }
 
     fn relabel_style(&mut self, style: &mut ResolvedRunStyle, text: &str) {
-        let l = self.label(requested_typeface(style, text), text, style.bold, style.italic);
+        let l = self.label(
+            requested_typeface(style, text),
+            text,
+            style.bold,
+            style.italic,
+        );
         style.latin_typeface = Some(l.clone());
         style.east_asian_typeface = Some(l.clone());
         style.complex_script_typeface = Some(l.clone());
@@ -151,12 +172,18 @@ impl Requests {
     fn relabel_body(&mut self, body: &mut ResolvedTextBody) {
         for p in &mut body.paragraphs {
             let first = p.runs.iter().find_map(|r| match r {
-                ResolvedTextRun::Text { style, .. } | ResolvedTextRun::Field { style, .. } => Some(style.clone()),
+                ResolvedTextRun::Text { style, .. } | ResolvedTextRun::Field { style, .. } => {
+                    Some(style.clone())
+                }
                 ResolvedTextRun::Break => None,
             });
             let first = first.unwrap_or_else(|| p.end_style.clone());
             match &mut p.bullet {
-                Some(ResolvedBullet::Character { character, font: Some(f), .. }) => {
+                Some(ResolvedBullet::Character {
+                    character,
+                    font: Some(f),
+                    ..
+                }) => {
                     *f = self.label(f.clone(), character, first.bold, first.italic);
                 }
                 Some(ResolvedBullet::AutoNumber { font: Some(f), .. }) => {
@@ -166,9 +193,8 @@ impl Requests {
             }
             for r in &mut p.runs {
                 match r {
-                    ResolvedTextRun::Text { text, style } | ResolvedTextRun::Field { text, style, .. } => {
-                        self.relabel_style(style, text)
-                    }
+                    ResolvedTextRun::Text { text, style }
+                    | ResolvedTextRun::Field { text, style, .. } => self.relabel_style(style, text),
                     ResolvedTextRun::Break => {}
                 }
             }
@@ -220,8 +246,12 @@ fn rebind_group_text(
         match element {
             PositionedElement::Text(run) => {
                 let old_id = run.font_id;
-                let Some(&original) = originals.get(&old_id) else { continue };
-                let Some((family, bold, italic)) = stock_fonts.get(&old_id) else { continue };
+                let Some(&original) = originals.get(&old_id) else {
+                    continue;
+                };
+                let Some((family, bold, italic)) = stock_fonts.get(&old_id) else {
+                    continue;
+                };
                 let selected = requests
                     .index
                     .get(&(family.clone(), Script::of(&run.text)))
@@ -237,12 +267,21 @@ fn rebind_group_text(
                 let mut after = fonts
                     .shape_text(selected, &run.text, run.font_size)
                     .map_err(|e| format!("cannot shape group text with its drawing font: {e}"))?;
-                let original_matches = before.glyph_ids == run.glyph_ids && before.advances.len() == run.advances.len();
-                let spacing: Vec<f64> = run.advances.iter().zip(&before.advances).map(|(a, b)| a - b).collect();
+                let original_matches = before.glyph_ids == run.glyph_ids
+                    && before.advances.len() == run.advances.len();
+                let spacing: Vec<f64> = run
+                    .advances
+                    .iter()
+                    .zip(&before.advances)
+                    .map(|(a, b)| a - b)
+                    .collect();
                 let has_spacing = spacing.iter().any(|x| x.abs() > 1e-8);
                 let same_character_mapping = run.text.chars().count() == before.glyph_ids.len()
                     && before.glyph_ids.len() == after.glyph_ids.len()
-                    && run.text.chars().all(|c| c.is_ascii() || prep::is_east_asian(c));
+                    && run
+                        .text
+                        .chars()
+                        .all(|c| c.is_ascii() || prep::is_east_asian(c));
                 if !original_matches || (has_spacing && !same_character_mapping) {
                     run.font_id = original;
                     retained += 1;
@@ -264,7 +303,8 @@ fn rebind_group_text(
                 }
             }
             PositionedElement::Group(group) => {
-                retained += rebind_group_text(&mut group.children, stock_fonts, originals, requests, fonts)?
+                retained +=
+                    rebind_group_text(&mut group.children, stock_fonts, originals, requests, fonts)?
             }
             PositionedElement::MarkedContent { children, .. } => {
                 retained += rebind_group_text(children, stock_fonts, originals, requests, fonts)?
@@ -293,7 +333,11 @@ impl FaceInfo {
 
     fn tooltip(&self) -> String {
         match &self.drawn {
-            Some(d) => format!("{} → {d} (metrics: {})", self.requested, self.metrics.name()),
+            Some(d) => format!(
+                "{} → {d} (metrics: {})",
+                self.requested,
+                self.metrics.name()
+            ),
             None => format!("{}: no font draws this text", self.requested),
         }
     }
@@ -342,8 +386,15 @@ fn png_dimensions(width: f64, height: f64, dpi: f64) -> Result<(u32, u32), Strin
         return Err("PNG page dimensions must be finite and positive".into());
     }
     let scale = dpi / 72.0;
-    let (width, height) = ((width * scale).round().max(1.0), (height * scale).round().max(1.0));
-    if !width.is_finite() || !height.is_finite() || width > u32::MAX as f64 || height > u32::MAX as f64 {
+    let (width, height) = (
+        (width * scale).round().max(1.0),
+        (height * scale).round().max(1.0),
+    );
+    if !width.is_finite()
+        || !height.is_finite()
+        || width > u32::MAX as f64
+        || height > u32::MAX as f64
+    {
         return Err("PNG page dimensions cannot be rasterized at this DPI".into());
     }
     Ok((width as u32, height as u32))
@@ -386,12 +437,10 @@ pub fn render_document_with_fonts(
     fonts: &FontOptions,
 ) -> Result<DocumentPreview, String> {
     match kind {
-        DocumentKind::Pptx => {
-            render_pptx_with_fonts(bytes, fonts).map(|preview| DocumentPreview::Layout(Box::new(preview)))
-        }
-        DocumentKind::Docx => {
-            docx::render_with_fonts(bytes, fonts).map(|preview| DocumentPreview::Layout(Box::new(preview)))
-        }
+        DocumentKind::Pptx => render_pptx_with_fonts(bytes, fonts)
+            .map(|preview| DocumentPreview::Layout(Box::new(preview))),
+        DocumentKind::Docx => docx::render_with_fonts(bytes, fonts)
+            .map(|preview| DocumentPreview::Layout(Box::new(preview))),
         #[cfg(feature = "hwpx")]
         DocumentKind::Hwpx => hwpx::render_with_fonts(bytes, fonts).map(DocumentPreview::Hwpx),
         #[cfg(not(feature = "hwpx"))]
@@ -554,8 +603,16 @@ impl FontsReport {
     pub fn lines(&self) -> Vec<String> {
         let mut out = vec![];
         for s in &self.substituted {
-            let what = if s.script == Script::Latin { String::new() } else { format!(" ({} text)", s.script.name()) };
-            let pages = format!("slide{} {}", if s.pages.len() == 1 { "" } else { "s" }, page_list(&s.pages));
+            let what = if s.script == Script::Latin {
+                String::new()
+            } else {
+                format!(" ({} text)", s.script.name())
+            };
+            let pages = format!(
+                "slide{} {}",
+                if s.pages.len() == 1 { "" } else { "s" },
+                page_list(&s.pages)
+            );
             out.push(match &s.drawn {
                 Some(d) => format!(
                     "{}{what} → {d}, {} chars, {pages} (metrics: {})",
@@ -563,16 +620,29 @@ impl FontsReport {
                     thousands(s.chars),
                     s.metrics.name()
                 ),
-                None => format!("{}{what}: no font draws it, {} chars, {pages}", s.requested, thousands(s.chars)),
+                None => format!(
+                    "{}{what}: no font draws it, {} chars, {pages}",
+                    s.requested,
+                    thousands(s.chars)
+                ),
             });
         }
         if self.missing_glyphs_total > 0 {
-            let shown: Vec<&str> = self.missing_glyphs.iter().take(8).map(|m| m.char.as_str()).collect();
+            let shown: Vec<&str> = self
+                .missing_glyphs
+                .iter()
+                .take(8)
+                .map(|m| m.char.as_str())
+                .collect();
             out.push(format!(
                 "{} characters have no usable glyph in the selected drawing fonts ({}{})",
                 thousands(self.missing_glyphs_total),
                 shown.join(" "),
-                if self.missing_glyphs_total > shown.len() { " …" } else { "" }
+                if self.missing_glyphs_total > shown.len() {
+                    " …"
+                } else {
+                    ""
+                }
             ));
         }
         out
@@ -586,7 +656,10 @@ impl FontsReport {
         // One entry per requested and drawn face, whatever the script.
         let mut merged: Vec<(&str, Option<&str>, usize)> = vec![];
         for s in &self.substituted {
-            match merged.iter_mut().find(|m| m.0 == s.requested && m.1 == s.drawn.as_deref()) {
+            match merged
+                .iter_mut()
+                .find(|m| m.0 == s.requested && m.1 == s.drawn.as_deref())
+            {
                 Some(m) => m.2 += s.chars,
                 None => merged.push((&s.requested, s.drawn.as_deref(), s.chars)),
             }
@@ -600,7 +673,10 @@ impl FontsReport {
             s.push_str(&format!("; {} as requested", self.drawn_as_requested.len()));
         }
         if self.missing_glyphs_total > 0 {
-            s.push_str(&format!("; {} characters missing", thousands(self.missing_glyphs_total)));
+            s.push_str(&format!(
+                "; {} characters missing",
+                thousands(self.missing_glyphs_total)
+            ));
         }
         s
     }
@@ -610,7 +686,8 @@ impl FontsReport {
 pub const NO_KOREAN_FONT: &str = "no Korean font was found, so Hangul is drawn as empty boxes. Install Noto Sans CJK KR (Linux: the fonts-noto-cjk package; or from https://github.com/notofonts/noto-cjk), or pass --font-dir DIR (or set HANJI_FONT_DIR) with a Korean font such as 맑은 고딕.";
 
 /// User-visible warning when a pie or doughnut category legend does not fit.
-pub const CHART_LEGEND_OMITTED_WARNING: &str = "chart too small, legend omitted; enlarge the chart to show it";
+pub const CHART_LEGEND_OMITTED_WARNING: &str =
+    "chart too small, legend omitted; enlarge the chart to show it";
 
 /// Map a renderer diagnostic message onto the warning text shown in preview/CLI.
 pub(crate) fn warning_text_for_diagnostic(message: &str) -> &str {
@@ -632,7 +709,11 @@ pub fn render_pptx(package: &[u8], opts: &Options) -> Result<Preview, String> {
 
 /// Native PPTX preview with configurable embedded-image decoded-byte budgets.
 #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
-pub fn render_pptx_with_limits(package: &[u8], opts: &Options, limits: ImageLimits) -> Result<Preview, String> {
+pub fn render_pptx_with_limits(
+    package: &[u8],
+    opts: &Options,
+    limits: ImageLimits,
+) -> Result<Preview, String> {
     limits.validate()?;
     let p = {
         let (input, stock) = resolve_pptx(package)?;
@@ -667,7 +748,10 @@ pub fn render_pptx_with_fonts_and_limits(
 /// One document job with caller-defined font selection. The resolver owns its full
 /// selection/fallback policy; use [`render_pptx_with_fonts`] for the built-in policy.
 /// Resolver calls stay inside Rust, not at the platform/FFI boundary.
-pub fn render_pptx_with_resolver(package: &[u8], resolver: &dyn FontResolver) -> Result<Preview, String> {
+pub fn render_pptx_with_resolver(
+    package: &[u8],
+    resolver: &dyn FontResolver,
+) -> Result<Preview, String> {
     render_pptx_with_resolver_and_limits(package, resolver, ImageLimits::default())
 }
 
@@ -697,8 +781,10 @@ fn finish_preview(mut p: Preview) -> Result<Preview, String> {
 
 fn resolve_pptx(package: &[u8]) -> Result<(rpptx_render::RenderInput, LayoutResult), String> {
     let prepared = prep::prepare(package)?;
-    let pres = rpptx::Presentation::from_bytes(&prepared).map_err(|e| format!("rpptx cannot open the deck: {e}"))?;
-    pres.render_deterministic().map_err(|e| format!("rpptx cannot resolve the deck: {e}"))
+    let pres = rpptx::Presentation::from_bytes(&prepared)
+        .map_err(|e| format!("rpptx cannot open the deck: {e}"))?;
+    pres.render_deterministic()
+        .map_err(|e| format!("rpptx cannot resolve the deck: {e}"))
 }
 
 fn layout_preview(
@@ -716,8 +802,11 @@ fn layout_preview(
     }
     // Group content was laid out with rpptx's deterministic fonts: its runs
     // ask for the face that drew them.
-    let stock_fonts: HashMap<FontId, (String, bool, bool)> =
-        stock.fonts.iter().map(|f| (f.id, (f.family.clone(), f.bold, f.italic))).collect();
+    let stock_fonts: HashMap<FontId, (String, bool, bool)> = stock
+        .fonts
+        .iter()
+        .map(|f| (f.id, (f.family.clone(), f.bold, f.italic)))
+        .collect();
     let mut grouped = 0;
     let mut group_faces = BTreeMap::new();
     for shape in input.slides.iter_mut().flat_map(|s| &mut s.shapes) {
@@ -752,12 +841,15 @@ fn layout_preview(
             let resolved = fonts.resolve_font(&r.requested, r.script, bold, italic);
             let draws_script = resolved.is_some();
             // Text no face draws still takes up room: lay it out in the Latin face.
-            let Some(face) = resolved.or_else(|| fonts.resolve_font(&r.requested, Script::Latin, bold, italic)) else {
+            let Some(face) =
+                resolved.or_else(|| fonts.resolve_font(&r.requested, Script::Latin, bold, italic))
+            else {
                 continue;
             };
             let (data, index) = (&face.font.data, face.font.face_index);
-            let (b, it) =
-                ttf_parser::Face::parse(data, index).map(|f| (f.is_bold(), f.is_italic())).unwrap_or_default();
+            let (b, it) = ttf_parser::Face::parse(data, index)
+                .map(|f| (f.is_bold(), f.is_italic()))
+                .unwrap_or_default();
             if seen.contains(&(b, it)) {
                 continue;
             }
@@ -776,21 +868,30 @@ fn layout_preview(
                         script: r.script,
                         drawn: draws_script.then(|| face.family.clone()),
                         source: draws_script.then_some(face.source),
-                        metrics: if draws_script { face.metrics } else { Metrics::Substitute },
+                        metrics: if draws_script {
+                            face.metrics
+                        } else {
+                            Metrics::Substitute
+                        },
                     };
                     r.drawn.insert((b, it), info.clone());
                     file_faces.push(info);
-                    files.push(FontFile { family: label(i), data });
+                    files.push(FontFile {
+                        family: label(i),
+                        data,
+                    });
                 }
-                Err(e) => warnings.push(format!("the face {} for {} cannot be used: {e}", face.family, r.requested)),
+                Err(e) => warnings.push(format!(
+                    "the face {} for {} cannot be used: {e}",
+                    face.family, r.requested
+                )),
             }
         }
     }
-    if req
-        .list
-        .iter()
-        .any(|r| r.script == Script::Hangul && (r.drawn.is_empty() || r.drawn.values().any(|f| f.drawn.is_none())))
-    {
+    if req.list.iter().any(|r| {
+        r.script == Script::Hangul
+            && (r.drawn.is_empty() || r.drawn.values().any(|f| f.drawn.is_none()))
+    }) {
         warnings.push(NO_KOREAN_FONT.to_string());
     }
 
@@ -799,7 +900,9 @@ fn layout_preview(
     // ambiguity; no horizontal metrics are changed in these copies.
     let mut original_labels = HashMap::new();
     for (id, script) in group_faces {
-        let Some(font) = stock.fonts.iter().find(|font| font.id == id) else { continue };
+        let Some(font) = stock.fonts.iter().find(|font| font.id == id) else {
+            continue;
+        };
         let face = ttf_parser::Face::parse(&font.data, font.face_index)
             .map_err(|e| format!("original group font {}: {e}", font.family))?;
         let family = format!("hanji-group-original-{}", id.0);
@@ -820,15 +923,22 @@ fn layout_preview(
             requested: font.family.clone(),
             script,
             drawn: Some(font.family.clone()),
-            source: Some(if input.fonts.iter().any(|f| f.data.as_slice() == font.data.as_ref()) {
-                Source::Embedded
-            } else {
-                Source::Bundled
-            }),
+            source: Some(
+                if input
+                    .fonts
+                    .iter()
+                    .any(|f| f.data.as_slice() == font.data.as_ref())
+                {
+                    Source::Embedded
+                } else {
+                    Source::Bundled
+                },
+            ),
             metrics: Metrics::Original,
         });
     }
-    let mut fm = oxml_layout::FontManager::new_deterministic().map_err(|e| format!("fonts: {e}"))?;
+    let mut fm =
+        oxml_layout::FontManager::new_deterministic().map_err(|e| format!("fonts: {e}"))?;
     fm.load_additional_fonts(&files);
     let originals: HashMap<_, _> = original_labels
         .into_iter()
@@ -841,7 +951,8 @@ fn layout_preview(
     let mut retained = 0;
     for shape in input.slides.iter_mut().flat_map(|s| &mut s.shapes) {
         if let ResolvedContent::Group(g) = &mut shape.content {
-            retained += rebind_group_text(&mut g.children, &stock_fonts, &originals, &req, &mut fm)?;
+            retained +=
+                rebind_group_text(&mut g.children, &stock_fonts, &originals, &req, &mut fm)?;
         }
     }
     if retained > 0 {
@@ -859,7 +970,9 @@ fn layout_preview(
             let info = files
                 .iter()
                 .zip(&file_faces)
-                .find(|(file, _)| file.family == f.family && file.data.as_slice() == f.data.as_ref())
+                .find(|(file, _)| {
+                    file.family == f.family && file.data.as_slice() == f.data.as_ref()
+                })
                 .map(|(_, info)| info.clone())
                 // A face rpptx chose itself (a chart's, or a fallback for characters the requested face lacks).
                 .unwrap_or_else(|| FaceInfo {
@@ -919,13 +1032,19 @@ impl Preview {
     }
 
     pub fn page_info(&self, index: usize) -> Option<PageInfo> {
-        self.layout.pages.get(index).map(|p| PageInfo { index, width: p.width, height: p.height })
+        self.layout.pages.get(index).map(|p| PageInfo {
+            index,
+            width: p.width,
+            height: p.height,
+        })
     }
 
     /// A coarse page job returning an owned buffer and stable diagnostics.
     /// Drop the [`Preview`] to release the document's layout/font caches.
     pub fn render_page(&self, index: usize, format: PageFormat) -> Result<RenderedPage, String> {
-        let page = self.page_info(index).ok_or_else(|| format!("page index {index} is out of range"))?;
+        let page = self
+            .page_info(index)
+            .ok_or_else(|| format!("page index {index} is out of range"))?;
         let data = match format {
             PageFormat::Svg => PageData::Svg(self.slide_svg(index)),
             PageFormat::Png { dpi } => PageData::Png(self.slide_png(index, dpi)?),
@@ -937,7 +1056,11 @@ impl Preview {
             .filter(|d| !d.path.starts_with("pages[") || d.path.starts_with(&prefix))
             .cloned()
             .collect();
-        Ok(RenderedPage { page, data, diagnostics })
+        Ok(RenderedPage {
+            page,
+            data,
+            diagnostics,
+        })
     }
 
     /// Characters per page and face, and the fonts report.
@@ -946,21 +1069,32 @@ impl Preview {
         let mut subs: BTreeMap<Key, (usize, BTreeSet<usize>)> = BTreeMap::new();
         let mut asked: BTreeMap<(String, Script, Source), usize> = BTreeMap::new();
         let mut missing: BTreeMap<char, (String, BTreeSet<usize>)> = BTreeMap::new();
-        let data: HashMap<FontId, (Arc<[u8]>, u32)> =
-            self.layout.fonts.iter().map(|f| (f.id, (f.data.clone(), f.face_index))).collect();
+        let data: HashMap<FontId, (Arc<[u8]>, u32)> = self
+            .layout
+            .fonts
+            .iter()
+            .map(|f| (f.id, (f.data.clone(), f.face_index)))
+            .collect();
         for (k, page) in self.layout.pages.iter().enumerate() {
             let mut list = vec![];
             runs(&page.elements, &mut list);
             let mut per_font: BTreeMap<FontId, BTreeSet<char>> = BTreeMap::new();
             for (id, text) in list {
-                let Some(info) = self.faces.get(&id) else { continue };
+                let Some(info) = self.faces.get(&id) else {
+                    continue;
+                };
                 // Spaces go into the subsets (a renderer without them draws `.notdef`), not into the counts.
-                per_font.entry(id).or_default().extend(text.chars().filter(|c| !c.is_control()));
+                per_font
+                    .entry(id)
+                    .or_default()
+                    .extend(text.chars().filter(|c| !c.is_control()));
                 let drawn: Vec<char> = text.chars().filter(|c| fonts::requires_glyph(*c)).collect();
                 if drawn.is_empty() {
                     continue;
                 }
-                let face = data.get(&id).and_then(|(d, i)| ttf_parser::Face::parse(d, *i).ok());
+                let face = data
+                    .get(&id)
+                    .and_then(|(d, i)| ttf_parser::Face::parse(d, *i).ok());
                 if face.as_ref().is_some_and(fonts::last_resort) {
                     self.diagnostics.push(Diagnostic {
                         path: format!("pages[{k}].fonts[{}]", id.0),
@@ -968,41 +1102,60 @@ impl Preview {
                     });
                 }
                 for &c in &drawn {
-                    if face.as_ref().is_none_or(|f| fonts::last_resort(f) || f.glyph_index(c).is_none_or(|g| g.0 == 0))
-                    {
-                        missing.entry(c).or_insert_with(|| (info.requested.clone(), BTreeSet::new())).1.insert(k + 1);
+                    if face.as_ref().is_none_or(|f| {
+                        fonts::last_resort(f) || f.glyph_index(c).is_none_or(|g| g.0 == 0)
+                    }) {
+                        missing
+                            .entry(c)
+                            .or_insert_with(|| (info.requested.clone(), BTreeSet::new()))
+                            .1
+                            .insert(k + 1);
                     }
                 }
                 if info.substituted() || info.drawn.is_none() {
-                    let key =
-                        (info.requested.clone(), info.script, info.drawn.clone(), info.source, info.metrics.clone());
+                    let key = (
+                        info.requested.clone(),
+                        info.script,
+                        info.drawn.clone(),
+                        info.source,
+                        info.metrics.clone(),
+                    );
                     let e = subs.entry(key).or_default();
                     e.0 += drawn.len();
                     e.1.insert(k + 1);
                 } else if let Some(src) = info.source {
-                    *asked.entry((info.requested.clone(), info.script, src)).or_default() += drawn.len();
+                    *asked
+                        .entry((info.requested.clone(), info.script, src))
+                        .or_default() += drawn.len();
                 }
             }
             self.chars.push(per_font);
         }
         let mut substituted: Vec<Substituted> = subs
             .into_iter()
-            .map(|((requested, script, drawn, source, metrics), (chars, pages))| Substituted {
-                requested,
-                script,
-                drawn,
-                source,
-                metrics,
-                chars,
-                pages: pages.into_iter().collect(),
-            })
+            .map(
+                |((requested, script, drawn, source, metrics), (chars, pages))| Substituted {
+                    requested,
+                    script,
+                    drawn,
+                    source,
+                    metrics,
+                    chars,
+                    pages: pages.into_iter().collect(),
+                },
+            )
             .collect();
         substituted.sort_by_key(|s| std::cmp::Reverse(s.chars));
         self.fonts = FontsReport {
             substituted,
             drawn_as_requested: asked
                 .into_iter()
-                .map(|((requested, script, source), chars)| AsRequested { requested, script, source, chars })
+                .map(|((requested, script, source), chars)| AsRequested {
+                    requested,
+                    script,
+                    source,
+                    chars,
+                })
                 .collect(),
             missing_glyphs_total: missing.len(),
             missing_glyphs: missing
@@ -1049,7 +1202,10 @@ impl Preview {
             match &face_cache[cs] {
                 Ok(data) => subsets.push((*id, data.clone())),
                 Err(e) => {
-                    let requested = self.faces.get(id).map_or("unknown", |f| f.requested.as_str());
+                    let requested = self
+                        .faces
+                        .get(id)
+                        .map_or("unknown", |f| f.requested.as_str());
                     diagnostics.push(Diagnostic {
                         path: format!("{path}[{}].subset", id.0),
                         message: format!(
@@ -1068,9 +1224,16 @@ impl Preview {
         self.prepare_output_with_cache_budget(SUBSET_CACHE_BYTES)
     }
 
-    fn prepare_output_with_cache_budget(&mut self, mut cache_remaining: usize) -> Result<(), String> {
+    fn prepare_output_with_cache_budget(
+        &mut self,
+        mut cache_remaining: usize,
+    ) -> Result<(), String> {
         self.image_plan = images::ImagePlan::inspect(&self.layout, self.image_limits)?;
-        fn append_unique(out: &mut Vec<Diagnostic>, seen: &mut BTreeSet<(String, String)>, ds: Vec<Diagnostic>) {
+        fn append_unique(
+            out: &mut Vec<Diagnostic>,
+            seen: &mut BTreeSet<(String, String)>,
+            ds: Vec<Diagnostic>,
+        ) {
             for d in ds {
                 if seen.insert((d.path.clone(), d.message.clone())) {
                     out.push(d);
@@ -1081,22 +1244,33 @@ impl Preview {
         let mut cache = SubsetCache::new();
         let mut all: BTreeMap<FontId, BTreeSet<char>> = BTreeMap::new();
         for (k, chars) in self.chars.iter().enumerate() {
-            let (subsets, diagnostics) =
-                self.subsets(chars, &format!("pages[{k}].fonts"), &mut cache, &mut cache_remaining);
+            let (subsets, diagnostics) = self.subsets(
+                chars,
+                &format!("pages[{k}].fonts"),
+                &mut cache,
+                &mut cache_remaining,
+            );
             self.page_subsets.push(subsets);
             append_unique(&mut self.diagnostics, &mut seen, diagnostics);
             for (id, cs) in chars {
                 all.entry(*id).or_default().extend(cs);
             }
         }
-        let (subsets, diagnostics) = self.subsets(&all, "viewer.fonts", &mut cache, &mut cache_remaining);
+        let (subsets, diagnostics) =
+            self.subsets(&all, "viewer.fonts", &mut cache, &mut cache_remaining);
         self.document_subsets = subsets;
         drop(cache);
         append_unique(&mut self.diagnostics, &mut seen, diagnostics);
-        append_unique(&mut self.diagnostics, &mut seen, svg::layout_diagnostics(&self.layout));
+        append_unique(
+            &mut self.diagnostics,
+            &mut seen,
+            svg::layout_diagnostics(&self.layout),
+        );
         for k in 0..self.slide_count() {
-            let diagnostics = svg::page_diagnostics(&self.layout, k, &self.image_plan)
-                .ok_or_else(|| format!("cannot render slide {}: the layout page is absent", k + 1))?;
+            let diagnostics =
+                svg::page_diagnostics(&self.layout, k, &self.image_plan).ok_or_else(|| {
+                    format!("cannot render slide {}: the layout page is absent", k + 1)
+                })?;
             append_unique(&mut self.diagnostics, &mut seen, diagnostics);
         }
         let mut summaries: BTreeMap<&str, (usize, &str)> = BTreeMap::new();
@@ -1117,13 +1291,19 @@ impl Preview {
 
     /// Only successful preflight entries are present. Inputs stay immutable, so
     /// uncached subsets deterministically reproduce the already validated bytes.
-    fn output_subsets(&self, prepared: &PreparedSubsets, chars: &BTreeMap<FontId, BTreeSet<char>>) -> Subsets {
+    fn output_subsets(
+        &self,
+        prepared: &PreparedSubsets,
+        chars: &BTreeMap<FontId, BTreeSet<char>>,
+    ) -> Subsets {
         prepared
             .iter()
             .filter_map(|(id, cached)| {
                 let data = cached.clone().or_else(|| {
                     let font = self.layout.fonts.iter().find(|f| f.id == *id)?;
-                    subset::subset(&font.data, font.face_index, chars.get(id)?).ok().map(Arc::from)
+                    subset::subset(&font.data, font.face_index, chars.get(id)?)
+                        .ok()
+                        .map(Arc::from)
                 })?;
                 Some((*id, data))
             })
@@ -1134,15 +1314,23 @@ impl Preview {
         subsets
             .iter()
             .map(|(id, d)| {
-                let (b, i) = ttf_parser::Face::parse(d, 0).map(|f| (f.is_bold(), f.is_italic())).unwrap_or_default();
+                let (b, i) = ttf_parser::Face::parse(d, 0)
+                    .map(|f| (f.is_bold(), f.is_italic()))
+                    .unwrap_or_default();
                 subset::font_face(id.0, d, b, i)
             })
             .collect()
     }
 
     fn page_svg(&self, k: usize, css: String, marks: bool) -> String {
-        let hooks = PageHooks { preview: self, css, marks };
-        svg::render_page(&self.layout, k, &hooks, &self.image_plan).expect("the slide's layout page exists").svg
+        let hooks = PageHooks {
+            preview: self,
+            css,
+            marks,
+        };
+        svg::render_page(&self.layout, k, &hooks, &self.image_plan)
+            .expect("the slide's layout page exists")
+            .svg
     }
 
     /// Slide `k` (0-based) as a standalone SVG with its fonts subset to the
@@ -1155,29 +1343,44 @@ impl Preview {
     /// Slide `k` (0-based) as PNG at `dpi`, drawn with the same subset faces.
     pub fn slide_png(&self, k: usize, dpi: f64) -> Result<Vec<u8>, String> {
         use resvg::{tiny_skia, usvg};
-        let page = self.layout.pages.get(k).ok_or_else(|| format!("page index {k} is out of range"))?;
+        let page = self
+            .layout
+            .pages
+            .get(k)
+            .ok_or_else(|| format!("page index {k} is out of range"))?;
         let (w, h) = png_dimensions(page.width, page.height, dpi)?;
         let subsets = self.output_subsets(&self.page_subsets[k], &self.chars[k]);
         let svg = self.page_svg(k, String::new(), false);
         let mut options = usvg::Options::default();
         let mut exact = HashMap::new();
         for (id, data) in &subsets {
-            let ids = options.fontdb_mut().load_font_source(usvg::fontdb::Source::Binary(Arc::new(data.clone())));
+            let ids = options
+                .fontdb_mut()
+                .load_font_source(usvg::fontdb::Source::Binary(Arc::new(data.clone())));
             if let Some(face) = ids.first() {
                 exact.insert(format!("hanji-font-{}", id.0), *face);
             }
         }
         options.font_resolver = usvg::FontResolver {
             select_font: Box::new(move |font, _| {
-                font.families().iter().find_map(|f| exact.get(f.to_string().trim_matches('"')).copied())
+                font.families()
+                    .iter()
+                    .find_map(|f| exact.get(f.to_string().trim_matches('"')).copied())
             }),
             select_fallback: Box::new(|_, _, _| None),
         };
         let tree = usvg::Tree::from_str(&svg, &options).map_err(|e| format!("usvg: {e}"))?;
         let mut pm = tiny_skia::Pixmap::new(w, h).ok_or("the slide is too large to draw")?;
         pm.fill(tiny_skia::Color::WHITE);
-        let (sx, sy) = (w as f32 / tree.size().width(), h as f32 / tree.size().height());
-        resvg::render(&tree, tiny_skia::Transform::from_scale(sx, sy), &mut pm.as_mut());
+        let (sx, sy) = (
+            w as f32 / tree.size().width(),
+            h as f32 / tree.size().height(),
+        );
+        resvg::render(
+            &tree,
+            tiny_skia::Transform::from_scale(sx, sy),
+            &mut pm.as_mut(),
+        );
         pm.encode_png().map_err(|e| format!("png: {e}"))
     }
 
@@ -1208,7 +1411,9 @@ impl Preview {
             let svg = self.page_svg(k, String::new(), true);
             // Sized by the page's CSS, not in points.
             let svg = match (svg.find(" width=\""), svg.find(" viewBox=")) {
-                (Some(a), Some(b)) if a < b => format!("{} class=\"slide-svg\"{}", &svg[..a], &svg[b..]),
+                (Some(a), Some(b)) if a < b => {
+                    format!("{} class=\"slide-svg\"{}", &svg[..a], &svg[b..])
+                }
                 _ => svg,
             };
             slides.push_str(&format!(
@@ -1250,7 +1455,11 @@ main {{ max-width: 1100px; margin: 0 auto; padding: 16px; }}
 </html>
 "#,
             title = esc(title),
-            lang = if self.faces.values().any(|f| f.script == Script::Hangul) { " lang=\"ko\"" } else { "" },
+            lang = if self.faces.values().any(|f| f.script == Script::Hangul) {
+                " lang=\"ko\""
+            } else {
+                ""
+            },
         )
     }
 }
@@ -1279,7 +1488,11 @@ impl svg::Hooks for PageHooks<'_> {
     }
 
     fn mark(&self, font: FontId) -> Option<String> {
-        let f = self.preview.faces.get(&font).filter(|f| self.marks && (f.substituted() || f.drawn.is_none()))?;
+        let f = self
+            .preview
+            .faces
+            .get(&font)
+            .filter(|f| self.marks && (f.substituted() || f.drawn.is_none()))?;
         Some(f.tooltip())
     }
 }
@@ -1294,7 +1507,12 @@ mod tests {
             width,
             height,
             vec![PositionedElement::FilledRect {
-                rect: oxml_layout::Rect { x: 0.0, y: 0.0, width, height },
+                rect: oxml_layout::Rect {
+                    x: 0.0,
+                    y: 0.0,
+                    width,
+                    height,
+                },
                 color: oxml_layout::Color::from_hex("FF0000"),
             }],
         );
@@ -1325,7 +1543,12 @@ mod tests {
             let image = resvg::tiny_skia::Pixmap::decode_png(&png).unwrap();
             assert_eq!((image.width(), image.height()), size);
             assert!(
-                image.data().as_chunks::<4>().0.iter().all(|pixel| *pixel == [255, 0, 0, 255]),
+                image
+                    .data()
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .all(|pixel| *pixel == [255, 0, 0, 255]),
                 "the red page fills every pixel at {dpi} DPI, including a rounded-up axis"
             );
         }
@@ -1335,10 +1558,16 @@ mod tests {
     fn png_dimensions_are_refused_before_unrepresentable_raster_allocation() {
         let p = red_page(72.0, 72.0);
         for dpi in [u32::MAX as f64 + 1.0, 1e30, f64::MAX] {
-            assert!(p.slide_png(0, dpi).unwrap_err().contains("dimensions cannot be rasterized"));
+            assert!(p
+                .slide_png(0, dpi)
+                .unwrap_err()
+                .contains("dimensions cannot be rasterized"));
         }
         for width in [0.0, -1.0, f64::NAN, f64::INFINITY] {
-            assert!(red_page(width, 72.0).slide_png(0, 72.0).unwrap_err().contains("dimensions must be finite"));
+            assert!(red_page(width, 72.0)
+                .slide_png(0, 72.0)
+                .unwrap_err()
+                .contains("dimensions must be finite"));
         }
     }
 
@@ -1347,7 +1576,12 @@ mod tests {
 
     fn embedded_image(data: &[u8], x: f64) -> PositionedElement {
         PositionedElement::Image {
-            rect: oxml_layout::Rect { x, y: 0.0, width: 1.0, height: 1.0 },
+            rect: oxml_layout::Rect {
+                x,
+                y: 0.0,
+                width: 1.0,
+                height: 1.0,
+            },
             data: data.to_vec(),
             content_type: String::new(),
             media_id: oxml_layout::MediaId::from_bytes(data),
@@ -1358,7 +1592,9 @@ mod tests {
         let pages = pages
             .into_iter()
             .enumerate()
-            .map(|(index, elements)| Arc::new(oxml_layout::PageFrame::new(index + 1, 2.0, 1.0, elements)))
+            .map(|(index, elements)| {
+                Arc::new(oxml_layout::PageFrame::new(index + 1, 2.0, 1.0, elements))
+            })
             .collect();
         finish_preview_with_limits(
             Preview {
@@ -1380,7 +1616,12 @@ mod tests {
 
     fn image_pixels(preview: &Preview, page: usize) -> Vec<[u8; 4]> {
         let png = preview.slide_png(page, 72.0).unwrap();
-        resvg::tiny_skia::Pixmap::decode_png(&png).unwrap().data().as_chunks::<4>().0.to_vec()
+        resvg::tiny_skia::Pixmap::decode_png(&png)
+            .unwrap()
+            .data()
+            .as_chunks::<4>()
+            .0
+            .to_vec()
     }
 
     #[test]
@@ -1395,7 +1636,10 @@ mod tests {
             b"\x89PNG\r\n\x1a\n".as_slice(),
             b"\xff\xd8\xff".as_slice(),
         ] {
-            let p = image_job(vec![vec![embedded_image(data, 0.0)]], ImageLimits::default());
+            let p = image_job(
+                vec![vec![embedded_image(data, 0.0)]],
+                ImageLimits::default(),
+            );
             assert_eq!(p.diagnostics.len(), 1);
             assert_eq!(p.diagnostics[0].path, "pages[0].elements[0]");
             assert!(p.diagnostics[0].message.contains("embedded image"));
@@ -1406,15 +1650,23 @@ mod tests {
             assert_eq!(image_pixels(&p, 0), [[255; 4]; 2]);
             let rendered = p.render_page(0, PageFormat::Svg).unwrap();
             assert_eq!(rendered.diagnostics, p.diagnostics);
-            assert!(p.quality(DocumentKind::Pptx).enforce(quality::Strictness::CriticalLosses).is_err());
+            assert!(p
+                .quality(DocumentKind::Pptx)
+                .enforce(quality::Strictness::CriticalLosses)
+                .is_err());
         }
     }
 
     fn owned_gif(animated: bool, transparent: bool, partial: bool) -> Vec<u8> {
         let mut bytes = Vec::new();
         {
-            let mut encoder =
-                gif::Encoder::new(&mut bytes, if partial { 2 } else { 1 }, 1, &[255, 0, 0, 0, 0, 255]).unwrap();
+            let mut encoder = gif::Encoder::new(
+                &mut bytes,
+                if partial { 2 } else { 1 },
+                1,
+                &[255, 0, 0, 0, 0, 255],
+            )
+            .unwrap();
             let mut frame = gif::Frame {
                 width: 1,
                 height: 1,
@@ -1436,12 +1688,24 @@ mod tests {
         for animated in [false, true] {
             let bytes = owned_gif(animated, false, false);
             let original = bytes.clone();
-            let p = image_job(vec![vec![embedded_image(&bytes, 0.0)]], ImageLimits::default());
-            assert_eq!(p.diagnostics.len(), usize::from(animated), "{:?}", p.diagnostics);
+            let p = image_job(
+                vec![vec![embedded_image(&bytes, 0.0)]],
+                ImageLimits::default(),
+            );
+            assert_eq!(
+                p.diagnostics.len(),
+                usize::from(animated),
+                "{:?}",
+                p.diagnostics
+            );
             if animated {
                 assert_eq!(p.diagnostics[0].message, quality::GIF_FIRST_FRAME);
                 let report = p.quality(DocumentKind::Docx);
-                let d = report.diagnostics.iter().find(|d| d.message == quality::GIF_FIRST_FRAME).unwrap();
+                let d = report
+                    .diagnostics
+                    .iter()
+                    .find(|d| d.message == quality::GIF_FIRST_FRAME)
+                    .unwrap();
                 assert_eq!(d.code, quality::DiagnosticCode::ImageApproximation);
                 assert_eq!(d.severity, quality::Severity::Warning);
                 assert_eq!(d.consequence, quality::Consequence::Approximation);
@@ -1457,7 +1721,10 @@ mod tests {
             assert_eq!(p.slide_svg(0), svg);
             assert_eq!(bytes, original);
         }
-        let p = image_job(vec![vec![embedded_image(&owned_gif(false, true, false), 0.0)]], ImageLimits::default());
+        let p = image_job(
+            vec![vec![embedded_image(&owned_gif(false, true, false), 0.0)]],
+            ImageLimits::default(),
+        );
         assert!(p.diagnostics.is_empty());
         assert_eq!(image_pixels(&p, 0), [[255; 4]; 2]);
     }
@@ -1474,29 +1741,49 @@ mod tests {
             &bytes[..bytes.len() - 5],
             bad_tail.as_slice(),
         ] {
-            let p = image_job(vec![vec![embedded_image(data, 0.0)]], ImageLimits::default());
+            let p = image_job(
+                vec![vec![embedded_image(data, 0.0)]],
+                ImageLimits::default(),
+            );
             assert_eq!(p.diagnostics.len(), 1);
             assert!(p.diagnostics[0].message.contains("GIF"));
             assert!(!p.slide_svg(0).contains("<image"));
             assert_eq!(image_pixels(&p, 0), [[255; 4]; 2]);
             let report = p.quality(DocumentKind::Docx);
-            let d = report.diagnostics.iter().find(|d| d.message == p.diagnostics[0].message).unwrap();
+            let d = report
+                .diagnostics
+                .iter()
+                .find(|d| d.message == p.diagnostics[0].message)
+                .unwrap();
             assert_eq!(d.code, quality::DiagnosticCode::ImageOmitted);
             assert_eq!(d.severity, quality::Severity::Error);
             assert_eq!(d.consequence, quality::Consequence::UnsupportedOmission);
             assert!(report.enforce(quality::Strictness::CriticalLosses).is_err());
         }
-        let limits = ImageLimits { max_image_decoded_bytes: 3, ..ImageLimits::default() };
+        let limits = ImageLimits {
+            max_image_decoded_bytes: 3,
+            ..ImageLimits::default()
+        };
         let p = image_job(vec![vec![embedded_image(&bytes, 0.0)]], limits);
-        assert!(p.diagnostics[0].message.contains("decoded-image byte budget"));
+        assert!(p.diagnostics[0]
+            .message
+            .contains("decoded-image byte budget"));
         assert!(!p.html("limited GIF").contains("<image"));
         assert_eq!(image_pixels(&p, 0), [[255; 4]; 2]);
         let mut oversized = bytes;
         oversized[6..10].fill(0xff);
-        let p = image_job(vec![vec![embedded_image(&oversized, 0.0)]], ImageLimits::default());
-        assert!(p.diagnostics[0].message.contains("decoded-image byte budget"));
+        let p = image_job(
+            vec![vec![embedded_image(&oversized, 0.0)]],
+            ImageLimits::default(),
+        );
+        assert!(p.diagnostics[0]
+            .message
+            .contains("decoded-image byte budget"));
         let report = p.quality(DocumentKind::Docx);
-        assert!(report.diagnostics.iter().any(|d| d.code == quality::DiagnosticCode::ImageResourceLimit));
+        assert!(report
+            .diagnostics
+            .iter()
+            .any(|d| d.code == quality::DiagnosticCode::ImageResourceLimit));
         assert_eq!(image_pixels(&p, 0), [[255; 4]; 2]);
     }
 
@@ -1504,13 +1791,19 @@ mod tests {
     fn embedded_gif_animation_never_decodes_later_frames() {
         let mut bytes = owned_gif(true, false, false);
         let header = b",\0\0\0\0\x01\0\x01\0\0";
-        let second = bytes.windows(header.len()).rposition(|window| window == header).unwrap();
+        let second = bytes
+            .windows(header.len())
+            .rposition(|window| window == header)
+            .unwrap();
         // The second frame declares nearly 16 GiB of RGBA pixels and has no compressed
         // data. The static preview must only inspect its metadata, within 4 bytes.
         bytes[second + 5..second + 9].fill(0xff);
         bytes.truncate(second + header.len() + 2);
-        let limits =
-            ImageLimits { max_image_decoded_bytes: 4, max_page_decoded_bytes: 4, max_document_decoded_bytes: 4 };
+        let limits = ImageLimits {
+            max_image_decoded_bytes: 4,
+            max_page_decoded_bytes: 4,
+            max_document_decoded_bytes: 4,
+        };
         let p = image_job(vec![vec![embedded_image(&bytes, 0.0)]], limits);
         assert_eq!(p.diagnostics.len(), 1);
         assert_eq!(p.diagnostics[0].message, quality::GIF_FIRST_FRAME);
@@ -1519,27 +1812,45 @@ mod tests {
 
     #[test]
     fn docx_gif_package_matches_the_existing_png_image_control() {
-        let mut parts = hanji_package::package::read(include_bytes!("../tests/fixtures/images/owned.docx")).unwrap();
-        let document = parts.iter_mut().find(|p| p.name == "word/document.xml").unwrap();
+        let mut parts =
+            hanji_package::package::read(include_bytes!("../tests/fixtures/images/owned.docx"))
+                .unwrap();
+        let document = parts
+            .iter_mut()
+            .find(|p| p.name == "word/document.xml")
+            .unwrap();
         document.data = String::from_utf8(document.data.clone())
             .unwrap()
-            .replace("<w:body>", "<w:body><w:p><w:r><w:t>before</w:t></w:r></w:p>")
-            .replace("<w:sectPr>", "<w:p><w:r><w:t>after</w:t></w:r></w:p><w:sectPr>")
+            .replace(
+                "<w:body>",
+                "<w:body><w:p><w:r><w:t>before</w:t></w:r></w:p>",
+            )
+            .replace(
+                "<w:sectPr>",
+                "<w:p><w:r><w:t>after</w:t></w:r></w:p><w:sectPr>",
+            )
             .into_bytes();
         let original = hanji_package::package::write(&parts).unwrap();
-        let media = parts.iter_mut().find(|p| p.name.starts_with("word/media/")).unwrap();
+        let media = parts
+            .iter_mut()
+            .find(|p| p.name.starts_with("word/media/"))
+            .unwrap();
         media.name = "word/media/image.gif".into();
         media.data = owned_gif(false, false, false);
         for part in &mut parts {
             let replacement = match part.name.as_str() {
                 "word/_rels/document.xml.rels" => Some(("media/image.png", "media/image.gif")),
-                "[Content_Types].xml" => {
-                    Some(("</Types>", "<Default Extension=\"gif\" ContentType=\"image/gif\"/></Types>"))
-                }
+                "[Content_Types].xml" => Some((
+                    "</Types>",
+                    "<Default Extension=\"gif\" ContentType=\"image/gif\"/></Types>",
+                )),
                 _ => None,
             };
             if let Some((from, to)) = replacement {
-                part.data = String::from_utf8(part.data.clone()).unwrap().replace(from, to).into_bytes();
+                part.data = String::from_utf8(part.data.clone())
+                    .unwrap()
+                    .replace(from, to)
+                    .into_bytes();
             }
         }
         let bytes = hanji_package::package::write(&parts).unwrap();
@@ -1549,10 +1860,24 @@ mod tests {
         assert_eq!(gif.page_count(), png.page_count());
         assert_eq!(gif.page_info(0), png.page_info(0));
         assert_eq!(gif.diagnostics, png.diagnostics);
-        let PageData::Png(a) = gif.render_page(0, PageFormat::Png { dpi: 96.0 }).unwrap().data else { panic!() };
-        let PageData::Png(b) = png.render_page(0, PageFormat::Png { dpi: 96.0 }).unwrap().data else { panic!() };
+        let PageData::Png(a) = gif
+            .render_page(0, PageFormat::Png { dpi: 96.0 })
+            .unwrap()
+            .data
+        else {
+            panic!()
+        };
+        let PageData::Png(b) = png
+            .render_page(0, PageFormat::Png { dpi: 96.0 })
+            .unwrap()
+            .data
+        else {
+            panic!()
+        };
         assert_eq!(a, b);
-        let PageData::Svg(svg) = gif.render_page(0, PageFormat::Svg).unwrap().data else { panic!() };
+        let PageData::Svg(svg) = gif.render_page(0, PageFormat::Svg).unwrap().data else {
+            panic!()
+        };
         assert!(svg.contains("data:image/png;base64,"));
         assert!(svg.contains("before") && svg.contains("after"));
         assert!(!gif.html("static GIF").contains("data:image/gif"));
@@ -1569,34 +1894,62 @@ mod tests {
             effects: vec![],
             children: vec![embedded_image(&bytes, 0.0)],
         });
-        let limits =
-            ImageLimits { max_image_decoded_bytes: 4, max_page_decoded_bytes: 4, max_document_decoded_bytes: 8 };
+        let limits = ImageLimits {
+            max_image_decoded_bytes: 4,
+            max_page_decoded_bytes: 4,
+            max_document_decoded_bytes: 8,
+        };
         let page = vec![group, embedded_image(&bytes, 1.0)];
         let p = image_job(vec![page.clone(), page], limits);
         assert_eq!(p.diagnostics.len(), 2);
-        assert!(p.diagnostics.iter().all(|d| d.message.contains("page decoded-image")));
+        assert!(p
+            .diagnostics
+            .iter()
+            .all(|d| d.message.contains("page decoded-image")));
         for k in 0..2 {
             assert_eq!(image_pixels(&p, k), [[255, 0, 0, 255], [255; 4]]);
         }
-        let limits = ImageLimits { max_page_decoded_bytes: 8, max_document_decoded_bytes: 4, ..limits };
-        let p = image_job(vec![vec![embedded_image(&bytes, 0.0)], vec![embedded_image(&bytes, 0.0)]], limits);
+        let limits = ImageLimits {
+            max_page_decoded_bytes: 8,
+            max_document_decoded_bytes: 4,
+            ..limits
+        };
+        let p = image_job(
+            vec![
+                vec![embedded_image(&bytes, 0.0)],
+                vec![embedded_image(&bytes, 0.0)],
+            ],
+            limits,
+        );
         assert_eq!(p.diagnostics.len(), 1);
         assert!(p.diagnostics[0].message.contains("document decoded-image"));
         assert_eq!(image_pixels(&p, 1), [[255; 4]; 2]);
-        let p = image_job(vec![vec![embedded_image(b"GIF89a", 0.0), embedded_image(&bytes, 1.0)]], limits);
+        let p = image_job(
+            vec![vec![
+                embedded_image(b"GIF89a", 0.0),
+                embedded_image(&bytes, 1.0),
+            ]],
+            limits,
+        );
         assert_eq!(p.diagnostics.len(), 1);
         assert_eq!(image_pixels(&p, 0), [[255; 4], [255, 0, 0, 255]]);
     }
 
     #[test]
     fn embedded_image_budget_preserves_ordinary_png_jpeg_pixels() {
-        for (data, mime, pixel) in
-            [(IMAGE_RED, "image/png", [255, 0, 0, 255]), (IMAGE_GRAY, "image/jpeg", [128, 128, 128, 255])]
-        {
-            let p = image_job(vec![vec![embedded_image(data, 0.0)]], ImageLimits::default());
+        for (data, mime, pixel) in [
+            (IMAGE_RED, "image/png", [255, 0, 0, 255]),
+            (IMAGE_GRAY, "image/jpeg", [128, 128, 128, 255]),
+        ] {
+            let p = image_job(
+                vec![vec![embedded_image(data, 0.0)]],
+                ImageLimits::default(),
+            );
             assert!(p.diagnostics.is_empty());
             assert!(p.slide_svg(0).contains(&format!("data:{mime};base64,")));
-            assert!(p.html("owned images").contains(&format!("data:{mime};base64,")));
+            assert!(p
+                .html("owned images")
+                .contains(&format!("data:{mime};base64,")));
             assert_eq!(image_pixels(&p, 0), [pixel, [255; 4]]);
         }
     }
@@ -1611,12 +1964,18 @@ mod tests {
             children: vec![embedded_image(IMAGE_RED, 0.0)],
         });
         let page = vec![nested, embedded_image(IMAGE_RED, 1.0)];
-        let limits =
-            ImageLimits { max_image_decoded_bytes: 4, max_page_decoded_bytes: 4, max_document_decoded_bytes: 8 };
+        let limits = ImageLimits {
+            max_image_decoded_bytes: 4,
+            max_page_decoded_bytes: 4,
+            max_document_decoded_bytes: 8,
+        };
         let p = image_job(vec![page.clone(), page], limits);
         assert_eq!(p.diagnostics.len(), 2);
         for index in 0..2 {
-            assert_eq!(p.diagnostics[index].path, format!("pages[{index}].elements[1]"));
+            assert_eq!(
+                p.diagnostics[index].path,
+                format!("pages[{index}].elements[1]")
+            );
             assert!(p.diagnostics[index].message.contains("page decoded-image"));
             assert_eq!(image_pixels(&p, index), [[255, 0, 0, 255], [255; 4]]);
         }
@@ -1635,8 +1994,11 @@ mod tests {
     #[test]
     fn embedded_image_budget_document_total_is_configurable_and_structured() {
         let pages = vec![vec![embedded_image(IMAGE_RED, 0.0)]; 2];
-        let limits =
-            ImageLimits { max_image_decoded_bytes: 4, max_page_decoded_bytes: 4, max_document_decoded_bytes: 4 };
+        let limits = ImageLimits {
+            max_image_decoded_bytes: 4,
+            max_page_decoded_bytes: 4,
+            max_document_decoded_bytes: 4,
+        };
         let p = image_job(pages.clone(), limits);
         assert_eq!(p.image_limits(), limits);
         assert_eq!(p.diagnostics.len(), 1);
@@ -1644,9 +2006,18 @@ mod tests {
         assert!(p.diagnostics[0].message.contains("document decoded-image"));
         assert_eq!(image_pixels(&p, 1), [[255; 4]; 2]);
         let report = p.quality(DocumentKind::Docx);
-        assert_eq!(report.diagnostics[0].code, quality::DiagnosticCode::ImageResourceLimit);
+        assert_eq!(
+            report.diagnostics[0].code,
+            quality::DiagnosticCode::ImageResourceLimit
+        );
         assert_eq!(report.diagnostics[0].location.page_index, Some(1));
-        let p = image_job(pages, ImageLimits { max_document_decoded_bytes: 8, ..limits });
+        let p = image_job(
+            pages,
+            ImageLimits {
+                max_document_decoded_bytes: 8,
+                ..limits
+            },
+        );
         assert!(p.diagnostics.is_empty());
         assert_eq!(image_pixels(&p, 1), [[255, 0, 0, 255], [255; 4]]);
     }
@@ -1654,7 +2025,10 @@ mod tests {
     #[test]
     fn embedded_image_budget_uses_exact_png_dimensions_and_checks_arithmetic() {
         let data = include_bytes!("../tests/fixtures/images/rounding.png");
-        let p = image_job(vec![vec![embedded_image(data, 0.0)]], ImageLimits::default());
+        let p = image_job(
+            vec![vec![embedded_image(data, 0.0)]],
+            ImageLimits::default(),
+        );
         assert_eq!(p.diagnostics.len(), 1); // 16,777,217 x 1 cannot round into the default allowance.
         let p = image_job(
             vec![vec![embedded_image(data, 0.0)]],
@@ -1667,7 +2041,10 @@ mod tests {
         assert!(p.diagnostics.is_empty());
         assert!(p.slide_svg(0).contains("<image")); // Metadata only: do not rasterize this fixture.
         let p = image_job(
-            vec![vec![embedded_image(include_bytes!("../tests/fixtures/images/overflow.png"), 0.0)]],
+            vec![vec![embedded_image(
+                include_bytes!("../tests/fixtures/images/overflow.png"),
+                0.0,
+            )]],
             ImageLimits {
                 max_image_decoded_bytes: u64::MAX,
                 max_page_decoded_bytes: u64::MAX,
@@ -1682,16 +2059,37 @@ mod tests {
     fn embedded_image_budget_rejects_invalid_configuration_before_import() {
         let default = ImageLimits::default();
         for limits in [
-            ImageLimits { max_image_decoded_bytes: 0, ..default },
-            ImageLimits { max_page_decoded_bytes: 0, ..default },
-            ImageLimits { max_document_decoded_bytes: 0, ..default },
+            ImageLimits {
+                max_image_decoded_bytes: 0,
+                ..default
+            },
+            ImageLimits {
+                max_page_decoded_bytes: 0,
+                ..default
+            },
+            ImageLimits {
+                max_document_decoded_bytes: 0,
+                ..default
+            },
         ] {
             assert_eq!(
-                render_pptx_with_fonts_and_limits(b"not a package", &FontOptions::default(), limits).err().unwrap(),
+                render_pptx_with_fonts_and_limits(
+                    b"not a package",
+                    &FontOptions::default(),
+                    limits
+                )
+                .err()
+                .unwrap(),
                 "embedded image budgets must be positive"
             );
             assert_eq!(
-                docx::render_with_fonts_and_limits(b"not a package", &FontOptions::default(), limits).err().unwrap(),
+                docx::render_with_fonts_and_limits(
+                    b"not a package",
+                    &FontOptions::default(),
+                    limits
+                )
+                .err()
+                .unwrap(),
                 "embedded image budgets must be positive"
             );
         }
@@ -1700,15 +2098,22 @@ mod tests {
     #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
     #[test]
     fn actual_korean_chart_runs_match_their_full_drawing_font() {
-        let bytes = include_bytes!("../../../prototype/preview/baseline/14-pptx-untouched-korean-report-deck.pptx");
+        let bytes = include_bytes!(
+            "../../../prototype/preview/baseline/14-pptx-untouched-korean-report-deck.pptx"
+        );
         let p = render_pptx(bytes, &Options::default()).unwrap();
         if p.fonts.missing_glyphs_total > 0 {
-            assert!(std::env::var_os("CI").is_none(), "CI needs its installed Korean font");
+            assert!(
+                std::env::var_os("CI").is_none(),
+                "CI needs its installed Korean font"
+            );
             return;
         }
         let mut checked = 0;
         oxml_layout::walk(&p.layout.pages[5].elements, &mut |e, _| {
-            let PositionedElement::Text(run) = e else { return };
+            let PositionedElement::Text(run) = e else {
+                return;
+            };
             if !["구독", "라이선스", "서비스"].contains(&run.text.as_str()) {
                 return;
             }
@@ -1718,10 +2123,16 @@ mod tests {
             for (i, c) in run.text.chars().enumerate() {
                 let glyph = face.glyph_index(c).unwrap();
                 assert_ne!(glyph.0, 0);
-                assert_eq!(run.glyph_ids[i], glyph.0, "{c} uses the selected full font's glyph");
-                let advance =
-                    f64::from(face.glyph_hor_advance(glyph).unwrap()) * run.font_size / f64::from(face.units_per_em());
-                assert!((run.advances[i] - advance).abs() < 1e-6, "{c} uses the selected font's advance");
+                assert_eq!(
+                    run.glyph_ids[i], glyph.0,
+                    "{c} uses the selected full font's glyph"
+                );
+                let advance = f64::from(face.glyph_hor_advance(glyph).unwrap()) * run.font_size
+                    / f64::from(face.units_per_em());
+                assert!(
+                    (run.advances[i] - advance).abs() < 1e-6,
+                    "{c} uses the selected font's advance"
+                );
             }
             checked += 1;
         });
@@ -1743,17 +2154,28 @@ mod tests {
         let mut requests = Requests::default();
         let requested = requests.label("Carlito".into(), "A A", false, false);
         let original = "original-group-test";
-        let originals_data =
-            [(fonts.font_data(old).unwrap(), original), (fonts.font_data(selected).unwrap(), requested.as_str())];
+        let originals_data = [
+            (fonts.font_data(old).unwrap(), original),
+            (fonts.font_data(selected).unwrap(), requested.as_str()),
+        ];
         let mut additions = vec![];
         for (font, family) in originals_data {
             let data = sfnt::build(
                 &font.data,
                 font.face_index,
-                &sfnt::Adjust { family: family.into(), bold: false, italic: false, line_em: None, ea_advance: None },
+                &sfnt::Adjust {
+                    family: family.into(),
+                    bold: false,
+                    italic: false,
+                    line_em: None,
+                    ea_advance: None,
+                },
             )
             .unwrap();
-            additions.push(FontFile { family: family.into(), data });
+            additions.push(FontFile {
+                family: family.into(),
+                data,
+            });
         }
         fonts.load_additional_fonts(&additions);
         let old = fonts.resolve_font(Some("Carlito"), false, false).unwrap();
@@ -1779,7 +2201,12 @@ mod tests {
             x_offsets: vec![0.0, 0.25, 0.0],
             y_offsets: vec![0.0; 3],
             clusters: (0..3)
-                .map(|i| oxml_layout::GlyphCluster { glyph_start: i, glyph_end: i + 1, char_start: i, char_end: i + 1 })
+                .map(|i| oxml_layout::GlyphCluster {
+                    glyph_start: i,
+                    glyph_end: i + 1,
+                    char_start: i,
+                    char_end: i + 1,
+                })
                 .collect(),
             logical_text: run.text.clone(),
             logical_index: 7,
@@ -1797,12 +2224,19 @@ mod tests {
             note_reference_source: run.note_reference_source,
         };
         assert!(rich.is_valid());
-        let mut children =
-            vec![PositionedElement::Text(run.clone()), PositionedElement::MultilingualText(rich.clone())];
+        let mut children = vec![
+            PositionedElement::Text(run.clone()),
+            PositionedElement::MultilingualText(rich.clone()),
+        ];
         let stock = HashMap::from([(old, ("Carlito".into(), false, false))]);
         let originals = HashMap::from([(old, original)]);
-        assert_eq!(rebind_group_text(&mut children, &stock, &originals, &requests, &mut fonts).unwrap(), 1);
-        let PositionedElement::Text(rebound) = &children[0] else { panic!("text") };
+        assert_eq!(
+            rebind_group_text(&mut children, &stock, &originals, &requests, &mut fonts).unwrap(),
+            1
+        );
+        let PositionedElement::Text(rebound) = &children[0] else {
+            panic!("text")
+        };
         assert_eq!(rebound.origin, run.origin);
         assert_eq!(rebound.font_id, selected);
         let font = fonts.font_data(selected).unwrap();
@@ -1810,13 +2244,19 @@ mod tests {
         for (i, c) in run.text.chars().enumerate() {
             let glyph = face.glyph_index(c).unwrap();
             assert_eq!(rebound.glyph_ids[i], glyph.0);
-            let width = f64::from(face.glyph_hor_advance(glyph).unwrap()) * 9.0 / f64::from(face.units_per_em());
+            let width = f64::from(face.glyph_hor_advance(glyph).unwrap()) * 9.0
+                / f64::from(face.units_per_em());
             assert!((rebound.advances[i] - width - if c == ' ' { 3.0 } else { 0.0 }).abs() < 1e-6);
         }
-        let PositionedElement::MultilingualText(rebound) = &children[1] else { panic!("rich text") };
+        let PositionedElement::MultilingualText(rebound) = &children[1] else {
+            panic!("rich text")
+        };
         let mut expected = rich;
         expected.font_id = original;
-        assert_eq!(rebound, &expected, "rich glyph IDs, offsets, clusters, spacing and bidi metadata survive");
+        assert_eq!(
+            rebound, &expected,
+            "rich glyph IDs, offsets, clusters, spacing and bidi metadata survive"
+        );
         assert!(rebound.is_valid());
     }
 
@@ -1842,9 +2282,18 @@ mod tests {
         reset_output(&mut p);
         p.prepare_output().unwrap();
         let path = format!("pages[0].fonts[{}].subset", id.0);
-        assert!(p.diagnostics.iter().any(|d| d.path == path && d.message.contains("not a font")));
-        assert!(p.diagnostics.iter().any(|d| d.path == format!("viewer.fonts[{}].subset", id.0)));
-        assert!(p.warnings.iter().any(|w| w.contains("could not be subset") && w.contains("text may be missing")));
+        assert!(p
+            .diagnostics
+            .iter()
+            .any(|d| d.path == path && d.message.contains("not a font")));
+        assert!(p
+            .diagnostics
+            .iter()
+            .any(|d| d.path == format!("viewer.fonts[{}].subset", id.0)));
+        assert!(p
+            .warnings
+            .iter()
+            .any(|w| w.contains("could not be subset") && w.contains("text may be missing")));
         assert!(p.html("preview").contains("could not be subset"));
         assert!(!p.page_subsets[0].iter().any(|(font, _)| *font == id));
     }
@@ -1863,37 +2312,64 @@ mod tests {
         let diagnostic = p
             .diagnostics
             .iter()
-            .find(|d| d.path.starts_with("layout.diagnostics[") && d.message.starts_with(rdocx::CHART_LEGEND_OMITTED))
+            .find(|d| {
+                d.path.starts_with("layout.diagnostics[")
+                    && d.message.starts_with(rdocx::CHART_LEGEND_OMITTED)
+            })
             .unwrap_or_else(|| panic!("layout diagnostic missing: {:?}", p.diagnostics));
-        let notice = rdocx::ChartLegendOmitted::from_diagnostic_message(&diagnostic.message).unwrap();
+        let notice =
+            rdocx::ChartLegendOmitted::from_diagnostic_message(&diagnostic.message).unwrap();
         assert_eq!(notice.reason, rdocx::LegendOmissionReason::ChartTooSmall);
         assert_eq!(notice.reason.as_str(), "chart-too-small");
-        assert_eq!((notice.width_pt, notice.height_pt, notice.entry_count), (200.0, 140.0, 10));
+        assert_eq!(
+            (notice.width_pt, notice.height_pt, notice.entry_count),
+            (200.0, 140.0, 10)
+        );
         assert!(diagnostic.message.contains("source=word:rId4"));
-        assert!(p.warnings.iter().any(|w| w.contains(CHART_LEGEND_OMITTED_WARNING) && w.contains(&diagnostic.path)));
+        assert!(p
+            .warnings
+            .iter()
+            .any(|w| w.contains(CHART_LEGEND_OMITTED_WARNING) && w.contains(&diagnostic.path)));
         assert!(p.html("preview").contains(CHART_LEGEND_OMITTED_WARNING));
         let quality = p.quality(DocumentKind::Pptx);
         assert_eq!(
-            quality.diagnostics.iter().filter(|d| d.code == quality::DiagnosticCode::ChartLegendOmitted).count(),
+            quality
+                .diagnostics
+                .iter()
+                .filter(|d| d.code == quality::DiagnosticCode::ChartLegendOmitted)
+                .count(),
             1
         );
-        assert!(!quality.diagnostics.iter().any(|d| d.code == quality::DiagnosticCode::UnclassifiedWarning
-            && d.message.contains(CHART_LEGEND_OMITTED_WARNING)));
+        assert!(!quality
+            .diagnostics
+            .iter()
+            .any(|d| d.code == quality::DiagnosticCode::UnclassifiedWarning
+                && d.message.contains(CHART_LEGEND_OMITTED_WARNING)));
     }
 
     #[test]
     fn svg_lowering_diagnostics_are_reported_with_the_page_and_element_path() {
         let mut p = deck();
-        Arc::make_mut(&mut p.layout.pages[0]).elements.push(PositionedElement::Image {
-            rect: oxml_layout::Rect { x: 0.0, y: 0.0, width: 10.0, height: 10.0 },
-            data: b"GIF89a".to_vec(),
-            content_type: "image/gif".into(),
-            media_id: oxml_layout::MediaId::from_bytes(b"GIF89a"),
-        });
+        Arc::make_mut(&mut p.layout.pages[0])
+            .elements
+            .push(PositionedElement::Image {
+                rect: oxml_layout::Rect {
+                    x: 0.0,
+                    y: 0.0,
+                    width: 10.0,
+                    height: 10.0,
+                },
+                data: b"GIF89a".to_vec(),
+                content_type: "image/gif".into(),
+                media_id: oxml_layout::MediaId::from_bytes(b"GIF89a"),
+            });
         reset_output(&mut p);
         p.prepare_output().unwrap();
         let message = "embedded image GIF dimensions could not be read and the image was omitted";
-        assert!(p.diagnostics.iter().any(|d| d.path.starts_with("pages[0].elements[") && d.message == message));
+        assert!(p
+            .diagnostics
+            .iter()
+            .any(|d| d.path.starts_with("pages[0].elements[") && d.message == message));
         assert!(p.warnings.iter().any(|w| w.contains(message)));
         assert!(p.html("preview").contains(message));
     }
@@ -1904,22 +2380,46 @@ mod tests {
         let mut p = deck();
         let mut page = (*p.layout.pages[0]).clone();
         page.elements = vec![PositionedElement::Image {
-            rect: oxml_layout::Rect { x: 0.0, y: 0.0, width: 10.0, height: 10.0 },
+            rect: oxml_layout::Rect {
+                x: 0.0,
+                y: 0.0,
+                width: 10.0,
+                height: 10.0,
+            },
             data: b"GIF89a".to_vec(),
             content_type: "image/gif".into(),
             media_id: oxml_layout::MediaId::from_bytes(b"GIF89a"),
         }];
         let page = Arc::new(page);
         p.layout.pages = vec![page; N];
-        p.layout.diagnostics =
-            (0..N).map(|i| oxml_layout::Diagnostic { message: format!("layout fallback {i}") }).collect();
+        p.layout.diagnostics = (0..N)
+            .map(|i| oxml_layout::Diagnostic {
+                message: format!("layout fallback {i}"),
+            })
+            .collect();
         p.chars = vec![BTreeMap::new(); N];
         reset_output(&mut p);
         p.prepare_output().unwrap();
         assert_eq!(p.diagnostics.len(), N * 2);
-        assert!(p.diagnostics.capacity() <= N * 4, "retained capacity {}", p.diagnostics.capacity());
-        assert_eq!(p.diagnostics.iter().filter(|d| d.path.starts_with("layout.diagnostics[")).count(), N);
-        assert_eq!(p.diagnostics.iter().filter(|d| d.path.starts_with("pages[")).count(), N);
+        assert!(
+            p.diagnostics.capacity() <= N * 4,
+            "retained capacity {}",
+            p.diagnostics.capacity()
+        );
+        assert_eq!(
+            p.diagnostics
+                .iter()
+                .filter(|d| d.path.starts_with("layout.diagnostics["))
+                .count(),
+            N
+        );
+        assert_eq!(
+            p.diagnostics
+                .iter()
+                .filter(|d| d.path.starts_with("pages["))
+                .count(),
+            N
+        );
     }
 
     #[test]
@@ -1934,8 +2434,14 @@ mod tests {
             for (id, bytes) in page {
                 let first = &p.page_subsets[0].iter().find(|(f, _)| f == id).unwrap().1;
                 let viewer = &p.document_subsets.iter().find(|(f, _)| f == id).unwrap().1;
-                assert!(Arc::ptr_eq(bytes.as_ref().unwrap(), first.as_ref().unwrap()));
-                assert!(Arc::ptr_eq(bytes.as_ref().unwrap(), viewer.as_ref().unwrap()));
+                assert!(Arc::ptr_eq(
+                    bytes.as_ref().unwrap(),
+                    first.as_ref().unwrap()
+                ));
+                assert!(Arc::ptr_eq(
+                    bytes.as_ref().unwrap(),
+                    viewer.as_ref().unwrap()
+                ));
             }
         }
     }
@@ -1963,7 +2469,11 @@ mod tests {
         assert!(retained > 0 && retained <= budget);
         reset_output(&mut p);
         p.prepare_output_with_cache_budget(0).unwrap();
-        assert!(p.page_subsets.iter().flatten().all(|(_, data)| data.is_none()));
+        assert!(p
+            .page_subsets
+            .iter()
+            .flatten()
+            .all(|(_, data)| data.is_none()));
         assert!(p.document_subsets.iter().all(|(_, data)| data.is_none()));
         assert_eq!(p.diagnostics, diagnostics);
         assert_eq!(p.warnings, warnings);
@@ -1971,11 +2481,18 @@ mod tests {
         assert_eq!(p.slide_png(0, 48.0).unwrap(), png);
         assert_eq!(p.html("test"), html);
         let id = *p.chars[0].keys().next().unwrap();
-        p.layout.fonts.iter_mut().find(|f| f.id == id).unwrap().data = Arc::from(b"invalid".as_slice());
+        p.layout.fonts.iter_mut().find(|f| f.id == id).unwrap().data =
+            Arc::from(b"invalid".as_slice());
         reset_output(&mut p);
         p.prepare_output_with_cache_budget(0).unwrap();
-        assert!(p.diagnostics.iter().any(|d| d.path.starts_with("pages[0].fonts") && d.message.contains("not a font")));
-        assert!(p.diagnostics.iter().any(|d| d.path.starts_with("viewer.fonts") && d.message.contains("not a font")));
+        assert!(p
+            .diagnostics
+            .iter()
+            .any(|d| d.path.starts_with("pages[0].fonts") && d.message.contains("not a font")));
+        assert!(p
+            .diagnostics
+            .iter()
+            .any(|d| d.path.starts_with("viewer.fonts") && d.message.contains("not a font")));
     }
 
     #[test]
@@ -1990,7 +2507,12 @@ mod tests {
             })
         }
         let mut p = deck();
-        let mut text = p.layout.pages.iter().find_map(|p| first_text(&p.elements)).unwrap();
+        let mut text = p
+            .layout
+            .pages
+            .iter()
+            .find_map(|p| first_text(&p.elements))
+            .unwrap();
         text.font_id = FontId(u32::MAX);
         text.text = "ab\0".into();
         text.glyph_ids.clear();
@@ -1998,28 +2520,47 @@ mod tests {
         let page = Arc::make_mut(&mut p.layout.pages[0]);
         page.background = Some(oxml_layout::Paint::Tile {
             image: oxml_layout::MediaId::from_bytes(b"missing"),
-            tile: oxml_layout::Rect { x: 0.0, y: 0.0, width: 10.0, height: 10.0 },
+            tile: oxml_layout::Rect {
+                x: 0.0,
+                y: 0.0,
+                width: 10.0,
+                height: 10.0,
+            },
             transform: oxml_layout::Transform::IDENTITY,
         });
         for scale in [0.0, 2.0] {
-            page.elements.push(PositionedElement::Group(oxml_layout::GroupElement {
-                transform: oxml_layout::Transform { a: scale, d: 1.0, ..oxml_layout::Transform::IDENTITY },
-                clip: None,
-                opacity: 1.0,
-                effects: vec![oxml_layout::Effect::OuterShadow {
-                    dx: 1.0,
-                    dy: 1.0,
-                    blur: 2.0,
-                    color: oxml_layout::Color::BLACK,
-                }],
-                children: vec![PositionedElement::Text(text.clone())],
-            }));
+            page.elements
+                .push(PositionedElement::Group(oxml_layout::GroupElement {
+                    transform: oxml_layout::Transform {
+                        a: scale,
+                        d: 1.0,
+                        ..oxml_layout::Transform::IDENTITY
+                    },
+                    clip: None,
+                    opacity: 1.0,
+                    effects: vec![oxml_layout::Effect::OuterShadow {
+                        dx: 1.0,
+                        dy: 1.0,
+                        blur: 2.0,
+                        color: oxml_layout::Color::BLACK,
+                    }],
+                    children: vec![PositionedElement::Text(text.clone())],
+                }));
         }
         page.elements.push(PositionedElement::LinkAnnotation {
-            rect: oxml_layout::Rect { x: 0.0, y: 0.0, width: 10.0, height: 10.0 },
+            rect: oxml_layout::Rect {
+                x: 0.0,
+                y: 0.0,
+                width: 10.0,
+                height: 10.0,
+            },
             url: "javascript:alert(1)".into(),
         });
-        let hooks = PageHooks { preview: &p, css: String::new(), marks: false };
+        let hooks = PageHooks {
+            preview: &p,
+            css: String::new(),
+            marks: false,
+        };
         for k in 0..p.slide_count() {
             let inspected = svg::page_diagnostics(&p.layout, k, &p.image_plan).unwrap();
             let rendered = svg::render_page(&p.layout, k, &hooks, &p.image_plan).unwrap();
@@ -2035,7 +2576,10 @@ mod tests {
             "anisotropic",
             "link target",
         ] {
-            assert!(inspected.iter().any(|d| d.message.contains(message)), "missing {message}: {inspected:?}");
+            assert!(
+                inspected.iter().any(|d| d.message.contains(message)),
+                "missing {message}: {inspected:?}"
+            );
         }
     }
 
@@ -2062,8 +2606,14 @@ mod tests {
         };
         assert_eq!(requested_typeface(&style, "Q3"), "Calibri");
         assert_eq!(requested_typeface(&style, "매출"), "맑은 고딕");
-        assert_eq!(requested_typeface(&ResolvedRunStyle::default(), "x"), "Arial");
-        let latin_only = ResolvedRunStyle { latin_typeface: Some("Calibri".into()), ..Default::default() };
+        assert_eq!(
+            requested_typeface(&ResolvedRunStyle::default(), "x"),
+            "Arial"
+        );
+        let latin_only = ResolvedRunStyle {
+            latin_typeface: Some("Calibri".into()),
+            ..Default::default()
+        };
         assert_eq!(requested_typeface(&latin_only, "매출"), "Calibri");
     }
 }

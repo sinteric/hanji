@@ -46,7 +46,10 @@ pub struct Doc {
 
 impl Element {
     pub fn new(name: &str) -> Element {
-        Element { name: name.into(), ..Default::default() }
+        Element {
+            name: name.into(),
+            ..Default::default()
+        }
     }
     pub fn with_attr(mut self, k: &str, v: &str) -> Element {
         self.attrs.push((k.into(), escape_attr(v)));
@@ -101,7 +104,11 @@ impl Element {
     }
     /// A copy with no children (the element's "shell").
     pub fn shell(&self) -> Element {
-        Element { name: self.name.clone(), attrs: self.attrs.clone(), children: vec![] }
+        Element {
+            name: self.name.clone(),
+            attrs: self.attrs.clone(),
+            children: vec![],
+        }
     }
     /// The start tag, `<name attrs…>`.
     pub fn open_tag(&self) -> String {
@@ -165,10 +172,16 @@ pub fn parse(data: &[u8]) -> Result<Doc, XmlError> {
     let mut root_end = 0;
     loop {
         let before = r.buffer_position() as usize;
-        let ev = r.read_event().map_err(|e| XmlError(format!("malformed XML at byte {before}: {e}")))?;
+        let ev = r
+            .read_event()
+            .map_err(|e| XmlError(format!("malformed XML at byte {before}: {e}")))?;
         let node = match ev {
             Event::Eof => break,
-            Event::DocType(_) => return Err(XmlError("a DOCTYPE is not allowed in a package part".into())),
+            Event::DocType(_) => {
+                return Err(XmlError(
+                    "a DOCTYPE is not allowed in a package part".into(),
+                ))
+            }
             Event::Decl(_) => continue,
             Event::Start(_) | Event::Empty(_) if stack.is_empty() && root.is_some() => {
                 return Err(XmlError("more than one root element".into()));
@@ -183,7 +196,9 @@ pub fn parse(data: &[u8]) -> Result<Doc, XmlError> {
                 Node::El(start(&s)?)
             }
             Event::End(_) => {
-                let el = stack.pop().ok_or_else(|| XmlError("unmatched end tag".into()))?;
+                let el = stack
+                    .pop()
+                    .ok_or_else(|| XmlError("unmatched end tag".into()))?;
                 Node::El(el)
             }
             Event::Text(t) => Node::Text(t.to_string()),
@@ -207,18 +222,25 @@ pub fn parse(data: &[u8]) -> Result<Doc, XmlError> {
     }
     let root = root.ok_or_else(|| XmlError("no root element".into()))?;
     let start = root_start.unwrap_or(0);
-    Ok(Doc { prolog: text[..start].to_string(), root, epilog: text[root_end..].to_string() })
+    Ok(Doc {
+        prolog: text[..start].to_string(),
+        root,
+        epilog: text[root_end..].to_string(),
+    })
 }
 
 /// Parse one element written by [`Element::to_xml`].
 pub fn fragment(s: &str) -> Element {
-    parse(s.as_bytes()).expect("stored fragment is well-formed").root
+    parse(s.as_bytes())
+        .expect("stored fragment is well-formed")
+        .root
 }
 
 /// An element stored as its shell followed by its leading children.
 pub fn assemble(xml: &[String]) -> Element {
     let mut e = fragment(&xml[0]);
-    e.children.extend(xml[1..].iter().map(|x| Node::El(fragment(x))));
+    e.children
+        .extend(xml[1..].iter().map(|x| Node::El(fragment(x))));
     e
 }
 
@@ -239,8 +261,13 @@ fn start(s: &quick_xml::events::BytesStart<'_>) -> Result<Element, XmlError> {
         match quote {
             Some(q) if b == q => {
                 quote = None;
-                if raw.get(k + 1).is_some_and(|n| !n.is_ascii_whitespace() && *n != b'/') {
-                    return Err(XmlError(format!("<{name}>: no white space between attributes")));
+                if raw
+                    .get(k + 1)
+                    .is_some_and(|n| !n.is_ascii_whitespace() && *n != b'/')
+                {
+                    return Err(XmlError(format!(
+                        "<{name}>: no white space between attributes"
+                    )));
                 }
             }
             Some(_) => {}
@@ -257,7 +284,11 @@ fn start(s: &quick_xml::events::BytesStart<'_>) -> Result<Element, XmlError> {
         }
         attrs.push((a.key.as_ref().to_string(), v));
     }
-    Ok(Element { name, attrs, children: vec![] })
+    Ok(Element {
+        name,
+        attrs,
+        children: vec![],
+    })
 }
 
 pub fn write_element(e: &Element, out: &mut String) {
@@ -324,7 +355,9 @@ pub fn unescape(s: &str) -> String {
             "quot" => Some('"'),
             "apos" => Some('\''),
             _ if ent.starts_with("#x") || ent.starts_with("#X") => {
-                u32::from_str_radix(&ent[2..], 16).ok().and_then(char::from_u32)
+                u32::from_str_radix(&ent[2..], 16)
+                    .ok()
+                    .and_then(char::from_u32)
             }
             _ if ent.starts_with('#') => ent[1..].parse().ok().and_then(char::from_u32),
             _ => None,
@@ -345,11 +378,15 @@ pub fn local_name(name: &str) -> &str {
 }
 
 pub fn escape_text(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 pub fn escape_attr(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('"', "&quot;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('"', "&quot;")
 }
 
 // ---------------------------------------------------------------- canonical form
@@ -417,7 +454,12 @@ fn canon_into(e: &Element, scope: &Scope, out: &mut String) {
         .attrs
         .iter()
         .filter(|a| ns_prefix(&a.0).is_none())
-        .map(|(k, v)| (expand(scope, k, true), unescape(v).replace(['\t', '\n', '\r'], " ")))
+        .map(|(k, v)| {
+            (
+                expand(scope, k, true),
+                unescape(v).replace(['\t', '\n', '\r'], " "),
+            )
+        })
         .collect();
     attrs.sort();
     for (k, v) in attrs {
@@ -476,7 +518,10 @@ pub fn write_nodes(nodes: &[Node]) -> String {
 pub fn insert_ordered(parent: &mut Element, el: Element, order: &[&str]) {
     let rank = |e: &Element| order.iter().position(|x| *x == e.local());
     let mine = rank(&el).unwrap_or(order.len());
-    let at = parent.children.iter().position(|n| matches!(n, Node::El(c) if rank(c).is_some_and(|r| r > mine)));
+    let at = parent
+        .children
+        .iter()
+        .position(|n| matches!(n, Node::El(c) if rank(c).is_some_and(|r| r > mine)));
     match at {
         Some(k) => parent.children.insert(k, Node::El(el)),
         None => parent.children.push(Node::El(el)),
@@ -485,7 +530,10 @@ pub fn insert_ordered(parent: &mut Element, el: Element, order: &[&str]) {
 
 /// Remove the first child element named `qname`.
 pub fn remove_child(e: &mut Element, qname: &str) -> Option<Element> {
-    let k = e.children.iter().position(|n| matches!(n, Node::El(c) if c.name == qname))?;
+    let k = e
+        .children
+        .iter()
+        .position(|n| matches!(n, Node::El(c) if c.name == qname))?;
     match e.children.remove(k) {
         Node::El(x) => Some(x),
         _ => None,
@@ -494,7 +542,10 @@ pub fn remove_child(e: &mut Element, qname: &str) -> Option<Element> {
 
 /// Fingerprint of fragments (canonical, joined; `-` for none).
 pub fn fp(scope: &Scope, els: &[Option<&Element>]) -> String {
-    els.iter().map(|e| e.map_or_else(|| "-".to_string(), |e| canon(e, scope))).collect::<Vec<_>>().join("|")
+    els.iter()
+        .map(|e| e.map_or_else(|| "-".to_string(), |e| canon(e, scope)))
+        .collect::<Vec<_>>()
+        .join("|")
 }
 
 /// Whitespace-only character data (between elements).

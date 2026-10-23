@@ -3,12 +3,20 @@
 //! the edits that are refused (attached connectors, groups, the slide size).
 
 use hanji_core::edit::{edit_in, rewrite_in};
-use hanji_core::{Capabilities, Engine, EngineError, ImportOptions, Imported, Part, Remainder, TextModel};
+use hanji_core::{
+    Capabilities, Engine, EngineError, ImportOptions, Imported, Part, Remainder, TextModel,
+};
 use hanji_package::{opc, package};
 use hanji_pptx::{PptxEngine, PptxModel};
 
-const CAPS: Capabilities =
-    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: false, table_place: false };
+const CAPS: Capabilities = Capabilities {
+    links: false,
+    fields: false,
+    footnotes: false,
+    math: false,
+    formatting: false,
+    table_place: false,
+};
 
 fn deck(name: &str) -> Vec<u8> {
     let path = format!("{}/corpus/{name}", env!("CARGO_MANIFEST_DIR"));
@@ -16,12 +24,16 @@ fn deck(name: &str) -> Vec<u8> {
 }
 
 fn import(pkg: &[u8]) -> Imported {
-    PptxEngine.import(pkg, &ImportOptions::default()).unwrap_or_else(|e| panic!("{e}"))
+    PptxEngine
+        .import(pkg, &ImportOptions::default())
+        .unwrap_or_else(|e| panic!("{e}"))
 }
 
 /// The canonical form of `text`: what the write returns.
 fn canonical(text: &str, rem: &Remainder) -> String {
-    let (blocks, _) = PptxModel.resolve(text, rem, CAPS).unwrap_or_else(|e| panic!("{e:?}"));
+    let (blocks, _) = PptxModel
+        .resolve(text, rem, CAPS)
+        .unwrap_or_else(|e| panic!("{e:?}"));
     PptxEngine::text_of(&blocks, rem, None)
 }
 
@@ -51,7 +63,9 @@ fn keep_ids_out(text: &str) -> String {
 
 /// Exports `text`; the export reads back as its canonical form (PutGet), `new` naming the ids new objects got.
 fn export_new(text: &str, rem: &Remainder, new: &[(&str, &str)]) -> (Vec<Part>, String) {
-    let out = PptxEngine.export(text, rem).unwrap_or_else(|e| panic!("{e}"));
+    let out = PptxEngine
+        .export(text, rem)
+        .unwrap_or_else(|e| panic!("{e}"));
     let back = import(&out).text;
     let (got, want) = (without_new_ids(&back, new), canonical(text, rem));
     if got != want {
@@ -66,7 +80,12 @@ fn export(text: &str, rem: &Remainder) -> Vec<Part> {
 }
 
 fn xml(parts: &[Part], name: &str) -> String {
-    String::from_utf8(package::get(parts, name).unwrap_or_else(|| panic!("no {name}")).to_vec()).unwrap()
+    String::from_utf8(
+        package::get(parts, name)
+            .unwrap_or_else(|| panic!("no {name}"))
+            .to_vec(),
+    )
+    .unwrap()
 }
 
 fn slides(parts: &[Part]) -> Vec<String> {
@@ -80,8 +99,13 @@ fn slides(parts: &[Part]) -> Vec<String> {
 
 /// An exact edit that must place every entry (none removed, none refused).
 fn exact(imp_text: &str, rem: &Remainder, old: &str, new: &str) -> (String, Remainder) {
-    let r = edit_in(&PptxModel, rem, imp_text, old, new, CAPS).unwrap_or_else(|e| panic!("{old:?}: {e}"));
-    assert!(r.report.refused.is_empty() && r.report.removed.is_empty(), "{:?}", r.report);
+    let r = edit_in(&PptxModel, rem, imp_text, old, new, CAPS)
+        .unwrap_or_else(|e| panic!("{old:?}: {e}"));
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
     (r.text, r.remainder)
 }
 
@@ -91,7 +115,9 @@ fn xfrms(x: &str) -> Vec<String> {
     for (open, close) in [("<a:xfrm", "</a:xfrm>"), ("<p:xfrm", "</p:xfrm>")] {
         let mut rest = x;
         while let Some(k) = rest.find(open) {
-            let e = rest[k..].find(close).map_or(k + open.len(), |e| k + e + close.len());
+            let e = rest[k..]
+                .find(close)
+                .map_or(k + open.len(), |e| k + e + close.len());
             out.push(rest[k..e].to_string());
             rest = &rest[e..];
         }
@@ -101,9 +127,14 @@ fn xfrms(x: &str) -> Vec<String> {
 
 /// The `a:xfrm` of the shape named `name` in slide XML.
 fn xfrm_of(x: &str, name: &str) -> String {
-    let at = x.find(&format!("name=\"{name}\"")).unwrap_or_else(|| panic!("no {name}"));
+    let at = x
+        .find(&format!("name=\"{name}\""))
+        .unwrap_or_else(|| panic!("no {name}"));
     let rest = &x[at..];
-    let end = rest.find("</p:sp>").or_else(|| rest.find("</p:pic>")).unwrap();
+    let end = rest
+        .find("</p:sp>")
+        .or_else(|| rest.find("</p:pic>"))
+        .unwrap();
     xfrms(&rest[..end]).into_iter().next().unwrap_or_default()
 }
 
@@ -113,18 +144,32 @@ fn every_object_shows_its_box_and_getput_keeps_every_xfrm() {
     let mut n = 0;
     for f in std::fs::read_dir(&dir).unwrap() {
         let path = f.unwrap().path();
-        if !matches!(path.extension().and_then(|e| e.to_str()), Some("pptx" | "pptm")) {
+        if !matches!(
+            path.extension().and_then(|e| e.to_str()),
+            Some("pptx" | "pptm")
+        ) {
             continue;
         }
         let pkg = std::fs::read(&path).unwrap();
         let before = package::read(&pkg).unwrap();
-        let raw = ImportOptions { neutralise: false, template: None };
-        let imp = PptxEngine.import(&pkg, &raw).unwrap_or_else(|e| panic!("{path:?}: {e}"));
-        let out = PptxEngine.export(&imp.text, &imp.remainder).unwrap_or_else(|e| panic!("{path:?}: {e}"));
+        let raw = ImportOptions {
+            neutralise: false,
+            template: None,
+        };
+        let imp = PptxEngine
+            .import(&pkg, &raw)
+            .unwrap_or_else(|e| panic!("{path:?}: {e}"));
+        let out = PptxEngine
+            .export(&imp.text, &imp.remainder)
+            .unwrap_or_else(|e| panic!("{path:?}: {e}"));
         let after = package::read(&out).unwrap();
         for s in slides(&before) {
             // Every stored box unchanged, and no box added where there was none.
-            assert_eq!(xfrms(&xml(&after, &s)), xfrms(&xml(&before, &s)), "{path:?} {s}");
+            assert_eq!(
+                xfrms(&xml(&after, &s)),
+                xfrms(&xml(&before, &s)),
+                "{path:?} {s}"
+            );
         }
         n += 1;
     }
@@ -148,7 +193,9 @@ fn every_object_shows_its_box_and_getput_keeps_every_xfrm() {
     assert!(imp.text.contains(
         "<shape id=\"s13\" name=\"Rectangle 12\" box=\"594 72 72 72\" fill=accent1-50% border=\"2pt solid accent1*\"/>"
     ));
-    assert!(imp.text.starts_with("---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 720 x 540 pt\n---\n"));
+    assert!(imp.text.starts_with(
+        "---\ntype: presentation\nformat: pptx\nschema: 1\nsize: 720 x 540 pt\n---\n"
+    ));
     // Every slot shows its box, inherited from the layout or the master.
     let k = import(&deck("korean-deck.pptx"));
     assert!(
@@ -157,7 +204,9 @@ fn every_object_shows_its_box_and_getput_keeps_every_xfrm() {
         "{}",
         k.text
     );
-    assert!(k.text.contains("::body box=\"36 126 648 356\" font=\"맑은 고딕\" color=tx1::\n"));
+    assert!(k
+        .text
+        .contains("::body box=\"36 126 648 356\" font=\"맑은 고딕\" color=tx1::\n"));
 }
 
 #[test]
@@ -227,9 +276,17 @@ fn objects_move_resize_align_and_a_text_box_is_added() {
     );
     let (parts, back) = export_new(&text, &rem, &[("s5", "TextBox 4")]);
     let x = xml(&parts, &s4);
-    assert!(x.contains("<a:off x=\"6400800\" y=\"4572000\"/><a:ext cx=\"1828800\" cy=\"914400\"/>"), "{x}");
-    let tb = &x[x.find("name=\"TextBox 4\"").expect("the new text box is named for its id")..];
-    assert!(tb.starts_with("name=\"TextBox 4\"/><p:cNvSpPr txBox=\"1\"/>"), "{tb}");
+    assert!(
+        x.contains("<a:off x=\"6400800\" y=\"4572000\"/><a:ext cx=\"1828800\" cy=\"914400\"/>"),
+        "{x}"
+    );
+    let tb = &x[x
+        .find("name=\"TextBox 4\"")
+        .expect("the new text box is named for its id")..];
+    assert!(
+        tb.starts_with("name=\"TextBox 4\"/><p:cNvSpPr txBox=\"1\"/>"),
+        "{tb}"
+    );
     assert!(tb.contains("<a:off x=\"457200\" y=\"1422400\"/><a:ext cx=\"8229600\" cy=\"355600\"/>"));
     assert!(tb.contains(">단위: 억 원</a:t>"));
     // The text read back shows the new box's id and name, after the title, before the table.
@@ -241,28 +298,50 @@ fn objects_move_resize_align_and_a_text_box_is_added() {
     );
     // Align two shapes' left edges (shapes.pptx slide 6), by a whole-file rewrite.
     let imp = import(&deck("shapes.pptx"));
-    let new =
-        imp.text.replace("name=\"Rectangle 8\" box=\"174 72 72 72\"", "name=\"Rectangle 8\" box=\"66 180 72 72\"");
-    let r = rewrite_in(&PptxModel, &imp.remainder, &imp.text, &new, CAPS).unwrap_or_else(|e| panic!("{e}"));
-    assert!(r.report.refused.is_empty() && r.report.removed.is_empty(), "{:?}", r.report);
+    let new = imp.text.replace(
+        "name=\"Rectangle 8\" box=\"174 72 72 72\"",
+        "name=\"Rectangle 8\" box=\"66 180 72 72\"",
+    );
+    let r = rewrite_in(&PptxModel, &imp.remainder, &imp.text, &new, CAPS)
+        .unwrap_or_else(|e| panic!("{e}"));
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
     let parts = export(&r.text, &r.remainder);
     let s6 = slides(&parts)[5].clone();
     let x = xml(&parts, &s6);
     let left = |name: &str| {
         let f = xfrm_of(&x, name);
-        f[f.find("<a:off x=\"").unwrap() + 11..].split('"').next().unwrap().to_string()
+        f[f.find("<a:off x=\"").unwrap() + 11..]
+            .split('"')
+            .next()
+            .unwrap()
+            .to_string()
     };
     assert_eq!(left("Rectangle 8"), left("Rectangle 1"));
-    assert!(xfrm_of(&x, "Rectangle 8").contains("<a:off x=\"838200\" y=\"2286000\"/>"), "{x}");
+    assert!(
+        xfrm_of(&x, "Rectangle 8").contains("<a:off x=\"838200\" y=\"2286000\"/>"),
+        "{x}"
+    );
 }
 
 #[test]
 fn a_resized_table_scales_its_grid() {
     let imp = import(&deck("korean-deck.pptx"));
-    let (text, rem) = exact(&imp.text, &imp.remainder, "box=\"72 144 576 144\"", "box=\"72 144 288 72\"");
+    let (text, rem) = exact(
+        &imp.text,
+        &imp.remainder,
+        "box=\"72 144 576 144\"",
+        "box=\"72 144 288 72\"",
+    );
     let parts = export(&text, &rem);
     let x = xml(&parts, &slides(&parts)[3]);
-    assert!(x.contains("<a:off x=\"914400\" y=\"1828800\"/><a:ext cx=\"3657600\" cy=\"914400\"/>"), "{x}");
+    assert!(
+        x.contains("<a:off x=\"914400\" y=\"1828800\"/><a:ext cx=\"3657600\" cy=\"914400\"/>"),
+        "{x}"
+    );
     assert_eq!(x.matches("<a:gridCol w=\"1219200\"/>").count(), 3, "{x}");
     assert_eq!(x.matches("<a:tr h=\"228600\">").count(), 4, "{x}");
 }
@@ -272,8 +351,12 @@ fn lines_move_by_their_ends_and_new_lines_are_drawn() {
     let imp = import(&deck("shapes.pptx"));
     let old = "name=\"Straight Connector 5\" from=\"84 144\" to=\"252 144\"";
     // Reversed: the line now runs right to left and up, both flips.
-    let (text, rem) =
-        exact(&imp.text, &imp.remainder, old, "name=\"Straight Connector 5\" from=\"252 180\" to=\"84 144\"");
+    let (text, rem) = exact(
+        &imp.text,
+        &imp.remainder,
+        old,
+        "name=\"Straight Connector 5\" from=\"252 180\" to=\"84 144\"",
+    );
     let (text, rem) = exact(
         &text,
         &rem,
@@ -304,13 +387,24 @@ fn an_object_a_connector_is_attached_to_takes_the_connector_along() {
     // moved or resized, the picture takes that end along (tests/route.rs).
     let imp = import(&deck("shapes.pptx"));
     let pic = "name=\"Picture 1\" box=\"402 78 144 132\"";
-    for to in ["name=\"Picture 1\" box=\"402 178 144 132\"", "name=\"Picture 1\" box=\"402 78 72 132\""] {
+    for to in [
+        "name=\"Picture 1\" box=\"402 178 144 132\"",
+        "name=\"Picture 1\" box=\"402 78 72 132\"",
+    ] {
         let (text, rem) = exact(&imp.text, &imp.remainder, pic, to);
-        let x = xml(&export(&text, &rem), &slides(&package::read(&deck("shapes.pptx")).unwrap())[0]);
+        let x = xml(
+            &export(&text, &rem),
+            &slides(&package::read(&deck("shapes.pptx")).unwrap())[0],
+        );
         assert!(x.contains("<a:endCxn id=\"2\" idx=\"1\"/>"), "{x}");
     }
     // An object nothing is attached to moves alone.
-    let (text, rem) = exact(&imp.text, &imp.remainder, "box=\"47 211 185 136\"", "box=\"47 311 185 136\"");
+    let (text, rem) = exact(
+        &imp.text,
+        &imp.remainder,
+        "box=\"47 211 185 136\"",
+        "box=\"47 311 185 136\"",
+    );
     export(&text, &rem);
 }
 
@@ -322,7 +416,12 @@ fn groups_move_whole_or_by_their_objects() {
     let orig = xml(&package::read(&pkg).unwrap(), &s3);
     // The group's box: the whole group moves; its objects stay in its child coordinates.
     let g = "<group id=\"g5\" name=\"Group 4\" box=\"120 108 258 152\">";
-    let (text, rem) = exact(&imp.text, &imp.remainder, g, "<group id=\"g5\" name=\"Group 4\" box=\"220 108 258 152\">");
+    let (text, rem) = exact(
+        &imp.text,
+        &imp.remainder,
+        g,
+        "<group id=\"g5\" name=\"Group 4\" box=\"220 108 258 152\">",
+    );
     let c = canonical(&text, &rem);
     assert!(
         c.contains(
@@ -335,7 +434,11 @@ fn groups_move_whole_or_by_their_objects() {
     let (a, b) = (xfrms(&x), xfrms(&orig));
     // [0] is the slide's shape tree, [1] the group.
     assert_eq!(a[2..], b[2..], "the objects' own boxes do not change");
-    assert!(a[1].contains("<a:chOff") && a[1].contains("<a:off x=\"2794000\""), "{}", a[1]);
+    assert!(
+        a[1].contains("<a:chOff") && a[1].contains("<a:off x=\"2794000\""),
+        "{}",
+        a[1]
+    );
     // One of its objects: it moves, and the group's box follows.
     let (text, rem) = exact(
         &imp.text,
@@ -344,14 +447,21 @@ fn groups_move_whole_or_by_their_objects() {
         "name=\"Oval 2\" box=\"406 150 72 72\" fill",
     );
     let c = canonical(&text, &rem);
-    assert!(c.contains("<group id=\"g5\" name=\"Group 4\" box=\"120 108 358 152\">"), "{c}");
+    assert!(
+        c.contains("<group id=\"g5\" name=\"Group 4\" box=\"120 108 358 152\">"),
+        "{c}"
+    );
     export(&text, &rem);
     // Both, disagreeing: refused with the reason.
     let both = imp
         .text
         .replace(g, "<group id=\"g5\" name=\"Group 4\" box=\"0 0 100 100\">")
-        .replace("name=\"Oval 2\" box=\"306 150 72 72\"", "name=\"Oval 2\" box=\"406 150 72 72\"");
-    let r = rewrite_in(&PptxModel, &imp.remainder, &imp.text, &both, CAPS).unwrap_or_else(|e| panic!("{e}"));
+        .replace(
+            "name=\"Oval 2\" box=\"306 150 72 72\"",
+            "name=\"Oval 2\" box=\"406 150 72 72\"",
+        );
+    let r = rewrite_in(&PptxModel, &imp.remainder, &imp.text, &both, CAPS)
+        .unwrap_or_else(|e| panic!("{e}"));
     match PptxEngine.export(&r.text, &r.remainder) {
         Err(EngineError::Refused(m)) => assert!(m.contains("both changed and disagree"), "{m}"),
         other => panic!("expected a refusal, got {:?}", other.map(|_| ())),
@@ -365,10 +475,18 @@ fn groups_move_whole_or_by_their_objects() {
     );
     let x = xml(&export(&text, &rem), &s3);
     assert!(x.contains("<a:t>text</a:t>"), "{x}");
-    let (text, rem) = exact(&imp.text, &imp.remainder, "name=\"Oval 2\"", "name=\"Oval 3\"");
+    let (text, rem) = exact(
+        &imp.text,
+        &imp.remainder,
+        "name=\"Oval 2\"",
+        "name=\"Oval 3\"",
+    );
     match PptxEngine.export(&text, &rem) {
         Err(EngineError::Refused(m)) => {
-            assert!(m.contains("never added, deleted, reordered, renamed"), "{m}")
+            assert!(
+                m.contains("never added, deleted, reordered, renamed"),
+                "{m}"
+            )
         }
         other => panic!("expected a refusal, got {:?}", other.map(|_| ())),
     }
@@ -379,14 +497,25 @@ fn a_layout_change_keeps_each_slot_where_its_box_says() {
     let pkg = deck("korean-deck.pptx");
     let imp = import(&pkg);
     // The section header's slots stay where the text puts them.
-    let (text, rem) = exact(&imp.text, &imp.remainder, "layout: Section Header", "layout: Title and Content");
+    let (text, rem) = exact(
+        &imp.text,
+        &imp.remainder,
+        "layout: Section Header",
+        "layout: Title and Content",
+    );
     let parts = export(&text, &rem);
     let x = xml(&parts, &slides(&parts)[5]);
     assert_eq!(xfrms(&x).len(), 2, "{x}");
     // Bare markers put them where the new layout does.
     let t2 = text
-        .replace("::title box=\"57 347 612 107\" font=\"맑은 고딕\" size=40pt color=tx1::\n부록", "::title::\n부록")
-        .replace("::body box=\"57 229 612 118\" font=\"맑은 고딕\" size=20pt color=tx1*::", "::body::");
+        .replace(
+            "::title box=\"57 347 612 107\" font=\"맑은 고딕\" size=40pt color=tx1::\n부록",
+            "::title::\n부록",
+        )
+        .replace(
+            "::body box=\"57 229 612 118\" font=\"맑은 고딕\" size=20pt color=tx1*::",
+            "::body::",
+        );
     let r = rewrite_in(&PptxModel, &rem, &text, &t2, CAPS).unwrap_or_else(|e| panic!("{e}"));
     let parts = export(&r.text, &r.remainder);
     assert!(xfrms(&xml(&parts, &slides(&parts)[5])).is_empty());
@@ -400,14 +529,26 @@ fn what_cannot_change_is_refused_with_the_reason() {
     let bad = imp.text.replace("size: 720 x 540 pt", "size: 960 x 540 pt");
     match PptxEngine.export(&bad, &imp.remainder) {
         Err(EngineError::Invalid(d)) => {
-            assert!(hanji_format::diag::render(&d).contains("size is the deck's slide size, size: 720 x 540 pt"))
+            assert!(hanji_format::diag::render(&d)
+                .contains("size is the deck's slide size, size: 720 x 540 pt"))
         }
         other => panic!("{:?}", other.map(|_| ())),
     }
-    let bad = imp.text.replace("box=\"36 475 288 29\"", "box=\"36 475 -288 29\"");
-    assert!(matches!(PptxEngine.export(&bad, &imp.remainder), Err(EngineError::Invalid(_))));
-    let bad = imp.text.replace("<shape id=\"s5\" name=\"출처\"", "<shape id=\"s99\" name=\"출처\"");
-    assert!(matches!(PptxEngine.export(&bad, &imp.remainder), Err(EngineError::Invalid(_))));
+    let bad = imp
+        .text
+        .replace("box=\"36 475 288 29\"", "box=\"36 475 -288 29\"");
+    assert!(matches!(
+        PptxEngine.export(&bad, &imp.remainder),
+        Err(EngineError::Invalid(_))
+    ));
+    let bad = imp.text.replace(
+        "<shape id=\"s5\" name=\"출처\"",
+        "<shape id=\"s99\" name=\"출처\"",
+    );
+    assert!(matches!(
+        PptxEngine.export(&bad, &imp.remainder),
+        Err(EngineError::Invalid(_))
+    ));
 }
 
 #[test]
@@ -439,7 +580,10 @@ fn a_changed_number_another_object_shows_takes_its_exact_emu() {
     );
     let (parts, _) = export_new(&text, &rem, &[("s5", "TextBox 4")]);
     let f = xfrm_of(&xml(&parts, &s5), "TextBox 4");
-    assert!(f.contains("<a:off x=\"2952093\" y=\"5588000\"/><a:ext cx=\"3239814\" cy=\"369332\"/>"), "{f}");
+    assert!(
+        f.contains("<a:off x=\"2952093\" y=\"5588000\"/><a:ext cx=\"3239814\" cy=\"369332\"/>"),
+        "{f}"
+    );
     // TextBox 1 moved in the same edit: its old x is nowhere, and 232 is 232 pt.
     let (text, rem) = exact(
         &imp.text,
@@ -447,7 +591,12 @@ fn a_changed_number_another_object_shows_takes_its_exact_emu() {
         "name=\"TextBox 1\" box=\"232 113 255 29\" font=Calibri size=18pt color=tx1>Shape 0",
         "name=\"TextBox 1\" box=\"100 113 255 29\" font=Calibri size=18pt color=tx1>Shape 0",
     );
-    let (text, rem) = exact(&text, &rem, "box=\"206 255 308 29\"", "box=\"232 255 308 29\"");
+    let (text, rem) = exact(
+        &text,
+        &rem,
+        "box=\"206 255 308 29\"",
+        "box=\"232 255 308 29\"",
+    );
     let f = xfrm_of(&xml(&export(&text, &rem), &s5), "TextBox 2");
     assert!(f.contains("<a:off x=\"2946400\" y=\"3244334\"/>"), "{f}");
 }
@@ -472,34 +621,79 @@ fn a_stored_rotation_left_as_shown_keeps_its_exact_value() {
     assert_eq!(canonical(&imp.text, &imp.remainder), imp.text);
     let parts = export(&imp.text, &imp.remainder);
     for p in &before {
-        assert_eq!(package::get(&parts, &p.name), Some(&p.data[..]), "{} changed", p.name);
+        assert_eq!(
+            package::get(&parts, &p.name),
+            Some(&p.data[..]),
+            "{} changed",
+            p.name
+        );
     }
     // The same turn written another way (-90 for 270, -300 for 60): still unchanged.
-    let (text, rem) = exact(&imp.text, &imp.remainder, "rot=\"270\" fill=", "rot=\"-90\" fill=");
+    let (text, rem) = exact(
+        &imp.text,
+        &imp.remainder,
+        "rot=\"270\" fill=",
+        "rot=\"-90\" fill=",
+    );
     let (text, rem) = exact(&text, &rem, "rot=\"60\"", "rot=\"-300\"");
-    let out = PptxEngine.export(&text, &rem).unwrap_or_else(|e| panic!("{e}"));
+    let out = PptxEngine
+        .export(&text, &rem)
+        .unwrap_or_else(|e| panic!("{e}"));
     assert_eq!(xml(&package::read(&out).unwrap(), &s1), xml(&before, &s1));
     // A box moved: its rotation, left as shown, keeps its stored value and sign.
-    let (text, rem) = exact(&imp.text, &imp.remainder, "box=\"60 160 200 40\"", "box=\"72 160 200 40\"");
+    let (text, rem) = exact(
+        &imp.text,
+        &imp.remainder,
+        "box=\"60 160 200 40\"",
+        "box=\"72 160 200 40\"",
+    );
     let x = xml(&export(&text, &rem), &s1);
-    assert!(xfrm_of(&x, "Minus ninety").starts_with("<a:xfrm rot=\"-5400000\"><a:off x=\"914400\""), "{x}");
+    assert!(
+        xfrm_of(&x, "Minus ninety").starts_with("<a:xfrm rot=\"-5400000\"><a:off x=\"914400\""),
+        "{x}"
+    );
     assert!(xfrm_of(&x, "Past a turn").starts_with("<a:xfrm rot=\"25200000\">"));
     // A changed rotation is written from 0 up to a full turn; a changed flip
     // goes, an unchanged one stays as the file writes it.
-    let (text, rem) = exact(&imp.text, &imp.remainder, "rot=\"270\" fill=", "rot=\"90\" fill=");
+    let (text, rem) = exact(
+        &imp.text,
+        &imp.remainder,
+        "rot=\"270\" fill=",
+        "rot=\"90\" fill=",
+    );
     let (text, rem) = exact(&text, &rem, "rot=\"60\"", "rot=\"-30\"");
     let (text, rem) = exact(&text, &rem, "rot=\"345\" flip=\"h\"", "rot=\"345\"");
     let x = xml(&export(&text, &rem), &s1);
-    assert!(xfrm_of(&x, "Minus ninety").starts_with("<a:xfrm rot=\"5400000\">"), "{x}");
-    assert!(xfrm_of(&x, "Past a turn").starts_with("<a:xfrm rot=\"19800000\">"), "{x}");
-    assert!(xfrm_of(&x, "Minus fifteen flipped").starts_with("<a:xfrm rot=\"-900000\">"), "{x}");
+    assert!(
+        xfrm_of(&x, "Minus ninety").starts_with("<a:xfrm rot=\"5400000\">"),
+        "{x}"
+    );
+    assert!(
+        xfrm_of(&x, "Past a turn").starts_with("<a:xfrm rot=\"19800000\">"),
+        "{x}"
+    );
+    assert!(
+        xfrm_of(&x, "Minus fifteen flipped").starts_with("<a:xfrm rot=\"-900000\">"),
+        "{x}"
+    );
     let (text, rem) = exact(&imp.text, &imp.remainder, "rot=\"60\"", "rot=\"-30\"");
     let x = xml(&export(&text, &rem), &s1);
-    assert!(xfrm_of(&x, "Minus fifteen flipped").starts_with("<a:xfrm rot=\"-900000\" flipH=\"true\">"), "{x}");
+    assert!(
+        xfrm_of(&x, "Minus fifteen flipped").starts_with("<a:xfrm rot=\"-900000\" flipH=\"true\">"),
+        "{x}"
+    );
     // A group's object moved: the turned one beside it keeps its stored rotation.
-    let (text, rem) = exact(&imp.text, &imp.remainder, "box=\"200 430 120 60\"", "box=\"200 440 120 60\"");
+    let (text, rem) = exact(
+        &imp.text,
+        &imp.remainder,
+        "box=\"200 430 120 60\"",
+        "box=\"200 440 120 60\"",
+    );
     let x = xml(&export(&text, &rem), &s1);
-    assert!(xfrm_of(&x, "Turned in group").starts_with("<a:xfrm rot=\"-2700000\">"), "{x}");
+    assert!(
+        xfrm_of(&x, "Turned in group").starts_with("<a:xfrm rot=\"-2700000\">"),
+        "{x}"
+    );
 }
 
 #[test]
@@ -514,14 +708,27 @@ fn an_alternate_content_object_left_as_shown_is_kept() {
     let imp = import(&pkg);
     let line = "kind=\"picture\" summary=\"Smiling face\" box=\"363 151 234 237\"/>";
     assert!(imp.text.contains(line), "{}", imp.text);
-    assert_eq!(xml(&export(&imp.text, &imp.remainder), &s2), xml(&before, &s2));
+    assert_eq!(
+        xml(&export(&imp.text, &imp.remainder), &s2),
+        xml(&before, &s2)
+    );
     // An edit elsewhere on the slide leaves it alone too.
-    let (text, rem) = exact(&imp.text, &imp.remainder, "One object in two forms", "One object, two forms");
+    let (text, rem) = exact(
+        &imp.text,
+        &imp.remainder,
+        "One object in two forms",
+        "One object, two forms",
+    );
     let x = xml(&export(&text, &rem), &s2);
     assert_eq!(xfrms(&x), xfrms(&xml(&before, &s2)));
-    let moved = imp.text.replace("box=\"363 151 234 237\"", "box=\"300 151 234 237\"");
+    let moved = imp
+        .text
+        .replace("box=\"363 151 234 237\"", "box=\"300 151 234 237\"");
     match PptxEngine.export(&moved, &imp.remainder) {
-        Err(e) => assert!(e.to_string().contains("stored in more than one form"), "{e}"),
+        Err(e) => assert!(
+            e.to_string().contains("stored in more than one form"),
+            "{e}"
+        ),
         Ok(_) => panic!("an alternate-content object was moved"),
     }
 }

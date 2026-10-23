@@ -9,13 +9,17 @@ use std::process::ExitCode;
 use clap::{Parser, Subcommand};
 use hanji_preview::store::{Output, XlsxSelection};
 use hanji_store::{
-    Changed, DocType, Error, ExportOptions, Format, FsStorage, ImportReport, MemStorage, Result, TextEdit, Window,
-    Workspace,
+    Changed, DocType, Error, ExportOptions, Format, FsStorage, ImportReport, MemStorage, Result,
+    TextEdit, Window, Workspace,
 };
 use serde::Serialize;
 
 #[derive(Parser)]
-#[command(name = "hanji", version, about = "Read, write and edit office documents (docx, hwpx, pptx, xlsx) as text")]
+#[command(
+    name = "hanji",
+    version,
+    about = "Read, write and edit office documents (docx, hwpx, pptx, xlsx) as text"
+)]
 struct Cli {
     /// Where documents and their revisions are kept.
     #[arg(long, global = true, env = "HANJI_STORE", default_value = ".hanji")]
@@ -139,7 +143,11 @@ enum Cmd {
         doc: String,
         path: PathBuf,
         /// The revision exported for editing in Office; refuse if the head has changed since.
-        #[arg(long, required_unless_present = "replace_head", conflicts_with = "replace_head")]
+        #[arg(
+            long,
+            required_unless_present = "replace_head",
+            conflicts_with = "replace_head"
+        )]
         base_rev: Option<u32>,
         /// Deliberately replace the current text and remainder, without merging committed changes.
         #[arg(long)]
@@ -181,7 +189,8 @@ struct WindowArgs {
 }
 
 fn parse_type(s: &str) -> std::result::Result<DocType, String> {
-    DocType::parse(s).ok_or_else(|| format!("{s:?} is not a type: document, presentation or spreadsheet"))
+    DocType::parse(s)
+        .ok_or_else(|| format!("{s:?} is not a type: document, presentation or spreadsheet"))
 }
 
 fn parse_format(s: &str) -> std::result::Result<Format, String> {
@@ -206,7 +215,9 @@ fn preview(
     let path = Path::new(doc);
     let file_format = path.is_file().then(|| Format::of_name(doc)).flatten();
     if file_format.is_some() && rev.is_some() {
-        return Err(Error::bad("--rev names a revision of a stored document; a file is previewed as it is."));
+        return Err(Error::bad(
+            "--rev names a revision of a stored document; a file is previewed as it is.",
+        ));
     }
     let input_format = match file_format {
         Some(format) => format,
@@ -223,11 +234,16 @@ fn preview(
             (p, window, out_dir.unwrap_or(parent))
         } else {
             let (p, window) = hanji_preview::store::render_xlsx(ws, doc, rev, &selection, &opts)?;
-            let dir = out_dir.unwrap_or_else(|| hanji_preview::store::default_dir(ws, doc, Path::new(".")));
+            let dir = out_dir
+                .unwrap_or_else(|| hanji_preview::store::default_dir(ws, doc, Path::new(".")));
             (p, window, dir)
         };
         hanji_preview::store::write_xlsx(&window, &mut p, format, &dir)?;
-        let mut t = p.files.iter().map(|f| format!("wrote {f}\n")).collect::<String>();
+        let mut t = p
+            .files
+            .iter()
+            .map(|f| format!("wrote {f}\n"))
+            .collect::<String>();
         t.push_str(&format!(
             "worksheet {:?} ({}), range {} from revision {} of {}; {}\n",
             p.sheet.name,
@@ -241,24 +257,41 @@ fn preview(
             t.push_str(&format!("warning: {w}\n"));
         }
         let quality = p.quality().rendered();
-        t.push_str(&format!("preview quality: {}; diagnostic coverage: partial\n", quality.summary()));
-        return Ok(out(&hanji_preview::quality::WithQuality { result: &p, quality }, t));
+        t.push_str(&format!(
+            "preview quality: {}; diagnostic coverage: partial\n",
+            quality.summary()
+        ));
+        return Ok(out(
+            &hanji_preview::quality::WithQuality {
+                result: &p,
+                quality,
+            },
+            t,
+        ));
     }
     if selection.is_requested() {
-        return Err(Error::bad("--sheet, --sheet-index and --range apply only to XLSX worksheet previews"));
+        return Err(Error::bad(
+            "--sheet, --sheet-index and --range apply only to XLSX worksheet previews",
+        ));
     }
     let (mut p, preview, dir) = if file_format.is_some() {
         let mut mem = Workspace::new(MemStorage::new());
-        let bytes = std::fs::read(path).map_err(|e| Error::io(format!("cannot read {}: {e}", path.display())))?;
-        let name = path.file_name().map_or_else(|| doc.to_string(), |n| n.to_string_lossy().into_owned());
+        let bytes = std::fs::read(path)
+            .map_err(|e| Error::io(format!("cannot read {}: {e}", path.display())))?;
+        let name = path
+            .file_name()
+            .map_or_else(|| doc.to_string(), |n| n.to_string_lossy().into_owned());
         let o = mem.open_bytes(&name, &bytes, None)?;
         let (p, preview) = hanji_preview::store::render_document(&mem, &o.doc_id, None, &opts)?;
-        let parent =
-            path.parent().filter(|p| !p.as_os_str().is_empty()).map_or_else(|| PathBuf::from("."), Path::to_path_buf);
+        let parent = path
+            .parent()
+            .filter(|p| !p.as_os_str().is_empty())
+            .map_or_else(|| PathBuf::from("."), Path::to_path_buf);
         (p, preview, out_dir.unwrap_or(parent))
     } else {
         let (p, preview) = hanji_preview::store::render_document(ws, doc, rev, &opts)?;
-        let dir = out_dir.unwrap_or_else(|| hanji_preview::store::default_dir(ws, doc, Path::new(".")));
+        let dir =
+            out_dir.unwrap_or_else(|| hanji_preview::store::default_dir(ws, doc, Path::new(".")));
         (p, preview, dir)
     };
     hanji_preview::store::write_document(&preview, &mut p, format, &dir)?;
@@ -266,22 +299,41 @@ fn preview(
     for f in &p.files {
         t.push_str(&format!("wrote {f}\n"));
     }
-    let unit = if p.format == Format::Pptx { "slides" } else { "pages" };
-    t.push_str(&format!("{} {unit} from revision {} of {}; {}\n", p.pages, p.revision, p.doc_id, p.summary));
+    let unit = if p.format == Format::Pptx {
+        "slides"
+    } else {
+        "pages"
+    };
+    t.push_str(&format!(
+        "{} {unit} from revision {} of {}; {}\n",
+        p.pages, p.revision, p.doc_id, p.summary
+    ));
     for w in &p.warnings {
         t.push_str(&format!("warning: {w}\n"));
     }
     let quality = p.quality().rendered();
-    t.push_str(&format!("preview quality: {}; diagnostic coverage: partial\n", quality.summary()));
-    Ok(out(&hanji_preview::quality::WithQuality { result: &p, quality }, t))
+    t.push_str(&format!(
+        "preview quality: {}; diagnostic coverage: partial\n",
+        quality.summary()
+    ));
+    Ok(out(
+        &hanji_preview::quality::WithQuality {
+            result: &p,
+            quality,
+        },
+        t,
+    ))
 }
 
 fn read_input(path: &Path) -> Result<String> {
     let mut s = String::new();
     if path == Path::new("-") {
-        std::io::stdin().read_to_string(&mut s).map_err(|e| Error::io(format!("cannot read stdin: {e}")))?;
+        std::io::stdin()
+            .read_to_string(&mut s)
+            .map_err(|e| Error::io(format!("cannot read stdin: {e}")))?;
     } else {
-        s = std::fs::read_to_string(path).map_err(|e| Error::io(format!("cannot read {}: {e}", path.display())))?;
+        s = std::fs::read_to_string(path)
+            .map_err(|e| Error::io(format!("cannot read {}: {e}", path.display())))?;
     }
     Ok(s)
 }
@@ -296,14 +348,25 @@ struct Out {
 }
 
 fn out<T: Serialize>(v: &T, text: String) -> Out {
-    Out { json: serde_json::to_string_pretty(v).expect("outputs serialize"), text, note: String::new(), ok: true }
+    Out {
+        json: serde_json::to_string_pretty(v).expect("outputs serialize"),
+        text,
+        note: String::new(),
+        ok: true,
+    }
 }
 
 fn report_lines(r: &ImportReport) -> String {
     let mut s = String::new();
-    for (what, list) in [("neutralised", &r.neutralised), ("surface before export", &r.surfaced)] {
+    for (what, list) in [
+        ("neutralised", &r.neutralised),
+        ("surface before export", &r.surfaced),
+    ] {
         for i in list {
-            s.push_str(&format!("{what}: {} at {}: {}\n", i.kind, i.location, i.detail));
+            s.push_str(&format!(
+                "{what}: {} at {}: {}\n",
+                i.kind, i.location, i.detail
+            ));
         }
     }
     s
@@ -313,19 +376,34 @@ fn changed_text(c: &Changed) -> String {
     if c.unchanged {
         return format!("{}: unchanged, still revision {}\n", c.doc_id, c.revision);
     }
-    let mut s = format!("{}: revision {} (from {})\n", c.doc_id, c.revision, c.parent);
+    let mut s = format!(
+        "{}: revision {} (from {})\n",
+        c.doc_id, c.revision, c.parent
+    );
     if !c.rebased_over.is_empty() {
         let over: Vec<String> = c.rebased_over.iter().map(u32::to_string).collect();
-        s.push_str(&format!("merged over re-imported revision {}\n", over.join(", ")));
+        s.push_str(&format!(
+            "merged over re-imported revision {}\n",
+            over.join(", ")
+        ));
     }
     if c.canonicalized {
         s.push_str("stored in canonical form: read again before the next edit\n");
     }
     for l in &c.removed {
-        s.push_str(&format!("removed with its text: {} ({})\n", l.kind, l.reason));
+        s.push_str(&format!(
+            "removed with its text: {} ({})\n",
+            l.kind, l.reason
+        ));
     }
     for m in &c.moved {
-        s.push_str(&format!("{} on {}: {} → {}\n", m.tag, m.sheet, m.before, m.after.as_deref().unwrap_or("removed")));
+        s.push_str(&format!(
+            "{} on {}: {} → {}\n",
+            m.tag,
+            m.sheet,
+            m.before,
+            m.after.as_deref().unwrap_or("removed")
+        ));
     }
     for n in &c.notices {
         s.push_str(&format!("{}: {} ({})\n", n.kind, n.location, n.detail));
@@ -350,12 +428,26 @@ fn run(cli: Cli) -> Result<Out> {
             );
             out(&o, t)
         }
-        Cmd::New { r#type, format, template } => {
+        Cmd::New {
+            r#type,
+            format,
+            template,
+        } => {
             let o = ws.create_from(r#type, format, template.as_deref())?;
-            let t = format!("made {} ({} {}), revision {}\n", o.doc_id, o.format.name(), o.doc_type.name(), o.revision);
+            let t = format!(
+                "made {} ({} {}), revision {}\n",
+                o.doc_id,
+                o.format.name(),
+                o.doc_type.name(),
+                o.revision
+            );
             out(&o, t)
         }
-        Cmd::Read { doc, rev, window: w } => {
+        Cmd::Read {
+            doc,
+            rev,
+            window: w,
+        } => {
             let win = Window {
                 lines: w.lines,
                 section: w.section,
@@ -370,7 +462,11 @@ fn run(cli: Cli) -> Result<Out> {
                 "{} · revision {}{} · lines {}–{} of {}\n",
                 r.doc_id,
                 r.revision,
-                if r.revision == r.head { " (current)".to_string() } else { format!(" (current: {})", r.head) },
+                if r.revision == r.head {
+                    " (current)".to_string()
+                } else {
+                    format!(" (current: {})", r.head)
+                },
                 r.first_line,
                 r.last_line,
                 r.total_lines
@@ -393,14 +489,31 @@ fn run(cli: Cli) -> Result<Out> {
             o.note = note;
             o
         }
-        Cmd::Edit { doc, rev, old, new, old_file, new_file, edits } => {
+        Cmd::Edit {
+            doc,
+            rev,
+            old,
+            new,
+            old_file,
+            new_file,
+            edits,
+        } => {
             let list = match (old, new, old_file, new_file, edits) {
                 (Some(old), Some(new), ..) => vec![TextEdit { old, new }],
-                (_, _, Some(o), Some(n), _) => vec![TextEdit { old: read_input(&o)?, new: read_input(&n)? }],
+                (_, _, Some(o), Some(n), _) => vec![TextEdit {
+                    old: read_input(&o)?,
+                    new: read_input(&n)?,
+                }],
                 (.., Some(f)) => serde_json::from_str(&read_input(&f)?).map_err(|e| {
-                    Error::bad(format!("the edits are not a JSON list of {{\"old\": …, \"new\": …}}: {e}"))
+                    Error::bad(format!(
+                        "the edits are not a JSON list of {{\"old\": …, \"new\": …}}: {e}"
+                    ))
                 })?,
-                _ => return Err(Error::bad("give --old and --new, --old-file and --new-file, or --edits")),
+                _ => {
+                    return Err(Error::bad(
+                        "give --old and --new, --old-file and --new-file, or --edits",
+                    ))
+                }
             };
             let c = ws.edit(&doc, rev, &list)?;
             out(&c, changed_text(&c))
@@ -410,7 +523,11 @@ fn run(cli: Cli) -> Result<Out> {
             out(&c, changed_text(&c))
         }
         Cmd::Ops { doc, rev, ops } => {
-            let json = if ops.trim_start().starts_with('[') { ops } else { read_input(Path::new(&ops))? };
+            let json = if ops.trim_start().starts_with('[') {
+                ops
+            } else {
+                read_input(Path::new(&ops))?
+            };
             let c = ws.ops(&doc, rev, &json)?;
             out(&c, changed_text(&c))
         }
@@ -419,14 +536,33 @@ fn run(cli: Cli) -> Result<Out> {
             let t = if v.valid {
                 format!("valid {}\n", v.doc_type.name())
             } else {
-                v.diagnostics.iter().map(|d| format!("line {}, column {}: {}\n", d.line, d.col, d.message)).collect()
+                v.diagnostics
+                    .iter()
+                    .map(|d| format!("line {}, column {}: {}\n", d.line, d.col, d.message))
+                    .collect()
             };
             let mut o = out(&v, t);
             o.ok = v.valid;
             o
         }
-        Cmd::Export { doc, path, rev, acknowledge_surfaced, tracked_changes, format } => {
-            let e = ws.export(&doc, rev, &path, &ExportOptions { acknowledge_surfaced, tracked_changes, format })?;
+        Cmd::Export {
+            doc,
+            path,
+            rev,
+            acknowledge_surfaced,
+            tracked_changes,
+            format,
+        } => {
+            let e = ws.export(
+                &doc,
+                rev,
+                &path,
+                &ExportOptions {
+                    acknowledge_surfaced,
+                    tracked_changes,
+                    format,
+                },
+            )?;
             let mut t = format!(
                 "wrote {} ({} bytes) from revision {} of {}; digest {}\n",
                 path.display(),
@@ -436,23 +572,55 @@ fn run(cli: Cli) -> Result<Out> {
                 e.digest
             );
             for s in &e.surfaced {
-                t.push_str(&format!("left with the file (acknowledged): {} at {}: {}\n", s.kind, s.location, s.detail));
+                t.push_str(&format!(
+                    "left with the file (acknowledged): {} at {}: {}\n",
+                    s.kind, s.location, s.detail
+                ));
             }
             if let Some(c) = &e.conversion {
                 t.push_str(&format!("{c}\n"));
             }
             out(&e, t)
         }
-        Cmd::Preview { doc, rev, out, format, font_dirs, sheet, sheet_index, range } => {
-            preview(&ws, &doc, rev, out, format, font_dirs, XlsxSelection { sheet, sheet_index, range })?
-        }
-        Cmd::Reimport { doc, path, base_rev, replace_head: _ } => {
+        Cmd::Preview {
+            doc,
+            rev,
+            out,
+            format,
+            font_dirs,
+            sheet,
+            sheet_index,
+            range,
+        } => preview(
+            &ws,
+            &doc,
+            rev,
+            out,
+            format,
+            font_dirs,
+            XlsxSelection {
+                sheet,
+                sheet_index,
+                range,
+            },
+        )?,
+        Cmd::Reimport {
+            doc,
+            path,
+            base_rev,
+            replace_head: _,
+        } => {
             let r = match base_rev {
                 Some(rev) => ws.reimport_at_revision(&doc, rev, &path)?,
                 None => ws.reimport(&doc, &path)?,
             };
             let t = if r.unchanged {
-                format!("{}: no changes in {}; still revision {}\n", r.doc_id, path.display(), r.revision)
+                format!(
+                    "{}: no changes in {}; still revision {}\n",
+                    r.doc_id,
+                    path.display(),
+                    r.revision
+                )
             } else {
                 format!(
                     "{}: revision {} (re-imported {})\n{}{}",
@@ -470,7 +638,12 @@ fn run(cli: Cli) -> Result<Out> {
             let mut t = String::new();
             for r in &h.revisions {
                 let mark = if r.id == h.head { '*' } else { ' ' };
-                t.push_str(&format!("{mark} {:>3}  {:<8} {}\n", r.id, format!("{:?}", r.op).to_lowercase(), r.summary));
+                t.push_str(&format!(
+                    "{mark} {:>3}  {:<8} {}\n",
+                    r.id,
+                    format!("{:?}", r.op).to_lowercase(),
+                    r.summary
+                ));
             }
             out(&h, t)
         }
@@ -519,10 +692,19 @@ fn main() -> ExitCode {
         }
         Err(e) => {
             if json {
-                let _ = writeln!(stdout.lock(), "{{\"error\": {}}}", serde_json::to_string_pretty(&e).unwrap());
+                let _ = writeln!(
+                    stdout.lock(),
+                    "{{\"error\": {}}}",
+                    serde_json::to_string_pretty(&e).unwrap()
+                );
             } else {
                 let code = serde_json::to_value(e.code).unwrap();
-                let _ = writeln!(stderr.lock(), "error ({}): {}", code.as_str().unwrap_or(""), e.message);
+                let _ = writeln!(
+                    stderr.lock(),
+                    "error ({}): {}",
+                    code.as_str().unwrap_or(""),
+                    e.message
+                );
             }
             ExitCode::from(1)
         }

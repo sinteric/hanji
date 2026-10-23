@@ -30,7 +30,9 @@ pub fn decode_xstring(s: &str) -> String {
     while let Some(k) = rest.find("_x") {
         out.push_str(&rest[..k]);
         let tail = &rest[k..];
-        let hex = tail.get(2..6).filter(|h| h.bytes().all(|b| b.is_ascii_hexdigit()));
+        let hex = tail
+            .get(2..6)
+            .filter(|h| h.bytes().all(|b| b.is_ascii_hexdigit()));
         match (hex, tail.get(6..7)) {
             (Some(h), Some("_")) => {
                 let unit = u16::from_str_radix(h, 16).expect("validated hex");
@@ -38,9 +40,10 @@ pub fn decode_xstring(s: &str) -> String {
                     .get(7..14)
                     .filter(|s| s.starts_with("_x") && s.ends_with('_'))
                     .and_then(|s| s.get(2..6).and_then(|h| u16::from_str_radix(h, 16).ok()))
-                    .filter(|u| (0xDC00..=0xDFFF).contains(u));
-                if let Some(low) = low.filter(|_| (0xD800..=0xDBFF).contains(&unit)) {
-                    let scalar = 0x10000 + ((u32::from(unit) - 0xD800) << 10) + u32::from(low) - 0xDC00;
+                    .filter(|u| (0xdc00..=0xdfff).contains(u));
+                if let Some(low) = low.filter(|_| (0xd800..=0xdbff).contains(&unit)) {
+                    let scalar =
+                        0x10000 + ((u32::from(unit) - 0xd800) << 10) + u32::from(low) - 0xdc00;
                     out.push(char::from_u32(scalar).expect("paired surrogate"));
                     rest = &tail[14..];
                 } else {
@@ -86,8 +89,10 @@ pub fn encode_xstring_raw(s: &str) -> String {
 
 /// A `<t>` element for `s`, with `xml:space="preserve"` when its ends or runs of spaces need it.
 pub fn t_element(prefix: &str, s: &str) -> String {
-    let keep =
-        s.starts_with(char::is_whitespace) || s.ends_with(char::is_whitespace) || s.contains("  ") || s.contains('\n');
+    let keep = s.starts_with(char::is_whitespace)
+        || s.ends_with(char::is_whitespace)
+        || s.contains("  ")
+        || s.contains('\n');
     let sp = if keep { " xml:space=\"preserve\"" } else { "" };
     format!("<{prefix}t{sp}>{}</{prefix}t>", encode_xstring(s))
 }
@@ -135,7 +140,9 @@ impl Sst {
                     "t" if in_si && rph == 0 => in_t = true,
                     _ => {}
                 },
-                Event::Empty(s) if xml::local_name(s.name().as_ref()) == "si" => strings.push(String::new()),
+                Event::Empty(s) if xml::local_name(s.name().as_ref()) == "si" => {
+                    strings.push(String::new())
+                }
                 Event::End(e) => match xml::local_name(e.name().as_ref()) {
                     "si" => {
                         in_si = false;
@@ -152,12 +159,21 @@ impl Sst {
             }
         }
         let loaded = strings.len();
-        Ok(Sst { part: part.to_string(), strings, loaded, lookup: None, refs_delta: 0 })
+        Ok(Sst {
+            part: part.to_string(),
+            strings,
+            loaded,
+            lookup: None,
+            refs_delta: 0,
+        })
     }
 
     /// An empty table to be written as a new part.
     pub fn new(part: &str) -> Sst {
-        Sst { part: part.into(), ..Default::default() }
+        Sst {
+            part: part.into(),
+            ..Default::default()
+        }
     }
 
     pub fn get(&self, i: usize) -> Option<&str> {
@@ -190,8 +206,10 @@ impl Sst {
     /// The part's bytes: `data` (the part as loaded; `None` for a new one)
     /// with the added strings appended and its counts updated.
     pub fn write(&self, data: Option<&[u8]>) -> Vec<u8> {
-        let added: String =
-            self.strings[self.loaded..].iter().map(|s| format!("<si>{}</si>", t_element("", s))).collect();
+        let added: String = self.strings[self.loaded..]
+            .iter()
+            .map(|s| format!("<si>{}</si>", t_element("", s)))
+            .collect();
         let Some(data) = data else {
             let n = self.strings.len();
             return format!(
@@ -201,7 +219,9 @@ impl Sst {
             .into_bytes();
         };
         let text = String::from_utf8_lossy(data).into_owned();
-        let Ok(d) = xml::parse(data) else { return data.to_vec() };
+        let Ok(d) = xml::parse(data) else {
+            return data.to_vec();
+        };
         let prefix = d.root.name.strip_suffix("sst").unwrap_or("").to_string();
         let added = if prefix.is_empty() {
             added
@@ -221,14 +241,19 @@ impl Sst {
         }
         // Splice: the new start tag, the old content, the new strings, the end tag.
         let open_at = text.find(&format!("<{}", d.root.name)).unwrap_or(0);
-        let open_end = text[open_at..].find('>').map_or(text.len(), |j| open_at + j + 1);
+        let open_end = text[open_at..]
+            .find('>')
+            .map_or(text.len(), |j| open_at + j + 1);
         let self_closed = text[..open_end].ends_with("/>");
         let close = format!("</{}>", d.root.name);
         let (body, after) = if self_closed {
             ("", &text[open_end..])
         } else {
             let k = text.rfind(&close).unwrap_or(text.len());
-            (&text[open_end..k], &text[(k + close.len()).min(text.len())..])
+            (
+                &text[open_end..k],
+                &text[(k + close.len()).min(text.len())..],
+            )
         };
         let mut out = text[..open_at].to_string();
         out.push_str(&root.open_tag());
@@ -254,10 +279,16 @@ mod tests {
         s.refs_delta = 1;
         let out = String::from_utf8(s.write(Some(src.as_bytes()))).unwrap();
         assert!(out.contains("count=\"4\" uniqueCount=\"3\""), "{out}");
-        assert!(out.ends_with("<si><t xml:space=\"preserve\"> new</t></si></sst>"), "{out}");
+        assert!(
+            out.ends_with("<si><t xml:space=\"preserve\"> new</t></si></sst>"),
+            "{out}"
+        );
         let again = Sst::parse("sst.xml", out.as_bytes()).unwrap();
         assert_eq!(again.strings, ["a & b", "매출 ", " new"]);
         assert_eq!(decode_xstring("a_x000D_b_x005F_x0041_"), "a\rb_x0041_");
-        assert_eq!(decode_xstring(&xml::unescape(&encode_xstring("a\u{1}b_x0041_c"))), "a\u{1}b_x0041_c");
+        assert_eq!(
+            decode_xstring(&xml::unescape(&encode_xstring("a\u{1}b_x0041_c"))),
+            "a\u{1}b_x0041_c"
+        );
     }
 }

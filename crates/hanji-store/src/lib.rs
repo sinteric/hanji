@@ -105,7 +105,10 @@ pub struct ImportReport {
 
 impl From<&hanji_core::ImportReport> for ImportReport {
     fn from(r: &hanji_core::ImportReport) -> ImportReport {
-        ImportReport { neutralised: items(&r.neutralised), surfaced: items(&r.surface) }
+        ImportReport {
+            neutralised: items(&r.neutralised),
+            surfaced: items(&r.surface),
+        }
     }
 }
 
@@ -330,7 +333,11 @@ pub fn id_from_name(name: &str) -> String {
 }
 
 fn valid_id(id: &str) -> bool {
-    !id.is_empty() && id.len() <= 200 && id.chars().all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    !id.is_empty()
+        && id.len() <= 200
+        && id
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
 }
 
 /// Every occurrence of `old` in `text` (overlapping ones included), as the core counts them.
@@ -358,11 +365,18 @@ fn locate(text: &str, old: &str, rev: u32) -> Result<usize> {
             let mut msg =
                 format!("the old text is not in revision {rev}; copy it exactly from a read of that revision.");
             let squash = |s: &str| s.split_whitespace().collect::<Vec<_>>().join(" ");
-            let first = old.lines().map(str::trim).find(|l| !l.is_empty()).unwrap_or("");
+            let first = old
+                .lines()
+                .map(str::trim)
+                .find(|l| !l.is_empty())
+                .unwrap_or("");
             let at: Vec<usize> = if first.is_empty() {
                 vec![]
             } else {
-                occurrences(text, first).iter().map(|&k| line_of(text, k)).collect()
+                occurrences(text, first)
+                    .iter()
+                    .map(|&k| line_of(text, k))
+                    .collect()
             };
             if let Some(near) = hanji_format::chars::near_miss(text, old) {
                 // Look-alike characters: name them where it would match.
@@ -401,7 +415,10 @@ fn locate(text: &str, old: &str, rev: u32) -> Result<usize> {
 }
 
 fn losses(r: &Report) -> Vec<Loss> {
-    r.removed.iter().map(|(_, k, why)| Loss::of(*k, why)).collect()
+    r.removed
+        .iter()
+        .map(|(_, k, why)| Loss::of(*k, why))
+        .collect()
 }
 
 fn engine_err(e: hanji_core::EngineError) -> Error {
@@ -430,16 +447,25 @@ impl<S: Storage> Workspace<S> {
 
     /// A document's record.
     pub fn doc(&self, id: &str) -> Result<DocRecord> {
-        let found = if valid_id(id) { self.get(&doc_key(id))? } else { None };
+        let found = if valid_id(id) {
+            self.get(&doc_key(id))?
+        } else {
+            None
+        };
         let Some(data) = found else {
             let ids = self.ids()?;
             let ids: Vec<&str> = ids.iter().map(String::as_str).take(20).collect();
             return Err(Error::not_found(format!(
                 "there is no document {id:?}. Documents: {}.",
-                if ids.is_empty() { "none (open or create one first)".into() } else { ids.join(", ") }
+                if ids.is_empty() {
+                    "none (open or create one first)".into()
+                } else {
+                    ids.join(", ")
+                }
             )));
         };
-        serde_json::from_slice(&data).map_err(|e| Error::io(format!("the record of {id} is damaged: {e}")))
+        serde_json::from_slice(&data)
+            .map_err(|e| Error::io(format!("the record of {id} is damaged: {e}")))
     }
 
     fn check_rev(doc: &DocRecord, rev: u32) -> Result<()> {
@@ -475,12 +501,24 @@ impl<S: Storage> Workspace<S> {
         Ok((text, rem))
     }
 
-    fn commit(&mut self, doc: &mut DocRecord, op: RevOp, summary: String, text: &str, rem: &Remainder) -> Result<u32> {
+    fn commit(
+        &mut self,
+        doc: &mut DocRecord,
+        op: RevOp,
+        summary: String,
+        text: &str,
+        rem: &Remainder,
+    ) -> Result<u32> {
         let id = doc.revisions.iter().map(|r| r.id).max().unwrap_or(0) + 1;
         self.put(&text_key(&doc.id, id), text.as_bytes())?;
         self.put(&rem_key(&doc.id, id), rem.to_json().as_bytes())?;
         let parent = (!doc.revisions.is_empty()).then_some(doc.head);
-        doc.revisions.push(Revision { id, parent, op, summary });
+        doc.revisions.push(Revision {
+            id,
+            parent,
+            op,
+            summary,
+        });
         doc.head = id;
         // The record last: a revision exists once the record names it.
         let rec = serde_json::to_vec_pretty(doc).expect("a record serializes");
@@ -507,7 +545,11 @@ impl<S: Storage> Workspace<S> {
         let mut chain = vec![];
         let mut cur = doc.head;
         while cur != rev {
-            let r = doc.revisions.iter().find(|r| r.id == cur).expect("the chain is stored");
+            let r = doc
+                .revisions
+                .iter()
+                .find(|r| r.id == cur)
+                .expect("the chain is stored");
             chain.push(r);
             cur = match r.parent {
                 Some(p) => p,
@@ -571,7 +613,10 @@ impl<S: Storage> Workspace<S> {
         source: Option<String>,
         op: RevOp,
     ) -> Result<Opened> {
-        let opts = ImportOptions { template: template.clone(), ..Default::default() };
+        let opts = ImportOptions {
+            template: template.clone(),
+            ..Default::default()
+        };
         let imp = format.engine().import(bytes, &opts)?;
         let id = self.fresh_id(id_from)?;
         let mut doc = DocRecord {
@@ -584,7 +629,11 @@ impl<S: Storage> Workspace<S> {
             revisions: vec![],
         };
         let summary = match op {
-            RevOp::New => format!("new {} ({})", format.doc_type().name(), template.as_deref().unwrap_or("blank")),
+            RevOp::New => format!(
+                "new {} ({})",
+                format.doc_type().name(),
+                template.as_deref().unwrap_or("blank")
+            ),
             _ => format!("opened {id_from}"),
         };
         let revision = self.commit(&mut doc, op, summary, &imp.text, &imp.remainder)?;
@@ -601,7 +650,12 @@ impl<S: Storage> Workspace<S> {
 
     /// Import a package (§8 neutralisation runs); `name` gives its format
     /// and the document id.
-    pub fn open_bytes(&mut self, name: &str, bytes: &[u8], source: Option<String>) -> Result<Opened> {
+    pub fn open_bytes(
+        &mut self,
+        name: &str,
+        bytes: &[u8],
+        source: Option<String>,
+    ) -> Result<Opened> {
         let format = Format::of_name(name).ok_or_else(|| {
             Error::bad(format!("cannot tell the format of {name:?}: hanji opens .docx, .hwpx, .pptx and .xlsx files."))
         })?;
@@ -611,10 +665,19 @@ impl<S: Storage> Workspace<S> {
     /// A new file of `ty` (rule 3): the blank package of its format, or a
     /// template package, imported. `template` is `(reference, package)`;
     /// the reference is written in the front matter.
-    pub fn create(&mut self, ty: DocType, format: Option<Format>, template: Option<(&str, &[u8])>) -> Result<Opened> {
+    pub fn create(
+        &mut self,
+        ty: DocType,
+        format: Option<Format>,
+        template: Option<(&str, &[u8])>,
+    ) -> Result<Opened> {
         let format = format.unwrap_or_else(|| ty.default_format());
         if format.doc_type() != ty {
-            let allowed: Vec<&str> = Format::ALL.iter().filter(|f| f.doc_type() == ty).map(|f| f.name()).collect();
+            let allowed: Vec<&str> = Format::ALL
+                .iter()
+                .filter(|f| f.doc_type() == ty)
+                .map(|f| f.name())
+                .collect();
             return Err(Error::bad(format!(
                 "a {} is written as {}, not {}.",
                 ty.name(),
@@ -648,9 +711,19 @@ impl<S: Storage> Workspace<S> {
         let end = view::clip(&ls, a, b, view::MAX_READ_BYTES);
         let part = ls[a..end].concat();
         let partial = a > 0 || end < total;
-        let next =
-            (end < b).then(|| format!("lines {}:{} (this part stops at {} bytes)", end + 1, b, view::MAX_READ_BYTES));
-        let data = if ty == DocType::Spreadsheet { self.cells(&text, &rem, w)? } else { None };
+        let next = (end < b).then(|| {
+            format!(
+                "lines {}:{} (this part stops at {} bytes)",
+                end + 1,
+                b,
+                view::MAX_READ_BYTES
+            )
+        });
+        let data = if ty == DocType::Spreadsheet {
+            self.cells(&text, &rem, w)?
+        } else {
+            None
+        };
         Ok(Read {
             doc_id: doc.id,
             revision: rev,
@@ -662,7 +735,11 @@ impl<S: Storage> Workspace<S> {
             total_lines: total,
             partial,
             text: part,
-            outline: if partial { view::outline(ty, &text) } else { vec![] },
+            outline: if partial {
+                view::outline(ty, &text)
+            } else {
+                vec![]
+            },
             data,
             next,
         })
@@ -675,41 +752,76 @@ impl<S: Storage> Workspace<S> {
         let win = |of: &WindowOf| XlsxEngine::window(rem, of).map_err(Error::from);
         if let Some(t) = &w.table {
             if w.sheet.is_some() || w.range.is_some() {
-                return Err(Error::bad("ask for a table (with rows) or a sheet with a range, not both."));
+                return Err(Error::bad(
+                    "ask for a table (with rows) or a sheet with a range, not both.",
+                ));
             }
-            let rows = w.rows.as_deref().map(|r| view::span(r, "rows")).transpose()?.map(|(a, b)| (a as u32, b as u32));
-            return win(&WindowOf::Table { name: t.clone(), rows }).map(Some);
+            let rows = w
+                .rows
+                .as_deref()
+                .map(|r| view::span(r, "rows"))
+                .transpose()?
+                .map(|(a, b)| (a as u32, b as u32));
+            return win(&WindowOf::Table {
+                name: t.clone(),
+                rows,
+            })
+            .map(Some);
         }
         if w.rows.is_some() {
             return Err(Error::bad("rows are a table's: name the table too."));
         }
         if let Some(r) = &w.range {
-            let (sheet, range) = match (&w.sheet, hanji_format::ops::split_range(r)) {
-                (Some(s), _) => (s.clone(), r.clone()),
-                (None, Some((s, r))) if !s.is_empty() => (s, r),
-                _ => {
-                    return Err(Error::bad("name the sheet of the range: sheet and range, or range \"Sheet1!A1:F50\"."))
-                }
-            };
+            let (sheet, range) =
+                match (&w.sheet, hanji_format::ops::split_range(r)) {
+                    (Some(s), _) => (s.clone(), r.clone()),
+                    (None, Some((s, r))) if !s.is_empty() => (s, r),
+                    _ => return Err(Error::bad(
+                        "name the sheet of the range: sheet and range, or range \"Sheet1!A1:F50\".",
+                    )),
+                };
             return win(&WindowOf::Range { sheet, range }).map(Some);
         }
         if w.sheet.is_some() {
-            return Err(Error::bad("name the range of the sheet to read, such as \"A1:F50\"."));
+            return Err(Error::bad(
+                "name the range of the sheet to read, such as \"A1:F50\".",
+            ));
         }
-        let s = hanji_format::parse_spreadsheet(text, &XlsxEngine::names(rem)).map_err(|d| Error::invalid(&d))?;
+        let s = hanji_format::parse_spreadsheet(text, &XlsxEngine::names(rem))
+            .map_err(|d| Error::invalid(&d))?;
         if let Some((_, t)) = s.tables().next() {
             let rows = CellRange::parse(&t.range).and_then(|r| {
                 let first = r.first.row + 1;
-                (r.last.row >= first + view::DEFAULT_ROWS).then(|| (first, first + view::DEFAULT_ROWS - 1))
+                (r.last.row >= first + view::DEFAULT_ROWS)
+                    .then(|| (first, first + view::DEFAULT_ROWS - 1))
             });
-            let of = WindowOf::Table { name: t.name.clone(), rows };
-            return win(&of).or_else(|_| win(&WindowOf::Table { name: t.name.clone(), rows: None })).map(Some);
+            let of = WindowOf::Table {
+                name: t.name.clone(),
+                rows,
+            };
+            return win(&of)
+                .or_else(|_| {
+                    win(&WindowOf::Table {
+                        name: t.name.clone(),
+                        rows: None,
+                    })
+                })
+                .map(Some);
         }
-        let Some(sh) = s.sheets.iter().find(|sh| sh.range.is_some()) else { return Ok(None) };
+        let Some(sh) = s.sheets.iter().find(|sh| sh.range.is_some()) else {
+            return Ok(None);
+        };
         let r = CellRange::parse(sh.range.as_deref().unwrap())
             .ok_or_else(|| Error::bad("the sheet's range is not a range"))?;
-        let last = CellRef::new(r.last.col.min(r.first.col + 25), r.last.row.min(r.first.row + view::DEFAULT_ROWS - 1));
-        win(&WindowOf::Range { sheet: sh.name.clone(), range: CellRange::new(r.first, last).to_string() }).map(Some)
+        let last = CellRef::new(
+            r.last.col.min(r.first.col + 25),
+            r.last.row.min(r.first.row + view::DEFAULT_ROWS - 1),
+        );
+        win(&WindowOf::Range {
+            sheet: sh.name.clone(),
+            range: CellRange::new(r.first, last).to_string(),
+        })
+        .map(Some)
     }
 
     /// Check a text (§5): its own grammar, and against a document's names
@@ -722,19 +834,31 @@ impl<S: Storage> Workspace<S> {
         })?;
         let ds = match &doc {
             Some(d) if d.doc_type != ty => {
-                return Err(Error::bad(format!("document {} is a {}, not a {}.", d.id, d.doc_type.name(), ty.name())))
+                return Err(Error::bad(format!(
+                    "document {} is a {}, not a {}.",
+                    d.id,
+                    d.doc_type.name(),
+                    ty.name()
+                )))
             }
             Some(d) => d.format.check(text, &self.revision(d, d.head)?.1),
             None => formats::check_text(ty, text),
         };
-        Ok(Validated { valid: ds.is_empty(), doc_type: ty, doc_id: doc.map(|d| d.id), diagnostics: diags(&ds) })
+        Ok(Validated {
+            valid: ds.is_empty(),
+            doc_type: ty,
+            doc_id: doc.map(|d| d.id),
+            diagnostics: diags(&ds),
+        })
     }
 
     /// Exact-span edits, applied in order against revision `rev` (which
     /// must be the current one, or older by re-imports only).
     pub fn edit(&mut self, id: &str, rev: u32, edits: &[TextEdit]) -> Result<Changed> {
         if edits.is_empty() {
-            return Err(Error::bad("no edits: give old and new (or a list of edits)."));
+            return Err(Error::bad(
+                "no edits: give old and new (or a list of edits).",
+            ));
         }
         let mut doc = self.doc(id)?;
         let over = Self::after(&doc, rev)?;
@@ -745,7 +869,8 @@ impl<S: Storage> Workspace<S> {
                     let (ra, removed) = chain(&text, &rem, edits.len(), |k, t, r| {
                         let (e, at) = (&edits[k], |x: Error| x.at_edit(k, edits.len()));
                         locate(t, &e.old, rev).map_err(at)?;
-                        edit_in(m, r, t, &e.old, &e.new, doc.format.caps()).map_err(|x| at(x.into()))
+                        edit_in(m, r, t, &e.old, &e.new, doc.format.caps())
+                            .map_err(|x| at(x.into()))
                     })?;
                     self.finish(&doc, &text, ra.expect("at least one edit"), removed)?
                 }
@@ -818,14 +943,24 @@ impl<S: Storage> Workspace<S> {
         let a = XlsxEngine::apply(&text, &rem, ops_json).map_err(engine_err)?;
         let n = a.report.applied;
         let next = self.applied(&doc, &text, a, &text)?;
-        self.store(&mut doc, RevOp::Ops, format!("{n} range operation{}", if n == 1 { "" } else { "s" }), next)
+        self.store(
+            &mut doc,
+            RevOp::Ops,
+            format!("{n} range operation{}", if n == 1 { "" } else { "s" }),
+            next,
+        )
     }
 
     /// Export a revision (the current one by default) to package bytes, in
     /// the document's format or, for a Document, its other one (`opts.format`,
     /// with the report of what did not cross in `conversion`).
     /// Refused while the §8 surface list is not empty, unless acknowledged.
-    pub fn export_bytes(&self, id: &str, revision: Option<u32>, opts: &ExportOptions) -> Result<(Exported, Vec<u8>)> {
+    pub fn export_bytes(
+        &self,
+        id: &str,
+        revision: Option<u32>,
+        opts: &ExportOptions,
+    ) -> Result<(Exported, Vec<u8>)> {
         let doc = self.doc(id)?;
         let rev = revision.unwrap_or(doc.head);
         let (text, rem) = self.revision(&doc, rev)?;
@@ -851,8 +986,10 @@ impl<S: Storage> Workspace<S> {
         let back = engine.import(&bytes, &ImportOptions::default())?;
         let surfaced = items(&back.report.surface);
         if !surfaced.is_empty() && !opts.acknowledge_surfaced {
-            let list: Vec<String> =
-                surfaced.iter().map(|s| format!("- {} at {}: {}", s.kind, s.location, s.detail)).collect();
+            let list: Vec<String> = surfaced
+                .iter()
+                .map(|s| format!("- {} at {}: {}", s.kind, s.location, s.detail))
+                .collect();
             let mut e = Error::new(
                 Code::SurfacedNotAcknowledged,
                 format!(
@@ -912,8 +1049,13 @@ impl<S: Storage> Workspace<S> {
         for r in &path[1..] {
             h.push_text(&self.text(doc, *r)?)?;
         }
-        let reviewer = hanji_docx::Reviewer { author: "hanji (model edit)".into(), date: TRACKED_DATE.into() };
-        let opts = hanji_docx::ExportOptions { tracked_changes: Some(reviewer) };
+        let reviewer = hanji_docx::Reviewer {
+            author: "hanji (model edit)".into(),
+            date: TRACKED_DATE.into(),
+        };
+        let opts = hanji_docx::ExportOptions {
+            tracked_changes: Some(reviewer),
+        };
         Ok(hanji_docx::DocxEngine.export_with(h.text(), h.remainder(), &opts, Some(&h))?)
     }
 
@@ -956,7 +1098,12 @@ impl<S: Storage> Workspace<S> {
         self.reimport_into(doc, name, bytes)
     }
 
-    fn reimport_into(&mut self, mut doc: DocRecord, name: &str, bytes: &[u8]) -> Result<Reimported> {
+    fn reimport_into(
+        &mut self,
+        mut doc: DocRecord,
+        name: &str,
+        bytes: &[u8],
+    ) -> Result<Reimported> {
         if let Some(f) = Format::of_name(name).filter(|f| *f != doc.format) {
             return Err(Error::bad(format!(
                 "{} is a {} document; {name:?} is {}.",
@@ -965,7 +1112,10 @@ impl<S: Storage> Workspace<S> {
                 f.name()
             )));
         }
-        let opts = ImportOptions { template: doc.template.clone(), ..Default::default() };
+        let opts = ImportOptions {
+            template: doc.template.clone(),
+            ..Default::default()
+        };
         let imp = doc.format.engine().import(bytes, &opts)?;
         let parent = doc.head;
         let (text, rem) = self.revision(&doc, parent)?;
@@ -976,25 +1126,53 @@ impl<S: Storage> Workspace<S> {
         let report = (&imp.report).into();
         // Nothing changed when the two revisions make the same package.
         let engine = doc.format.engine();
-        let same = |a: &str, ra: &Remainder, b: &str, rb: &Remainder| match (engine.export(a, ra), engine.export(b, rb))
-        {
+        let same = |a: &str, ra: &Remainder, b: &str, rb: &Remainder| match (
+            engine.export(a, ra),
+            engine.export(b, rb),
+        ) {
             (Ok(x), Ok(y)) => x == y,
             _ => false,
         };
         if text == imp.text && same(&text, &rem, &imp.text, &imp.remainder) {
-            return Ok(Reimported { doc_id: doc.id, revision: parent, parent, unchanged: true, report, diff });
+            return Ok(Reimported {
+                doc_id: doc.id,
+                revision: parent,
+                parent,
+                unchanged: true,
+                report,
+                diff,
+            });
         }
         if doc.format == Format::Xlsx && diff.is_empty() {
             diff.push_str(XLSX_OTHER_CHANGES);
         }
         let summary = format!("re-imported {name}");
-        let revision = self.commit(&mut doc, RevOp::Reimport, summary, &imp.text, &imp.remainder)?;
-        Ok(Reimported { doc_id: doc.id, revision, parent, unchanged: false, report, diff })
+        let revision = self.commit(
+            &mut doc,
+            RevOp::Reimport,
+            summary,
+            &imp.text,
+            &imp.remainder,
+        )?;
+        Ok(Reimported {
+            doc_id: doc.id,
+            revision,
+            parent,
+            unchanged: false,
+            report,
+            diff,
+        })
     }
 
     pub fn history(&self, id: &str) -> Result<History> {
         let d = self.doc(id)?;
-        Ok(History { doc_id: d.id, doc_type: d.doc_type, format: d.format, head: d.head, revisions: d.revisions })
+        Ok(History {
+            doc_id: d.id,
+            doc_type: d.doc_type,
+            format: d.format,
+            head: d.head,
+            revisions: d.revisions,
+        })
     }
 
     /// The text diff of revision `from` → `to` (unified, by lines), followed
@@ -1002,7 +1180,12 @@ impl<S: Storage> Workspace<S> {
     pub fn diff(&self, id: &str, from: u32, to: u32) -> Result<Diff> {
         let doc = self.doc(id)?;
         let (a, b) = (self.text(&doc, from)?, self.text(&doc, to)?);
-        let mut diff = merge::unified(&a, &b, &format!("revision {from}"), &format!("revision {to}"));
+        let mut diff = merge::unified(
+            &a,
+            &b,
+            &format!("revision {from}"),
+            &format!("revision {to}"),
+        );
         if doc.format == Format::Xlsx {
             let ((_, ar), (_, br)) = (self.revision(&doc, from)?, self.revision(&doc, to)?);
             diff.push_str(&XlsxEngine::cell_diff(&ar, &br)?);
@@ -1010,36 +1193,70 @@ impl<S: Storage> Workspace<S> {
                 diff.push_str(XLSX_OTHER_CHANGES);
             }
         }
-        Ok(Diff { doc_id: doc.id, from, to, diff })
+        Ok(Diff {
+            doc_id: doc.id,
+            from,
+            to,
+            diff,
+        })
     }
 
     // ------------------------------------------------------------ helpers
 
     /// A re-anchored Document or Presentation revision: exported once so a
     /// refusal comes now, not at export, and stored in canonical form.
-    fn finish(&self, doc: &DocRecord, before: &str, mut ra: Reanchored, removed: Vec<Loss>) -> Result<Next> {
+    fn finish(
+        &self,
+        doc: &DocRecord,
+        before: &str,
+        mut ra: Reanchored,
+        removed: Vec<Loss>,
+    ) -> Result<Next> {
         let f = doc.format;
         f.complete(&mut ra.new, &mut ra.remainder);
         f.engine().export(&ra.text, &ra.remainder)?;
         let canon = f.text_of(&ra.new, &ra.remainder, doc.template.as_deref());
-        let same_blocks =
-            |t: &str| f.text_model().unwrap().resolve(t, &ra.remainder, f.caps()).is_ok_and(|(b, _)| b == ra.new);
-        let (text, canonicalized) =
-            if canon != ra.text && same_blocks(&canon) { (canon, true) } else { (ra.text.clone(), false) };
+        let same_blocks = |t: &str| {
+            f.text_model()
+                .unwrap()
+                .resolve(t, &ra.remainder, f.caps())
+                .is_ok_and(|(b, _)| b == ra.new)
+        };
+        let (text, canonicalized) = if canon != ra.text && same_blocks(&canon) {
+            (canon, true)
+        } else {
+            (ra.text.clone(), false)
+        };
         let mut changed = self.changed(doc, before == text);
         changed.canonicalized = canonicalized;
         changed.placed = Some(ra.report.placed);
         changed.removed = removed;
-        Ok(Next { text, rem: ra.remainder, changed })
+        Ok(Next {
+            text,
+            rem: ra.remainder,
+            changed,
+        })
     }
 
     /// A Spreadsheet's structure text edited: the engine reconciles it.
-    fn structure(&self, doc: &DocRecord, before: &str, new_text: &str, rem: &Remainder) -> Result<Next> {
+    fn structure(
+        &self,
+        doc: &DocRecord,
+        before: &str,
+        new_text: &str,
+        rem: &Remainder,
+    ) -> Result<Next> {
         let a = XlsxEngine::apply(new_text, rem, "[]").map_err(engine_err)?;
         self.applied(doc, before, a, new_text)
     }
 
-    fn applied(&self, doc: &DocRecord, before: &str, a: hanji_xlsx::Applied, written: &str) -> Result<Next> {
+    fn applied(
+        &self,
+        doc: &DocRecord,
+        before: &str,
+        a: hanji_xlsx::Applied,
+        written: &str,
+    ) -> Result<Next> {
         let mut changed = self.changed(doc, false);
         changed.canonicalized = a.text != written;
         changed.applied = Some(a.report.applied);
@@ -1057,9 +1274,17 @@ impl<S: Storage> Workspace<S> {
             .collect();
         changed.notices = items(&a.report.notices);
         let rc = &a.report.recalc;
-        changed.recalc = (rc.dirty > 0).then(|| Recalc { dirty: rc.dirty, written: rc.written, left: rc.left.clone() });
+        changed.recalc = (rc.dirty > 0).then(|| Recalc {
+            dirty: rc.dirty,
+            written: rc.written,
+            left: rc.left.clone(),
+        });
         changed.unchanged = a.text == before && a.report.applied == 0;
-        Ok(Next { text: a.text, rem: a.remainder, changed })
+        Ok(Next {
+            text: a.text,
+            rem: a.remainder,
+            changed,
+        })
     }
 
     fn changed(&self, doc: &DocRecord, unchanged: bool) -> Changed {
@@ -1096,8 +1321,16 @@ impl<S: Storage> Workspace<S> {
         let hunks: Vec<Hunk> = match merge::merge(base, ours, theirs) {
             Merged::Clean(h) => h,
             Merged::Conflict(c) => {
-                let shown: Vec<String> =
-                    c.iter().map(|(a, b)| if a == b { format!("{a}") } else { format!("{a}–{b}") }).collect();
+                let shown: Vec<String> = c
+                    .iter()
+                    .map(|(a, b)| {
+                        if a == b {
+                            format!("{a}")
+                        } else {
+                            format!("{a}–{b}")
+                        }
+                    })
+                    .collect();
                 let mut e = Error::new(
                     Code::MergeConflict,
                     format!(
@@ -1107,7 +1340,13 @@ impl<S: Storage> Workspace<S> {
                         doc.head
                     ),
                 );
-                e.detail.conflicts = c.iter().map(|&(a, b)| Conflict { first_line: a, last_line: b }).collect();
+                e.detail.conflicts = c
+                    .iter()
+                    .map(|&(a, b)| Conflict {
+                        first_line: a,
+                        last_line: b,
+                    })
+                    .collect();
                 e.detail.head = Some(doc.head);
                 return Err(e);
             }
@@ -1127,7 +1366,11 @@ impl<S: Storage> Workspace<S> {
                 })?;
                 match ra {
                     Some(ra) => self.finish(doc, theirs, ra, removed)?,
-                    None => Next { text: theirs.to_string(), rem: rem.clone(), changed: self.changed(doc, true) },
+                    None => Next {
+                        text: theirs.to_string(),
+                        rem: rem.clone(),
+                        changed: self.changed(doc, true),
+                    },
                 }
             }
             None => self.structure(doc, theirs, &merge::apply(theirs, &hunks), rem)?,
@@ -1136,7 +1379,13 @@ impl<S: Storage> Workspace<S> {
         Ok(next)
     }
 
-    fn store(&mut self, doc: &mut DocRecord, op: RevOp, summary: String, next: Next) -> Result<Changed> {
+    fn store(
+        &mut self,
+        doc: &mut DocRecord,
+        op: RevOp,
+        summary: String,
+        next: Next,
+    ) -> Result<Changed> {
         let mut c = next.changed;
         if c.unchanged {
             return Ok(c);
@@ -1166,7 +1415,9 @@ fn chain(
 ) -> Result<(Option<Reanchored>, Vec<Loss>)> {
     let (mut cur, mut removed): (Option<Reanchored>, Vec<Loss>) = (None, vec![]);
     for k in 0..steps {
-        let (t, r) = cur.as_ref().map_or((text, rem), |c| (c.text.as_str(), &c.remainder));
+        let (t, r) = cur
+            .as_ref()
+            .map_or((text, rem), |c| (c.text.as_str(), &c.remainder));
         let ra = step(k, t, r)?;
         removed.extend(losses(&ra.report));
         cur = Some(ra);
@@ -1182,13 +1433,18 @@ mod native {
 
     fn read_file(path: &Path) -> Result<Vec<u8>> {
         std::fs::read(path).map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotFound => Error::not_found(format!("there is no file {}.", path.display())),
+            std::io::ErrorKind::NotFound => {
+                Error::not_found(format!("there is no file {}.", path.display()))
+            }
             _ => Error::io(format!("cannot read {}: {e}", path.display())),
         })
     }
 
     fn name_of(path: &Path) -> String {
-        path.file_name().map_or_else(|| path.display().to_string(), |n| n.to_string_lossy().into_owned())
+        path.file_name().map_or_else(
+            || path.display().to_string(),
+            |n| n.to_string_lossy().into_owned(),
+        )
     }
 
     impl<S: Storage> Workspace<S> {
@@ -1200,7 +1456,12 @@ mod native {
         }
 
         /// A new file of `ty`, from a blank package or the template at `template`.
-        pub fn create_from(&mut self, ty: DocType, format: Option<Format>, template: Option<&Path>) -> Result<Opened> {
+        pub fn create_from(
+            &mut self,
+            ty: DocType,
+            format: Option<Format>,
+            template: Option<&Path>,
+        ) -> Result<Opened> {
             match template {
                 None => self.create(ty, format, None),
                 Some(p) => {
@@ -1212,25 +1473,39 @@ mod native {
         }
 
         /// Export a revision to `path` (see [`Workspace::export_bytes`]).
-        pub fn export(&self, id: &str, revision: Option<u32>, path: &Path, opts: &ExportOptions) -> Result<Exported> {
+        pub fn export(
+            &self,
+            id: &str,
+            revision: Option<u32>,
+            path: &Path,
+            opts: &ExportOptions,
+        ) -> Result<Exported> {
             let (mut out, bytes) = self.export_bytes(id, revision, opts)?;
             // The extension must be the format's own: an export carries no macros.
             let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase());
-            if ext.as_deref().is_some_and(|e| e != out.format.name() && Format::of_name(&format!("x.{e}")).is_some()) {
+            if ext.as_deref().is_some_and(|e| {
+                e != out.format.name() && Format::of_name(&format!("x.{e}")).is_some()
+            }) {
                 return Err(Error::bad(format!(
                     "{id} exports as .{}; {} names another kind of file.",
                     out.format.name(),
                     path.display()
                 )));
             }
-            std::fs::write(path, &bytes).map_err(|e| Error::io(format!("cannot write {}: {e}", path.display())))?;
+            std::fs::write(path, &bytes)
+                .map_err(|e| Error::io(format!("cannot write {}: {e}", path.display())))?;
             out.path = Some(path.display().to_string());
             Ok(out)
         }
 
         /// Re-import `path` if its exported base revision is still current
         /// (see [`Workspace::reimport_bytes_at_revision`]).
-        pub fn reimport_at_revision(&mut self, id: &str, base_revision: u32, path: &Path) -> Result<Reimported> {
+        pub fn reimport_at_revision(
+            &mut self,
+            id: &str,
+            base_revision: u32,
+            path: &Path,
+        ) -> Result<Reimported> {
             let bytes = read_file(path)?;
             self.reimport_bytes_at_revision(id, base_revision, &name_of(path), &bytes)
         }
@@ -1260,11 +1535,18 @@ mod tests {
     fn locating_old() {
         assert_eq!(locate("a b a", "b", 1).unwrap(), 2);
         let e = locate("x\nab\nab\n", "ab", 1).unwrap_err();
-        assert_eq!((e.code, e.detail.matches, e.detail.lines.clone()), (Code::AmbiguousMatch, Some(2), vec![2, 3]));
+        assert_eq!(
+            (e.code, e.detail.matches, e.detail.lines.clone()),
+            (Code::AmbiguousMatch, Some(2), vec![2, 3])
+        );
         assert!(e.message.contains("occurs 2 times"), "{}", e.message);
         let e = locate("| a | b |\n", "|  a |  b |", 1).unwrap_err();
         assert_eq!(e.code, Code::NoMatch);
-        assert!(e.message.contains("spaces and line breaks"), "{}", e.message);
+        assert!(
+            e.message.contains("spaces and line breaks"),
+            "{}",
+            e.message
+        );
         assert_eq!(locate("aaa", "aa", 1).unwrap_err().detail.matches, Some(2));
     }
 
@@ -1273,13 +1555,30 @@ mod tests {
         let e = locate("# 계획\n\n□\u{2007}추진 배경\n", "□ 추진 배경", 1).unwrap_err();
         assert_eq!(e.code, Code::NoMatch);
         assert!(e.message.contains("matches line 3"), "{}", e.message);
-        assert!(e.message.contains("\"□⟨U+2007 FIGURE SPACE⟩추진 배경\""), "{}", e.message);
-        assert!(e.message.contains("\\u2007 in a JSON string"), "{}", e.message);
+        assert!(
+            e.message.contains("\"□⟨U+2007 FIGURE SPACE⟩추진 배경\""),
+            "{}",
+            e.message
+        );
+        assert!(
+            e.message.contains("\\u2007 in a JSON string"),
+            "{}",
+            e.message
+        );
         let e = locate("\u{f076}2025년 계획\n다음 줄\n", " 2025년 계획\n다음", 1).unwrap_err();
         assert!(e.message.contains("⟨U+F076 private use⟩"), "{}", e.message);
         // A first line quoted from the revision is named too.
         let e = locate("□\u{2007}추진\n가\n", "□\u{2007}추진\n나", 1).unwrap_err();
-        assert!(e.message.contains("Its first line \"□⟨U+2007 FIGURE SPACE⟩추진\" is at line 1"), "{}", e.message);
-        assert!(!e.message.contains('\u{2007}') && !e.message.contains("\\u{2007}"), "{}", e.message);
+        assert!(
+            e.message
+                .contains("Its first line \"□⟨U+2007 FIGURE SPACE⟩추진\" is at line 1"),
+            "{}",
+            e.message
+        );
+        assert!(
+            !e.message.contains('\u{2007}') && !e.message.contains("\\u{2007}"),
+            "{}",
+            e.message
+        );
     }
 }

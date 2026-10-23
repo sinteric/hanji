@@ -61,7 +61,12 @@ impl Key {
         Key::Indent,
     ];
     /// The four sides, as `border` sets them.
-    pub const SIDES: [Key; 4] = [Key::BorderTop, Key::BorderRight, Key::BorderBottom, Key::BorderLeft];
+    pub const SIDES: [Key; 4] = [
+        Key::BorderTop,
+        Key::BorderRight,
+        Key::BorderBottom,
+        Key::BorderLeft,
+    ];
     /// A paragraph's layout.
     pub const PARA: [Key; 7] = [
         Key::Align,
@@ -77,8 +82,14 @@ impl Key {
     /// Flags: in running text they are the marks `**`, `*`, `<u>`, `~~`.
     pub const FLAGS: [Key; 4] = [Key::Bold, Key::Italic, Key::Underline, Key::Strike];
     /// A box: a cell, a shape.
-    pub const BOX: [Key; 6] =
-        [Key::Fill, Key::BorderTop, Key::BorderRight, Key::BorderBottom, Key::BorderLeft, Key::Valign];
+    pub const BOX: [Key; 6] = [
+        Key::Fill,
+        Key::BorderTop,
+        Key::BorderRight,
+        Key::BorderBottom,
+        Key::BorderLeft,
+        Key::Valign,
+    ];
 
     pub fn name(self) -> &'static str {
         match self {
@@ -124,7 +135,9 @@ impl Key {
         if self.is_flag() {
             return vocab::parse_flag(name, v).map(Value::Flag);
         }
-        let Some(v) = v else { return Err(format!("{name} needs a value: {name}=…")) };
+        let Some(v) = v else {
+            return Err(format!("{name} needs a value: {name}=…"));
+        };
         let at = |m: String| format!("{name}: {m}");
         Ok(match self {
             Key::Fill => Value::Fill(Fill::parse(v).map_err(at)?),
@@ -133,7 +146,11 @@ impl Key {
             }
             Key::Valign => Value::Choice(vocab::parse_choice(name, v, vocab::VALIGN)?),
             Key::Align => Value::Choice(vocab::parse_choice(name, v, vocab::ALIGN)?),
-            Key::IndentLeft | Key::IndentRight | Key::FirstLine | Key::SpaceBefore | Key::SpaceAfter => {
+            Key::IndentLeft
+            | Key::IndentRight
+            | Key::FirstLine
+            | Key::SpaceBefore
+            | Key::SpaceAfter => {
                 let neg = matches!(self, Key::IndentLeft | Key::IndentRight | Key::FirstLine);
                 Value::Len(vocab::parse_length(v, neg).map_err(at)?)
             }
@@ -153,11 +170,9 @@ impl Key {
             }
             Key::Color => Value::Color(Color::parse(v).map_err(at)?),
             Key::Indent => {
-                let n: u32 = v
-                    .parse()
-                    .ok()
-                    .filter(|n| *n <= 250)
-                    .ok_or_else(|| format!("indent={v}: a whole number of indent levels, 0 to 250"))?;
+                let n: u32 = v.parse().ok().filter(|n| *n <= 250).ok_or_else(|| {
+                    format!("indent={v}: a whole number of indent levels, 0 to 250")
+                })?;
                 Value::Levels(n)
             }
             Key::Bold | Key::Italic | Key::Underline | Key::Strike => unreachable!(),
@@ -277,12 +292,24 @@ impl Props {
 
     /// The properties of `keys` only.
     pub fn only(&self, keys: &[Key]) -> Props {
-        Props(self.0.iter().filter(|(k, _)| keys.contains(k)).map(|(k, v)| (*k, v.clone())).collect())
+        Props(
+            self.0
+                .iter()
+                .filter(|(k, _)| keys.contains(k))
+                .map(|(k, v)| (*k, v.clone()))
+                .collect(),
+        )
     }
 
     /// Without the properties of `keys`.
     pub fn without(&self, keys: &[Key]) -> Props {
-        Props(self.0.iter().filter(|(k, _)| !keys.contains(k)).map(|(k, v)| (*k, v.clone())).collect())
+        Props(
+            self.0
+                .iter()
+                .filter(|(k, _)| !keys.contains(k))
+                .map(|(k, v)| (*k, v.clone()))
+                .collect(),
+        )
     }
 
     /// `self` with `over`'s properties on top.
@@ -296,7 +323,13 @@ impl Props {
 
     /// The properties of `self` that `base` does not have with the same value.
     pub fn diff(&self, base: &Props) -> Props {
-        Props(self.0.iter().filter(|(k, v)| base.0.get(k) != Some(v)).map(|(k, v)| (*k, v.clone())).collect())
+        Props(
+            self.0
+                .iter()
+                .filter(|(k, v)| base.0.get(k) != Some(v))
+                .map(|(k, v)| (*k, v.clone()))
+                .collect(),
+        )
     }
 
     /// Canonical text, no braces: canonical key order, `border` for four
@@ -366,13 +399,17 @@ pub fn items(src: &str, extra: &[&str]) -> Result<Vec<(Item, usize)>, (usize, St
             continue;
         }
         if name == "border" {
-            let b = Key::BorderTop.parse(value.as_deref()).map_err(|m| (col, m.replacen("border-top", "border", 1)))?;
+            let b = Key::BorderTop
+                .parse(value.as_deref())
+                .map_err(|m| (col, m.replacen("border-top", "border", 1)))?;
             for k in Key::SIDES {
                 out.push((Item::Prop(k, b.clone()), col));
             }
             continue;
         }
-        let Some(key) = Key::from_name(&name) else { return Err((col, unknown(&name))) };
+        let Some(key) = Key::from_name(&name) else {
+            return Err((col, unknown(&name)));
+        };
         let v = key.parse(value.as_deref()).map_err(|m| (col, m))?;
         out.push((Item::Prop(key, v), col));
     }
@@ -382,20 +419,33 @@ pub fn items(src: &str, extra: &[&str]) -> Result<Vec<(Item, usize)>, (usize, St
 /// [`items`] as a set: a property written twice is an error (`border` and a
 /// side of it too).
 #[allow(clippy::type_complexity)]
-pub fn parse_list(src: &str, extra: &[&str]) -> Result<(Props, Vec<(String, Option<String>, usize)>), (usize, String)> {
+pub fn parse_list(
+    src: &str,
+    extra: &[&str],
+) -> Result<(Props, Vec<(String, Option<String>, usize)>), (usize, String)> {
     let mut props = Props::new();
     let mut others = vec![];
     for (it, col) in items(src, extra)? {
         match it {
             Item::Prop(k, v) => {
                 if props.has(k) {
-                    let what = if k.is_side() { format!("{k} (or border)") } else { k.to_string() };
-                    return Err((col, format!("{what} is written twice; write each property once")));
+                    let what = if k.is_side() {
+                        format!("{k} (or border)")
+                    } else {
+                        k.to_string()
+                    };
+                    return Err((
+                        col,
+                        format!("{what} is written twice; write each property once"),
+                    ));
                 }
                 props.set(k, v);
             }
             Item::Other(n, v) => {
-                if others.iter().any(|(x, _, _): &(String, Option<String>, usize)| *x == n) {
+                if others
+                    .iter()
+                    .any(|(x, _, _): &(String, Option<String>, usize)| *x == n)
+                {
                     return Err((col, format!("{n} is written twice")));
                 }
                 others.push((n, v, col));
@@ -410,7 +460,9 @@ pub fn parse_list(src: &str, extra: &[&str]) -> Result<(Props, Vec<(String, Opti
 pub fn unknown(name: &str) -> String {
     let keys = "fill, border, border-top, border-right, border-bottom, border-left, valign, align, indent-left, indent-right, first-line, space-before, space-after, line-spacing, font, size, color, bold, italic, underline, strike";
     let instead = match name {
-        "background" | "background-color" | "bg" | "shading" | "shade" | "fill-color" => Some("fill"),
+        "background" | "background-color" | "bg" | "shading" | "shade" | "fill-color" => {
+            Some("fill")
+        }
         "colour" | "font-color" | "text-color" | "fg" | "foreground" => Some("color"),
         "font-size" | "fontsize" | "sz" | "pt" => Some("size"),
         "font-family" | "face" | "typeface" | "font-face" => Some("font"),
@@ -442,13 +494,14 @@ pub fn unknown(name: &str) -> String {
         "shadow" | "glow" | "effect" | "effects" | "reflection" | "emboss" | "engrave" | "3d" => {
             Some("shadows, glow and other effects")
         }
-        "spacing" | "letter-spacing" | "char-spacing" | "character-spacing" | "kerning" | "tracking" | "width"
-        | "scale" | "ratio" => Some("character spacing and width"),
+        "spacing" | "letter-spacing" | "char-spacing" | "character-spacing" | "kerning"
+        | "tracking" | "width" | "scale" | "ratio" => Some("character spacing and width"),
         "gradient" | "pattern" | "hatch" | "texture" => Some("gradients and patterns"),
-        "diagonal" | "border-diagonal" | "slash" | "backslash" | "diagonal-up" | "diagonal-down" => {
-            Some("diagonal cell borders")
+        "diagonal" | "border-diagonal" | "slash" | "backslash" | "diagonal-up"
+        | "diagonal-down" => Some("diagonal cell borders"),
+        "rotate" | "rotation" | "direction" | "text-direction" | "writing-mode" => {
+            Some("text direction")
         }
-        "rotate" | "rotation" | "direction" | "text-direction" | "writing-mode" => Some("text direction"),
         "caps" | "small-caps" | "superscript" | "subscript" | "vertical" | "baseline" => {
             Some("capitals, superscript and subscript")
         }
@@ -465,12 +518,16 @@ mod tests {
     use super::*;
 
     fn props(s: &str) -> Props {
-        parse_list(s, &[]).unwrap_or_else(|e| panic!("{s}: {e:?}")).0
+        parse_list(s, &[])
+            .unwrap_or_else(|e| panic!("{s}: {e:?}"))
+            .0
     }
 
     #[test]
     fn a_list_reads_and_writes_in_canonical_order() {
-        let p = props(r#"size=20pt align=center fill=#fff0c3 border-bottom="2.83pt solid #7F7F7F" font=나눔고딕 bold"#);
+        let p = props(
+            r#"size=20pt align=center fill=#fff0c3 border-bottom="2.83pt solid #7F7F7F" font=나눔고딕 bold"#,
+        );
         assert_eq!(
             p.write(),
             r#"fill=#FFF0C3 border-bottom="2.83pt solid #7F7F7F" align=center font=나눔고딕 size=20pt bold"#
@@ -488,7 +545,10 @@ mod tests {
             props("italic=no line-spacing=\"at-least 14pt\"").write(),
             "line-spacing=\"at-least 14pt\" italic=no"
         );
-        assert_eq!(props("first-line=-10pt").get(Key::FirstLine), Some(&Value::Len(-1000)));
+        assert_eq!(
+            props("first-line=-10pt").get(Key::FirstLine),
+            Some(&Value::Len(-1000))
+        );
     }
 
     #[test]
@@ -503,7 +563,10 @@ mod tests {
         assert!(err("space-before=-2pt").1.contains("0pt or more"));
         assert_eq!(err("fill=#FFF0C3 color=red").0, 14);
         let (p, other) = parse_list(r#"style="개요 3" first-line=10pt"#, &["style"]).unwrap();
-        assert_eq!(other, vec![("style".to_string(), Some("개요 3".to_string()), 1)]);
+        assert_eq!(
+            other,
+            vec![("style".to_string(), Some("개요 3".to_string()), 1)]
+        );
         assert_eq!(p.write(), "first-line=10pt");
     }
 
@@ -515,7 +578,10 @@ mod tests {
         assert_eq!(eff.write(), "align=justify font=바탕 size=15pt bold");
         assert_eq!(eff.diff(&base).write(), "size=15pt bold");
         assert_eq!(eff.only(&Key::PARA).write(), "align=justify");
-        assert_eq!(eff.without(&Key::FLAGS).write(), "align=justify font=바탕 size=15pt");
+        assert_eq!(
+            eff.without(&Key::FLAGS).write(),
+            "align=justify font=바탕 size=15pt"
+        );
         let json = serde_json::to_string(&eff).unwrap();
         assert_eq!(json, "\"align=justify font=바탕 size=15pt bold\"");
         assert_eq!(serde_json::from_str::<Props>(&json).unwrap(), eff);

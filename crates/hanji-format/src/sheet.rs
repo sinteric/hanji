@@ -18,7 +18,9 @@ use crate::serialize::{attr, front_lines};
 pub const COLUMN_TYPES: &[&str] = &["text", "number", "date", "mixed"];
 
 /// Chart types a `<chart/>` line may name.
-pub const CHART_TYPES: &[&str] = &["bar", "column", "line", "pie", "area", "scatter", "doughnut", "radar"];
+pub const CHART_TYPES: &[&str] = &[
+    "bar", "column", "line", "pie", "area", "scatter", "doughnut", "radar",
+];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Spreadsheet {
@@ -83,11 +85,14 @@ impl Spreadsheet {
     }
 
     pub fn table(&self, name: &str) -> Option<(&SheetDecl, &TableDecl)> {
-        self.tables().find(|(_, t)| t.name.eq_ignore_ascii_case(name))
+        self.tables()
+            .find(|(_, t)| t.name.eq_ignore_ascii_case(name))
     }
 
     pub fn sheet(&self, name: &str) -> Option<&SheetDecl> {
-        self.sheets.iter().find(|s| s.name.eq_ignore_ascii_case(name))
+        self.sheets
+            .iter()
+            .find(|s| s.name.eq_ignore_ascii_case(name))
     }
 
     pub fn keeps(&self) -> impl Iterator<Item = &Keep> {
@@ -190,7 +195,9 @@ pub fn sheet_name_problem(name: &str) -> Option<String> {
         return Some("a sheet name has at most 31 characters".into());
     }
     if let Some(c) = name.chars().find(|c| "[]:*?/\\".contains(*c)) {
-        return Some(format!("a sheet name cannot hold {c:?} (nor any of [ ] : * ? / \\)"));
+        return Some(format!(
+            "a sheet name cannot hold {c:?} (nor any of [ ] : * ? / \\)"
+        ));
     }
     if name.starts_with('\'') || name.ends_with('\'') {
         return Some("a sheet name does not begin or end with '".into());
@@ -204,7 +211,9 @@ pub fn table_name_problem(name: &str) -> Option<String> {
     let first = it.next()?;
     let form = "a table name is letters, digits, _ and ., starting with a letter or _";
     if !(first.is_alphabetic() || first == '_' || first == '\\')
-        || !name.chars().all(|c| c.is_alphanumeric() || matches!(c, '_' | '.' | '\\'))
+        || !name
+            .chars()
+            .all(|c| c.is_alphanumeric() || matches!(c, '_' | '.' | '\\'))
     {
         return Some(form.into());
     }
@@ -214,13 +223,17 @@ pub fn table_name_problem(name: &str) -> Option<String> {
     let upper = name.to_ascii_uppercase();
     let cell_like = hanji_cell_like(&upper) || upper == "R" || upper == "C";
     if cell_like {
-        return Some(format!("{name} reads as a cell address; {form}, and not a cell address such as A1 or R1C1"));
+        return Some(format!(
+            "{name} reads as a cell address; {form}, and not a cell address such as A1 or R1C1"
+        ));
     }
     None
 }
 
 fn hanji_cell_like(u: &str) -> bool {
-    let k = u.find(|c: char| !c.is_ascii_alphabetic()).unwrap_or(u.len());
+    let k = u
+        .find(|c: char| !c.is_ascii_alphabetic())
+        .unwrap_or(u.len());
     let a1 = k > 0 && k <= 3 && k < u.len() && u[k..].bytes().all(|b| b.is_ascii_digit());
     let r1c1 = u.starts_with('R') && {
         let rest = u[1..].trim_start_matches(|c: char| c.is_ascii_digit());
@@ -239,7 +252,9 @@ const KEEP_FORM: &str = "<keep id=\"…\" kind=\"…\" summary=\"…\"/>";
 pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<Diagnostic>> {
     let mut p = Parser::new(text, names);
     let (front, first) = p.front_matter("spreadsheet");
-    let Some(front) = front.filter(|_| p.errors.is_empty()) else { return Err(p.errors) };
+    let Some(front) = front.filter(|_| p.errors.is_empty()) else {
+        return Err(p.errors);
+    };
     let mut sheets: Vec<SheetDecl> = vec![];
     let mut keeps: Vec<(usize, usize, Keep)> = vec![];
     let n = p.lines.len();
@@ -257,7 +272,11 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
         if t.starts_with("</sheet") {
             match open.take() {
                 Some((_, s)) => sheets.push(s),
-                None => p.err(i, col, format!("</sheet> closes no sheet; a sheet is {SHEET_FORM}.")),
+                None => p.err(
+                    i,
+                    col,
+                    format!("</sheet> closes no sheet; a sheet is {SHEET_FORM}."),
+                ),
             }
             i += 1;
             continue;
@@ -298,7 +317,11 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
             continue;
         }
         let Some((_, sheet)) = open.as_mut() else {
-            p.err(i, col, format!("everything in a Spreadsheet is inside a sheet: {SHEET_FORM}."));
+            p.err(
+                i,
+                col,
+                format!("everything in a Spreadsheet is inside a sheet: {SHEET_FORM}."),
+            );
             i += 1;
             continue;
         };
@@ -335,24 +358,42 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
         i += 1;
     }
     if let Some((at, s)) = open {
-        p.err(at, 1, format!("sheet \"{}\" is not closed by a line </sheet>.", s.name));
+        p.err(
+            at,
+            1,
+            format!("sheet \"{}\" is not closed by a line </sheet>.", s.name),
+        );
     }
     check_names(&mut p, &sheets, &keeps);
     if !p.errors.is_empty() {
         p.errors.sort_by_key(|d| (d.line, d.col));
         return Err(p.errors);
     }
-    Ok(Spreadsheet { front, default_format, sheets })
+    Ok(Spreadsheet {
+        front,
+        default_format,
+        sheets,
+    })
 }
 
 /// The attributes of a single-line tag at line `i`, checked against `allowed`.
-fn tag_attrs(p: &mut Parser<'_>, i: usize, name: &str, form: &str, allowed: &[&str]) -> Option<Vec<(String, String)>> {
+fn tag_attrs(
+    p: &mut Parser<'_>,
+    i: usize,
+    name: &str,
+    form: &str,
+    allowed: &[&str],
+) -> Option<Vec<(String, String)>> {
     let line = &p.lines[i];
     let lead = line.text.len() - line.text.trim_start().len();
     let src = chars_of(line, lead);
     let col = lead + 1;
     let Some((tag, end)) = parse_tag(&src, 0) else {
-        p.err(i, col, format!("this line is not a well-formed tag; it is {form}."));
+        p.err(
+            i,
+            col,
+            format!("this line is not a well-formed tag; it is {form}."),
+        );
         return None;
     };
     if tag.name != name || tag.closing {
@@ -360,13 +401,21 @@ fn tag_attrs(p: &mut Parser<'_>, i: usize, name: &str, form: &str, allowed: &[&s
         return None;
     }
     if src[end..].iter().any(|s| !s.2.is_whitespace()) {
-        p.err(i, src.get(end).map_or(col, |s| s.1), format!("nothing follows the tag on its line; it is {form}."));
+        p.err(
+            i,
+            src.get(end).map_or(col, |s| s.1),
+            format!("nothing follows the tag on its line; it is {form}."),
+        );
         return None;
     }
     let mut out = vec![];
     for (k, v, c) in &tag.attrs {
         if !allowed.contains(&k.as_str()) {
-            p.err(i, *c, format!("<{name}> has no attribute \"{k}\"; it is {form}."));
+            p.err(
+                i,
+                *c,
+                format!("<{name}> has no attribute \"{k}\"; it is {form}."),
+            );
             return None;
         }
         if out.iter().any(|(x, _): &(String, String)| x == k) {
@@ -409,13 +458,22 @@ fn sheet_tag(p: &mut Parser<'_>, i: usize) -> Option<SheetDecl> {
             return None;
         }
     }
-    Some(SheetDecl { name: name.to_string(), range, formats: vec![], items: vec![] })
+    Some(SheetDecl {
+        name: name.to_string(),
+        range,
+        formats: vec![],
+        items: vec![],
+    })
 }
 
 fn is_range(r: &str) -> bool {
     let cell = |s: &str| {
         let k = s.find(|c: char| !c.is_ascii_uppercase()).unwrap_or(s.len());
-        k > 0 && k <= 3 && k < s.len() && s[k..].bytes().all(|b| b.is_ascii_digit()) && !s[k..].starts_with('0')
+        k > 0
+            && k <= 3
+            && k < s.len()
+            && s[k..].bytes().all(|b| b.is_ascii_digit())
+            && !s[k..].starts_with('0')
     };
     match r.split_once(':') {
         Some((a, b)) => cell(a) && cell(b),
@@ -428,7 +486,10 @@ fn is_range(r: &str) -> bool {
 /// a name's own leading or trailing spaces survive.
 pub fn split_pipe_row(line: &str) -> Option<Vec<String>> {
     let t = line.trim();
-    let inner = t.strip_prefix('|')?.strip_suffix('|').filter(|_| t.len() >= 2)?;
+    let inner = t
+        .strip_prefix('|')?
+        .strip_suffix('|')
+        .filter(|_| t.len() >= 2)?;
     let mut cells = vec![];
     let mut cur = String::new();
     let mut it = inner.chars().peekable();
@@ -455,23 +516,37 @@ fn unpad(s: &str) -> String {
 }
 
 fn is_delim_row(cells: &[String]) -> bool {
-    !cells.is_empty() && cells.iter().all(|c| c.trim().chars().all(|x| x == '-' || x == ':') && c.contains('-'))
+    !cells.is_empty()
+        && cells
+            .iter()
+            .all(|c| c.trim().chars().all(|x| x == '-' || x == ':') && c.contains('-'))
 }
 
 fn table_block(p: &mut Parser<'_>, i: usize) -> (Option<TableDecl>, usize) {
     let n = p.lines.len();
     let close = (i + 1..n).find(|&k| {
         let t = p.lines[k].text.trim();
-        t.starts_with("</table") || t.starts_with("<table") || t.starts_with("<sheet") || t.starts_with("</sheet")
+        t.starts_with("</table")
+            || t.starts_with("<table")
+            || t.starts_with("<sheet")
+            || t.starts_with("</sheet")
     });
     let next = match close {
         Some(k) if p.lines[k].text.trim().starts_with("</table") => k + 1,
         Some(k) => {
-            p.err(i, 1, format!("this table is not closed by a line </table>; a table is {TABLE_FORM}."));
+            p.err(
+                i,
+                1,
+                format!("this table is not closed by a line </table>; a table is {TABLE_FORM}."),
+            );
             return (None, k);
         }
         None => {
-            p.err(i, 1, format!("this table is not closed by a line </table>; a table is {TABLE_FORM}."));
+            p.err(
+                i,
+                1,
+                format!("this table is not closed by a line </table>; a table is {TABLE_FORM}."),
+            );
             return (None, n);
         }
     };
@@ -480,9 +555,15 @@ fn table_block(p: &mut Parser<'_>, i: usize) -> (Option<TableDecl>, usize) {
     if closer != "</table>" {
         p.err(close, 1, "the line closing a table is exactly </table>.");
     }
-    let Some(attrs) = tag_attrs(p, i, "table", TABLE_FORM, &["name", "range"]) else { return (None, next) };
+    let Some(attrs) = tag_attrs(p, i, "table", TABLE_FORM, &["name", "range"]) else {
+        return (None, next);
+    };
     let (Some(name), Some(range)) = (get(&attrs, "name"), get(&attrs, "range")) else {
-        p.err(i, 1, format!("<table> has a name and a range: {TABLE_FORM}."));
+        p.err(
+            i,
+            1,
+            format!("<table> has a name and a range: {TABLE_FORM}."),
+        );
         return (None, next);
     };
     if let Some(m) = table_name_problem(name) {
@@ -490,10 +571,16 @@ fn table_block(p: &mut Parser<'_>, i: usize) -> (Option<TableDecl>, usize) {
         return (None, next);
     }
     if !is_range(range) {
-        p.err(i, 1, format!("table \"{name}\": range=\"{range}\" is not an A1 range such as A1:F20."));
+        p.err(
+            i,
+            1,
+            format!("table \"{name}\": range=\"{range}\" is not an A1 range such as A1:F20."),
+        );
         return (None, next);
     }
-    let body: Vec<usize> = (i + 1..close).filter(|&k| !p.lines[k].text.trim().is_empty()).collect();
+    let body: Vec<usize> = (i + 1..close)
+        .filter(|&k| !p.lines[k].text.trim().is_empty())
+        .collect();
     let header = body.first().and_then(|&k| split_pipe_row(p.lines[k].text));
     let head_ok = header.as_ref().is_some_and(|h| {
         let h: Vec<String> = h.iter().map(|c| c.trim().to_ascii_lowercase()).collect();
@@ -508,16 +595,28 @@ fn table_block(p: &mut Parser<'_>, i: usize) -> (Option<TableDecl>, usize) {
         );
         return (None, next);
     }
-    if !body.get(1).and_then(|&k| split_pipe_row(p.lines[k].text)).is_some_and(|d| is_delim_row(&d)) {
+    if !body
+        .get(1)
+        .and_then(|&k| split_pipe_row(p.lines[k].text))
+        .is_some_and(|d| is_delim_row(&d))
+    {
         let at = body.get(1).copied().unwrap_or(body[0]);
-        p.err(at, 1, "the second line of a table block is |---|---|---|---|.");
+        p.err(
+            at,
+            1,
+            "the second line of a table block is |---|---|---|---|.",
+        );
         return (None, next);
     }
     let mut columns: Vec<ColumnDecl> = vec![];
     let before = p.errors.len();
     for &k in &body[2..] {
         let Some(cells) = split_pipe_row(p.lines[k].text) else {
-            p.err(k, 1, "each line of a table block is one column: | name | type | format | formula |.");
+            p.err(
+                k,
+                1,
+                "each line of a table block is one column: | name | type | format | formula |.",
+            );
             continue;
         };
         if cells.len() < 3 || cells.len() > 4 {
@@ -525,17 +624,31 @@ fn table_block(p: &mut Parser<'_>, i: usize) -> (Option<TableDecl>, usize) {
             continue;
         }
         let (cname, ty, format) = (&cells[0], &cells[1].trim().to_string(), &cells[2]);
-        let formula = cells.get(3).map(|f| f.trim().to_string()).unwrap_or_default();
+        let formula = cells
+            .get(3)
+            .map(|f| f.trim().to_string())
+            .unwrap_or_default();
         if cname.trim().is_empty() {
             p.err(k, 1, "a column has a name (its header cell).");
             continue;
         }
         if !COLUMN_TYPES.contains(&ty.as_str()) {
-            p.err(k, 1, format!("column \"{cname}\": the type is one of {}, not \"{ty}\".", quoted_list(COLUMN_TYPES)));
+            p.err(
+                k,
+                1,
+                format!(
+                    "column \"{cname}\": the type is one of {}, not \"{ty}\".",
+                    quoted_list(COLUMN_TYPES)
+                ),
+            );
             continue;
         }
         if format.trim().is_empty() {
-            p.err(k, 1, format!("column \"{cname}\" has a number format (General for none; @ for text)."));
+            p.err(
+                k,
+                1,
+                format!("column \"{cname}\" has a number format (General for none; @ for text)."),
+            );
             continue;
         }
         if !formula.is_empty() && !formula.starts_with('=') {
@@ -550,12 +663,28 @@ fn table_block(p: &mut Parser<'_>, i: usize) -> (Option<TableDecl>, usize) {
             );
             continue;
         }
-        columns.push(ColumnDecl { name: cname.clone(), ty: ty.clone(), format: format.clone(), formula });
+        columns.push(ColumnDecl {
+            name: cname.clone(),
+            ty: ty.clone(),
+            format: format.clone(),
+            formula,
+        });
     }
     if columns.is_empty() && p.errors.len() == before {
-        p.err(i, 1, format!("table \"{name}\" has no columns; a table has one line per column."));
+        p.err(
+            i,
+            1,
+            format!("table \"{name}\" has no columns; a table has one line per column."),
+        );
     }
-    ((p.errors.len() == before).then(|| TableDecl { name: name.to_string(), range: range.to_string(), columns }), next)
+    (
+        (p.errors.len() == before).then(|| TableDecl {
+            name: name.to_string(),
+            range: range.to_string(),
+            columns,
+        }),
+        next,
+    )
 }
 
 fn quoted_list(v: &[&str]) -> String {
@@ -569,7 +698,14 @@ fn chart_tag(p: &mut Parser<'_>, i: usize) -> Option<ChartDecl> {
         return None;
     };
     if !CHART_TYPES.contains(&ty) {
-        p.err(i, 1, format!("chart type \"{ty}\" is not one of {}.", quoted_list(CHART_TYPES)));
+        p.err(
+            i,
+            1,
+            format!(
+                "chart type \"{ty}\" is not one of {}.",
+                quoted_list(CHART_TYPES)
+            ),
+        );
         return None;
     }
     if data.split(',').any(|s| s.trim().is_empty()) {
@@ -580,15 +716,25 @@ fn chart_tag(p: &mut Parser<'_>, i: usize) -> Option<ChartDecl> {
         );
         return None;
     }
-    Some(ChartDecl { ty: ty.into(), data: data.into(), title: get(&attrs, "title").map(str::to_string) })
+    Some(ChartDecl {
+        ty: ty.into(),
+        data: data.into(),
+        title: get(&attrs, "title").map(str::to_string),
+    })
 }
 
 fn keep_tag(p: &mut Parser<'_>, i: usize) -> Option<Keep> {
     let attrs = tag_attrs(p, i, "keep", KEEP_FORM, &["id", "kind", "summary"])?;
-    match (get(&attrs, "id"), get(&attrs, "kind"), get(&attrs, "summary")) {
-        (Some(id), Some(kind), Some(summary)) => {
-            Some(Keep { id: id.into(), kind: kind.into(), summary: summary.into() })
-        }
+    match (
+        get(&attrs, "id"),
+        get(&attrs, "kind"),
+        get(&attrs, "summary"),
+    ) {
+        (Some(id), Some(kind), Some(summary)) => Some(Keep {
+            id: id.into(),
+            kind: kind.into(),
+            summary: summary.into(),
+        }),
         _ => {
             p.err(i, 1, format!("a placeholder keeps its id, kind and summary as they are in the file: {KEEP_FORM}."));
             None
@@ -597,27 +743,66 @@ fn keep_tag(p: &mut Parser<'_>, i: usize) -> Option<Keep> {
 }
 
 fn check_names(p: &mut Parser<'_>, sheets: &[SheetDecl], keeps: &[(usize, usize, Keep)]) {
-    let line_of = |p: &Parser<'_>, pat: &str| (0..p.lines.len()).find(|&k| p.lines[k].text.contains(pat)).unwrap_or(0);
+    let line_of = |p: &Parser<'_>, pat: &str| {
+        (0..p.lines.len())
+            .find(|&k| p.lines[k].text.contains(pat))
+            .unwrap_or(0)
+    };
     for (k, s) in sheets.iter().enumerate() {
-        if sheets[..k].iter().any(|o| o.name.to_lowercase() == s.name.to_lowercase()) {
+        if sheets[..k]
+            .iter()
+            .any(|o| o.name.to_lowercase() == s.name.to_lowercase())
+        {
             let at = line_of(p, &format!("name=\"{}\"", s.name));
-            p.err(at, 1, format!("two sheets are named \"{}\"; sheet names are unique (case does not count).", s.name));
+            p.err(
+                at,
+                1,
+                format!(
+                    "two sheets are named \"{}\"; sheet names are unique (case does not count).",
+                    s.name
+                ),
+            );
         }
     }
     let tables: Vec<&TableDecl> = sheets
         .iter()
-        .flat_map(|s| s.items.iter().filter_map(|i| if let SheetItem::Table(t) = i { Some(t) } else { None }))
+        .flat_map(|s| {
+            s.items.iter().filter_map(|i| {
+                if let SheetItem::Table(t) = i {
+                    Some(t)
+                } else {
+                    None
+                }
+            })
+        })
         .collect();
     for (k, t) in tables.iter().enumerate() {
-        if tables[..k].iter().any(|o| o.name.to_lowercase() == t.name.to_lowercase()) {
+        if tables[..k]
+            .iter()
+            .any(|o| o.name.to_lowercase() == t.name.to_lowercase())
+        {
             let at = line_of(p, &format!("name=\"{}\"", t.name));
-            p.err(at, 1, format!("two tables are named \"{}\"; table names are unique in the workbook.", t.name));
+            p.err(
+                at,
+                1,
+                format!(
+                    "two tables are named \"{}\"; table names are unique in the workbook.",
+                    t.name
+                ),
+            );
         }
     }
     let known = p.names.keeps.clone();
     for (k, (line, col, keep)) in keeps.iter().enumerate() {
         if keeps[..k].iter().any(|o| o.2.id == keep.id) {
-            p.err(*line, *col, format!("placeholder id=\"{}\" appears twice; keep each placeholder once.", keep.id));
+            p.err(
+                *line,
+                *col,
+                format!(
+                    "placeholder id=\"{}\" appears twice; keep each placeholder once.",
+                    keep.id
+                ),
+            );
         }
         if let Some(known) = &known {
             match known.iter().find(|x| x.id == keep.id) {
@@ -675,7 +860,9 @@ pub fn sheet_open(sh: &SheetDecl) -> String {
 
 /// A pipe-table cell as written: `|` escaped, line breaks as `<br/>`.
 pub fn pipe_cell(s: &str) -> String {
-    s.replace('|', "\\|").replace("\r\n", "<br/>").replace(['\n', '\r'], "<br/>")
+    s.replace('|', "\\|")
+        .replace("\r\n", "<br/>")
+        .replace(['\n', '\r'], "<br/>")
 }
 
 fn row_line(cells: &[String]) -> String {
@@ -689,7 +876,12 @@ pub fn table_lines(t: &TableDecl) -> Vec<String> {
         "|---|---|---|---|".into(),
     ];
     for c in &t.columns {
-        out.push(row_line(&[pipe_cell(&c.name), c.ty.clone(), pipe_cell(&c.format), pipe_cell(&c.formula)]));
+        out.push(row_line(&[
+            pipe_cell(&c.name),
+            c.ty.clone(),
+            pipe_cell(&c.format),
+            pipe_cell(&c.formula),
+        ]));
     }
     out.push("</table>".into());
     out
@@ -707,7 +899,10 @@ pub fn chart_line(c: &ChartDecl) -> String {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum WindowOf {
     /// `rows`: the sheet rows shown when not every data row is (`2:101`).
-    Table { name: String, rows: Option<(u32, u32)> },
+    Table {
+        name: String,
+        rows: Option<(u32, u32)>,
+    },
     /// A range of a sheet (`A1:F50`); its columns are named by their letters.
     Range { sheet: String, range: String },
 }
@@ -718,8 +913,13 @@ pub enum WindowOf {
 pub fn window_text(of: &WindowOf, header: &[String], rows: &[(u32, Vec<String>)]) -> String {
     let open = match of {
         WindowOf::Table { name, rows: None } => format!("<data table=\"{}\">", attr(name)),
-        WindowOf::Table { name, rows: Some((a, b)) } => format!("<data table=\"{}\" rows=\"{a}:{b}\">", attr(name)),
-        WindowOf::Range { sheet, range } => format!("<data sheet=\"{}\" range=\"{range}\">", attr(sheet)),
+        WindowOf::Table {
+            name,
+            rows: Some((a, b)),
+        } => format!("<data table=\"{}\" rows=\"{a}:{b}\">", attr(name)),
+        WindowOf::Range { sheet, range } => {
+            format!("<data sheet=\"{}\" range=\"{range}\">", attr(sheet))
+        }
     };
     let mut out = String::with_capacity(64 * (rows.len() + 3));
     out.push_str(&open);
@@ -762,31 +962,49 @@ mod tests {
     }
 
     fn errs(text: &str) -> Vec<String> {
-        let k1 = Keep { id: "k1".into(), kind: "merged-cells".into(), summary: "G1:H1".into() };
-        parse_spreadsheet(text, &Names { keeps: Some(vec![k1]), ..Default::default() })
-            .err()
-            .unwrap_or_default()
-            .into_iter()
-            .map(|d| d.to_string())
-            .collect()
+        let k1 = Keep {
+            id: "k1".into(),
+            kind: "merged-cells".into(),
+            summary: "G1:H1".into(),
+        };
+        parse_spreadsheet(
+            text,
+            &Names {
+                keeps: Some(vec![k1]),
+                ..Default::default()
+            },
+        )
+        .err()
+        .unwrap_or_default()
+        .into_iter()
+        .map(|d| d.to_string())
+        .collect()
     }
 
     #[test]
     fn errors_for_the_model() {
         let e = errs(&TEXT.replace("| 월 | date |", "| 월 | month |"));
-        assert!(e[0].contains("line 12") && e[0].contains("\"text\", \"number\", \"date\", \"mixed\""), "{e:?}");
+        assert!(
+            e[0].contains("line 12") && e[0].contains("\"text\", \"number\", \"date\", \"mixed\""),
+            "{e:?}"
+        );
         let e = errs(&TEXT.replace("</table>\n", ""));
         assert!(e[0].contains("not closed by a line </table>"), "{e:?}");
         let e = errs(&TEXT.replace(" title=", " colour=\"red\" title="));
         assert!(e[0].contains("no attribute \"colour\""), "{e:?}");
         let e = errs(&TEXT.replace("id=\"k1\"", "id=\"k2\""));
-        assert!(e[0].contains("placeholder id=\"k2\" is not in this file"), "{e:?}");
+        assert!(
+            e[0].contains("placeholder id=\"k2\" is not in this file"),
+            "{e:?}"
+        );
         let e = errs(&TEXT.replace("G1:H1", "G1:H2"));
         assert!(e[0].contains("was altered"), "{e:?}");
         let e = errs(&TEXT.replace("name=\"Sales\"", "name=\"A1\""));
         assert!(e[0].contains("reads as a cell address"), "{e:?}");
-        let e =
-            errs(&TEXT.replace("| 이익 | number | #,##0 | =[@매출]-[@원가] |", "| 이익 | number | #,##0 | [@매출] |"));
+        let e = errs(&TEXT.replace(
+            "| 이익 | number | #,##0 | =[@매출]-[@원가] |",
+            "| 이익 | number | #,##0 | [@매출] |",
+        ));
         assert!(e[0].contains("a formula starts with \"=\""), "{e:?}");
         let e = errs(&TEXT.replace("</sheet>\n", "| 2 | 2026-01 | 1 | 2 |\n</sheet>\n"));
         assert!(e[0].contains("range operations"), "{e:?}");
@@ -819,9 +1037,15 @@ mod tests {
     #[test]
     fn window() {
         let w = window_text(
-            &WindowOf::Table { name: "Sales".into(), rows: None },
+            &WindowOf::Table {
+                name: "Sales".into(),
+                rows: None,
+            },
             &["월".into(), "매출".into()],
-            &[(2, vec!["2026-01".into(), "12,000,000".into()]), (3, vec![String::new(), String::new()])],
+            &[
+                (2, vec!["2026-01".into(), "12,000,000".into()]),
+                (3, vec![String::new(), String::new()]),
+            ],
         );
         assert_eq!(w, "<data table=\"Sales\">\n| row | 월 | 매출 |\n|---|---|---|\n| 2 | 2026-01 | 12,000,000 |\n| 3 |  |  |\n</data>\n");
         assert_eq!(split_pipe_row("| a\\|b | c |").unwrap(), ["a|b", "c"]);

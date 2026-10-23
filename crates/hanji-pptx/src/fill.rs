@@ -13,7 +13,14 @@ use crate::text;
 /// A fill element as the file stores it (`a:solidFill`, `a:noFill`, …).
 pub type FillXml = String;
 
-const FILLS: &[&str] = &["a:noFill", "a:solidFill", "a:gradFill", "a:blipFill", "a:pattFill", "a:grpFill"];
+const FILLS: &[&str] = &[
+    "a:noFill",
+    "a:solidFill",
+    "a:gradFill",
+    "a:blipFill",
+    "a:pattFill",
+    "a:grpFill",
+];
 
 /// `p:spPr`'s children in schema order (local names).
 const SPPR_ORDER: &[&str] = &[
@@ -52,9 +59,14 @@ pub struct ThemeFills {
 
 impl ThemeFills {
     pub fn of(theme: &Element) -> ThemeFills {
-        let scheme = theme.child("a:themeElements").and_then(|t| t.child("a:fmtScheme"));
+        let scheme = theme
+            .child("a:themeElements")
+            .and_then(|t| t.child("a:fmtScheme"));
         let list = |n: &str| -> Vec<FillXml> {
-            scheme.and_then(|s| s.child(n)).map(|l| l.elements().map(Element::to_xml).collect()).unwrap_or_default()
+            scheme
+                .and_then(|s| s.child(n))
+                .map(|l| l.elements().map(Element::to_xml).collect())
+                .unwrap_or_default()
         };
         ThemeFills {
             fills: list("a:fillStyleLst"),
@@ -67,7 +79,10 @@ impl ThemeFills {
 
 /// The fill element of `el`'s own `p:spPr`, if it sets one.
 pub fn own(el: &Element) -> Option<FillXml> {
-    el.child("p:spPr")?.elements().find(|e| FILLS.contains(&e.name.as_str())).map(Element::to_xml)
+    el.child("p:spPr")?
+        .elements()
+        .find(|e| FILLS.contains(&e.name.as_str()))
+        .map(Element::to_xml)
 }
 
 /// The fill `el`'s `p:style` gives: its `a:fillRef` style from the theme,
@@ -130,17 +145,32 @@ pub fn shown(fill: Option<&FillXml>) -> Option<String> {
 /// a linear angle in whole degrees; `None` for any other gradient (shown as
 /// `gradient`, kept).
 fn linear_of(g: &Element) -> Option<Linear> {
-    let stops: Vec<&Element> = g.child("a:gsLst")?.elements().filter(|e| e.is("a:gs")).collect();
-    let [a, b] = stops.as_slice() else { return None };
+    let stops: Vec<&Element> = g
+        .child("a:gsLst")?
+        .elements()
+        .filter(|e| e.is("a:gs"))
+        .collect();
+    let [a, b] = stops.as_slice() else {
+        return None;
+    };
     if a.get("pos").as_deref() != Some("0") || b.get("pos").as_deref() != Some("100000") {
         return None;
     }
-    let ang: i64 = g.child("a:lin")?.get("ang").unwrap_or_else(|| "0".into()).parse().ok()?;
+    let ang: i64 = g
+        .child("a:lin")?
+        .get("ang")
+        .unwrap_or_else(|| "0".into())
+        .parse()
+        .ok()?;
     if ang % 60_000 != 0 || g.child("a:path").is_some() {
         return None;
     }
     let col = |s: &Element| hanji_format::vocab::Color::parse(&text::color_of(s)?).ok();
-    let l = Linear { angle: (ang / 60_000).rem_euclid(360), from: col(a)?, to: col(b)? };
+    let l = Linear {
+        angle: (ang / 60_000).rem_euclid(360),
+        from: col(a)?,
+        to: col(b)?,
+    };
     l.is_writable().then_some(l)
 }
 
@@ -168,7 +198,10 @@ fn linear_xml(g: Option<&FillXml>, want: &Linear) -> FillXml {
     }
     if let Some(gs) = e.child_mut("a:gsLst") {
         let mut stops = gs.elements_mut().filter(|x| x.is("a:gs"));
-        for (stop, (h, w)) in [(stops.next(), (&had.from, &want.from)), (stops.next(), (&had.to, &want.to))] {
+        for (stop, (h, w)) in [
+            (stops.next(), (&had.from, &want.from)),
+            (stops.next(), (&had.to, &want.to)),
+        ] {
             if let (Some(s), true) = (stop, h != w) {
                 s.children = vec![Node::El(fragment(&color(w)))];
             }
@@ -181,7 +214,8 @@ fn linear_xml(g: Option<&FillXml>, want: &Linear) -> FillXml {
 pub fn without_fill(el: &Element) -> Element {
     let mut e = el.clone();
     if let Some(sp) = e.child_mut("p:spPr") {
-        sp.children.retain(|n| !matches!(n, Node::El(c) if FILLS.contains(&c.name.as_str())));
+        sp.children
+            .retain(|n| !matches!(n, Node::El(c) if FILLS.contains(&c.name.as_str())));
     }
     e
 }
@@ -239,7 +273,8 @@ pub fn write(el: &mut Element, want: Option<&str>, p: Parents) -> Result<(), Str
         el.children.insert(at, Node::El(Element::new("p:spPr")));
     }
     let sp = el.child_mut("p:spPr").expect("p:spPr");
-    sp.children.retain(|n| !matches!(n, Node::El(c) if FILLS.contains(&c.name.as_str())));
+    sp.children
+        .retain(|n| !matches!(n, Node::El(c) if FILLS.contains(&c.name.as_str())));
     if let Some(f) = set {
         insert_ordered(sp, fragment(&f), SPPR_ORDER);
     }
@@ -264,23 +299,43 @@ mod tests {
                 "<p:sp><p:nvSpPr/><p:spPr/><p:style><a:fillRef idx=\"{idx}\"><a:schemeClr val=\"accent2\"/></a:fillRef></p:style></p:sp>"
             ))
         };
-        let p = Parents { now: None, then: None, theme: &theme };
-        assert_eq!(shown(effective(&sp(1), None, &theme).as_ref()).as_deref(), Some("accent2"));
-        assert_eq!(shown(effective(&sp(2), None, &theme).as_ref()).as_deref(), Some("accent2*"));
+        let p = Parents {
+            now: None,
+            then: None,
+            theme: &theme,
+        };
+        assert_eq!(
+            shown(effective(&sp(1), None, &theme).as_ref()).as_deref(),
+            Some("accent2")
+        );
+        assert_eq!(
+            shown(effective(&sp(2), None, &theme).as_ref()).as_deref(),
+            Some("accent2*")
+        );
         assert_eq!(shown(effective(&sp(0), None, &theme).as_ref()), None);
         // Removing the style's fill writes none; writing it back removes the shape's own.
         let mut e = sp(1);
         write(&mut e, None, p).unwrap();
-        assert!(e.to_xml().contains("<p:spPr><a:noFill/></p:spPr>"), "{}", e.to_xml());
+        assert!(
+            e.to_xml().contains("<p:spPr><a:noFill/></p:spPr>"),
+            "{}",
+            e.to_xml()
+        );
         write(&mut e, Some("accent2"), p).unwrap();
-        assert!(e.to_xml().contains("<p:spPr/>") || e.to_xml().contains("<p:spPr></p:spPr>"), "{}", e.to_xml());
+        assert!(
+            e.to_xml().contains("<p:spPr/>") || e.to_xml().contains("<p:spPr></p:spPr>"),
+            "{}",
+            e.to_xml()
+        );
         write(&mut e, Some("#FF7F50/50%"), p).unwrap();
         assert!(e
             .to_xml()
             .contains("<a:solidFill><a:srgbClr val=\"FF7F50\"><a:alpha val=\"50000\"/></a:srgbClr></a:solidFill>"));
         assert!(write(&mut sp(1), Some("gradient"), p).is_err());
         // Order: after the geometry, before the outline.
-        let mut e = fragment("<p:sp><p:nvSpPr/><p:spPr><a:xfrm/><a:prstGeom prst=\"rect\"/><a:ln/></p:spPr></p:sp>");
+        let mut e = fragment(
+            "<p:sp><p:nvSpPr/><p:spPr><a:xfrm/><a:prstGeom prst=\"rect\"/><a:ln/></p:spPr></p:sp>",
+        );
         write(&mut e, Some("accent1"), p).unwrap();
         assert!(e
             .to_xml()

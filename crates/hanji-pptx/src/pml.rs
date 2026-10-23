@@ -8,15 +8,22 @@ pub const R_NS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/re
 pub const P14_NS: &str = "http://schemas.microsoft.com/office/powerpoint/2010/main";
 
 pub const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-pub const REL_SLIDE: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide";
-pub const REL_LAYOUT: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout";
-pub const REL_NOTES: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide";
-pub const REL_IMAGE: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
-pub const REL_NOTES_MASTER: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster";
+pub const REL_SLIDE: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slide";
+pub const REL_LAYOUT: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout";
+pub const REL_NOTES: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide";
+pub const REL_IMAGE: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+pub const REL_NOTES_MASTER: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster";
 
 pub const CT_SLIDE: &str = "application/vnd.openxmlformats-officedocument.presentationml.slide+xml";
-pub const CT_NOTES: &str = "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml";
-pub const CT_MAIN: &str = "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml";
+pub const CT_NOTES: &str =
+    "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml";
+pub const CT_MAIN: &str =
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml";
 
 /// Stand-in, in a slide's or notes page's stored skeleton, for a modelled
 /// shape: `<hanji-item k="3"/>`.
@@ -81,11 +88,17 @@ pub fn placeholder(shape: &Element) -> Option<(String, u32, &Element)> {
 
 /// `p:cNvPr` of a shape.
 pub fn c_nv_pr(shape: &Element) -> Option<&Element> {
-    shape.elements().find(|e| e.name.starts_with("p:nv"))?.child("p:cNvPr")
+    shape
+        .elements()
+        .find(|e| e.name.starts_with("p:nv"))?
+        .child("p:cNvPr")
 }
 
 pub fn c_nv_pr_mut(shape: &mut Element) -> Option<&mut Element> {
-    shape.elements_mut().find(|e| e.name.starts_with("p:nv"))?.child_mut("p:cNvPr")
+    shape
+        .elements_mut()
+        .find(|e| e.name.starts_with("p:nv"))?
+        .child_mut("p:cNvPr")
 }
 
 /// A bullet setting of one paragraph level.
@@ -181,7 +194,10 @@ pub fn marks_of(rpr: Option<&Element>) -> hanji_format::Marks {
         .with(Marks::BOLD, on("b"))
         .with(Marks::ITALIC, on("i"))
         .with(Marks::UNDERLINE, get("u").is_some_and(|v| v != "none"))
-        .with(Marks::STRIKE, get("strike").is_some_and(|v| v != "noStrike"))
+        .with(
+            Marks::STRIKE,
+            get("strike").is_some_and(|v| v != "noStrike"),
+        )
 }
 
 /// The `a:rPr` attributes the marks are written in.
@@ -190,6 +206,13 @@ pub const MARK_ATTRS: &[&str] = &["b", "i", "u", "strike"];
 /// Every relationship id an attribute of `root` names (`r:id`, `r:embed`, …).
 pub fn named_rel_ids(root: &Element) -> std::collections::BTreeSet<String> {
     let mut ids = std::collections::BTreeSet::new();
-    root.walk(&mut |e| ids.extend(e.attrs.iter().filter(|a| a.0.starts_with("r:")).map(|a| a.1.clone())));
+    root.walk(&mut |e| {
+        ids.extend(
+            e.attrs
+                .iter()
+                .filter(|a| a.0.starts_with("r:"))
+                .map(|a| a.1.clone()),
+        )
+    });
     ids
 }

@@ -55,12 +55,17 @@ impl ThemeFonts {
         theme.walk(&mut |e| {
             if e.is("a:fontScheme") {
                 let face = |g: &str, k: &str| {
-                    e.child(g).and_then(|x| x.child(k)).and_then(|x| x.get("typeface")).filter(|t| !t.is_empty())
+                    e.child(g)
+                        .and_then(|x| x.child(k))
+                        .and_then(|x| x.get("typeface"))
+                        .filter(|t| !t.is_empty())
                 };
                 let hang = |g: &str| {
                     e.child(g)
                         .and_then(|x| {
-                            x.elements().find(|f| f.is("a:font") && f.get("script").as_deref() == Some("Hang"))
+                            x.elements().find(|f| {
+                                f.is("a:font") && f.get("script").as_deref() == Some("Hang")
+                            })
                         })
                         .and_then(|x| x.get("typeface"))
                         .filter(|t| !t.is_empty())
@@ -100,7 +105,11 @@ impl RunStyle {
             ea: self.ea.clone().or_else(|| under.ea.clone()),
             size: self.size.or(under.size),
             color: self.color.clone().or_else(|| under.color.clone()),
-            fill: if self.color.is_some() { self.fill.clone() } else { under.fill.clone() },
+            fill: if self.color.is_some() {
+                self.fill.clone()
+            } else {
+                under.fill.clone()
+            },
             hang: self.hang.clone().or_else(|| under.hang.clone()),
         }
     }
@@ -119,12 +128,20 @@ impl RunStyle {
     /// As the text shows it: the East Asian font when there is one, else
     /// the Latin one (round 6: `font` is the Korean text's).
     pub fn shown(&self) -> TextStyle {
-        TextStyle { font: self.ea.clone().or_else(|| self.latin.clone()), size: self.size, color: self.color.clone() }
+        TextStyle {
+            font: self.ea.clone().or_else(|| self.latin.clone()),
+            size: self.size,
+            color: self.color.clone(),
+        }
     }
 
     /// What an `a:rPr` or `a:defRPr` sets.
     pub fn of(rpr: &Element, fonts: &ThemeFonts) -> RunStyle {
-        let face = |k: &str| rpr.child(k).and_then(|x| x.get("typeface")).and_then(|t| fonts.resolve(&t));
+        let face = |k: &str| {
+            rpr.child(k)
+                .and_then(|x| x.get("typeface"))
+                .and_then(|t| fonts.resolve(&t))
+        };
         let hang = match rpr.child("a:ea").and_then(|x| x.get("typeface")).as_deref() {
             Some("+mj-ea") => fonts.major_hang.clone(),
             Some("+mn-ea") => fonts.minor_hang.clone(),
@@ -161,8 +178,11 @@ pub fn defaults(fonts: &ThemeFonts) -> RunStyle {
 pub fn levels(lst: Option<&Element>, fonts: &ThemeFonts) -> [RunStyle; 9] {
     let mut out: [RunStyle; 9] = Default::default();
     let Some(l) = lst else { return out };
-    let of =
-        |p: Option<&Element>| p.and_then(|p| p.child("a:defRPr")).map(|r| RunStyle::of(r, fonts)).unwrap_or_default();
+    let of = |p: Option<&Element>| {
+        p.and_then(|p| p.child("a:defRPr"))
+            .map(|r| RunStyle::of(r, fonts))
+            .unwrap_or_default()
+    };
     let def = of(l.child("a:defPPr"));
     for (k, o) in out.iter_mut().enumerate() {
         *o = of(l.child(&format!("a:lvl{}pPr", k + 1))).over(&def);
@@ -186,8 +206,16 @@ pub fn base(el: &Element, inherited: &[RunStyle; 9], fonts: &ThemeFonts) -> [Run
     let mut under = inherited.clone();
     if let Some(fr) = el.child("p:style").and_then(|s| s.child("a:fontRef")) {
         let (latin, ea, hang) = match fr.get("idx").as_deref() {
-            Some("major") => (fonts.major_latin.clone(), fonts.major_ea.clone(), fonts.major_hang.clone()),
-            Some("minor") => (fonts.minor_latin.clone(), fonts.minor_ea.clone(), fonts.minor_hang.clone()),
+            Some("major") => (
+                fonts.major_latin.clone(),
+                fonts.major_ea.clone(),
+                fonts.major_hang.clone(),
+            ),
+            Some("minor") => (
+                fonts.minor_latin.clone(),
+                fonts.minor_ea.clone(),
+                fonts.minor_hang.clone(),
+            ),
             _ => (None, None, None),
         };
         let color = color_of(fr);
@@ -196,17 +224,46 @@ pub fn base(el: &Element, inherited: &[RunStyle; 9], fonts: &ThemeFonts) -> [Run
             .filter(|c| is_kept(c))
             .and_then(|_| fr.elements().next())
             .map(|c| format!("<a:solidFill>{}</a:solidFill>", c.to_xml()));
-        let r = RunStyle { latin, ea, size: None, color, fill, hang };
-        under =
-            over(&[r.clone(), r.clone(), r.clone(), r.clone(), r.clone(), r.clone(), r.clone(), r.clone(), r], &under);
+        let r = RunStyle {
+            latin,
+            ea,
+            size: None,
+            color,
+            fill,
+            hang,
+        };
+        under = over(
+            &[
+                r.clone(),
+                r.clone(),
+                r.clone(),
+                r.clone(),
+                r.clone(),
+                r.clone(),
+                r.clone(),
+                r.clone(),
+                r,
+            ],
+            &under,
+        );
     }
-    let own = levels(el.child("p:txBody").and_then(|t| t.child("a:lstStyle")), fonts);
+    let own = levels(
+        el.child("p:txBody").and_then(|t| t.child("a:lstStyle")),
+        fonts,
+    );
     over(&own, &under)
 }
 
 // ---------------------------------------------------------------- colours
 
-const FILLS: &[&str] = &["a:noFill", "a:solidFill", "a:gradFill", "a:blipFill", "a:pattFill", "a:grpFill"];
+const FILLS: &[&str] = &[
+    "a:noFill",
+    "a:solidFill",
+    "a:gradFill",
+    "a:blipFill",
+    "a:pattFill",
+    "a:grpFill",
+];
 
 /// The colour an `a:rPr` fill gives its text: a colour, `none`, or what the
 /// text shows but cannot write (`gradient`, `pattern`, `picture`).
@@ -226,7 +283,10 @@ fn fill_color(rpr: &Element) -> Option<String> {
 /// (`a:solidFill`, `a:fontRef`, …).
 pub fn color_of(holder: &Element) -> Option<String> {
     let c = holder.elements().find(|e| {
-        matches!(e.name.as_str(), "a:srgbClr" | "a:schemeClr" | "a:sysClr" | "a:prstClr" | "a:scrgbClr" | "a:hslClr")
+        matches!(
+            e.name.as_str(),
+            "a:srgbClr" | "a:schemeClr" | "a:sysClr" | "a:prstClr" | "a:scrgbClr" | "a:hslClr"
+        )
     })?;
     let v = c.get("val").unwrap_or_default();
     let base = match c.name.as_str() {
@@ -236,23 +296,42 @@ pub fn color_of(holder: &Element) -> Option<String> {
         "a:schemeClr" if style::THEME_COLORS.contains(&v.as_str()) => v,
         "a:sysClr" => {
             let last = c.get("lastClr").filter(|l| l.len() == 6);
-            let hex = last.unwrap_or_else(|| if v == "window" { "FFFFFF".into() } else { "000000".into() });
+            let hex = last.unwrap_or_else(|| {
+                if v == "window" {
+                    "FFFFFF".into()
+                } else {
+                    "000000".into()
+                }
+            });
             format!("#{}", hex.to_ascii_uppercase())
         }
         "a:prstClr" => format!("#{}", preset_color(&v)?),
         "a:scrgbClr" => {
-            let ch = |k: &str| c.get(k).and_then(|x| x.parse::<f64>().ok()).unwrap_or(0.0) / 100_000.0;
+            let ch =
+                |k: &str| c.get(k).and_then(|x| x.parse::<f64>().ok()).unwrap_or(0.0) / 100_000.0;
             let s = |l: f64| {
                 let l = l.clamp(0.0, 1.0);
-                let v = if l <= 0.003_130_8 { 12.92 * l } else { 1.055 * l.powf(1.0 / 2.4) - 0.055 };
+                let v = if l <= 0.003_130_8 {
+                    12.92 * l
+                } else {
+                    1.055 * l.powf(1.0 / 2.4) - 0.055
+                };
                 (v * 255.0).round() as u8
             };
             format!("#{:02X}{:02X}{:02X}", s(ch("r")), s(ch("g")), s(ch("b")))
         }
         "a:hslClr" => {
             let n = |k: &str| c.get(k).and_then(|x| x.parse::<f64>().ok()).unwrap_or(0.0);
-            let (h, s, l) = (n("hue") / 60_000.0 / 360.0, n("sat") / 100_000.0, n("lum") / 100_000.0);
-            let q = if l < 0.5 { l * (1.0 + s) } else { l + s - l * s };
+            let (h, s, l) = (
+                n("hue") / 60_000.0 / 360.0,
+                n("sat") / 100_000.0,
+                n("lum") / 100_000.0,
+            );
+            let q = if l < 0.5 {
+                l * (1.0 + s)
+            } else {
+                l + s - l * s
+            };
             let p = 2.0 * l - q;
             let t = |mut t: f64| {
                 t = t.rem_euclid(1.0);
@@ -267,7 +346,12 @@ pub fn color_of(holder: &Element) -> Option<String> {
                 };
                 (v.clamp(0.0, 1.0) * 255.0).round() as u8
             };
-            format!("#{:02X}{:02X}{:02X}", t(h + 1.0 / 3.0), t(h), t(h - 1.0 / 3.0))
+            format!(
+                "#{:02X}{:02X}{:02X}",
+                t(h + 1.0 / 3.0),
+                t(h),
+                t(h - 1.0 / 3.0)
+            )
         }
         _ => return None,
     };
@@ -291,7 +375,9 @@ pub fn color_of(holder: &Element) -> Option<String> {
         (Some(m), Some(o)) if m + o == 100_000 && c.is("a:schemeClr") => {
             Some(pct(o).map_or("*".to_string(), |n| format!("+{n}%")))
         }
-        (Some(m), None) if c.is("a:schemeClr") => Some(pct(100_000 - m).map_or("*".to_string(), |n| format!("-{n}%"))),
+        (Some(m), None) if c.is("a:schemeClr") => {
+            Some(pct(100_000 - m).map_or("*".to_string(), |n| format!("-{n}%")))
+        }
         _ => Some("*".to_string()),
     };
     if let Some(t) = tint {
@@ -312,10 +398,16 @@ pub fn fill_xml(c: &str) -> String {
         return "<a:noFill/>".into();
     }
     use hanji_format::vocab::{Color, ColorBase, Tint};
-    let Ok(col) = Color::parse(c) else { return "<a:noFill/>".into() };
+    let Ok(col) = Color::parse(c) else {
+        return "<a:noFill/>".into();
+    };
     let mut mods = match col.tint {
         Tint::Lighter(n) => {
-            format!("<a:lumMod val=\"{}\"/><a:lumOff val=\"{}\"/>", (100 - n as i64) * 1000, n as i64 * 1000)
+            format!(
+                "<a:lumMod val=\"{}\"/><a:lumOff val=\"{}\"/>",
+                (100 - n as i64) * 1000,
+                n as i64 * 1000
+            )
         }
         Tint::Darker(n) => format!("<a:lumMod val=\"{}\"/>", (100 - n as i64) * 1000),
         _ => String::new(),
@@ -345,7 +437,8 @@ pub fn without_shown(rpr: &mut Element) {
 
 /// `rpr` takes `fill` (an `a:rPr` fill element's XML) in place of its own.
 pub fn set_fill(rpr: &mut Element, fill: &str) {
-    rpr.children.retain(|n| !matches!(n, Node::El(e) if FILLS.contains(&e.name.as_str())));
+    rpr.children
+        .retain(|n| !matches!(n, Node::El(e) if FILLS.contains(&e.name.as_str())));
     insert_ordered(rpr, fragment(fill), RPR_ORDER);
 }
 
@@ -442,8 +535,13 @@ pub fn write(
             rpr.set("sz", &s.to_string());
         }
     }
-    if let Some(c) = want.color.as_ref().filter(|c| Some(*c) != had.color.as_ref()) {
-        rpr.children.retain(|n| !matches!(n, Node::El(e) if FILLS.contains(&e.name.as_str())));
+    if let Some(c) = want
+        .color
+        .as_ref()
+        .filter(|c| Some(*c) != had.color.as_ref())
+    {
+        rpr.children
+            .retain(|n| !matches!(n, Node::El(e) if FILLS.contains(&e.name.as_str())));
         if Some(c) != inherited.color.as_ref() {
             if is_kept(c) {
                 return Err(format!(
@@ -455,13 +553,22 @@ pub fn write(
         }
     }
     if let Some(f) = want.font.as_ref().filter(|f| Some(*f) != had.font.as_ref()) {
-        rpr.children.retain(|n| !matches!(n, Node::El(e) if e.is("a:latin") || e.is("a:ea")));
+        rpr.children
+            .retain(|n| !matches!(n, Node::El(e) if e.is("a:latin") || e.is("a:ea")));
         if Some(f) != inherited.font.as_ref() {
-            insert_ordered(rpr, Element::new("a:latin").with_attr("typeface", f), RPR_ORDER);
+            insert_ordered(
+                rpr,
+                Element::new("a:latin").with_attr("typeface", f),
+                RPR_ORDER,
+            );
             // Where the run shows its East Asian font (in Korean text, the
             // theme's Hangul face), that is the one written too.
             if base.ea.is_some() || (hangul && base.hang.is_some()) {
-                insert_ordered(rpr, Element::new("a:ea").with_attr("typeface", f), RPR_ORDER);
+                insert_ordered(
+                    rpr,
+                    Element::new("a:ea").with_attr("typeface", f),
+                    RPR_ORDER,
+                );
             }
         }
     }
@@ -476,5 +583,7 @@ pub(crate) fn is_hangul(c: char) -> bool {
 /// Whether a paragraph's units hold Hangul: in such a paragraph the text
 /// shows the theme's Hangul face ([`RunStyle::shown_for`]).
 pub(crate) fn has_hangul(units: &[hanji_format::Unit]) -> bool {
-    units.iter().any(|u| matches!(u.atom, hanji_format::Atom::Char(c) if is_hangul(c)))
+    units
+        .iter()
+        .any(|u| matches!(u.atom, hanji_format::Atom::Char(c) if is_hangul(c)))
 }

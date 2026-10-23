@@ -19,7 +19,10 @@ pub mod safety;
 
 use std::collections::{BTreeSet, HashMap};
 
-use hanji_core::{Block, Capabilities, Engine, EngineError, ImportOptions, ImportReport, Imported, Kind, Remainder};
+use hanji_core::{
+    Block, Capabilities, Engine, EngineError, ImportOptions, ImportReport, Imported, Kind,
+    Remainder,
+};
 use hanji_format::{self as fmt, FrontMatter};
 use serde::{Deserialize, Serialize};
 
@@ -57,8 +60,10 @@ pub struct PackageShell {
 
 /// The package's section parts, in section order.
 fn section_parts(parts: &[hanji_core::Part]) -> Vec<String> {
-    let mut v: Vec<(u32, String)> =
-        parts.iter().filter_map(|p| section_number(&p.name).map(|n| (n, p.name.clone()))).collect();
+    let mut v: Vec<(u32, String)> = parts
+        .iter()
+        .filter_map(|p| section_number(&p.name).map(|n| (n, p.name.clone())))
+        .collect();
     v.sort();
     v.into_iter().map(|x| x.1).collect()
 }
@@ -81,7 +86,9 @@ impl HwpxEngine {
         let pkg = |m: String| EngineError::Package(m);
         let mut parts = package::read(package).map_err(pkg)?;
         if package::get(&parts, "mimetype").is_none_or(|m| !m.starts_with(b"application/hwp+zip")) {
-            return Err(pkg("not an hwpx package: it has no mimetype part saying application/hwp+zip".into()));
+            return Err(pkg(
+                "not an hwpx package: it has no mimetype part saying application/hwp+zip".into(),
+            ));
         }
         let names = section_parts(&parts);
         if names.is_empty() {
@@ -89,7 +96,8 @@ impl HwpxEngine {
         }
         let mut sections = vec![];
         for n in &names {
-            let d = xml::parse(package::get(&parts, n).unwrap()).map_err(|e| pkg(format!("{n}: {e}")))?;
+            let d = xml::parse(package::get(&parts, n).unwrap())
+                .map_err(|e| pkg(format!("{n}: {e}")))?;
             if d.root.name != "hs:sec" || !d.root.attrs.iter().any(|a| a.0 == "xmlns:hp") {
                 return Err(pkg(format!(
                     "{n}: the section must be <hs:sec> with the paragraph namespace as hp: (other prefixes are not supported yet)"
@@ -107,7 +115,9 @@ impl HwpxEngine {
         let mut blocks = vec![];
         let mut shells = vec![];
         for (k, (name, d)) in sections.iter().enumerate() {
-            let start = imp.section(k, &d.root, &mut blocks).map_err(|e| pkg(format!("{name}: {e}")))?;
+            let start = imp
+                .section(k, &d.root, &mut blocks)
+                .map_err(|e| pkg(format!("{name}: {e}")))?;
             shells.push(SectionShell {
                 part: name.clone(),
                 prolog: d.prolog.clone(),
@@ -132,7 +142,10 @@ impl HwpxEngine {
                 p.data.clear();
             }
         }
-        let shell = PackageShell { sections: shells, tracked: split.tracked };
+        let shell = PackageShell {
+            sections: shells,
+            tracked: split.tracked,
+        };
         let rem = Remainder {
             format: "hwpx".into(),
             namespaces,
@@ -152,20 +165,33 @@ impl Engine for HwpxEngine {
     }
 
     fn capabilities(&self) -> Capabilities {
-        Capabilities { formatting: true, ..Default::default() }
+        Capabilities {
+            formatting: true,
+            ..Default::default()
+        }
     }
 
     fn import(&self, package: &[u8], opts: &ImportOptions) -> Result<Imported, EngineError> {
         let (blocks, remainder, report, _) = Self::split(package, opts)?;
         let text = Self::text_of(&blocks, &remainder, opts.template.as_deref());
-        Ok(Imported { text, remainder, report })
+        Ok(Imported {
+            text,
+            remainder,
+            report,
+        })
     }
 
     fn export(&self, text: &str, rem: &Remainder) -> Result<Vec<u8>, EngineError> {
-        let (_, blocks) = hanji_core::model_of(text, rem, self.capabilities()).map_err(EngineError::Invalid)?;
+        let (_, blocks) =
+            hanji_core::model_of(text, rem, self.capabilities()).map_err(EngineError::Invalid)?;
         // The style section as the text has it.
         let mut rem = rem.clone();
-        hanji_core::TextModel::restyle(&hanji_core::DocumentModel, text, &mut rem, self.capabilities());
+        hanji_core::TextModel::restyle(
+            &hanji_core::DocumentModel,
+            text,
+            &mut rem,
+            self.capabilities(),
+        );
         write_package(&rem, export_sections(&blocks, &rem)?)
     }
 }
@@ -187,31 +213,49 @@ impl HwpxEngine {
         for s in &mut rem.styles.paragraph {
             format::snap_props(&mut s.props);
         }
-        let Ok(header) = Header::read(package::get(&rem.parts, HEADER_PART)) else { return };
+        let Ok(header) = Header::read(package::get(&rem.parts, HEADER_PART)) else {
+            return;
+        };
         let f = export::Fmt::new(&rem.styles);
         // A new table's cells, as export draws them.
         let look = match rem.entries.iter().find(|e| e.kind == Kind::Tc) {
             Some(e) => header.cell_box(&xml::fragment(&e.xml[0]), &xml::fragment(&e.xml[1])),
             None => {
                 let mut p = Props::new();
-                let line = hanji_format::Key::BorderTop.parse(Some("0.34pt solid #000000")).unwrap();
+                let line = hanji_format::Key::BorderTop
+                    .parse(Some("0.34pt solid #000000"))
+                    .unwrap();
                 for k in hanji_format::Key::SIDES {
                     p.set(k, line.clone());
                 }
-                p.set(hanji_format::Key::Valign, hanji_format::Value::Choice("middle".into()));
+                p.set(
+                    hanji_format::Key::Valign,
+                    hanji_format::Value::Choice("middle".into()),
+                );
                 p
             }
         }
         .diff(&styled::box_default());
         for (bi, b) in blocks.iter_mut().enumerate() {
             let Block::Table(t) = b else { continue };
-            let new = !rem.entries.iter().any(|e| e.kind == Kind::Tbl && e.path == [bi] && e.meta.tag.is_empty());
+            let new = !rem
+                .entries
+                .iter()
+                .any(|e| e.kind == Kind::Tbl && e.path == [bi] && e.meta.tag.is_empty());
             if new && t.boxes.iter().flatten().all(Props::is_empty) {
                 t.boxes = t
                     .rows
                     .iter()
                     .map(|r| {
-                        r.iter().map(|c| if matches!(c, Cell::Text(_)) { look.clone() } else { Props::new() }).collect()
+                        r.iter()
+                            .map(|c| {
+                                if matches!(c, Cell::Text(_)) {
+                                    look.clone()
+                                } else {
+                                    Props::new()
+                                }
+                            })
+                            .collect()
                     })
                     .collect();
             }
@@ -224,7 +268,10 @@ impl HwpxEngine {
             if !styled::shows(content) {
                 return;
             }
-            let Some(e) = rem.entries.iter_mut().find(|e| e.kind == Kind::Ppr && e.path == path && e.meta.unshown)
+            let Some(e) = rem
+                .entries
+                .iter_mut()
+                .find(|e| e.kind == Kind::Ppr && e.path == path && e.meta.unshown)
             else {
                 return;
             };
@@ -235,14 +282,22 @@ impl HwpxEngine {
             let x = xml::fragment(&e.xml[0]);
             let sid = e.meta.style.clone().unwrap_or_else(|| "0".into());
             let style = if style.is_empty() {
-                rem.styles.paragraph_name(&sid).unwrap_or(&rem.styles.default_paragraph).to_string()
+                rem.styles
+                    .paragraph_name(&sid)
+                    .unwrap_or(&rem.styles.default_paragraph)
+                    .to_string()
             } else {
                 style.to_string()
             };
             let ppr = x
                 .get("paraPrIDRef")
                 .and_then(|v| v.parse().ok())
-                .or_else(|| sid.parse().ok().and_then(|id| header.style(id)).map(|st| st.para_pr));
+                .or_else(|| {
+                    sid.parse()
+                        .ok()
+                        .and_then(|id| header.style(id))
+                        .map(|st| st.para_pr)
+                });
             if let Some(ppr) = ppr {
                 let base = f.of(&style);
                 *props = header.para_values(ppr).only(&styled::PARA_OWN).diff(base);
@@ -278,7 +333,11 @@ impl HwpxEngine {
     /// its shape; unless its text writes an indent of its own.
     fn level_indents(blocks: &mut [Block], rem: &Remainder, header: &Header, f: &export::Fmt) {
         let ind = import::LIST_INDENT;
-        let own = |bi: usize| rem.entries.iter().find(|e| e.kind == Kind::Ppr && e.path == [bi]);
+        let own = |bi: usize| {
+            rem.entries
+                .iter()
+                .find(|e| e.kind == Kind::Ppr && e.path == [bi])
+        };
         fn item_of(b: &Block) -> Option<(hanji_core::ListItem, &hanji_core::Para)> {
             match b {
                 Block::Para(p) => p.item.map(|i| (i, p)),
@@ -293,14 +352,21 @@ impl HwpxEngine {
             }
         };
         let stable = |k: usize| {
-            item_of(&blocks[k])
-                .is_some_and(|(i, _)| own(k).and_then(|e| e.meta.item).is_some_and(|w| w.level == i.level))
+            item_of(&blocks[k]).is_some_and(|(i, _)| {
+                own(k)
+                    .and_then(|e| e.meta.item)
+                    .is_some_and(|w| w.level == i.level)
+            })
         };
         let mut fixes = vec![];
         for bi in 0..blocks.len() {
-            let Some((it, p)) = item_of(&blocks[bi]) else { continue };
+            let Some((it, p)) = item_of(&blocks[bi]) else {
+                continue;
+            };
             let e = own(bi);
-            let moved = e.and_then(|e| e.meta.item).is_some_and(|w| w.level != it.level);
+            let moved = e
+                .and_then(|e| e.meta.item)
+                .is_some_and(|w| w.level != it.level);
             if e.is_some() && !moved {
                 continue;
             }
@@ -309,24 +375,36 @@ impl HwpxEngine {
                 // Moved: an indent it had is carried, not written.
                 let x = xml::fragment(&e.xml[0]);
                 let ppr = x.get("paraPrIDRef").and_then(|v| v.parse().ok());
-                let had = ppr.map(|id| header.para_values(id).only(&ind).diff(&base)).unwrap_or_default();
+                let had = ppr
+                    .map(|id| header.para_values(id).only(&ind).diff(&base))
+                    .unwrap_or_default();
                 if p.props.only(&ind) != had {
                     continue;
                 }
             } else if !p.props.only(&ind).is_empty() {
                 continue;
             }
-            let lo = (0..=bi).rev().take_while(|&k| item_of(&blocks[k]).is_some()).last().unwrap_or(bi);
-            let hi = (bi..blocks.len()).take_while(|&k| item_of(&blocks[k]).is_some()).last().unwrap_or(bi);
+            let lo = (0..=bi)
+                .rev()
+                .take_while(|&k| item_of(&blocks[k]).is_some())
+                .last()
+                .unwrap_or(bi);
+            let hi = (bi..blocks.len())
+                .take_while(|&k| item_of(&blocks[k]).is_some())
+                .last()
+                .unwrap_or(bi);
             let mut near: Vec<usize> = (0..blocks.len())
                 .filter(|&k| {
                     k != bi
                         && stable(k)
-                        && item_of(&blocks[k]).is_some_and(|(i, _)| i.level == it.level && i.ordered == it.ordered)
+                        && item_of(&blocks[k])
+                            .is_some_and(|(i, _)| i.level == it.level && i.ordered == it.ordered)
                 })
                 .collect();
             near.sort_by_key(|&k| (!(lo..=hi).contains(&k), k.abs_diff(bi), k));
-            let Some((_, q)) = near.first().and_then(|&k| item_of(&blocks[k])) else { continue };
+            let Some((_, q)) = near.first().and_then(|&k| item_of(&blocks[k])) else {
+                continue;
+            };
             let eff = f.of(&style_of(q)).only(&ind).overlay(&q.props.only(&ind));
             fixes.push((bi, eff.diff(&base)));
         }
@@ -368,8 +446,13 @@ pub fn layout_problems(package: &[u8]) -> Result<Vec<String>, String> {
     let parts = package::read(package)?;
     let mut out = vec![];
     for name in section_parts(&parts) {
-        let d = xml::parse(package::get(&parts, &name).unwrap()).map_err(|e| format!("{name}: {e}"))?;
-        out.extend(owpml::layout_problems(&d.root).into_iter().map(|p| format!("{name}: {p}")));
+        let d =
+            xml::parse(package::get(&parts, &name).unwrap()).map_err(|e| format!("{name}: {e}"))?;
+        out.extend(
+            owpml::layout_problems(&d.root)
+                .into_iter()
+                .map(|p| format!("{name}: {p}")),
+        );
     }
     Ok(out)
 }
@@ -378,10 +461,13 @@ pub fn layout_problems(package: &[u8]) -> Result<Vec<String>, String> {
 pub fn export_sections(blocks: &[Block], rem: &Remainder) -> Result<Exported, EngineError> {
     let refused = EngineError::Refused;
     let shell: PackageShell = serde_json::from_str(
-        rem.shell.first().ok_or_else(|| EngineError::Package("remainder has no package shell".into()))?,
+        rem.shell
+            .first()
+            .ok_or_else(|| EngineError::Package("remainder has no package shell".into()))?,
     )
     .map_err(|e| EngineError::Package(e.to_string()))?;
-    let mut header = Header::read(package::get(&rem.parts, HEADER_PART)).map_err(EngineError::Package)?;
+    let mut header =
+        Header::read(package::get(&rem.parts, HEADER_PART)).map_err(EngineError::Package)?;
     let lists = hanji_core::plan_lists(blocks, &rem.entries, &mut header).map_err(refused)?;
     tracked_groups_intact(blocks, rem).map_err(refused)?;
     // The style section (§5.2): changed styles point at new shapes, new ones are written.
@@ -429,7 +515,10 @@ pub fn export_sections(blocks: &[Block], rem: &Remainder) -> Result<Exported, En
         x.push_str(&s.epilog);
         sections.push((name.to_string(), x.into_bytes()));
     }
-    Ok(Exported { sections, header: ex.header.part() })
+    Ok(Exported {
+        sections,
+        header: ex.header.part(),
+    })
 }
 
 /// The paragraphs of one tracked change stay together, all of them and in
@@ -443,12 +532,18 @@ fn tracked_groups_intact(blocks: &[Block], rem: &Remainder) -> Result<(), String
     let is_break = |b: &Block| matches!(b, Block::Para(p) if export::is_page_break(&p.content));
     for (bi, b) in blocks.iter().filter(|b| !is_break(b)).enumerate() {
         let Block::Keep(id) = b else { continue };
-        let Some(e) =
-            rem.entries.iter().find(|e| e.kind == Kind::Bkeep && e.meta.keep.as_ref().is_some_and(|k| &k.id == id))
+        let Some(e) = rem
+            .entries
+            .iter()
+            .find(|e| e.kind == Kind::Bkeep && e.meta.keep.as_ref().is_some_and(|k| &k.id == id))
         else {
             continue;
         };
-        if e.meta.keep.as_ref().is_none_or(|k| k.kind != "tracked-change") {
+        if e.meta
+            .keep
+            .as_ref()
+            .is_none_or(|k| k.kind != "tracked-change")
+        {
             continue;
         }
         let g = e.meta.aux[0].as_str();
@@ -462,7 +557,10 @@ fn tracked_groups_intact(blocks: &[Block], rem: &Remainder) -> Result<(), String
         let total = e.meta.aux.get(1).and_then(|n| n.parse().ok());
         count.entry(g).or_insert((0, total, s)).0 += 1;
     }
-    if let Some((_, _, s)) = count.values().find(|(n, total, _)| total.is_some_and(|t| *n != t)) {
+    if let Some((_, _, s)) = count
+        .values()
+        .find(|(n, total, _)| total.is_some_and(|t| *n != t))
+    {
         return Err(format!("the edit removes a paragraph of a tracked change that spans paragraphs ({s}); tracked changes cannot be dropped on export. Keep its placeholders, or accept or reject the change in Hancom first"));
     }
     Ok(())

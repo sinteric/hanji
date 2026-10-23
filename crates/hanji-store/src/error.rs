@@ -49,7 +49,10 @@ pub struct Loss {
 
 impl Loss {
     pub fn of(kind: Kind, reason: &str) -> Loss {
-        Loss { kind: format!("{kind:?}").to_lowercase(), reason: name_in(reason).into_owned() }
+        Loss {
+            kind: format!("{kind:?}").to_lowercase(),
+            reason: name_in(reason).into_owned(),
+        }
     }
 }
 
@@ -63,7 +66,11 @@ pub struct Item {
 
 impl From<&Notice> for Item {
     fn from(n: &Notice) -> Item {
-        Item { kind: n.kind.clone(), location: n.location.clone(), detail: n.detail.clone() }
+        Item {
+            kind: n.kind.clone(),
+            location: n.location.clone(),
+            detail: n.detail.clone(),
+        }
     }
 }
 
@@ -80,7 +87,13 @@ pub struct Diag {
 }
 
 pub fn diags(ds: &[Diagnostic]) -> Vec<Diag> {
-    ds.iter().map(|d| Diag { line: d.line, col: d.col, message: name_in(&d.message).into_owned() }).collect()
+    ds.iter()
+        .map(|d| Diag {
+            line: d.line,
+            col: d.col,
+            message: name_in(&d.message).into_owned(),
+        })
+        .collect()
 }
 
 /// Lines of a revision the edit and a person's edits both change.
@@ -135,7 +148,11 @@ impl Error {
             std::borrow::Cow::Borrowed(_) => message,
             std::borrow::Cow::Owned(m) => m,
         };
-        Error { code, message, detail: Box::default() }
+        Error {
+            code,
+            message,
+            detail: Box::default(),
+        }
     }
 
     pub fn bad(message: impl Into<String>) -> Error {
@@ -151,7 +168,10 @@ impl Error {
     }
 
     pub fn invalid(ds: &[Diagnostic]) -> Error {
-        let mut e = Error::new(Code::Invalid, format!("the text is not valid:\n{}", hanji_format::diag::render(ds)));
+        let mut e = Error::new(
+            Code::Invalid,
+            format!("the text is not valid:\n{}", hanji_format::diag::render(ds)),
+        );
         e.detail.diagnostics = diags(ds);
         e
     }
@@ -178,9 +198,13 @@ impl From<EngineError> for Error {
     fn from(e: EngineError) -> Error {
         match e {
             EngineError::Invalid(d) => Error::invalid(&d),
-            EngineError::Package(m) => Error::new(Code::Package, format!("the package cannot be read: {m}")),
+            EngineError::Package(m) => {
+                Error::new(Code::Package, format!("the package cannot be read: {m}"))
+            }
             EngineError::Refused(m) => Error::new(Code::Refused, format!("refused: {m}")),
-            EngineError::Unsupported(m) => Error::new(Code::Unsupported, format!("not supported: {m}")),
+            EngineError::Unsupported(m) => {
+                Error::new(Code::Unsupported, format!("not supported: {m}"))
+            }
         }
     }
 }
@@ -191,8 +215,15 @@ impl From<Refusal> for Error {
             Refusal::Invalid(d) => Error::invalid(&d),
             Refusal::Edit(m) => Error::bad(m),
             Refusal::Unplaceable(rep) => {
-                let mut e = Error::new(Code::Unplaceable, Refusal::Unplaceable(rep.clone()).to_string());
-                e.detail.lost = rep.refused.iter().map(|(_, k, why)| Loss::of(*k, why)).collect();
+                let mut e = Error::new(
+                    Code::Unplaceable,
+                    Refusal::Unplaceable(rep.clone()).to_string(),
+                );
+                e.detail.lost = rep
+                    .refused
+                    .iter()
+                    .map(|(_, k, why)| Loss::of(*k, why))
+                    .collect();
                 e
             }
         }

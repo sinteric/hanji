@@ -101,7 +101,9 @@ pub enum SlideItem {
 /// Where an object is (§5.3): its box in EMU as written (the text shows
 /// whole points, 1 pt = 12,700 EMU), its rotation in 60,000ths of a degree
 /// clockwise, and its flips.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct Geom {
     pub x: i64,
     pub y: i64,
@@ -114,7 +116,9 @@ pub struct Geom {
 
 /// A line's two ends in EMU, as written, and the connection sites they are
 /// attached to (§5.3): an attached end is where its site is.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct Ends {
     pub from: (i64, i64),
     pub to: (i64, i64),
@@ -143,13 +147,23 @@ impl Attach {
         if !digits(id) || !digits(site) {
             return None;
         }
-        Some(Attach { group, id: id.parse().ok()?, site: site.parse().ok()? })
+        Some(Attach {
+            group,
+            id: id.parse().ok()?,
+            site: site.parse().ok()?,
+        })
     }
 }
 
 impl std::fmt::Display for Attach {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}{}.{}", if self.group { 'g' } else { 's' }, self.id, self.site)
+        write!(
+            f,
+            "{}{}.{}",
+            if self.group { 'g' } else { 's' },
+            self.id,
+            self.site
+        )
     }
 }
 
@@ -222,19 +236,32 @@ impl Geom {
     /// As the text shows it: every number rounded.
     pub fn shown(&self) -> Geom {
         let r = |v: i64| shown_pt(v) * EMU_PER_PT;
-        Geom { x: r(self.x), y: r(self.y), w: r(self.w), h: r(self.h), rot: shown_deg(self.rot) * 60_000, ..*self }
+        Geom {
+            x: r(self.x),
+            y: r(self.y),
+            w: r(self.w),
+            h: r(self.h),
+            rot: shown_deg(self.rot) * 60_000,
+            ..*self
+        }
     }
 }
 
 impl Ends {
     pub fn shows_as(&self, other: &Ends) -> bool {
-        let p = |a: (i64, i64), b: (i64, i64)| shown_pt(a.0) == shown_pt(b.0) && shown_pt(a.1) == shown_pt(b.1);
+        let p = |a: (i64, i64), b: (i64, i64)| {
+            shown_pt(a.0) == shown_pt(b.0) && shown_pt(a.1) == shown_pt(b.1)
+        };
         p(self.from, other.from) && p(self.to, other.to)
     }
 
     pub fn merged(&self, written: &Ends) -> Ends {
         let k = |a: (i64, i64), b: (i64, i64)| (keep_or(a.0, b.0), keep_or(a.1, b.1));
-        Ends { from: k(self.from, written.from), to: k(self.to, written.to), ..*written }
+        Ends {
+            from: k(self.from, written.from),
+            to: k(self.to, written.to),
+            ..*written
+        }
     }
 }
 
@@ -295,7 +322,9 @@ pub struct PictureItem {
 /// How much of the image is cut off at each edge, left, top, right and
 /// bottom, in thousandths of a percent of its size (`a:srcRect`); the text
 /// shows percent. A negative value leaves space beside the image.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Copy, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub struct Crop {
     pub l: i64,
     pub t: i64,
@@ -309,7 +338,11 @@ pub const PER_PERCENT: i64 = 1_000;
 /// A crop value (thousandths of a percent) as the text shows it: percent, at most one decimal.
 pub fn shown_pct(v: i64) -> String {
     let tenths = (v as f64 / 100.0).round() as i64;
-    let (sign, a) = if tenths < 0 { ("-", -tenths) } else { ("", tenths) };
+    let (sign, a) = if tenths < 0 {
+        ("-", -tenths)
+    } else {
+        ("", tenths)
+    };
     if a % 10 == 0 {
         format!("{sign}{}", a / 10)
     } else {
@@ -328,19 +361,32 @@ impl Crop {
 
     /// The same crop as `other` as the text shows them.
     pub fn shows_as(&self, other: &Crop) -> bool {
-        self.vals().iter().zip(other.vals()).all(|(a, b)| shown_pct(*a) == shown_pct(b))
+        self.vals()
+            .iter()
+            .zip(other.vals())
+            .all(|(a, b)| shown_pct(*a) == shown_pct(b))
     }
 
     /// `written`, each value left as `self` shows it keeping its exact value.
     pub fn merged(&self, written: &Crop) -> Crop {
         let k = |s: i64, w: i64| if shown_pct(s) == shown_pct(w) { s } else { w };
-        Crop { l: k(self.l, written.l), t: k(self.t, written.t), r: k(self.r, written.r), b: k(self.b, written.b) }
+        Crop {
+            l: k(self.l, written.l),
+            t: k(self.t, written.t),
+            r: k(self.r, written.r),
+            b: k(self.b, written.b),
+        }
     }
 
     /// As the text shows it: every value rounded to a tenth of a percent.
     pub fn shown(&self) -> Crop {
         let r = |v: i64| (v as f64 / 100.0).round() as i64 * 100;
-        Crop { l: r(self.l), t: r(self.t), r: r(self.r), b: r(self.b) }
+        Crop {
+            l: r(self.l),
+            t: r(self.t),
+            r: r(self.r),
+            b: r(self.b),
+        }
     }
 }
 
@@ -466,7 +512,9 @@ impl TablePlace {
     /// Canonical text, no braces: `table-align=… table-indent=…`.
     pub fn write(&self) -> String {
         let a = self.align.as_ref().map(|a| format!("table-align={a}"));
-        let i = self.indent.map(|n| format!("table-indent={}", crate::vocab::length_text(n)));
+        let i = self
+            .indent
+            .map(|n| format!("table-indent={}", crate::vocab::length_text(n)));
         a.into_iter().chain(i).collect::<Vec<_>>().join(" ")
     }
 }
@@ -474,7 +522,10 @@ impl TablePlace {
 impl Table {
     /// The box properties of the cell at `r`, `c`.
     pub fn box_at(&self, r: usize, c: usize) -> &Props {
-        self.boxes.get(r).and_then(|row| row.get(c)).unwrap_or(&NO_PROPS)
+        self.boxes
+            .get(r)
+            .and_then(|row| row.get(c))
+            .unwrap_or(&NO_PROPS)
     }
 }
 
@@ -494,7 +545,11 @@ pub enum Cell {
 impl Cell {
     /// A cell of one default-style paragraph.
     pub fn text(content: Inline) -> Cell {
-        Cell::Text(vec![CellPara { style: None, content, props: Props::default() }])
+        Cell::Text(vec![CellPara {
+            style: None,
+            content,
+            props: Props::default(),
+        }])
     }
 }
 
@@ -533,7 +588,11 @@ pub struct Unit {
 
 impl Unit {
     pub fn new(atom: Atom, marks: Marks) -> Unit {
-        Unit { atom, marks, props: Props::default() }
+        Unit {
+            atom,
+            marks,
+            props: Props::default(),
+        }
     }
 
     /// A character the text states text properties for: not a space.
@@ -588,7 +647,19 @@ pub enum SpanKind {
 }
 
 /// Emphasis flags of one unit.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone,
+    Copy,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub struct Marks(pub u8);
 
 impl Marks {
@@ -618,8 +689,21 @@ impl Marks {
 impl fmt::Display for Marks {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let names = ["bold", "italic", "strike", "underline"];
-        let on: Vec<&str> = Marks::ALL.iter().zip(names).filter(|(m, _)| self.has(**m)).map(|(_, n)| n).collect();
-        write!(f, "{}", if on.is_empty() { "plain".into() } else { on.join("+") })
+        let on: Vec<&str> = Marks::ALL
+            .iter()
+            .zip(names)
+            .filter(|(m, _)| self.has(**m))
+            .map(|(_, n)| n)
+            .collect();
+        write!(
+            f,
+            "{}",
+            if on.is_empty() {
+                "plain".into()
+            } else {
+                on.join("+")
+            }
+        )
     }
 }
 
@@ -628,7 +712,16 @@ impl Inline {
         Inline {
             units: text
                 .chars()
-                .map(|c| Unit::new(if c == '\n' { Atom::Break } else { Atom::Char(c) }, Marks::NONE))
+                .map(|c| {
+                    Unit::new(
+                        if c == '\n' {
+                            Atom::Break
+                        } else {
+                            Atom::Char(c)
+                        },
+                        Marks::NONE,
+                    )
+                })
                 .collect(),
             spans: vec![],
         }
@@ -642,7 +735,10 @@ impl Inline {
     pub fn spaces_only(&self) -> bool {
         !self.units.is_empty()
             && self.spans.is_empty()
-            && self.units.iter().all(|u| matches!(u.atom, Atom::Char(c) if c.is_whitespace() && c != '\t'))
+            && self
+                .units
+                .iter()
+                .all(|u| matches!(u.atom, Atom::Char(c) if c.is_whitespace() && c != '\t'))
     }
 
     /// The text with atoms shown as `\u{FFFC}` (for summaries and messages).
@@ -743,9 +839,12 @@ impl Inline {
                         i += 1;
                     }
                     let marked = |k: Option<usize>| {
-                        k.is_some_and(|k| !self.units[k].atom.is_space() && self.units[k].marks.has(m))
+                        k.is_some_and(|k| {
+                            !self.units[k].atom.is_space() && self.units[k].marks.has(m)
+                        })
                     };
-                    let (left, right) = (s.checked_sub(1).filter(|&k| k >= a), (i < b).then_some(i));
+                    let (left, right) =
+                        (s.checked_sub(1).filter(|&k| k >= a), (i < b).then_some(i));
                     if marked(left) && marked(right) && out[s..i].iter().all(|x| x.has(m)) {
                         for x in &mut out[s..i] {
                             *x = x.with(m, false);
@@ -783,7 +882,10 @@ pub(crate) fn normalize_blocks(blocks: &mut [Block]) {
                 if !crate::styled::shows(&p.content) {
                     p.props = Props::default();
                 }
-                if p.style == ParaStyle::Plain && p.content.spans.is_empty() && p.content.units.len() == 1 {
+                if p.style == ParaStyle::Plain
+                    && p.content.spans.is_empty()
+                    && p.content.units.len() == 1
+                {
                     let u = &p.content.units[0];
                     match &u.atom {
                         Atom::Keep(k) if u.marks.is_empty() => *b = Block::Keep(k.clone()),

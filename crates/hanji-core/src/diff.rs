@@ -146,11 +146,23 @@ impl<'a, T: Hash + Eq> Matcher<'a, T> {
                 _ => None,
             };
             if let Some(tag) = tag {
-                out.push(Op { tag, i1: i, i2: ai, j1: j, j2: bj });
+                out.push(Op {
+                    tag,
+                    i1: i,
+                    i2: ai,
+                    j1: j,
+                    j2: bj,
+                });
             }
             (i, j) = (ai + size, bj + size);
             if size > 0 {
-                out.push(Op { tag: Tag::Equal, i1: ai, i2: i, j1: bj, j2: j });
+                out.push(Op {
+                    tag: Tag::Equal,
+                    i1: ai,
+                    i2: i,
+                    j1: bj,
+                    j2: j,
+                });
             }
         }
         out
@@ -179,7 +191,13 @@ pub fn ratio<T: Hash + Eq>(a: &[T], b: &[T]) -> f64 {
 pub fn span_ops(n_old: usize, s: usize, e: usize, new_len: usize) -> Vec<Op> {
     let mut ops = vec![];
     if s > 0 {
-        ops.push(Op { tag: Tag::Equal, i1: 0, i2: s, j1: 0, j2: s });
+        ops.push(Op {
+            tag: Tag::Equal,
+            i1: 0,
+            i2: s,
+            j1: 0,
+            j2: s,
+        });
     }
     if e > s || new_len > 0 {
         let tag = match (e > s, new_len > 0) {
@@ -187,16 +205,34 @@ pub fn span_ops(n_old: usize, s: usize, e: usize, new_len: usize) -> Vec<Op> {
             (true, false) => Tag::Delete,
             _ => Tag::Insert,
         };
-        ops.push(Op { tag, i1: s, i2: e, j1: s, j2: s + new_len });
+        ops.push(Op {
+            tag,
+            i1: s,
+            i2: e,
+            j1: s,
+            j2: s + new_len,
+        });
     }
     if e < n_old {
-        ops.push(Op { tag: Tag::Equal, i1: e, i2: n_old, j1: s + new_len, j2: s + new_len + n_old - e });
+        ops.push(Op {
+            tag: Tag::Equal,
+            i1: e,
+            i2: n_old,
+            j1: s + new_len,
+            j2: s + new_len + n_old - e,
+        });
     }
     ops
 }
 
 pub fn equal_ops(n: usize) -> Vec<Op> {
-    vec![Op { tag: Tag::Equal, i1: 0, i2: n, j1: 0, j2: n }]
+    vec![Op {
+        tag: Tag::Equal,
+        i1: 0,
+        i2: n,
+        j1: 0,
+        j2: n,
+    }]
 }
 
 #[cfg(test)]
@@ -206,7 +242,10 @@ mod tests {
     fn codes(a: &str, b: &str) -> Vec<(Tag, usize, usize, usize, usize)> {
         let a: Vec<char> = a.chars().collect();
         let b: Vec<char> = b.chars().collect();
-        opcodes(&a, &b).iter().map(|o| (o.tag, o.i1, o.i2, o.j1, o.j2)).collect()
+        opcodes(&a, &b)
+            .iter()
+            .map(|o| (o.tag, o.i1, o.i2, o.j1, o.j2))
+            .collect()
     }
 
     #[test]
@@ -223,8 +262,14 @@ mod tests {
                 (Insert, 6, 6, 5, 6)
             ]
         );
-        assert_eq!(codes("2023", "20235"), vec![(Equal, 0, 4, 0, 4), (Insert, 4, 4, 4, 5)]);
-        assert_eq!(codes("abcabc", "abc"), vec![(Equal, 0, 3, 0, 3), (Delete, 3, 6, 3, 3)]);
+        assert_eq!(
+            codes("2023", "20235"),
+            vec![(Equal, 0, 4, 0, 4), (Insert, 4, 4, 4, 5)]
+        );
+        assert_eq!(
+            codes("abcabc", "abc"),
+            vec![(Equal, 0, 3, 0, 3), (Delete, 3, 6, 3, 3)]
+        );
         assert_eq!(codes("", ""), vec![]);
         let a: Vec<char> = "abcd".chars().collect();
         let b: Vec<char> = "bcde".chars().collect();

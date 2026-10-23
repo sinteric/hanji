@@ -23,10 +23,13 @@ pub const MAIN_NS: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/
 pub const STRICT_NS: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
 pub const R_NS: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 pub const REL_BASE: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/";
-pub const CT_SHEET: &str = "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml";
+pub const CT_SHEET: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml";
 pub const CT_TABLE: &str = "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml";
-pub const CT_SST: &str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml";
-pub const CT_MAIN: &str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
+pub const CT_SST: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml";
+pub const CT_MAIN: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SheetKind {
@@ -134,7 +137,9 @@ fn parse_part(parts: &[Part], name: &str) -> Result<xml::Doc, String> {
 impl Book {
     /// The main part of a package (`xl/workbook.xml`).
     pub fn main_part(parts: &[Part]) -> Result<String, String> {
-        let root = opc::parse_rels(package::get(parts, "_rels/.rels").ok_or("the package has no _rels/.rels")?);
+        let root = opc::parse_rels(
+            package::get(parts, "_rels/.rels").ok_or("the package has no _rels/.rels")?,
+        );
         root.iter()
             .find(|r| r.short_type() == "officeDocument" && !r.external)
             .map(|r| opc::resolve_target("", &r.target))
@@ -144,7 +149,12 @@ impl Book {
     pub fn load(parts: Vec<Part>, entries: Vec<Entry>, shell: Shell) -> Result<Book, String> {
         let wb_part = Book::main_part(&parts)?;
         let wb = parse_part(&parts, &wb_part)?;
-        let ns = wb.root.attrs.iter().find(|a| a.0 == "xmlns" || a.0.starts_with("xmlns:")).map(|a| a.1.clone());
+        let ns = wb
+            .root
+            .attrs
+            .iter()
+            .find(|a| a.0 == "xmlns" || a.0.starts_with("xmlns:"))
+            .map(|a| a.1.clone());
         if wb.root.local() != "workbook" {
             return Err(format!("{wb_part} is not a workbook"));
         }
@@ -186,7 +196,9 @@ impl Book {
             }
         }
         let target = |ty: &str| {
-            rels.iter().find(|r| r.short_type() == ty && !r.external).map(|r| opc::resolve_target(&wb_part, &r.target))
+            rels.iter()
+                .find(|r| r.short_type() == ty && !r.external)
+                .map(|r| opc::resolve_target(&wb_part, &r.target))
         };
         let sst = match target("sharedStrings") {
             Some(p) => match package::get(&parts, &p) {
@@ -196,14 +208,19 @@ impl Book {
             None => None,
         };
         let styles_part = target("styles");
-        let styles =
-            Styles::load(styles_part.as_deref(), styles_part.as_deref().and_then(|p| package::get(&parts, p)))?;
+        let styles = Styles::load(
+            styles_part.as_deref(),
+            styles_part.as_deref().and_then(|p| package::get(&parts, p)),
+        )?;
         let mut tables = vec![];
         for (k, s) in sheets.iter().enumerate() {
             if s.kind != SheetKind::Work {
                 continue;
             }
-            for r in opc::rels_of(&parts, &s.part).iter().filter(|r| r.short_type() == "table" && !r.external) {
+            for r in opc::rels_of(&parts, &s.part)
+                .iter()
+                .filter(|r| r.short_type() == "table" && !r.external)
+            {
                 let part = opc::resolve_target(&s.part, &r.target);
                 let doc = parse_part(&parts, &part)?;
                 tables.push(read_table(part, k, doc)?);
@@ -244,7 +261,9 @@ impl Book {
             return Ok(());
         }
         let part = &self.sheets[i].part;
-        let data = package::get(&self.parts, part).ok_or_else(|| format!("no {part}"))?.to_vec();
+        let data = package::get(&self.parts, part)
+            .ok_or_else(|| format!("no {part}"))?
+            .to_vec();
         self.stores[i] = Some(Store::load(data).map_err(|e| format!("{part}: {e}"))?);
         Ok(())
     }
@@ -265,11 +284,15 @@ impl Book {
     }
 
     pub fn sheet_index(&self, name: &str) -> Option<usize> {
-        self.sheets.iter().position(|s| s.name.eq_ignore_ascii_case(name))
+        self.sheets
+            .iter()
+            .position(|s| s.name.eq_ignore_ascii_case(name))
     }
 
     pub fn table_index(&self, name: &str) -> Option<usize> {
-        self.tables.iter().position(|t| t.name.eq_ignore_ascii_case(name))
+        self.tables
+            .iter()
+            .position(|t| t.name.eq_ignore_ascii_case(name))
     }
 
     /// A cell's value (a formula cell: its cached value).
@@ -280,17 +303,23 @@ impl Book {
                 .and_then(|i| i.trim().parse::<usize>().ok())
                 .and_then(|i| self.sst.as_ref()?.get(i).map(str::to_string))
                 .map_or(CellValue::Empty, CellValue::Text),
-            "str" => v.map_or(CellValue::Empty, |s| CellValue::Text(sst::decode_xstring(&s))),
-            "inlineStr" => c.is.as_ref().map_or(CellValue::Empty, |is| CellValue::Text(sst::rich_text(is))),
+            "str" => v.map_or(CellValue::Empty, |s| {
+                CellValue::Text(sst::decode_xstring(&s))
+            }),
+            "inlineStr" => {
+                c.is.as_ref()
+                    .map_or(CellValue::Empty, |is| CellValue::Text(sst::rich_text(is)))
+            }
             "b" => v.map_or(CellValue::Empty, |s| {
                 CellValue::Bool(s.trim() == "1" || s.trim().eq_ignore_ascii_case("true"))
             }),
             "e" => v.map_or(CellValue::Empty, CellValue::Error),
             "d" => v.map_or(CellValue::Empty, CellValue::Text),
             _ => match v {
-                Some(s) if !s.trim().is_empty() => {
-                    s.trim().parse::<f64>().map_or(CellValue::Text(s), CellValue::Number)
-                }
+                Some(s) if !s.trim().is_empty() => s
+                    .trim()
+                    .parse::<f64>()
+                    .map_or(CellValue::Text(s), CellValue::Number),
                 _ => CellValue::Empty,
             },
         }
@@ -323,12 +352,19 @@ impl Book {
 
     /// A cell as it is displayed.
     pub fn display(&self, c: &Cell) -> String {
-        numfmt::display(&self.value(c), &self.styles.format_of(c.style()), self.date1904)
+        numfmt::display(
+            &self.value(c),
+            &self.styles.format_of(c.style()),
+            self.date1904,
+        )
     }
 
     /// Rels of `part`, as changed so far.
     pub fn rels_of(&self, part: &str) -> Vec<Rel> {
-        self.rels.get(part).cloned().unwrap_or_else(|| opc::rels_of(&self.parts, part))
+        self.rels
+            .get(part)
+            .cloned()
+            .unwrap_or_else(|| opc::rels_of(&self.parts, part))
     }
 
     pub fn set_rels(&mut self, part: &str, rels: Vec<Rel>) {
@@ -351,8 +387,18 @@ impl Book {
 
     /// Add a part with its content type.
     pub fn add_part(&mut self, name: &str, data: Vec<u8>, ct: &str) {
-        let dos_time = self.parts.iter().find(|p| p.name == self.wb_part).map_or(0, |p| p.dos_time);
-        self.parts.push(Part { name: name.into(), data, dos_time, external_attr: 0, deflate: true });
+        let dos_time = self
+            .parts
+            .iter()
+            .find(|p| p.name == self.wb_part)
+            .map_or(0, |p| p.dos_time);
+        self.parts.push(Part {
+            name: name.into(),
+            data,
+            dos_time,
+            external_attr: 0,
+            deflate: true,
+        });
         self.added.push((name.into(), ct.into()));
     }
 
@@ -369,15 +415,25 @@ impl Book {
 
     /// A free part name `dir/stemN.xml`.
     pub fn free_part(&self, dir: &str, stem: &str) -> String {
-        (1..).map(|k| format!("{dir}/{stem}{k}.xml")).find(|n| !self.parts.iter().any(|p| &p.name == n)).unwrap()
+        (1..)
+            .map(|k| format!("{dir}/{stem}{k}.xml"))
+            .find(|n| !self.parts.iter().any(|p| &p.name == n))
+            .unwrap()
     }
 
     /// The shared string table, made when the workbook has none.
     pub fn sst_mut(&mut self) -> &mut Sst {
         if self.sst.is_none() {
-            let dir = self.wb_part.rsplit_once('/').map_or("", |x| x.0).to_string();
-            let part =
-                if dir.is_empty() { "sharedStrings.xml".to_string() } else { format!("{dir}/sharedStrings.xml") };
+            let dir = self
+                .wb_part
+                .rsplit_once('/')
+                .map_or("", |x| x.0)
+                .to_string();
+            let part = if dir.is_empty() {
+                "sharedStrings.xml".to_string()
+            } else {
+                format!("{dir}/sharedStrings.xml")
+            };
             self.sst = Some(Sst::new(&part));
             self.sst_new = true;
         }
@@ -387,7 +443,13 @@ impl Book {
     fn set_part(&mut self, name: &str, data: Vec<u8>) {
         match self.parts.iter_mut().find(|p| p.name == name) {
             Some(p) => p.data = data,
-            None => self.parts.push(Part { name: name.into(), data, dos_time: 0, external_attr: 0, deflate: true }),
+            None => self.parts.push(Part {
+                name: name.into(),
+                data,
+                dos_time: 0,
+                external_attr: 0,
+                deflate: true,
+            }),
         }
     }
 
@@ -444,7 +506,12 @@ impl Book {
                 self.add_part(&name, data, "");
             }
         }
-        let added: Vec<(String, String)> = self.added.iter().filter(|a| !a.1.is_empty()).cloned().collect();
+        let added: Vec<(String, String)> = self
+            .added
+            .iter()
+            .filter(|a| !a.1.is_empty())
+            .cloned()
+            .collect();
         if let Some(ct) = opc::content_types(&self.parts, &self.gone, &added) {
             self.set_part(opc::CT_PART, ct);
         }
@@ -454,10 +521,15 @@ impl Book {
 
 pub(crate) fn read_table(part: String, sheet: usize, doc: xml::Doc) -> Result<TableInfo, String> {
     let r = &doc.root;
-    let range =
-        r.get("ref").and_then(|v| CellRange::parse(&v)).ok_or_else(|| format!("{part}: the table has no ref"))?;
+    let range = r
+        .get("ref")
+        .and_then(|v| CellRange::parse(&v))
+        .ok_or_else(|| format!("{part}: the table has no ref"))?;
     let header = r.get("headerRowCount").is_none_or(|v| v != "0");
-    let totals = r.get("totalsRowCount").and_then(|v| v.parse().ok()).unwrap_or(0);
+    let totals = r
+        .get("totalsRowCount")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
     let cols = r
         .elements()
         .find(|e| e.local() == "tableColumns")
@@ -476,15 +548,39 @@ pub(crate) fn read_table(part: String, sheet: usize, doc: xml::Doc) -> Result<Ta
         })
         .unwrap_or_default();
     if cols.len() as u32 != range.cols() {
-        return Err(format!("{part}: the table has {} columns for a range of {}", cols.len(), range.cols()));
+        return Err(format!(
+            "{part}: the table has {} columns for a range of {}",
+            cols.len(),
+            range.cols()
+        ));
     }
-    let name = r.get("displayName").or_else(|| r.get("name")).unwrap_or_default();
-    Ok(TableInfo { part, sheet, doc, name, range, header, totals, cols, changed: false, new: false })
+    let name = r
+        .get("displayName")
+        .or_else(|| r.get("name"))
+        .unwrap_or_default();
+    Ok(TableInfo {
+        part,
+        sheet,
+        doc,
+        name,
+        range,
+        header,
+        totals,
+        cols,
+        changed: false,
+        new: false,
+    })
 }
 
 /// The table part for a table's current fields.
 fn write_table(t: &mut TableInfo) -> Vec<u8> {
-    let p = t.doc.root.name.strip_suffix("table").unwrap_or("").to_string();
+    let p = t
+        .doc
+        .root
+        .name
+        .strip_suffix("table")
+        .unwrap_or("")
+        .to_string();
     let r = &mut t.doc.root;
     let range = t.range.to_string();
     r.set("ref", &range);
@@ -505,7 +601,12 @@ fn write_table(t: &mut TableInfo) -> Vec<u8> {
         .find(|e| e.local() == "tableColumns")
         .map(|tc| tc.elements().cloned().collect())
         .unwrap_or_default();
-    let mut next_id = old.iter().filter_map(|c| c.get("id").and_then(|v| v.parse::<u32>().ok())).max().unwrap_or(0) + 1;
+    let mut next_id = old
+        .iter()
+        .filter_map(|c| c.get("id").and_then(|v| v.parse::<u32>().ok()))
+        .max()
+        .unwrap_or(0)
+        + 1;
     let mut cols = vec![];
     for c in &t.cols {
         let mut e = old
@@ -513,7 +614,8 @@ fn write_table(t: &mut TableInfo) -> Vec<u8> {
             .find(|o| sst::decode_xstring(&o.get("name").unwrap_or_default()) == c.name)
             .cloned()
             .unwrap_or_else(|| {
-                let e = Element::new(&format!("{p}tableColumn")).with_attr("id", &next_id.to_string());
+                let e =
+                    Element::new(&format!("{p}tableColumn")).with_attr("id", &next_id.to_string());
                 next_id += 1;
                 e
             });
@@ -526,7 +628,8 @@ fn write_table(t: &mut TableInfo) -> Vec<u8> {
                 e.remove_attr("dataDxfId");
             }
         }
-        e.children.retain(|n| !matches!(n, Node::El(x) if x.local() == "calculatedColumnFormula"));
+        e.children
+            .retain(|n| !matches!(n, Node::El(x) if x.local() == "calculatedColumnFormula"));
         if let Some(f) = &c.calc {
             let mut cf = Element::new(&format!("{p}calculatedColumnFormula"));
             cf.children.push(Node::Text(xml::escape_text(f)));

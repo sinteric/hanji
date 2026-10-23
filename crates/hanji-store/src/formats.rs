@@ -20,7 +20,11 @@ pub enum DocType {
 }
 
 impl DocType {
-    pub const ALL: [DocType; 3] = [DocType::Document, DocType::Presentation, DocType::Spreadsheet];
+    pub const ALL: [DocType; 3] = [
+        DocType::Document,
+        DocType::Presentation,
+        DocType::Spreadsheet,
+    ];
 
     pub fn name(self) -> &'static str {
         match self {
@@ -31,7 +35,9 @@ impl DocType {
     }
 
     pub fn parse(s: &str) -> Option<DocType> {
-        DocType::ALL.into_iter().find(|t| t.name() == s.trim().to_lowercase())
+        DocType::ALL
+            .into_iter()
+            .find(|t| t.name() == s.trim().to_lowercase())
     }
 
     /// The home format a new file of this type gets when none is named.
@@ -84,7 +90,9 @@ impl Format {
     }
 
     pub fn parse(s: &str) -> Option<Format> {
-        Format::ALL.into_iter().find(|f| f.name() == s.trim().to_lowercase())
+        Format::ALL
+            .into_iter()
+            .find(|f| f.name() == s.trim().to_lowercase())
     }
 
     /// The format of a file name, by its extension; the macro-enabled
@@ -136,7 +144,9 @@ impl Format {
     /// reason says what to write instead).
     pub fn writes(self, key: Key, value: &Value) -> Result<(), String> {
         let colour = match value {
-            Value::Color(c) | Value::Fill(Fill::Color(c)) | Value::Border(Border::Line { color: c, .. }) => Some(c),
+            Value::Color(c)
+            | Value::Fill(Fill::Color(c))
+            | Value::Border(Border::Line { color: c, .. }) => Some(c),
             _ => None,
         };
         match self {
@@ -181,7 +191,9 @@ impl Format {
     pub fn check(self, text: &str, rem: &Remainder) -> Vec<Diagnostic> {
         match self.text_model() {
             Some(m) => m.resolve(text, rem, self.caps()).err().unwrap_or_default(),
-            None => hanji_format::parse_spreadsheet(text, &XlsxEngine::names(rem)).err().unwrap_or_default(),
+            None => hanji_format::parse_spreadsheet(text, &XlsxEngine::names(rem))
+                .err()
+                .unwrap_or_default(),
         }
     }
 }

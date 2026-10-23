@@ -5,8 +5,7 @@
 use std::collections::HashMap;
 
 use hanji_core::{Block, Entry, KeepIds, Kind, ListItem, Meta, Para, StyleDef, StyleSet, Table};
-use hanji_format::styled;
-use hanji_format::{Atom, Cell, CellPara, Inline, Keep, Key, Marks, Props, Unit};
+use hanji_format::{styled, Atom, Cell, CellPara, Inline, Keep, Key, Marks, Props, Unit};
 
 use crate::format;
 
@@ -151,7 +150,17 @@ impl<'a> Importer<'a> {
         let id = self.next_id;
         self.next_id += 1;
         let seq = self.seq();
-        self.entries.push(Entry { id, kind, xml, fp, path: path.to_vec(), start, end, seq, meta });
+        self.entries.push(Entry {
+            id,
+            kind,
+            xml,
+            fp,
+            path: path.to_vec(),
+            start,
+            end,
+            seq,
+            meta,
+        });
         self.entries.len() - 1
     }
 
@@ -172,9 +181,17 @@ impl<'a> Importer<'a> {
         } else {
             keep_kind(&els[0].name)
         };
-        let keep = Keep { id, kind: kind_name, summary: self.summary(els) };
+        let keep = Keep {
+            id,
+            kind: kind_name,
+            summary: self.summary(els),
+        };
         let xml = els.iter().map(|e| self.frag(e)).collect();
-        let meta = Meta { keep: Some(keep.clone()), run, ..Default::default() };
+        let meta = Meta {
+            keep: Some(keep.clone()),
+            run,
+            ..Default::default()
+        };
         self.entry(kind, xml, fpv, path, pos, pos.map(|p| p + 1), meta);
         keep
     }
@@ -182,39 +199,68 @@ impl<'a> Importer<'a> {
     // ------------------------------------------------------------ summaries
 
     fn note(&self, part: &str, id: Option<String>) -> String {
-        id.and_then(|id| self.notes.get(&(part.to_string(), id)).cloned()).unwrap_or_default()
+        id.and_then(|id| self.notes.get(&(part.to_string(), id)).cloned())
+            .unwrap_or_default()
     }
 
     fn summary(&self, els: &[&Element]) -> String {
         let el = els[0];
-        let text = |e: &Element, n: usize| clip(&e.text_of(&["w:t", "w:delText", "w:instrText"]), n);
+        let text =
+            |e: &Element, n: usize| clip(&e.text_of(&["w:t", "w:delText", "w:instrText"]), n);
         let s = match el.local() {
             "drawing" | "pict" | "AlternateContent" | "object" => {
                 let mut found = None;
                 el.walk(&mut |e| {
                     if found.is_none() && e.local() == "docPr" {
-                        found = e.get("descr").filter(|d| !d.is_empty()).or_else(|| e.get("name"));
+                        found = e
+                            .get("descr")
+                            .filter(|d| !d.is_empty())
+                            .or_else(|| e.get("name"));
                     }
                 });
-                found.unwrap_or_else(|| if el.local() == "pict" { "vml shape".into() } else { el.local().into() })
+                found.unwrap_or_else(|| {
+                    if el.local() == "pict" {
+                        "vml shape".into()
+                    } else {
+                        el.local().into()
+                    }
+                })
             }
             "footnoteReference" => format!("footnote: {}", self.note("footnote", el.get("w:id"))),
             "endnoteReference" => format!("endnote: {}", self.note("endnote", el.get("w:id"))),
             "commentReference" => format!("comment: {}", self.note("comment", el.get("w:id"))),
             "ins" | "del" | "moveFrom" | "moveTo" => {
-                format!("{} by {}: {}", el.local(), el.get("w:author").unwrap_or_else(|| "?".into()), text(el, 40))
+                format!(
+                    "{} by {}: {}",
+                    el.local(),
+                    el.get("w:author").unwrap_or_else(|| "?".into()),
+                    text(el, 40)
+                )
             }
             "sdt" => {
-                let alias = el.descendants("w:alias").first().and_then(|a| a.get("w:val"));
-                format!("{}{}", alias.map(|a| a + ": ").unwrap_or_default(), text(el, 40))
+                let alias = el
+                    .descendants("w:alias")
+                    .first()
+                    .and_then(|a| a.get("w:val"));
+                format!(
+                    "{}{}",
+                    alias.map(|a| a + ": ").unwrap_or_default(),
+                    text(el, 40)
+                )
             }
             "fldSimple" => {
-                format!("field {} → {}", clip(&el.get("w:instr").unwrap_or_default(), 30), text(el, 25))
+                format!(
+                    "field {} → {}",
+                    clip(&el.get("w:instr").unwrap_or_default(), 30),
+                    text(el, 25)
+                )
             }
             "r" if els.len() > 1 || !el.descendants("w:fldChar").is_empty() => {
                 let instr: String = els.iter().map(|e| e.text_of(&["w:instrText"])).collect();
                 let result = field_result(els);
-                format!("field {} → {}", clip(&instr, 30), clip(&result, 25)).trim().to_string()
+                format!("field {} → {}", clip(&instr, 30), clip(&result, 25))
+                    .trim()
+                    .to_string()
             }
             "tbl" => format!("table: {}", text(el, 40)),
             _ => {
@@ -240,9 +286,10 @@ impl<'a> Importer<'a> {
             let bi = blocks.len();
             let el = match n {
                 Node::El(e) => e,
-                Node::Comment(_) | Node::Pi(_) => {
-                    return Err("an XML comment or processing instruction between blocks is not supported yet".into())
-                }
+                Node::Comment(_) | Node::Pi(_) => return Err(
+                    "an XML comment or processing instruction between blocks is not supported yet"
+                        .into(),
+                ),
                 _ => return Err("text directly inside <w:body>".into()),
             };
             if el.is("w:sectPr") && Some(idx) == last_el {
@@ -270,7 +317,13 @@ impl<'a> Importer<'a> {
             let (x, f) = (self.frag(m), self.fp(&[Some(m)]));
             self.entry(Kind::Tail, vec![x], f, &[], None, None, Meta::default());
         }
-        Ok(Split { blocks, entries: self.entries, styles: self.styles, next_id: self.next_id, stats: self.stats })
+        Ok(Split {
+            blocks,
+            entries: self.entries,
+            styles: self.styles,
+            next_id: self.next_id,
+            stats: self.stats,
+        })
     }
 
     /// A zero-width element between blocks, rows, cells or cell paragraphs:
@@ -315,9 +368,13 @@ impl<'a> Importer<'a> {
                 if ps.is_empty() || !all_p {
                     let mut kinds: Vec<&str> = ps
                         .iter()
-                        .filter_map(
-                            |n| if let Node::El(e) = n { (!e.is("w:p")).then(|| e.local()) } else { Some("#text") },
-                        )
+                        .filter_map(|n| {
+                            if let Node::El(e) = n {
+                                (!e.is("w:p")).then(|| e.local())
+                            } else {
+                                Some("#text")
+                            }
+                        })
                         .collect();
                     kinds.sort();
                     kinds.dedup();
@@ -327,8 +384,10 @@ impl<'a> Importer<'a> {
                         format!("cell holds {}", kinds.join(","))
                     });
                 }
-                let paras: Vec<&Element> =
-                    ps.iter().filter_map(|n| if let Node::El(e) = n { Some(e) } else { None }).collect();
+                let paras: Vec<&Element> = ps
+                    .iter()
+                    .filter_map(|n| if let Node::El(e) = n { Some(e) } else { None })
+                    .collect();
                 let tcpr = tc.child("w:tcPr");
                 let (span, covered) = (grid_span(tcpr), v_merged(tcpr));
                 if covered {
@@ -342,7 +401,11 @@ impl<'a> Importer<'a> {
                 if tcpr.is_some_and(|t| t.child("w:hMerge").is_some()) {
                     return Some("hMerge".into());
                 }
-                row.push(if covered { Cell::Up } else { Cell::text(Inline::default()) });
+                row.push(if covered {
+                    Cell::Up
+                } else {
+                    Cell::text(Inline::default())
+                });
                 row.extend((1..span).map(|_| Cell::Left));
             }
             grid.push(row);
@@ -374,7 +437,9 @@ impl<'a> Importer<'a> {
             None => {
                 self.rollback(mark);
                 self.stats.tables_kept += 1;
-                self.stats.kept_reasons.push("cell text not writable in a pipe table".into());
+                self.stats
+                    .kept_reasons
+                    .push("cell text not writable in a pipe table".into());
                 Ok(self.block_keep(tbl, bi))
             }
         }
@@ -382,12 +447,21 @@ impl<'a> Importer<'a> {
 
     fn table_inner(&mut self, tbl: &Element, bi: usize) -> Result<Option<Table>, String> {
         let shell = tbl.shell();
-        let head: Vec<&Element> = tbl.elements().filter(|e| e.is("w:tblPr") || e.is("w:tblGrid")).collect();
+        let head: Vec<&Element> = tbl
+            .elements()
+            .filter(|e| e.is("w:tblPr") || e.is("w:tblGrid"))
+            .collect();
         // The style the table is drawn with: its own, or the file's default.
-        let style_id = tbl.child("w:tblPr").and_then(|p| p.child("w:tblStyle")).and_then(|s| s.get("w:val"));
+        let style_id = tbl
+            .child("w:tblPr")
+            .and_then(|p| p.child("w:tblStyle"))
+            .and_then(|s| s.get("w:val"));
         let style_id = style_id.or_else(|| self.default_table.clone());
         // The table's own position (§5.2); the fingerprint leaves out what the text shows.
-        let place = tbl.child("w:tblPr").map(format::tblpr_place).unwrap_or_default();
+        let place = tbl
+            .child("w:tblPr")
+            .map(format::tblpr_place)
+            .unwrap_or_default();
         let mut head_fp: Vec<Element> = head.iter().map(|e| (*e).clone()).collect();
         for h in &mut head_fp {
             if h.is("w:tblPr") {
@@ -396,9 +470,27 @@ impl<'a> Importer<'a> {
                 }
             }
         }
-        let fpv = fp(self.scope, &std::iter::once(Some(&shell)).chain(head_fp.iter().map(Some)).collect::<Vec<_>>());
-        let xml = std::iter::once(self.frag(&shell)).chain(head.iter().map(|e| self.frag(e))).collect();
-        self.entry(Kind::Tbl, xml, fpv, &[bi], None, None, Meta { style: style_id.clone(), ..Default::default() });
+        let fpv = fp(
+            self.scope,
+            &std::iter::once(Some(&shell))
+                .chain(head_fp.iter().map(Some))
+                .collect::<Vec<_>>(),
+        );
+        let xml = std::iter::once(self.frag(&shell))
+            .chain(head.iter().map(|e| self.frag(e)))
+            .collect();
+        self.entry(
+            Kind::Tbl,
+            xml,
+            fpv,
+            &[bi],
+            None,
+            None,
+            Meta {
+                style: style_id.clone(),
+                ..Default::default()
+            },
+        );
         let style = style_id.and_then(|id| self.styles.table_style_name(&id));
         let mut rows = vec![];
         let mut boxes: Vec<Vec<Props>> = vec![];
@@ -413,10 +505,19 @@ impl<'a> Importer<'a> {
             }
             let (ri, tr) = (rows.len(), el);
             let trs = tr.shell();
-            let rhead: Vec<&Element> = tr.elements().filter(|e| e.is("w:tblPrEx") || e.is("w:trPr")).collect();
-            let fpv =
-                fp(self.scope, &std::iter::once(Some(&trs)).chain(rhead.iter().map(|e| Some(*e))).collect::<Vec<_>>());
-            let xml = std::iter::once(self.frag(&trs)).chain(rhead.iter().map(|e| self.frag(e))).collect();
+            let rhead: Vec<&Element> = tr
+                .elements()
+                .filter(|e| e.is("w:tblPrEx") || e.is("w:trPr"))
+                .collect();
+            let fpv = fp(
+                self.scope,
+                &std::iter::once(Some(&trs))
+                    .chain(rhead.iter().map(|e| Some(*e)))
+                    .collect::<Vec<_>>(),
+            );
+            let xml = std::iter::once(self.frag(&trs))
+                .chain(rhead.iter().map(|e| self.frag(e)))
+                .collect();
             self.entry(Kind::Tr, xml, fpv, &[bi, ri], None, None, Meta::default());
             let mut row = vec![];
             let mut brow = vec![];
@@ -432,7 +533,9 @@ impl<'a> Importer<'a> {
                 let gc = row.len();
                 let tcpr = tc.child("w:tcPr");
                 let tcs = tc.shell();
-                let xml = std::iter::once(self.frag(&tcs)).chain(tcpr.map(|t| self.frag(t))).collect();
+                let xml = std::iter::once(self.frag(&tcs))
+                    .chain(tcpr.map(|t| self.frag(t)))
+                    .collect();
                 let mut rest = tcpr.cloned();
                 if let Some(x) = &mut rest {
                     for n in format::SHOWN_TCPR {
@@ -446,8 +549,13 @@ impl<'a> Importer<'a> {
                     let k = paras.len();
                     if e.is("w:p") {
                         let para = self.para(e, &[bi, ri, gc, k])?;
-                        let style = (para.style != self.styles.default_paragraph).then_some(para.style);
-                        paras.push(CellPara { props: para.props, style, content: para.content });
+                        let style =
+                            (para.style != self.styles.default_paragraph).then_some(para.style);
+                        paras.push(CellPara {
+                            props: para.props,
+                            style,
+                            content: para.content,
+                        });
                     } else {
                         // A marker between a cell's paragraphs: before paragraph k.
                         self.bmarker(e, &[bi, ri, gc, k]);
@@ -462,7 +570,11 @@ impl<'a> Importer<'a> {
                         return Ok(None);
                     }
                     row.push(Cell::Text(paras));
-                    brow.push(tcpr.map(format::tcpr_props).unwrap_or_default().diff(&styled::box_default()));
+                    brow.push(
+                        tcpr.map(format::tcpr_props)
+                            .unwrap_or_default()
+                            .diff(&styled::box_default()),
+                    );
                 }
                 row.extend((1..span).map(|_| Cell::Left));
                 brow.extend((1..span).map(|_| Props::new()));
@@ -473,7 +585,12 @@ impl<'a> Importer<'a> {
         if boxes.iter().flatten().all(Props::is_empty) {
             boxes.clear();
         }
-        Ok(Some(Table { style, rows, boxes, place }))
+        Ok(Some(Table {
+            style,
+            rows,
+            boxes,
+            place,
+        }))
     }
 
     // ------------------------------------------------------------ paragraphs
@@ -482,14 +599,18 @@ impl<'a> Importer<'a> {
         let saved = self.inherited.len();
         self.inherit(p);
         let ppr = p.child("w:pPr");
-        let sid = ppr.and_then(|x| x.child("w:pStyle")).and_then(|s| s.get("w:val"));
+        let sid = ppr
+            .and_then(|x| x.child("w:pStyle"))
+            .and_then(|s| s.get("w:val"));
         let default_id = self.styles.default_paragraph_id().to_string();
         let sid = sid.unwrap_or_else(|| default_id.clone());
         let style = match self.styles.paragraph_name(&sid) {
             Some(n) => n.to_string(),
             None => {
                 // A style id missing from styles.xml: keep it by id.
-                self.styles.paragraph.push(StyleDef::new(sid.clone(), sid.clone()));
+                self.styles
+                    .paragraph
+                    .push(StyleDef::new(sid.clone(), sid.clone()));
                 sid.clone()
             }
         };
@@ -508,7 +629,9 @@ impl<'a> Importer<'a> {
         } else {
             self.fp(&[Some(&shell), rest.as_ref()])
         };
-        let xml = std::iter::once(self.frag(&shell)).chain(ppr.map(|x| self.frag(x))).collect();
+        let xml = std::iter::once(self.frag(&shell))
+            .chain(ppr.map(|x| self.frag(x)))
+            .collect();
         // A numbered top-level paragraph is a list item; a heading keeps its
         // numbering in the remainder, and so does a cell paragraph.
         let item = (path.len() == 1 && self.styles.heading_level(&style).is_none())
@@ -524,19 +647,31 @@ impl<'a> Importer<'a> {
         // What the paragraph sets beyond its style (§5.2).
         let base = self.style_values(&sid);
         let size = base.get(Key::Size).and_then(|v| v.length()).unwrap_or(1000);
-        let props = ppr.map(|x| format::ppr_props(x, size)).unwrap_or_default().only(&styled::PARA_OWN).diff(&base);
+        let props = ppr
+            .map(|x| format::ppr_props(x, size))
+            .unwrap_or_default()
+            .only(&styled::PARA_OWN)
+            .diff(&base);
         self.text_base = base.only(&Key::TEXT);
         self.buf.clear();
         let page_break_only = sid == default_id && is_page_break_para(p);
         self.walk(p, path, page_break_only)?;
         self.inherited.truncate(saved);
-        let mut content = Inline { units: std::mem::take(&mut self.buf), spans: vec![] };
+        let mut content = Inline {
+            units: std::mem::take(&mut self.buf),
+            spans: vec![],
+        };
         content.normalize();
         // A paragraph without text shows none of it, and keeps it (§5.2).
         self.entries[ppr_at].meta.unshown = !styled::shows(&content) && !props.is_empty();
         let item = item.map(|i| i.0);
         self.stats.list_items += item.is_some() as usize;
-        Ok(Para { style, content, item, props })
+        Ok(Para {
+            style,
+            content,
+            item,
+            props,
+        })
     }
 
     /// The list item a paragraph is, from its own `w:numPr` or its style's,
@@ -573,7 +708,14 @@ impl<'a> Importer<'a> {
             }
         };
         let how = if direct { "direct" } else { "style" };
-        Some((ListItem { ordered, level, first }, [num.to_string(), ilvl.to_string(), how.to_string()]))
+        Some((
+            ListItem {
+                ordered,
+                level,
+                first,
+            },
+            [num.to_string(), ilvl.to_string(), how.to_string()],
+        ))
     }
 
     fn inherit(&mut self, e: &Element) {
@@ -629,7 +771,15 @@ impl<'a> Importer<'a> {
                     .collect();
                 let (x, f) = (self.frag(&shell), self.fp(&[Some(&shell)]));
                 let at = self.pos();
-                let idx = self.entry(Kind::Wrap, vec![x], f, path, Some(at), None, Meta::default());
+                let idx = self.entry(
+                    Kind::Wrap,
+                    vec![x],
+                    f,
+                    path,
+                    Some(at),
+                    None,
+                    Meta::default(),
+                );
                 let saved = self.inherited.len();
                 self.inherit(k);
                 self.walk(k, path, pb)?;
@@ -674,14 +824,37 @@ impl<'a> Importer<'a> {
                 remove_child(x, n);
             }
         }
-        let trivial =
-            shell.attrs.is_empty() && rest.as_ref().is_none_or(|x| x.children.is_empty() && x.attrs.is_empty());
-        let f = if trivial { String::new() } else { self.fp(&[Some(&shell), rest.as_ref()]) };
-        let xml = std::iter::once(self.frag(&shell)).chain(rpr.map(|x| self.frag(x))).collect();
+        let trivial = shell.attrs.is_empty()
+            && rest
+                .as_ref()
+                .is_none_or(|x| x.children.is_empty() && x.attrs.is_empty());
+        let f = if trivial {
+            String::new()
+        } else {
+            self.fp(&[Some(&shell), rest.as_ref()])
+        };
+        let xml = std::iter::once(self.frag(&shell))
+            .chain(rpr.map(|x| self.frag(x)))
+            .collect();
         let start = self.pos();
-        let idx = self.entry(Kind::Run, xml, f, path, Some(start), None, Meta { marks, ..Default::default() });
+        let idx = self.entry(
+            Kind::Run,
+            xml,
+            f,
+            path,
+            Some(start),
+            None,
+            Meta {
+                marks,
+                ..Default::default()
+            },
+        );
         let text_props = rpr
-            .map(|x| format::rpr_props(x, &self.fmt.theme).only(&Key::TEXT).diff(&self.text_base))
+            .map(|x| {
+                format::rpr_props(x, &self.fmt.theme)
+                    .only(&Key::TEXT)
+                    .diff(&self.text_base)
+            })
             .unwrap_or_default();
         let run_id = self.entries[idx].id;
         let mut aux = vec![];
@@ -699,9 +872,15 @@ impl<'a> Importer<'a> {
                         self.push(Atom::Char(ch), marks);
                     }
                 }
-                "w:tab" if c.attrs.is_empty() && c.children.is_empty() => self.push(Atom::Char('\t'), marks),
-                "w:br" if c.attrs.is_empty() && c.children.is_empty() => self.push(Atom::Break, marks),
-                "w:br" if pb && c.children.is_empty() && is_page_br(c) => self.push(Atom::PageBreak, marks),
+                "w:tab" if c.attrs.is_empty() && c.children.is_empty() => {
+                    self.push(Atom::Char('\t'), marks)
+                }
+                "w:br" if c.attrs.is_empty() && c.children.is_empty() => {
+                    self.push(Atom::Break, marks)
+                }
+                "w:br" if pb && c.children.is_empty() && is_page_br(c) => {
+                    self.push(Atom::PageBreak, marks)
+                }
                 n if RUN_MARKERS.contains(&n) => {
                     let (x, f) = (self.frag(c), self.fp(&[Some(c)]));
                     let at = self.pos();
@@ -712,7 +891,11 @@ impl<'a> Importer<'a> {
                         path,
                         Some(at),
                         Some(at),
-                        Meta { run: Some(run_id), tag: n.into(), ..Default::default() },
+                        Meta {
+                            run: Some(run_id),
+                            tag: n.into(),
+                            ..Default::default()
+                        },
                     );
                 }
                 _ => {
@@ -746,13 +929,21 @@ fn structure_reason(e: &Element, head: &[&str], item: &str, level: &str) -> Opti
         match ch {
             Node::El(x) if head.contains(&x.name.as_str()) => {
                 if past_head {
-                    return Some(format!("{level}-level {} after a row, cell or marker", x.local()));
+                    return Some(format!(
+                        "{level}-level {} after a row, cell or marker",
+                        x.local()
+                    ));
                 }
             }
             Node::El(x) if x.is(item) || MARKERS.contains(&x.name.as_str()) => past_head = true,
             Node::El(x) => return Some(format!("{level}-level {}", x.local())),
             n if is_blank(n) => {}
-            _ => return Some(format!("text or comment in a table{}", if level == "row" { " row" } else { "" })),
+            _ => {
+                return Some(format!(
+                    "text or comment in a table{}",
+                    if level == "row" { " row" } else { "" }
+                ))
+            }
         }
     }
     None
@@ -827,7 +1018,9 @@ fn field_groups(kids: &[&Element]) -> HashMap<usize, usize> {
     let mut i = 0;
     while i < kids.len() {
         let begins = kids[i].is("w:r")
-            && kids[i].elements().any(|f| f.is("w:fldChar") && f.get("w:fldCharType").as_deref() == Some("begin"));
+            && kids[i]
+                .elements()
+                .any(|f| f.is("w:fldChar") && f.get("w:fldCharType").as_deref() == Some("begin"));
         if begins {
             let mut depth: i32 = 0;
             let mut j = i;
@@ -846,7 +1039,9 @@ fn field_groups(kids: &[&Element]) -> HashMap<usize, usize> {
             }
             if depth == 0
                 && j < kids.len()
-                && kids[i..=j].iter().all(|x| x.is("w:r") || MARKERS.contains(&x.name.as_str()))
+                && kids[i..=j]
+                    .iter()
+                    .all(|x| x.is("w:r") || MARKERS.contains(&x.name.as_str()))
             {
                 groups.insert(i, j);
                 i = j + 1;

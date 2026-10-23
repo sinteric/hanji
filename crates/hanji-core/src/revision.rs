@@ -39,7 +39,11 @@ pub fn paragraphs(blocks: &[Block]) -> Vec<(Path, &Inline)> {
                 for (r, row) in t.rows.iter().enumerate() {
                     for (c, cell) in row.iter().enumerate() {
                         if let Cell::Text(ps) = cell {
-                            out.extend(ps.iter().enumerate().map(|(k, p)| (vec![i, r, c, k], &p.content)));
+                            out.extend(
+                                ps.iter()
+                                    .enumerate()
+                                    .map(|(k, p)| (vec![i, r, c, k], &p.content)),
+                            );
                         }
                     }
                 }
@@ -58,7 +62,9 @@ pub fn same_shape(a: &[Vec<Cell>], b: &[Vec<Cell>]) -> bool {
         Cell::Left => 2,
     };
     a.len() == b.len()
-        && a.iter().zip(b).all(|(x, y)| x.len() == y.len() && x.iter().zip(y).all(|(p, q)| kind(p) == kind(q)))
+        && a.iter()
+            .zip(b)
+            .all(|(x, y)| x.len() == y.len() && x.iter().zip(y).all(|(p, q)| kind(p) == kind(q)))
 }
 
 impl Kept {
@@ -89,9 +95,16 @@ impl Kept {
             in_new.extend(g.new.order.iter().cloned());
             stream_pairs(&g.old, &g.new, &g.ops, g.min_equal, &mut m);
         }
-        for (i, j) in al.bmap.iter().enumerate().filter_map(|(i, j)| j.map(|j| (i, j))) {
+        for (i, j) in al
+            .bmap
+            .iter()
+            .enumerate()
+            .filter_map(|(i, j)| j.map(|j| (i, j)))
+        {
             match (&old[i], &new[j]) {
-                (Block::Para(a), Block::Para(b)) if !in_old.contains(&vec![i]) && !in_new.contains(&vec![j]) => {
+                (Block::Para(a), Block::Para(b))
+                    if !in_old.contains(&vec![i]) && !in_new.contains(&vec![j]) =>
+                {
                     let ops = al.para_ops.get(&vec![i]).cloned();
                     para_pairs(&a.content, &b.content, &[i], &[j], ops, &mut m);
                 }
@@ -102,8 +115,12 @@ impl Kept {
                     }
                     for (r, (ra, rb)) in a.rows.iter().zip(&b.rows).enumerate() {
                         for (c, (ca, cb)) in ra.iter().zip(rb).enumerate() {
-                            let (Cell::Text(pa), Cell::Text(pb)) = (ca, cb) else { continue };
-                            if in_old.contains(&vec![i, r, c, 0]) || in_new.contains(&vec![j, r, c, 0]) {
+                            let (Cell::Text(pa), Cell::Text(pb)) = (ca, cb) else {
+                                continue;
+                            };
+                            if in_old.contains(&vec![i, r, c, 0])
+                                || in_new.contains(&vec![j, r, c, 0])
+                            {
                                 continue; // the global map has them
                             }
                             let olds: Vec<&Inline> = pa.iter().map(|p| &p.content).collect();
@@ -123,7 +140,12 @@ impl Kept {
 
     /// `self` (old → mid), then `next` (mid → new): old → new.
     pub fn then(&self, next: &Kept) -> Kept {
-        Kept(self.0.iter().filter_map(|(a, b)| next.0.get(b).map(|c| (a.clone(), c.clone()))).collect())
+        Kept(
+            self.0
+                .iter()
+                .filter_map(|(a, b)| next.0.get(b).map(|c| (a.clone(), c.clone())))
+                .collect(),
+        )
     }
 
     pub fn get(&self, p: &Pos) -> Option<&Pos> {
@@ -145,7 +167,7 @@ const MIN_EQUAL: usize = 3;
 
 /// A placeholder, note reference or other atom: never a stray match.
 fn is_atom(key: u32) -> bool {
-    key > 0x10_FFFF
+    key > 0x10_ffff
 }
 
 /// Pairs of equal stream positions; units only from equal stretches of at
@@ -159,7 +181,9 @@ fn stream_pairs(a: &Stream, b: &Stream, ops: &[Op], min: usize, m: &mut HashMap<
                 continue;
             }
             match (stream_pos(a, x), stream_pos(b, y)) {
-                (Some(p @ Pos::Unit(..)), Some(q @ Pos::Unit(..))) if !short || is_atom(a.text[x]) => {
+                (Some(p @ Pos::Unit(..)), Some(q @ Pos::Unit(..)))
+                    if !short || is_atom(a.text[x]) =>
+                {
                     m.insert(p, q);
                 }
                 (Some(p @ Pos::Mark(_)), Some(q @ Pos::Mark(_))) => {
@@ -171,10 +195,23 @@ fn stream_pairs(a: &Stream, b: &Stream, ops: &[Op], min: usize, m: &mut HashMap<
     }
 }
 
-fn para_pairs(a: &Inline, b: &Inline, pa: &[usize], pb: &[usize], ops: Option<Vec<Op>>, m: &mut HashMap<Pos, Pos>) {
+fn para_pairs(
+    a: &Inline,
+    b: &Inline,
+    pa: &[usize],
+    pb: &[usize],
+    ops: Option<Vec<Op>>,
+    m: &mut HashMap<Pos, Pos>,
+) {
     let (ka, kb) = (keys(a), keys(b));
     let min = if ops.is_some() { 1 } else { MIN_EQUAL };
-    let ops = ops.unwrap_or_else(|| if ka == kb { diff::equal_ops(ka.len()) } else { diff::opcodes(&ka, &kb) });
+    let ops = ops.unwrap_or_else(|| {
+        if ka == kb {
+            diff::equal_ops(ka.len())
+        } else {
+            diff::opcodes(&ka, &kb)
+        }
+    });
     for o in ops.iter().filter(|o| o.tag == Tag::Equal) {
         let long = o.i2 - o.i1 >= min || o.i2 - o.i1 == ka.len();
         for k in 0..o.i2 - o.i1 {
@@ -189,7 +226,13 @@ fn para_pairs(a: &Inline, b: &Inline, pa: &[usize], pb: &[usize], ops: Option<Ve
 
 /// A cell's paragraphs: one by one when their number is the same, else one
 /// diff over the cell (text may cross a split or join inside it).
-fn cell_pairs(olds: &[&Inline], news: &[&Inline], ca: &[usize], cb: &[usize], m: &mut HashMap<Pos, Pos>) {
+fn cell_pairs(
+    olds: &[&Inline],
+    news: &[&Inline],
+    ca: &[usize],
+    cb: &[usize],
+    m: &mut HashMap<Pos, Pos>,
+) {
     let sub = |base: &[usize], k: usize| -> Path { base.iter().copied().chain([k]).collect() };
     if olds.len() == news.len() {
         for (k, (a, b)) in olds.iter().zip(news).enumerate() {

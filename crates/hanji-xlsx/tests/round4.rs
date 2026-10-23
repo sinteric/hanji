@@ -26,13 +26,27 @@ fn root() -> PathBuf {
 }
 
 fn read_json(p: PathBuf) -> Value {
-    serde_json::from_str(&std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display()))).unwrap()
+    serde_json::from_str(
+        &std::fs::read_to_string(&p).unwrap_or_else(|e| panic!("{}: {e}", p.display())),
+    )
+    .unwrap()
 }
 
 /// The rows of a window: `[row, cells…]` as displayed.
 fn window_rows(rem: &Remainder, table: &str) -> Vec<Vec<String>> {
-    let w = XlsxEngine::window(rem, &WindowOf::Table { name: table.into(), rows: None }).unwrap();
-    w.lines().skip(3).take_while(|l| !l.starts_with("</data>")).map(|l| split_pipe_row(l).unwrap()).collect()
+    let w = XlsxEngine::window(
+        rem,
+        &WindowOf::Table {
+            name: table.into(),
+            rows: None,
+        },
+    )
+    .unwrap();
+    w.lines()
+        .skip(3)
+        .take_while(|l| !l.starts_with("</data>"))
+        .map(|l| split_pipe_row(l).unwrap())
+        .collect()
 }
 
 /// Differences between the tables of `rem` and `expected` (wb.py's tables).
@@ -51,7 +65,14 @@ fn compare(rem: &Remainder, expected: &Value) -> Vec<String> {
         let cols: Vec<(String, String, String, bool)> = decl
             .columns
             .iter()
-            .map(|c| (c.name.clone(), c.ty.clone(), c.format.clone(), !c.formula.is_empty()))
+            .map(|c| {
+                (
+                    c.name.clone(),
+                    c.ty.clone(),
+                    c.format.clone(),
+                    !c.formula.is_empty(),
+                )
+            })
             .collect();
         let want: Vec<(String, String, String, bool)> = t["columns"]
             .as_array()
@@ -82,12 +103,15 @@ fn compare(rem: &Remainder, expected: &Value) -> Vec<String> {
                 .iter()
                 .map(|x| x.as_str().map_or_else(|| x.to_string(), str::to_string))
                 .collect();
-            let blank = w.iter().skip(1).zip(&formula_cols).all(|(v, f)| *f || v.is_empty());
+            let blank = w
+                .iter()
+                .skip(1)
+                .zip(&formula_cols)
+                .all(|(v, f)| *f || v.is_empty());
             let same = g.len() == w.len()
-                && g.iter()
-                    .zip(&w)
-                    .enumerate()
-                    .all(|(k, (a, b))| a == b || (k > 0 && blank && formula_cols[k - 1] && b.is_empty()));
+                && g.iter().zip(&w).enumerate().all(|(k, (a, b))| {
+                    a == b || (k > 0 && blank && formula_cols[k - 1] && b.is_empty())
+                });
             if !same {
                 out.push(format!("{name}: row {g:?} for {w:?}"));
             }
@@ -98,7 +122,8 @@ fn compare(rem: &Remainder, expected: &Value) -> Vec<String> {
 
 #[test]
 fn gold_operations_land_on_real_workbooks() {
-    let expected = read_json(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/round4/expected.json"));
+    let expected =
+        read_json(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/round4/expected.json"));
     let (mut tasks, mut landed, mut putget, mut refused) = (0, 0, 0, 0);
     let mut failures = vec![];
     for rep in 1..=3 {
@@ -129,7 +154,9 @@ fn gold_operations_land_on_real_workbooks() {
                 failures.push(format!("{id}:\n  {}", d.join("\n  ")));
             }
             // PutGet: the export reads back as what was written.
-            let out = XlsxEngine.export(&applied.text, &applied.remainder).unwrap();
+            let out = XlsxEngine
+                .export(&applied.text, &applied.remainder)
+                .unwrap();
             let again = XlsxEngine.import(&out, &ImportOptions::default()).unwrap();
             let same_windows = applied.remainder.parts.len() == again.remainder.parts.len()
                 && XlsxEngine::view(&applied.remainder, 500).unwrap()
@@ -146,8 +173,14 @@ fn gold_operations_land_on_real_workbooks() {
             format!("[{{\"op\": \"append_rows\", \"table\": \"Training\", \"rows\": [{}]}}]", vec!["{\"시간\": 1}"; 714].join(",")),
             r#"[{"op": "set_color", "table": "Budget", "rows": "2:10", "color": "red"}]"#.to_string(),
         ];
-        let e = XlsxEngine::apply(&text, &rem, &attempts[rep - 1]).unwrap_err().to_string();
-        let want = ["fetches data", "no answer adds more than 50 rows", "\"set_color\" is not an operation"][rep - 1];
+        let e = XlsxEngine::apply(&text, &rem, &attempts[rep - 1])
+            .unwrap_err()
+            .to_string();
+        let want = [
+            "fetches data",
+            "no answer adds more than 50 rows",
+            "\"set_color\" is not an operation",
+        ][rep - 1];
         assert!(e.contains(want), "{unit_id} e5: {e}");
         refused += 1;
     }

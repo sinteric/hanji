@@ -14,8 +14,10 @@ use serde_json::Value as Json;
 use crate::cellfmt::{self, CellFormat};
 use crate::diag::quoted;
 use crate::formula::{self, FormulaProblem};
-use crate::sheet::{format_kind, sheet_name_problem, table_name_problem, type_fits_format, FormatKind, Spreadsheet};
-use crate::sheet::{ColumnDecl, SheetDecl, SheetItem, TableDecl};
+use crate::sheet::{
+    format_kind, sheet_name_problem, table_name_problem, type_fits_format, ColumnDecl, FormatKind,
+    SheetDecl, SheetItem, Spreadsheet, TableDecl,
+};
 use crate::vocab::{Border, Color, Fill};
 
 /// The operations, with their required and optional keys.
@@ -28,7 +30,11 @@ pub const OPS: &[(&str, &[&str], &[&str])] = &[
     ("set_type", &["table", "column", "type"], &["format"]),
     ("add_column", &["table", "column"], &[]),
     ("sort", &["table", "keys"], &[]),
-    ("add_table", &["sheet", "name", "anchor", "columns"], &["rows"]),
+    (
+        "add_table",
+        &["sheet", "name", "anchor", "columns"],
+        &["rows"],
+    ),
     ("add_sheet", &["name"], &[]),
     ("format", &["range", "set"], &[]),
 ];
@@ -156,9 +162,9 @@ impl RangeOp {
     /// Rows the operation adds.
     pub fn new_rows(&self) -> usize {
         match self {
-            RangeOp::AppendRows { rows, .. } | RangeOp::InsertRows { rows, .. } | RangeOp::AddTable { rows, .. } => {
-                rows.len()
-            }
+            RangeOp::AppendRows { rows, .. }
+            | RangeOp::InsertRows { rows, .. }
+            | RangeOp::AddTable { rows, .. } => rows.len(),
             _ => 0,
         }
     }
@@ -195,7 +201,10 @@ impl std::error::Error for OpError {}
 
 /// All errors, one per line.
 pub fn render_errors(errs: &[OpError]) -> String {
-    errs.iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n")
+    errs.iter()
+        .map(|e| e.to_string())
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn op_list() -> String {
@@ -205,7 +214,14 @@ fn op_list() -> String {
 /// Read the JSON list (a JSON string holding the list, or a fenced code
 /// block, is accepted too) and check every operation's keys and value shapes.
 pub fn parse_ops(text: &str) -> Result<Vec<RangeOp>, Vec<OpError>> {
-    let whole = |m: String| vec![OpError { op: 0, name: None, field: None, message: m }];
+    let whole = |m: String| {
+        vec![OpError {
+            op: 0,
+            name: None,
+            field: None,
+            message: m,
+        }]
+    };
     let mut s = text.trim();
     if let Some(rest) = s.strip_prefix("```") {
         let body = rest.split_once('\n').map_or("", |x| x.1);
@@ -215,11 +231,16 @@ pub fn parse_ops(text: &str) -> Result<Vec<RangeOp>, Vec<OpError>> {
         whole(format!("the operations are not JSON ({e}); they are a JSON list such as [{{\"op\": \"set\", \"range\": \"Sheet1!B7\", \"values\": [[1204]]}}]."))
     })?;
     if let Json::String(inner) = &v {
-        v = serde_json::from_str(inner)
-            .map_err(|e| whole(format!("the operations are a JSON list, not a string ({e}).")))?;
+        v = serde_json::from_str(inner).map_err(|e| {
+            whole(format!(
+                "the operations are a JSON list, not a string ({e})."
+            ))
+        })?;
     }
     let Json::Array(items) = v else {
-        return Err(whole("the operations are a JSON list: [{\"op\": …}, …].".into()));
+        return Err(whole(
+            "the operations are a JSON list: [{\"op\": …}, …].".into(),
+        ));
     };
     let mut ops = vec![];
     let mut errs = vec![];
@@ -262,25 +283,47 @@ impl Ctx {
 }
 
 fn one_op(k: usize, item: &Json) -> Result<RangeOp, OpError> {
-    let bad = |m: String| OpError { op: k, name: None, field: None, message: m };
+    let bad = |m: String| OpError {
+        op: k,
+        name: None,
+        field: None,
+        message: m,
+    };
     let Json::Object(o) = item else {
-        return Err(bad(format!("an operation is an object {{\"op\": …}}; \"op\" is one of {}.", op_list())));
+        return Err(bad(format!(
+            "an operation is an object {{\"op\": …}}; \"op\" is one of {}.",
+            op_list()
+        )));
     };
     let Some(Json::String(name)) = o.get("op") else {
         return Err(bad(format!("\"op\" is one of {}.", op_list())));
     };
     let Some(&(name, req, opt)) = OPS.iter().find(|x| x.0 == name) else {
-        return Err(bad(format!("\"{name}\" is not an operation; \"op\" is one of {}.", op_list())));
+        return Err(bad(format!(
+            "\"{name}\" is not an operation; \"op\" is one of {}.",
+            op_list()
+        )));
     };
     let cx = Ctx { op: k, name };
-    let missing: Vec<&str> = req.iter().copied().filter(|a| !o.contains_key(*a)).collect();
-    let extra: Vec<&str> =
-        o.keys().map(String::as_str).filter(|a| *a != "op" && !req.contains(a) && !opt.contains(a)).collect();
+    let missing: Vec<&str> = req
+        .iter()
+        .copied()
+        .filter(|a| !o.contains_key(*a))
+        .collect();
+    let extra: Vec<&str> = o
+        .keys()
+        .map(String::as_str)
+        .filter(|a| *a != "op" && !req.contains(a) && !opt.contains(a))
+        .collect();
     if !missing.is_empty() || !extra.is_empty() {
         let takes = format!(
             "it takes {}{}",
             req.join(", "),
-            if opt.is_empty() { String::new() } else { format!(" and optionally {}", opt.join(", ")) }
+            if opt.is_empty() {
+                String::new()
+            } else {
+                format!(" and optionally {}", opt.join(", "))
+            }
         );
         let what = if !missing.is_empty() {
             format!("missing {}", missing.join(", "))
@@ -307,26 +350,45 @@ fn one_op(k: usize, item: &Json) -> Result<RangeOp, OpError> {
         "set" => {
             let range = s("range")?;
             let Some(Json::Array(rows)) = o.get("values") else {
-                return Err(cx.err("values", "is a list of rows, each a list of values: [[1204]] for one cell."));
+                return Err(cx.err(
+                    "values",
+                    "is a list of rows, each a list of values: [[1204]] for one cell.",
+                ));
             };
             let mut values = vec![];
             for r in rows {
                 let Json::Array(cells) = r else {
                     return Err(cx.err("values", "is a list of rows, each a list of values: [[1204]] for one cell, [[1, 2], [3, 4]] for two rows of two."));
                 };
-                values.push(cells.iter().map(|c| value(&cx, "values", c)).collect::<Result<Vec<_>, _>>()?);
+                values.push(
+                    cells
+                        .iter()
+                        .map(|c| value(&cx, "values", c))
+                        .collect::<Result<Vec<_>, _>>()?,
+                );
             }
             RangeOp::Set { range, values }
         }
         "format" => {
             let range = s("range")?;
             let (set, outline) = format_set(&cx, o.get("set"))?;
-            RangeOp::Format { range, set: Box::new(set), outline }
+            RangeOp::Format {
+                range,
+                set: Box::new(set),
+                outline,
+            }
         }
-        "append_rows" => RangeOp::AppendRows { table: s("table")?, rows: rows(&cx, o.get("rows"))? },
+        "append_rows" => RangeOp::AppendRows {
+            table: s("table")?,
+            rows: rows(&cx, o.get("rows"))?,
+        },
         "insert_rows" => {
             let before = row_number(&cx, "before", o.get("before"))?;
-            RangeOp::InsertRows { table: s("table")?, before, rows: rows(&cx, o.get("rows"))? }
+            RangeOp::InsertRows {
+                table: s("table")?,
+                before,
+                rows: rows(&cx, o.get("rows"))?,
+            }
         }
         "delete_rows" => {
             let (first, last) = match o.get("rows") {
@@ -334,34 +396,70 @@ fn one_op(k: usize, item: &Json) -> Result<RangeOp, OpError> {
                     let n = n.as_u64().unwrap() as u32;
                     (n, n)
                 }
-                Some(Json::String(v)) => parse_rows(v)
-                    .ok_or_else(|| cx.err("rows", format!("is \"57\" or \"57:58\" (sheet row numbers), not {v:?}.")))?,
+                Some(Json::String(v)) => parse_rows(v).ok_or_else(|| {
+                    cx.err(
+                        "rows",
+                        format!("is \"57\" or \"57:58\" (sheet row numbers), not {v:?}."),
+                    )
+                })?,
                 _ => return Err(cx.err("rows", "is \"57\" or \"57:58\" (sheet row numbers).")),
             };
             if last < first {
-                return Err(cx.err("rows", format!("\"{first}:{last}\" runs backwards; write \"{last}:{first}\".")));
+                return Err(cx.err(
+                    "rows",
+                    format!("\"{first}:{last}\" runs backwards; write \"{last}:{first}\"."),
+                ));
             }
-            RangeOp::DeleteRows { table: s("table")?, first, last }
+            RangeOp::DeleteRows {
+                table: s("table")?,
+                first,
+                last,
+            }
         }
-        "fill_formula" => RangeOp::FillFormula { table: s("table")?, column: s("column")?, formula: s("formula")? },
-        "set_type" => {
-            RangeOp::SetType { table: s("table")?, column: s("column")?, ty: s("type")?, format: opt_s("format")? }
-        }
-        "add_column" => RangeOp::AddColumn { table: s("table")?, column: column_spec(&cx, "column", o.get("column"))? },
-        "sort" => RangeOp::Sort { table: s("table")?, keys: sort_keys(&cx, o.get("keys"))? },
+        "fill_formula" => RangeOp::FillFormula {
+            table: s("table")?,
+            column: s("column")?,
+            formula: s("formula")?,
+        },
+        "set_type" => RangeOp::SetType {
+            table: s("table")?,
+            column: s("column")?,
+            ty: s("type")?,
+            format: opt_s("format")?,
+        },
+        "add_column" => RangeOp::AddColumn {
+            table: s("table")?,
+            column: column_spec(&cx, "column", o.get("column"))?,
+        },
+        "sort" => RangeOp::Sort {
+            table: s("table")?,
+            keys: sort_keys(&cx, o.get("keys"))?,
+        },
         "add_table" => {
-            let Some(Json::Array(cols)) = o.get("columns").filter(|c| c.as_array().is_some_and(|a| !a.is_empty()))
+            let Some(Json::Array(cols)) = o
+                .get("columns")
+                .filter(|c| c.as_array().is_some_and(|a| !a.is_empty()))
             else {
-                return Err(
-                    cx.err("columns", "is a non-empty list of {\"name\", \"type\", \"format\"[, \"formula\"]}.")
-                );
+                return Err(cx.err(
+                    "columns",
+                    "is a non-empty list of {\"name\", \"type\", \"format\"[, \"formula\"]}.",
+                ));
             };
-            let columns = cols.iter().map(|c| column_spec(&cx, "columns", Some(c))).collect::<Result<Vec<_>, _>>()?;
+            let columns = cols
+                .iter()
+                .map(|c| column_spec(&cx, "columns", Some(c)))
+                .collect::<Result<Vec<_>, _>>()?;
             let rows = match o.get("rows") {
                 None | Some(Json::Null) => vec![],
                 r => rows(&cx, r)?,
             };
-            RangeOp::AddTable { sheet: s("sheet")?, name: s("name")?, anchor: s("anchor")?, columns, rows }
+            RangeOp::AddTable {
+                sheet: s("sheet")?,
+                name: s("name")?,
+                anchor: s("anchor")?,
+                columns,
+                rows,
+            }
         }
         _ => RangeOp::AddSheet { name: s("name")? },
     })
@@ -412,17 +510,27 @@ fn rows(cx: &Ctx, v: Option<&Json>) -> Result<Vec<Row>, OpError> {
         .enumerate()
         .map(|(k, r)| {
             let Json::Object(o) = r else {
-                return Err(cx.err("rows", format!("row {} is an object {{column: value}}, not {r}.", k + 1)));
+                return Err(cx.err(
+                    "rows",
+                    format!("row {} is an object {{column: value}}, not {r}.", k + 1),
+                ));
             };
-            o.iter().map(|(c, v)| Ok((c.clone(), value(cx, "rows", v)?))).collect()
+            o.iter()
+                .map(|(c, v)| Ok((c.clone(), value(cx, "rows", v)?)))
+                .collect()
         })
         .collect()
 }
 
 fn column_spec(cx: &Ctx, field: &str, v: Option<&Json>) -> Result<ColumnSpec, OpError> {
     let form = "{\"name\": …, \"type\": \"text\" | \"number\" | \"date\", \"format\": …[, \"formula\": \"=…\"]}";
-    let Some(Json::Object(o)) = v else { return Err(cx.err(field, format!("a column is {form}."))) };
-    if let Some(k) = o.keys().find(|k| !["name", "type", "format", "formula"].contains(&k.as_str())) {
+    let Some(Json::Object(o)) = v else {
+        return Err(cx.err(field, format!("a column is {form}.")));
+    };
+    if let Some(k) = o
+        .keys()
+        .find(|k| !["name", "type", "format", "formula"].contains(&k.as_str()))
+    {
         return Err(cx.err(field, format!("a column has no key \"{k}\"; it is {form}.")));
     }
     let get = |k: &str| match o.get(k) {
@@ -430,9 +538,17 @@ fn column_spec(cx: &Ctx, field: &str, v: Option<&Json>) -> Result<ColumnSpec, Op
         _ => None,
     };
     let (Some(name), Some(ty)) = (get("name"), get("type")) else {
-        return Err(cx.err(field, format!("a column is {form}; it needs a name and a type.")));
+        return Err(cx.err(
+            field,
+            format!("a column is {form}; it needs a name and a type."),
+        ));
     };
-    Ok(ColumnSpec { name, ty, format: get("format"), formula: get("formula") })
+    Ok(ColumnSpec {
+        name,
+        ty,
+        format: get("format"),
+        formula: get("formula"),
+    })
 }
 
 fn sort_keys(cx: &Ctx, v: Option<&Json>) -> Result<Vec<SortKey>, OpError> {
@@ -447,12 +563,18 @@ fn sort_keys(cx: &Ctx, v: Option<&Json>) -> Result<Vec<SortKey>, OpError> {
                 Json::String(c) => (Some(c.clone()), "asc".to_string()),
                 Json::Object(o) => (
                     o.get("column").and_then(Json::as_str).map(str::to_string),
-                    o.get("order").and_then(Json::as_str).unwrap_or("asc").to_ascii_lowercase(),
+                    o.get("order")
+                        .and_then(Json::as_str)
+                        .unwrap_or("asc")
+                        .to_ascii_lowercase(),
                 ),
                 _ => (None, String::new()),
             };
             match (col, order.as_str()) {
-                (Some(column), "asc" | "desc") => Ok(SortKey { column, desc: order == "desc" }),
+                (Some(column), "asc" | "desc") => Ok(SortKey {
+                    column,
+                    desc: order == "desc",
+                }),
                 _ => Err(cx.err("keys", form)),
             }
         })
@@ -464,7 +586,9 @@ fn sort_keys(cx: &Ctx, v: Option<&Json>) -> Result<Vec<SortKey>, OpError> {
 /// four sides of every cell and `outline` for the outer edges of the range.
 fn format_set(cx: &Ctx, v: Option<&Json>) -> Result<(CellFormat, Option<Border>), OpError> {
     let form = "is an object of formatting keys, such as {\"fill\": \"#D9D9D9\", \"bold\": true, \"border-bottom\": \"0.75pt solid #000000\"}";
-    let Some(Json::Object(o)) = v else { return Err(cx.err("set", format!("{form}."))) };
+    let Some(Json::Object(o)) = v else {
+        return Err(cx.err("set", format!("{form}.")));
+    };
     if o.is_empty() {
         return Err(cx.err("set", format!("{form}; it sets at least one key.")));
     }
@@ -498,12 +622,13 @@ fn format_set(cx: &Ctx, v: Option<&Json>) -> Result<(CellFormat, Option<Border>)
             }
         };
         if k == "outline" {
-            let b =
-                Border::parse(text.as_deref().unwrap_or("")).map_err(|m| cx.err("set", format!("outline: {m}.")))?;
+            let b = Border::parse(text.as_deref().unwrap_or(""))
+                .map_err(|m| cx.err("set", format!("outline: {m}.")))?;
             outline = Some(b);
             continue;
         }
-        f.set(k, text.as_deref()).map_err(|m| cx.err("set", format!("{m}.")))?;
+        f.set(k, text.as_deref())
+            .map_err(|m| cx.err("set", format!("{m}.")))?;
     }
     writable(cx, &f, outline.as_ref())?;
     Ok((f, outline))
@@ -534,9 +659,16 @@ fn writable(cx: &Ctx, f: &CellFormat, outline: Option<&Border>) -> Result<(), Op
             other => return Err(cx.err("set", format!("fill={other} is shown but cannot be written: a workbook's gradients and patterns are kept as the file has them; write a colour or none."))),
         }
     }
-    let sides = f.borders.iter().enumerate().filter_map(|(k, b)| b.as_ref().map(|b| (cellfmt::SIDES[k], b)));
+    let sides = f
+        .borders
+        .iter()
+        .enumerate()
+        .filter_map(|(k, b)| b.as_ref().map(|b| (cellfmt::SIDES[k], b)));
     for (key, b) in sides.chain(outline.map(|b| ("outline", b))) {
-        if let Border::Line { style, color: c, .. } = b {
+        if let Border::Line {
+            style, color: c, ..
+        } = b
+        {
             if !crate::vocab::BORDER_STYLES.contains(&style.as_str()) {
                 return Err(cx.err("set", format!("{key}: a workbook has no {style} border; write solid, dashed, dotted, double, dash-dot or dash-dot-dot.")));
             }
@@ -564,7 +696,12 @@ pub fn split_range(range: &str) -> Option<(String, String)> {
 fn cell(s: &str) -> Option<(u32, u32)> {
     let k = s.find(|c: char| !c.is_ascii_alphabetic())?;
     let (l, d) = s.split_at(k);
-    if l.is_empty() || l.len() > 3 || d.is_empty() || !d.bytes().all(|b| b.is_ascii_digit()) || d.starts_with('0') {
+    if l.is_empty()
+        || l.len() > 3
+        || d.is_empty()
+        || !d.bytes().all(|b| b.is_ascii_digit())
+        || d.starts_with('0')
+    {
         return None;
     }
     let mut c: u32 = 0;
@@ -596,7 +733,11 @@ impl Formats {
     }
     fn list(&self) -> String {
         let shown: Vec<String> = self.0.iter().take(40).cloned().collect();
-        let more = if self.0.len() > 40 { format!(" (and {} more)", self.0.len() - 40) } else { String::new() };
+        let more = if self.0.len() > 40 {
+            format!(" (and {} more)", self.0.len() - 40)
+        } else {
+            String::new()
+        };
         format!("{}{more}", quoted(&shown))
     }
 }
@@ -604,11 +745,18 @@ impl Formats {
 /// Check names, types, formats and formulas of `ops` against `structure`,
 /// following the list as it adds sheets, tables and columns and moves rows.
 /// `formats` lists the number formats the file allows (empty: any).
-pub fn check_ops(ops: &[RangeOp], structure: &Spreadsheet, formats: &Formats) -> Result<(), Vec<OpError>> {
+pub fn check_ops(
+    ops: &[RangeOp],
+    structure: &Spreadsheet,
+    formats: &Formats,
+) -> Result<(), Vec<OpError>> {
     let mut st = structure.clone();
     let mut errs = vec![];
     for (k, op) in ops.iter().enumerate() {
-        let cx = Ctx { op: k + 1, name: op.name() };
+        let cx = Ctx {
+            op: k + 1,
+            name: op.name(),
+        };
         if let Err(e) = check_one(&cx, op, &mut st, formats) {
             errs.push(e);
             // Later operations depend on this one; one error per list is clearer than a cascade.
@@ -653,16 +801,19 @@ fn table_mut(st: &mut Spreadsheet, (si, ti): (usize, usize)) -> &mut TableDecl {
 }
 
 fn column_index(cx: &Ctx, field: &str, t: &TableDecl, name: &str) -> Result<usize, OpError> {
-    t.columns.iter().position(|c| c.name == name).ok_or_else(|| {
-        cx.err(
-            field,
-            format!(
-                "table {} has no column \"{name}\" (columns: {}).",
-                t.name,
-                names_of(t.columns.iter().map(|c| c.name.as_str()))
-            ),
-        )
-    })
+    t.columns
+        .iter()
+        .position(|c| c.name == name)
+        .ok_or_else(|| {
+            cx.err(
+                field,
+                format!(
+                    "table {} has no column \"{name}\" (columns: {}).",
+                    t.name,
+                    names_of(t.columns.iter().map(|c| c.name.as_str()))
+                ),
+            )
+        })
 }
 
 /// `(c0, header row, c1, last row)` of a table's range.
@@ -711,7 +862,9 @@ pub fn value_problem(col_name: &str, ty: &str, v: &Value) -> Option<String> {
 pub fn date_of(s: &str) -> Option<(i32, u32, u32)> {
     let p: Vec<&str> = s.trim().split('-').collect();
     let num = |x: &str, n: usize| {
-        (x.len() == n && x.bytes().all(|b| b.is_ascii_digit())).then(|| x.parse::<u32>().ok()).flatten()
+        (x.len() == n && x.bytes().all(|b| b.is_ascii_digit()))
+            .then(|| x.parse::<u32>().ok())
+            .flatten()
     };
     let (y, m, d) = match p.as_slice() {
         [y, m] => (num(y, 4)?, num(m, 2)?, 1),
@@ -720,7 +873,11 @@ pub fn date_of(s: &str) -> Option<(i32, u32, u32)> {
     };
     let dim = [
         31,
-        if (y % 4 == 0 && y % 100 != 0) || y % 400 == 0 { 29 } else { 28 },
+        if (y % 4 == 0 && y % 100 != 0) || y % 400 == 0 {
+            29
+        } else {
+            28
+        },
         31,
         30,
         31,
@@ -739,8 +896,10 @@ pub fn date_of(s: &str) -> Option<(i32, u32, u32)> {
 fn check_rows(cx: &Ctx, t: &TableDecl, rows: &[Row]) -> Result<(), OpError> {
     for (k, r) in rows.iter().enumerate() {
         for (c, v) in r {
-            let ci = column_index(cx, "rows", t, c)
-                .map_err(|e| OpError { message: format!("row {}: {}", k + 1, e.message), ..e })?;
+            let ci = column_index(cx, "rows", t, c).map_err(|e| OpError {
+                message: format!("row {}: {}", k + 1, e.message),
+                ..e
+            })?;
             let col = &t.columns[ci];
             if !col.formula.is_empty() {
                 if *v == Value::Null {
@@ -764,11 +923,21 @@ fn check_rows(cx: &Ctx, t: &TableDecl, rows: &[Row]) -> Result<(), OpError> {
     Ok(())
 }
 
-fn check_format(cx: &Ctx, field: &str, formats: &Formats, ty: &str, fmt: &str) -> Result<(), OpError> {
+fn check_format(
+    cx: &Ctx,
+    field: &str,
+    formats: &Formats,
+    ty: &str,
+    fmt: &str,
+) -> Result<(), OpError> {
     if !formats.allowed(fmt) {
-        return Err(
-            cx.err(field, format!("\"{fmt}\" is not a number format of this workbook. Formats: {}.", formats.list()))
-        );
+        return Err(cx.err(
+            field,
+            format!(
+                "\"{fmt}\" is not a number format of this workbook. Formats: {}.",
+                formats.list()
+            ),
+        ));
     }
     if !type_fits_format(ty, fmt) {
         let want = match ty {
@@ -777,7 +946,10 @@ fn check_format(cx: &Ctx, field: &str, formats: &Formats, ty: &str, fmt: &str) -
             "number" => "a number column takes a number format (#,##0, 0.0%, 00000, …)".to_string(),
             _ => String::new(),
         };
-        return Err(cx.err(field, format!("\"{fmt}\" does not fit a {ty} column: {want}.")));
+        return Err(cx.err(
+            field,
+            format!("\"{fmt}\" does not fit a {ty} column: {want}."),
+        ));
     }
     Ok(())
 }
@@ -790,20 +962,38 @@ fn default_format(ty: &str) -> Option<&'static str> {
     }
 }
 
-fn spec_to_decl(cx: &Ctx, field: &str, formats: &Formats, c: &ColumnSpec) -> Result<ColumnDecl, OpError> {
+fn spec_to_decl(
+    cx: &Ctx,
+    field: &str,
+    formats: &Formats,
+    c: &ColumnSpec,
+) -> Result<ColumnDecl, OpError> {
     if !["text", "number", "date"].contains(&c.ty.as_str()) {
         return Err(cx.err(
             field,
-            format!("column \"{}\": the type is \"text\", \"number\" or \"date\", not \"{}\".", c.name, c.ty),
+            format!(
+                "column \"{}\": the type is \"text\", \"number\" or \"date\", not \"{}\".",
+                c.name, c.ty
+            ),
         ));
     }
     let format = match (&c.format, default_format(&c.ty)) {
         (Some(f), _) => f.clone(),
         (None, Some(d)) => d.to_string(),
-        (None, None) => return Err(cx.err(field, format!("column \"{}\": a {} column needs a format.", c.name, c.ty))),
+        (None, None) => {
+            return Err(cx.err(
+                field,
+                format!("column \"{}\": a {} column needs a format.", c.name, c.ty),
+            ))
+        }
     };
     check_format(cx, field, formats, &c.ty, &format)?;
-    Ok(ColumnDecl { name: c.name.clone(), ty: c.ty.clone(), format, formula: c.formula.clone().unwrap_or_default() })
+    Ok(ColumnDecl {
+        name: c.name.clone(),
+        ty: c.ty.clone(),
+        format,
+        formula: c.formula.clone().unwrap_or_default(),
+    })
 }
 
 /// A model-written formula for a column of table `own` (with `own_cols`), against the structure.
@@ -817,19 +1007,28 @@ fn check_formula(
 ) -> Result<(), OpError> {
     if let Some(p) = formula::model_formula_problem(f) {
         let m = match p {
-            FormulaProblem::NotAFormula => format!("a formula is text starting with \"=\", not {f:?}."),
+            FormulaProblem::NotAFormula => {
+                format!("a formula is text starting with \"=\", not {f:?}.")
+            }
             p => format!("formula {f} is refused: {p}."),
         };
         return Err(cx.err(field, m));
     }
     for r in formula::structured_refs(f) {
         let (tname, cols): (String, Vec<&str>) = match &r.table {
-            None => (own.to_string(), own_cols.iter().map(|c| c.name.as_str()).collect()),
-            Some(t) if t.eq_ignore_ascii_case(own) => {
-                (own.to_string(), own_cols.iter().map(|c| c.name.as_str()).collect())
-            }
+            None => (
+                own.to_string(),
+                own_cols.iter().map(|c| c.name.as_str()).collect(),
+            ),
+            Some(t) if t.eq_ignore_ascii_case(own) => (
+                own.to_string(),
+                own_cols.iter().map(|c| c.name.as_str()).collect(),
+            ),
             Some(t) => match st.table(t) {
-                Some((_, td)) => (td.name.clone(), td.columns.iter().map(|c| c.name.as_str()).collect()),
+                Some((_, td)) => (
+                    td.name.clone(),
+                    td.columns.iter().map(|c| c.name.as_str()).collect(),
+                ),
                 None => {
                     return Err(cx.err(
                         field,
@@ -841,7 +1040,11 @@ fn check_formula(
                 }
             },
         };
-        if r.this_row() && r.table.as_deref().is_some_and(|t| !t.eq_ignore_ascii_case(own)) {
+        if r.this_row()
+            && r.table
+                .as_deref()
+                .is_some_and(|t| !t.eq_ignore_ascii_case(own))
+        {
             return Err(cx.err(
                 field,
                 format!(
@@ -866,12 +1069,18 @@ fn check_formula(
     Ok(())
 }
 
-fn check_one(cx: &Ctx, op: &RangeOp, st: &mut Spreadsheet, formats: &Formats) -> Result<(), OpError> {
+fn check_one(
+    cx: &Ctx,
+    op: &RangeOp,
+    st: &mut Spreadsheet,
+    formats: &Formats,
+) -> Result<(), OpError> {
     match op {
         RangeOp::Set { range, values } => {
-            let form = "is Sheet!Cell or Sheet!First:Last, such as \"매출!D70\" or \"매출!D70:E71\"";
-            let (sheet, cells) =
-                split_range(range).ok_or_else(|| cx.err("range", format!("{form}, not {range:?}.")))?;
+            let form =
+                "is Sheet!Cell or Sheet!First:Last, such as \"매출!D70\" or \"매출!D70:E71\"";
+            let (sheet, cells) = split_range(range)
+                .ok_or_else(|| cx.err("range", format!("{form}, not {range:?}.")))?;
             let Some(sd) = st.sheet(&sheet) else {
                 return Err(cx.err(
                     "range",
@@ -881,15 +1090,20 @@ fn check_one(cx: &Ctx, op: &RangeOp, st: &mut Spreadsheet, formats: &Formats) ->
                     ),
                 ));
             };
-            let (c0, r0, c1, r1) = area(&cells).ok_or_else(|| cx.err("range", format!("{form}, not {range:?}.")))?;
+            let (c0, r0, c1, r1) =
+                area(&cells).ok_or_else(|| cx.err("range", format!("{form}, not {range:?}.")))?;
             if c1 < c0 || r1 < r0 {
-                return Err(cx.err("range", format!("{range} runs backwards; the first cell is the top-left one.")));
+                return Err(cx.err(
+                    "range",
+                    format!("{range} runs backwards; the first cell is the top-left one."),
+                ));
             }
             let (h, w) = ((r1 - r0 + 1) as usize, (c1 - c0 + 1) as usize);
             if values.len() != h || values.iter().any(|r| r.len() != w) {
-                return Err(
-                    cx.err("values", format!("is a list of {h} row(s) of {w} value(s) each, the shape of {range}."))
-                );
+                return Err(cx.err(
+                    "values",
+                    format!("is a list of {h} row(s) of {w} value(s) each, the shape of {range}."),
+                ));
             }
             for (i, row) in values.iter().enumerate() {
                 for (j, v) in row.iter().enumerate() {
@@ -924,7 +1138,11 @@ fn check_one(cx: &Ctx, op: &RangeOp, st: &mut Spreadsheet, formats: &Formats) ->
             let last = table_area(t).3;
             set_rows(t, last + rows.len() as u32);
         }
-        RangeOp::InsertRows { table, before, rows } => {
+        RangeOp::InsertRows {
+            table,
+            before,
+            rows,
+        } => {
             let at = find_table(cx, st, table)?;
             let t = table_mut(st, at);
             let (_, r0, _, r1) = table_area(t);
@@ -950,46 +1168,85 @@ fn check_one(cx: &Ctx, op: &RangeOp, st: &mut Spreadsheet, formats: &Formats) ->
             if *first <= r0 || *last > r1 {
                 return Err(cx.err(
                     "rows",
-                    format!("rows {first}-{last} are not data rows of {} (rows {}-{}).", t.name, r0 + 1, r1),
+                    format!(
+                        "rows {first}-{last} are not data rows of {} (rows {}-{}).",
+                        t.name,
+                        r0 + 1,
+                        r1
+                    ),
                 ));
             }
             set_rows(t, r1 - (last - first + 1));
         }
-        RangeOp::FillFormula { table, column, formula } => {
+        RangeOp::FillFormula {
+            table,
+            column,
+            formula,
+        } => {
             let at = find_table(cx, st, table)?;
             let snapshot = st.clone();
             let t = table_mut(st, at);
             let ci = column_index(cx, "column", t, column)?;
-            check_formula(cx, "formula", &snapshot, &t.name.clone(), &t.columns.clone(), formula)?;
+            check_formula(
+                cx,
+                "formula",
+                &snapshot,
+                &t.name.clone(),
+                &t.columns.clone(),
+                formula,
+            )?;
             let refs_self = formula::structured_refs(formula).iter().any(|r| {
-                r.table.as_deref().is_none_or(|x| x.eq_ignore_ascii_case(&t.name))
-                    && r.columns.as_ref().is_some_and(|(a, b)| a == column || b == column)
+                r.table
+                    .as_deref()
+                    .is_none_or(|x| x.eq_ignore_ascii_case(&t.name))
+                    && r.columns
+                        .as_ref()
+                        .is_some_and(|(a, b)| a == column || b == column)
                     && r.this_row()
             });
             if refs_self {
-                return Err(cx.err("formula", format!("the formula of {}[{column}] refers to its own cell.", t.name)));
+                return Err(cx.err(
+                    "formula",
+                    format!(
+                        "the formula of {}[{column}] refers to its own cell.",
+                        t.name
+                    ),
+                ));
             }
             t.columns[ci].formula = formula.clone();
         }
-        RangeOp::SetType { table, column, ty, format } => {
+        RangeOp::SetType {
+            table,
+            column,
+            ty,
+            format,
+        } => {
             let at = find_table(cx, st, table)?;
             let t = table_mut(st, at);
             let ci = column_index(cx, "column", t, column)?;
             if !["text", "number", "date"].contains(&ty.as_str()) {
-                return Err(cx.err("type", format!("is \"text\", \"number\" or \"date\", not \"{ty}\".")));
+                return Err(cx.err(
+                    "type",
+                    format!("is \"text\", \"number\" or \"date\", not \"{ty}\"."),
+                ));
             }
             let col = &t.columns[ci];
             let fmt = match (format, default_format(ty)) {
                 (Some(f), _) => f.clone(),
                 (None, Some(d)) => d.to_string(),
                 (None, None) if col.ty == *ty => col.format.clone(),
-                (None, None) => return Err(cx.err("format", format!("a {ty} column needs a format."))),
+                (None, None) => {
+                    return Err(cx.err("format", format!("a {ty} column needs a format.")))
+                }
             };
             check_format(cx, "format", formats, ty, &fmt)?;
             if (col.ty == "number" && ty == "date") || (col.ty == "date" && ty == "number") {
                 return Err(cx.err(
                     "type",
-                    format!("a {} column cannot become a {ty} column directly; make it text first.", col.ty),
+                    format!(
+                        "a {} column cannot become a {ty} column directly; make it text first.",
+                        col.ty
+                    ),
                 ));
             }
             let c = &mut t.columns[ci];
@@ -1000,14 +1257,27 @@ fn check_one(cx: &Ctx, op: &RangeOp, st: &mut Spreadsheet, formats: &Formats) ->
             let at = find_table(cx, st, table)?;
             let snapshot = st.clone();
             let t = table_mut(st, at);
-            if t.columns.iter().any(|c| c.name.eq_ignore_ascii_case(&column.name)) {
-                return Err(cx.err("column", format!("table {} already has a column \"{}\".", t.name, column.name)));
+            if t.columns
+                .iter()
+                .any(|c| c.name.eq_ignore_ascii_case(&column.name))
+            {
+                return Err(cx.err(
+                    "column",
+                    format!("table {} already has a column \"{}\".", t.name, column.name),
+                ));
             }
             let decl = spec_to_decl(cx, "column", formats, column)?;
             let mut cols = t.columns.clone();
             cols.push(decl.clone());
             if !decl.formula.is_empty() {
-                check_formula(cx, "column", &snapshot, &t.name.clone(), &cols, &decl.formula)?;
+                check_formula(
+                    cx,
+                    "column",
+                    &snapshot,
+                    &t.name.clone(),
+                    &cols,
+                    &decl.formula,
+                )?;
             }
             t.columns.push(decl);
             let (c0, r0, c1, r1) = table_area(t);
@@ -1020,8 +1290,18 @@ fn check_one(cx: &Ctx, op: &RangeOp, st: &mut Spreadsheet, formats: &Formats) ->
                 column_index(cx, "keys", t, &k.column)?;
             }
         }
-        RangeOp::AddTable { sheet, name, anchor, columns, rows } => {
-            let Some(si) = st.sheets.iter().position(|s| s.name.eq_ignore_ascii_case(sheet)) else {
+        RangeOp::AddTable {
+            sheet,
+            name,
+            anchor,
+            columns,
+            rows,
+        } => {
+            let Some(si) = st
+                .sheets
+                .iter()
+                .position(|s| s.name.eq_ignore_ascii_case(sheet))
+            else {
                 return Err(cx.err(
                     "sheet",
                     format!(
@@ -1065,7 +1345,10 @@ fn check_one(cx: &Ctx, op: &RangeOp, st: &mut Spreadsheet, formats: &Formats) ->
             }
             check_rows(cx, &decl, rows)?;
             let mine = (c0, r0, c1, r1);
-            for (_, other) in st.tables().filter(|(s, _)| s.name.eq_ignore_ascii_case(sheet)) {
+            for (_, other) in st
+                .tables()
+                .filter(|(s, _)| s.name.eq_ignore_ascii_case(sheet))
+            {
                 let o = table_area(other);
                 if mine.0 <= o.2 && o.0 <= mine.2 && mine.1 <= o.3 && o.1 <= mine.3 {
                     return Err(cx.err(
@@ -1086,12 +1369,17 @@ fn check_one(cx: &Ctx, op: &RangeOp, st: &mut Spreadsheet, formats: &Formats) ->
             if st.sheet(name).is_some() {
                 return Err(cx.err("name", format!("there is already a sheet \"{name}\".")));
             }
-            st.sheets.push(SheetDecl { name: name.clone(), range: None, formats: vec![], items: vec![] });
+            st.sheets.push(SheetDecl {
+                name: name.clone(),
+                range: None,
+                formats: vec![],
+                items: vec![],
+            });
         }
         RangeOp::Format { range, .. } => {
             let form = "is Sheet!Cell or Sheet!First:Last, such as \"매출!A1\" or \"매출!A1:D1\"";
-            let (sheet, cells) =
-                split_range(range).ok_or_else(|| cx.err("range", format!("{form}, not {range:?}.")))?;
+            let (sheet, cells) = split_range(range)
+                .ok_or_else(|| cx.err("range", format!("{form}, not {range:?}.")))?;
             if st.sheet(&sheet).is_none() {
                 return Err(cx.err(
                     "range",
@@ -1101,9 +1389,13 @@ fn check_one(cx: &Ctx, op: &RangeOp, st: &mut Spreadsheet, formats: &Formats) ->
                     ),
                 ));
             }
-            let (c0, r0, c1, r1) = area(&cells).ok_or_else(|| cx.err("range", format!("{form}, not {range:?}.")))?;
+            let (c0, r0, c1, r1) =
+                area(&cells).ok_or_else(|| cx.err("range", format!("{form}, not {range:?}.")))?;
             if c1 < c0 || r1 < r0 {
-                return Err(cx.err("range", format!("{range} runs backwards; the first cell is the top-left one.")));
+                return Err(cx.err(
+                    "range",
+                    format!("{range} runs backwards; the first cell is the top-left one."),
+                ));
             }
             let n = (c1 - c0 + 1) as u64 * (r1 - r0 + 1) as u64;
             if n > MAX_FORMAT_CELLS {
@@ -1155,19 +1447,28 @@ mod tests {
 
     #[test]
     fn errors_name_the_operation_field_and_allowed_names() {
-        let e = check(r##"[{"op": "set", "range": "매출!C3", "values": [[1]]}, {"op": "apend_rows"}]"##).unwrap_err();
+        let e = check(
+            r##"[{"op": "set", "range": "매출!C3", "values": [[1]]}, {"op": "apend_rows"}]"##,
+        )
+        .unwrap_err();
         assert!(
             e.starts_with("operation 2: \"apend_rows\" is not an operation; \"op\" is one of set, append_rows"),
             "{e}"
         );
         let e = check(r##"[{"op": "append_rows", "table": "Sale", "rows": []}]"##).unwrap_err();
-        assert_eq!(e, "operation 1 (append_rows), \"table\": there is no table \"Sale\". Tables: \"Sales\".");
-        let e = check(r##"[{"op": "append_rows", "table": "Sales", "rows": [{"매출": "1,204"}]}]"##).unwrap_err();
+        assert_eq!(
+            e,
+            "operation 1 (append_rows), \"table\": there is no table \"Sale\". Tables: \"Sales\"."
+        );
+        let e =
+            check(r##"[{"op": "append_rows", "table": "Sales", "rows": [{"매출": "1,204"}]}]"##)
+                .unwrap_err();
         assert!(
             e.contains("row 1: column \"매출\" is a number column; \"1,204\" is text. Write a JSON number (1204)"),
             "{e}"
         );
-        let e = check(r##"[{"op": "append_rows", "table": "Sales", "rows": [{"이익": 5}]}]"##).unwrap_err();
+        let e = check(r##"[{"op": "append_rows", "table": "Sales", "rows": [{"이익": 5}]}]"##)
+            .unwrap_err();
         assert!(e.contains("formula column"), "{e}");
         let e = check(r##"[{"op": "set", "range": "매출!D3", "values": [[1]]}]"##).unwrap_err();
         assert!(e.contains("formula column"), "{e}");
@@ -1194,11 +1495,17 @@ mod tests {
         let e = check(r##"[{"op": "add_table", "sheet": "매출", "name": "Returns", "anchor": "C5", "columns": [{"name": "a", "type": "text"}]}]"##).unwrap_err();
         assert!(e.contains("overlap"), "{e}");
         let rows: Vec<String> = (0..51).map(|_| "{\"지점\": \"x\"}".to_string()).collect();
-        let e = check(&format!("[{{\"op\": \"append_rows\", \"table\": \"Sales\", \"rows\": [{}]}}]", rows.join(",")))
-            .unwrap_err();
+        let e = check(&format!(
+            "[{{\"op\": \"append_rows\", \"table\": \"Sales\", \"rows\": [{}]}}]",
+            rows.join(",")
+        ))
+        .unwrap_err();
         assert!(e.contains("no answer adds more than 50 rows"), "{e}");
         let e = check(r##"[{"op": "delete_rows", "table": "Sales", "row": "3"}]"##).unwrap_err();
-        assert_eq!(e, "operation 1 (delete_rows): it takes table, rows; missing rows.");
+        assert_eq!(
+            e,
+            "operation 1 (delete_rows): it takes table, rows; missing rows."
+        );
     }
 
     #[test]

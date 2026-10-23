@@ -9,7 +9,10 @@ fn main() {
     for path in std::env::args().skip(1) {
         let bytes = std::fs::read(&path).unwrap();
         let name = path.rsplit('/').next().unwrap();
-        let opts = ImportOptions { neutralise: false, template: None };
+        let opts = ImportOptions {
+            neutralise: false,
+            template: None,
+        };
         let imp = match PptxEngine.import(&bytes, &opts) {
             Ok(i) => i,
             Err(e) => {
@@ -40,7 +43,11 @@ fn main() {
                     bad.push(x.name.clone());
                     if std::env::var("DIFF").is_ok() {
                         let (cx, cy) = (cx.unwrap_or_default(), cy.unwrap_or_default());
-                        let k = cx.bytes().zip(cy.bytes()).take_while(|(p, q)| p == q).count();
+                        let k = cx
+                            .bytes()
+                            .zip(cy.bytes())
+                            .take_while(|(p, q)| p == q)
+                            .count();
                         println!(
                             "   {}\n   A {}\n   B {}",
                             x.name,
@@ -60,7 +67,11 @@ fn main() {
                 Ok(false) => "DIFFERS",
                 Err(_) => "REIMPORT-FAILS",
             },
-            if bad.is_empty() { "GetPut ok".to_string() } else { format!("GetPut FAIL {bad:?}") }
+            if bad.is_empty() {
+                "GetPut ok".to_string()
+            } else {
+                format!("GetPut FAIL {bad:?}")
+            }
         );
     }
 }

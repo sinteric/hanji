@@ -6,7 +6,9 @@ use hanji_docx::DocxEngine;
 fn main() {
     let path = std::env::args().nth(1).expect("usage: dump FILE.docx");
     let bytes = std::fs::read(&path).expect("read");
-    let imp = DocxEngine.import(&bytes, &ImportOptions::default()).unwrap_or_else(|e| panic!("{e}"));
+    let imp = DocxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap_or_else(|e| panic!("{e}"));
     print!("{}", imp.text);
     let mut kinds = std::collections::BTreeMap::new();
     for e in &imp.remainder.entries {

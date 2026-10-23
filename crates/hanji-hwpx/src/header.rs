@@ -161,22 +161,42 @@ impl Header {
                 .collect();
             h.fonts.push((ff.get("lang").unwrap_or_default(), fonts));
         }
-        h.bullets = items(&doc.root, "hh:bullets", "hh:bullet").into_iter().filter_map(id_of).collect();
+        h.bullets = items(&doc.root, "hh:bullets", "hh:bullet")
+            .into_iter()
+            .filter_map(id_of)
+            .collect();
         for s in items(&doc.root, "hh:styles", "hh:style") {
             let n = |k: &str| s.get(k).and_then(|v| v.parse::<u32>().ok());
             if s.get("type").as_deref().unwrap_or("PARA") != "PARA" {
                 continue;
             }
-            let (Some(id), Some(para_pr), Some(char_pr)) = (n("id"), n("paraPrIDRef"), n("charPrIDRef")) else {
+            let (Some(id), Some(para_pr), Some(char_pr)) =
+                (n("id"), n("paraPrIDRef"), n("charPrIDRef"))
+            else {
                 continue;
             };
-            let name = s.get("name").filter(|x| !x.is_empty()).or_else(|| s.get("engName")).unwrap_or(id.to_string());
-            h.styles.push(Style { id, name, para_pr, char_pr });
+            let name = s
+                .get("name")
+                .filter(|x| !x.is_empty())
+                .or_else(|| s.get("engName"))
+                .unwrap_or(id.to_string());
+            h.styles.push(Style {
+                id,
+                name,
+                para_pr,
+                char_pr,
+            });
         }
-        let authors: HashMap<String, String> = items(&doc.root, "hh:trackChangeAuthors", "hh:trackChangeAuthor")
-            .into_iter()
-            .map(|a| (a.get("id").unwrap_or_default(), a.get("name").unwrap_or_default()))
-            .collect();
+        let authors: HashMap<String, String> =
+            items(&doc.root, "hh:trackChangeAuthors", "hh:trackChangeAuthor")
+                .into_iter()
+                .map(|a| {
+                    (
+                        a.get("id").unwrap_or_default(),
+                        a.get("name").unwrap_or_default(),
+                    )
+                })
+                .collect();
         for t in items(&doc.root, "hh:trackChanges", "hh:trackChange") {
             let what = match t.get("type").as_deref() {
                 Some("Insert") => "insertion",
@@ -184,8 +204,14 @@ impl Header {
                 Some("CharShape") | Some("ParaShape") => "formatting change",
                 _ => "change",
             };
-            let who = t.get("authorID").and_then(|a| authors.get(&a).cloned()).unwrap_or_else(|| "?".into());
-            h.tracked.insert(t.get("id").unwrap_or_default(), format!("tracked {what} by {who}"));
+            let who = t
+                .get("authorID")
+                .and_then(|a| authors.get(&a).cloned())
+                .unwrap_or_else(|| "?".into());
+            h.tracked.insert(
+                t.get("id").unwrap_or_default(),
+                format!("tracked {what} by {who}"),
+            );
         }
         h.doc = Some(doc);
         Ok(h)
@@ -205,7 +231,12 @@ impl Header {
     /// Style `id`, or, when header.xml has no such style, a stand-in named
     /// by its id with the first shapes, so the reference is kept as it is.
     pub fn style_or_missing(&self, id: u32) -> Style {
-        self.style(id).cloned().unwrap_or_else(|| Style { id, name: id.to_string(), para_pr: 0, char_pr: 0 })
+        self.style(id).cloned().unwrap_or_else(|| Style {
+            id,
+            name: id.to_string(),
+            para_pr: 0,
+            char_pr: 0,
+        })
     }
 
     pub fn style_named(&self, name: &str) -> Option<&Style> {
@@ -218,14 +249,20 @@ impl Header {
     pub fn style_set(&self) -> StyleSet {
         let mut s = StyleSet::default();
         for st in &self.styles {
-            s.paragraph.push(StyleDef::new(st.id.to_string(), st.name.clone()));
+            s.paragraph
+                .push(StyleDef::new(st.id.to_string(), st.name.clone()));
             if let Some(Heading::Outline(l)) = self.heading(st.para_pr) {
                 if let Some(slot) = s.headings.get_mut(l as usize) {
                     slot.get_or_insert_with(|| st.name.clone());
                 }
             }
         }
-        s.default_paragraph = match self.styles.iter().find(|x| x.id == 0).or(self.styles.first()) {
+        s.default_paragraph = match self
+            .styles
+            .iter()
+            .find(|x| x.id == 0)
+            .or(self.styles.first())
+        {
             Some(st) => st.name.clone(),
             None => {
                 s.paragraph.push(StyleDef::new("0", "바탕글"));
@@ -240,28 +277,43 @@ impl Header {
 
     /// The Hangul font faces by id: the face a text's `font` names.
     fn hangul_fonts(&self) -> HashMap<u32, String> {
-        self.fonts.iter().filter(|f| f.0 == "HANGUL").flat_map(|f| f.1.iter().cloned()).collect()
+        self.fonts
+            .iter()
+            .filter(|f| f.0 == "HANGUL")
+            .flat_map(|f| f.1.iter().cloned())
+            .collect()
     }
 
     /// What paragraph shape `id` sets (complete; nothing for a shape the file lacks).
     pub fn para_values(&self, id: u32) -> Props {
         let bf = |b: u32| self.border_fills.get(&b).cloned();
-        self.para_prs.get(&id).map(|e| format::para_pr_props(e, &bf)).unwrap_or_default()
+        self.para_prs
+            .get(&id)
+            .map(|e| format::para_pr_props(e, &bf))
+            .unwrap_or_default()
     }
 
     /// What character shape `id` sets: font, size, colour and the flags.
     pub fn char_values(&self, id: u32) -> Props {
-        self.char_prs.get(&id).map(|e| format::char_pr_props(e, &self.hangul_fonts())).unwrap_or_default()
+        self.char_prs
+            .get(&id)
+            .map(|e| format::char_pr_props(e, &self.hangul_fonts()))
+            .unwrap_or_default()
     }
 
     /// What style `st` sets: its paragraph and character shapes' values.
     pub fn style_values(&self, st: &Style) -> Props {
-        self.para_values(st.para_pr).overlay(&self.char_values(st.char_pr)).only(&styled::STYLE_KEYS)
+        self.para_values(st.para_pr)
+            .overlay(&self.char_values(st.char_pr))
+            .only(&styled::STYLE_KEYS)
     }
 
     /// A cell's box: its border fill (`borderFillIDRef`) and vertical alignment.
     pub fn cell_box(&self, tc: &Element, sub: &Element) -> Props {
-        let bf = tc.get("borderFillIDRef").and_then(|v| v.parse().ok()).and_then(|b: u32| self.border_fills.get(&b));
+        let bf = tc
+            .get("borderFillIDRef")
+            .and_then(|v| v.parse().ok())
+            .and_then(|b: u32| self.border_fills.get(&b));
         let mut p = format::border_fill_props(bf);
         p.set(Key::Valign, Value::Choice(format::valign(sub).into()));
         p
@@ -278,19 +330,32 @@ impl Header {
     fn lines_into(&self, set: &mut StyleSet) {
         let implicit = styled::implicit();
         let default_id: Option<u32> = set.default_paragraph_id().parse().ok();
-        let dflt = default_id.and_then(|id| self.style(id)).map(|st| self.style_values(st)).unwrap_or_default();
+        let dflt = default_id
+            .and_then(|id| self.style(id))
+            .map(|st| self.style_values(st))
+            .unwrap_or_default();
         let dflt = implicit.overlay(&dflt);
         for s in &mut set.paragraph {
-            let Some(st) = s.id.parse().ok().and_then(|id| self.style(id)) else { continue };
+            let Some(st) = s.id.parse().ok().and_then(|id| self.style(id)) else {
+                continue;
+            };
             let v = dflt.overlay(&self.style_values(st));
-            s.props = if Some(st.id) == default_id { v.diff(&implicit) } else { v.diff(&dflt) };
+            s.props = if Some(st.id) == default_id {
+                v.diff(&implicit)
+            } else {
+                v.diff(&dflt)
+            };
         }
         set.formatting = true;
     }
 
     /// The face of font `id` in language `attr` (`hangul`, `latin`, …).
     fn face_of(&self, attr: &str, id: Option<u32>) -> Option<&str> {
-        let fonts = &self.fonts.iter().find(|f| f.0.eq_ignore_ascii_case(attr))?.1;
+        let fonts = &self
+            .fonts
+            .iter()
+            .find(|f| f.0.eq_ignore_ascii_case(attr))?
+            .1;
         fonts.iter().find(|f| Some(f.0) == id).map(|f| f.1.as_str())
     }
 
@@ -327,8 +392,11 @@ impl Header {
         if delta.is_empty() {
             return Ok(base);
         }
-        let mut x =
-            self.char_prs.get(&base).cloned().ok_or_else(|| format!("character shape {base} is not in header.xml"))?;
+        let mut x = self
+            .char_prs
+            .get(&base)
+            .cloned()
+            .ok_or_else(|| format!("character shape {base} is not in header.xml"))?;
         for (k, v) in delta.iter() {
             format::writable(k, v)?;
             match (k, v) {
@@ -347,7 +415,11 @@ impl Header {
                         .fonts
                         .iter()
                         .map(|f| f.0.to_lowercase())
-                        .filter(|l| l == "hangul" || was.is_none() || self.face_of(l, id(l)).map(str::to_string) == was)
+                        .filter(|l| {
+                            l == "hangul"
+                                || was.is_none()
+                                || self.face_of(l, id(l)).map(str::to_string) == was
+                        })
                         .collect();
                     let refs = self.font_refs(face, &langs);
                     let fr = x.child_mut("hh:fontRef").unwrap();
@@ -359,8 +431,12 @@ impl Header {
                 (Key::Color, Value::Color(c)) => x.set("textColor", &format::rgb(c)?),
                 (Key::Bold, Value::Flag(on)) => set_present(&mut x, "hh:bold", *on),
                 (Key::Italic, Value::Flag(on)) => set_present(&mut x, "hh:italic", *on),
-                (Key::Underline, Value::Flag(on)) => set_line(&mut x, "hh:underline", "type", "BOTTOM", *on),
-                (Key::Strike, Value::Flag(on)) => set_line(&mut x, "hh:strikeout", "shape", "SOLID", *on),
+                (Key::Underline, Value::Flag(on)) => {
+                    set_line(&mut x, "hh:underline", "type", "BOTTOM", *on)
+                }
+                (Key::Strike, Value::Flag(on)) => {
+                    set_line(&mut x, "hh:strikeout", "shape", "SOLID", *on)
+                }
                 _ => return Err(format!("{k} is not a text property")),
             }
         }
@@ -372,14 +448,26 @@ impl Header {
         if delta.is_empty() {
             return Ok(base);
         }
-        let mut x =
-            self.para_prs.get(&base).cloned().ok_or_else(|| format!("paragraph shape {base} is not in header.xml"))?;
-        let boxed = delta.only(&[Key::Fill, Key::BorderTop, Key::BorderRight, Key::BorderBottom, Key::BorderLeft]);
+        let mut x = self
+            .para_prs
+            .get(&base)
+            .cloned()
+            .ok_or_else(|| format!("paragraph shape {base} is not in header.xml"))?;
+        let boxed = delta.only(&[
+            Key::Fill,
+            Key::BorderTop,
+            Key::BorderRight,
+            Key::BorderBottom,
+            Key::BorderLeft,
+        ]);
         for (k, v) in delta.iter().filter(|(k, _)| !boxed.has(*k)) {
             format::set_para(&mut x, k, v)?;
         }
         if !boxed.is_empty() {
-            let cur = x.child("hh:border").and_then(|b| b.get("borderFillIDRef")).and_then(|v| v.parse().ok());
+            let cur = x
+                .child("hh:border")
+                .and_then(|b| b.get("borderFillIDRef"))
+                .and_then(|v| v.parse().ok());
             let bf = self.border_fill_set(cur, &boxed)?;
             match x.child_mut("hh:border") {
                 Some(b) => b.set("borderFillIDRef", &bf.to_string()),
@@ -412,7 +500,10 @@ impl Header {
                 return Ok(b);
             }
         }
-        let has_list = self.doc.as_ref().is_some_and(|d| !items(&d.root, "hh:refList", "hh:borderFills").is_empty());
+        let has_list = self
+            .doc
+            .as_ref()
+            .is_some_and(|d| !items(&d.root, "hh:refList", "hh:borderFills").is_empty());
         if !has_list {
             return Err("header.xml has no border fills (hh:borderFills), so a fill or border cannot be written".into());
         }
@@ -433,19 +524,44 @@ impl Header {
     /// (no id yet) is a new `hh:style` with shapes copied from the default
     /// style's, and gets its id in `set`.
     pub fn write_styles(&mut self, set: &mut StyleSet) -> Result<(), String> {
-        let table = StyleTable { default: Some(set.default_paragraph.clone()), lines: set.lines() };
+        let table = StyleTable {
+            default: Some(set.default_paragraph.clone()),
+            lines: set.lines(),
+        };
         let implicit = styled::implicit();
         let default_id: Option<u32> = set.default_paragraph_id().parse().ok();
         let dflt_style = default_id.and_then(|id| self.style(id)).cloned();
-        let dflt = implicit.overlay(&dflt_style.as_ref().map(|st| self.style_values(st)).unwrap_or_default());
+        let dflt = implicit.overlay(
+            &dflt_style
+                .as_ref()
+                .map(|st| self.style_values(st))
+                .unwrap_or_default(),
+        );
         let para_keys = styled::PARA_OWN;
-        let text_keys = [Key::Font, Key::Size, Key::Color, Key::Bold, Key::Italic, Key::Underline, Key::Strike];
+        let text_keys = [
+            Key::Font,
+            Key::Size,
+            Key::Color,
+            Key::Bold,
+            Key::Italic,
+            Key::Underline,
+            Key::Strike,
+        ];
         for d in &mut set.paragraph {
             let want = table.values(Some(&d.name)).only(&styled::STYLE_KEYS);
-            match d.id.parse::<u32>().ok().and_then(|id| self.style(id)).cloned() {
+            match d
+                .id
+                .parse::<u32>()
+                .ok()
+                .and_then(|id| self.style(id))
+                .cloned()
+            {
                 Some(st) => {
-                    let have =
-                        if Some(st.id) == default_id { dflt.clone() } else { dflt.overlay(&self.style_values(&st)) };
+                    let have = if Some(st.id) == default_id {
+                        dflt.clone()
+                    } else {
+                        dflt.overlay(&self.style_values(&st))
+                    };
                     let delta = want.diff(&have);
                     if delta.is_empty() {
                         continue;
@@ -466,7 +582,11 @@ impl Header {
                     let lang = self
                         .doc
                         .as_ref()
-                        .and_then(|doc| items(&doc.root, "hh:styles", "hh:style").first().and_then(|s| s.get("langID")))
+                        .and_then(|doc| {
+                            items(&doc.root, "hh:styles", "hh:style")
+                                .first()
+                                .and_then(|s| s.get("langID"))
+                        })
                         .unwrap_or_else(|| "1042".into());
                     let el = Element::new("hh:style")
                         .with_attr("id", &id.to_string())
@@ -479,7 +599,12 @@ impl Header {
                         .with_attr("langID", &lang)
                         .with_attr("lockForm", "0");
                     self.added.push((Container::Styles, el));
-                    self.styles.push(Style { id, name: d.name.clone(), para_pr: pp, char_pr: cp });
+                    self.styles.push(Style {
+                        id,
+                        name: d.name.clone(),
+                        para_pr: pp,
+                        char_pr: cp,
+                    });
                     d.id = id.to_string();
                 }
                 // A style missing from header.xml keeps its reference as it is.
@@ -493,9 +618,15 @@ impl Header {
 
     /// Bold, italic, underline and strikeout of character shape `id`.
     pub fn flags(&self, id: u32) -> Marks {
-        let Some(e) = self.char_prs.get(&id) else { return Marks::NONE };
-        let underline = e.child("hh:underline").is_some_and(|u| u.get("type").is_some_and(|t| t != "NONE"));
-        let strike = e.child("hh:strikeout").is_some_and(|u| u.get("shape").is_some_and(|t| format::strikes(&t)));
+        let Some(e) = self.char_prs.get(&id) else {
+            return Marks::NONE;
+        };
+        let underline = e
+            .child("hh:underline")
+            .is_some_and(|u| u.get("type").is_some_and(|t| t != "NONE"));
+        let strike = e
+            .child("hh:strikeout")
+            .is_some_and(|u| u.get("shape").is_some_and(|t| format::strikes(&t)));
         Marks::NONE
             .with(Marks::BOLD, e.child("hh:bold").is_some())
             .with(Marks::ITALIC, e.child("hh:italic").is_some())
@@ -507,7 +638,9 @@ impl Header {
     /// (for fingerprints: what the text does not show): the four flags,
     /// its size, colour and Hangul font.
     pub fn char_rest(&self, id: u32) -> String {
-        let Some(e) = self.char_prs.get(&id) else { return format!("charPr {id}?") };
+        let Some(e) = self.char_prs.get(&id) else {
+            return format!("charPr {id}?");
+        };
         let mut x = e.clone();
         for a in ["id", "height", "textColor"] {
             x.remove_attr(a);
@@ -527,12 +660,27 @@ impl Header {
         if self.flags(base) == want {
             return Ok(base);
         }
-        let mut x =
-            self.char_prs.get(&base).cloned().ok_or_else(|| format!("character shape {base} is not in header.xml"))?;
+        let mut x = self
+            .char_prs
+            .get(&base)
+            .cloned()
+            .ok_or_else(|| format!("character shape {base} is not in header.xml"))?;
         set_present(&mut x, "hh:bold", want.has(Marks::BOLD));
         set_present(&mut x, "hh:italic", want.has(Marks::ITALIC));
-        set_line(&mut x, "hh:underline", "type", "BOTTOM", want.has(Marks::UNDERLINE));
-        set_line(&mut x, "hh:strikeout", "shape", "SOLID", want.has(Marks::STRIKE));
+        set_line(
+            &mut x,
+            "hh:underline",
+            "type",
+            "BOTTOM",
+            want.has(Marks::UNDERLINE),
+        );
+        set_line(
+            &mut x,
+            "hh:strikeout",
+            "shape",
+            "SOLID",
+            want.has(Marks::STRIKE),
+        );
         Ok(self.add(Container::CharProperties, x))
     }
 
@@ -545,8 +693,14 @@ impl Header {
         let n = |k: &str| h.get(k).and_then(|v| v.parse::<u32>().ok()).unwrap_or(0);
         match h.get("type").as_deref() {
             Some("OUTLINE") => Some(Heading::Outline(n("level"))),
-            Some("NUMBER") => Some(Heading::Number { id: n("idRef"), level: n("level") }),
-            Some("BULLET") => Some(Heading::Bullet { id: n("idRef"), level: n("level") }),
+            Some("NUMBER") => Some(Heading::Number {
+                id: n("idRef"),
+                level: n("level"),
+            }),
+            Some("BULLET") => Some(Heading::Bullet {
+                id: n("idRef"),
+                level: n("level"),
+            }),
             _ => None,
         }
     }
@@ -554,7 +708,9 @@ impl Header {
     /// Canonical form of paragraph shape `id` without what the text states
     /// (for fingerprints): its alignment, margins, line spacing and border fill.
     pub fn para_rest_hidden(&self, id: u32) -> String {
-        let Some(e) = self.para_prs.get(&id) else { return format!("paraPr {id}?") };
+        let Some(e) = self.para_prs.get(&id) else {
+            return format!("paraPr {id}?");
+        };
         let mut x = e.clone();
         x.remove_attr("id");
         if let Some(a) = x.child_mut("hh:align") {
@@ -585,8 +741,11 @@ impl Header {
         if self.heading(base) == h {
             return Ok(base);
         }
-        let mut x =
-            self.para_prs.get(&base).cloned().ok_or_else(|| format!("paragraph shape {base} is not in header.xml"))?;
+        let mut x = self
+            .para_prs
+            .get(&base)
+            .cloned()
+            .ok_or_else(|| format!("paragraph shape {base} is not in header.xml"))?;
         let (ty, id, level) = match h {
             None => ("NONE", 0, 0),
             Some(Heading::Outline(l)) => ("OUTLINE", 0, l),
@@ -600,7 +759,11 @@ impl Header {
         if let Some(cur) = x.child_mut("hh:heading") {
             *cur = el;
         } else {
-            insert_ordered(&mut x, el, &["align", "heading", "breakSetting", "autoSpacing"]);
+            insert_ordered(
+                &mut x,
+                el,
+                &["align", "heading", "breakSetting", "autoSpacing"],
+            );
         }
         Ok(self.add(Container::ParaProperties, x))
     }
@@ -618,7 +781,10 @@ impl Header {
             return id;
         }
         // Border fill ids count from 1.
-        let id = map.keys().next_back().map_or((c == Container::BorderFills) as u32, |m| m + 1);
+        let id = map
+            .keys()
+            .next_back()
+            .map_or((c == Container::BorderFills) as u32, |m| m + 1);
         x.set("id", &id.to_string());
         map.insert(id, x.clone());
         if let Some(i) = index {
@@ -637,11 +803,17 @@ impl Header {
         if let Some((&id, _)) = self.border_fills.iter().find(|(_, e)| is_table_look(e)) {
             return Ok(id);
         }
-        let has_list = self.doc.as_ref().is_some_and(|d| !items(&d.root, "hh:refList", "hh:borderFills").is_empty());
+        let has_list = self
+            .doc
+            .as_ref()
+            .is_some_and(|d| !items(&d.root, "hh:refList", "hh:borderFills").is_empty());
         if !has_list {
-            return Err("header.xml has no border fills (hh:borderFills) to draw a new table with".into());
+            return Err(
+                "header.xml has no border fills (hh:borderFills) to draw a new table with".into(),
+            );
         }
-        let line = |side: &str| format!(r##"<hh:{side} type="SOLID" width="0.12 mm" color="#000000"/>"##);
+        let line =
+            |side: &str| format!(r##"<hh:{side} type="SOLID" width="0.12 mm" color="#000000"/>"##);
         let x = xml::fragment(&format!(
             r##"<hh:borderFill id="0" threeD="0" shadow="0" centerLine="NONE" breakCellSeparateLine="0"><hh:slash type="NONE" Crooked="0" isCounter="0"/><hh:backSlash type="NONE" Crooked="0" isCounter="0"/>{}{}{}{}<hh:diagonal type="SOLID" width="0.1 mm" color="#000000"/></hh:borderFill>"##,
             line("leftBorder"),
@@ -662,9 +834,15 @@ impl Header {
             for c in e.elements_mut() {
                 if c.is("hh:fontface") {
                     let lang = c.get("lang").unwrap_or_default();
-                    let mine: Vec<&Element> = h.added_fonts.iter().filter(|a| a.0 == lang).map(|a| &a.1).collect();
+                    let mine: Vec<&Element> = h
+                        .added_fonts
+                        .iter()
+                        .filter(|a| a.0 == lang)
+                        .map(|a| &a.1)
+                        .collect();
                     if !mine.is_empty() {
-                        c.children.extend(mine.into_iter().map(|x| Node::El(x.clone())));
+                        c.children
+                            .extend(mine.into_iter().map(|x| Node::El(x.clone())));
                         let n = c.elements().filter(|f| f.is("hh:font")).count();
                         if c.attr("fontCnt").is_some() {
                             c.set("fontCnt", &n.to_string());
@@ -680,12 +858,18 @@ impl Header {
                     }
                     continue;
                 }
-                let mine: Vec<&Element> = h.added.iter().filter(|a| c.is(a.0.name())).map(|a| &a.1).collect();
+                let mine: Vec<&Element> = h
+                    .added
+                    .iter()
+                    .filter(|a| c.is(a.0.name()))
+                    .map(|a| &a.1)
+                    .collect();
                 if mine.is_empty() {
                     rec(c, h);
                     continue;
                 }
-                c.children.extend(mine.into_iter().map(|x| Node::El(x.clone())));
+                c.children
+                    .extend(mine.into_iter().map(|x| Node::El(x.clone())));
                 let n = c.elements().count();
                 if c.attr("itemCnt").is_some() {
                     c.set("itemCnt", &n.to_string());
@@ -704,10 +888,21 @@ impl Header {
 fn is_table_look(e: &Element) -> bool {
     let is = |x: &Element, k: &str, v: &str| x.get(k).is_some_and(|a| a.eq_ignore_ascii_case(v));
     let solid = |n: &str| {
-        e.child(n).is_some_and(|b| is(b, "type", "SOLID") && is(b, "width", "0.12 mm") && is(b, "color", "#000000"))
+        e.child(n).is_some_and(|b| {
+            is(b, "type", "SOLID") && is(b, "width", "0.12 mm") && is(b, "color", "#000000")
+        })
     };
-    ["hh:leftBorder", "hh:rightBorder", "hh:topBorder", "hh:bottomBorder"].into_iter().all(solid)
-        && ["hh:slash", "hh:backSlash"].into_iter().all(|n| e.child(n).is_none_or(|x| is(x, "type", "NONE")))
+    [
+        "hh:leftBorder",
+        "hh:rightBorder",
+        "hh:topBorder",
+        "hh:bottomBorder",
+    ]
+    .into_iter()
+    .all(solid)
+        && ["hh:slash", "hh:backSlash"]
+            .into_iter()
+            .all(|n| e.child(n).is_none_or(|x| is(x, "type", "NONE")))
         && e.child("hc:fillBrush").is_none()
         && !is(e, "threeD", "1")
         && !is(e, "shadow", "1")
@@ -753,10 +948,14 @@ impl ListDefs for Header {
             Heading::Number { id, level } => {
                 let n = self.numberings.get(&id)?;
                 // `hh:paraHead level` counts from 1.
-                let lvl = n.elements().find(|p| p.is("hh:paraHead") && p.get("level") == Some((level + 1).to_string()));
+                let lvl = n.elements().find(|p| {
+                    p.is("hh:paraHead") && p.get("level") == Some((level + 1).to_string())
+                });
                 lvl.is_some().then_some(true)
             }
-            Heading::Bullet { id, level } => (self.bullets.contains(&id) && level < 10).then_some(false),
+            Heading::Bullet { id, level } => {
+                (self.bullets.contains(&id) && level < 10).then_some(false)
+            }
             Heading::Outline(_) => None,
         }
     }
@@ -782,7 +981,11 @@ impl ListDefs for Header {
 
     /// A copy of numbering `base` under a new id, so its count starts again.
     fn new_list(&mut self, base: u32) -> u32 {
-        let x = self.numberings.get(&base).cloned().unwrap_or_else(|| Element::new("hh:numbering"));
+        let x = self
+            .numberings
+            .get(&base)
+            .cloned()
+            .unwrap_or_else(|| Element::new("hh:numbering"));
         numbering_num(self.add(Container::Numberings, x))
     }
 }

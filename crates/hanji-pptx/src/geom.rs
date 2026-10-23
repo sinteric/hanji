@@ -60,7 +60,9 @@ pub fn write(el: &mut Element, g: &Geom) -> Result<(), String> {
     let frame = el.is("p:graphicFrame");
     let h: &mut Element = match el.name.as_str() {
         "p:graphicFrame" => el,
-        "p:grpSp" => el.child_mut("p:grpSpPr").ok_or("a group without p:grpSpPr")?,
+        "p:grpSp" => el
+            .child_mut("p:grpSpPr")
+            .ok_or("a group without p:grpSpPr")?,
         _ => {
             if el.child("p:spPr").is_none() {
                 return Err(format!("<{}> has no p:spPr to hold its position", el.name));
@@ -72,7 +74,10 @@ pub fn write(el: &mut Element, g: &Geom) -> Result<(), String> {
         let x = Element::new(name);
         let at = if frame {
             // p:xfrm follows p:nvGraphicFramePr.
-            h.children.iter().position(|n| matches!(n, Node::El(e) if e.is("p:nvGraphicFramePr"))).map_or(0, |k| k + 1)
+            h.children
+                .iter()
+                .position(|n| matches!(n, Node::El(e) if e.is("p:nvGraphicFramePr")))
+                .map_or(0, |k| k + 1)
         } else {
             0
         };
@@ -131,18 +136,34 @@ pub fn remove(el: &mut Element) {
         "p:grpSp" => el.child_mut("p:grpSpPr"),
         _ => el.child_mut("p:spPr"),
     } {
-        h.children.retain(|n| !matches!(n, Node::El(e) if e.is(name)));
+        h.children
+            .retain(|n| !matches!(n, Node::El(e) if e.is(name)));
     }
 }
 
 /// A line's ends from its box: the flips say which corner it starts at.
 pub fn ends_of(g: &Geom) -> Ends {
-    let (x0, x1) = if g.flip_h { (g.x + g.w, g.x) } else { (g.x, g.x + g.w) };
-    let (y0, y1) = if g.flip_v { (g.y + g.h, g.y) } else { (g.y, g.y + g.h) };
+    let (x0, x1) = if g.flip_h {
+        (g.x + g.w, g.x)
+    } else {
+        (g.x, g.x + g.w)
+    };
+    let (y0, y1) = if g.flip_v {
+        (g.y + g.h, g.y)
+    } else {
+        (g.y, g.y + g.h)
+    };
     // A turned line's ends turn with it, about its box's centre.
-    let c = ((g.x as f64) + g.w as f64 / 2.0, (g.y as f64) + g.h as f64 / 2.0);
+    let c = (
+        (g.x as f64) + g.w as f64 / 2.0,
+        (g.y as f64) + g.h as f64 / 2.0,
+    );
     let t = |p: (i64, i64)| turned(p, c, g.rot);
-    Ends { from: t((x0, y0)), to: t((x1, y1)), ..Default::default() }
+    Ends {
+        from: t((x0, y0)),
+        to: t((x1, y1)),
+        ..Default::default()
+    }
 }
 
 /// `p` turned `rot` (60,000ths of a degree, clockwise) about `c`.
@@ -152,7 +173,10 @@ pub fn turned(p: (i64, i64), c: (f64, f64), rot: i64) -> (i64, i64) {
     }
     let (s, k) = (rot as f64 / 60_000.0).to_radians().sin_cos();
     let (dx, dy) = (p.0 as f64 - c.0, p.1 as f64 - c.1);
-    ((c.0 + dx * k - dy * s).round() as i64, (c.1 + dx * s + dy * k).round() as i64)
+    (
+        (c.0 + dx * k - dy * s).round() as i64,
+        (c.1 + dx * s + dy * k).round() as i64,
+    )
 }
 
 /// The box and flips of a line from `from` to `to`, turned `rot` (kept):
@@ -177,7 +201,15 @@ pub fn box_of(e: &Ends, rot: i64) -> Geom {
     let (w, h) = (ux.abs().round() as i64, uy.abs().round() as i64);
     let x = (c.0 - w as f64 / 2.0).round() as i64;
     let y = (c.1 - h as f64 / 2.0).round() as i64;
-    Geom { x, y, w, h, rot, flip_h: ux < -0.5, flip_v: uy < -0.5 }
+    Geom {
+        x,
+        y,
+        w,
+        h,
+        rot,
+        flip_h: ux < -0.5,
+        flip_v: uy < -0.5,
+    }
 }
 
 /// A group's mapping from child coordinates to its parent's: `a:off`,
@@ -192,7 +224,12 @@ pub struct Frame {
 
 impl Frame {
     /// The identity (the slide itself).
-    pub const SLIDE: Frame = Frame { off: (0, 0), ext: (1, 1), ch_off: (0, 0), ch_ext: (1, 1) };
+    pub const SLIDE: Frame = Frame {
+        off: (0, 0),
+        ext: (1, 1),
+        ch_off: (0, 0),
+        ch_ext: (1, 1),
+    };
 
     /// A group's frame; `None` without a complete `a:xfrm` or with a zero child extent.
     pub fn of(grp: &Element) -> Option<Frame> {
@@ -209,7 +246,10 @@ impl Frame {
     }
 
     fn scale(&self) -> (f64, f64) {
-        (self.ext.0 as f64 / self.ch_ext.0 as f64, self.ext.1 as f64 / self.ch_ext.1 as f64)
+        (
+            self.ext.0 as f64 / self.ch_ext.0 as f64,
+            self.ext.1 as f64 / self.ch_ext.1 as f64,
+        )
     }
 
     /// A child box in the parent's coordinates.
@@ -240,8 +280,18 @@ impl Frame {
 
     /// This frame seen from the slide, when its parent is `parent`.
     pub fn within(&self, parent: &Frame) -> Frame {
-        let o = parent.out(&Geom { x: self.off.0, y: self.off.1, w: self.ext.0, h: self.ext.1, ..Default::default() });
-        Frame { off: (o.x, o.y), ext: (o.w, o.h), ..*self }
+        let o = parent.out(&Geom {
+            x: self.off.0,
+            y: self.off.1,
+            w: self.ext.0,
+            h: self.ext.1,
+            ..Default::default()
+        });
+        Frame {
+            off: (o.x, o.y),
+            ext: (o.w, o.h),
+            ..*self
+        }
     }
 }
 
@@ -251,7 +301,13 @@ pub fn union(boxes: &[Geom]) -> Option<Geom> {
     let y0 = boxes.iter().map(|g| g.y).min()?;
     let x1 = boxes.iter().map(|g| g.x + g.w).max()?;
     let y1 = boxes.iter().map(|g| g.y + g.h).max()?;
-    Some(Geom { x: x0, y: y0, w: x1 - x0, h: y1 - y0, ..Default::default() })
+    Some(Geom {
+        x: x0,
+        y: y0,
+        w: x1 - x0,
+        h: y1 - y0,
+        ..Default::default()
+    })
 }
 
 /// A shape's `p:cNvPr` id.
@@ -261,7 +317,12 @@ pub fn shape_id(el: &Element) -> Option<u32> {
 
 /// The shape ids a connector's ends are attached to (`a:stCxn`, `a:endCxn`).
 pub fn connections(cxn: &Element) -> Vec<(&'static str, u32)> {
-    let Some(c) = cxn.child("p:nvCxnSpPr").and_then(|n| n.child("p:cNvCxnSpPr")) else { return vec![] };
+    let Some(c) = cxn
+        .child("p:nvCxnSpPr")
+        .and_then(|n| n.child("p:cNvCxnSpPr"))
+    else {
+        return vec![];
+    };
     [("start", "a:stCxn"), ("end", "a:endCxn")]
         .into_iter()
         .filter_map(|(end, n)| Some((end, c.child(n)?.get("id")?.parse().ok()?)))
@@ -274,7 +335,9 @@ pub type Attachments = [Option<(u32, u32)>; 2];
 /// A connector's ends' attachments: the shape id and connection site index
 /// of its `a:stCxn` and `a:endCxn`.
 pub fn attachments(cxn: &Element) -> Attachments {
-    let c = cxn.child("p:nvCxnSpPr").and_then(|n| n.child("p:cNvCxnSpPr"));
+    let c = cxn
+        .child("p:nvCxnSpPr")
+        .and_then(|n| n.child("p:cNvCxnSpPr"));
     let at = |n: &str| {
         let e = c?.child(n)?;
         Some((e.get("id")?.parse().ok()?, e.get("idx")?.parse().ok()?))
@@ -289,7 +352,13 @@ pub fn scale_table(frame: &mut Element, (ow, oh): (i64, i64), (w, h): (i64, i64)
     frame.walk_mut(&mut |e| {
         if e.is("a:tbl") && tbl.is_none() {
             tbl = Some(());
-            let f = |v: i64, a: i64, b: i64| if a > 0 { (v as f64 * b as f64 / a as f64).round() as i64 } else { v };
+            let f = |v: i64, a: i64, b: i64| {
+                if a > 0 {
+                    (v as f64 * b as f64 / a as f64).round() as i64
+                } else {
+                    v
+                }
+            };
             for c in e.elements_mut() {
                 if c.is("a:tblGrid") {
                     for col in c.elements_mut().filter(|x| x.is("a:gridCol")) {
@@ -312,7 +381,8 @@ pub fn scale_table(frame: &mut Element, (ow, oh): (i64, i64), (w, h): (i64, i64)
 pub fn without_geometry(el: &Element) -> Element {
     let mut e = el.clone();
     e.walk_mut(&mut |x| {
-        x.children.retain(|n| !matches!(n, Node::El(c) if c.is("a:xfrm") || c.is("p:xfrm")));
+        x.children
+            .retain(|n| !matches!(n, Node::El(c) if c.is("a:xfrm") || c.is("p:xfrm")));
         if x.is("a:gridCol") {
             x.remove_attr("w");
         } else if x.is("a:tr") {
@@ -383,11 +453,20 @@ mod tests {
     const PT: i64 = hanji_format::EMU_PER_PT;
 
     fn b(x: i64, y: i64, w: i64, h: i64) -> Geom {
-        Geom { x, y, w, h, ..Default::default() }
+        Geom {
+            x,
+            y,
+            w,
+            h,
+            ..Default::default()
+        }
     }
 
     fn kept_as_shown(g: Geom) -> Written {
-        Written { stored: Some(g), written: Some(g.shown()) }
+        Written {
+            stored: Some(g),
+            written: Some(g.shown()),
+        }
     }
 
     #[test]
@@ -396,28 +475,54 @@ mod tests {
         // (232.45 pt, shown 232); TextBox 2 is written at x 232.
         let one = b(2952093, 1_000_000, 3_000_000, 500_000);
         let two = b(1_000_000, 2_000_000, 3_000_000, 500_000);
-        let boxes =
-            [kept_as_shown(one), Written { stored: Some(two), written: Some(Geom { x: 232 * PT, ..two.shown() }) }];
+        let boxes = [
+            kept_as_shown(one),
+            Written {
+                stored: Some(two),
+                written: Some(Geom {
+                    x: 232 * PT,
+                    ..two.shown()
+                }),
+            },
+        ];
         let g = snapped(&boxes, 1).unwrap();
         assert_eq!(g.x, 2952093);
         // Its other numbers are its own as shown; place_box keeps them exact.
-        assert_eq!((g.y, g.w, g.h), (two.shown().y, two.shown().w, two.shown().h));
+        assert_eq!(
+            (g.y, g.w, g.h),
+            (two.shown().y, two.shown().w, two.shown().h)
+        );
         // The same for y, w and h, each against the same number only.
         let other = b(10 * PT, 100 * PT + 3000, 200 * PT + 4000, 50 * PT - 2000);
         let mine = b(400 * PT, 300 * PT, 20 * PT, 20 * PT);
         let boxes = [
             kept_as_shown(other),
-            Written { stored: Some(mine), written: Some(b(400 * PT, 100 * PT, 200 * PT, 50 * PT)) },
+            Written {
+                stored: Some(mine),
+                written: Some(b(400 * PT, 100 * PT, 200 * PT, 50 * PT)),
+            },
         ];
-        assert_eq!(snapped(&boxes, 1).unwrap(), b(400 * PT, 100 * PT + 3000, 200 * PT + 4000, 50 * PT - 2000));
+        assert_eq!(
+            snapped(&boxes, 1).unwrap(),
+            b(400 * PT, 100 * PT + 3000, 200 * PT + 4000, 50 * PT - 2000)
+        );
         // x never snaps to a y, a w or an h.
         let boxes = [
             kept_as_shown(other),
-            Written { stored: Some(mine), written: Some(b(100 * PT, 300 * PT, 20 * PT, 20 * PT)) },
+            Written {
+                stored: Some(mine),
+                written: Some(b(100 * PT, 300 * PT, 20 * PT, 20 * PT)),
+            },
         ];
         assert_eq!(snapped(&boxes, 1).unwrap().x, 100 * PT);
         // A new object (nothing stored) snaps too.
-        let boxes = [kept_as_shown(one), Written { stored: None, written: Some(b(232 * PT, 0, 10 * PT, 10 * PT)) }];
+        let boxes = [
+            kept_as_shown(one),
+            Written {
+                stored: None,
+                written: Some(b(232 * PT, 0, 10 * PT, 10 * PT)),
+            },
+        ];
         assert_eq!(snapped(&boxes, 1).unwrap().x, 2952093);
     }
 
@@ -427,8 +532,20 @@ mod tests {
         let two = b(0, 200 * PT, 100 * PT, 100 * PT);
         // TextBox 1 moves away in the same edit: its old x is nowhere, so 232 is 232.
         let boxes = [
-            Written { stored: Some(one), written: Some(Geom { x: 300 * PT, ..one.shown() }) },
-            Written { stored: Some(two), written: Some(Geom { x: 232 * PT, ..two.shown() }) },
+            Written {
+                stored: Some(one),
+                written: Some(Geom {
+                    x: 300 * PT,
+                    ..one.shown()
+                }),
+            },
+            Written {
+                stored: Some(two),
+                written: Some(Geom {
+                    x: 232 * PT,
+                    ..two.shown()
+                }),
+            },
         ];
         assert_eq!(snapped(&boxes, 1).unwrap().x, 232 * PT);
         // A number left as shown keeps its own exact value, never another's.
@@ -437,8 +554,17 @@ mod tests {
         assert_eq!(snapped(&boxes, 1).unwrap().x, mine.shown().x);
         // An object without a written box is no anchor.
         let boxes = [
-            Written { stored: Some(one), written: None },
-            Written { stored: Some(two), written: Some(Geom { x: 232 * PT, ..two.shown() }) },
+            Written {
+                stored: Some(one),
+                written: None,
+            },
+            Written {
+                stored: Some(two),
+                written: Some(Geom {
+                    x: 232 * PT,
+                    ..two.shown()
+                }),
+            },
         ];
         assert_eq!(snapped(&boxes, 1).unwrap().x, 232 * PT);
     }
@@ -446,11 +572,27 @@ mod tests {
     #[test]
     fn the_nearest_in_z_order_wins_and_the_one_beneath_on_a_tie() {
         let at = |x: i64| kept_as_shown(b(x, 0, PT, PT));
-        let me = Written { stored: Some(b(0, 300 * PT, PT, PT)), written: Some(b(232 * PT, 300 * PT, PT, PT)) };
-        let (far, below, above) = (at(232 * PT - 5000), at(232 * PT + 3000), at(232 * PT + 6000));
-        assert_eq!(snapped(&[far, below, me, at(9 * PT), above], 2).unwrap().x, 232 * PT + 3000);
-        assert_eq!(snapped(&[far, at(9 * PT), me, above], 2).unwrap().x, 232 * PT + 6000);
+        let me = Written {
+            stored: Some(b(0, 300 * PT, PT, PT)),
+            written: Some(b(232 * PT, 300 * PT, PT, PT)),
+        };
+        let (far, below, above) = (
+            at(232 * PT - 5000),
+            at(232 * PT + 3000),
+            at(232 * PT + 6000),
+        );
+        assert_eq!(
+            snapped(&[far, below, me, at(9 * PT), above], 2).unwrap().x,
+            232 * PT + 3000
+        );
+        assert_eq!(
+            snapped(&[far, at(9 * PT), me, above], 2).unwrap().x,
+            232 * PT + 6000
+        );
         assert_eq!(snapped(&[above, me, below], 1).unwrap().x, 232 * PT + 6000);
-        assert_eq!(snapped(&[me, at(9 * PT), far], 0).unwrap().x, 232 * PT - 5000);
+        assert_eq!(
+            snapped(&[me, at(9 * PT), far], 0).unwrap().x,
+            232 * PT - 5000
+        );
     }
 }

@@ -16,11 +16,14 @@ pub mod remainder;
 pub mod revision;
 
 pub use edit::{
-    edit, edit_in, model_of, reanchor, reanchor_rewrite, reanchor_rewrite_in, reanchor_span, reanchor_span_in, rewrite,
-    rewrite_in, DocumentModel, Reanchored, Refusal, Report, TextModel,
+    edit, edit_in, model_of, reanchor, reanchor_rewrite, reanchor_rewrite_in, reanchor_span,
+    reanchor_span_in, rewrite, rewrite_in, DocumentModel, Reanchored, Refusal, Report, TextModel,
 };
 pub use engine::{notice, Engine, EngineError, ImportOptions, ImportReport, Imported, Notice};
 pub use lists::{plan_lists, ListDefs, ListPlan};
-pub use model::{Block, BlockSrc, Capabilities, Head, ListItem, Para, Path, Place, SrcKind, StyleDef, StyleSet, Table};
+pub use model::{
+    Block, BlockSrc, Capabilities, Head, ListItem, Para, Path, Place, SrcKind, StyleDef, StyleSet,
+    Table,
+};
 pub use remainder::{Entry, KeepIds, Kind, Meta, Part, Remainder};
 pub use revision::{Kept, Pos};

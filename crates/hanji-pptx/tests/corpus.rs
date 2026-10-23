@@ -6,7 +6,9 @@
 
 use std::path::PathBuf;
 
-use hanji_core::{Block, Engine, EngineError, Entry, ImportOptions, ImportReport, Kind, Remainder, TextModel};
+use hanji_core::{
+    Block, Engine, EngineError, Entry, ImportOptions, ImportReport, Kind, Remainder, TextModel,
+};
 use hanji_pptx::{export_parts, write_package, xml, PptxEngine, PptxModel};
 use hanji_testkit::{Format, Out};
 
@@ -15,8 +17,10 @@ mod edits;
 pub struct Pptx;
 
 /// `a:rPr` attributes that change nothing a person sees.
-const QUIET_RPR: &[&str] =
-    &["lang", "altLang", "dirty", "err", "noProof", "smtClean", "smtId", "b", "i", "u", "strike", "bmk"];
+const QUIET_RPR: &[&str] = &[
+    "lang", "altLang", "dirty", "err", "noProof", "smtClean", "smtId", "b", "i", "u", "strike",
+    "bmk",
+];
 
 impl Format for Pptx {
     fn engine(&self) -> &dyn Engine {
@@ -40,7 +44,11 @@ impl Format for Pptx {
     fn text_of(&self, blocks: &[Block], rem: &Remainder) -> String {
         PptxEngine::text_of(blocks, rem, None)
     }
-    fn export_blocks(&self, blocks: &[Block], rem: &Remainder) -> Result<(Vec<u8>, bool), EngineError> {
+    fn export_blocks(
+        &self,
+        blocks: &[Block],
+        rem: &Remainder,
+    ) -> Result<(Vec<u8>, bool), EngineError> {
         let parts = export_parts(blocks, rem)?;
         let well_formed = parts
             .iter()
@@ -75,7 +83,9 @@ impl Format for Pptx {
 }
 
 fn numbered(name: &str, base: &str) -> bool {
-    name.strip_prefix(base).and_then(|r| r.strip_suffix(".xml")).is_some_and(|n| n.parse::<u32>().is_ok())
+    name.strip_prefix(base)
+        .and_then(|r| r.strip_suffix(".xml"))
+        .is_some_and(|n| n.parse::<u32>().is_ok())
 }
 
 pub fn corpus() -> Vec<(String, Vec<u8>)> {
@@ -88,7 +98,10 @@ pub fn corpus() -> Vec<(String, Vec<u8>)> {
 /// The canvas audit's decks (`corpus/audit/`, see SOURCES.md): real designed
 /// decks and two synthetic modern ones.
 pub fn audit_decks() -> Vec<(String, Vec<u8>)> {
-    hanji_testkit::corpus(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("corpus/audit"), "pptx")
+    hanji_testkit::corpus(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("corpus/audit"),
+        "pptx",
+    )
 }
 
 fn out_dir() -> PathBuf {
@@ -99,7 +112,16 @@ fn out_dir() -> PathBuf {
 fn corpus_getput_putget_remainder() {
     let files = corpus();
     assert!(files.len() >= 10, "the corpus has {} files", files.len());
-    let sum = hanji_testkit::run_corpus_with(&Pptx, &files, &Out { dir: out_dir(), ext: "pptx" }, &edits::EDITS, "P9");
+    let sum = hanji_testkit::run_corpus_with(
+        &Pptx,
+        &files,
+        &Out {
+            dir: out_dir(),
+            ext: "pptx",
+        },
+        &edits::EDITS,
+        "P9",
+    );
     #[cfg(not(target_os = "wasi"))]
     if std::env::var("HANJI_SOFFICE").is_ok() {
         soffice();
@@ -107,18 +129,29 @@ fn corpus_getput_putget_remainder() {
     assert!(sum.failures.is_empty(), "{}", sum.failures.join("\n"));
     assert_eq!(sum.getput_ok, files.len());
     // Exact spans lose nothing.
-    assert_eq!(sum.touched.get("exact").map_or(0, |t| t[2]), 0, "exact spans lost entries");
+    assert_eq!(
+        sum.touched.get("exact").map_or(0, |t| t[2]),
+        0,
+        "exact spans lost entries"
+    );
 }
 
 #[test]
 fn audit_decks_getput_putget_remainder() {
     let files = audit_decks();
     assert_eq!(files.len(), 5);
-    let out = Out { dir: PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("pptx-audit-out"), ext: "pptx" };
+    let out = Out {
+        dir: PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("pptx-audit-out"),
+        ext: "pptx",
+    };
     let sum = hanji_testkit::run_corpus_with(&Pptx, &files, &out, &edits::EDITS, "P9");
     assert!(sum.failures.is_empty(), "{}", sum.failures.join("\n"));
     assert_eq!(sum.getput_ok, files.len());
-    assert_eq!(sum.touched.get("exact").map_or(0, |t| t[2]), 0, "exact spans lost entries");
+    assert_eq!(
+        sum.touched.get("exact").map_or(0, |t| t[2]),
+        0,
+        "exact spans lost entries"
+    );
 }
 
 /// Every export converts to PDF with LibreOffice, one page per slide it
@@ -198,8 +231,14 @@ fn soffice() {
         }
     }
     println!("soffice: exports whose page count differs from their slide count: {differ:?}");
-    println!("soffice ({}): {ok}/{total} exports converted to PDF", String::from_utf8_lossy(&v.stdout).trim());
-    assert_eq!(ok, total, "LibreOffice (with Impress) converts every export");
+    println!(
+        "soffice ({}): {ok}/{total} exports converted to PDF",
+        String::from_utf8_lossy(&v.stdout).trim()
+    );
+    assert_eq!(
+        ok, total,
+        "LibreOffice (with Impress) converts every export"
+    );
     assert!(differ.is_empty(), "{differ:?}");
 }
 

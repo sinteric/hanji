@@ -14,9 +14,11 @@ pub fn unusual(c: char) -> Option<&'static str> {
     Some(match c {
         '\t' => "CHARACTER TABULATION",
         '\r' => "CARRIAGE RETURN",
-        '\u{0}'..='\u{8}' | '\u{b}'..='\u{c}' | '\u{e}'..='\u{1f}' | '\u{7f}'..='\u{84}' | '\u{86}'..='\u{9f}' => {
-            "control"
-        }
+        '\u{0}'..='\u{8}'
+        | '\u{b}'..='\u{c}'
+        | '\u{e}'..='\u{1f}'
+        | '\u{7f}'..='\u{84}'
+        | '\u{86}'..='\u{9f}' => "control",
         '\u{85}' => "NEXT LINE",
         '\u{a0}' => "NO-BREAK SPACE",
         '\u{ad}' => "SOFT HYPHEN",
@@ -70,7 +72,9 @@ pub fn unusual(c: char) -> Option<&'static str> {
         '\u{fffc}' => "OBJECT REPLACEMENT CHARACTER",
         '\u{fffd}' => "REPLACEMENT CHARACTER",
         '\u{e0000}'..='\u{e007f}' => "tag",
-        '\u{e000}'..='\u{f8ff}' | '\u{f0000}'..='\u{ffffd}' | '\u{100000}'..='\u{10fffd}' => "private use",
+        '\u{e000}'..='\u{f8ff}' | '\u{f0000}'..='\u{ffffd}' | '\u{100000}'..='\u{10fffd}' => {
+            "private use"
+        }
         '\u{fdd0}'..='\u{fdef}' => "noncharacter",
         c if (c as u32) & 0xfffe == 0xfffe => "noncharacter",
         _ => return None,
@@ -133,7 +137,9 @@ pub fn name_in(msg: &str) -> Cow<'_, str> {
         }
         rest = &rest[c.len_utf8()..];
     }
-    let Some(c) = first else { return Cow::Borrowed(msg) };
+    let Some(c) = first else {
+        return Cow::Borrowed(msg);
+    };
     note(&mut out, c);
     Cow::Owned(out)
 }
@@ -144,8 +150,16 @@ fn note(out: &mut String, c: char) {
         return;
     }
     let l = label(c).unwrap_or_default();
-    let json: String = c.encode_utf16(&mut [0; 2]).iter().map(|u| format!("\\u{u:04x}")).collect();
-    let s = if out.ends_with('.') || out.ends_with(')') { " " } else { ". " };
+    let json: String = c
+        .encode_utf16(&mut [0; 2])
+        .iter()
+        .map(|u| format!("\\u{u:04x}"))
+        .collect();
+    let s = if out.ends_with('.') || out.ends_with(')') {
+        " "
+    } else {
+        ". "
+    };
     out.push_str(&format!(
         "{s}({l} {NOTE}, named by its code point: the revision holds the character itself, so write that \
          character, as {json} in a JSON string.)"
@@ -180,19 +194,37 @@ pub struct NearMiss {
 /// all of `old`, then each of its lines.
 pub fn near_miss(text: &str, old: &str) -> Option<NearMiss> {
     let whole = std::iter::once(old);
-    let lines = old.lines().filter(|l| l.trim().len() < old.trim().len() && !text.contains(l.trim()));
+    let lines = old
+        .lines()
+        .filter(|l| l.trim().len() < old.trim().len() && !text.contains(l.trim()));
     for (k, part) in whole.chain(lines).enumerate() {
         for drop_spaces in [false, true] {
-            let Some(m) = loose_match(text, part, drop_spaces) else { continue };
+            let Some(m) = loose_match(text, part, drop_spaces) else {
+                continue;
+            };
             let (s, e) = widen(text, m.0, m.1);
-            let there: Vec<char> = text[s..e].chars().filter(|&c| unusual(c).is_some()).collect();
-            let theirs: Vec<char> = part.chars().filter(|&c| unusual(c).is_some() && !there.contains(&c)).collect();
+            let there: Vec<char> = text[s..e]
+                .chars()
+                .filter(|&c| unusual(c).is_some())
+                .collect();
+            let theirs: Vec<char> = part
+                .chars()
+                .filter(|&c| unusual(c).is_some() && !there.contains(&c))
+                .collect();
             if there.is_empty() && theirs.is_empty() {
                 continue;
             }
             let line = text[..m.0].matches('\n').count() + 1;
-            let what = if k == 0 { "It".to_string() } else { format!("Its line \"{}\"", show(part.trim())) };
-            let ignored = if drop_spaces { "spaces" } else { "the kind of space" };
+            let what = if k == 0 {
+                "It".to_string()
+            } else {
+                format!("Its line \"{}\"", show(part.trim()))
+            };
+            let ignored = if drop_spaces {
+                "spaces"
+            } else {
+                "the kind of space"
+            };
             let mut msg = format!(
                 "{what} matches line {line} if {ignored} and invisible characters are ignored; the revision has \
                  \"{}\" there",
@@ -208,7 +240,10 @@ pub fn near_miss(text: &str, old: &str) -> Option<NearMiss> {
                     listed(&theirs)
                 ));
             }
-            note(&mut msg, there.first().or(theirs.first()).copied().unwrap_or(' '));
+            note(
+                &mut msg,
+                there.first().or(theirs.first()).copied().unwrap_or(' '),
+            );
             return Some(NearMiss { line, message: msg });
         }
     }
@@ -332,7 +367,10 @@ mod tests {
     #[test]
     fn names_raw_characters_and_debug_escapes_once() {
         let m = name_in("its first line \"□\\u{2007}추진\" is at line 3");
-        assert!(m.starts_with("its first line \"□⟨U+2007 FIGURE SPACE⟩추진\" is at line 3. (⟨U+2007"), "{m}");
+        assert!(
+            m.starts_with("its first line \"□⟨U+2007 FIGURE SPACE⟩추진\" is at line 3. (⟨U+2007"),
+            "{m}"
+        );
         assert!(m.contains("\\u2007 in a JSON string"), "{m}");
         assert_eq!(name_in(&m), m, "idempotent");
         let m = name_in("banner \u{f076} here.");
@@ -341,8 +379,14 @@ mod tests {
         // A supplementary character is two UTF-16 escapes in JSON.
         assert!(name_in("x\u{f0001}").contains("\\udb80\\udc01"));
         // Plain messages and ordinary escapes are left alone.
-        assert!(matches!(name_in("nor any of [ ] : * ? / \\)"), Cow::Borrowed(_)));
-        assert!(matches!(name_in("\"a\\u{41}b\\\\u{2007}\""), Cow::Borrowed(_)));
+        assert!(matches!(
+            name_in("nor any of [ ] : * ? / \\)"),
+            Cow::Borrowed(_)
+        ));
+        assert!(matches!(
+            name_in("\"a\\u{41}b\\\\u{2007}\""),
+            Cow::Borrowed(_)
+        ));
     }
 
     #[test]
@@ -350,30 +394,59 @@ mod tests {
         let text = "# 계획\n\n□\u{2007}추진 배경\n\nㅇ\u{2007}세부 내용\n";
         let m = near_miss(text, "□ 추진 배경").expect("a near miss");
         assert_eq!(m.line, 3);
-        assert!(m.message.contains("\"□⟨U+2007 FIGURE SPACE⟩추진 배경\""), "{}", m.message);
-        assert!(m.message.contains("with ⟨U+2007 FIGURE SPACE⟩."), "{}", m.message);
+        assert!(
+            m.message.contains("\"□⟨U+2007 FIGURE SPACE⟩추진 배경\""),
+            "{}",
+            m.message
+        );
+        assert!(
+            m.message.contains("with ⟨U+2007 FIGURE SPACE⟩."),
+            "{}",
+            m.message
+        );
         // Across lines, and the count of each.
         let m = near_miss(text, "□ 추진 배경\n\nㅇ 세부 내용").expect("a near miss");
-        assert!(m.message.contains("⟨U+2007 FIGURE SPACE⟩ ×2"), "{}", m.message);
+        assert!(
+            m.message.contains("⟨U+2007 FIGURE SPACE⟩ ×2"),
+            "{}",
+            m.message
+        );
     }
 
     #[test]
     fn near_miss_names_a_private_use_symbol_written_as_nothing_or_a_space() {
         let text = "앞 문단\n\u{f076} 2025년 사업 계획 \u{f076}\n";
-        for old in ["2025년 사업 계획 \n", " 2025년 사업 계획", "앞 문단\n 2025년 사업 계획  "] {
+        for old in [
+            "2025년 사업 계획 \n",
+            " 2025년 사업 계획",
+            "앞 문단\n 2025년 사업 계획  ",
+        ] {
             let m = near_miss(text, old).unwrap_or_else(|| panic!("{old:?}"));
-            assert!(m.message.contains("⟨U+F076 private use⟩"), "{old:?}: {}", m.message);
+            assert!(
+                m.message.contains("⟨U+F076 private use⟩"),
+                "{old:?}: {}",
+                m.message
+            );
             assert_eq!(m.line, if old.starts_with('앞') { 1 } else { 2 }, "{old:?}");
         }
         let text = "배너\u{f076}제목\n";
         let m = near_miss(text, "배너 제목").expect("a near miss, spaces left out");
-        assert!(m.message.contains("\"배너⟨U+F076 private use⟩제목\""), "{}", m.message);
+        assert!(
+            m.message.contains("\"배너⟨U+F076 private use⟩제목\""),
+            "{}",
+            m.message
+        );
     }
 
     #[test]
     fn near_miss_names_what_the_old_text_has_and_the_revision_does_not() {
         let m = near_miss("금액 100 원\n", "금액\u{a0}100 원").expect("a near miss");
-        assert!(m.message.contains("The old text has ⟨U+00A0 NO-BREAK SPACE⟩"), "{}", m.message);
+        assert!(
+            m.message
+                .contains("The old text has ⟨U+00A0 NO-BREAK SPACE⟩"),
+            "{}",
+            m.message
+        );
     }
 
     #[test]
@@ -388,6 +461,11 @@ mod tests {
         let text = "첫 줄\n□\u{2007}둘째 줄\n셋째 줄\n";
         let m = near_miss(text, "첫 줄\n□ 둘째 줄\n넷째 줄").expect("a near miss on a line");
         assert_eq!(m.line, 2);
-        assert!(m.message.starts_with("Its line \"□ 둘째 줄\" matches line 2"), "{}", m.message);
+        assert!(
+            m.message
+                .starts_with("Its line \"□ 둘째 줄\" matches line 2"),
+            "{}",
+            m.message
+        );
     }
 }

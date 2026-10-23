@@ -15,8 +15,17 @@ pub struct Notice {
 }
 
 /// Add a notice to a report list.
-pub fn notice(report: &mut Vec<Notice>, kind: &str, location: impl Into<String>, detail: impl Into<String>) {
-    report.push(Notice { kind: kind.into(), location: location.into(), detail: detail.into() });
+pub fn notice(
+    report: &mut Vec<Notice>,
+    kind: &str,
+    location: impl Into<String>,
+    detail: impl Into<String>,
+) {
+    report.push(Notice {
+        kind: kind.into(),
+        location: location.into(),
+        detail: detail.into(),
+    });
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -69,7 +78,10 @@ pub struct ImportOptions {
 
 impl Default for ImportOptions {
     fn default() -> Self {
-        ImportOptions { neutralise: true, template: None }
+        ImportOptions {
+            neutralise: true,
+            template: None,
+        }
     }
 }
 

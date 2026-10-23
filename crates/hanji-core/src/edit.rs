@@ -56,15 +56,25 @@ pub fn names(rem: &Remainder) -> Names {
         formats: Some(vec![rem.format.clone()]),
         style_lines: rem.styles.formatting.then(|| rem.styles.lines()),
         headings: rem.styles.headings.clone(),
-        item_style: rem.styles.default_item.clone().filter(|_| rem.styles.formatting),
+        item_style: rem
+            .styles
+            .default_item
+            .clone()
+            .filter(|_| rem.styles.formatting),
         ..Default::default()
     }
 }
 
 /// Parse, validate and resolve model text against a remainder.
-pub fn model_of(text: &str, rem: &Remainder, caps: Capabilities) -> Result<(Parsed, Vec<Block>), Vec<Diagnostic>> {
+pub fn model_of(
+    text: &str,
+    rem: &Remainder,
+    caps: Capabilities,
+) -> Result<(Parsed, Vec<Block>), Vec<Diagnostic>> {
     let parsed = fmt::parse_with(text, &names(rem))?;
-    let blocks = model::resolve(&parsed, text, &rem.styles, caps, &|id| rem.is_block_keep(id))?;
+    let blocks = model::resolve(&parsed, text, &rem.styles, caps, &|id| {
+        rem.is_block_keep(id)
+    })?;
     Ok((parsed, blocks))
 }
 
@@ -124,10 +134,16 @@ pub fn reanchor(
             Some(Status::Placed { .. }) => report.placed += 1,
             Some(Status::Removed(why)) => report.removed.push((e.id, e.kind, why.clone())),
             Some(Status::Refused(why)) => report.refused.push((e.id, e.kind, why.clone())),
-            None => report.refused.push((e.id, e.kind, "no rule placed it".into())),
+            None => report
+                .refused
+                .push((e.id, e.kind, "no rule placed it".into())),
         }
     }
-    let new_rem = Remainder { entries, next_id: next, ..rem.clone() };
+    let new_rem = Remainder {
+        entries,
+        next_id: next,
+        ..rem.clone()
+    };
     (new_rem, report, outcomes)
 }
 
@@ -175,7 +191,15 @@ pub fn reanchor_rewrite_in(
     let alignment = Alignment::design_c(&old, &new);
     let (mut remainder, report, outcomes) = reanchor(rem, &old, &new, &alignment);
     m.restyle(new_text, &mut remainder, caps);
-    Ok(Reanchored { text: new_text.to_string(), old, new, remainder, report, outcomes, alignment })
+    Ok(Reanchored {
+        text: new_text.to_string(),
+        old,
+        new,
+        remainder,
+        report,
+        outcomes,
+        alignment,
+    })
 }
 
 /// Re-anchor the edit `text[start..end] → new`; refusals are in the report.
@@ -200,7 +224,11 @@ pub fn reanchor_span_in(
     new: &str,
     caps: Capabilities,
 ) -> Result<Reanchored, Refusal> {
-    if start > end || end > text.len() || !text.is_char_boundary(start) || !text.is_char_boundary(end) {
+    if start > end
+        || end > text.len()
+        || !text.is_char_boundary(start)
+        || !text.is_char_boundary(end)
+    {
         return Err(Refusal::Edit(format!(
             "bytes {start}..{end} are not a span of characters of the text ({} bytes).",
             text.len()
@@ -212,7 +240,16 @@ pub fn reanchor_span_in(
     let (nb, nm) = m.resolve(&new_text, rem, caps).map_err(Refusal::Invalid)?;
     let (mut s, mut e) = (s, e);
     let plain = |a: &str, b: &str| plain_text(a) && plain_text(b);
-    let mut alignment = exact_alignment(&om, &old, &nm, &nb, s, e, repl.len(), plain(&text[s..e], repl));
+    let mut alignment = exact_alignment(
+        &om,
+        &old,
+        &nm,
+        &nb,
+        s,
+        e,
+        repl.len(),
+        plain(&text[s..e], repl),
+    );
     // A span that cuts a head's line and leaves it unpaired is read by
     // whole lines: the same text change, with the lines it repeats left out
     // (deleting a slide whose neighbour begins alike cuts both slide lines).
@@ -220,22 +257,48 @@ pub fn reanchor_span_in(
     if !cut.is_empty() {
         let (s2, e2, r2) = whole_lines(text, s, e, repl);
         debug_assert_eq!(format!("{}{r2}{}", &text[..s2], &text[e2..]), new_text);
-        let al2 = exact_alignment(&om, &old, &nm, &nb, s2, e2, r2.len(), plain(&text[s2..e2], &r2));
+        let al2 = exact_alignment(
+            &om,
+            &old,
+            &nm,
+            &nb,
+            s2,
+            e2,
+            r2.len(),
+            plain(&text[s2..e2], &r2),
+        );
         let gone_whole = |i: usize| {
             let level = old[i].head().map_or(0, |h| h.level);
-            let end =
-                (i + 1..old.len()).find(|&k| old[k].head().is_some_and(|h| h.level <= level)).unwrap_or(old.len());
+            let end = (i + 1..old.len())
+                .find(|&k| old[k].head().is_some_and(|h| h.level <= level))
+                .unwrap_or(old.len());
             s2 <= om[i].start && om[end - 1].end <= e2
         };
-        if cut.iter().all(|&i| al2.bmap[i].is_some() || gone_whole(i)) && cut_heads(&old, &om, &al2, s2, e2).is_empty()
+        if cut.iter().all(|&i| al2.bmap[i].is_some() || gone_whole(i))
+            && cut_heads(&old, &om, &al2, s2, e2).is_empty()
         {
             (s, e, alignment) = (s2, e2, al2);
         }
     }
     let (mut remainder, mut report, mut outcomes) = reanchor(rem, &old, &nb, &alignment);
     m.restyle(&new_text, &mut remainder, caps);
-    refuse_cut_heads(rem, text, &om, &cut_heads(&old, &om, &alignment, s, e), &mut report, &mut outcomes);
-    Ok(Reanchored { text: new_text, old, new: nb, remainder, report, outcomes, alignment })
+    refuse_cut_heads(
+        rem,
+        text,
+        &om,
+        &cut_heads(&old, &om, &alignment, s, e),
+        &mut report,
+        &mut outcomes,
+    );
+    Ok(Reanchored {
+        text: new_text,
+        old,
+        new: nb,
+        remainder,
+        report,
+        outcomes,
+        alignment,
+    })
 }
 
 /// Heads (a slide's `layout:` line, a slot's or shape's) the span `s..e`
@@ -257,13 +320,24 @@ fn cut_heads(old: &[Block], om: &[BlockSrc], al: &Alignment, s: usize, e: usize)
 /// it starts or ends with unchanged.
 fn whole_lines(text: &str, s: usize, e: usize, repl: &str) -> (usize, usize, String) {
     let s0 = text[..s].rfind('\n').map_or(0, |k| k + 1);
-    let e0 =
-        if e == 0 || text[..e].ends_with('\n') { e } else { text[e..].find('\n').map_or(text.len(), |k| e + k + 1) };
+    let e0 = if e == 0 || text[..e].ends_with('\n') {
+        e
+    } else {
+        text[e..].find('\n').map_or(text.len(), |k| e + k + 1)
+    };
     let old = &text[s0..e0];
     let new = format!("{}{repl}{}", &text[s0..s], &text[e..e0]);
-    let (ol, nl): (Vec<&str>, Vec<&str>) = (old.split_inclusive('\n').collect(), new.split_inclusive('\n').collect());
+    let (ol, nl): (Vec<&str>, Vec<&str>) = (
+        old.split_inclusive('\n').collect(),
+        new.split_inclusive('\n').collect(),
+    );
     let pre = ol.iter().zip(&nl).take_while(|(a, b)| a == b).count();
-    let suf = ol[pre..].iter().rev().zip(nl[pre..].iter().rev()).take_while(|(a, b)| a == b).count();
+    let suf = ol[pre..]
+        .iter()
+        .rev()
+        .zip(nl[pre..].iter().rev())
+        .take_while(|(a, b)| a == b)
+        .count();
     let bytes = |ls: &[&str]| ls.iter().map(|l| l.len()).sum::<usize>();
     let (a, b) = (bytes(&ol[..pre]), bytes(&ol[ol.len() - suf..]));
     let nb = bytes(&nl[nl.len() - suf..]);
@@ -283,8 +357,12 @@ fn refuse_cut_heads(
     outcomes: &mut HashMap<u64, Outcome>,
 ) {
     for en in &rem.entries {
-        let Some(&i) = en.path.first().filter(|i| cut.contains(i)) else { continue };
-        let Some(o) = outcomes.get_mut(&en.id) else { continue };
+        let Some(&i) = en.path.first().filter(|i| cut.contains(i)) else {
+            continue;
+        };
+        let Some(o) = outcomes.get_mut(&en.id) else {
+            continue;
+        };
         if matches!(o.status, Status::Removed(_)) {
             let line = text[om[i].start..om[i].end].trim_end();
             let why = format!(
@@ -301,7 +379,12 @@ fn refuse_cut_heads(
 /// A whole-file rewrite: `old_text` (the revision `rem` belongs to) becomes
 /// `new_text`. Blocks are aligned by diff (design C). Refused when an entry
 /// cannot be placed.
-pub fn rewrite(rem: &Remainder, old_text: &str, new_text: &str, caps: Capabilities) -> Result<Reanchored, Refusal> {
+pub fn rewrite(
+    rem: &Remainder,
+    old_text: &str,
+    new_text: &str,
+    caps: Capabilities,
+) -> Result<Reanchored, Refusal> {
     rewrite_in(&DocumentModel, rem, old_text, new_text, caps)
 }
 
@@ -319,7 +402,13 @@ pub fn rewrite_in(
 /// An exact edit: the one occurrence of `old` in `text` becomes `new`, and
 /// the remainder is re-anchored from that span. Refused when an entry
 /// cannot be placed.
-pub fn edit(rem: &Remainder, text: &str, old: &str, new: &str, caps: Capabilities) -> Result<Reanchored, Refusal> {
+pub fn edit(
+    rem: &Remainder,
+    text: &str,
+    old: &str,
+    new: &str,
+    caps: Capabilities,
+) -> Result<Reanchored, Refusal> {
     edit_in(&DocumentModel, rem, text, old, new, caps)
 }
 
@@ -333,7 +422,9 @@ pub fn edit_in(
     caps: Capabilities,
 ) -> Result<Reanchored, Refusal> {
     if old.is_empty() {
-        return Err(Refusal::Edit("the old text is empty; include the text around the place to edit.".into()));
+        return Err(Refusal::Edit(
+            "the old text is empty; include the text around the place to edit.".into(),
+        ));
     }
     // Every occurrence, overlapping ones included ("aa" occurs twice in "aaa").
     let mut hits: Vec<usize> = vec![];
@@ -345,7 +436,8 @@ pub fn edit_in(
     let s = match hits.as_slice() {
         [s] => *s,
         [] => {
-            let mut m = "the old text was not found; copy it exactly from the current revision.".to_string();
+            let mut m = "the old text was not found; copy it exactly from the current revision."
+                .to_string();
             if let Some(near) = fmt::chars::near_miss(text, old) {
                 m.push(' ');
                 m.push_str(&near.message);
@@ -373,14 +465,18 @@ fn trim_span<'a>(text: &str, s: usize, e: usize, new: &'a str) -> (usize, usize,
     let pre = if ws_or_end(&old[pre..]) && ws_or_end(&new[pre..]) {
         pre
     } else {
-        old[..pre].rfind(char::is_whitespace).map_or(0, |k| k + old[k..].chars().next().unwrap().len_utf8())
+        old[..pre]
+            .rfind(char::is_whitespace)
+            .map_or(0, |k| k + old[k..].chars().next().unwrap().len_utf8())
     };
     let (o2, n2) = (&old[pre..], &new[pre..]);
     let suf = common_suffix(o2, n2);
     let suf = if ws_or_start(&o2[..o2.len() - suf]) && ws_or_start(&n2[..n2.len() - suf]) {
         suf
     } else {
-        o2[o2.len() - suf..].find(char::is_whitespace).map_or(0, |k| suf - k)
+        o2[o2.len() - suf..]
+            .find(char::is_whitespace)
+            .map_or(0, |k| suf - k)
     };
     (s + pre, e - suf, &n2[..n2.len() - suf])
 }
@@ -416,7 +512,12 @@ fn para_maps<'a>(
                 for (r, row) in cells.iter().enumerate() {
                     for (c, pms) in row.iter().enumerate() {
                         for (k, pm) in pms.iter().flatten().enumerate() {
-                            out.push((vec![j, r, c, k], model::content_at(blocks, &[j, r, c, k]), pm, j));
+                            out.push((
+                                vec![j, r, c, k],
+                                model::content_at(blocks, &[j, r, c, k]),
+                                pm,
+                                j,
+                            ));
                         }
                     }
                 }
@@ -460,22 +561,43 @@ fn exact_alignment(
             None
         }
     };
-    let new_start: HashMap<usize, usize> = new_maps.iter().enumerate().map(|(j, m)| (m.start, j)).collect();
+    let new_start: HashMap<usize, usize> = new_maps
+        .iter()
+        .enumerate()
+        .map(|(j, m)| (m.start, j))
+        .collect();
     let mut bmap = vec![None; ob.len()];
     let mut touched_old = vec![];
     for (i, m) in old_maps.iter().enumerate() {
         let untouched = m.end <= s || m.start >= e;
-        match untouched.then(|| shift(m.start).and_then(|x| new_start.get(&x).copied())).flatten() {
+        match untouched
+            .then(|| shift(m.start).and_then(|x| new_start.get(&x).copied()))
+            .flatten()
+        {
             Some(j) => bmap[i] = Some(j),
             None => touched_old.push(i),
         }
     }
     let touched_old: HashSet<usize> = touched_old.into_iter().collect();
     let claimed: HashSet<usize> = bmap.iter().flatten().copied().collect();
-    let old_items: Vec<_> = para_maps(ob, old_maps).into_iter().filter(|x| touched_old.contains(&x.3)).collect();
-    let new_items: Vec<_> = para_maps(nb, new_maps).into_iter().filter(|x| !claimed.contains(&x.3)).collect();
-    let old_stream = Stream::new(old_items.iter().map(|x| (x.0.clone(), x.1.unwrap_or(&EMPTY))));
-    let new_stream = Stream::new(new_items.iter().map(|x| (x.0.clone(), x.1.unwrap_or(&EMPTY))));
+    let old_items: Vec<_> = para_maps(ob, old_maps)
+        .into_iter()
+        .filter(|x| touched_old.contains(&x.3))
+        .collect();
+    let new_items: Vec<_> = para_maps(nb, new_maps)
+        .into_iter()
+        .filter(|x| !claimed.contains(&x.3))
+        .collect();
+    let old_stream = Stream::new(
+        old_items
+            .iter()
+            .map(|x| (x.0.clone(), x.1.unwrap_or(&EMPTY))),
+    );
+    let new_stream = Stream::new(
+        new_items
+            .iter()
+            .map(|x| (x.0.clone(), x.1.unwrap_or(&EMPTY))),
+    );
     // Source offset of every stream position (units, then the mark). A
     // block placeholder's line is a unit in its source map but no content
     // in the stream: only its mark counts, so the offsets stay in step.
@@ -502,21 +624,33 @@ fn exact_alignment(
     }
     // Inside a span that rewrites syntax, the units it keeps at its ends.
     let old_in: Vec<usize> = (0..oo.len()).filter(|&k| (s..e).contains(&oo[k])).collect();
-    let new_in: Vec<usize> = (0..no.len()).filter(|&n| (s..s + new_len).contains(&no[n])).collect();
-    let same =
-        |k: usize, n: usize| old_stream.text.get(k).is_some() && old_stream.text.get(k) == new_stream.text.get(n);
+    let new_in: Vec<usize> = (0..no.len())
+        .filter(|&n| (s..s + new_len).contains(&no[n]))
+        .collect();
+    let same = |k: usize, n: usize| {
+        old_stream.text.get(k).is_some() && old_stream.text.get(k) == new_stream.text.get(n)
+    };
     // Only within one paragraph: a span across blocks aligns as before.
     let one = |st: &Stream, v: &[usize]| {
         let paths: Vec<Option<Path>> = v.iter().map(|&g| st.locate(g).map(|p| p.0)).collect();
         paths.windows(2).all(|w| w[0] == w[1])
     };
     let within = one(&old_stream, &old_in) && one(&new_stream, &new_in);
-    let most = if plain || !within { 0 } else { old_in.len().min(new_in.len()) };
-    let pre = (0..most).take_while(|&x| same(old_in[x], new_in[x])).count();
-    let suf = (0..most - pre).take_while(|&x| same(old_in[old_in.len() - 1 - x], new_in[new_in.len() - 1 - x])).count();
+    let most = if plain || !within {
+        0
+    } else {
+        old_in.len().min(new_in.len())
+    };
+    let pre = (0..most)
+        .take_while(|&x| same(old_in[x], new_in[x]))
+        .count();
+    let suf = (0..most - pre)
+        .take_while(|&x| same(old_in[old_in.len() - 1 - x], new_in[new_in.len() - 1 - x]))
+        .count();
     if pre + suf > 0 {
         pairs.extend((0..pre).map(|x| (old_in[x], new_in[x])));
-        pairs.extend((0..suf).map(|x| (old_in[old_in.len() - 1 - x], new_in[new_in.len() - 1 - x])));
+        pairs
+            .extend((0..suf).map(|x| (old_in[old_in.len() - 1 - x], new_in[new_in.len() - 1 - x])));
         pairs.sort();
         let mut kept: Vec<(usize, usize)> = vec![];
         for p in pairs {
@@ -549,8 +683,15 @@ fn exact_alignment(
     // pairs its paragraphs' positions too, so they keep their entries. (A
     // head the span cuts stays unpaired: see `cut_heads`.)
     let paired: HashSet<usize> = pairs.iter().map(|p| p.0).collect();
-    let para_at = |st: &Stream, g: usize| st.locate(g).is_some_and(|p| matches!(ob.get(p.0[0]), Some(Block::Para(_))));
-    let new_para_at = |g: usize| new_stream.locate(g).is_some_and(|p| matches!(nb.get(p.0[0]), Some(Block::Para(_))));
+    let para_at = |st: &Stream, g: usize| {
+        st.locate(g)
+            .is_some_and(|p| matches!(ob.get(p.0[0]), Some(Block::Para(_))))
+    };
+    let new_para_at = |g: usize| {
+        new_stream
+            .locate(g)
+            .is_some_and(|p| matches!(nb.get(p.0[0]), Some(Block::Para(_))))
+    };
     let kept: Vec<(usize, usize)> = ops
         .iter()
         .filter(|o| o.tag == Tag::Equal)
@@ -572,7 +713,10 @@ fn exact_alignment(
         }
     }
     for &(k, n) in &pairs {
-        if let (Some(i), Some(j)) = (old_stream.char_at(k).map(|p| p.0[0]), new_stream.char_at(n).map(|p| p.0[0])) {
+        if let (Some(i), Some(j)) = (
+            old_stream.char_at(k).map(|p| p.0[0]),
+            new_stream.char_at(n).map(|p| p.0[0]),
+        ) {
             if bmap[i].is_none()
                 && !owner_of_new.contains_key(&j)
                 && same_kind(&ob[i], &nb[j])
@@ -585,12 +729,22 @@ fn exact_alignment(
     }
     for (i, b) in ob.iter().enumerate() {
         if let Block::Keep(id) = b {
-            bmap[i] = nb.iter().position(|x| matches!(x, Block::Keep(y) if y == id));
+            bmap[i] = nb
+                .iter()
+                .position(|x| matches!(x, Block::Keep(y) if y == id));
         }
     }
-    let global =
-        (!old_stream.order.is_empty()).then_some(Global { old: old_stream, new: new_stream, ops, min_equal: 1 });
-    Alignment { bmap, global, ..Default::default() }
+    let global = (!old_stream.order.is_empty()).then_some(Global {
+        old: old_stream,
+        new: new_stream,
+        ops,
+        min_equal: 1,
+    });
+    Alignment {
+        bmap,
+        global,
+        ..Default::default()
+    }
 }
 
 /// Matched pairs → opcodes; an unmatched stretch whose units are identical
@@ -608,7 +762,13 @@ fn pairs_to_ops(pairs: &[(usize, usize)], a: &[u32], b: &[u32]) -> Vec<Op> {
                 return;
             }
         }
-        ops.push(Op { tag, i1, i2, j1, j2 });
+        ops.push(Op {
+            tag,
+            i1,
+            i2,
+            j1,
+            j2,
+        });
     };
     let (mut i, mut j) = (0, 0);
     let ends = pairs.iter().copied().chain([(a.len(), b.len())]);
@@ -624,7 +784,12 @@ fn pairs_to_ops(pairs: &[(usize, usize)], a: &[u32], b: &[u32]) -> Vec<Op> {
                 Tag::Insert
             };
             let same_text = || {
-                let text = |x: &[u32]| x.iter().filter(|&&u| u != place::SEP).copied().collect::<Vec<_>>();
+                let text = |x: &[u32]| {
+                    x.iter()
+                        .filter(|&&u| u != place::SEP)
+                        .copied()
+                        .collect::<Vec<_>>()
+                };
                 text(&a[i..k]) == text(&b[j..n])
             };
             if tag == Tag::Equal && k > i {
@@ -644,7 +809,13 @@ fn pairs_to_ops(pairs: &[(usize, usize)], a: &[u32], b: &[u32]) -> Vec<Op> {
                     }
                 }
             } else if tag != Tag::Equal {
-                ops.push(Op { tag, i1: i, i2: k, j1: j, j2: n });
+                ops.push(Op {
+                    tag,
+                    i1: i,
+                    i2: k,
+                    j1: j,
+                    j2: n,
+                });
             }
         }
         if k < a.len() {
@@ -660,9 +831,20 @@ mod tests {
     use super::*;
 
     /// Opcodes as (tag, old range, new range).
-    fn ops_of(pairs: &[(usize, usize)], a: &str, b: &str) -> Vec<(Tag, usize, usize, usize, usize)> {
-        let units = |s: &str| s.chars().map(|c| if c == '|' { place::SEP } else { c as u32 }).collect::<Vec<_>>();
-        pairs_to_ops(pairs, &units(a), &units(b)).iter().map(|o| (o.tag, o.i1, o.i2, o.j1, o.j2)).collect()
+    fn ops_of(
+        pairs: &[(usize, usize)],
+        a: &str,
+        b: &str,
+    ) -> Vec<(Tag, usize, usize, usize, usize)> {
+        let units = |s: &str| {
+            s.chars()
+                .map(|c| if c == '|' { place::SEP } else { c as u32 })
+                .collect::<Vec<_>>()
+        };
+        pairs_to_ops(pairs, &units(a), &units(b))
+            .iter()
+            .map(|o| (o.tag, o.i1, o.i2, o.j1, o.j2))
+            .collect()
     }
 
     #[test]
@@ -670,12 +852,20 @@ mod tests {
         // A join ("ab|cd" → "abcd"), nothing paired inside the span.
         assert_eq!(
             ops_of(&[(0, 0), (4, 3)], "ab|cd", "abcd"),
-            [(Tag::Equal, 0, 2, 0, 2), (Tag::Delete, 2, 3, 2, 2), (Tag::Equal, 3, 5, 2, 4)]
+            [
+                (Tag::Equal, 0, 2, 0, 2),
+                (Tag::Delete, 2, 3, 2, 2),
+                (Tag::Equal, 3, 5, 2, 4)
+            ]
         );
         // A split, and a paragraph mark that moved.
         assert_eq!(
             ops_of(&[], "abcd", "ab|cd"),
-            [(Tag::Equal, 0, 2, 0, 2), (Tag::Insert, 2, 2, 2, 3), (Tag::Equal, 2, 4, 3, 5)]
+            [
+                (Tag::Equal, 0, 2, 0, 2),
+                (Tag::Insert, 2, 2, 2, 3),
+                (Tag::Equal, 2, 4, 3, 5)
+            ]
         );
         assert_eq!(
             ops_of(&[], "a|bc", "ab|c"),
@@ -694,16 +884,39 @@ mod tests {
     use crate::remainder::{Entry, Meta};
 
     fn entry(id: u64, kind: Kind, path: Path, start: Option<usize>, end: Option<usize>) -> Entry {
-        Entry { id, kind, xml: vec![], fp: format!("fp{id}"), path, start, end, seq: id * 1000, meta: Meta::default() }
+        Entry {
+            id,
+            kind,
+            xml: vec![],
+            fp: format!("fp{id}"),
+            path,
+            start,
+            end,
+            seq: id * 1000,
+            meta: Meta::default(),
+        }
     }
 
     #[test]
     fn a_missing_old_names_the_characters_it_missed() {
-        let rem = Remainder { format: "hwpx".into(), ..Default::default() };
+        let rem = Remainder {
+            format: "hwpx".into(),
+            ..Default::default()
+        };
         let text = "---\ntype: document\nformat: hwpx\nschema: 1\n---\n□\u{2007}추진 배경\n";
-        let e = edit(&rem, text, "□ 추진 배경", "□ 추진 경과", Capabilities::default()).unwrap_err();
+        let e = edit(
+            &rem,
+            text,
+            "□ 추진 배경",
+            "□ 추진 경과",
+            Capabilities::default(),
+        )
+        .unwrap_err();
         let m = e.to_string();
-        assert!(m.contains("matches line 6") && m.contains("\"□⟨U+2007 FIGURE SPACE⟩추진 배경\""), "{m}");
+        assert!(
+            m.contains("matches line 6") && m.contains("\"□⟨U+2007 FIGURE SPACE⟩추진 배경\""),
+            "{m}"
+        );
         // A refusal quoting text with a debug escape names the character too.
         let r = Refusal::Edit("the edit cuts through the line \"a\\u{f076}b\"".into());
         assert!(r.to_string().contains("\"a⟨U+F076 private use⟩b\""), "{r}");
@@ -723,15 +936,35 @@ mod tests {
             entry(3, Kind::Run, vec![2], Some(0), Some(9)),
             entry(4, Kind::Ppr, vec![1], None, None),
         ];
-        let rem = Remainder { format: "docx".into(), styles, entries, next_id: 5, ..Default::default() };
+        let rem = Remainder {
+            format: "docx".into(),
+            styles,
+            entries,
+            next_id: 5,
+            ..Default::default()
+        };
         let text = "---\ntype: document\nformat: docx\nschema: 1\n---\na[^1]\n\n[^1]: note\n\nmiddle\n\nlast para\n";
-        let caps = Capabilities { footnotes: true, ..Default::default() };
+        let caps = Capabilities {
+            footnotes: true,
+            ..Default::default()
+        };
         let at = |r: &Reanchored, id| {
-            assert!(r.report.refused.is_empty() && r.report.removed.is_empty(), "{:?}", r.report);
-            r.remainder.entries.iter().find(|e| e.id == id).map(|e| (e.path.clone(), e.start, e.end))
+            assert!(
+                r.report.refused.is_empty() && r.report.removed.is_empty(),
+                "{:?}",
+                r.report
+            );
+            r.remainder
+                .entries
+                .iter()
+                .find(|e| e.id == id)
+                .map(|e| (e.path.clone(), e.start, e.end))
         };
         // Edits after the definition, as an exact span and as a rewrite.
-        for r in [edit(&rem, text, "last", "final", caps), rewrite(&rem, text, &text.replace("last", "final"), caps)] {
+        for r in [
+            edit(&rem, text, "last", "final", caps),
+            rewrite(&rem, text, &text.replace("last", "final"), caps),
+        ] {
             let r = r.unwrap();
             assert_eq!(at(&r, 2), Some((vec![2], None, None)));
             assert_eq!(at(&r, 3), Some((vec![2], Some(0), Some(10))));

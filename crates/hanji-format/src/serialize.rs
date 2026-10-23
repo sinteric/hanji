@@ -8,10 +8,17 @@ use crate::styled::{self, StyleTable};
 
 pub fn serialize(doc: &Document) -> String {
     let mut out = front_lines(&doc.front);
-    let table = StyleTable { default: doc.styles.first().map(|l| l.name.clone()), lines: doc.styles.clone() };
+    let table = StyleTable {
+        default: doc.styles.first().map(|l| l.name.clone()),
+        lines: doc.styles.clone(),
+    };
     for l in &doc.styles {
         let p = l.props.write();
-        out.push(format!("<style name=\"{}\"{}{p}/>", attr(&l.name), if p.is_empty() { "" } else { " " }));
+        out.push(format!(
+            "<style name=\"{}\"{}{p}/>",
+            attr(&l.name),
+            if p.is_empty() { "" } else { " " }
+        ));
     }
     if !doc.styles.is_empty() && !doc.blocks.is_empty() {
         out.push(String::new());
@@ -22,13 +29,21 @@ pub fn serialize(doc: &Document) -> String {
 
 /// The front matter's lines.
 pub(crate) fn front_lines(f: &FrontMatter) -> Vec<String> {
-    let mut out = vec!["---".to_string(), format!("type: {}", f.doc_type), format!("format: {}", f.format)];
+    let mut out = vec![
+        "---".to_string(),
+        format!("type: {}", f.doc_type),
+        format!("format: {}", f.format),
+    ];
     if let Some(t) = &f.template {
         out.push(format!("template: {t}"));
     }
     out.push(format!("schema: {}", f.schema));
     if let Some((w, h)) = f.size {
-        out.push(format!("size: {} x {} pt", crate::pres::pt(w), crate::pres::pt(h)));
+        out.push(format!(
+            "size: {} x {} pt",
+            crate::pres::pt(w),
+            crate::pres::pt(h)
+        ));
     }
     out.push("---".into());
     out
@@ -49,7 +64,12 @@ fn blocks_in(out: &mut Vec<String>, blocks: &[Block], st: &StyleTable) {
 /// [`blocks`]; `pres`: a Presentation slot's text (§5.3), whose `[text]{…}`
 /// is formatting, each of its lines ending in `ends[block][line]` (a
 /// paragraph's own formatting, ` {…}`) when there is one.
-pub(crate) fn blocks_with(out: &mut Vec<String>, blocks: &[Block], pres: bool, ends: &[Vec<String>]) {
+pub(crate) fn blocks_with(
+    out: &mut Vec<String>,
+    blocks: &[Block],
+    pres: bool,
+    ends: &[Vec<String>],
+) {
     let st = StyleTable::default();
     for (k, b) in blocks.iter().enumerate() {
         if k > 0 && !(is_empty_para(b) && is_empty_para(&blocks[k - 1])) {
@@ -79,7 +99,11 @@ fn block_pres(out: &mut Vec<String>, b: &Block) {
                 widths.truncate(it.level);
                 let indent: usize = widths.iter().sum();
                 let body = serialize_inline_with(&it.content, true);
-                let line = if body.is_empty() { it.marker().to_string() } else { format!("{} {body}", it.marker()) };
+                let line = if body.is_empty() {
+                    it.marker().to_string()
+                } else {
+                    format!("{} {body}", it.marker())
+                };
                 out.push(format!("{}{line}", " ".repeat(indent)));
                 widths.push(it.marker().len() + 1);
             }
@@ -101,10 +125,16 @@ fn block(out: &mut Vec<String>, b: &Block, st: &StyleTable) {
                 widths.truncate(it.level);
                 let indent: usize = widths.iter().sum();
                 let (body, own) = with_own(&it.content, &it.props, &Props::new(), &Props::new());
-                let mut line =
-                    if body.is_empty() { it.marker().to_string() } else { format!("{} {body}", it.marker()) };
+                let mut line = if body.is_empty() {
+                    it.marker().to_string()
+                } else {
+                    format!("{} {body}", it.marker())
+                };
                 let style = it.style.as_ref().map(|s| format!("style=\"{}\"", attr(s)));
-                let brace: Vec<String> = style.into_iter().chain((!own.is_empty()).then(|| own.write())).collect();
+                let brace: Vec<String> = style
+                    .into_iter()
+                    .chain((!own.is_empty()).then(|| own.write()))
+                    .collect();
                 if !brace.is_empty() {
                     line.push_str(&format!(" {{{}}}", brace.join(" ")));
                 }
@@ -115,7 +145,11 @@ fn block(out: &mut Vec<String>, b: &Block, st: &StyleTable) {
         Block::PageBreak => out.push("<pagebreak/>".into()),
         Block::FootnoteDef(f) => {
             let body = serialize_inline(&f.content);
-            out.push(if body.is_empty() { format!("[^{}]:", f.label) } else { format!("[^{}]: {body}", f.label) });
+            out.push(if body.is_empty() {
+                format!("[^{}]:", f.label)
+            } else {
+                format!("[^{}]: {body}", f.label)
+            });
         }
     }
 }
@@ -168,7 +202,11 @@ fn cell_text_in(ps: &[CellPara], st: &StyleTable, tl: &Props) -> String {
         if lead_needed {
             s.push_str(&p_tag(p.style.as_deref()));
         }
-        let base = if tl.is_empty() { Props::new() } else { st.values(p.style.as_deref()) };
+        let base = if tl.is_empty() {
+            Props::new()
+        } else {
+            st.values(p.style.as_deref())
+        };
         let (body, own) = with_own(&p.content, &p.props, &base, tl);
         s.push_str(&body);
         if !own.is_empty() {
@@ -188,7 +226,10 @@ fn with_own(content: &Inline, props: &Props, base: &Props, tl: &Props) -> (Strin
         return (serialize_inline(content), Props::new());
     }
     let reference = base.overlay(tl);
-    let mut own = base.overlay(props).only(&styled::PARA_OWN).diff(&reference.only(&styled::PARA_OWN));
+    let mut own = base
+        .overlay(props)
+        .only(&styled::PARA_OWN)
+        .diff(&reference.only(&styled::PARA_OWN));
     let text_base = base.only(&Key::TEXT);
     let eff = |u: &Unit| text_base.overlay(&u.props);
     let mut common: Option<Props> = None;
@@ -223,7 +264,10 @@ fn table(out: &mut Vec<String>, t: &Table, st: &StyleTable) {
         .iter()
         .enumerate()
         .flat_map(|(r, row)| {
-            row.iter().enumerate().filter(|(_, c)| matches!(c, Cell::Text(_))).map(move |(c, _)| (r, c))
+            row.iter()
+                .enumerate()
+                .filter(|(_, c)| matches!(c, Cell::Text(_)))
+                .map(move |(c, _)| (r, c))
         })
         .collect();
     let eff_box = |r: usize, c: usize| dflt.overlay(t.box_at(r, c));
@@ -233,7 +277,10 @@ fn table(out: &mut Vec<String>, t: &Table, st: &StyleTable) {
             return out;
         }
         for k in Key::BOX {
-            let vals: Vec<Option<Value>> = cells.iter().map(|&(r, c)| eff_box(r, c).get(k).cloned()).collect();
+            let vals: Vec<Option<Value>> = cells
+                .iter()
+                .map(|&(r, c)| eff_box(r, c).get(k).cloned())
+                .collect();
             if let Some((Some(v), n)) = styled::mode(&vals) {
                 if 2 * n > vals.len() && reference.get(k) != Some(&v) {
                     out.set(k, v);
@@ -248,7 +295,13 @@ fn table(out: &mut Vec<String>, t: &Table, st: &StyleTable) {
         .rows
         .iter()
         .flatten()
-        .filter_map(|c| if let Cell::Text(ps) = c { Some(ps) } else { None })
+        .filter_map(|c| {
+            if let Cell::Text(ps) = c {
+                Some(ps)
+            } else {
+                None
+            }
+        })
         .flatten()
         .filter(|p| styled::shows(&p.content))
         .map(|p| (p, st.values(p.style.as_deref())))
@@ -288,7 +341,11 @@ fn table(out: &mut Vec<String>, t: &Table, st: &StyleTable) {
     let head = table_box.overlay(&table_para);
     let style = t.style.as_ref().map(|s| format!("style=\"{}\"", attr(s)));
     let place = (!t.place.is_empty()).then(|| t.place.write());
-    let parts: Vec<String> = style.into_iter().chain(place).chain((!head.is_empty()).then(|| head.write())).collect();
+    let parts: Vec<String> = style
+        .into_iter()
+        .chain(place)
+        .chain((!head.is_empty()).then(|| head.write()))
+        .collect();
     if !parts.is_empty() {
         out.push(format!("{{{}}}", parts.join(" ")));
     }
@@ -375,14 +432,16 @@ fn escape_line_start(mut s: String) -> String {
         s.insert(lead + digits, '\\');
         return s;
     }
-    let bullet =
-        (first == Some('-') && matches!(second, Some(' ') | None)) || (first == Some('+') && second == Some(' '));
+    let bullet = (first == Some('-') && matches!(second, Some(' ') | None))
+        || (first == Some('+') && second == Some(' '));
     if first == Some('|') || bullet {
         s.insert(lead, '\\');
         return s;
     }
     let first = s.chars().next().unwrap();
-    let thematic = matches!(first, '-' | '_') && s.len() >= 3 && s.trim_end().chars().all(|c| c == first || c == ' ');
+    let thematic = matches!(first, '-' | '_')
+        && s.len() >= 3
+        && s.trim_end().chars().all(|c| c == first || c == ' ');
     if first == '#' || first == '>' || thematic {
         s.insert(0, '\\');
     }
@@ -406,7 +465,11 @@ fn inline_spans(inl: &Inline, want: &dyn Fn(&Unit) -> Props) -> String {
 }
 
 fn inline_spans_with(inl: &Inline, want: &dyn Fn(&Unit) -> Props, pres: bool) -> String {
-    let mut out = Out { dollar: dollar_escapes(inl), pres, ..Out::default() };
+    let mut out = Out {
+        dollar: dollar_escapes(inl),
+        pres,
+        ..Out::default()
+    };
     for (a, b, span) in inl.segments() {
         let spans = prop_spans(&inl.units, a, b, want);
         match span.map(|s| &s.kind) {
@@ -438,9 +501,19 @@ fn inline_spans_with(inl: &Inline, want: &dyn Fn(&Unit) -> Props, pres: bool) ->
 /// The `[text]{…}` stretches of `units[a..b]`: maximal runs of units with
 /// the same non-empty `want`. A space or atom (which states no properties)
 /// is inside a stretch when the units around it are.
-fn prop_spans(units: &[Unit], a: usize, b: usize, want: &dyn Fn(&Unit) -> Props) -> Vec<(usize, usize, Props)> {
-    let mut w: Vec<Option<Props>> =
-        (a..b).map(|i| units[i].takes_props().then(|| want(&units[i]).only(&Key::TEXT))).collect();
+fn prop_spans(
+    units: &[Unit],
+    a: usize,
+    b: usize,
+    want: &dyn Fn(&Unit) -> Props,
+) -> Vec<(usize, usize, Props)> {
+    let mut w: Vec<Option<Props>> = (a..b)
+        .map(|i| {
+            units[i]
+                .takes_props()
+                .then(|| want(&units[i]).only(&Key::TEXT))
+        })
+        .collect();
     for i in 0..w.len() {
         if w[i].is_some() {
             continue;
@@ -474,13 +547,18 @@ fn dollar_escapes(inl: &Inline) -> Vec<bool> {
     let u = &inl.units;
     let span_starts: Vec<usize> = inl.spans.iter().flat_map(|s| [s.start, s.end]).collect();
     let span_dollar = |j: usize| {
-        inl.spans
-            .iter()
-            .any(|s| s.start >= j && matches!(&s.kind, SpanKind::Link(x) | SpanKind::Field(x) if x.contains('$')))
+        inl.spans.iter().any(|s| {
+            s.start >= j
+                && matches!(&s.kind, SpanKind::Link(x) | SpanKind::Field(x) if x.contains('$'))
+        })
     };
     let closer_after = |i: usize| {
         (i + 1..u.len()).any(|j| match &u[j].atom {
-            Atom::Char('$') => !u[j - 1].atom.is_space() || u[j - 1].marks != u[j].marks || span_starts.contains(&j),
+            Atom::Char('$') => {
+                !u[j - 1].atom.is_space()
+                    || u[j - 1].marks != u[j].marks
+                    || span_starts.contains(&j)
+            }
             Atom::Math(_) => true,
             Atom::Keep(k) => (k.id.clone() + &k.kind + &k.summary).contains('$'),
             _ => false,
@@ -488,9 +566,9 @@ fn dollar_escapes(inl: &Inline) -> Vec<bool> {
     };
     (0..u.len())
         .map(|i| {
-            let opens = u
-                .get(i + 1)
-                .is_some_and(|n| !n.atom.is_space() || n.marks != u[i].marks || span_starts.contains(&(i + 1)));
+            let opens = u.get(i + 1).is_some_and(|n| {
+                !n.atom.is_space() || n.marks != u[i].marks || span_starts.contains(&(i + 1))
+            });
             u[i].atom == Atom::Char('$') && opens && closer_after(i)
         })
         .collect()
@@ -532,10 +610,22 @@ impl Out {
 
 /// One marked stretch `units[a..b]`: nested where possible (the
 /// longest-lasting mark opens first), toggled where marks cross.
-fn run(out: &mut Out, all: &[Unit], a: usize, b: usize, in_link: bool, spans: &[(usize, usize, Props)]) {
+fn run(
+    out: &mut Out,
+    all: &[Unit],
+    a: usize,
+    b: usize,
+    in_link: bool,
+    spans: &[(usize, usize, Props)],
+) {
     let units = &all[a..b];
     let mut open: Vec<Marks> = vec![];
-    let close_at = |at: usize| spans.iter().find(|s| s.1 == at).map(|s| format!("]{{{}}}", s.2.write()));
+    let close_at = |at: usize| {
+        spans
+            .iter()
+            .find(|s| s.1 == at)
+            .map(|s| format!("]{{{}}}", s.2.write()))
+    };
     let mut in_span = false;
     for i in 0..units.len() {
         let want = units[i].marks;
@@ -553,8 +643,15 @@ fn run(out: &mut Out, all: &[Unit], a: usize, b: usize, in_link: bool, spans: &[
             out.text("[");
             in_span = true;
         }
-        let mut new: Vec<Marks> = Marks::ALL.into_iter().filter(|&m| want.has(m) && !open.contains(&m)).collect();
-        let end = |m: Marks| (i..units.len()).find(|&j| !units[j].marks.has(m)).unwrap_or(units.len());
+        let mut new: Vec<Marks> = Marks::ALL
+            .into_iter()
+            .filter(|&m| want.has(m) && !open.contains(&m))
+            .collect();
+        let end = |m: Marks| {
+            (i..units.len())
+                .find(|&j| !units[j].marks.has(m))
+                .unwrap_or(units.len())
+        };
         new.sort_by_key(|&m| std::cmp::Reverse(end(m)));
         for m in new {
             out.delim(delim(m));
@@ -580,16 +677,22 @@ fn unit(out: &mut Out, units: &[Unit], i: usize, in_link: bool) {
             '\\' => out.text("\\\\"),
             '*' => out.text("\\*"),
             '~' => out.tilde(),
-            '<' if next_char.is_some_and(|c| c.is_ascii_alphabetic() || matches!(c, '/' | '!' | '?')) => {
+            '<' if next_char
+                .is_some_and(|c| c.is_ascii_alphabetic() || matches!(c, '/' | '!' | '?')) =>
+            {
                 out.text("\\<")
             }
             '[' if in_link || next_char == Some('^') => out.text("\\["),
             '^' if in_link && out.s.ends_with('[') => out.text("\\^"),
-            ']' if in_link || next_char == Some('(') || (out.pres && next_char == Some('{')) => out.text("\\]"),
+            ']' if in_link || next_char == Some('(') || (out.pres && next_char == Some('{')) => {
+                out.text("\\]")
+            }
             '$' if out.dollar[i] => out.text("\\$"),
             // A Document escapes every `{`; a Presentation's text, one that
             // could open a paragraph's formatting.
-            '{' if !out.pres || out.s.chars().last().is_none_or(char::is_whitespace) => out.text("\\{"),
+            '{' if !out.pres || out.s.chars().last().is_none_or(char::is_whitespace) => {
+                out.text("\\{")
+            }
             c => {
                 let mut b = [0u8; 4];
                 out.text(c.encode_utf8(&mut b));
@@ -615,12 +718,23 @@ fn unit(out: &mut Out, units: &[Unit], i: usize, in_link: bool) {
 /// $10`), and `$`, a trailing `\` or a `<p` inside would end or split it.
 /// Otherwise the math is written `<math>m</math>`.
 fn dollar_math_ok(m: &str) -> bool {
-    let (Some(first), Some(last)) = (m.chars().next(), m.chars().last()) else { return false };
-    !first.is_whitespace() && !last.is_whitespace() && last != '\\' && !m.contains('$') && !m.contains("<p")
+    let (Some(first), Some(last)) = (m.chars().next(), m.chars().last()) else {
+        return false;
+    };
+    !first.is_whitespace()
+        && !last.is_whitespace()
+        && last != '\\'
+        && !m.contains('$')
+        && !m.contains("<p")
 }
 
 pub(crate) fn keep_tag(k: &Keep) -> String {
-    format!("<keep id=\"{}\" kind=\"{}\" summary=\"{}\"/>", attr(&k.id), attr(&k.kind), attr(&k.summary))
+    format!(
+        "<keep id=\"{}\" kind=\"{}\" summary=\"{}\"/>",
+        attr(&k.id),
+        attr(&k.kind),
+        attr(&k.summary)
+    )
 }
 
 /// An attribute value as the text writes it between quotes.
@@ -629,7 +743,9 @@ pub fn attr_value(s: &str) -> String {
 }
 
 pub(crate) fn attr(s: &str) -> String {
-    s.replace('&', "&amp;").replace('"', "&quot;").replace('<', "&lt;")
+    s.replace('&', "&amp;")
+        .replace('"', "&quot;")
+        .replace('<', "&lt;")
 }
 
 fn link_url(url: &str) -> String {

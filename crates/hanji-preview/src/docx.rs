@@ -6,7 +6,9 @@ use hanji_package::{package, xml};
 use oxml_layout::{FontFile, FontId};
 
 use crate::fonts::{FontResolver, Fonts, Metrics, Script, Source};
-use crate::{finish_preview_with_limits, sfnt, FaceInfo, FontOptions, FontsReport, ImageLimits, Preview};
+use crate::{
+    finish_preview_with_limits, sfnt, FaceInfo, FontOptions, FontsReport, ImageLimits, Preview,
+};
 
 /// DOCX preview with caller font bytes and deterministic bundled fallbacks.
 /// Layout uses the accepted revision view. No document is edited or saved.
@@ -21,7 +23,8 @@ pub fn render_with_fonts_and_limits(
     limits: ImageLimits,
 ) -> Result<Preview, String> {
     limits.validate()?;
-    let document = rdocx::Document::from_bytes(bytes).map_err(|e| format!("rdocx cannot open the document: {e}"))?;
+    let document = rdocx::Document::from_bytes(bytes)
+        .map_err(|e| format!("rdocx cannot open the document: {e}"))?;
     let embedded = embedded_fonts(&document);
     let fonts = Fonts::from_bytes(&options.fonts, &embedded, options.aliases.clone())?;
     render(&document, bytes, &fonts, limits)
@@ -41,7 +44,8 @@ pub fn render_native_with_limits(
     limits: ImageLimits,
 ) -> Result<Preview, String> {
     limits.validate()?;
-    let document = rdocx::Document::from_bytes(bytes).map_err(|e| format!("rdocx cannot open the document: {e}"))?;
+    let document = rdocx::Document::from_bytes(bytes)
+        .map_err(|e| format!("rdocx cannot open the document: {e}"))?;
     let embedded = embedded_fonts(&document);
     let fonts = Fonts::load(&options.font_dirs, &embedded, options.system_fonts);
     render(&document, bytes, &fonts, limits)
@@ -55,7 +59,10 @@ fn embedded_fonts(document: &rdocx::Document) -> Vec<FontFile> {
             font.embedded_fonts
                 .into_iter()
                 .filter(|f| !f.data.is_empty())
-                .map(move |f| FontFile { family: font.name.clone(), data: f.data })
+                .map(move |f| FontFile {
+                    family: font.name.clone(),
+                    data: f.data,
+                })
         })
         .collect()
 }
@@ -67,7 +74,11 @@ struct RequestedFonts {
 }
 
 fn attr(element: &xml::Element, name: &str) -> Option<String> {
-    element.attrs.iter().find(|(n, _)| xml::local_name(n) == name).map(|(_, v)| xml::unescape(v))
+    element
+        .attrs
+        .iter()
+        .find(|(n, _)| xml::local_name(n) == name)
+        .map(|(_, v)| xml::unescape(v))
 }
 
 fn child<'a>(element: &'a xml::Element, name: &str) -> Option<&'a xml::Element> {
@@ -93,12 +104,24 @@ fn requested_fonts(bytes: &[u8]) -> Result<RequestedFonts, String> {
         tree.root.walk(&mut |element| {
             if part.name == "word/fontTable.xml" && element.local() == "font" {
                 symbol_charset |= attr(element, "name").as_deref() == Some("Symbol")
-                    && child(element, "charset").and_then(|e| attr(e, "val")).as_deref() == Some("02");
+                    && child(element, "charset")
+                        .and_then(|e| attr(e, "val"))
+                        .as_deref()
+                        == Some("02");
             }
             if part.name == "word/numbering.xml" && element.local() == "lvl" {
-                symbol_bullet |= child(element, "numFmt").and_then(|e| attr(e, "val")).as_deref() == Some("bullet")
-                    && child(element, "lvlText").and_then(|e| attr(e, "val")).as_deref() == Some("\u{F0B7}")
-                    && child(element, "rPr").and_then(|e| child(e, "rFonts")).and_then(|e| attr(e, "ascii")).as_deref()
+                symbol_bullet |= child(element, "numFmt")
+                    .and_then(|e| attr(e, "val"))
+                    .as_deref()
+                    == Some("bullet")
+                    && child(element, "lvlText")
+                        .and_then(|e| attr(e, "val"))
+                        .as_deref()
+                        == Some("\u{F0B7}")
+                    && child(element, "rPr")
+                        .and_then(|e| child(e, "rFonts"))
+                        .and_then(|e| attr(e, "ascii"))
+                        .as_deref()
                         == Some("Symbol");
             }
             if element.local() == "t" {
@@ -159,11 +182,13 @@ fn requested_fonts(bytes: &[u8]) -> Result<RequestedFonts, String> {
                 }
             } else if matches!(element.local(), "latin" | "ea" | "cs") {
                 if let Some(family) = element.get("typeface").filter(|f| !f.is_empty()) {
-                    requested.entry(family).or_insert(if element.local() == "ea" {
-                        Script::Hangul
-                    } else {
-                        Script::Latin
-                    });
+                    requested
+                        .entry(family)
+                        .or_insert(if element.local() == "ea" {
+                            Script::Hangul
+                        } else {
+                            Script::Latin
+                        });
                 }
             }
         });
@@ -179,7 +204,11 @@ fn requested_fonts(bytes: &[u8]) -> Result<RequestedFonts, String> {
         }
     }
     requested.extend(observed);
-    Ok(RequestedFonts { families: requested, chars, symbol_bullet: symbol_charset && symbol_bullet })
+    Ok(RequestedFonts {
+        families: requested,
+        chars,
+        symbol_bullet: symbol_charset && symbol_bullet,
+    })
 }
 
 fn prefer_script(left: Script, right: Script) -> Script {
@@ -206,7 +235,9 @@ fn render(
         for (bold, italic) in [(false, false), (true, false), (false, true), (true, true)] {
             let face = resolver.resolve_font(&requested, script, bold, italic);
             let draws_script = face.is_some();
-            let Some(face) = face.or_else(|| resolver.resolve_font(&requested, Script::Latin, bold, italic)) else {
+            let Some(face) =
+                face.or_else(|| resolver.resolve_font(&requested, Script::Latin, bold, italic))
+            else {
                 continue;
             };
             let parsed = ttf_parser::Face::parse(&face.font.data, face.font.face_index)
@@ -239,13 +270,20 @@ fn render(
                     data = adapted;
                 }
             }
-            files.push(FontFile { family: requested.clone(), data });
+            files.push(FontFile {
+                family: requested.clone(),
+                data,
+            });
             infos.push(FaceInfo {
                 requested: requested.clone(),
                 script,
                 drawn: draws_script.then_some(face.family),
                 source: draws_script.then_some(face.source),
-                metrics: if draws_script { face.metrics } else { Metrics::Substitute },
+                metrics: if draws_script {
+                    face.metrics
+                } else {
+                    Metrics::Substitute
+                },
             });
         }
     }
@@ -253,13 +291,23 @@ fn render(
     // available coverage fallbacks for real source characters absent from all
     // current faces, instead of assuming its small bundled subsets are complete.
     // The engine retains shaping, source spans and pagination ownership.
-    for c in requested_fonts.chars.into_iter().filter(|c| !c.is_whitespace() && !c.is_control()) {
+    for c in requested_fonts
+        .chars
+        .into_iter()
+        .filter(|c| !c.is_whitespace() && !c.is_control())
+    {
         let text = c.to_string();
-        if files.iter().any(|f| crate::fonts::covers_text(&f.data, 0, &text)) {
+        if files
+            .iter()
+            .any(|f| crate::fonts::covers_text(&f.data, 0, &text))
+        {
             continue;
         }
         let script = Script::of(&text);
-        let Some(face) = resolver.resolve_font_for_text("Arial", script, false, false, &text) else { continue };
+        let Some(face) = resolver.resolve_font_for_text("Arial", script, false, false, &text)
+        else {
+            continue;
+        };
         if !crate::fonts::covers_text(&face.font.data, face.font.face_index, &text) {
             continue;
         }
@@ -286,9 +334,15 @@ fn render(
             source: Some(face.source),
             metrics: Metrics::Substitute,
         });
-        files.push(FontFile { family: face.family, data });
+        files.push(FontFile {
+            family: face.family,
+            data,
+        });
     }
-    let refs: Vec<_> = files.iter().map(|f| (f.family.as_str(), f.data.as_slice())).collect();
+    let refs: Vec<_> = files
+        .iter()
+        .map(|f| (f.family.as_str(), f.data.as_slice()))
+        .collect();
     let layout = document
         .layout_with_fonts_and_bundled_fallback(&refs)
         .map_err(|e| format!("rdocx cannot lay out the document: {e}"))?
@@ -300,7 +354,9 @@ fn render(
             let info = files
                 .iter()
                 .zip(&infos)
-                .find(|(file, _)| file.family == font.family && file.data.as_slice() == font.data.as_ref())
+                .find(|(file, _)| {
+                    file.family == font.family && file.data.as_slice() == font.data.as_ref()
+                })
                 .map(|(_, info)| info.clone())
                 .unwrap_or_else(|| FaceInfo {
                     requested: font.family.clone(),
@@ -312,7 +368,10 @@ fn render(
             (font.id, info)
         })
         .collect();
-    if faces.values().any(|f| f.script == Script::Hangul && f.drawn.is_none()) {
+    if faces
+        .values()
+        .any(|f| f.script == Script::Hangul && f.drawn.is_none())
+    {
         warnings.push(crate::NO_KOREAN_FONT.into());
     }
     finish_preview_with_limits(
@@ -342,16 +401,19 @@ mod tests {
             r#"<x:document xmlns:x="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><x:body><x:p><x:r><x:rPr><x:rFonts x:eastAsia="Run East Asian"/></x:rPr>{text_xml}</x:r></x:p></x:body></x:document>"#
         );
         let styles = r#"<x:styles xmlns:x="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><x:docDefaults><x:rPrDefault><x:rPr><x:rFonts x:eastAsia="Inherited East Asian"/></x:rPr></x:rPrDefault></x:docDefaults></x:styles>"#;
-        let parts = [("word/document.xml", document.as_bytes()), ("word/styles.xml", styles.as_bytes())]
-            .into_iter()
-            .map(|(name, data)| hanji_core::Part {
-                name: name.into(),
-                data: data.into(),
-                dos_time: 0,
-                external_attr: 0,
-                deflate: false,
-            })
-            .collect::<Vec<_>>();
+        let parts = [
+            ("word/document.xml", document.as_bytes()),
+            ("word/styles.xml", styles.as_bytes()),
+        ]
+        .into_iter()
+        .map(|(name, data)| hanji_core::Part {
+            name: name.into(),
+            data: data.into(),
+            dos_time: 0,
+            external_attr: 0,
+            deflate: false,
+        })
+        .collect::<Vec<_>>();
         package::write(&parts).unwrap()
     }
 
@@ -361,8 +423,14 @@ mod tests {
         let original = bytes.clone();
         let requested = requested_fonts(&bytes).unwrap();
         assert_eq!(requested.chars, "한글".chars().collect());
-        assert_eq!(requested.families.get("Run East Asian"), Some(&Script::Hangul));
-        assert_eq!(requested.families.get("Inherited East Asian"), Some(&Script::Hangul));
+        assert_eq!(
+            requested.families.get("Run East Asian"),
+            Some(&Script::Hangul)
+        );
+        assert_eq!(
+            requested.families.get("Inherited East Asian"),
+            Some(&Script::Hangul)
+        );
         assert_eq!(bytes, original);
     }
 
@@ -373,30 +441,48 @@ mod tests {
         );
         let requested = requested_fonts(&bytes).unwrap();
         assert_eq!(requested.chars, "日&한😀A글끝".chars().collect());
-        assert_eq!(requested.families.get("Run East Asian"), Some(&Script::Hangul));
-        assert_eq!(requested.families.get("Inherited East Asian"), Some(&Script::Hangul));
+        assert_eq!(
+            requested.families.get("Run East Asian"),
+            Some(&Script::Hangul)
+        );
+        assert_eq!(
+            requested.families.get("Inherited East Asian"),
+            Some(&Script::Hangul)
+        );
     }
 
     #[test]
     fn cdata_entity_spelling_stays_literal_for_coverage_and_script() {
-        let bytes = font_discovery_package("<x:t><![CDATA[&amp; &#xAC00; &#65; <tag>]]>&amp;&#66;</x:t>");
+        let bytes =
+            font_discovery_package("<x:t><![CDATA[&amp; &#xAC00; &#65; <tag>]]>&amp;&#66;</x:t>");
         let requested = requested_fonts(&bytes).unwrap();
-        assert_eq!(requested.chars, "&amp; &#xAC00; &#65; <tag>&B".chars().collect());
+        assert_eq!(
+            requested.chars,
+            "&amp; &#xAC00; &#65; <tag>&B".chars().collect()
+        );
         assert!(!requested.chars.contains(&'가'));
         assert_eq!(requested.families.get("Run East Asian"), Some(&Script::Cjk));
-        assert_eq!(requested.families.get("Inherited East Asian"), Some(&Script::Cjk));
+        assert_eq!(
+            requested.families.get("Inherited East Asian"),
+            Some(&Script::Cjk)
+        );
     }
 
     #[test]
     fn cdata_preview_matches_equivalent_escaped_text() {
         fn document_bytes(text: &str) -> Vec<u8> {
-            let mut parts =
-                package::read(include_bytes!("../../../prototype/preview/baseline/08-docx-new-report-en.docx"))
-                    .unwrap();
+            let mut parts = package::read(include_bytes!(
+                "../../../prototype/preview/baseline/08-docx-new-report-en.docx"
+            ))
+            .unwrap();
             let xml = format!(
                 r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t xml:space="preserve">{text}</w:t></w:r></w:p></w:body></w:document>"#
             );
-            parts.iter_mut().find(|part| part.name == "word/document.xml").unwrap().data = xml.into_bytes();
+            parts
+                .iter_mut()
+                .find(|part| part.name == "word/document.xml")
+                .unwrap()
+                .data = xml.into_bytes();
             package::write(&parts).unwrap()
         }
 
@@ -411,8 +497,16 @@ mod tests {
             ("\u{feff}text", "&#xFEFF;text", "\u{feff}text"),
             ("<![CDATA[\u{feff}text]]>", "&#xFEFF;text", "\u{feff}text"),
             ("<![CDATA[]]>\u{feff}text", "&#xFEFF;text", "\u{feff}text"),
-            ("&lt;![CDATA[&amp;amp;]]&gt;", "&lt;![CDATA[&amp;amp;]]&gt;", "<![CDATA[&amp;]]>"),
-            ("<![CDATA[]]>ordinary &amp; text", "ordinary &amp; text", "ordinary & text"),
+            (
+                "&lt;![CDATA[&amp;amp;]]&gt;",
+                "&lt;![CDATA[&amp;amp;]]&gt;",
+                "<![CDATA[&amp;]]>",
+            ),
+            (
+                "<![CDATA[]]>ordinary &amp; text",
+                "ordinary &amp; text",
+                "ordinary & text",
+            ),
         ] {
             let bytes = document_bytes(payload);
             let original = bytes.clone();
@@ -422,8 +516,14 @@ mod tests {
             let preview = render_with_fonts(&bytes, &options).unwrap();
             let control = render_with_fonts(&document_bytes(escaped), &options).unwrap();
             assert_eq!(preview.page_count(), control.page_count());
-            assert_eq!(preview.fonts.missing_glyphs_total, control.fonts.missing_glyphs_total);
-            assert_eq!(serde_json::to_value(&preview.fonts).unwrap(), serde_json::to_value(&control.fonts).unwrap());
+            assert_eq!(
+                preview.fonts.missing_glyphs_total,
+                control.fonts.missing_glyphs_total
+            );
+            assert_eq!(
+                serde_json::to_value(&preview.fonts).unwrap(),
+                serde_json::to_value(&control.fonts).unwrap()
+            );
             assert_eq!(preview.html("CDATA control"), control.html("CDATA control"));
             for page in 0..preview.page_count() {
                 for format in [crate::PageFormat::Svg, crate::PageFormat::Png { dpi: 72.0 }] {
@@ -441,13 +541,18 @@ mod tests {
                 }
             }
             assert_eq!(bytes, original);
-            assert_eq!(package::read(&bytes).unwrap(), package::read(&original).unwrap());
+            assert_eq!(
+                package::read(&bytes).unwrap(),
+                package::read(&original).unwrap()
+            );
         }
     }
 
     #[test]
     fn japanese_runs_do_not_request_a_hangul_font() {
-        let bytes = include_bytes!("../../../prototype/preview/baseline/04-docx-untouched-testword-various.docx");
+        let bytes = include_bytes!(
+            "../../../prototype/preview/baseline/04-docx-untouched-testword-various.docx"
+        );
         let requested = requested_fonts(bytes).unwrap().families;
         assert_eq!(requested.get("MS Mincho"), Some(&Script::Cjk));
         assert_eq!(requested.get("Arial"), Some(&Script::Latin));

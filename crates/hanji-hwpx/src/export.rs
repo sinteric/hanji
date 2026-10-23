@@ -39,9 +39,19 @@ pub struct Fmt {
 
 impl Fmt {
     pub fn new(styles: &StyleSet) -> Fmt {
-        let table = StyleTable { default: Some(styles.default_paragraph.clone()), lines: styles.lines() };
-        let values = styles.paragraph.iter().map(|d| (d.name.clone(), table.values(Some(&d.name)))).collect();
-        Fmt { values, default: table.default_values() }
+        let table = StyleTable {
+            default: Some(styles.default_paragraph.clone()),
+            lines: styles.lines(),
+        };
+        let values = styles
+            .paragraph
+            .iter()
+            .map(|d| (d.name.clone(), table.values(Some(&d.name))))
+            .collect();
+        Fmt {
+            values,
+            default: table.default_values(),
+        }
     }
 
     /// The values of paragraph style `style`.
@@ -148,11 +158,17 @@ impl<'a> Exporter<'a> {
     }
 
     fn at(&self, path: &[usize], kind: Kind) -> Vec<&'a Entry> {
-        self.by.get(&(path.to_vec(), kind)).cloned().unwrap_or_default()
+        self.by
+            .get(&(path.to_vec(), kind))
+            .cloned()
+            .unwrap_or_default()
     }
 
     fn keep_entry(&self, id: &str) -> Result<&'a Entry, String> {
-        self.keep.get(id).copied().ok_or_else(|| format!("placeholder {id} has no remainder entry"))
+        self.keep
+            .get(id)
+            .copied()
+            .ok_or_else(|| format!("placeholder {id} has no remainder entry"))
     }
 
     /// A style by its name in the text; a style missing from header.xml is
@@ -161,8 +177,15 @@ impl<'a> Exporter<'a> {
         if let Some(s) = self.header.style_named(name) {
             return Ok(s.clone());
         }
-        let missing = self.styles.paragraph.iter().find(|d| d.name == name).and_then(|d| d.id.parse().ok());
-        missing.map(|id| self.header.style_or_missing(id)).ok_or_else(|| format!("unknown paragraph style {name:?}"))
+        let missing = self
+            .styles
+            .paragraph
+            .iter()
+            .find(|d| d.name == name)
+            .and_then(|d| d.id.parse().ok());
+        missing
+            .map(|id| self.header.style_or_missing(id))
+            .ok_or_else(|| format!("unknown paragraph style {name:?}"))
     }
 
     fn default_style(&self) -> Result<Style, String> {
@@ -172,12 +195,24 @@ impl<'a> Exporter<'a> {
     // ------------------------------------------------------------ body
 
     /// The sections: `(stored section, paragraphs)` in text order.
-    pub fn body(&mut self, blocks: &[Block]) -> Result<Vec<(&'a SectionShell, Vec<Element>)>, String> {
+    pub fn body(
+        &mut self,
+        blocks: &[Block],
+    ) -> Result<Vec<(&'a SectionShell, Vec<Element>)>, String> {
         let shell = self.shell;
-        let first = shell.sections.first().ok_or("the remainder has no section")?;
+        let first = shell
+            .sections
+            .first()
+            .ok_or("the remainder has no section")?;
         let mut out = Out {
-            sections: vec![Section { shell: 0, paras: vec![] }],
-            start: first.start_run.as_deref().map(|r| (fragment(r), first.start_merged)),
+            sections: vec![Section {
+                shell: 0,
+                paras: vec![],
+            }],
+            start: first
+                .start_run
+                .as_deref()
+                .map(|r| (fragment(r), first.start_merged)),
             runs: vec![],
             page_break: false,
         };
@@ -202,8 +237,10 @@ impl<'a> Exporter<'a> {
                 Block::Para(p) => {
                     // A list item keeps the paragraph style the remainder
                     // has, unless the text shows formatting (and its style).
-                    let style = (p.item.is_none() || self.fmt.is_some()).then_some(p.style.as_str());
-                    let pel = self.para(&p.content, style, Some(&p.props), &[bi], Some((bi, blocks)))?;
+                    let style =
+                        (p.item.is_none() || self.fmt.is_some()).then_some(p.style.as_str());
+                    let pel =
+                        self.para(&p.content, style, Some(&p.props), &[bi], Some((bi, blocks)))?;
                     self.emit(&mut out, pel);
                     1
                 }
@@ -240,8 +277,12 @@ impl<'a> Exporter<'a> {
             }
             self.close_section(&mut out)?;
             let last = out.sections.last_mut().unwrap().paras.last_mut().unwrap();
-            let at = last.children.iter().position(|n| matches!(n, Node::El(e) if e.is("hp:linesegarray")));
-            last.children.insert(at.unwrap_or(last.children.len()), node(wrap_run(e)));
+            let at = last
+                .children
+                .iter()
+                .position(|n| matches!(n, Node::El(e) if e.is("hp:linesegarray")));
+            last.children
+                .insert(at.unwrap_or(last.children.len()), node(wrap_run(e)));
         }
         self.close_section(&mut out)?;
         let mut used: Vec<usize> = out.sections.iter().map(|s| s.shell).collect();
@@ -256,23 +297,42 @@ impl<'a> Exporter<'a> {
             return Err("a section starts twice".into());
         }
         for (i, s) in out.sections.iter().enumerate() {
-            if s.paras.first().is_none_or(|p| p.descendants("hp:secPr").is_empty()) {
+            if s.paras
+                .first()
+                .is_none_or(|p| p.descendants("hp:secPr").is_empty())
+            {
                 return Err(format!(
                     "section {} lost its section settings (hp:secPr) with the paragraph that held them",
                     i + 1
                 ));
             }
         }
-        Ok(out.sections.into_iter().map(|s| (&shell.sections[s.shell], s.paras)).collect())
+        Ok(out
+            .sections
+            .into_iter()
+            .map(|s| (&shell.sections[s.shell], s.paras))
+            .collect())
     }
 
     /// Section `m` starts here: the one before it is closed.
     fn start_section(&self, out: &mut Out, m: &Entry) -> Result<(), String> {
-        let k: usize = m.meta.aux[0].parse().map_err(|_| "a section marker without its section")?;
+        let k: usize = m.meta.aux[0]
+            .parse()
+            .map_err(|_| "a section marker without its section")?;
         self.close_section(out)?;
-        let s = self.shell.sections.get(k).ok_or_else(|| format!("section {k} is not in the remainder"))?;
-        out.sections.push(Section { shell: k, paras: vec![] });
-        out.start = s.start_run.as_deref().map(|r| (fragment(r), s.start_merged));
+        let s = self
+            .shell
+            .sections
+            .get(k)
+            .ok_or_else(|| format!("section {k} is not in the remainder"))?;
+        out.sections.push(Section {
+            shell: k,
+            paras: vec![],
+        });
+        out.start = s
+            .start_run
+            .as_deref()
+            .map(|r| (fragment(r), s.start_merged));
         Ok(())
     }
 
@@ -303,9 +363,18 @@ impl<'a> Exporter<'a> {
                 start = None;
             }
         }
-        let lead: Vec<Node> = start.map(|s| s.0).into_iter().chain(out.runs.drain(..)).map(node).collect();
+        let lead: Vec<Node> = start
+            .map(|s| s.0)
+            .into_iter()
+            .chain(out.runs.drain(..))
+            .map(node)
+            .collect();
         if !lead.is_empty() {
-            let at = p.children.iter().position(|n| matches!(n, Node::El(_))).unwrap_or(p.children.len());
+            let at = p
+                .children
+                .iter()
+                .position(|n| matches!(n, Node::El(_)))
+                .unwrap_or(p.children.len());
             p.children.splice(at..at, lead);
         }
         out.sections.last_mut().unwrap().paras.push(p);
@@ -335,12 +404,20 @@ impl<'a> Exporter<'a> {
             Block::Para(p) => p.item,
             _ => None,
         };
-        let lo = (0..=bi).rev().take_while(|&k| item(k).is_some()).last().unwrap_or(bi);
-        let hi = (bi..blocks.len()).take_while(|&k| item(k).is_some()).last().unwrap_or(bi);
+        let lo = (0..=bi)
+            .rev()
+            .take_while(|&k| item(k).is_some())
+            .last()
+            .unwrap_or(bi);
+        let hi = (bi..blocks.len())
+            .take_while(|&k| item(k).is_some())
+            .last()
+            .unwrap_or(bi);
         let level = item(bi).map(|i| i.level);
         let mut near: Vec<usize> = (lo..=hi).filter(|&k| k != bi).collect();
         near.sort_by_key(|&k| (item(k).map(|i| i.level) != level, k.abs_diff(bi), k));
-        near.into_iter().find_map(|k| self.at(&[k], Kind::Ppr).first().copied())
+        near.into_iter()
+            .find_map(|k| self.at(&[k], Kind::Ppr).first().copied())
     }
 
     /// The paragraph shape for a list item whose level the text changed (an
@@ -355,15 +432,27 @@ impl<'a> Exporter<'a> {
             _ => None,
         };
         let it = item(bi)?;
-        let lo = (0..=bi).rev().take_while(|&k| item(k).is_some()).last().unwrap_or(bi);
-        let hi = (bi..blocks.len()).take_while(|&k| item(k).is_some()).last().unwrap_or(bi);
+        let lo = (0..=bi)
+            .rev()
+            .take_while(|&k| item(k).is_some())
+            .last()
+            .unwrap_or(bi);
+        let hi = (bi..blocks.len())
+            .take_while(|&k| item(k).is_some())
+            .last()
+            .unwrap_or(bi);
         let mut near: Vec<usize> = (0..blocks.len())
-            .filter(|&k| k != bi && item(k).is_some_and(|i| i.level == it.level && i.ordered == it.ordered))
+            .filter(|&k| {
+                k != bi && item(k).is_some_and(|i| i.level == it.level && i.ordered == it.ordered)
+            })
             .collect();
         near.sort_by_key(|&k| (!(lo..=hi).contains(&k), k.abs_diff(bi), k));
         near.into_iter().find_map(|k| {
             let e = self.at(&[k], Kind::Ppr).first().copied()?;
-            e.meta.item.is_some_and(|was| was.level == it.level && was.ordered == it.ordered).then_some(e)
+            e.meta
+                .item
+                .is_some_and(|was| was.level == it.level && was.ordered == it.ordered)
+                .then_some(e)
         })
     }
 
@@ -380,15 +469,21 @@ impl<'a> Exporter<'a> {
     ) -> Result<Element, String> {
         let pp = self.at(path, Kind::Ppr).first().copied();
         let template = match (pp, list) {
-            (None, Some((bi, blocks))) if self.lists.contains_key(&bi) => self.list_template(blocks, bi),
+            (None, Some((bi, blocks))) if self.lists.contains_key(&bi) => {
+                self.list_template(blocks, bi)
+            }
             _ => None,
         };
         let default = self.default_style()?;
         let (mut p, old_style, lines, layout) = match pp.or(template) {
             Some(e) => {
                 let p = fragment(&e.xml[0]);
-                let old =
-                    e.meta.style.as_deref().and_then(|s| s.parse().ok()).map(|id| self.header.style_or_missing(id));
+                let old = e
+                    .meta
+                    .style
+                    .as_deref()
+                    .and_then(|s| s.parse().ok())
+                    .map(|id| self.header.style_or_missing(id));
                 let own = pp.is_some();
                 let lines = e.xml.get(1).filter(|_| own).map(|x| fragment(x));
                 let layout = own.then(|| {
@@ -412,8 +507,12 @@ impl<'a> Exporter<'a> {
             p.set("styleIDRef", &now.id.to_string());
             if old_style.as_ref().is_none_or(|s| s.para_pr == ppr) {
                 // A list item restyled keeps its list: the heading its shape had.
-                let is_item = list.is_some_and(|(bi, b)| matches!(&b[bi], Block::Para(x) if x.item.is_some()));
-                let heading = self.header.heading(ppr).filter(|h| is_item && list_num(*h).is_some());
+                let is_item = list
+                    .is_some_and(|(bi, b)| matches!(&b[bi], Block::Para(x) if x.item.is_some()));
+                let heading = self
+                    .header
+                    .heading(ppr)
+                    .filter(|h| is_item && list_num(*h).is_some());
                 ppr = now.para_pr;
                 if heading.is_some() {
                     ppr = self.header.para_pr_with(ppr, heading)?;
@@ -434,11 +533,15 @@ impl<'a> Exporter<'a> {
             let level_ppr = moved.and_then(|t| num_attr(&fragment(&t.xml[0]), "paraPrIDRef"));
             match self.lists.get(&bi) {
                 // A bullet takes the level's shape as it is, bullet and all.
-                Some(ListPlan::Set { .. }) if level_ppr.is_some() && now_item.is_some_and(|i| !i.ordered) => {
+                Some(ListPlan::Set { .. })
+                    if level_ppr.is_some() && now_item.is_some_and(|i| !i.ordered) =>
+                {
                     ppr = level_ppr.unwrap()
                 }
                 Some(ListPlan::Set { num, ilvl }) => {
-                    ppr = self.header.para_pr_with(level_ppr.unwrap_or(ppr), Some(list_heading(*num, *ilvl)))?
+                    ppr = self
+                        .header
+                        .para_pr_with(level_ppr.unwrap_or(ppr), Some(list_heading(*num, *ilvl)))?
                 }
                 Some(ListPlan::Strip) => ppr = self.header.para_pr_with(ppr, None)?,
                 Some(ListPlan::Keep) | None => {}
@@ -505,7 +608,8 @@ impl<'a> Exporter<'a> {
                 }
             }
         }
-        let bounds: std::collections::HashSet<usize> = zruns.iter().map(|z| z.start.unwrap()).collect();
+        let bounds: std::collections::HashSet<usize> =
+            zruns.iter().map(|z| z.start.unwrap()).collect();
         // Text properties as exported (§5.2): a unit the text states none for
         // (a space, an atom) takes what the rest of its run takes when that
         // agrees (it keeps what its run had when the run has nothing else);
@@ -513,14 +617,20 @@ impl<'a> Exporter<'a> {
         let style_values = self.fmt.as_ref().map(|f| f.of(&style.name).clone());
         let text_base = style_values.as_ref().map(|v| v.only(&Key::TEXT));
         let stored = |o: &Entry| -> Props {
-            let Some(b) = &text_base else { return Props::new() };
+            let Some(b) = &text_base else {
+                return Props::new();
+            };
             let cp = self.base_char_pr(&fragment(&o.xml[0]), style, old_style);
             self.header.char_values(cp).only(&Key::TEXT).diff(b)
         };
         let want: Vec<Props> = match &text_base {
             None => vec![Props::new(); n],
             Some(_) => {
-                let takes: Vec<Option<&Props>> = p.units.iter().map(|u| u.takes_props().then_some(&u.props)).collect();
+                let takes: Vec<Option<&Props>> = p
+                    .units
+                    .iter()
+                    .map(|u| u.takes_props().then_some(&u.props))
+                    .collect();
                 let mut mates: HashMap<u64, Option<Option<&Props>>> = HashMap::new();
                 for c in 0..n {
                     if let (Some(pr), Some(o)) = (takes[c], owner[c]) {
@@ -578,9 +688,16 @@ impl<'a> Exporter<'a> {
                 .position(|g| own(g) && g.0 <= s && s <= g.1)
                 .map(Target::Seg)
                 .or_else(|| {
-                    zruns.iter().find(|z| Some(z.id) == m.meta.run && z.start == Some(s)).map(|z| Target::Zrun(z.id))
+                    zruns
+                        .iter()
+                        .find(|z| Some(z.id) == m.meta.run && z.start == Some(s))
+                        .map(|z| Target::Zrun(z.id))
                 })
-                .or_else(|| segs.iter().position(|g| g.0 <= s && s < g.1).map(Target::Seg))
+                .or_else(|| {
+                    segs.iter()
+                        .position(|g| g.0 <= s && s < g.1)
+                        .map(Target::Seg)
+                })
                 .or_else(|| segs.iter().rposition(|g| g.1 == s).map(Target::Seg))
                 .unwrap_or(Target::New(s));
             at.entry(t).or_default().push(m);
@@ -621,13 +738,23 @@ impl<'a> Exporter<'a> {
                     let base = self.base_char_pr(&r, style, old_style);
                     self.set_char_pr(&mut r, base, old_style, style);
                     let ms = at.get(&Target::Zrun(z.id)).unwrap_or(&none);
-                    self.fill_run(&mut r, p, z.start.unwrap(), z.start.unwrap(), ms, None, &mut tabs)?;
+                    self.fill_run(
+                        &mut r,
+                        p,
+                        z.start.unwrap(),
+                        z.start.unwrap(),
+                        ms,
+                        None,
+                        &mut tabs,
+                    )?;
                     out.push(node(r));
                 }
                 It::New(s) => {
                     let ms = &at[&Target::New(s)];
-                    let mut r =
-                        ms.iter().find_map(|m| m.xml.get(1)).map_or_else(|| empty_run(style.char_pr), |x| fragment(x));
+                    let mut r = ms
+                        .iter()
+                        .find_map(|m| m.xml.get(1))
+                        .map_or_else(|| empty_run(style.char_pr), |x| fragment(x));
                     r.children.clear();
                     self.fill_run(&mut r, p, s, s, ms, None, &mut tabs)?;
                     out.push(node(r));
@@ -654,7 +781,9 @@ impl<'a> Exporter<'a> {
                     let mut cp = self.header.char_pr_with(base, marks)?;
                     if let Some(tb) = &text_base {
                         let cur = tb.overlay(&self.header.char_values(cp).only(&Key::TEXT));
-                        cp = self.header.char_pr_set(cp, &tb.overlay(&want[a]).diff(&cur))?;
+                        cp = self
+                            .header
+                            .char_pr_set(cp, &tb.overlay(&want[a]).diff(&cur))?;
                     }
                     unit_cp[a..b].fill(cp);
                     self.set_char_pr(&mut r, cp, old_style, style);
@@ -700,7 +829,10 @@ impl<'a> Exporter<'a> {
     ) -> Result<(), String> {
         let mut by_pos: BTreeMap<usize, Vec<&Entry>> = BTreeMap::new();
         for m in zw {
-            by_pos.entry(m.start.unwrap().clamp(a, b)).or_default().push(m);
+            by_pos
+                .entry(m.start.unwrap().clamp(a, b))
+                .or_default()
+                .push(m);
         }
         let mut t: Option<Element> = None;
         let close = |t: &mut Option<Element>, r: &mut Element| {
@@ -789,8 +921,17 @@ impl<'a> Exporter<'a> {
 
     /// The paragraph holding the table at `bi` and the side-by-side tables
     /// after it that shared its paragraph; how many blocks it took.
-    fn table_group(&mut self, blocks: &[Block], bi: usize, section: usize) -> Result<(Element, usize), String> {
-        let tag = |k: usize, t: &str| self.at(&[k], Kind::Tbl).into_iter().find(|e| e.meta.tag == t);
+    fn table_group(
+        &mut self,
+        blocks: &[Block],
+        bi: usize,
+        section: usize,
+    ) -> Result<(Element, usize), String> {
+        let tag = |k: usize, t: &str| {
+            self.at(&[k], Kind::Tbl)
+                .into_iter()
+                .find(|e| e.meta.tag == t)
+        };
         let (mut anchor, group) = match tag(bi, "hwpx:anchor") {
             Some(a) => (fragment(&a.xml[0]), Some(a.meta.aux[0].clone())),
             None => (self.fresh_anchor(tag(bi, "hwpx:join"))?, None),
@@ -809,7 +950,9 @@ impl<'a> Exporter<'a> {
         }
         let mut tables = vec![];
         for &k in &members {
-            let Block::Table(t) = &blocks[k] else { unreachable!() };
+            let Block::Table(t) = &blocks[k] else {
+                unreachable!()
+            };
             tables.push(self.table(t, k, section)?);
         }
         // Fill the `hp:tbl` slots in order; slots of tables that went are dropped.
@@ -834,11 +977,16 @@ impl<'a> Exporter<'a> {
     /// A paragraph for one table: the shell of its group's paragraph, or a
     /// new one.
     fn fresh_anchor(&self, join: Option<&Entry>) -> Result<Element, String> {
-        let from = join.and_then(|j| self.anchors.get(j.meta.aux[0].as_str())).map(|a| fragment(&a.xml[0]));
+        let from = join
+            .and_then(|j| self.anchors.get(j.meta.aux[0].as_str()))
+            .map(|a| fragment(&a.xml[0]));
         let default = self.default_style()?;
         let (mut p, run) = match from {
             Some(a) => {
-                let run = a.elements().find(|r| r.is("hp:run") && r.child("hp:tbl").is_some()).map(|r| r.shell());
+                let run = a
+                    .elements()
+                    .find(|r| r.is("hp:run") && r.child("hp:tbl").is_some())
+                    .map(|r| r.shell());
                 (a.shell(), run)
             }
             None => (self.new_para(&default), None),
@@ -851,12 +999,20 @@ impl<'a> Exporter<'a> {
     }
 
     /// The table at `bi`, in section `section`.
-    fn table(&mut self, t: &hanji_core::Table, bi: usize, section: usize) -> Result<Element, String> {
+    fn table(
+        &mut self,
+        t: &hanji_core::Table,
+        bi: usize,
+        section: usize,
+    ) -> Result<Element, String> {
         if t.style.is_some() {
             return Err("hwpx has no table styles; remove the {style=…} line".into());
         }
         let (rows_n, cols_n) = (t.rows.len(), t.rows.first().map_or(0, Vec::len));
-        let own = self.at(&[bi], Kind::Tbl).into_iter().find(|e| e.meta.tag.is_empty());
+        let own = self
+            .at(&[bi], Kind::Tbl)
+            .into_iter()
+            .find(|e| e.meta.tag.is_empty());
         // A new table takes the first table's layout, not its caption; in a
         // file with no table, Hancom's default layout across the text width.
         let mut fresh = None;
@@ -871,43 +1027,61 @@ impl<'a> Exporter<'a> {
             }
         };
         if own.is_none() {
-            tbl.children.retain(|n| !matches!(n, Node::El(x) if x.is("hp:caption")));
+            tbl.children
+                .retain(|n| !matches!(n, Node::El(x) if x.is("hp:caption")));
         }
         let (r0, c0) = dims(&tbl);
         tbl.set("rowCnt", &rows_n.to_string());
         tbl.set("colCnt", &cols_n.to_string());
         if own.is_none() || (r0, c0) != (rows_n, cols_n) {
             // Cell zones address the old grid.
-            tbl.children.retain(|n| !matches!(n, Node::El(x) if x.is("hp:cellzoneList")));
+            tbl.children
+                .retain(|n| !matches!(n, Node::El(x) if x.is("hp:cellzoneList")));
         }
         for (ri, row) in t.rows.iter().enumerate() {
-            let mut tr =
-                self.at(&[bi, ri], Kind::Tr).first().map_or_else(|| Element::new("hp:tr"), |e| assemble(&e.xml));
+            let mut tr = self
+                .at(&[bi, ri], Kind::Tr)
+                .first()
+                .map_or_else(|| Element::new("hp:tr"), |e| assemble(&e.xml));
             for (ci, cell) in row.iter().enumerate() {
                 let path = [bi, ri, ci];
                 let ps = match cell {
-                    Cell::Left if ci == 0 => return Err(format!("row {}: || with no cell to its left", ri + 1)),
+                    Cell::Left if ci == 0 => {
+                        return Err(format!("row {}: || with no cell to its left", ri + 1))
+                    }
                     Cell::Text(ps) => ps,
                     _ => {
                         // hwpx has no cell where a merge covers one: what the old cell held would go.
-                        let held = self
-                            .by
-                            .iter()
-                            .any(|((p, _), es)| p.len() >= 3 && p[..3] == path && es.iter().any(|e| !e.is_trivial()));
+                        let held = self.by.iter().any(|((p, _), es)| {
+                            p.len() >= 3 && p[..3] == path && es.iter().any(|e| !e.is_trivial())
+                        });
                         if held {
                             return Err(format!("the cell at row {}, column {} is now covered by a merge, and hwpx keeps no cell there, so its properties and content would be lost; merge cells in Hancom, or write the merged table as a new one", ri + 1, ci + 1));
                         }
                         continue;
                     }
                 };
-                let span = 1 + row[ci + 1..].iter().take_while(|c| **c == Cell::Left).count();
-                let down = 1 + t.rows[ri + 1..].iter().take_while(|r| r.get(ci) == Some(&Cell::Up)).count();
-                let te = self.at(&path, Kind::Tc).first().copied().or_else(|| self.cell_neighbour(t, bi, ri, ci));
+                let span = 1 + row[ci + 1..]
+                    .iter()
+                    .take_while(|c| **c == Cell::Left)
+                    .count();
+                let down = 1 + t.rows[ri + 1..]
+                    .iter()
+                    .take_while(|r| r.get(ci) == Some(&Cell::Up))
+                    .count();
+                let te = self
+                    .at(&path, Kind::Tc)
+                    .first()
+                    .copied()
+                    .or_else(|| self.cell_neighbour(t, bi, ri, ci));
                 let xml = match (te, fresh) {
                     (Some(e), _) => e.xml.clone(),
                     (None, Some((border, col))) => new_cell(border, col * span as u32),
                     (None, None) => {
-                        return Err("this file has no table cell to take a new cell's properties from".into())
+                        return Err(
+                            "this file has no table cell to take a new cell's properties from"
+                                .into(),
+                        )
                     }
                 };
                 let mut tc = fragment(&xml[0]);
@@ -915,7 +1089,12 @@ impl<'a> Exporter<'a> {
                 if self.fmt.is_some() {
                     // The cell's box (§5.2): its border fill and vertical alignment.
                     let full = self.header.cell_box(&tc, &sub);
-                    let want = t.boxes.get(ri).and_then(|r| r.get(ci)).cloned().unwrap_or_default();
+                    let want = t
+                        .boxes
+                        .get(ri)
+                        .and_then(|r| r.get(ci))
+                        .cloned()
+                        .unwrap_or_default();
                     let target = styled::box_default().overlay(&want);
                     let delta = target.diff(&full);
                     if let Some(v) = delta.get(Key::Valign).and_then(Value::choice) {
@@ -931,7 +1110,13 @@ impl<'a> Exporter<'a> {
                 for (k, p) in ps.iter().enumerate() {
                     let style = p.style.as_deref().unwrap_or(&styles.default_paragraph);
                     let props = Some(&p.props);
-                    sub.children.push(node(self.para(&p.content, Some(style), props, &[bi, ri, ci, k], None)?));
+                    sub.children.push(node(self.para(
+                        &p.content,
+                        Some(style),
+                        props,
+                        &[bi, ri, ci, k],
+                        None,
+                    )?));
                 }
                 if !self.at(&[bi, ri, ci, ps.len()], Kind::Bmarker).is_empty() {
                     return Err("a marker between cell paragraphs cannot be written to hwpx".into());
@@ -941,10 +1126,16 @@ impl<'a> Exporter<'a> {
                 // The cell's place, written after its address (which goes first).
                 for (name, attrs, after) in [
                     ("hp:cellAddr", [("colAddr", ci), ("rowAddr", ri)], None),
-                    ("hp:cellSpan", [("colSpan", span), ("rowSpan", down)], Some("hp:cellAddr")),
+                    (
+                        "hp:cellSpan",
+                        [("colSpan", span), ("rowSpan", down)],
+                        Some("hp:cellAddr"),
+                    ),
                 ] {
                     let k = rest.iter().position(|x| x.is(name)).unwrap_or_else(|| {
-                        let at = after.and_then(|a| rest.iter().position(|x| x.is(a))).map_or(0, |k| k + 1);
+                        let at = after
+                            .and_then(|a| rest.iter().position(|x| x.is(a)))
+                            .map_or(0, |k| k + 1);
                         rest.insert(at, Element::new(name));
                         at
                     });
@@ -962,13 +1153,21 @@ impl<'a> Exporter<'a> {
 
     /// Properties for a new cell: the nearest cell above, then to the left,
     /// in the same table, then the file's first cell.
-    fn cell_neighbour(&self, t: &hanji_core::Table, bi: usize, ri: usize, ci: usize) -> Option<&'a Entry> {
+    fn cell_neighbour(
+        &self,
+        t: &hanji_core::Table,
+        bi: usize,
+        ri: usize,
+        ci: usize,
+    ) -> Option<&'a Entry> {
         let find = |r: usize, c: usize| self.at(&[bi, r, c], Kind::Tc).first().copied();
         (0..ri)
             .rev()
             .find_map(|r| find(r, ci))
             .or_else(|| (0..ci).rev().find_map(|c| find(ri, c)))
-            .or_else(|| (0..t.rows.len()).find_map(|r| (0..t.rows[r].len()).find_map(|c| find(r, c))))
+            .or_else(|| {
+                (0..t.rows.len()).find_map(|r| (0..t.rows[r].len()).find_map(|c| find(r, c)))
+            })
             .or(self.cell_template)
     }
 }
@@ -982,13 +1181,22 @@ const OUT_MARGIN: u32 = 283;
 fn text_width(s: &SectionShell) -> u32 {
     let run = s.start_run.as_deref().map(fragment);
     let n = |e: &Element, k: &str| num_attr(e, k).unwrap_or(0);
-    let width = run.as_ref().and_then(|r| r.descendants("hp:pagePr").first().copied()).map_or(0, |p| {
-        // A landscape page (`NARROWLY`) keeps its portrait sizes.
-        let w = if p.get("landscape").as_deref() == Some("NARROWLY") { n(p, "height") } else { n(p, "width") };
-        let m = p.child("hp:margin");
-        w.saturating_sub(m.map_or(0, |m| n(m, "left") + n(m, "right") + n(m, "gutter")))
-    });
-    let cols = run.as_ref().and_then(|r| r.descendants("hp:colPr").first().copied());
+    let width = run
+        .as_ref()
+        .and_then(|r| r.descendants("hp:pagePr").first().copied())
+        .map_or(0, |p| {
+            // A landscape page (`NARROWLY`) keeps its portrait sizes.
+            let w = if p.get("landscape").as_deref() == Some("NARROWLY") {
+                n(p, "height")
+            } else {
+                n(p, "width")
+            };
+            let m = p.child("hp:margin");
+            w.saturating_sub(m.map_or(0, |m| n(m, "left") + n(m, "right") + n(m, "gutter")))
+        });
+    let cols = run
+        .as_ref()
+        .and_then(|r| r.descendants("hp:colPr").first().copied());
     let (count, gap) = cols.map_or((1, 0), |c| (n(c, "colCount").max(1), n(c, "sameGap")));
     let width = width.saturating_sub(gap * (count - 1)) / count;
     if width > 2 * OUT_MARGIN + 1000 {

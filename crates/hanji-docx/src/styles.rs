@@ -16,9 +16,17 @@ pub fn read(data: Option<&[u8]>) -> (StyleSet, Option<String>) {
     let mut tables: HashMap<String, (bool, Option<String>)> = HashMap::new();
     if let Some(root) = data.and_then(|d| xml::parse(d).ok()).map(|d| d.root) {
         for st in root.elements().filter(|e| e.is("w:style")) {
-            let Some(id) = st.get("w:styleId") else { continue };
-            let name = st.child("w:name").and_then(|n| n.get("w:val")).unwrap_or_else(|| id.clone());
-            let default = matches!(st.get("w:default").as_deref(), Some("1") | Some("true") | Some("on"));
+            let Some(id) = st.get("w:styleId") else {
+                continue;
+            };
+            let name = st
+                .child("w:name")
+                .and_then(|n| n.get("w:val"))
+                .unwrap_or_else(|| id.clone());
+            let default = matches!(
+                st.get("w:default").as_deref(),
+                Some("1") | Some("true") | Some("on")
+            );
             match st.get("w:type").as_deref() {
                 Some("paragraph") => {
                     if default && default_p.is_none() {
@@ -50,7 +58,9 @@ pub fn read(data: Option<&[u8]>) -> (StyleSet, Option<String>) {
     let bordered = |id: &str| {
         let mut cur = tables.get(id);
         for _ in 0..16 {
-            let Some((borders, based)) = cur else { return false };
+            let Some((borders, based)) = cur else {
+                return false;
+            };
             if *borders {
                 return true;
             }
@@ -61,12 +71,18 @@ pub fn read(data: Option<&[u8]>) -> (StyleSet, Option<String>) {
     let name = |id: &str| s.table_name(id).map(str::to_string);
     let default_table = match default_t.as_deref() {
         Some(id) if bordered(id) => name(id),
-        d => s.table_id("Table Grid").map(|_| "Table Grid".to_string()).or_else(|| d.and_then(name)),
+        d => s
+            .table_id("Table Grid")
+            .map(|_| "Table Grid".to_string())
+            .or_else(|| d.and_then(name)),
     };
     s.default_table = default_table;
     for p in &s.paragraph {
         let lower = p.name.to_lowercase();
-        if let Some(n) = lower.strip_prefix("heading ").and_then(|d| d.parse::<usize>().ok()) {
+        if let Some(n) = lower
+            .strip_prefix("heading ")
+            .and_then(|d| d.parse::<usize>().ok())
+        {
             if (1..=6).contains(&n) && s.headings[n - 1].is_none() {
                 s.headings[n - 1] = Some(p.name.clone());
             }
@@ -78,5 +94,8 @@ pub fn read(data: Option<&[u8]>) -> (StyleSet, Option<String>) {
 /// A table style whose own table properties draw a border.
 fn draws_borders(st: &Element) -> bool {
     let borders = st.child("w:tblPr").and_then(|p| p.child("w:tblBorders"));
-    borders.is_some_and(|b| b.elements().any(|x| !matches!(x.get("w:val").as_deref(), Some("nil" | "none"))))
+    borders.is_some_and(|b| {
+        b.elements()
+            .any(|x| !matches!(x.get("w:val").as_deref(), Some("nil" | "none")))
+    })
 }

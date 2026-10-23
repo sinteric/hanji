@@ -8,12 +8,17 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let bytes = std::fs::read(&args[0]).unwrap();
     let ops = std::fs::read_to_string(&args[1]).unwrap();
-    let imp = XlsxEngine.import(&bytes, &ImportOptions::default()).unwrap();
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
     match XlsxEngine::apply(&imp.text, &imp.remainder, &ops) {
         Ok(a) => {
             println!("{}", XlsxEngine::view(&a.remainder, 12).unwrap());
             for e in &a.report.entries {
-                println!("entry {} {} {}: {} -> {:?}", e.id, e.tag, e.sheet, e.before, e.after);
+                println!(
+                    "entry {} {} {}: {} -> {:?}",
+                    e.id, e.tag, e.sheet, e.before, e.after
+                );
             }
             for n in &a.report.notices {
                 println!("notice {}: {} ({})", n.kind, n.location, n.detail);

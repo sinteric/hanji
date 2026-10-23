@@ -27,7 +27,8 @@ use hanji_format::{Crop, Geom, Inline, PictureItem};
 use hanji_pptx::import::SlideInfo;
 use hanji_pptx::DeckShell;
 use hanji_testkit::{
-    block_ranges, chars, deleted_span, entries_at, figure_or_word, ident, replace_span, span_of, Cx, Doc, Edit, EditFn,
+    block_ranges, chars, deleted_span, entries_at, figure_or_word, ident, replace_span, span_of,
+    Cx, Doc, Edit, EditFn,
 };
 
 pub const EDITS: [(&str, EditFn); 32] = [
@@ -72,11 +73,16 @@ struct Slide {
 }
 
 fn slides(blocks: &[Block]) -> Vec<Slide> {
-    let heads: Vec<usize> = (0..blocks.len()).filter(|&k| blocks[k].head().is_some_and(|h| h.level == 0)).collect();
+    let heads: Vec<usize> = (0..blocks.len())
+        .filter(|&k| blocks[k].head().is_some_and(|h| h.level == 0))
+        .collect();
     heads
         .iter()
         .enumerate()
-        .map(|(n, &h)| Slide { head: h, end: heads.get(n + 1).copied().unwrap_or(blocks.len()) })
+        .map(|(n, &h)| Slide {
+            head: h,
+            end: heads.get(n + 1).copied().unwrap_or(blocks.len()),
+        })
         .collect()
 }
 
@@ -92,7 +98,10 @@ pub fn slide_at(blocks: &[Block], k: usize) -> (usize, usize, usize, String) {
         match b {
             Block::Head(h) => slot = Some(kind(h)),
             Block::Para(p) => {
-                let t: String = chars(&p.content).into_iter().filter(|c| (*c as u32) < 0xF0000).collect();
+                let t: String = chars(&p.content)
+                    .into_iter()
+                    .filter(|c| (*c as u32) < 0xf0000)
+                    .collect();
                 let t = t.split_whitespace().collect::<Vec<_>>().join(" ");
                 if t.is_empty() {
                     continue;
@@ -109,7 +118,16 @@ pub fn slide_at(blocks: &[Block], k: usize) -> (usize, usize, usize, String) {
     let t = title.or(first).unwrap_or_default();
     let short: String = t.chars().take(30).collect();
     let more = if short.len() < t.len() { "…" } else { "" };
-    (n + 1, ss.len(), s.head, if short.is_empty() { short } else { format!("{short}{more}") })
+    (
+        n + 1,
+        ss.len(),
+        s.head,
+        if short.is_empty() {
+            short
+        } else {
+            format!("{short}{more}")
+        },
+    )
 }
 
 /// How an edit names the slide block `k` is on: `slide 3 of 7 ('지역별 현황')`.
@@ -136,19 +154,37 @@ fn paras_in<'b>(blocks: &'b [Block], pick: &dyn Fn(HeadKind) -> bool) -> Vec<(us
 
 /// A figure or word to change in one of `paras`, preferring one with a run
 /// whose formatting shows (or several runs).
-fn change_in(d: &Doc, cx: &Cx, paras: &[(usize, &Para)], name: &'static str, what: &str) -> Option<Edit> {
+fn change_in(
+    d: &Doc,
+    cx: &Cx,
+    paras: &[(usize, &Para)],
+    name: &'static str,
+    what: &str,
+) -> Option<Edit> {
     let score = |bi: usize| {
         let es = entries_at(d, &[bi]);
-        (es.iter().any(|e| cx.fmt.visible_run(e)), es.iter().filter(|e| e.kind == Kind::Run).count() > 1)
+        (
+            es.iter().any(|e| cx.fmt.visible_run(e)),
+            es.iter().filter(|e| e.kind == Kind::Run).count() > 1,
+        )
     };
-    let mut cands: Vec<(usize, (usize, usize, String))> =
-        paras.iter().filter_map(|(bi, p)| figure_or_word(&chars(&p.content)).map(|f| (*bi, f))).collect();
+    let mut cands: Vec<(usize, (usize, usize, String))> = paras
+        .iter()
+        .filter_map(|(bi, p)| figure_or_word(&chars(&p.content)).map(|f| (*bi, f)))
+        .collect();
     cands.sort_by_key(|(bi, _)| std::cmp::Reverse(score(*bi)));
     let (bi, (s, e, new)) = cands.into_iter().next()?;
     let p = paras.iter().find(|x| x.0 == bi).unwrap().1;
     let old: String = chars(&p.content)[s..e].iter().collect();
-    let mut ed =
-        replace_span(d, &[bi], s, e, &new, name, format!("{what}: {old:?} → {new:?} on {}", slide_name(&d.blocks, bi)));
+    let mut ed = replace_span(
+        d,
+        &[bi],
+        s,
+        e,
+        &new,
+        name,
+        format!("{what}: {old:?} → {new:?} on {}", slide_name(&d.blocks, bi)),
+    );
     ed.named = vec![slide_at(&d.blocks, bi).2];
     Some(ed)
 }
@@ -159,8 +195,12 @@ fn p1_title(d: &Doc, cx: &Cx) -> Option<Edit> {
 }
 
 fn p2_bullet(d: &Doc, cx: &Cx) -> Option<Edit> {
-    let body = |k: HeadKind| matches!(k, HeadKind::Slot { name } if name != "title" && name != "notes");
-    let ps: Vec<(usize, &Para)> = paras_in(&d.blocks, &body).into_iter().filter(|(_, p)| p.item.is_some()).collect();
+    let body =
+        |k: HeadKind| matches!(k, HeadKind::Slot { name } if name != "title" && name != "notes");
+    let ps: Vec<(usize, &Para)> = paras_in(&d.blocks, &body)
+        .into_iter()
+        .filter(|(_, p)| p.item.is_some())
+        .collect();
     change_in(d, cx, &ps, "P2 edit a body bullet", "bullet")
 }
 
@@ -169,7 +209,11 @@ fn shell(cx: &Cx) -> DeckShell {
 }
 
 fn item(first: bool, level: usize) -> Option<ListItem> {
-    Some(ListItem { ordered: false, level, first })
+    Some(ListItem {
+        ordered: false,
+        level,
+        first,
+    })
 }
 
 fn para(text: &str, item: Option<ListItem>) -> Block {
@@ -208,7 +252,11 @@ fn p3_add_slide(d: &Doc, cx: &Cx) -> Option<Edit> {
         }
         b
     };
-    blocks.extend([slide_head(&layout.name), slot("title"), styled(para("새 슬라이드 제목", None), &text("title", 0))]);
+    blocks.extend([
+        slide_head(&layout.name),
+        slot("title"),
+        styled(para("새 슬라이드 제목", None), &text("title", 0)),
+    ]);
     if has(&layout, "body") {
         blocks.extend([
             slot("body"),
@@ -220,7 +268,10 @@ fn p3_add_slide(d: &Doc, cx: &Cx) -> Option<Edit> {
     let count = slides(&d.blocks).len() + 1;
     let mut ed = Edit::blocks(
         "P3 add a slide from a layout",
-        format!("add slide {count} of {count} ('새 슬라이드 제목') from layout {:?}, at the end", layout.name),
+        format!(
+            "add slide {count} of {count} ('새 슬라이드 제목') from layout {:?}, at the end",
+            layout.name
+        ),
         blocks,
         ident(n),
         HashSet::new(),
@@ -233,30 +284,48 @@ fn p3_add_slide(d: &Doc, cx: &Cx) -> Option<Edit> {
 
 /// Whether a slide can go: nothing else links to it or shows it.
 fn deletable(cx: &Cx, d: &Doc, s: &Slide) -> bool {
-    let Some(e) = d.entries.iter().find(|e| e.kind == Kind::Slide && e.meta.tag == "slide" && e.path == [s.head])
+    let Some(e) = d
+        .entries
+        .iter()
+        .find(|e| e.kind == Kind::Slide && e.meta.tag == "slide" && e.path == [s.head])
     else {
         return false;
     };
     let info: SlideInfo = serde_json::from_str(&e.meta.aux[0]).unwrap();
     let parts = &cx.rem.parts;
-    let linked = parts.iter().filter(|p| p.name.ends_with(".rels") && p.name.starts_with("ppt/slides/")).any(|p| {
-        let src = hanji_package::opc::source_of_rels(&p.name).unwrap();
-        src != info.part
-            && hanji_package::opc::parse_rels(&p.data)
-                .iter()
-                .any(|r| !r.external && hanji_package::opc::resolve_target(&src, &r.target) == info.part)
-    });
+    let linked = parts
+        .iter()
+        .filter(|p| p.name.ends_with(".rels") && p.name.starts_with("ppt/slides/"))
+        .any(|p| {
+            let src = hanji_package::opc::source_of_rels(&p.name).unwrap();
+            src != info.part
+                && hanji_package::opc::parse_rels(&p.data).iter().any(|r| {
+                    !r.external && hanji_package::opc::resolve_target(&src, &r.target) == info.part
+                })
+        });
     let sh = shell(cx);
-    let rid = hanji_pptx::xml::fragment(&info.sld_id).get("r:id").unwrap_or_default();
-    !linked && !sh.pres.contains(&format!("r:id=\"{rid}\"/></p:custShow")) && !sh.pres.contains("custShowLst")
+    let rid = hanji_pptx::xml::fragment(&info.sld_id)
+        .get("r:id")
+        .unwrap_or_default();
+    !linked
+        && !sh.pres.contains(&format!("r:id=\"{rid}\"/></p:custShow"))
+        && !sh.pres.contains("custShowLst")
 }
 
 /// The slide with the most entries (after the first) goes.
 fn p4_delete_slide(d: &Doc, cx: &Cx) -> Option<Edit> {
     let ss = slides(&d.blocks);
-    let count =
-        |s: &Slide| d.entries.iter().filter(|e| e.path.first().is_some_and(|&p| p >= s.head && p < s.end)).count();
-    let s = ss.iter().skip(1).filter(|s| deletable(cx, d, s)).max_by_key(|s| (count(s), std::cmp::Reverse(s.head)))?;
+    let count = |s: &Slide| {
+        d.entries
+            .iter()
+            .filter(|e| e.path.first().is_some_and(|&p| p >= s.head && p < s.end))
+            .count()
+    };
+    let s = ss
+        .iter()
+        .skip(1)
+        .filter(|s| deletable(cx, d, s))
+        .max_by_key(|s| (count(s), std::cmp::Reverse(s.head)))?;
     let (a, b) = (s.head, s.end);
     let mut blocks = d.blocks.clone();
     blocks.drain(a..b);
@@ -291,7 +360,10 @@ fn same_section(cx: &Cx, d: &Doc, a: &Slide, b: &Slide) -> bool {
         return true;
     }
     let id = |s: &Slide| {
-        let e = d.entries.iter().find(|e| e.kind == Kind::Slide && e.meta.tag == "slide" && e.path == [s.head])?;
+        let e = d
+            .entries
+            .iter()
+            .find(|e| e.kind == Kind::Slide && e.meta.tag == "slide" && e.path == [s.head])?;
         let info: SlideInfo = serde_json::from_str(&e.meta.aux[0]).ok()?;
         hanji_pptx::xml::fragment(&info.sld_id).get("id")
     };
@@ -309,7 +381,9 @@ fn same_section(cx: &Cx, d: &Doc, a: &Slide, b: &Slide) -> bool {
         }
     });
     let (ia, ib) = (id(a), id(b));
-    sections.iter().any(|s| ia.as_ref().is_some_and(|x| s.contains(x)) && ib.as_ref().is_some_and(|x| s.contains(x)))
+    sections.iter().any(|s| {
+        ia.as_ref().is_some_and(|x| s.contains(x)) && ib.as_ref().is_some_and(|x| s.contains(x))
+    })
 }
 
 /// The last slide moves before the one before it (two slides of one
@@ -317,17 +391,33 @@ fn same_section(cx: &Cx, d: &Doc, a: &Slide, b: &Slide) -> bool {
 fn p5_move_slide(d: &Doc, cx: &Cx) -> Option<Edit> {
     let ss = slides(&d.blocks);
     let differ = |a: &Slide, b: &Slide| d.blocks[a.head..a.end] != d.blocks[b.head..b.end];
-    let k = (1..ss.len()).rev().find(|&k| differ(&ss[k - 1], &ss[k]) && same_section(cx, d, &ss[k - 1], &ss[k]))?;
+    let k = (1..ss.len())
+        .rev()
+        .find(|&k| differ(&ss[k - 1], &ss[k]) && same_section(cx, d, &ss[k - 1], &ss[k]))?;
     let (x, y) = (&ss[k - 1], &ss[k]);
-    let order: Vec<usize> =
-        (0..x.head).chain(y.head..y.end).chain(x.head..x.end).chain(y.end..d.blocks.len()).collect();
+    let order: Vec<usize> = (0..x.head)
+        .chain(y.head..y.end)
+        .chain(x.head..x.end)
+        .chain(y.end..d.blocks.len())
+        .collect();
     let blocks = order.iter().map(|&o| d.blocks[o].clone()).collect();
     let mut bmap = vec![None; d.blocks.len()];
     for (n, &o) in order.iter().enumerate() {
         bmap[o] = Some(n);
     }
-    let what = format!("move {} before {}", slide_name(&d.blocks, y.head), slide_name(&d.blocks, x.head));
-    let mut ed = Edit::blocks("P5 move a slide", what, blocks, bmap, (x.head..y.end).collect(), false);
+    let what = format!(
+        "move {} before {}",
+        slide_name(&d.blocks, y.head),
+        slide_name(&d.blocks, x.head)
+    );
+    let mut ed = Edit::blocks(
+        "P5 move a slide",
+        what,
+        blocks,
+        bmap,
+        (x.head..y.end).collect(),
+        false,
+    );
     ed.named = vec![y.head, x.head];
     Some(ed)
 }
@@ -340,11 +430,22 @@ fn p6_notes(d: &Doc, cx: &Cx) -> Option<Edit> {
     }
     shell(cx).deck.notes.as_ref()?;
     let ss = slides(&d.blocks);
-    let s = ss.iter().find(|s| !(s.head..s.end).any(|k| d.blocks[k].head().is_some_and(|h| h.key == "slot:notes")))?;
+    let s = ss.iter().find(|s| {
+        !(s.head..s.end).any(|k| d.blocks[k].head().is_some_and(|h| h.key == "slot:notes"))
+    })?;
     let mut blocks = d.blocks.clone();
-    blocks.splice(s.end..s.end, [slot_head("notes", None), para("발표자 메모 12", None)]);
-    let bmap = (0..d.blocks.len()).map(|k| Some(if k < s.end { k } else { k + 2 })).collect();
-    let touched = if s.end < d.blocks.len() { HashSet::from([s.end]) } else { HashSet::new() };
+    blocks.splice(
+        s.end..s.end,
+        [slot_head("notes", None), para("발표자 메모 12", None)],
+    );
+    let bmap = (0..d.blocks.len())
+        .map(|k| Some(if k < s.end { k } else { k + 2 }))
+        .collect();
+    let touched = if s.end < d.blocks.len() {
+        HashSet::from([s.end])
+    } else {
+        HashSet::new()
+    };
     let what = format!("notes for {}", slide_name(&d.blocks, s.head));
     let mut ed = Edit::blocks("P6 add notes", what, blocks, bmap, touched, true);
     let m = block_ranges(cx, d);
@@ -362,7 +463,9 @@ fn p7_shape(d: &Doc, cx: &Cx) -> Option<Edit> {
 fn p8_layout(d: &Doc, cx: &Cx) -> Option<Edit> {
     let sh = shell(cx);
     for s in slides(&d.blocks) {
-        let Some(HeadKind::Slide { layout }) = d.blocks[s.head].head().map(kind) else { continue };
+        let Some(HeadKind::Slide { layout }) = d.blocks[s.head].head().map(kind) else {
+            continue;
+        };
         let used: Vec<&str> = (s.head + 1..s.end)
             .filter_map(|k| match d.blocks[k].head().map(kind) {
                 Some(HeadKind::Slot { name }) => Some(name),
@@ -375,17 +478,25 @@ fn p8_layout(d: &Doc, cx: &Cx) -> Option<Edit> {
         }
         let cur = sh.deck.layout(layout)?;
         let slot = |l: &hanji_pptx::deck::LayoutInfo, n: &str| l.slot(n).cloned();
-        let fits = |l: &&hanji_pptx::deck::LayoutInfo| l.name != layout && used.iter().all(|u| slot(l, u).is_some());
+        let fits = |l: &&hanji_pptx::deck::LayoutInfo| {
+            l.name != layout && used.iter().all(|u| slot(l, u).is_some())
+        };
         // Prefer a layout whose slots give the text the same bullets, then the fewest slots.
         let same_bullets = |l: &hanji_pptx::deck::LayoutInfo| {
-            used.iter().all(|u| slot(l, u).map(|s| s.bullets) == slot(cur, u).map(|s| s.bullets))
+            used.iter()
+                .all(|u| slot(l, u).map(|s| s.bullets) == slot(cur, u).map(|s| s.bullets))
         };
-        let mut cands: Vec<&hanji_pptx::deck::LayoutInfo> = sh.deck.layouts.iter().filter(fits).collect();
+        let mut cands: Vec<&hanji_pptx::deck::LayoutInfo> =
+            sh.deck.layouts.iter().filter(fits).collect();
         cands.sort_by_key(|l| (!same_bullets(l), l.slots.len()));
         let Some(to) = cands.first() else { continue };
         let mut blocks = d.blocks.clone();
         blocks[s.head] = slide_head(&to.name);
-        let what = format!("{}: layout {layout:?} → {:?}", slide_name(&d.blocks, s.head), to.name);
+        let what = format!(
+            "{}: layout {layout:?} → {:?}",
+            slide_name(&d.blocks, s.head),
+            to.name
+        );
         let mut ed = Edit::blocks(
             "P8 restyle a slide's layout",
             what,
@@ -406,10 +517,14 @@ fn p8_layout(d: &Doc, cx: &Cx) -> Option<Edit> {
 fn objects(d: &Doc) -> Vec<(usize, usize, &str, usize)> {
     let mut out = vec![];
     for sl in slides(&d.blocks) {
-        let skel = d.entries.iter().find(|e| e.kind == Kind::Slide && e.meta.tag == "slide" && e.path == [sl.head]);
+        let skel = d
+            .entries
+            .iter()
+            .find(|e| e.kind == Kind::Slide && e.meta.tag == "slide" && e.path == [sl.head]);
         let timing = skel.map_or(String::new(), |e| {
             let x = &e.xml[0];
-            x.find("<p:timing").map_or(String::new(), |k| x[k..].to_string())
+            x.find("<p:timing")
+                .map_or(String::new(), |k| x[k..].to_string())
         });
         for k in sl.head..sl.end {
             if let Some(HeadKind::Picture { id, .. }) = d.blocks[k].head().map(kind) {
@@ -419,22 +534,38 @@ fn objects(d: &Doc) -> Vec<(usize, usize, &str, usize)> {
                 }
                 continue;
             }
-            if !d.blocks[k].head().is_some_and(|h| kind(h) == HeadKind::Object) {
+            if !d.blocks[k]
+                .head()
+                .is_some_and(|h| kind(h) == HeadKind::Object)
+            {
                 continue;
             }
-            let Some(Block::Keep(id)) = d.blocks.get(k + 1) else { continue };
-            let Some(e) = d.entries.iter().find(|e| e.meta.keep.as_ref().is_some_and(|x| &x.id == id)) else {
+            let Some(Block::Keep(id)) = d.blocks.get(k + 1) else {
+                continue;
+            };
+            let Some(e) = d
+                .entries
+                .iter()
+                .find(|e| e.meta.keep.as_ref().is_some_and(|x| &x.id == id))
+            else {
                 continue;
             };
             let el = hanji_pptx::xml::fragment(&e.xml[0]);
             let mut animated = false;
             el.walk(&mut |x| {
                 if x.is("p:cNvPr") {
-                    animated |= x.get("id").is_some_and(|i| timing.contains(&format!("spid=\"{i}\"")));
+                    animated |= x
+                        .get("id")
+                        .is_some_and(|i| timing.contains(&format!("spid=\"{i}\"")));
                 }
             });
             if !animated {
-                out.push((k, sl.head, e.meta.keep.as_ref().map_or("object", |x| x.kind.as_str()), 2));
+                out.push((
+                    k,
+                    sl.head,
+                    e.meta.keep.as_ref().map_or("object", |x| x.kind.as_str()),
+                    2,
+                ));
             }
         }
     }
@@ -476,10 +607,16 @@ fn p10_delete_object(d: &Doc, cx: &Cx) -> Option<Edit> {
 /// The first object with an item before it on its slide moves before that item.
 fn p11_move_object(d: &Doc, _cx: &Cx) -> Option<Edit> {
     let (a, slide, obj, n, prev) = objects(d).into_iter().find_map(|(a, slide, obj, n)| {
-        let prev = (slide + 1..a).rev().find(|&k| d.blocks[k].head().is_some_and(|h| h.level == 1))?;
+        let prev = (slide + 1..a)
+            .rev()
+            .find(|&k| d.blocks[k].head().is_some_and(|h| h.level == 1))?;
         Some((a, slide, obj, n, prev))
     })?;
-    let order: Vec<usize> = (0..prev).chain(a..a + n).chain(prev..a).chain(a + n..d.blocks.len()).collect();
+    let order: Vec<usize> = (0..prev)
+        .chain(a..a + n)
+        .chain(prev..a)
+        .chain(a + n..d.blocks.len())
+        .collect();
     let blocks = order.iter().map(|&o| d.blocks[o].clone()).collect();
     let mut bmap = vec![None; d.blocks.len()];
     for (n, &o) in order.iter().enumerate() {
@@ -490,8 +627,18 @@ fn p11_move_object(d: &Doc, _cx: &Cx) -> Option<Edit> {
         Some(HeadKind::Shape { name, .. }) => format!("shape '{name}'"),
         _ => "the object before it".into(),
     };
-    let what = format!("move the {obj} on {} behind {behind} (before it in the z-order)", slide_name(&d.blocks, a));
-    let mut ed = Edit::blocks("P11 move an object", what, blocks, bmap, (prev..a + n).collect(), false);
+    let what = format!(
+        "move the {obj} on {} behind {behind} (before it in the z-order)",
+        slide_name(&d.blocks, a)
+    );
+    let mut ed = Edit::blocks(
+        "P11 move an object",
+        what,
+        blocks,
+        bmap,
+        (prev..a + n).collect(),
+        false,
+    );
     ed.named = vec![slide];
     Some(ed)
 }
@@ -514,8 +661,14 @@ fn slide_size(cx: &Cx) -> (i64, i64) {
 /// Whether a connector of the slide at `slide` is attached to shape `id`
 /// (moving it alone is refused, §5.3).
 fn attached(d: &Doc, slide: usize, id: u32) -> bool {
-    let end = slides(&d.blocks).into_iter().find(|s| s.head == slide).map_or(slide + 1, |s| s.end);
-    let pats = [format!("<a:stCxn id=\"{id}\""), format!("<a:endCxn id=\"{id}\"")];
+    let end = slides(&d.blocks)
+        .into_iter()
+        .find(|s| s.head == slide)
+        .map_or(slide + 1, |s| s.end);
+    let pats = [
+        format!("<a:stCxn id=\"{id}\""),
+        format!("<a:endCxn id=\"{id}\""),
+    ];
     d.entries
         .iter()
         .filter(|e| e.path.first().is_some_and(|&k| (slide..end).contains(&k)))
@@ -525,10 +678,17 @@ fn attached(d: &Doc, slide: usize, id: u32) -> bool {
 /// The shape id of a shape head (`s7` → 7) or of an object head's placeholder.
 fn shape_id_of(d: &Doc, k: usize) -> Option<u32> {
     match d.blocks[k].head().map(kind)? {
-        HeadKind::Shape { id, .. } | HeadKind::Picture { id, .. } => id.strip_prefix('s')?.parse().ok(),
+        HeadKind::Shape { id, .. } | HeadKind::Picture { id, .. } => {
+            id.strip_prefix('s')?.parse().ok()
+        }
         HeadKind::Object => {
-            let Some(Block::Keep(kid)) = d.blocks.get(k + 1) else { return None };
-            let e = d.entries.iter().find(|e| e.meta.keep.as_ref().is_some_and(|x| &x.id == kid))?;
+            let Some(Block::Keep(kid)) = d.blocks.get(k + 1) else {
+                return None;
+            };
+            let e = d
+                .entries
+                .iter()
+                .find(|e| e.meta.keep.as_ref().is_some_and(|x| &x.id == kid))?;
             let x = &e.xml[0];
             let at = x.find("<p:cNvPr id=\"")? + 13;
             x[at..].split('"').next()?.parse().ok()
@@ -542,8 +702,12 @@ fn movable(d: &Doc, pick: &dyn Fn(&Doc, usize) -> bool) -> Vec<(usize, usize, Ge
     let mut out = vec![];
     for sl in slides(&d.blocks) {
         for k in sl.head + 1..sl.end {
-            let Some(h) = d.blocks[k].head() else { continue };
-            let (Some(g), Some(id)) = (geom_of(h), shape_id_of(d, k)) else { continue };
+            let Some(h) = d.blocks[k].head() else {
+                continue;
+            };
+            let (Some(g), Some(id)) = (geom_of(h), shape_id_of(d, k)) else {
+                continue;
+            };
             if g.rot == 0 && !g.flip_h && !g.flip_v && pick(d, k) && !attached(d, sl.head, id) {
                 out.push((k, sl.head, g));
             }
@@ -585,7 +749,13 @@ fn label(d: &Doc, k: usize) -> String {
     }
 }
 
-fn geometry_edit(name: &'static str, what: String, blocks: Vec<Block>, k: usize, slide: usize) -> Edit {
+fn geometry_edit(
+    name: &'static str,
+    what: String,
+    blocks: Vec<Block>,
+    k: usize,
+    slide: usize,
+) -> Edit {
     let n = blocks.len();
     let mut ed = Edit::blocks(name, what, blocks, ident(n), HashSet::from([k]), true);
     ed.named = vec![slide];
@@ -595,33 +765,52 @@ fn geometry_edit(name: &'static str, what: String, blocks: Vec<Block>, k: usize,
 /// The first shape with a box moves half an inch (36 pt): right, else left,
 /// down or up, the first way that keeps it on the slide.
 fn p12_move_shape(d: &Doc, cx: &Cx) -> Option<Edit> {
-    let is_shape = |d: &Doc, k: usize| matches!(d.blocks[k].head().map(kind), Some(HeadKind::Shape { .. }));
+    let is_shape =
+        |d: &Doc, k: usize| matches!(d.blocks[k].head().map(kind), Some(HeadKind::Shape { .. }));
     let (w, h) = slide_size(cx);
     let step = 36 * PT;
-    let (k, slide, g, to) = movable(d, &is_shape).into_iter().find_map(|(k, slide, g)| {
-        let s = g.shown();
-        let to = [
-            (g.x + g.w + step <= w).then(|| Geom { x: s.x + step, ..s }),
-            (g.x >= step).then(|| Geom { x: s.x - step, ..s }),
-            (g.y + g.h + step <= h).then(|| Geom { y: s.y + step, ..s }),
-            (g.y >= step).then(|| Geom { y: s.y - step, ..s }),
-        ]
+    let (k, slide, g, to) = movable(d, &is_shape)
         .into_iter()
-        .flatten()
-        .next()?;
-        Some((k, slide, g, to))
-    })?;
-    let what = format!("move {} from box {} to {} on {}", label(d, k), pts(&g), pts(&to), slide_name(&d.blocks, k));
-    Some(geometry_edit("P12 move a shape", what, moved(d, k, to), k, slide))
+        .find_map(|(k, slide, g)| {
+            let s = g.shown();
+            let to = [
+                (g.x + g.w + step <= w).then(|| Geom { x: s.x + step, ..s }),
+                (g.x >= step).then(|| Geom { x: s.x - step, ..s }),
+                (g.y + g.h + step <= h).then(|| Geom { y: s.y + step, ..s }),
+                (g.y >= step).then(|| Geom { y: s.y - step, ..s }),
+            ]
+            .into_iter()
+            .flatten()
+            .next()?;
+            Some((k, slide, g, to))
+        })?;
+    let what = format!(
+        "move {} from box {} to {} on {}",
+        label(d, k),
+        pts(&g),
+        pts(&to),
+        slide_name(&d.blocks, k)
+    );
+    Some(geometry_edit(
+        "P12 move a shape",
+        what,
+        moved(d, k, to),
+        k,
+        slide,
+    ))
 }
 
 /// Whether head `k` is an object stored in `mc:AlternateContent`, which
 /// the write refuses to move or resize (DESIGN.md §5.3).
 fn alternate_content(d: &Doc, k: usize) -> bool {
-    let Some(Block::Keep(kid)) = d.blocks.get(k + 1) else { return false };
+    let Some(Block::Keep(kid)) = d.blocks.get(k + 1) else {
+        return false;
+    };
     d.entries.iter().any(|e| {
         e.meta.keep.as_ref().is_some_and(|x| &x.id == kid)
-            && e.xml.first().is_some_and(|x| x.starts_with("<mc:AlternateContent"))
+            && e.xml
+                .first()
+                .is_some_and(|x| x.starts_with("<mc:AlternateContent"))
     })
 }
 
@@ -632,14 +821,34 @@ fn p13_resize_picture(d: &Doc, cx: &Cx) -> Option<Edit> {
     let (k, slide, g) = movable(d, &picture).into_iter().next()?;
     let (w, h) = slide_size(cx);
     let s = |v: i64, num: i64, den: i64| hanji_format::shown_pt(v * num / den) * PT;
-    let big = Geom { w: s(g.w, 3, 2), h: s(g.h, 3, 2), ..g.shown() };
+    let big = Geom {
+        w: s(g.w, 3, 2),
+        h: s(g.h, 3, 2),
+        ..g.shown()
+    };
     let to = if big.x + big.w <= w && big.y + big.h <= h {
         big
     } else {
-        Geom { w: s(g.w, 2, 3), h: s(g.h, 2, 3), ..g.shown() }
+        Geom {
+            w: s(g.w, 2, 3),
+            h: s(g.h, 2, 3),
+            ..g.shown()
+        }
     };
-    let what = format!("resize {} from box {} to {} on {}", label(d, k), pts(&g), pts(&to), slide_name(&d.blocks, k));
-    Some(geometry_edit("P13 resize a picture", what, moved(d, k, to), k, slide))
+    let what = format!(
+        "resize {} from box {} to {} on {}",
+        label(d, k),
+        pts(&g),
+        pts(&to),
+        slide_name(&d.blocks, k)
+    );
+    Some(geometry_edit(
+        "P13 resize a picture",
+        what,
+        moved(d, k, to),
+        k,
+        slide,
+    ))
 }
 
 /// A text box right under the first title with a box, as wide as it, 28 pt tall.
@@ -647,28 +856,55 @@ fn p14_add_text_box(d: &Doc, cx: &Cx) -> Option<Edit> {
     let (_, h) = slide_size(cx);
     let ss = slides(&d.blocks);
     for sl in &ss {
-        let Some(t) = (sl.head + 1..sl.end).find(|&k| d.blocks[k].head().is_some_and(|h| h.key == "slot:title")) else {
+        let Some(t) = (sl.head + 1..sl.end)
+            .find(|&k| d.blocks[k].head().is_some_and(|h| h.key == "slot:title"))
+        else {
             continue;
         };
-        let Some(g) = d.blocks[t].head().and_then(geom_of) else { continue };
+        let Some(g) = d.blocks[t].head().and_then(geom_of) else {
+            continue;
+        };
         let top = g.y + g.h + 6 * PT;
         if top + 28 * PT > h {
             continue;
         }
-        let at = (t + 1..sl.end).find(|&k| d.blocks[k].head().is_some()).unwrap_or(sl.end);
-        let bx = Geom { x: g.x, y: top, w: g.w, h: 28 * PT, ..Default::default() }.shown();
-        let Some(HeadKind::Slide { layout }) = d.blocks[sl.head].head().map(kind) else { continue };
+        let at = (t + 1..sl.end)
+            .find(|&k| d.blocks[k].head().is_some())
+            .unwrap_or(sl.end);
+        let bx = Geom {
+            x: g.x,
+            y: top,
+            w: g.w,
+            h: 28 * PT,
+            ..Default::default()
+        }
+        .shown();
+        let Some(HeadKind::Slide { layout }) = d.blocks[sl.head].head().map(kind) else {
+            continue;
+        };
         let sh = shell(cx);
         let under = &sh.deck.layout(layout)?.other_text[0];
         let mut blocks = d.blocks.clone();
-        blocks.splice(at..at, [shape_head("", "", Some(bx)), styled(para("출처: 편집 12", None), under)]);
-        let bmap = (0..d.blocks.len()).map(|k| Some(if k < at { k } else { k + 2 })).collect();
+        blocks.splice(
+            at..at,
+            [
+                shape_head("", "", Some(bx)),
+                styled(para("출처: 편집 12", None), under),
+            ],
+        );
+        let bmap = (0..d.blocks.len())
+            .map(|k| Some(if k < at { k } else { k + 2 }))
+            .collect();
         let what = format!(
             "add a text box '출처: 편집 12' at box {} under the title of {}",
             pts(&bx),
             slide_name(&d.blocks, t)
         );
-        let touched = if at < d.blocks.len() { HashSet::from([at]) } else { HashSet::new() };
+        let touched = if at < d.blocks.len() {
+            HashSet::from([at])
+        } else {
+            HashSet::new()
+        };
         let mut ed = Edit::blocks("P14 add a text box", what, blocks, bmap, touched, true);
         let m = block_ranges(cx, d);
         ed.span = span_of(cx, d, &ed.blocks, m[at - 1].1, m[at - 1].1);
@@ -683,10 +919,17 @@ fn p15_align(d: &Doc, _: &Cx) -> Option<Edit> {
     let any = |_: &Doc, _: usize| true;
     let all = movable(d, &any);
     for (n, &(a, slide, ga)) in all.iter().enumerate() {
-        let Some(&(b, _, gb)) = all[n + 1..].iter().find(|x| x.1 == slide && x.2.shown().x != ga.shown().x) else {
+        let Some(&(b, _, gb)) = all[n + 1..]
+            .iter()
+            .find(|x| x.1 == slide && x.2.shown().x != ga.shown().x)
+        else {
             continue;
         };
-        let to = Geom { x: ga.x, ..gb.shown() }.shown();
+        let to = Geom {
+            x: ga.x,
+            ..gb.shown()
+        }
+        .shown();
         let what = format!(
             "align the left edge of {} (box {}) with {} (x {}) on {}",
             label(d, b),
@@ -695,7 +938,13 @@ fn p15_align(d: &Doc, _: &Cx) -> Option<Edit> {
             hanji_format::pres::pt(ga.x),
             slide_name(&d.blocks, b)
         );
-        return Some(geometry_edit("P15 align two objects", what, moved(d, b, to), b, slide));
+        return Some(geometry_edit(
+            "P15 align two objects",
+            what,
+            moved(d, b, to),
+            b,
+            slide,
+        ));
     }
     None
 }
@@ -731,7 +980,9 @@ fn format_shape(
 ) -> Option<Edit> {
     let mut blocks = d.blocks.clone();
     for &bi in paras {
-        let Block::Para(p) = &mut blocks[bi] else { continue };
+        let Block::Para(p) = &mut blocks[bi] else {
+            continue;
+        };
         let mut st = inline_style::unit_styles(&p.content);
         f(bi, &p.content, &mut st);
         inline_style::set_unit_styles(&mut p.content, &st);
@@ -740,7 +991,14 @@ fn format_shape(
         return None;
     }
     // The exact edit is the smallest differing span of the text.
-    let mut ed = Edit::blocks(name, what, blocks, ident(d.blocks.len()), paras.iter().copied().collect(), true);
+    let mut ed = Edit::blocks(
+        name,
+        what,
+        blocks,
+        ident(d.blocks.len()),
+        paras.iter().copied().collect(),
+        true,
+    );
     ed.named = vec![slide_at(&d.blocks, head).2];
     Some(ed)
 }
@@ -749,16 +1007,23 @@ fn format_shape(
 fn p18_format_word(d: &Doc, _: &Cx) -> Option<Edit> {
     for (head, paras) in text_shapes(d) {
         for &bi in &paras {
-            let Block::Para(p) = &d.blocks[bi] else { continue };
+            let Block::Para(p) = &d.blocks[bi] else {
+                continue;
+            };
             let cs = chars(&p.content);
             let words = hanji_testkit::runs_of(&cs, |c| c.is_alphanumeric(), 2);
             // A word beside other text, so the rest keeps what it shows.
-            let Some(&(s, e)) = words.iter().find(|&&(s, e)| e - s < cs.iter().filter(|c| !c.is_whitespace()).count())
+            let Some(&(s, e)) = words
+                .iter()
+                .find(|&&(s, e)| e - s < cs.iter().filter(|c| !c.is_whitespace()).count())
             else {
                 continue;
             };
             let word: String = cs[s..e].iter().collect();
-            let what = format!("shape text: {word:?} → 24 pt, #FF7F50 on {}", slide_name(&d.blocks, bi));
+            let what = format!(
+                "shape text: {word:?} → 24 pt, #FF7F50 on {}",
+                slide_name(&d.blocks, bi)
+            );
             let f = |b: usize, _: &Inline, st: &mut [TextStyle]| {
                 if b == bi {
                     for x in &mut st[s..e] {
@@ -767,7 +1032,14 @@ fn p18_format_word(d: &Doc, _: &Cx) -> Option<Edit> {
                     }
                 }
             };
-            return format_shape(d, head, &paras, "P18 format a word of a shape's text", what, &f);
+            return format_shape(
+                d,
+                head,
+                &paras,
+                "P18 format a word of a shape's text",
+                what,
+                &f,
+            );
         }
     }
     None
@@ -816,15 +1088,40 @@ fn with_picture(d: &Doc, k: usize, p: PictureItem) -> Vec<Block> {
 /// and right and a twentieth at the top and bottom.
 fn p16_crop_picture(d: &Doc, _: &Cx) -> Option<Edit> {
     let (k, slide, p) = pictures(d).into_iter().find(|x| x.2.crop.is_none())?;
-    let crop = Crop { l: 10_000, t: 5_000, r: 10_000, b: 5_000 };
-    let what =
-        format!("crop the picture {:?} ({}) to crop=\"10 5 10 5\" on {}", p.name, p.src, slide_name(&d.blocks, k));
-    Some(geometry_edit("P16 crop a picture", what, with_picture(d, k, PictureItem { crop: Some(crop), ..p }), k, slide))
+    let crop = Crop {
+        l: 10_000,
+        t: 5_000,
+        r: 10_000,
+        b: 5_000,
+    };
+    let what = format!(
+        "crop the picture {:?} ({}) to crop=\"10 5 10 5\" on {}",
+        p.name,
+        p.src,
+        slide_name(&d.blocks, k)
+    );
+    Some(geometry_edit(
+        "P16 crop a picture",
+        what,
+        with_picture(
+            d,
+            k,
+            PictureItem {
+                crop: Some(crop),
+                ..p
+            },
+        ),
+        k,
+        slide,
+    ))
 }
 
 /// The last picture not already an ellipse is cut to one, with new alternative text.
 fn p17_mask_picture(d: &Doc, _: &Cx) -> Option<Edit> {
-    let (k, slide, p) = pictures(d).into_iter().rev().find(|x| x.2.mask.as_deref() != Some("ellipse"))?;
+    let (k, slide, p) = pictures(d)
+        .into_iter()
+        .rev()
+        .find(|x| x.2.mask.as_deref() != Some("ellipse"))?;
     let alt = "편집한 그림 12".to_string();
     let what = format!(
         "cut the picture {:?} ({}) to an ellipse, mask=\"ellipse\", with alt=\"{alt}\" on {}",
@@ -832,15 +1129,26 @@ fn p17_mask_picture(d: &Doc, _: &Cx) -> Option<Edit> {
         p.src,
         slide_name(&d.blocks, k)
     );
-    let pic = PictureItem { mask: Some("ellipse".into()), alt: Some(alt), ..p };
-    Some(geometry_edit("P17 mask a picture", what, with_picture(d, k, pic), k, slide))
+    let pic = PictureItem {
+        mask: Some("ellipse".into()),
+        alt: Some(alt),
+        ..p
+    };
+    Some(geometry_edit(
+        "P17 mask a picture",
+        what,
+        with_picture(d, k, pic),
+        k,
+        slide,
+    ))
 }
 
 /// A top-level `<shape>` head `pick` accepts, and its fill.
 fn shape_with(d: &Doc, pick: &dyn Fn(Option<&str>) -> bool) -> Option<usize> {
     (0..d.blocks.len()).find(|&k| {
         d.blocks[k].head().is_some_and(|h| {
-            matches!(kind(h), HeadKind::Shape { id, .. } if !id.is_empty()) && pick(h.look.fill.as_deref())
+            matches!(kind(h), HeadKind::Shape { id, .. } if !id.is_empty())
+                && pick(h.look.fill.as_deref())
         })
     })
 }
@@ -850,7 +1158,14 @@ fn look_edit(d: &Doc, k: usize, fill: Option<&str>, name: &'static str, what: St
     if let Block::Head(h) = &mut blocks[k] {
         h.look.fill = fill.map(str::to_string);
     }
-    let mut ed = Edit::blocks(name, what, blocks, ident(d.blocks.len()), HashSet::from([k]), true);
+    let mut ed = Edit::blocks(
+        name,
+        what,
+        blocks,
+        ident(d.blocks.len()),
+        HashSet::from([k]),
+        true,
+    );
     ed.named = vec![slide_at(&d.blocks, k).2];
     ed
 }
@@ -859,13 +1174,18 @@ fn look_edit(d: &Doc, k: usize, fill: Option<&str>, name: &'static str, what: St
 fn p20_fill_shape(d: &Doc, _: &Cx) -> Option<Edit> {
     let k = shape_with(d, &|f| f != Some("accent2"))?;
     let label = d.blocks[k].head()?.label.clone();
-    let what = format!("shape {label:?}: fill=accent2 on {}", slide_name(&d.blocks, k));
+    let what = format!(
+        "shape {label:?}: fill=accent2 on {}",
+        slide_name(&d.blocks, k)
+    );
     Some(look_edit(d, k, Some("accent2"), "P20 fill a shape", what))
 }
 
 /// A shape with a fill the text can write loses it.
 fn p21_clear_fill(d: &Doc, _: &Cx) -> Option<Edit> {
-    let k = shape_with(d, &|f| f.is_some_and(|f| !hanji_format::look::is_kept_fill(f)))?;
+    let k = shape_with(d, &|f| {
+        f.is_some_and(|f| !hanji_format::look::is_kept_fill(f))
+    })?;
     let label = d.blocks[k].head()?.label.clone();
     let what = format!("shape {label:?}: no fill on {}", slide_name(&d.blocks, k));
     Some(look_edit(d, k, None, "P21 clear a shape's fill", what))
@@ -874,11 +1194,18 @@ fn p21_clear_fill(d: &Doc, _: &Cx) -> Option<Edit> {
 /// A figure or word of a group's shape changes, keeping its formatting.
 fn p22_group_text(d: &Doc, _: &Cx) -> Option<Edit> {
     for (k, b) in d.blocks.iter().enumerate() {
-        let Some(Place::Group(g)) = b.head().and_then(|h| h.place.as_ref()) else { continue };
+        let Some(Place::Group(g)) = b.head().and_then(|h| h.place.as_ref()) else {
+            continue;
+        };
         for (m, it) in g.items.iter().enumerate() {
-            let hanji_format::SlideItem::Shape(sh) = it else { continue };
-            let Some((pi, (s, e, new))) =
-                sh.paras.iter().enumerate().find_map(|(i, p)| figure_or_word(&chars(p)).map(|f| (i, f)))
+            let hanji_format::SlideItem::Shape(sh) = it else {
+                continue;
+            };
+            let Some((pi, (s, e, new))) = sh
+                .paras
+                .iter()
+                .enumerate()
+                .find_map(|(i, p)| figure_or_word(&chars(p)).map(|f| (i, f)))
             else {
                 continue;
             };
@@ -889,7 +1216,11 @@ fn p22_group_text(d: &Doc, _: &Cx) -> Option<Edit> {
             let mut st = inline_style::unit_styles(&q);
             let like = st[s].clone();
             st.splice(s..e, std::iter::repeat_n(like, new.chars().count()));
-            q.units.splice(s..e, new.chars().map(|c| hanji_format::Unit::new(hanji_format::Atom::Char(c), marks)));
+            q.units.splice(
+                s..e,
+                new.chars()
+                    .map(|c| hanji_format::Unit::new(hanji_format::Atom::Char(c), marks)),
+            );
             inline_style::set_unit_styles(&mut q, &st);
             let mut g2 = g.clone();
             if let hanji_format::SlideItem::Shape(x) = &mut g2.items[m] {
@@ -899,8 +1230,12 @@ fn p22_group_text(d: &Doc, _: &Cx) -> Option<Edit> {
             if let Block::Head(h) = &mut blocks[k] {
                 h.place = Some(Place::Group(g2));
             }
-            let what =
-                format!("group {:?}, shape {:?}: {old:?} → {new:?} on {}", g.name, sh.name, slide_name(&d.blocks, k));
+            let what = format!(
+                "group {:?}, shape {:?}: {old:?} → {new:?} on {}",
+                g.name,
+                sh.name,
+                slide_name(&d.blocks, k)
+            );
             let mut ed = Edit::blocks(
                 "P22 edit a group's shape's text",
                 what,
@@ -917,12 +1252,25 @@ fn p22_group_text(d: &Doc, _: &Cx) -> Option<Edit> {
 }
 
 /// A block's head changed by `f`, as one edit.
-fn head_edit(d: &Doc, k: usize, f: impl FnOnce(&mut hanji_core::Head), name: &'static str, what: String) -> Edit {
+fn head_edit(
+    d: &Doc,
+    k: usize,
+    f: impl FnOnce(&mut hanji_core::Head),
+    name: &'static str,
+    what: String,
+) -> Edit {
     let mut blocks = d.blocks.clone();
     if let Block::Head(h) = &mut blocks[k] {
         f(h);
     }
-    let mut ed = Edit::blocks(name, what, blocks, ident(d.blocks.len()), HashSet::from([k]), true);
+    let mut ed = Edit::blocks(
+        name,
+        what,
+        blocks,
+        ident(d.blocks.len()),
+        HashSet::from([k]),
+        true,
+    );
     ed.named = vec![slide_at(&d.blocks, k).2];
     ed
 }
@@ -932,24 +1280,44 @@ fn p23_outline_shape(d: &Doc, _: &Cx) -> Option<Edit> {
     const BORDER: &str = "1.5pt dashed accent2";
     let k = (0..d.blocks.len()).find(|&k| {
         d.blocks[k].head().is_some_and(|h| {
-            matches!(kind(h), HeadKind::Shape { id, .. } if !id.is_empty()) && h.look.border.as_deref() != Some(BORDER)
+            matches!(kind(h), HeadKind::Shape { id, .. } if !id.is_empty())
+                && h.look.border.as_deref() != Some(BORDER)
         })
     })?;
     let label = d.blocks[k].head()?.label.clone();
-    let what = format!("shape {label:?}: border=\"{BORDER}\" on {}", slide_name(&d.blocks, k));
-    Some(head_edit(d, k, |h| h.look.border = Some(BORDER.into()), "P23 outline a shape", what))
+    let what = format!(
+        "shape {label:?}: border=\"{BORDER}\" on {}",
+        slide_name(&d.blocks, k)
+    );
+    Some(head_edit(
+        d,
+        k,
+        |h| h.look.border = Some(BORDER.into()),
+        "P23 outline a shape",
+        what,
+    ))
 }
 
 /// A line without an arrowhead at its end gets one.
 fn p24_arrowhead(d: &Doc, _: &Cx) -> Option<Edit> {
     let k = (0..d.blocks.len()).find(|&k| {
         d.blocks[k].head().is_some_and(|h| {
-            matches!(kind(h), HeadKind::Line { id, .. } if !id.is_empty()) && h.look.end.as_deref() != Some("triangle")
+            matches!(kind(h), HeadKind::Line { id, .. } if !id.is_empty())
+                && h.look.end.as_deref() != Some("triangle")
         })
     })?;
     let label = d.blocks[k].head()?.label.clone();
-    let what = format!("line {label:?}: end=triangle on {}", slide_name(&d.blocks, k));
-    Some(head_edit(d, k, |h| h.look.end = Some("triangle".into()), "P24 put an arrowhead on a line", what))
+    let what = format!(
+        "line {label:?}: end=triangle on {}",
+        slide_name(&d.blocks, k)
+    );
+    Some(head_edit(
+        d,
+        k,
+        |h| h.look.end = Some("triangle".into()),
+        "P24 put an arrowhead on a line",
+        what,
+    ))
 }
 
 /// A preset shape becomes a rounded rectangle, its corners a sixth of its
@@ -959,16 +1327,28 @@ fn p25_round_corners(d: &Doc, _: &Cx) -> Option<Edit> {
     let k = (0..d.blocks.len()).find(|&k| {
         d.blocks[k].head().is_some_and(|h| {
             matches!(kind(h), HeadKind::Shape { id, .. } if !id.is_empty())
-                && h.look.kind.as_deref().is_some_and(|k| k != "roundRect" && k != "custom")
+                && h.look
+                    .kind
+                    .as_deref()
+                    .is_some_and(|k| k != "roundRect" && k != "custom")
         })
     })?;
     let label = d.blocks[k].head()?.label.clone();
-    let what = format!("shape {label:?}: kind=\"roundRect\" adj=\"16667\" on {}", slide_name(&d.blocks, k));
+    let what = format!(
+        "shape {label:?}: kind=\"roundRect\" adj=\"16667\" on {}",
+        slide_name(&d.blocks, k)
+    );
     let f = |h: &mut hanji_core::Head| {
         h.look.kind = Some("roundRect".into());
         h.look.adj = Some("16667".into());
     };
-    Some(head_edit(d, k, f, "P25 make a shape a rounded rectangle", what))
+    Some(head_edit(
+        d,
+        k,
+        f,
+        "P25 make a shape a rounded rectangle",
+        what,
+    ))
 }
 
 /// A straight line is bent at its middle (an elbow connector), or a bent one made straight.
@@ -983,15 +1363,27 @@ fn p26_bend_line(d: &Doc, _: &Cx) -> Option<Edit> {
     let bent = h.look.kind.is_some();
     let label = h.label.clone();
     let what = if bent {
-        format!("line {label:?}: straight, kind left out, on {}", slide_name(&d.blocks, k))
+        format!(
+            "line {label:?}: straight, kind left out, on {}",
+            slide_name(&d.blocks, k)
+        )
     } else {
-        format!("line {label:?}: kind=\"bentConnector3\" on {}", slide_name(&d.blocks, k))
+        format!(
+            "line {label:?}: kind=\"bentConnector3\" on {}",
+            slide_name(&d.blocks, k)
+        )
     };
     let f = move |h: &mut hanji_core::Head| {
         h.look.kind = (!bent).then(|| "bentConnector3".into());
         h.look.adj = None;
     };
-    Some(head_edit(d, k, f, "P26 bend a line or straighten one", what))
+    Some(head_edit(
+        d,
+        k,
+        f,
+        "P26 bend a line or straighten one",
+        what,
+    ))
 }
 
 /// How many connection sites head `k` has, when the write knows where they
@@ -999,7 +1391,9 @@ fn p26_bend_line(d: &Doc, _: &Cx) -> Option<Edit> {
 fn known_sites(d: &Doc, k: usize) -> Option<u32> {
     let h = d.blocks[k].head()?;
     let n = |kind: Option<&str>| match kind {
-        Some("rect" | "roundRect" | "diamond" | "flowChartProcess" | "flowChartDecision") => Some(4),
+        Some("rect" | "roundRect" | "diamond" | "flowChartProcess" | "flowChartDecision") => {
+            Some(4)
+        }
         Some("ellipse" | "flowChartConnector") => Some(8),
         _ => None,
     };
@@ -1019,14 +1413,24 @@ fn connections(d: &Doc) -> Vec<(usize, usize, usize, u32, usize)> {
     let mut out = vec![];
     for sl in slides(&d.blocks) {
         for k in sl.head + 1..sl.end {
-            let Some(h) = d.blocks[k].head() else { continue };
-            let Some(Place::Line(e)) = &h.place else { continue };
-            if !matches!(h.look.kind.as_deref(), None | Some("bentConnector2" | "bentConnector3")) {
+            let Some(h) = d.blocks[k].head() else {
+                continue;
+            };
+            let Some(Place::Line(e)) = &h.place else {
+                continue;
+            };
+            if !matches!(
+                h.look.kind.as_deref(),
+                None | Some("bentConnector2" | "bentConnector3")
+            ) {
                 continue;
             }
             for (end, at) in [e.from_at, e.to_at].into_iter().enumerate() {
-                let Some(a) = at.filter(|a| !a.group) else { continue };
-                let target = (sl.head + 1..sl.end).find(|&t| shape_id_of(d, t) == Some(a.id) && t != k);
+                let Some(a) = at.filter(|a| !a.group) else {
+                    continue;
+                };
+                let target =
+                    (sl.head + 1..sl.end).find(|&t| shape_id_of(d, t) == Some(a.id) && t != k);
                 if let Some((t, n)) = target.and_then(|t| Some((t, known_sites(d, t)?))) {
                     out.push((k, end, t, n, sl.head));
                 }
@@ -1039,16 +1443,27 @@ fn connections(d: &Doc) -> Vec<(usize, usize, usize, u32, usize)> {
 /// Whether every connector attached to shape `id` on `slide` is a top-level
 /// straight or elbow line, which the write reroutes (a group's are not).
 fn only_top_level_connectors(d: &Doc, slide: usize, id: u32) -> bool {
-    let end = slides(&d.blocks).into_iter().find(|s| s.head == slide).map_or(slide + 1, |s| s.end);
-    let pats = [format!("<a:stCxn id=\"{id}\""), format!("<a:endCxn id=\"{id}\"")];
+    let end = slides(&d.blocks)
+        .into_iter()
+        .find(|s| s.head == slide)
+        .map_or(slide + 1, |s| s.end);
+    let pats = [
+        format!("<a:stCxn id=\"{id}\""),
+        format!("<a:endCxn id=\"{id}\""),
+    ];
     d.entries
         .iter()
         .filter(|e| e.path.first().is_some_and(|&k| (slide..end).contains(&k)))
         .filter(|e| e.xml.iter().any(|x| pats.iter().any(|p| x.contains(p))))
         .all(|e| {
-            let straight_or_elbow = ["line", "straightConnector1", "bentConnector2", "bentConnector3"]
-                .iter()
-                .any(|k| e.xml[0].contains(&format!("prst=\"{k}\"")));
+            let straight_or_elbow = [
+                "line",
+                "straightConnector1",
+                "bentConnector2",
+                "bentConnector3",
+            ]
+            .iter()
+            .any(|k| e.xml[0].contains(&format!("prst=\"{k}\"")));
             e.meta.tag == "p:cxnSp" && straight_or_elbow
         })
 }
@@ -1065,7 +1480,11 @@ fn p27_move_connected(d: &Doc, cx: &Cx) -> Option<Edit> {
     })?;
     let g = d.blocks[t].head().and_then(geom_of)?;
     let s = g.shown();
-    let to = if g.x + g.w + step <= w { Geom { x: s.x + step, ..s } } else { Geom { x: s.x - step, ..s } };
+    let to = if g.x + g.w + step <= w {
+        Geom { x: s.x + step, ..s }
+    } else {
+        Geom { x: s.x - step, ..s }
+    };
     let what = format!(
         "move {} (a connector is attached to it) from box {} to {} on {}; its connectors follow",
         label(d, t),
@@ -1073,7 +1492,13 @@ fn p27_move_connected(d: &Doc, cx: &Cx) -> Option<Edit> {
         pts(&to),
         slide_name(&d.blocks, t)
     );
-    Some(geometry_edit("P27 move an object a connector is attached to", what, moved(d, t, to), t, slide))
+    Some(geometry_edit(
+        "P27 move an object a connector is attached to",
+        what,
+        moved(d, t, to),
+        t,
+        slide,
+    ))
 }
 
 /// A connector's end moves to the opposite site of the object it is attached to.
@@ -1088,9 +1513,17 @@ fn p28_reattach(d: &Doc, _: &Cx) -> Option<Edit> {
             && shape_id_of(d, t).is_some_and(|id| only_top_level_connectors(d, slide, id))
     })?;
     let mut blocks = d.blocks.clone();
-    let Block::Head(h) = &mut blocks[k] else { return None };
-    let Some(Place::Line(e)) = &mut h.place else { return None };
-    let at = if end == 0 { &mut e.from_at } else { &mut e.to_at };
+    let Block::Head(h) = &mut blocks[k] else {
+        return None;
+    };
+    let Some(Place::Line(e)) = &mut h.place else {
+        return None;
+    };
+    let at = if end == 0 {
+        &mut e.from_at
+    } else {
+        &mut e.to_at
+    };
     let a = at.as_mut()?;
     let old = a.to_string();
     a.site = (a.site + n / 2) % n;
@@ -1101,14 +1534,21 @@ fn p28_reattach(d: &Doc, _: &Cx) -> Option<Edit> {
         a,
         slide_name(&d.blocks, k)
     );
-    Some(geometry_edit("P28 re-attach a connector", what, blocks, k, slide))
+    Some(geometry_edit(
+        "P28 re-attach a connector",
+        what,
+        blocks,
+        k,
+        slide,
+    ))
 }
 
 /// The first top-level shape whose effects `pick` accepts.
 fn shape_by_effects(d: &Doc, pick: &dyn Fn(Option<&str>) -> bool) -> Option<usize> {
     (0..d.blocks.len()).find(|&k| {
         d.blocks[k].head().is_some_and(|h| {
-            matches!(kind(h), HeadKind::Shape { id, .. } if !id.is_empty()) && pick(h.look.effects.as_deref())
+            matches!(kind(h), HeadKind::Shape { id, .. } if !id.is_empty())
+                && pick(h.look.effects.as_deref())
         })
     })
 }
@@ -1123,32 +1563,56 @@ fn p29_clear_effects(d: &Doc, _: &Cx) -> Option<Edit> {
         h.look.effects.as_deref()?,
         slide_name(&d.blocks, k)
     );
-    Some(head_edit(d, k, |h| h.look.effects = None, "P29 remove a shape's effects", what))
+    Some(head_edit(
+        d,
+        k,
+        |h| h.look.effects = None,
+        "P29 remove a shape's effects",
+        what,
+    ))
 }
 
 /// A shape without effects gets PowerPoint's preset shadow.
 fn p30_shadow(d: &Doc, _: &Cx) -> Option<Edit> {
     let k = shape_by_effects(d, &|e| e.is_none())?;
     let label = d.blocks[k].head()?.label.clone();
-    let what = format!("shape {label:?}: effects=\"shadow\" on {}", slide_name(&d.blocks, k));
-    Some(head_edit(d, k, |h| h.look.effects = Some("shadow".into()), "P30 give a shape a shadow", what))
+    let what = format!(
+        "shape {label:?}: effects=\"shadow\" on {}",
+        slide_name(&d.blocks, k)
+    );
+    Some(head_edit(
+        d,
+        k,
+        |h| h.look.effects = Some("shadow".into()),
+        "P30 give a shape a shadow",
+        what,
+    ))
 }
 
 /// A shape drawn with custom geometry becomes an ellipse.
 fn p31_custom_to_preset(d: &Doc, _: &Cx) -> Option<Edit> {
     let k = (0..d.blocks.len()).find(|&k| {
         d.blocks[k].head().is_some_and(|h| {
-            matches!(kind(h), HeadKind::Shape { id, .. } if !id.is_empty()) && h.look.kind.as_deref() == Some("custom")
+            matches!(kind(h), HeadKind::Shape { id, .. } if !id.is_empty())
+                && h.look.kind.as_deref() == Some("custom")
         })
     })?;
     let label = d.blocks[k].head()?.label.clone();
-    let what =
-        format!("shape {label:?}: kind=\"ellipse\" in place of its custom geometry on {}", slide_name(&d.blocks, k));
+    let what = format!(
+        "shape {label:?}: kind=\"ellipse\" in place of its custom geometry on {}",
+        slide_name(&d.blocks, k)
+    );
     let f = |h: &mut hanji_core::Head| {
         h.look.kind = Some("ellipse".into());
         h.look.adj = None;
     };
-    Some(head_edit(d, k, f, "P31 draw a custom shape as a preset", what))
+    Some(head_edit(
+        d,
+        k,
+        f,
+        "P31 draw a custom shape as a preset",
+        what,
+    ))
 }
 
 /// The shape ids of a group's objects, nested groups' too.
@@ -1174,10 +1638,16 @@ fn member_ids(items: &[hanji_format::SlideItem], out: &mut Vec<u32>) {
 fn p32_turn_group(d: &Doc, _: &Cx) -> Option<Edit> {
     for sl in slides(&d.blocks) {
         for k in sl.head + 1..sl.end {
-            let Some(h) = d.blocks[k].head() else { continue };
-            let Some(Place::Group(g)) = &h.place else { continue };
+            let Some(h) = d.blocks[k].head() else {
+                continue;
+            };
+            let Some(Place::Group(g)) = &h.place else {
+                continue;
+            };
             let Some(geom) = g.geom else { continue };
-            let Some(id) = g.id.strip_prefix('g').and_then(|n| n.parse::<u32>().ok()) else { continue };
+            let Some(id) = g.id.strip_prefix('g').and_then(|n| n.parse::<u32>().ok()) else {
+                continue;
+            };
             // A connector attached to it or its objects would need rerouting through its turn.
             let mut ids = vec![id];
             member_ids(&g.items, &mut ids);
@@ -1188,7 +1658,10 @@ fn p32_turn_group(d: &Doc, _: &Cx) -> Option<Edit> {
             let mut blocks = d.blocks.clone();
             if let Block::Head(h2) = &mut blocks[k] {
                 if let Some(Place::Group(g2)) = &mut h2.place {
-                    g2.geom = Some(Geom { rot, ..geom.shown() });
+                    g2.geom = Some(Geom {
+                        rot,
+                        ..geom.shown()
+                    });
                 }
             }
             let what = format!(
@@ -1206,11 +1679,19 @@ fn p32_turn_group(d: &Doc, _: &Cx) -> Option<Edit> {
 /// A shape with a writable fill takes a gradient from accent1 to white, top to bottom.
 fn p33_gradient(d: &Doc, _: &Cx) -> Option<Edit> {
     const FILL: &str = "linear 90 accent1 #FFFFFF";
-    let k = shape_with(d, &|f| f.is_some_and(|f| !hanji_format::look::is_kept_fill(f) && f != FILL))?;
+    let k = shape_with(d, &|f| {
+        f.is_some_and(|f| !hanji_format::look::is_kept_fill(f) && f != FILL)
+    })?;
     let label = d.blocks[k].head()?.label.clone();
     let what = format!(
         "shape {label:?}: fill=\"{FILL}\" (accent 1 at the top to white at the bottom) on {}",
         slide_name(&d.blocks, k)
     );
-    Some(look_edit(d, k, Some(FILL), "P33 fill a shape with a gradient", what))
+    Some(look_edit(
+        d,
+        k,
+        Some(FILL),
+        "P33 fill a shape with a gradient",
+        what,
+    ))
 }

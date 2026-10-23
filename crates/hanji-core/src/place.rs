@@ -14,7 +14,10 @@ use crate::remainder::{Entry, Kind};
 #[allow(clippy::large_enum_variant)] // short-lived; one per entry
 pub enum Status {
     /// Placed; a run may land in several pieces `(path, start, end)`.
-    Placed { entry: Entry, pieces: Vec<(Path, usize, usize)> },
+    Placed {
+        entry: Entry,
+        pieces: Vec<(Path, usize, usize)>,
+    },
     /// Removed together with its text or block; reported.
     Removed(String),
     /// Refused: it cannot be placed without guessing.
@@ -30,7 +33,10 @@ pub struct Outcome {
 
 impl From<Status> for Outcome {
     fn from(status: Status) -> Outcome {
-        Outcome { status, lenient: false }
+        Outcome {
+            status,
+            lenient: false,
+        }
     }
 }
 
@@ -82,16 +88,24 @@ fn content(b: &Block) -> Vec<u32> {
             }
             out
         }
-        Block::Keep(id) => std::iter::once(3).chain(id.chars().map(|c| c as u32)).collect(),
+        Block::Keep(id) => std::iter::once(3)
+            .chain(id.chars().map(|c| c as u32))
+            .collect(),
         // What a head is, not its label: a slide whose layout changed has the same content.
-        Block::Head(h) => [5, h.level as u32].into_iter().chain(h.key.chars().map(|c| c as u32)).collect(),
+        Block::Head(h) => [5, h.level as u32]
+            .into_iter()
+            .chain(h.key.chars().map(|c| c as u32))
+            .collect(),
     }
 }
 
 pub(crate) fn same_kind(a: &Block, b: &Block) -> bool {
     match (a, b) {
         (Block::Head(x), Block::Head(y)) => x.level == y.level && x.key == y.key,
-        _ => matches!((a, b), (Block::Para(_), Block::Para(_)) | (Block::Table(_), Block::Table(_))),
+        _ => matches!(
+            (a, b),
+            (Block::Para(_), Block::Para(_)) | (Block::Table(_), Block::Table(_))
+        ),
     }
 }
 
@@ -112,10 +126,17 @@ pub fn align_ambiguous(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, Has
 
 /// [`align_ambiguous`], and the heads left `unsure`: unplaced, with a new
 /// head they could be (see [`follow_heads`]).
-pub fn align_full(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, HashSet<usize>, HashSet<usize>) {
+pub fn align_full(
+    old: &[Block],
+    new: &[Block],
+) -> (Vec<Option<usize>>, HashSet<usize>, HashSet<usize>) {
     // Nothing changed: every block is where it was, identical ones included.
     if old == new {
-        return ((0..old.len()).map(Some).collect(), HashSet::new(), HashSet::new());
+        return (
+            (0..old.len()).map(Some).collect(),
+            HashSet::new(),
+            HashSet::new(),
+        );
     }
     let mut bmap: Vec<Option<usize>> = vec![None; old.len()];
     let mut used: HashSet<usize> = HashSet::new();
@@ -153,7 +174,10 @@ pub fn align_full(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, HashSet<
     let moved: Vec<usize> = stretches.iter().flat_map(|s| s.0.clone()).collect();
     for &i in &moved {
         if unique(&old[i]) {
-            if let Some(&j) = free_new.iter().find(|&&j| !used.contains(&j) && new[j] == old[i]) {
+            if let Some(&j) = free_new
+                .iter()
+                .find(|&&j| !used.contains(&j) && new[j] == old[i])
+            {
                 pair(&mut bmap, &mut used, i, j);
             }
         }
@@ -165,9 +189,13 @@ pub fn align_full(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, HashSet<
                 continue;
             }
             let next_to = |j: usize| {
-                (i > 0 && j > 0 && bmap[i - 1] == Some(j - 1)) || (i + 1 < old.len() && bmap[i + 1] == Some(j + 1))
+                (i > 0 && j > 0 && bmap[i - 1] == Some(j - 1))
+                    || (i + 1 < old.len() && bmap[i + 1] == Some(j + 1))
             };
-            if let Some(&j) = free_new.iter().find(|&&j| !used.contains(&j) && new[j] == old[i] && next_to(j)) {
+            if let Some(&j) = free_new
+                .iter()
+                .find(|&&j| !used.contains(&j) && new[j] == old[i] && next_to(j))
+            {
                 pair(&mut bmap, &mut used, i, j);
                 changed = true;
             }
@@ -179,7 +207,10 @@ pub fn align_full(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, HashSet<
     for &i in &moved {
         // A head is not paired by chance among identical heads: it follows what it holds (below).
         if bmap[i].is_none() && old[i].head().is_none() {
-            if let Some(&j) = free_new.iter().find(|&&j| !used.contains(&j) && new[j] == old[i]) {
+            if let Some(&j) = free_new
+                .iter()
+                .find(|&&j| !used.contains(&j) && new[j] == old[i])
+            {
                 pair(&mut bmap, &mut used, i, j);
             }
         }
@@ -196,15 +227,19 @@ pub fn align_full(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, HashSet<
             if bmap[i].is_some() {
                 continue;
             }
-            if let Some(&j) =
-                free_new.iter().find(|&&j| !used.contains(&j) && pairable(i, j) && contents_old[i] == contents_new[j])
-            {
+            if let Some(&j) = free_new.iter().find(|&&j| {
+                !used.contains(&j) && pairable(i, j) && contents_old[i] == contents_new[j]
+            }) {
                 pair(&mut bmap, &mut used, i, j);
             }
         }
     }
     for (olds, news) in &stretches {
-        let o: Vec<usize> = olds.iter().copied().filter(|&i| bmap[i].is_none()).collect();
+        let o: Vec<usize> = olds
+            .iter()
+            .copied()
+            .filter(|&i| bmap[i].is_none())
+            .collect();
         let n: Vec<usize> = news.iter().copied().filter(|j| !used.contains(j)).collect();
         if o.len() == n.len() {
             for (&i, &j) in o.iter().zip(&n) {
@@ -214,8 +249,16 @@ pub fn align_full(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, HashSet<
             }
         }
     }
-    let left_o: Vec<usize> = stretches.iter().flat_map(|s| s.0.clone()).filter(|&i| bmap[i].is_none()).collect();
-    let left_n: Vec<usize> = free_new.iter().copied().filter(|j| !used.contains(j)).collect();
+    let left_o: Vec<usize> = stretches
+        .iter()
+        .flat_map(|s| s.0.clone())
+        .filter(|&i| bmap[i].is_none())
+        .collect();
+    let left_n: Vec<usize> = free_new
+        .iter()
+        .copied()
+        .filter(|j| !used.contains(j))
+        .collect();
     let mut cands: Vec<(f64, usize, usize)> = vec![];
     for &i in &left_o {
         for &j in &left_n {
@@ -237,7 +280,9 @@ pub fn align_full(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, HashSet<
     // follow them: an object's head goes where its placeholder went).
     for (i, b) in old.iter().enumerate() {
         if let Block::Keep(id) = b {
-            bmap[i] = new.iter().position(|x| matches!(x, Block::Keep(y) if y == id));
+            bmap[i] = new
+                .iter()
+                .position(|x| matches!(x, Block::Keep(y) if y == id));
             ambiguous.remove(&i);
         }
     }
@@ -248,7 +293,11 @@ pub fn align_full(old: &[Block], new: &[Block]) -> (Vec<Option<usize>>, HashSet<
     let mut k = 0;
     while k < old.len() {
         let mut e = k + 1;
-        while e < old.len() && bmap[k].is_some() && bmap[e].is_some() && bmap[e] == bmap[e - 1].map(|j| j + 1) {
+        while e < old.len()
+            && bmap[k].is_some()
+            && bmap[e].is_some()
+            && bmap[e] == bmap[e - 1].map(|j| j + 1)
+        {
             e += 1;
         }
         if bmap[k].is_some() && (k..e).any(|i| !ambiguous.contains(&i)) {
@@ -278,12 +327,21 @@ fn follow_heads(
     ambiguous: &mut HashSet<usize>,
     unsure: &mut HashSet<usize>,
 ) {
-    let heads: Vec<usize> = (0..old.len()).filter(|&i| old[i].head().is_some()).collect();
+    let heads: Vec<usize> = (0..old.len())
+        .filter(|&i| old[i].head().is_some())
+        .collect();
     if heads.is_empty() {
         return;
     }
-    let diff: HashMap<usize, usize> = heads.iter().filter_map(|&i| bmap[i].map(|j| (i, j))).collect();
-    let diff_ambiguous: HashSet<usize> = heads.iter().copied().filter(|i| ambiguous.contains(i)).collect();
+    let diff: HashMap<usize, usize> = heads
+        .iter()
+        .filter_map(|&i| bmap[i].map(|j| (i, j)))
+        .collect();
+    let diff_ambiguous: HashSet<usize> = heads
+        .iter()
+        .copied()
+        .filter(|i| ambiguous.contains(i))
+        .collect();
     for &i in &heads {
         if let Some(j) = bmap[i].take() {
             used.remove(&j);
@@ -292,7 +350,9 @@ fn follow_heads(
     }
     let level = |b: &Block| b.head().map(|h| h.level);
     let end = |xs: &[Block], i: usize, lv: u8| {
-        (i + 1..xs.len()).find(|&k| level(&xs[k]).is_some_and(|l| l <= lv)).unwrap_or(xs.len())
+        (i + 1..xs.len())
+            .find(|&k| level(&xs[k]).is_some_and(|l| l <= lv))
+            .unwrap_or(xs.len())
     };
     // `unders[lv][j]`: the new head of level `lv` or above that new block `j` sits under.
     let top = old.iter().chain(new).filter_map(level).max().unwrap_or(0);
@@ -311,14 +371,15 @@ fn follow_heads(
         })
         .collect();
     let under = |j: usize, lv: u8| unders[lv as usize][j];
-    let pair = |bmap: &mut [Option<usize>], used: &mut HashSet<usize>, i: usize, j: usize| -> bool {
-        let fits = j < new.len() && !used.contains(&j) && same_kind(&old[i], &new[j]);
-        if fits {
-            bmap[i] = Some(j);
-            used.insert(j);
-        }
-        fits
-    };
+    let pair =
+        |bmap: &mut [Option<usize>], used: &mut HashSet<usize>, i: usize, j: usize| -> bool {
+            let fits = j < new.len() && !used.contains(&j) && same_kind(&old[i], &new[j]);
+            if fits {
+                bmap[i] = Some(j);
+                used.insert(j);
+            }
+            fits
+        };
     // A head that holds nothing (a line, a group, a shape without text) has
     // no contents to follow: it pairs with the new head identical to it,
     // place and name included, when each is the only one of its kind on
@@ -327,7 +388,11 @@ fn follow_heads(
         if level(&old[i]) != Some(1) || end(old, i, 1) != i + 1 {
             continue;
         }
-        let twins = |xs: &[Block]| (0..xs.len()).filter(|&k| xs[k] == old[i]).collect::<Vec<_>>();
+        let twins = |xs: &[Block]| {
+            (0..xs.len())
+                .filter(|&k| xs[k] == old[i])
+                .collect::<Vec<_>>()
+        };
         if let ([_], [j]) = (twins(old).as_slice(), twins(new).as_slice()) {
             pair(bmap, used, i, *j);
         }
@@ -338,7 +403,9 @@ fn follow_heads(
         for &i in heads.iter().filter(|&&i| level(&old[i]) == Some(lv)) {
             let contents = i + 1..end(old, i, lv);
             for (k, to) in contents.clone().zip(&bmap[contents]) {
-                let Some(x) = to.and_then(|jk| under(jk, lv)) else { continue };
+                let Some(x) = to.and_then(|jk| under(jk, lv)) else {
+                    continue;
+                };
                 match votes.iter_mut().find(|v| v.0 == i && v.1 == x) {
                     Some(v) => {
                         v.2 += 1;
@@ -358,10 +425,15 @@ fn follow_heads(
             }
         }
         if lv == 0 {
-            let unvoted: Vec<usize> =
-                heads.iter().copied().filter(|&i| level(&old[i]) == Some(0) && bmap[i].is_none()).collect();
+            let unvoted: Vec<usize> = heads
+                .iter()
+                .copied()
+                .filter(|&i| level(&old[i]) == Some(0) && bmap[i].is_none())
+                .collect();
             // Where a slide stood: after where the last placed block before it went.
-            let there = |bmap: &[Option<usize>], i: usize| (0..i).rev().find_map(|p| bmap[p]).map_or(0, |j| j + 1);
+            let there = |bmap: &[Option<usize>], i: usize| {
+                (0..i).rev().find_map(|p| bmap[p]).map_or(0, |j| j + 1)
+            };
             // The diff's pairing, when it keeps the slide where it stood (a
             // slide whose text all changed in place). One elsewhere is no
             // evidence: the slide may as well have been deleted and another added.
@@ -373,8 +445,9 @@ fn follow_heads(
             }
             // A slide still unplaced was deleted, unless there is a new slide
             // nobody took. That is not guessed: its entries are refused.
-            let free: Vec<usize> =
-                (0..new.len()).filter(|&x| level(&new[x]) == Some(0) && !used.contains(&x)).collect();
+            let free: Vec<usize> = (0..new.len())
+                .filter(|&x| level(&new[x]) == Some(0) && !used.contains(&x))
+                .collect();
             for &i in unvoted.iter().filter(|&&i| bmap[i].is_none()) {
                 // None of its text is left: any new slide no other took could be it, rewritten.
                 let could_be = free.iter().any(|&x| same_kind(&old[i], &new[x]));
@@ -389,8 +462,16 @@ fn follow_heads(
         if level(&old[i]) != Some(1) || bmap[i].is_some() || unsure.contains(&i) {
             continue;
         }
-        let Some(js) = (0..i).rev().find(|&s| level(&old[s]) == Some(0)).and_then(|s| bmap[s]) else { continue };
-        if let Some(x) = (js + 1..end(new, js, 0)).find(|&x| !used.contains(&x) && same_kind(&old[i], &new[x])) {
+        let Some(js) = (0..i)
+            .rev()
+            .find(|&s| level(&old[s]) == Some(0))
+            .and_then(|s| bmap[s])
+        else {
+            continue;
+        };
+        if let Some(x) =
+            (js + 1..end(new, js, 0)).find(|&x| !used.contains(&x) && same_kind(&old[i], &new[x]))
+        {
             pair(bmap, used, i, x);
         }
     }
@@ -420,7 +501,13 @@ fn cell_map(ot: &[Vec<Cell>], nt: &[Vec<Cell>]) -> CellMap {
     }
     let widths: HashSet<usize> = ot.iter().chain(nt).map(Vec::len).collect();
     let same_cols = widths.len() == 1;
-    Box::new(move |r, c| if same_cols { rm.get(&r).map(|&nr| (nr, c)) } else { None })
+    Box::new(move |r, c| {
+        if same_cols {
+            rm.get(&r).map(|&nr| (nr, c))
+        } else {
+            None
+        }
+    })
 }
 
 // ------------------------------------------------------------------ character mapping
@@ -440,7 +527,11 @@ pub fn map_pos(ops: &[Op], p: usize, right: bool) -> usize {
             _ => cands.push(if right { o.j2 } else { o.j1 }),
         }
     }
-    let pick = if right { cands.iter().max() } else { cands.iter().min() };
+    let pick = if right {
+        cands.iter().max()
+    } else {
+        cands.iter().min()
+    };
     pick.copied().unwrap_or(0)
 }
 
@@ -562,7 +653,9 @@ impl Alignment {
         for (i, j) in bmap.iter().enumerate() {
             let Some(j) = *j else { continue };
             let same = match (&old[i], &new[j]) {
-                (Block::Para(a), Block::Para(b)) => a.style == b.style && keys(&a.content) == keys(&b.content),
+                (Block::Para(a), Block::Para(b)) => {
+                    a.style == b.style && keys(&a.content) == keys(&b.content)
+                }
                 (Block::Para(_), _) => false,
                 _ => true,
             };
@@ -575,9 +668,20 @@ impl Alignment {
         let n = Stream::new(top_paras(new, &same_new));
         let global = (!o.order.is_empty()).then(|| {
             let ops = diff::opcodes(&o.text, &n.text);
-            Global { old: o, new: n, ops, min_equal: 3 }
+            Global {
+                old: o,
+                new: n,
+                ops,
+                min_equal: 3,
+            }
         });
-        Alignment { bmap, global, ambiguous, unsure, ..Default::default() }
+        Alignment {
+            bmap,
+            global,
+            ambiguous,
+            unsure,
+            ..Default::default()
+        }
     }
 }
 
@@ -609,13 +713,26 @@ fn top_paras<'b>(blocks: &'b [Block], same: &HashSet<usize>) -> Vec<(Path, &'b I
 }
 
 /// Place every entry of `entries` (anchored to `old`) against `new`.
-pub fn place(old: &[Block], new: &[Block], entries: &[Entry], al: &Alignment) -> HashMap<u64, Outcome> {
+pub fn place(
+    old: &[Block],
+    new: &[Block],
+    entries: &[Entry],
+    al: &Alignment,
+) -> HashMap<u64, Outcome> {
     let mut by_path: HashMap<Path, Vec<&Entry>> = HashMap::new();
     for e in entries {
         by_path.entry(e.path.clone()).or_default().push(e);
     }
-    let mut p =
-        Placer { old, new, entries, al, out: HashMap::new(), handled: HashSet::new(), by_path, owners: HashMap::new() };
+    let mut p = Placer {
+        old,
+        new,
+        entries,
+        al,
+        out: HashMap::new(),
+        handled: HashSet::new(),
+        by_path,
+        owners: HashMap::new(),
+    };
     p.run();
     keep_marker_order(entries, &mut p.out);
     p.out
@@ -636,7 +753,13 @@ fn keep_marker_order(entries: &[Entry], out: &mut HashMap<u64, Outcome>) {
         list.sort_by_key(|e| (e.start, e.seq));
         let mut last: Option<(Path, Option<usize>)> = None;
         for e in list.iter() {
-            let Some(Outcome { status: Status::Placed { entry: x, .. }, .. }) = out.get_mut(&e.id) else { continue };
+            let Some(Outcome {
+                status: Status::Placed { entry: x, .. },
+                ..
+            }) = out.get_mut(&e.id)
+            else {
+                continue;
+            };
             if x.kind != Kind::Marker {
                 continue;
             }
@@ -659,7 +782,13 @@ impl<'a> Placer<'a> {
     }
 
     fn put(&mut self, e: &Entry, path: Path, start: Option<usize>, end: Option<usize>) {
-        self.set(e, Status::Placed { entry: moved(e, path, start, end), pieces: vec![] });
+        self.set(
+            e,
+            Status::Placed {
+                entry: moved(e, path, start, end),
+                pieces: vec![],
+            },
+        );
     }
 
     fn entries_at(&self, path: &Path) -> Vec<&'a Entry> {
@@ -680,7 +809,13 @@ impl<'a> Placer<'a> {
             }
             None => x.kind = Kind::Tail,
         }
-        self.set(e, Status::Placed { entry: x, pieces: vec![] });
+        self.set(
+            e,
+            Status::Placed {
+                entry: x,
+                pieces: vec![],
+            },
+        );
     }
 
     fn run(&mut self) {
@@ -700,10 +835,18 @@ impl<'a> Placer<'a> {
         for e in self.entries {
             match e.kind {
                 Kind::Keep | Kind::Bkeep => {
-                    let id = &e.meta.keep.as_ref().expect("keep entry without placeholder").id;
+                    let id = &e
+                        .meta
+                        .keep
+                        .as_ref()
+                        .expect("keep entry without placeholder")
+                        .id;
                     match where_keep.get(id).cloned() {
                         Some((path, c)) => self.put(e, path, c, c.map(|c| c + 1)),
-                        None => self.set(e, Status::Removed(format!("placeholder {id} deleted by the edit"))),
+                        None => self.set(
+                            e,
+                            Status::Removed(format!("placeholder {id} deleted by the edit")),
+                        ),
                     }
                 }
                 Kind::Tail => self.put(e, e.path.clone(), e.start, e.end),
@@ -737,7 +880,9 @@ impl<'a> Placer<'a> {
                 continue;
             };
             match (&old[i], &new[j]) {
-                (Block::Para(op), Block::Para(np)) => self.para(&op.content, vec![i], &np.content, vec![j], &[]),
+                (Block::Para(op), Block::Para(np)) => {
+                    self.para(&op.content, vec![i], &np.content, vec![j], &[])
+                }
                 (Block::Table(ot), Block::Table(nt)) => self.table(ot, i, nt, j),
                 (Block::Head(_), Block::Head(_)) => {
                     for e in self.entries_at(&vec![i]) {
@@ -773,7 +918,13 @@ impl<'a> Placer<'a> {
                 && (!e.fp.is_empty() || e.meta.unshown)
                 && !matches!(e.kind, Kind::Keep | Kind::Bkeep)
         };
-        let id = |e: &Entry| if e.meta.unshown { e.xml.concat() } else { e.fp.clone() };
+        let id = |e: &Entry| {
+            if e.meta.unshown {
+                e.xml.concat()
+            } else {
+                e.fp.clone()
+            }
+        };
         let sig = |p: &Placer, i: usize| -> Sig {
             let mut v: Vec<_> = p
                 .entries
@@ -788,7 +939,9 @@ impl<'a> Placer<'a> {
         ambiguous.sort();
         for i in ambiguous {
             let mine = sig(self, i);
-            let twins: Vec<usize> = (0..self.old.len()).filter(|&k| k != i && self.old[k] == self.old[i]).collect();
+            let twins: Vec<usize> = (0..self.old.len())
+                .filter(|&k| k != i && self.old[k] == self.old[i])
+                .collect();
             if twins.iter().all(|&k| sig(self, k) == mine) {
                 continue;
             }
@@ -820,7 +973,12 @@ impl<'a> Placer<'a> {
     fn deleted_block(&mut self, i: usize) {
         let mut paths = vec![vec![i]];
         if matches!(self.old[i], Block::Table(_)) {
-            paths = self.by_path.keys().filter(|p| p.len() >= 2 && p[0] == i).cloned().collect();
+            paths = self
+                .by_path
+                .keys()
+                .filter(|p| p.len() >= 2 && p[0] == i)
+                .cloned()
+                .collect();
             paths.sort();
             paths.push(vec![i]);
         }
@@ -887,7 +1045,13 @@ impl<'a> Placer<'a> {
                 }
                 let olds = self.cell_paras(cell, &path);
                 let news = self.cell_paras_new(ncell);
-                self.cell(&path, &olds, &npath, &news, matches!((cell, ncell), (Cell::Up, Cell::Up)));
+                self.cell(
+                    &path,
+                    &olds,
+                    &npath,
+                    &news,
+                    matches!((cell, ncell), (Cell::Up, Cell::Up)),
+                );
             }
         }
         // Markers after the last row.
@@ -924,26 +1088,47 @@ impl<'a> Placer<'a> {
     /// Paragraphs of a cell: aligned like blocks; when the text changed, one
     /// character diff over the whole cell lets text carry its entries across
     /// a split or join inside it.
-    fn cell(&mut self, path: &Path, olds: &[Inline], npath: &Path, news: &[Inline], both_covered: bool) {
+    fn cell(
+        &mut self,
+        path: &Path,
+        olds: &[Inline],
+        npath: &Path,
+        news: &[Inline],
+        both_covered: bool,
+    ) {
         let pmap: Vec<Option<usize>> = if both_covered || olds.len() == news.len() {
-            (0..olds.len()).map(|k| (k < news.len()).then_some(k)).collect()
+            (0..olds.len())
+                .map(|k| (k < news.len()).then_some(k))
+                .collect()
         } else {
             let as_blocks = |xs: &[Inline]| -> Vec<Block> {
-                xs.iter().map(|x| Block::Para(crate::model::Para::new(String::new(), x.clone(), None))).collect()
+                xs.iter()
+                    .map(|x| Block::Para(crate::model::Para::new(String::new(), x.clone(), None)))
+                    .collect()
             };
             align(&as_blocks(olds), &as_blocks(news))
         };
         let sub = |base: &Path, k: usize| -> Path { base.iter().copied().chain([k]).collect() };
-        let changed = olds.len() != news.len() || olds.iter().zip(news).any(|(a, b)| keys(a) != keys(b));
+        let changed =
+            olds.len() != news.len() || olds.iter().zip(news).any(|(a, b)| keys(a) != keys(b));
         if changed && olds.len() + news.len() > 2 && !both_covered {
             let o = Stream::new(olds.iter().enumerate().map(|(k, x)| (sub(path, k), x)));
             let n = Stream::new(news.iter().enumerate().map(|(k, x)| (sub(npath, k), x)));
             let ops = diff::opcodes(&o.text, &n.text);
-            self.global_map(&Global { old: o, new: n, ops, min_equal: 3 });
+            self.global_map(&Global {
+                old: o,
+                new: n,
+                ops,
+                min_equal: 3,
+            });
         }
         // Markers before a cell paragraph (or after the last) go with it.
         for k in 0..=olds.len() {
-            let to = if k == olds.len() { Some(news.len()) } else { (k..olds.len()).find_map(|x| pmap[x]) };
+            let to = if k == olds.len() {
+                Some(news.len())
+            } else {
+                (k..olds.len()).find_map(|x| pmap[x])
+            };
             for e in self.entries_at(&sub(path, k)) {
                 if e.kind == Kind::Bmarker {
                     self.put(e, sub(npath, to.unwrap_or(news.len())), None, None);
@@ -958,9 +1143,16 @@ impl<'a> Placer<'a> {
                     let target = (k + 1..olds.len())
                         .find_map(|x| pmap[x])
                         .map(|k2| (k2, 0))
-                        .or_else(|| (0..k).rev().find_map(|x| pmap[x]).map(|k2| (k2, news[k2].units.len())));
+                        .or_else(|| {
+                            (0..k)
+                                .rev()
+                                .find_map(|x| pmap[x])
+                                .map(|k2| (k2, news[k2].units.len()))
+                        });
                     for e in self.entries_at(&p) {
-                        if matches!(e.kind, Kind::Keep | Kind::Bkeep | Kind::Bmarker) || self.handled.contains(&e.id) {
+                        if matches!(e.kind, Kind::Keep | Kind::Bkeep | Kind::Bmarker)
+                            || self.handled.contains(&e.id)
+                        {
                             continue;
                         }
                         match target {
@@ -1093,7 +1285,10 @@ impl<'a> Placer<'a> {
     }
 
     fn offset_entries(&self, path: &Path) -> Vec<&'a Entry> {
-        self.entries_at(path).into_iter().filter(|e| e.kind.is_offset()).collect()
+        self.entries_at(path)
+            .into_iter()
+            .filter(|e| e.kind.is_offset())
+            .collect()
     }
 
     /// Oracle: a true split/join map.
@@ -1101,9 +1296,17 @@ impl<'a> Placer<'a> {
         let cross = &self.al.cross;
         for (path, segs) in cross {
             let mp = |pos: usize, right: bool| {
-                let hits: Vec<(Path, usize)> =
-                    segs.iter().filter(|s| s.0 <= pos && pos <= s.1).map(|s| (s.2.clone(), pos - s.0 + s.3)).collect();
-                if right { hits.last().cloned() } else { hits.first().cloned() }.unwrap()
+                let hits: Vec<(Path, usize)> = segs
+                    .iter()
+                    .filter(|s| s.0 <= pos && pos <= s.1)
+                    .map(|s| (s.2.clone(), pos - s.0 + s.3))
+                    .collect();
+                if right {
+                    hits.last().cloned()
+                } else {
+                    hits.first().cloned()
+                }
+                .unwrap()
             };
             for e in self.offset_entries(path) {
                 self.handled.insert(e.id);
@@ -1147,7 +1350,8 @@ impl<'a> Placer<'a> {
         let (old, new, ops) = (&g.old, &g.new, &g.ops);
         let mut survived = vec![false; old.text.len()];
         for o in ops {
-            if o.tag == Tag::Equal && (o.i2 - o.i1 >= g.min_equal || o.i2 - o.i1 == old.text.len()) {
+            if o.tag == Tag::Equal && (o.i2 - o.i1 >= g.min_equal || o.i2 - o.i1 == old.text.len())
+            {
                 survived[o.i1..o.i2].fill(true);
             }
         }
@@ -1171,7 +1375,11 @@ impl<'a> Placer<'a> {
                     new_src[j] = Some(o.i1 + (j - o.j1));
                     continue;
                 }
-                let mut src = if o.tag == Tag::Replace { o.i1 as isize } else { o.i1 as isize - 1 };
+                let mut src = if o.tag == Tag::Replace {
+                    o.i1 as isize
+                } else {
+                    o.i1 as isize - 1
+                };
                 if src < 0 || old.text[src as usize] == SEP {
                     src = o.i1 as isize; // inserted at a paragraph start: join the run on the right
                 }
@@ -1181,7 +1389,9 @@ impl<'a> Placer<'a> {
                     src = (o.i1..o.i2).find(|&k| old.text[k] != SEP).unwrap_or(o.i1) as isize;
                 }
                 let src = (src as usize).min(old.text.len().saturating_sub(1));
-                let Some((p, _)) = old.char_at(src) else { continue };
+                let Some((p, _)) = old.char_at(src) else {
+                    continue;
+                };
                 let lo = old.base[&p];
                 new_owner[j] = resolve_in(&old_owner, src, lo, lo + old.lens[&p]);
             }
@@ -1230,14 +1440,24 @@ impl<'a> Placer<'a> {
                                     placed(e, a.0, a.1, z.1)
                                 }
                             }
-                            _ => Status::Refused("its two ends now fall in different paragraphs".into()).into(),
+                            _ => Status::Refused(
+                                "its two ends now fall in different paragraphs".into(),
+                            )
+                            .into(),
                         }
                     }
                     _ => match new.locate(map_pos(ops, b + s, e.meta.opens)) {
                         Some((p, loc)) => placed(e, p, loc, loc),
                         None => {
-                            let x = Entry { kind: Kind::Tail, ..moved(e, vec![], None, None) };
-                            Status::Placed { entry: x, pieces: vec![] }.into()
+                            let x = Entry {
+                                kind: Kind::Tail,
+                                ..moved(e, vec![], None, None)
+                            };
+                            Status::Placed {
+                                entry: x,
+                                pieces: vec![],
+                            }
+                            .into()
                         }
                     },
                 };
@@ -1249,19 +1469,38 @@ impl<'a> Placer<'a> {
 
 /// `e` re-anchored at `path`.
 fn moved(e: &Entry, path: Path, start: Option<usize>, end: Option<usize>) -> Entry {
-    Entry { path, start, end, ..e.clone() }
+    Entry {
+        path,
+        start,
+        end,
+        ..e.clone()
+    }
 }
 
 fn placed(e: &Entry, path: Path, s: usize, en: usize) -> Outcome {
-    Status::Placed { entry: moved(e, path, Some(s), Some(en)), pieces: vec![] }.into()
+    Status::Placed {
+        entry: moved(e, path, Some(s), Some(en)),
+        pieces: vec![],
+    }
+    .into()
 }
 
 /// The new revision's entries: placed entries, runs split into pieces with
 /// fresh ids.
-pub fn placed_entries(entries: &[Entry], outcomes: &HashMap<u64, Outcome>, next_id: &mut u64) -> Vec<Entry> {
+pub fn placed_entries(
+    entries: &[Entry],
+    outcomes: &HashMap<u64, Outcome>,
+    next_id: &mut u64,
+) -> Vec<Entry> {
     let mut out = vec![];
     for e in entries {
-        let Some(Outcome { status: Status::Placed { entry, pieces }, .. }) = outcomes.get(&e.id) else { continue };
+        let Some(Outcome {
+            status: Status::Placed { entry, pieces },
+            ..
+        }) = outcomes.get(&e.id)
+        else {
+            continue;
+        };
         if pieces.is_empty() {
             out.push(entry.clone());
             continue;
@@ -1272,8 +1511,9 @@ pub fn placed_entries(entries: &[Entry], outcomes: &HashMap<u64, Outcome>, next_
             if !entry.meta.aux_at.is_empty() {
                 // Each piece keeps the items of its own characters.
                 let to = from + (en - s);
-                let mine: Vec<usize> =
-                    (0..entry.meta.aux_at.len()).filter(|&i| (from..to).contains(&entry.meta.aux_at[i])).collect();
+                let mine: Vec<usize> = (0..entry.meta.aux_at.len())
+                    .filter(|&i| (from..to).contains(&entry.meta.aux_at[i]))
+                    .collect();
                 x.meta.aux = mine.iter().map(|&i| entry.meta.aux[i].clone()).collect();
                 x.meta.aux_at = mine.iter().map(|&i| entry.meta.aux_at[i] - from).collect();
                 from = to;

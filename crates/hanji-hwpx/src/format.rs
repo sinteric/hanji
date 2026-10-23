@@ -59,8 +59,10 @@ const WRITE_LINES: [(&str, &str); 6] = [
 ];
 
 /// Hancom's border widths, in millimetres.
-pub const WIDTHS: [&str; 16] =
-    ["0.1", "0.12", "0.15", "0.2", "0.25", "0.3", "0.4", "0.5", "0.6", "0.7", "1.0", "1.5", "2.0", "3.0", "4.0", "5.0"];
+pub const WIDTHS: [&str; 16] = [
+    "0.1", "0.12", "0.15", "0.2", "0.25", "0.3", "0.4", "0.5", "0.6", "0.7", "1.0", "1.5", "2.0",
+    "3.0", "4.0", "5.0",
+];
 
 /// Millimetres in hundredths of a point.
 fn mm(v: f64) -> i64 {
@@ -69,15 +71,25 @@ fn mm(v: f64) -> i64 {
 
 /// The Hancom width nearest `width` (hundredths of a point).
 pub fn snap_width(width: i64) -> &'static str {
-    WIDTHS.iter().min_by_key(|w| (mm(w.parse().unwrap()) - width).abs()).copied().unwrap()
+    WIDTHS
+        .iter()
+        .min_by_key(|w| (mm(w.parse().unwrap()) - width).abs())
+        .copied()
+        .unwrap()
 }
 
 /// A border as it is written, its width snapped to Hancom's.
 pub fn snap_border(b: &Border) -> Border {
     match b {
-        Border::Line { width, style, color } => {
-            Border::Line { width: mm(snap_width(*width).parse().unwrap()), style: style.clone(), color: color.clone() }
-        }
+        Border::Line {
+            width,
+            style,
+            color,
+        } => Border::Line {
+            width: mm(snap_width(*width).parse().unwrap()),
+            style: style.clone(),
+            color: color.clone(),
+        },
         other => other.clone(),
     }
 }
@@ -87,9 +99,9 @@ pub fn snap_border(b: &Border) -> Border {
 pub fn snap(k: Key, v: &Value) -> Value {
     match v {
         Value::Border(b) => Value::Border(snap_border(b)),
-        Value::Spacing(LineSpacing::Percent(p)) if k == Key::LineSpacing => {
-            Value::Spacing(LineSpacing::Percent((*p as f64 / 100.0).round() as i64 * 100))
-        }
+        Value::Spacing(LineSpacing::Percent(p)) if k == Key::LineSpacing => Value::Spacing(
+            LineSpacing::Percent((*p as f64 / 100.0).round() as i64 * 100),
+        ),
         v => v.clone(),
     }
 }
@@ -125,22 +137,37 @@ pub fn border(e: Option<&Element>) -> Border {
         return Border::None;
     }
     let style = LINES.iter().find(|x| x.0 == t).map_or("solid", |x| x.1);
-    let w = e.get("width").and_then(|w| w.split_whitespace().next().and_then(|n| n.parse::<f64>().ok()));
+    let w = e.get("width").and_then(|w| {
+        w.split_whitespace()
+            .next()
+            .and_then(|n| n.parse::<f64>().ok())
+    });
     let c = color(e.get("color")).unwrap_or_else(|| Color::rgb(0, 0, 0));
-    Border::Line { width: mm(w.unwrap_or(0.1)).max(1), style: style.into(), color: c }
+    Border::Line {
+        width: mm(w.unwrap_or(0.1)).max(1),
+        style: style.into(),
+        color: c,
+    }
 }
 
 /// A border fill's `hc:fillBrush` as a fill.
 pub fn fill(bf: &Element) -> Fill {
-    let Some(fb) = child_local(bf, "fillBrush") else { return Fill::None };
+    let Some(fb) = child_local(bf, "fillBrush") else {
+        return Fill::None;
+    };
     if child_local(fb, "gradation").is_some() {
         return Fill::Gradient;
     }
     if child_local(fb, "imgBrush").is_some() {
         return Fill::Picture;
     }
-    let Some(wb) = child_local(fb, "winBrush") else { return Fill::None };
-    if wb.get("hatchStyle").is_some_and(|h| !matches!(h.as_str(), "NONE" | "-1" | "")) {
+    let Some(wb) = child_local(fb, "winBrush") else {
+        return Fill::None;
+    };
+    if wb
+        .get("hatchStyle")
+        .is_some_and(|h| !matches!(h.as_str(), "NONE" | "-1" | ""))
+    {
         return Fill::Pattern;
     }
     color(wb.get("faceColor")).map_or(Fill::None, Fill::Color)
@@ -158,7 +185,10 @@ const SIDES: [(Key, &str); 4] = [
 pub fn border_fill_props(bf: Option<&Element>) -> Props {
     let mut p = Props::new();
     for (k, local) in SIDES {
-        p.set(k, Value::Border(border(bf.and_then(|b| child_local(b, local)))));
+        p.set(
+            k,
+            Value::Border(border(bf.and_then(|b| child_local(b, local)))),
+        );
     }
     p.set(Key::Fill, Value::Fill(bf.map_or(Fill::None, fill)));
     p
@@ -168,11 +198,17 @@ pub fn border_fill_props(bf: Option<&Element>) -> Props {
 /// (the branches of its `hp:switch`, or the shape itself) with the scale of
 /// its lengths, the one to read first.
 fn layout_places(pp: &Element) -> Vec<(&Element, i64)> {
-    let Some(sw) = pp.elements().find(|e| e.local() == "switch") else { return vec![(pp, 2)] };
+    let Some(sw) = pp.elements().find(|e| e.local() == "switch") else {
+        return vec![(pp, 2)];
+    };
     let mut out = vec![];
     for b in sw.elements() {
         match b.local() {
-            "case" if b.attrs.iter().any(|a| a.0.ends_with("required-namespace") && a.1.ends_with("HwpUnitChar")) => {
+            "case"
+                if b.attrs.iter().any(|a| {
+                    a.0.ends_with("required-namespace") && a.1.ends_with("HwpUnitChar")
+                }) =>
+            {
                 out.insert(0, (b, 1))
             }
             "default" => out.push((b, 2)),
@@ -199,7 +235,9 @@ const MARGINS: [(Key, &str); 5] = [
 pub fn para_pr_props(pp: &Element, border_fill: &dyn Fn(u32) -> Option<Element>) -> Props {
     let mut p = Props::new();
     let al = pp.child("hh:align").and_then(|a| a.get("horizontal"));
-    let al = al.and_then(|a| ALIGNS.iter().find(|x| x.0 == a)).map_or("justify", |x| x.1);
+    let al = al
+        .and_then(|a| ALIGNS.iter().find(|x| x.0 == a))
+        .map_or("justify", |x| x.1);
     p.set(Key::Align, Value::Choice(al.into()));
     let places = layout_places(pp);
     let (place, scale) = places[0];
@@ -213,7 +251,9 @@ pub fn para_pr_props(pp: &Element, border_fill: &dyn Fn(u32) -> Option<Element>)
         p.set(k, Value::Len(v / scale));
     }
     let ls = place.elements().find(|e| e.local() == "lineSpacing");
-    let n = ls.and_then(|l| l.get("value")).and_then(|v| v.parse::<i64>().ok());
+    let n = ls
+        .and_then(|l| l.get("value"))
+        .and_then(|v| v.parse::<i64>().ok());
     let spacing = match (ls.and_then(|l| l.get("type")).as_deref(), n) {
         (_, None) => LineSpacing::Percent(16000),
         (Some("FIXED"), Some(v)) => LineSpacing::Exact(v / scale),
@@ -222,7 +262,10 @@ pub fn para_pr_props(pp: &Element, border_fill: &dyn Fn(u32) -> Option<Element>)
         (_, Some(v)) => LineSpacing::Percent(v * 100),
     };
     p.set(Key::LineSpacing, Value::Spacing(spacing));
-    let bf = pp.child("hh:border").and_then(|b| b.get("borderFillIDRef")).and_then(|v| v.parse().ok());
+    let bf = pp
+        .child("hh:border")
+        .and_then(|b| b.get("borderFillIDRef"))
+        .and_then(|v| v.parse().ok());
     let bf = bf.and_then(border_fill);
     p = p.overlay(&border_fill_props(bf.as_ref()));
     p
@@ -232,15 +275,32 @@ pub fn para_pr_props(pp: &Element, border_fill: &dyn Fn(u32) -> Option<Element>)
 /// the four flags. `fonts`: the Hangul font faces by id.
 pub fn char_pr_props(cp: &Element, fonts: &HashMap<u32, String>) -> Props {
     let mut p = Props::new();
-    let face = cp.child("hh:fontRef").and_then(|f| f.get("hangul")).and_then(|v| v.parse().ok());
-    if let Some(f) = face.and_then(|id: u32| fonts.get(&id)).filter(|f| !f.trim().is_empty()) {
+    let face = cp
+        .child("hh:fontRef")
+        .and_then(|f| f.get("hangul"))
+        .and_then(|v| v.parse().ok());
+    if let Some(f) = face
+        .and_then(|id: u32| fonts.get(&id))
+        .filter(|f| !f.trim().is_empty())
+    {
         p.set(Key::Font, Value::Text(f.trim().to_string()));
     }
-    let size = cp.get("height").and_then(|v| v.parse::<i64>().ok()).filter(|n| *n > 0).unwrap_or(1000);
+    let size = cp
+        .get("height")
+        .and_then(|v| v.parse::<i64>().ok())
+        .filter(|n| *n > 0)
+        .unwrap_or(1000);
     p.set(Key::Size, Value::Len(size));
-    p.set(Key::Color, Value::Color(color(cp.get("textColor")).unwrap_or_else(|| Color::rgb(0, 0, 0))));
-    let underline = cp.child("hh:underline").is_some_and(|u| u.get("type").is_some_and(|t| t != "NONE"));
-    let strike = cp.child("hh:strikeout").is_some_and(|u| u.get("shape").is_some_and(|t| strikes(&t)));
+    p.set(
+        Key::Color,
+        Value::Color(color(cp.get("textColor")).unwrap_or_else(|| Color::rgb(0, 0, 0))),
+    );
+    let underline = cp
+        .child("hh:underline")
+        .is_some_and(|u| u.get("type").is_some_and(|t| t != "NONE"));
+    let strike = cp
+        .child("hh:strikeout")
+        .is_some_and(|u| u.get("shape").is_some_and(|t| strikes(&t)));
     p.set(Key::Bold, Value::Flag(cp.child("hh:bold").is_some()));
     p.set(Key::Italic, Value::Flag(cp.child("hh:italic").is_some()));
     p.set(Key::Underline, Value::Flag(underline));
@@ -296,14 +356,30 @@ pub fn rgb(c: &Color) -> Result<String, String> {
 }
 
 /// Order of a paragraph shape's children.
-const PARAPR_ORDER: &[&str] = &["align", "heading", "breakSetting", "margin", "lineSpacing", "border", "autoSpacing"];
+const PARAPR_ORDER: &[&str] = &[
+    "align",
+    "heading",
+    "breakSetting",
+    "margin",
+    "lineSpacing",
+    "border",
+    "autoSpacing",
+];
 
 /// Order of a margin's children.
 const MARGIN_ORDER: &[&str] = &["intent", "left", "right", "prev", "next"];
 
 /// Order of a border fill's children.
-pub const BORDERFILL_ORDER: &[&str] =
-    &["slash", "backSlash", "leftBorder", "rightBorder", "topBorder", "bottomBorder", "diagonal", "fillBrush"];
+pub const BORDERFILL_ORDER: &[&str] = &[
+    "slash",
+    "backSlash",
+    "leftBorder",
+    "rightBorder",
+    "topBorder",
+    "bottomBorder",
+    "diagonal",
+    "fillBrush",
+];
 
 fn child_local_mut<'a>(e: &'a mut Element, local: &str) -> Option<&'a mut Element> {
     e.elements_mut().find(|x| x.local() == local)
@@ -324,7 +400,9 @@ pub fn set_para(pp: &mut Element, k: Key, v: &Value) -> Result<(), String> {
             Some(al) => al.set("horizontal", &a),
             None => insert_ordered(
                 pp,
-                Element::new("hh:align").with_attr("horizontal", &a).with_attr("vertical", "BASELINE"),
+                Element::new("hh:align")
+                    .with_attr("horizontal", &a)
+                    .with_attr("vertical", "BASELINE"),
                 PARAPR_ORDER,
             ),
         }
@@ -338,7 +416,10 @@ pub fn set_para(pp: &mut Element, k: Key, v: &Value) -> Result<(), String> {
                 insert_ordered(place, Element::new("hh:margin"), order);
             }
             let m = child_local_mut(place, "margin").unwrap();
-            let cpre = m.elements().next().map_or("hc:".to_string(), |c| prefix(c).to_string());
+            let cpre = m
+                .elements()
+                .next()
+                .map_or("hc:".to_string(), |c| prefix(c).to_string());
             match child_local_mut(m, local) {
                 Some(c) => c.set("value", &n.to_string()),
                 None => insert_ordered(
@@ -351,7 +432,9 @@ pub fn set_para(pp: &mut Element, k: Key, v: &Value) -> Result<(), String> {
             }
             return Ok(());
         }
-        let Value::Spacing(ls) = v else { return Err(format!("{k} cannot be written to a paragraph shape")) };
+        let Value::Spacing(ls) = v else {
+            return Err(format!("{k} cannot be written to a paragraph shape"));
+        };
         let (ty, n) = match ls {
             LineSpacing::Percent(p) => ("PERCENT", (*p as f64 / 100.0).round() as i64),
             LineSpacing::Exact(l) => ("FIXED", l * scale),
@@ -379,7 +462,9 @@ pub fn set_para(pp: &mut Element, k: Key, v: &Value) -> Result<(), String> {
         for b in sw.elements_mut() {
             let scale = match b.local() {
                 "case"
-                    if b.attrs.iter().any(|a| a.0.ends_with("required-namespace") && a.1.ends_with("HwpUnitChar")) =>
+                    if b.attrs.iter().any(|a| {
+                        a.0.ends_with("required-namespace") && a.1.ends_with("HwpUnitChar")
+                    }) =>
                 {
                     1
                 }
@@ -397,7 +482,11 @@ pub fn set_para(pp: &mut Element, k: Key, v: &Value) -> Result<(), String> {
 /// Sets a border fill's side `k` to `b`, its width snapped to Hancom's.
 pub fn set_side(bf: &mut Element, k: Key, b: &Border) -> Result<(), String> {
     writable(k, &Value::Border(b.clone()))?;
-    let local = SIDES.iter().find(|s| s.0 == k).map(|s| s.1).ok_or("not a side")?;
+    let local = SIDES
+        .iter()
+        .find(|s| s.0 == k)
+        .map(|s| s.1)
+        .ok_or("not a side")?;
     let pre = prefix(bf).to_string();
     if child_local(bf, local).is_none() {
         let e = Element::new(&format!("{pre}{local}"))
@@ -410,10 +499,18 @@ pub fn set_side(bf: &mut Element, k: Key, b: &Border) -> Result<(), String> {
     let e = child_local_mut(bf, local).unwrap();
     match b {
         Border::None => e.set("type", "NONE"),
-        Border::Line { width, style, color } => {
+        Border::Line {
+            width,
+            style,
+            color,
+        } => {
             let same_style = matches!(&cur, Border::Line { style: s, .. } if s == style);
             if !same_style {
-                let t = WRITE_LINES.iter().find(|x| x.0 == style).map(|x| x.1).unwrap_or("SOLID");
+                let t = WRITE_LINES
+                    .iter()
+                    .find(|x| x.0 == style)
+                    .map(|x| x.1)
+                    .unwrap_or("SOLID");
                 e.set("type", t);
             }
             e.set("width", &format!("{} mm", snap_width(*width)));
@@ -449,7 +546,9 @@ pub fn set_fill(bf: &mut Element, f: &Fill) -> Result<(), String> {
         insert_ordered(bf, Element::new("hc:fillBrush"), BORDERFILL_ORDER);
     }
     let fb = child_local_mut(bf, "fillBrush").unwrap();
-    fb.children.retain(|n| !matches!(n, Node::El(e) if e.local() == "gradation" || e.local() == "imgBrush"));
+    fb.children.retain(
+        |n| !matches!(n, Node::El(e) if e.local() == "gradation" || e.local() == "imgBrush"),
+    );
     let pre = prefix(fb).to_string();
     match child_local_mut(fb, "winBrush") {
         Some(wb) => {

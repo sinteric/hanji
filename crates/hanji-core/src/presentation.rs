@@ -88,7 +88,13 @@ pub fn kind(h: &Head) -> HeadKind<'_> {
 }
 
 pub fn slide_head(layout: &str) -> Block {
-    Block::Head(Head { level: 0, key: SLIDE.into(), label: layout.into(), place: None, look: Default::default() })
+    Block::Head(Head {
+        level: 0,
+        key: SLIDE.into(),
+        label: layout.into(),
+        place: None,
+        look: Default::default(),
+    })
 }
 
 pub fn slot_head(name: &str, geom: Option<fmt::Geom>) -> Block {
@@ -167,7 +173,14 @@ fn no_styles() -> StyleSet {
 }
 
 fn head_src(h: &fmt::HeadMap) -> BlockSrc {
-    BlockSrc { start: h.start, end: h.end, kind: SrcKind::Para(fmt::ParaMap { units: vec![], mark: h.mark }) }
+    BlockSrc {
+        start: h.start,
+        end: h.end,
+        kind: SrcKind::Para(fmt::ParaMap {
+            units: vec![],
+            mark: h.mark,
+        }),
+    }
 }
 
 /// Parse and check a presentation's text against `names`, and resolve it:
@@ -245,8 +258,14 @@ pub fn resolve(
             }
             // The item's blocks resolve as a document body would.
             let doc = fmt::Parsed {
-                doc: fmt::Document { styles: vec![], front: parsed.pres.front.clone(), blocks: body },
-                map: fmt::SourceMap { blocks: im.blocks.clone() },
+                doc: fmt::Document {
+                    styles: vec![],
+                    front: parsed.pres.front.clone(),
+                    blocks: body,
+                },
+                map: fmt::SourceMap {
+                    blocks: im.blocks.clone(),
+                },
             };
             match model::resolve(&doc, text, &styles, caps, is_block_keep) {
                 Ok(b) => {
@@ -266,20 +285,32 @@ pub fn resolve(
 }
 
 /// Flat blocks → the Presentation AST, in canonical shape.
-pub fn unresolve(blocks: &[Block], front: fmt::FrontMatter, keep: &dyn Fn(&str) -> fmt::Keep) -> fmt::Presentation {
+pub fn unresolve(
+    blocks: &[Block],
+    front: fmt::FrontMatter,
+    keep: &dyn Fn(&str) -> fmt::Keep,
+) -> fmt::Presentation {
     let styles = no_styles();
-    let mut pres = fmt::Presentation { front: front.clone(), slides: vec![] };
+    let mut pres = fmt::Presentation {
+        front: front.clone(),
+        slides: vec![],
+    };
     let mut k = 0;
     while k < blocks.len() {
         let Block::Head(h) = &blocks[k] else {
             k += 1; // not held by a head: a malformed model
             continue;
         };
-        let end = (k + 1..blocks.len()).find(|&x| blocks[x].head().is_some()).unwrap_or(blocks.len());
+        let end = (k + 1..blocks.len())
+            .find(|&x| blocks[x].head().is_some())
+            .unwrap_or(blocks.len());
         let body = &blocks[k + 1..end];
         let geom = geom_of(h);
         match kind(h) {
-            HeadKind::Slide { layout } => pres.slides.push(fmt::Slide { layout: layout.into(), items: vec![] }),
+            HeadKind::Slide { layout } => pres.slides.push(fmt::Slide {
+                layout: layout.into(),
+                items: vec![],
+            }),
             HeadKind::Slot { name } => {
                 let blocks = model::unresolve(body, &styles, front.clone(), keep).blocks;
                 if let Some(s) = pres.slides.last_mut() {
@@ -300,13 +331,22 @@ pub fn unresolve(blocks: &[Block], front: fmt::FrontMatter, keep: &dyn Fn(&str) 
                     })
                     .collect();
                 if let Some(s) = pres.slides.last_mut() {
-                    let sh = fmt::ShapeText { id: id.into(), name: name.into(), geom, look: (*h.look).clone(), paras };
+                    let sh = fmt::ShapeText {
+                        id: id.into(),
+                        name: name.into(),
+                        geom,
+                        look: (*h.look).clone(),
+                        paras,
+                    };
                     s.items.push(fmt::SlideItem::Shape(sh));
                 }
             }
             HeadKind::Object => {
                 if let (Some(s), Some(Block::Keep(id))) = (pres.slides.last_mut(), body.first()) {
-                    s.items.push(fmt::SlideItem::Object(fmt::ObjectItem { keep: keep(id), geom }));
+                    s.items.push(fmt::SlideItem::Object(fmt::ObjectItem {
+                        keep: keep(id),
+                        geom,
+                    }));
                 }
             }
             HeadKind::Line { id, name } => {

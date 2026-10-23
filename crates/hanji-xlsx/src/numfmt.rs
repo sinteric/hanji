@@ -60,7 +60,9 @@ pub fn display(v: &CellValue, code: &str, date1904: bool) -> String {
         CellValue::Empty => String::new(),
         CellValue::Bool(b) => (if *b { "TRUE" } else { "FALSE" }).into(),
         CellValue::Error(e) => e.clone(),
-        CellValue::Text(s) => text_section(code).map_or_else(|| s.clone(), |sec| render_text(&sec, s)),
+        CellValue::Text(s) => {
+            text_section(code).map_or_else(|| s.clone(), |sec| render_text(&sec, s))
+        }
         CellValue::Number(x) => number(*x, code, date1904),
     }
 }
@@ -114,7 +116,9 @@ fn text_section(code: &str) -> Option<String> {
 
 /// Whether `c` appears outside quotes and escapes.
 fn has_outside(s: &str, c: char) -> bool {
-    tokens(s).iter().any(|t| matches!(t, Tk::Code(x) if *x == c))
+    tokens(s)
+        .iter()
+        .any(|t| matches!(t, Tk::Code(x) if *x == c))
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -222,15 +226,28 @@ fn number(x: f64, code: &str, date1904: bool) -> String {
     let secs: Vec<String> = sections(code).into_iter().collect();
     let conds: Vec<Option<(String, f64)>> = secs
         .iter()
-        .map(|s| tokens(s).into_iter().find_map(|t| if let Tk::Bracket(b) = t { condition(&b) } else { None }))
+        .map(|s| {
+            tokens(s).into_iter().find_map(|t| {
+                if let Tk::Bracket(b) = t {
+                    condition(&b)
+                } else {
+                    None
+                }
+            })
+        })
         .collect();
     // Which section, and whether it shows the sign itself.
     let (sec, signed) = if conds.iter().any(Option::is_some) {
         let k = (0..secs.len().min(3)).find(|&k| conds[k].as_ref().is_some_and(|c| holds(c, x)));
         match k {
-            Some(k) => (secs[k].clone(), k == 0 && conds[0].as_ref().is_some_and(|c| c.1 >= 0.0 || x >= 0.0)),
+            Some(k) => (
+                secs[k].clone(),
+                k == 0 && conds[0].as_ref().is_some_and(|c| c.1 >= 0.0 || x >= 0.0),
+            ),
             None => {
-                let k = (0..secs.len().min(3)).find(|&k| conds[k].is_none()).unwrap_or(secs.len() - 1);
+                let k = (0..secs.len().min(3))
+                    .find(|&k| conds[k].is_none())
+                    .unwrap_or(secs.len() - 1);
                 (secs[k].clone(), true)
             }
         }
@@ -257,7 +274,9 @@ fn number(x: f64, code: &str, date1904: bool) -> String {
     };
     let v = if signed { x } else { x.abs() };
     let toks = tokens(&sec);
-    if sec.trim().eq_ignore_ascii_case("general") || toks.iter().all(|t| matches!(t, Tk::Bracket(_))) {
+    if sec.trim().eq_ignore_ascii_case("general")
+        || toks.iter().all(|t| matches!(t, Tk::Bracket(_)))
+    {
         let mut out = String::new();
         for t in &toks {
             if let Tk::Bracket(b) = t {
@@ -269,7 +288,10 @@ fn number(x: f64, code: &str, date1904: bool) -> String {
     if is_date(&toks) {
         return date(v, &toks, date1904);
     }
-    if toks.iter().any(|t| matches!(t, Tk::Code(c) if c.eq_ignore_ascii_case(&'g'))) {
+    if toks
+        .iter()
+        .any(|t| matches!(t, Tk::Code(c) if c.eq_ignore_ascii_case(&'g')))
+    {
         // `General` with literals around it
         let mut out = String::new();
         let mut skip = 0;
@@ -319,7 +341,11 @@ pub fn general(x: f64) -> String {
         let e: i32 = e.parse().unwrap();
         return format!("{m}E{}{:02}", if e < 0 { '-' } else { '+' }, e.abs());
     }
-    let int_digits = if a < 1.0 { 1 } else { a.log10().floor() as i32 + 1 };
+    let int_digits = if a < 1.0 {
+        1
+    } else {
+        a.log10().floor() as i32 + 1
+    };
     let places = (10 - int_digits).max(0) as usize;
     let (neg, i, f) = round_decimal(x, places);
     let f = f.trim_end_matches('0');
@@ -347,15 +373,27 @@ fn round_shifted(x: f64, shift: i32, places: usize) -> (bool, String, String) {
     let s = format!("{:.14e}", x.abs());
     let (m, e) = s.split_once('e').unwrap();
     let e: i32 = e.parse().unwrap();
-    let digits: Vec<u8> = m.bytes().filter(|b| b.is_ascii_digit()).map(|b| b - b'0').collect();
+    let digits: Vec<u8> = m
+        .bytes()
+        .filter(|b| b.is_ascii_digit())
+        .map(|b| b - b'0')
+        .collect();
     // value = 0.d1d2d3… × 10^(e+1+shift)
     let point = e + 1 + shift;
     let keep = point + places as i32;
-    let mut ds: Vec<u8> = if keep <= 0 { vec![] } else { digits.iter().copied().take(keep as usize).collect() };
+    let mut ds: Vec<u8> = if keep <= 0 {
+        vec![]
+    } else {
+        digits.iter().copied().take(keep as usize).collect()
+    };
     while (ds.len() as i32) < keep {
         ds.push(0);
     }
-    let next = if keep < 0 { 0 } else { digits.get(keep as usize).copied().unwrap_or(0) };
+    let next = if keep < 0 {
+        0
+    } else {
+        digits.get(keep as usize).copied().unwrap_or(0)
+    };
     let mut point = point;
     if next >= 5 {
         let mut k = ds.len();
@@ -387,7 +425,11 @@ fn round_shifted(x: f64, shift: i32, places: usize) -> (bool, String, String) {
         frac.push('0');
     }
     let int_trim = int.trim_start_matches('0');
-    int = if int_trim.is_empty() { "0".into() } else { int_trim.into() };
+    int = if int_trim.is_empty() {
+        "0".into()
+    } else {
+        int_trim.into()
+    };
     let zero = int == "0" && frac.bytes().all(|b| b == b'0');
     (neg && !zero, int, frac)
 }
@@ -407,32 +449,68 @@ fn group(int: &str) -> String {
 fn numeric(x: f64, toks: &[Tk]) -> String {
     // Placeholders: integer part, fraction part, exponent.
     let is_ph = |c: char| matches!(c, '0' | '#' | '?');
-    let codes: Vec<(usize, char)> =
-        toks.iter().enumerate().filter_map(|(k, t)| if let Tk::Code(c) = t { Some((k, *c)) } else { None }).collect();
+    let codes: Vec<(usize, char)> = toks
+        .iter()
+        .enumerate()
+        .filter_map(|(k, t)| {
+            if let Tk::Code(c) = t {
+                Some((k, *c))
+            } else {
+                None
+            }
+        })
+        .collect();
     let first_ph = codes.iter().find(|(_, c)| is_ph(*c)).map(|x| x.0);
     let last_ph = codes.iter().rev().find(|(_, c)| is_ph(*c)).map(|x| x.0);
     let Some((first_ph, last_ph)) = first_ph.zip(last_ph) else {
         // No digits: literals only (e.g. `"-"`).
         return literals(toks);
     };
-    if codes.iter().any(|(_, c)| *c == '/') && codes.iter().any(|(k, c)| *c == '/' && *k > first_ph && *k < last_ph) {
+    if codes.iter().any(|(_, c)| *c == '/')
+        && codes
+            .iter()
+            .any(|(k, c)| *c == '/' && *k > first_ph && *k < last_ph)
+    {
         return fraction(x, toks);
     }
     let percent = codes.iter().filter(|(_, c)| *c == '%').count() as i32;
-    let exp_at = codes.iter().find(|(k, c)| c.eq_ignore_ascii_case(&'e') && *k > first_ph).map(|x| x.0);
+    let exp_at = codes
+        .iter()
+        .find(|(k, c)| c.eq_ignore_ascii_case(&'e') && *k > first_ph)
+        .map(|x| x.0);
     let dot = codes
         .iter()
-        .find(|(k, c)| *c == '.' && *k > first_ph.saturating_sub(1) && exp_at.is_none_or(|e| *k < e))
+        .find(|(k, c)| {
+            *c == '.' && *k > first_ph.saturating_sub(1) && exp_at.is_none_or(|e| *k < e)
+        })
         .map(|x| x.0);
-    let dot = dot.or_else(|| codes.iter().find(|(_, c)| *c == '.').map(|x| x.0).filter(|k| *k < last_ph));
+    let dot = dot.or_else(|| {
+        codes
+            .iter()
+            .find(|(_, c)| *c == '.')
+            .map(|x| x.0)
+            .filter(|k| *k < last_ph)
+    });
     let mant_end = exp_at.unwrap_or(toks.len());
     let int_end = dot.unwrap_or(mant_end);
     let int_ph: Vec<char> = (first_ph..int_end)
-        .filter_map(|k| if let Tk::Code(c) = &toks[k] { is_ph(*c).then_some(*c) } else { None })
+        .filter_map(|k| {
+            if let Tk::Code(c) = &toks[k] {
+                is_ph(*c).then_some(*c)
+            } else {
+                None
+            }
+        })
         .collect();
     let frac_ph: Vec<char> = dot.map_or(vec![], |d| {
         (d + 1..mant_end)
-            .filter_map(|k| if let Tk::Code(c) = &toks[k] { is_ph(*c).then_some(*c) } else { None })
+            .filter_map(|k| {
+                if let Tk::Code(c) = &toks[k] {
+                    is_ph(*c).then_some(*c)
+                } else {
+                    None
+                }
+            })
             .collect()
     });
     let grouping = (first_ph..int_end).any(|k| {
@@ -442,8 +520,10 @@ fn numeric(x: f64, toks: &[Tk]) -> String {
             && (k + 1..int_end).any(|j| matches!(&toks[j], Tk::Code(c) if is_ph(*c)))
     });
     // Trailing commas after the last integer placeholder scale by 1000.
-    let last_int_ph =
-        (first_ph..int_end).rev().find(|&k| matches!(&toks[k], Tk::Code(c) if is_ph(*c))).unwrap_or(first_ph);
+    let last_int_ph = (first_ph..int_end)
+        .rev()
+        .find(|&k| matches!(&toks[k], Tk::Code(c) if is_ph(*c)))
+        .unwrap_or(first_ph);
     let mut scale = 0;
     let mut k = last_int_ph + 1;
     while k < toks.len() && toks[k] == Tk::Code(',') {
@@ -461,12 +541,22 @@ fn numeric(x: f64, toks: &[Tk]) -> String {
     if let Some(e) = exp_at {
         let sign_plus = matches!(toks.get(e + 1), Some(Tk::Code('+')));
         let exp_digits: Vec<char> = (e + 1..toks.len())
-            .filter_map(|k| if let Tk::Code(c) = &toks[k] { is_ph(*c).then_some(*c) } else { None })
+            .filter_map(|k| {
+                if let Tk::Code(c) = &toks[k] {
+                    is_ph(*c).then_some(*c)
+                } else {
+                    None
+                }
+            })
             .collect();
         let mut ex = 0;
         if v != 0.0 {
             // Engineering form (`##0.0E+0`): the exponent a multiple of the integer placeholders.
-            let step = if int_ph.len() > 1 && int_ph.contains(&'#') { int_ph.len() as i32 } else { 1 };
+            let step = if int_ph.len() > 1 && int_ph.contains(&'#') {
+                int_ph.len() as i32
+            } else {
+                1
+            };
             ex = v.abs().log10().floor() as i32 + shift;
             if step > 1 {
                 ex = ex.div_euclid(step) * step;
@@ -500,7 +590,11 @@ fn numeric(x: f64, toks: &[Tk]) -> String {
     // Integer digits with the placeholders' minimum width.
     let min_int = int_ph.iter().filter(|c| **c == '0').count();
     let q_int = int_ph.iter().filter(|c| **c == '?').count();
-    let mut int_s = if int == "0" && min_int == 0 { String::new() } else { int.clone() };
+    let mut int_s = if int == "0" && min_int == 0 {
+        String::new()
+    } else {
+        int.clone()
+    };
     while int_s.len() < min_int {
         int_s.insert(0, '0');
     }
@@ -513,12 +607,20 @@ fn numeric(x: f64, toks: &[Tk]) -> String {
     }
     // Literals between integer placeholders (`###-####`): digits fill the
     // placeholders from the right, the first taking what is left.
-    let int_pos: Vec<usize> = (first_ph..int_end).filter(|&k| matches!(&toks[k], Tk::Code(c) if is_ph(*c))).collect();
-    let interleaved =
-        !grouping && int_pos.windows(2).any(|w| (w[0] + 1..w[1]).any(|k| !matches!(&toks[k], Tk::Code(','))));
+    let int_pos: Vec<usize> = (first_ph..int_end)
+        .filter(|&k| matches!(&toks[k], Tk::Code(c) if is_ph(*c)))
+        .collect();
+    let interleaved = !grouping
+        && int_pos
+            .windows(2)
+            .any(|w| (w[0] + 1..w[1]).any(|k| !matches!(&toks[k], Tk::Code(','))));
     let mut int_at: std::collections::HashMap<usize, String> = std::collections::HashMap::new();
     if interleaved {
-        let digits: Vec<char> = if int == "0" && min_int == 0 { vec![] } else { int.chars().collect() };
+        let digits: Vec<char> = if int == "0" && min_int == 0 {
+            vec![]
+        } else {
+            int.chars().collect()
+        };
         let mut di = digits.len();
         for (j, &k) in int_pos.iter().enumerate().rev() {
             let ph = if let Tk::Code(c) = &toks[k] { *c } else { '#' };
@@ -562,7 +664,9 @@ fn numeric(x: f64, toks: &[Tk]) -> String {
         if Some(k) == exp_at {
             out.push_str(&exp_text);
             k += 1;
-            while k < toks.len() && matches!(&toks[k], Tk::Code(c) if is_ph(*c) || *c == '+' || *c == '-') {
+            while k < toks.len()
+                && matches!(&toks[k], Tk::Code(c) if is_ph(*c) || *c == '+' || *c == '-')
+            {
                 k += 1;
             }
             continue;
@@ -622,17 +726,29 @@ fn literals(toks: &[Tk]) -> String {
 
 fn fraction(x: f64, toks: &[Tk]) -> String {
     // `# ?/?`, `# ??/??`, `?/8`: whole part (if a placeholder precedes a space), then numerator/denominator.
-    let codes: String = toks.iter().map(|t| if let Tk::Code(c) = t { *c } else { ' ' }).collect();
+    let codes: String = toks
+        .iter()
+        .map(|t| if let Tk::Code(c) = t { *c } else { ' ' })
+        .collect();
     let slash = codes.find('/').unwrap();
     let den_part = &codes[slash + 1..];
-    let den_digits = den_part.chars().take_while(|c| matches!(c, '0' | '#' | '?' | '1'..='9')).collect::<String>();
-    let fixed: Option<u64> =
-        den_digits.parse().ok().filter(|d| *d > 0 && den_digits.chars().all(|c| c.is_ascii_digit()));
+    let den_digits = den_part
+        .chars()
+        .take_while(|c| matches!(c, '0' | '#' | '?' | '1'..='9'))
+        .collect::<String>();
+    let fixed: Option<u64> = den_digits
+        .parse()
+        .ok()
+        .filter(|d| *d > 0 && den_digits.chars().all(|c| c.is_ascii_digit()));
     let before = codes[..slash].trim_end();
     let has_whole = before.contains(' ') || before.split_whitespace().count() > 1;
     let neg = x < 0.0;
     let a = x.abs();
-    let (whole, f) = if has_whole { (a.trunc(), a.fract()) } else { (0.0, a) };
+    let (whole, f) = if has_whole {
+        (a.trunc(), a.fract())
+    } else {
+        (0.0, a)
+    };
     // Past 15 digits an f64 has no more to tell.
     let max_den = 10u64.pow(den_digits.len().clamp(1, 15) as u32) - 1;
     let (mut n, d) = match fixed {
@@ -717,7 +833,8 @@ pub fn civil(serial: f64, date1904: bool) -> Option<(i64, u32, u32)> {
     } else {
         days_from_civil(1899, 12, 30)
     };
-    (days >= 0 && base + days <= days_from_civil(9999, 12, 31)).then(|| civil_from_days(base + days))
+    (days >= 0 && base + days <= days_from_civil(9999, 12, 31))
+        .then(|| civil_from_days(base + days))
 }
 
 /// Days from 1970-01-01 of a civil date.
@@ -769,7 +886,15 @@ const MONTHS: [&str; 12] = [
     "November",
     "December",
 ];
-const DAYS: [&str; 7] = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const DAYS: [&str; 7] = [
+    "Sunday",
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+];
 
 fn date(x: f64, toks: &[Tk], date1904: bool) -> String {
     if x < 0.0 {
@@ -778,9 +903,14 @@ fn date(x: f64, toks: &[Tk], date1904: bool) -> String {
     // Fractional seconds shown: the count of 0s after `s.`. Past microseconds,
     // more than a present-day serial holds, the digits show as 0s and 10^digits
     // stays finite.
-    let codes: Vec<char> = toks.iter().filter_map(|t| if let Tk::Code(c) = t { Some(*c) } else { None }).collect();
+    let codes: Vec<char> = toks
+        .iter()
+        .filter_map(|t| if let Tk::Code(c) = t { Some(*c) } else { None })
+        .collect();
     let low: String = codes.iter().collect::<String>().to_ascii_lowercase();
-    let sub_digits = low.find("s.").map_or(0, |k| low[k + 2..].chars().take_while(|c| *c == '0').count());
+    let sub_digits = low.find("s.").map_or(0, |k| {
+        low[k + 2..].chars().take_while(|c| *c == '0').count()
+    });
     let sub_shown = sub_digits.min(6);
     let sub_unit = 10f64.powi(sub_shown as i32);
     let unit = 86_400.0 * sub_unit;
@@ -794,7 +924,9 @@ fn date(x: f64, toks: &[Tk], date1904: bool) -> String {
         (total_secs % 60.0).floor() as u64,
     );
     let sub = (rem % sub_unit) as u64;
-    let Some((y, mo, d)) = civil(day, date1904) else { return "#".repeat(11) };
+    let Some((y, mo, d)) = civil(day, date1904) else {
+        return "#".repeat(11);
+    };
     let ampm = low.contains("am/pm") || low.contains("a/p");
     let weekday = ((days_from_civil(y, mo, d) % 7 + 11) % 7) as usize; // 1970-01-01 was a Thursday
     let mut out = String::new();
@@ -824,16 +956,26 @@ fn date(x: f64, toks: &[Tk], date1904: bool) -> String {
         match &toks[k] {
             Tk::Code(c) => {
                 let lc = c.to_ascii_lowercase();
-                let run =
-                    toks[k..].iter().take_while(|t| matches!(t, Tk::Code(x) if x.eq_ignore_ascii_case(c))).count();
+                let run = toks[k..]
+                    .iter()
+                    .take_while(|t| matches!(t, Tk::Code(x) if x.eq_ignore_ascii_case(c)))
+                    .count();
                 match lc {
                     'y' => {
-                        out.push_str(&if run <= 2 { format!("{:02}", y % 100) } else { format!("{y:04}") });
+                        out.push_str(&if run <= 2 {
+                            format!("{:02}", y % 100)
+                        } else {
+                            format!("{y:04}")
+                        });
                         k += run;
                         continue;
                     }
                     'm' if run <= 2 && is_minute(k) => {
-                        out.push_str(&if run == 2 { format!("{mm:02}") } else { mm.to_string() });
+                        out.push_str(&if run == 2 {
+                            format!("{mm:02}")
+                        } else {
+                            mm.to_string()
+                        });
                         k += run;
                         continue;
                     }
@@ -862,12 +1004,20 @@ fn date(x: f64, toks: &[Tk], date1904: bool) -> String {
                     }
                     'h' => {
                         let h = if ampm { (hh + 11) % 12 + 1 } else { hh };
-                        out.push_str(&if run >= 2 { format!("{h:02}") } else { h.to_string() });
+                        out.push_str(&if run >= 2 {
+                            format!("{h:02}")
+                        } else {
+                            h.to_string()
+                        });
                         k += run;
                         continue;
                     }
                     's' => {
-                        out.push_str(&if run >= 2 { format!("{ss:02}") } else { ss.to_string() });
+                        out.push_str(&if run >= 2 {
+                            format!("{ss:02}")
+                        } else {
+                            ss.to_string()
+                        });
                         k += run;
                         continue;
                     }
@@ -889,7 +1039,10 @@ fn date(x: f64, toks: &[Tk], date1904: bool) -> String {
                         }
                         out.push(*c);
                     }
-                    '.' if sub_digits > 0 && low.contains("s.") && matches!(toks.get(k + 1), Some(Tk::Code('0'))) => {
+                    '.' if sub_digits > 0
+                        && low.contains("s.")
+                        && matches!(toks.get(k + 1), Some(Tk::Code('0'))) =>
+                    {
                         out.push('.');
                         out.push_str(&format!("{:0w$}", sub, w = sub_shown));
                         out.push_str(&"0".repeat(sub_digits - sub_shown));
@@ -947,7 +1100,10 @@ mod tests {
         assert_eq!(n(0.0, "0.0"), "0.0");
         assert_eq!(n(-0.001, "0.0"), "0.0");
         assert_eq!(n(5.0, "#.##"), "5.");
-        assert_eq!(n(1234.0, "_-* #,##0_-;-* #,##0_-;_-* \"-\"_-;_-@_-"), " 1,234 ");
+        assert_eq!(
+            n(1234.0, "_-* #,##0_-;-* #,##0_-;_-* \"-\"_-;_-@_-"),
+            " 1,234 "
+        );
         assert_eq!(n(7.0, "[Red][<=9999999]###-####;(###) ###-####"), "-7");
     }
 
@@ -972,14 +1128,37 @@ mod tests {
         for d in 1..=120u32 {
             for n in 0..=d {
                 let q = n as f64 / d as f64;
-                fs.extend([q, q + 1e-9, (q - 1e-9).max(0.0), q + 1e-4, (q - 1e-4).max(0.0)]);
+                fs.extend([
+                    q,
+                    q + 1e-9,
+                    (q - 1e-9).max(0.0),
+                    q + 1e-4,
+                    (q - 1e-4).max(0.0),
+                ]);
             }
         }
-        fs.extend([std::f64::consts::PI, std::f64::consts::E, std::f64::consts::SQRT_2, 0.1 + 0.2, 1.0 / 3.0]);
-        fs.extend([2.0 / 3.0 + 1e-13, 0.123456789, 0.999999, 0.000001, 7.0 / 9.0, 32769.0 / 65536.0]);
+        fs.extend([
+            std::f64::consts::PI,
+            std::f64::consts::E,
+            std::f64::consts::SQRT_2,
+            0.1 + 0.2,
+            1.0 / 3.0,
+        ]);
+        fs.extend([
+            2.0 / 3.0 + 1e-13,
+            0.123456789,
+            0.999999,
+            0.000001,
+            7.0 / 9.0,
+            32769.0 / 65536.0,
+        ]);
         for max_den in [9, 99, 999] {
             for &f in &fs {
-                assert_eq!(best_fraction(f, max_den), best_fraction_linear(f, max_den), "f = {f}, max_den = {max_den}");
+                assert_eq!(
+                    best_fraction(f, max_den),
+                    best_fraction_linear(f, max_den),
+                    "f = {f}, max_den = {max_den}"
+                );
             }
         }
     }
@@ -995,7 +1174,10 @@ mod tests {
         assert_eq!(n(1.0 / 3.0, "?/?????????"), "1/3");
         assert_eq!(n(0.1 + 0.2, "?/????????"), "3/10");
         // The first convergent of π within 1e-12.
-        assert_eq!(n(std::f64::consts::PI, "# ??????????/??????????"), "3 192583/1360120");
+        assert_eq!(
+            n(std::f64::consts::PI, "# ??????????/??????????"),
+            "3 192583/1360120"
+        );
         assert_eq!(n(0.0, "# ????????/????????"), "0");
     }
 
@@ -1036,8 +1218,14 @@ mod tests {
         assert_eq!(n(1e300, "[h]:mm"), "#".repeat(11));
         assert_eq!(n(2_958_465.5, "yyyy-mm-dd"), "9999-12-31");
         assert_eq!(n(2_958_466.0, "yyyy-mm-dd"), "#".repeat(11));
-        assert_eq!(display(&CellValue::Number(2_957_003.0), "yyyy-mm-dd", true), "9999-12-31");
-        assert_eq!(display(&CellValue::Number(2_957_004.0), "yyyy-mm-dd", true), "#".repeat(11));
+        assert_eq!(
+            display(&CellValue::Number(2_957_003.0), "yyyy-mm-dd", true),
+            "9999-12-31"
+        );
+        assert_eq!(
+            display(&CellValue::Number(2_957_004.0), "yyyy-mm-dd", true),
+            "#".repeat(11)
+        );
     }
 
     #[test]
@@ -1063,8 +1251,14 @@ mod tests {
         assert_eq!(n(-1.5e307, "0.0%"), format!("-15{}.0%", "0".repeat(308)));
         assert_eq!(n(1e307, "0.00E+00%"), "1.00E+309%");
         assert_eq!(n(1.7e308, "0,%"), format!("17{}%", "0".repeat(306)));
-        assert_eq!(n(0.0, &format!("0{}", "%".repeat(200))), format!("0{}", "%".repeat(200)));
-        assert_eq!(n(2.0, &format!("0{}", "%".repeat(200))), format!("2{}{}", "0".repeat(400), "%".repeat(200)));
+        assert_eq!(
+            n(0.0, &format!("0{}", "%".repeat(200))),
+            format!("0{}", "%".repeat(200))
+        );
+        assert_eq!(
+            n(2.0, &format!("0{}", "%".repeat(200))),
+            format!("2{}{}", "0".repeat(400), "%".repeat(200))
+        );
         assert_eq!(n(0.5, "0%"), "50%");
     }
 

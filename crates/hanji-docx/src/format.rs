@@ -37,8 +37,14 @@ pub struct Theme {
 impl Theme {
     pub fn read(parts: &[Part]) -> Theme {
         let mut t = Theme::default();
-        let name = parts.iter().map(|p| p.name.as_str()).find(|n| n.starts_with("word/theme/") && n.ends_with(".xml"));
-        let Some(root) = name.and_then(|n| package::get(parts, n)).and_then(|d| xml::parse(d).ok()).map(|d| d.root)
+        let name = parts
+            .iter()
+            .map(|p| p.name.as_str())
+            .find(|n| n.starts_with("word/theme/") && n.ends_with(".xml"));
+        let Some(root) = name
+            .and_then(|n| package::get(parts, n))
+            .and_then(|d| xml::parse(d).ok())
+            .map(|d| d.root)
         else {
             return t;
         };
@@ -47,7 +53,13 @@ impl Theme {
                 for c in e.elements() {
                     let v = c
                         .elements()
-                        .find_map(|x| if x.local() == "sysClr" { x.get("lastClr") } else { x.get("val") })
+                        .find_map(|x| {
+                            if x.local() == "sysClr" {
+                                x.get("lastClr")
+                            } else {
+                                x.get("val")
+                            }
+                        })
                         .unwrap_or_default();
                     let n = match c.local() {
                         "dk1" => "tx1",
@@ -61,25 +73,39 @@ impl Theme {
             }
             "minorFont" | "majorFont" => {
                 let get = |local: &str| {
-                    e.elements().find(|x| x.local() == local).and_then(|x| x.get("typeface")).unwrap_or_default()
+                    e.elements()
+                        .find(|x| x.local() == local)
+                        .and_then(|x| x.get("typeface"))
+                        .unwrap_or_default()
                 };
                 let hang = e
                     .elements()
                     .find(|x| x.local() == "font" && x.get("script").as_deref() == Some("Hang"))
                     .and_then(|x| x.get("typeface"))
                     .unwrap_or_default();
-                let key = if e.local() == "minorFont" { "minor" } else { "major" };
+                let key = if e.local() == "minorFont" {
+                    "minor"
+                } else {
+                    "major"
+                };
                 t.fonts.insert(key, (get("latin"), get("ea"), hang));
             }
             _ => {}
         });
-        let settings = package::get(parts, "word/settings.xml").and_then(|d| xml::parse(d).ok()).map(|d| d.root);
+        let settings = package::get(parts, "word/settings.xml")
+            .and_then(|d| xml::parse(d).ok())
+            .map(|d| d.root);
         if let Some(root) = settings {
             root.walk(&mut |e| {
                 if e.local() != "clrSchemeMapping" {
                     return;
                 }
-                for (attr, name) in [("w:t1", "tx1"), ("w:bg1", "bg1"), ("w:t2", "tx2"), ("w:bg2", "bg2")] {
+                for (attr, name) in [
+                    ("w:t1", "tx1"),
+                    ("w:bg1", "bg1"),
+                    ("w:t2", "tx2"),
+                    ("w:bg2", "bg2"),
+                ] {
                     let to = match e.get(attr).as_deref() {
                         Some("dark1") => "tx1",
                         Some("light1") => "bg1",
@@ -96,8 +122,11 @@ impl Theme {
 
     /// A theme font reference (`minorEastAsia`, `majorHAnsi`, …) → its typeface.
     fn font(&self, r: &str) -> Option<String> {
-        let (which, rest) =
-            if let Some(x) = r.strip_prefix("minor") { ("minor", x) } else { ("major", r.strip_prefix("major")?) };
+        let (which, rest) = if let Some(x) = r.strip_prefix("minor") {
+            ("minor", x)
+        } else {
+            ("major", r.strip_prefix("major")?)
+        };
         let (latin, ea, hang) = self.fonts.get(which)?;
         let f = if rest == "EastAsia" {
             [ea, hang, latin].into_iter().find(|f| !f.is_empty())
@@ -108,7 +137,10 @@ impl Theme {
     }
 
     fn rgb(&self, name: &str) -> String {
-        self.colors.get(name).cloned().unwrap_or_else(|| "000000".into())
+        self.colors
+            .get(name)
+            .cloned()
+            .unwrap_or_else(|| "000000".into())
     }
 
     /// The RGB colour `c` stands for in this theme: a theme colour with its
@@ -117,7 +149,9 @@ impl Theme {
     /// theme colour, one this theme lacks, and another transform, which a
     /// theme cannot say.
     pub fn resolve(&self, c: &Color) -> Option<Color> {
-        let ColorBase::Theme(name) = &c.base else { return None };
+        let ColorBase::Theme(name) = &c.base else {
+            return None;
+        };
         let name = match name.as_str() {
             "dk1" => "tx1",
             "lt1" => "bg1",
@@ -131,11 +165,17 @@ impl Theme {
         let rgb = [channel(0)?, channel(2)?, channel(4)?];
         let rgb = match c.tint {
             Tint::None => rgb,
-            Tint::Lighter(p) => lum(rgb, |l| l * (1.0 - f64::from(p) / 100.0) + f64::from(p) / 100.0),
+            Tint::Lighter(p) => lum(rgb, |l| {
+                l * (1.0 - f64::from(p) / 100.0) + f64::from(p) / 100.0
+            }),
             Tint::Darker(p) => lum(rgb, |l| l * (1.0 - f64::from(p) / 100.0)),
             Tint::Other => return None,
         };
-        Some(Color { base: ColorBase::Rgb(rgb), tint: Tint::None, alpha: c.alpha })
+        Some(Color {
+            base: ColorBase::Rgb(rgb),
+            tint: Tint::None,
+            alpha: c.alpha,
+        })
     }
 }
 
@@ -204,18 +244,34 @@ const THEME_NAMES: &[(&str, &str)] = &[
 ];
 
 /// A colour from `val` (`RRGGBB` or `auto`) and theme attributes.
-fn color(val: Option<String>, theme: Option<String>, tint: Option<String>, shade: Option<String>) -> Option<Color> {
+fn color(
+    val: Option<String>,
+    theme: Option<String>,
+    tint: Option<String>,
+    shade: Option<String>,
+) -> Option<Color> {
     if let Some(t) = theme {
         let name = THEME_NAMES.iter().find(|x| x.0 == t).map_or("tx1", |x| x.1);
-        let pct = |h: &str| u8::from_str_radix(h, 16).ok().map(|b| ((1.0 - b as f64 / 255.0) * 100.0).round() as i64);
-        let tint = match (tint.as_deref().and_then(pct), shade.as_deref().and_then(pct)) {
+        let pct = |h: &str| {
+            u8::from_str_radix(h, 16)
+                .ok()
+                .map(|b| ((1.0 - b as f64 / 255.0) * 100.0).round() as i64)
+        };
+        let tint = match (
+            tint.as_deref().and_then(pct),
+            shade.as_deref().and_then(pct),
+        ) {
             (Some(_), Some(_)) => Tint::Other,
             (Some(p), None) if (1..=99).contains(&p) => Tint::Lighter(p as u8),
             (None, Some(p)) if (1..=99).contains(&p) => Tint::Darker(p as u8),
             (Some(0), None) | (None, Some(0)) | (None, None) => Tint::None,
             _ => Tint::Other,
         };
-        return Some(Color { base: ColorBase::Theme(name.into()), tint, alpha: None });
+        return Some(Color {
+            base: ColorBase::Theme(name.into()),
+            tint,
+            alpha: None,
+        });
     }
     let v = val.filter(|v| v != "auto")?;
     Color::parse(&format!("#{v}")).ok()
@@ -227,7 +283,11 @@ fn border(e: &Element) -> Border {
     if matches!(v.as_str(), "nil" | "none" | "") {
         return Border::None;
     }
-    let sz: i64 = e.get("w:sz").and_then(|s| s.parse().ok()).unwrap_or(4).max(2);
+    let sz: i64 = e
+        .get("w:sz")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(4)
+        .max(2);
     let style = match v.as_str() {
         "single" | "thick" => "solid",
         "dashed" | "dashSmallGap" => "dashed",
@@ -241,9 +301,18 @@ fn border(e: &Element) -> Border {
         "thickThinSmallGap" | "thickThinMediumGap" | "thickThinLargeGap" => "thick-thin",
         _ => "triple",
     };
-    let c = color(e.get("w:color"), e.get("w:themeColor"), e.get("w:themeTint"), e.get("w:themeShade"))
-        .unwrap_or_else(|| Color::rgb(0, 0, 0));
-    Border::Line { width: (sz as f64 * 12.5).round() as i64, style: style.into(), color: c }
+    let c = color(
+        e.get("w:color"),
+        e.get("w:themeColor"),
+        e.get("w:themeTint"),
+        e.get("w:themeShade"),
+    )
+    .unwrap_or_else(|| Color::rgb(0, 0, 0));
+    Border::Line {
+        width: (sz as f64 * 12.5).round() as i64,
+        style: style.into(),
+        color: c,
+    }
 }
 
 /// `w:shd` as a fill.
@@ -251,10 +320,20 @@ fn shd(e: &Element) -> Fill {
     let v = e.get("w:val").unwrap_or_else(|| "clear".into());
     match v.as_str() {
         "nil" => Fill::None,
-        "clear" => color(e.get("w:fill"), e.get("w:themeFill"), e.get("w:themeFillTint"), e.get("w:themeFillShade"))
-            .map_or(Fill::None, Fill::Color),
-        "solid" => color(e.get("w:color"), e.get("w:themeColor"), e.get("w:themeTint"), e.get("w:themeShade"))
-            .map_or(Fill::None, Fill::Color),
+        "clear" => color(
+            e.get("w:fill"),
+            e.get("w:themeFill"),
+            e.get("w:themeFillTint"),
+            e.get("w:themeFillShade"),
+        )
+        .map_or(Fill::None, Fill::Color),
+        "solid" => color(
+            e.get("w:color"),
+            e.get("w:themeColor"),
+            e.get("w:themeTint"),
+            e.get("w:themeShade"),
+        )
+        .map_or(Fill::None, Fill::Color),
         _ => Fill::Pattern,
     }
 }
@@ -289,8 +368,11 @@ pub fn ppr_props(ppr: &Element, size: i64) -> Props {
         p.set(Key::Align, Value::Choice(a.into()));
     }
     if let Some(ind) = ppr.child("w:ind") {
-        let chars =
-            |n: &str| ind.get(n).and_then(|v| v.parse::<f64>().ok()).map(|c| (c / 100.0 * size as f64).round() as i64);
+        let chars = |n: &str| {
+            ind.get(n)
+                .and_then(|v| v.parse::<f64>().ok())
+                .map(|c| (c / 100.0 * size as f64).round() as i64)
+        };
         let left = chars("w:leftChars")
             .or_else(|| chars("w:startChars"))
             .or_else(|| attr(ind, &["w:left", "w:start"]).and_then(|v| tw(&v)));
@@ -304,7 +386,8 @@ pub fn ppr_props(ppr: &Element, size: i64) -> Props {
             p.set(Key::IndentRight, Value::Len(r));
         }
         let hanging = chars("w:hangingChars").or_else(|| ind.get("w:hanging").and_then(|v| tw(&v)));
-        let first = chars("w:firstLineChars").or_else(|| ind.get("w:firstLine").and_then(|v| tw(&v)));
+        let first =
+            chars("w:firstLineChars").or_else(|| ind.get("w:firstLine").and_then(|v| tw(&v)));
         match (hanging, first) {
             (Some(h), _) if h != 0 => p.set(Key::FirstLine, Value::Len(-h)),
             (_, Some(f)) => p.set(Key::FirstLine, Value::Len(f)),
@@ -313,14 +396,31 @@ pub fn ppr_props(ppr: &Element, size: i64) -> Props {
         }
     }
     if let Some(sp) = ppr.child("w:spacing") {
-        let lines =
-            |n: &str| sp.get(n).and_then(|v| v.parse::<f64>().ok()).map(|l| (l / 100.0 * 12.0 * 100.0).round() as i64);
+        let lines = |n: &str| {
+            sp.get(n)
+                .and_then(|v| v.parse::<f64>().ok())
+                .map(|l| (l / 100.0 * 12.0 * 100.0).round() as i64)
+        };
         let auto = |n: &str| matches!(sp.get(n).as_deref(), Some("1" | "true" | "on"));
         for (key, n, lines_n, auto_n) in [
-            (Key::SpaceBefore, "w:before", "w:beforeLines", "w:beforeAutospacing"),
-            (Key::SpaceAfter, "w:after", "w:afterLines", "w:afterAutospacing"),
+            (
+                Key::SpaceBefore,
+                "w:before",
+                "w:beforeLines",
+                "w:beforeAutospacing",
+            ),
+            (
+                Key::SpaceAfter,
+                "w:after",
+                "w:afterLines",
+                "w:afterAutospacing",
+            ),
         ] {
-            let v = if auto(auto_n) { Some(1400) } else { lines(lines_n).or_else(|| sp.get(n).and_then(|v| tw(&v))) };
+            let v = if auto(auto_n) {
+                Some(1400)
+            } else {
+                lines(lines_n).or_else(|| sp.get(n).and_then(|v| tw(&v)))
+            };
             if let Some(v) = v {
                 p.set(key, Value::Len(v));
             }
@@ -357,22 +457,41 @@ pub fn rpr_props(rpr: &Element, theme: &Theme) -> Props {
             p.set(Key::Font, Value::Text(face.trim().to_string()));
         }
     }
-    if let Some(sz) = rpr.child("w:sz").and_then(|s| s.get("w:val")).and_then(|v| v.parse::<f64>().ok()) {
+    if let Some(sz) = rpr
+        .child("w:sz")
+        .and_then(|s| s.get("w:val"))
+        .and_then(|v| v.parse::<f64>().ok())
+    {
         if sz > 0.0 {
             p.set(Key::Size, Value::Len((sz * 50.0).round() as i64));
         }
     }
     if let Some(c) = rpr.child("w:color") {
-        let v = color(c.get("w:val"), c.get("w:themeColor"), c.get("w:themeTint"), c.get("w:themeShade"));
-        p.set(Key::Color, Value::Color(v.unwrap_or_else(|| Color::rgb(0, 0, 0))));
+        let v = color(
+            c.get("w:val"),
+            c.get("w:themeColor"),
+            c.get("w:themeTint"),
+            c.get("w:themeShade"),
+        );
+        p.set(
+            Key::Color,
+            Value::Color(v.unwrap_or_else(|| Color::rgb(0, 0, 0))),
+        );
     }
-    for (k, n) in [(Key::Bold, "w:b"), (Key::Italic, "w:i"), (Key::Strike, "w:strike")] {
+    for (k, n) in [
+        (Key::Bold, "w:b"),
+        (Key::Italic, "w:i"),
+        (Key::Strike, "w:strike"),
+    ] {
         if let Some(e) = rpr.child(n) {
             p.set(k, Value::Flag(crate::ooxml::on(Some(e))));
         }
     }
     if let Some(u) = rpr.child("w:u") {
-        p.set(Key::Underline, Value::Flag(crate::ooxml::underline_on(Some(u))));
+        p.set(
+            Key::Underline,
+            Value::Flag(crate::ooxml::underline_on(Some(u))),
+        );
     }
     p
 }
@@ -402,27 +521,39 @@ pub fn tcpr_props(tcpr: &Element) -> Props {
 /// value, and a `w:tblInd` of another type (`nil`, `auto`, `pct`), are not
 /// shown and stay as the file has them.
 pub fn tblpr_place(tblpr: &Element) -> TablePlace {
-    let align = tblpr.child("w:jc").and_then(|j| j.get("w:val")).and_then(|v| {
-        Some(match v.as_str() {
-            "left" | "start" => "left",
-            "center" => "center",
-            "right" | "end" => "right",
-            _ => return None,
-        })
-    });
+    let align = tblpr
+        .child("w:jc")
+        .and_then(|j| j.get("w:val"))
+        .and_then(|v| {
+            Some(match v.as_str() {
+                "left" | "start" => "left",
+                "center" => "center",
+                "right" | "end" => "right",
+                _ => return None,
+            })
+        });
     let indent = tblpr
         .child("w:tblInd")
         .filter(|i| i.get("w:type").is_none_or(|t| t == "dxa"))
         .and_then(|i| i.get("w:w"))
         .and_then(|v| v.parse::<i64>().ok())
         .map(|tw| tw * 5);
-    TablePlace { align: align.map(String::from), indent }
+    TablePlace {
+        align: align.map(String::from),
+        indent,
+    }
 }
 
 /// The `w:tblPr` children [`tblpr_place`] shows: a fingerprint leaves them out.
 pub fn shown_tblpr(tblpr: &Element) -> Vec<&'static str> {
     let p = tblpr_place(tblpr);
-    [p.align.is_some().then_some("w:jc"), p.indent.is_some().then_some("w:tblInd")].into_iter().flatten().collect()
+    [
+        p.align.is_some().then_some("w:jc"),
+        p.indent.is_some().then_some("w:tblInd"),
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
 }
 
 /// Writes the table's own position on `tblpr` where it differs from what
@@ -456,7 +587,9 @@ pub fn set_tblpr_place(tblpr: &mut Element, want: &TablePlace) {
 /// The `w:pPr` children the text shows (§5.2): a fingerprint leaves them out.
 pub const SHOWN_PPR: [&str; 5] = ["w:jc", "w:ind", "w:spacing", "w:shd", "w:pBdr"];
 /// The `w:rPr` children the text shows: marks and text properties.
-pub const SHOWN_RPR: [&str; 7] = ["w:b", "w:i", "w:strike", "w:u", "w:rFonts", "w:sz", "w:color"];
+pub const SHOWN_RPR: [&str; 7] = [
+    "w:b", "w:i", "w:strike", "w:u", "w:rFonts", "w:sz", "w:color",
+];
 /// The `w:tcPr` children the text shows: a cell's box.
 pub const SHOWN_TCPR: [&str; 3] = ["w:shd", "w:tcBorders", "w:vAlign"];
 
@@ -517,12 +650,24 @@ struct ColorAttrs {
     shade: &'static str,
 }
 
-const RUN_COLOR: ColorAttrs =
-    ColorAttrs { val: "w:val", theme: "w:themeColor", tint: "w:themeTint", shade: "w:themeShade" };
-const LINE_COLOR: ColorAttrs =
-    ColorAttrs { val: "w:color", theme: "w:themeColor", tint: "w:themeTint", shade: "w:themeShade" };
-const FILL_COLOR: ColorAttrs =
-    ColorAttrs { val: "w:fill", theme: "w:themeFill", tint: "w:themeFillTint", shade: "w:themeFillShade" };
+const RUN_COLOR: ColorAttrs = ColorAttrs {
+    val: "w:val",
+    theme: "w:themeColor",
+    tint: "w:themeTint",
+    shade: "w:themeShade",
+};
+const LINE_COLOR: ColorAttrs = ColorAttrs {
+    val: "w:color",
+    theme: "w:themeColor",
+    tint: "w:themeTint",
+    shade: "w:themeShade",
+};
+const FILL_COLOR: ColorAttrs = ColorAttrs {
+    val: "w:fill",
+    theme: "w:themeFill",
+    tint: "w:themeFillTint",
+    shade: "w:themeFillShade",
+};
 
 /// Sets colour `c` on `e`: the RGB value, and the theme colour with its
 /// tint or shade when it is one.
@@ -566,7 +711,10 @@ fn child<'a>(parent: &'a mut Element, name: &str, order: &[&str]) -> &'a mut Ele
 
 /// Removes `name` when it has no attribute and no child left.
 fn drop_empty(parent: &mut Element, name: &str) {
-    if parent.child(name).is_some_and(|c| c.attrs.is_empty() && !c.has_elements()) {
+    if parent
+        .child(name)
+        .is_some_and(|c| c.attrs.is_empty() && !c.has_elements())
+    {
         remove_child(parent, name);
     }
 }
@@ -575,12 +723,21 @@ fn twips(v: i64) -> String {
     ((v as f64) / 5.0).round().to_string()
 }
 
-const PBDR_ORDER: &[&str] = &["top", "left", "start", "bottom", "right", "end", "between", "bar"];
-const TCBORDERS_ORDER: &[&str] =
-    &["top", "start", "left", "bottom", "end", "right", "insideH", "insideV", "tl2br", "tr2bl"];
+const PBDR_ORDER: &[&str] = &[
+    "top", "left", "start", "bottom", "right", "end", "between", "bar",
+];
+const TCBORDERS_ORDER: &[&str] = &[
+    "top", "start", "left", "bottom", "end", "right", "insideH", "insideV", "tl2br", "tr2bl",
+];
 
 /// A side of `w:pBdr` / `w:tcBorders`: written as `b`, or removed.
-fn set_side(box_el: &mut Element, k: Key, b: Option<&Border>, theme: &Theme, order: &[&str]) -> Result<(), String> {
+fn set_side(
+    box_el: &mut Element,
+    k: Key,
+    b: Option<&Border>,
+    theme: &Theme,
+    order: &[&str],
+) -> Result<(), String> {
     let names = SIDES.iter().find(|s| s.0 == k).unwrap().1;
     let existing = names.iter().find(|n| box_el.child(n).is_some()).copied();
     let Some(b) = b else {
@@ -596,7 +753,11 @@ fn set_side(box_el: &mut Element, k: Key, b: Option<&Border>, theme: &Theme, ord
             e.attrs.clear();
             e.set("w:val", "nil");
         }
-        Border::Line { width, style, color } => {
+        Border::Line {
+            width,
+            style,
+            color,
+        } => {
             let val = match style.as_str() {
                 "dashed" => "dashed",
                 "dotted" => "dotted",
@@ -619,12 +780,20 @@ fn set_side(box_el: &mut Element, k: Key, b: Option<&Border>, theme: &Theme, ord
     Ok(())
 }
 
-fn set_shd(parent: &mut Element, f: Option<&Fill>, theme: &Theme, order: &[&str]) -> Result<(), String> {
+fn set_shd(
+    parent: &mut Element,
+    f: Option<&Fill>,
+    theme: &Theme,
+    order: &[&str],
+) -> Result<(), String> {
     let Some(f) = f else {
         remove_child(parent, "w:shd");
         return Ok(());
     };
-    let mut e = parent.child("w:shd").cloned().unwrap_or_else(|| el("w:shd"));
+    let mut e = parent
+        .child("w:shd")
+        .cloned()
+        .unwrap_or_else(|| el("w:shd"));
     match f {
         Fill::None => {
             e.attrs.clear();
@@ -685,7 +854,12 @@ pub fn set_ppr(ppr: &mut Element, k: Key, v: Option<&Value>, theme: &Theme) -> R
                     }
                 }
                 _ => {
-                    for a in ["w:firstLine", "w:hanging", "w:firstLineChars", "w:hangingChars"] {
+                    for a in [
+                        "w:firstLine",
+                        "w:hanging",
+                        "w:firstLineChars",
+                        "w:hangingChars",
+                    ] {
                         ind.remove_attr(a);
                     }
                     match v.and_then(Value::length) {
@@ -719,7 +893,9 @@ pub fn set_ppr(ppr: &mut Element, k: Key, v: Option<&Value>, theme: &Theme) -> R
             match v {
                 Some(Value::Spacing(ls)) => {
                     let (line, rule) = match ls {
-                        LineSpacing::Percent(p) => ((*p as f64 * 240.0 / 10000.0).round() as i64, "auto"),
+                        LineSpacing::Percent(p) => {
+                            ((*p as f64 * 240.0 / 10000.0).round() as i64, "auto")
+                        }
                         LineSpacing::Exact(l) => (((*l as f64) / 5.0).round() as i64, "exact"),
                         LineSpacing::AtLeast(l) => (((*l as f64) / 5.0).round() as i64, "atLeast"),
                         LineSpacing::Gap(_) => unreachable!("checked writable"),
@@ -774,7 +950,14 @@ pub fn set_rpr(rpr: &mut Element, k: Key, v: Option<&Value>, theme: &Theme) -> R
             }
             None => {
                 if let Some(f) = rpr.child_mut("w:rFonts") {
-                    for a in ["w:ascii", "w:hAnsi", "w:eastAsia", "w:asciiTheme", "w:hAnsiTheme", "w:eastAsiaTheme"] {
+                    for a in [
+                        "w:ascii",
+                        "w:hAnsi",
+                        "w:eastAsia",
+                        "w:asciiTheme",
+                        "w:hAnsiTheme",
+                        "w:eastAsiaTheme",
+                    ] {
                         f.remove_attr(a);
                     }
                 }
@@ -824,7 +1007,12 @@ pub fn set_rpr(rpr: &mut Element, k: Key, v: Option<&Value>, theme: &Theme) -> R
 }
 
 /// Writes (or removes) one box property on a cell's `tcpr`.
-pub fn set_tcpr(tcpr: &mut Element, k: Key, v: Option<&Value>, theme: &Theme) -> Result<(), String> {
+pub fn set_tcpr(
+    tcpr: &mut Element,
+    k: Key,
+    v: Option<&Value>,
+    theme: &Theme,
+) -> Result<(), String> {
     if let Some(v) = v {
         writable(k, v)?;
     }
@@ -857,7 +1045,13 @@ pub fn set_tcpr(tcpr: &mut Element, k: Key, v: Option<&Value>, theme: &Theme) ->
                 _ => None,
             };
             if b.is_some() || tcpr.child("w:tcBorders").is_some() {
-                set_side(child(tcpr, "w:tcBorders", TCPR_ORDER), k, b, theme, TCBORDERS_ORDER)?;
+                set_side(
+                    child(tcpr, "w:tcBorders", TCPR_ORDER),
+                    k,
+                    b,
+                    theme,
+                    TCBORDERS_ORDER,
+                )?;
                 drop_empty(tcpr, "w:tcBorders");
             }
             Ok(())
@@ -890,9 +1084,14 @@ pub fn apply(
 
 /// Match a newly created styles part to the document's WordprocessingML namespace.
 fn document_namespace(parts: &[Part]) -> &'static str {
-    let strict =
-        package::get(parts, crate::ooxml::DOC_PART).and_then(|bytes| xml::parse(bytes).ok()).is_some_and(|d| {
-            let key = d.root.name.split_once(':').map_or("xmlns".to_string(), |(p, _)| format!("xmlns:{p}"));
+    let strict = package::get(parts, crate::ooxml::DOC_PART)
+        .and_then(|bytes| xml::parse(bytes).ok())
+        .is_some_and(|d| {
+            let key = d
+                .root
+                .name
+                .split_once(':')
+                .map_or("xmlns".to_string(), |(p, _)| format!("xmlns:{p}"));
             d.root.get(&key).as_deref() == Some(crate::ooxml::W_NS_STRICT)
         });
     if strict {
@@ -905,11 +1104,16 @@ fn document_namespace(parts: &[Part]) -> &'static str {
 /// Word's values where `docDefaults` and the styles set nothing.
 fn word_defaults(theme: &Theme) -> Props {
     let mut p = styled::implicit();
-    p.set(Key::LineSpacing, Value::Spacing(LineSpacing::Percent(10000)));
+    p.set(
+        Key::LineSpacing,
+        Value::Spacing(LineSpacing::Percent(10000)),
+    );
     p.set(Key::Size, Value::Len(1000));
     p.set(Key::Color, Value::Color(Color::rgb(0, 0, 0)));
-    let font =
-        theme.font("minorEastAsia").or_else(|| theme.font("minorHAnsi")).unwrap_or_else(|| "Times New Roman".into());
+    let font = theme
+        .font("minorEastAsia")
+        .or_else(|| theme.font("minorHAnsi"))
+        .unwrap_or_else(|| "Times New Roman".into());
     p.set(Key::Font, Value::Text(font));
     p
 }
@@ -945,11 +1149,14 @@ impl Styles {
     }
 
     fn styles(&self) -> impl Iterator<Item = &Element> {
-        self.doc.iter().flat_map(|d| d.root.elements().filter(|e| e.is("w:style")))
+        self.doc
+            .iter()
+            .flat_map(|d| d.root.elements().filter(|e| e.is("w:style")))
     }
 
     fn by_id(&self, id: &str) -> Option<&Element> {
-        self.styles().find(|s| s.get("w:styleId").as_deref() == Some(id))
+        self.styles()
+            .find(|s| s.get("w:styleId").as_deref() == Some(id))
     }
 
     /// What style `st` sets itself (its `w:pPr` and `w:rPr`), `size` the
@@ -975,7 +1182,10 @@ impl Styles {
                 break;
             }
             chain.push(s);
-            cur = s.child("w:basedOn").and_then(|b| b.get("w:val")).and_then(|b| self.by_id(&b));
+            cur = s
+                .child("w:basedOn")
+                .and_then(|b| b.get("w:val"))
+                .and_then(|b| self.by_id(&b));
         }
         let mut p = self.base.clone();
         for s in chain.iter().rev() {
@@ -992,7 +1202,11 @@ impl Styles {
         let dflt = self.values(&default_id);
         for s in &mut set.paragraph {
             let v = self.values(&s.id);
-            s.props = if s.id == default_id { v.diff(&styled::implicit()) } else { v.diff(&dflt) };
+            s.props = if s.id == default_id {
+                v.diff(&styled::implicit())
+            } else {
+                v.diff(&dflt)
+            };
         }
         set.formatting = true;
     }
@@ -1004,7 +1218,11 @@ impl Styles {
 /// changed in its own `w:pPr` / `w:rPr`; a line with a name no style has is
 /// a new style based on the default. `None` when nothing changes. The ids of
 /// new styles are set in `set`. A missing part is created only for a style edit.
-pub fn write_styles(parts: &[Part], set: &mut StyleSet, text_lines: &[StyleLine]) -> Result<Option<Vec<u8>>, String> {
+pub fn write_styles(
+    parts: &[Part],
+    set: &mut StyleSet,
+    text_lines: &[StyleLine],
+) -> Result<Option<Vec<u8>>, String> {
     write_styles_in_namespace(parts, set, text_lines, document_namespace(parts))
 }
 
@@ -1023,22 +1241,30 @@ pub(crate) fn write_styles_in_namespace(
             None => lines.push(l.clone()),
         }
     }
-    let table = StyleTable { default: Some(set.default_paragraph.clone()), lines: lines.clone() };
+    let table = StyleTable {
+        default: Some(set.default_paragraph.clone()),
+        lines: lines.clone(),
+    };
     let created = st.doc.is_none();
     let mut doc = match st.doc.clone() {
         Some(doc) => doc,
         None => {
             // Edits can already be in the remainder, with no text_lines passed.
             let changed = lines.iter().any(|l| {
-                set.paragraph_def(&l.name).filter(|d| !d.id.is_empty()).is_none_or(|def| {
-                    table.values(Some(&l.name)).only(style_keys()) != st.values(&def.id).only(style_keys())
-                })
+                set.paragraph_def(&l.name)
+                    .filter(|d| !d.id.is_empty())
+                    .is_none_or(|def| {
+                        table.values(Some(&l.name)).only(style_keys())
+                            != st.values(&def.id).only(style_keys())
+                    })
             });
             if !changed {
                 return Ok(None);
             }
             if package::get(parts, "word/styles.xml").is_some() {
-                return Err("word/styles.xml cannot be parsed, so its styles cannot be changed".into());
+                return Err(
+                    "word/styles.xml cannot be parsed, so its styles cannot be changed".into(),
+                );
             }
             xml::Doc {
                 prolog: "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n".into(),
@@ -1059,7 +1285,12 @@ pub(crate) fn write_styles_in_namespace(
         let Some(def) = set.paragraph.iter_mut().find(|d| d.name == l.name) else {
             let id = new_id(&l.name, &ids);
             ids.push(id.clone());
-            set.paragraph.push(hanji_core::StyleDef { id, name: l.name.clone(), props: l.props.clone(), shown: true });
+            set.paragraph.push(hanji_core::StyleDef {
+                id,
+                name: l.name.clone(),
+                props: l.props.clone(),
+                shown: true,
+            });
             continue;
         };
         if def.id.is_empty() {
@@ -1078,9 +1309,11 @@ pub(crate) fn write_styles_in_namespace(
             if created && id == default_id {
                 s.set("w:default", "1");
             }
-            s.children.push(Node::El(el("w:name").with_attr("w:val", &l.name)));
+            s.children
+                .push(Node::El(el("w:name").with_attr("w:val", &l.name)));
             if id != default_id {
-                s.children.push(Node::El(el("w:basedOn").with_attr("w:val", &default_id)));
+                s.children
+                    .push(Node::El(el("w:basedOn").with_attr("w:val", &default_id)));
             }
             s.children.push(Node::El(el("w:qFormat")));
             let at = doc
@@ -1124,16 +1357,27 @@ pub(crate) fn write_styles_in_namespace(
         .collect();
     order.sort();
     for (_, id, name) in order {
-        let now = Styles { doc: Some(doc.clone()), theme: st.theme.clone(), base: st.base.clone() };
+        let now = Styles {
+            doc: Some(doc.clone()),
+            theme: st.theme.clone(),
+            base: st.base.clone(),
+        };
         let have = now.values(&id).only(style_keys());
         let want = table.values(Some(&name)).only(style_keys());
         if have == want {
             continue;
         }
-        let parent = now.by_id(&id).and_then(|s| s.child("w:basedOn")).and_then(|b| b.get("w:val"));
+        let parent = now
+            .by_id(&id)
+            .and_then(|s| s.child("w:basedOn"))
+            .and_then(|b| b.get("w:val"));
         let parent_values = parent.map_or_else(|| now.base.clone(), |p| now.values(&p));
         let sel = doc.root.children.iter_mut().find_map(|n| match n {
-            Node::El(e) if e.is("w:style") && e.get("w:styleId").as_deref() == Some(id.as_str()) => Some(e),
+            Node::El(e)
+                if e.is("w:style") && e.get("w:styleId").as_deref() == Some(id.as_str()) =>
+            {
+                Some(e)
+            }
             _ => None,
         });
         let s = sel.unwrap();

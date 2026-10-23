@@ -28,14 +28,23 @@ impl Format for Hwpx {
         let (b, r, rep, s) = HwpxEngine::split(pkg, opts)?;
         let line = format!(
             "tables {}/{} (side by side: {}) kept {:?}, list items {}, tracked paragraphs {}",
-            s.tables_modelled, s.tables_kept, s.side_by_side, s.kept_reasons, s.list_items, s.tracked_paragraphs
+            s.tables_modelled,
+            s.tables_kept,
+            s.side_by_side,
+            s.kept_reasons,
+            s.list_items,
+            s.tracked_paragraphs
         );
         Ok((b, r, rep, line))
     }
     fn text_of(&self, blocks: &[Block], rem: &Remainder) -> String {
         HwpxEngine::text_of(blocks, rem, None)
     }
-    fn export_blocks(&self, blocks: &[Block], rem: &Remainder) -> Result<(Vec<u8>, bool), EngineError> {
+    fn export_blocks(
+        &self,
+        blocks: &[Block],
+        rem: &Remainder,
+    ) -> Result<(Vec<u8>, bool), EngineError> {
         let out = export_sections(blocks, rem)?;
         // Well-formed, and no layout cache past its paragraph's end (Hancom's repair prompt).
         let valid = |(name, d): &(String, Vec<u8>)| {
@@ -47,7 +56,8 @@ impl Format for Hwpx {
                 problems.is_empty()
             })
         };
-        let well_formed = out.sections.iter().all(valid) && out.header.as_deref().is_none_or(|h| xml::parse(h).is_ok());
+        let well_formed = out.sections.iter().all(valid)
+            && out.header.as_deref().is_none_or(|h| xml::parse(h).is_ok());
         Ok((write_package(rem, out)?, well_formed))
     }
     fn is_split_part(&self, name: &str) -> bool {
@@ -65,9 +75,18 @@ impl Format for Hwpx {
         &["본문", "Body Text", "Quote"]
     }
     fn is_drawing(&self, xml: &str) -> bool {
-        ["<hp:pic", "<hp:rect", "<hp:container", "<hp:ellipse", "<hp:polygon", "<hp:line", "<hp:curve", "<hp:arc"]
-            .iter()
-            .any(|t| xml.contains(t))
+        [
+            "<hp:pic",
+            "<hp:rect",
+            "<hp:container",
+            "<hp:ellipse",
+            "<hp:polygon",
+            "<hp:line",
+            "<hp:curve",
+            "<hp:arc",
+        ]
+        .iter()
+        .any(|t| xml.contains(t))
     }
     fn complete(&self, blocks: &mut [Block], rem: &mut Remainder) {
         HwpxEngine::complete(blocks, rem);
@@ -75,15 +94,22 @@ impl Format for Hwpx {
 }
 
 pub fn corpus() -> Vec<(String, Vec<u8>)> {
-    hanji_testkit::corpus(&PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("corpus"), "hwpx")
+    hanji_testkit::corpus(
+        &PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("corpus"),
+        "hwpx",
+    )
 }
 
 #[test]
 fn corpus_getput_putget_remainder() {
     let files = corpus();
     assert!(files.len() >= 10, "the corpus has {} files", files.len());
-    let out = Out { dir: PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("hwpx-corpus-out"), ext: "hwpx" };
-    let sum = hanji_testkit::run_corpus_with(&Hwpx, &files, &out, &hanji_testkit::FORMATTED_EDITS, "E10");
+    let out = Out {
+        dir: PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("hwpx-corpus-out"),
+        ext: "hwpx",
+    };
+    let sum =
+        hanji_testkit::run_corpus_with(&Hwpx, &files, &out, &hanji_testkit::FORMATTED_EDITS, "E10");
     assert!(sum.failures.is_empty(), "{}", sum.failures.join("\n"));
     assert_eq!(sum.getput_ok, files.len());
     // An exact-span edit loses no entry of the blocks it touches.
@@ -106,19 +132,27 @@ fn a_serialized_remainder_exports_the_same_package() {
 /// default look.
 #[test]
 fn a_new_table_can_be_added_to_every_file() {
-    let out = Out { dir: PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("hwpx-corpus-out"), ext: "hwpx" };
+    let out = Out {
+        dir: PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("hwpx-corpus-out"),
+        ext: "hwpx",
+    };
     let caps = HwpxEngine.capabilities();
     for (name, pkg) in corpus() {
         let imp = HwpxEngine.import(&pkg, &ImportOptions::default()).unwrap();
         let new = format!("{}\n| 새 표 | 값 |\n|---|---|\n| 가 | 1 |\n", imp.text);
-        let r = hanji_core::rewrite(&imp.remainder, &imp.text, &new, caps).unwrap_or_else(|e| panic!("{name}: {e:?}"));
+        let r = hanji_core::rewrite(&imp.remainder, &imp.text, &new, caps)
+            .unwrap_or_else(|e| panic!("{name}: {e:?}"));
         // As the store returns it: the new table shows the look it takes.
         let (_, mut blocks) = hanji_core::model_of(&r.text, &r.remainder, caps).unwrap();
         let mut rem = r.remainder.clone();
         HwpxEngine::complete(&mut blocks, &mut rem);
         let text = HwpxEngine::text_of(&blocks, &rem, None);
-        let bytes = HwpxEngine.export(&text, &rem).unwrap_or_else(|e| panic!("{name}: {e}"));
-        let back = HwpxEngine.import(&bytes, &ImportOptions::default()).unwrap();
+        let bytes = HwpxEngine
+            .export(&text, &rem)
+            .unwrap_or_else(|e| panic!("{name}: {e}"));
+        let back = HwpxEngine
+            .import(&bytes, &ImportOptions::default())
+            .unwrap();
         assert_eq!(back.text, text, "{name}: PutGet");
         out.save(&name, "ORIGINAL", &pkg);
         out.save(&name, "new-table", &bytes);

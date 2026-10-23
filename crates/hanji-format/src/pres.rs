@@ -52,12 +52,19 @@ pub struct ParsedPresentation {
 
 /// Parse a Presentation, checking layouts, slots, shapes and placeholders
 /// against `names` (a `None` list skips its check).
-pub fn parse_presentation(text: &str, names: &Names) -> Result<ParsedPresentation, Vec<Diagnostic>> {
+pub fn parse_presentation(
+    text: &str,
+    names: &Names,
+) -> Result<ParsedPresentation, Vec<Diagnostic>> {
     let mut p = Parser::new(text, names);
     let (front, first) = p.front_matter("presentation");
-    let Some(front) = front.filter(|_| p.errors.is_empty()) else { return Err(p.errors) };
+    let Some(front) = front.filter(|_| p.errors.is_empty()) else {
+        return Err(p.errors);
+    };
     let n = p.lines.len();
-    let seps: Vec<usize> = (first..n).filter(|&i| is_separator(p.lines[i].text)).collect();
+    let seps: Vec<usize> = (first..n)
+        .filter(|&i| is_separator(p.lines[i].text))
+        .collect();
     let mut segs = vec![];
     let mut from = first;
     for &s in &seps {
@@ -66,12 +73,19 @@ pub fn parse_presentation(text: &str, names: &Names) -> Result<ParsedPresentatio
     }
     segs.push((from, n));
     let blank = |p: &Parser, a: usize, b: usize| (a..b).all(|i| p.lines[i].text.trim().is_empty());
-    let mut pres = Presentation { front, slides: vec![] };
+    let mut pres = Presentation {
+        front,
+        slides: vec![],
+    };
     let mut map = PresentationMap::default();
     if seps.is_empty() && blank(&p, from, n) {
         // No slides at all.
         p.check_names_after();
-        return if p.errors.is_empty() { Ok(ParsedPresentation { pres, map }) } else { Err(p.errors) };
+        return if p.errors.is_empty() {
+            Ok(ParsedPresentation { pres, map })
+        } else {
+            Err(p.errors)
+        };
     }
     for (k, &(a, b)) in segs.iter().enumerate() {
         if blank(&p, a, b) {
@@ -92,7 +106,9 @@ pub fn parse_presentation(text: &str, names: &Names) -> Result<ParsedPresentatio
         let slidev = k > 0 && {
             let (pa, pb) = segs[k - 1];
             (pa..pb).any(|i| layout_value(p.lines[i].text.trim()).is_some())
-                && (pa..pb).all(|i| p.lines[i].text.trim().is_empty() || key_value(p.lines[i].text.trim()).is_some())
+                && (pa..pb).all(|i| {
+                    p.lines[i].text.trim().is_empty() || key_value(p.lines[i].text.trim()).is_some()
+                })
         };
         let before = p.errors.len();
         let parsed = slide(&mut p, a, b, slidev.then(|| seps[k - 1]));
@@ -118,7 +134,11 @@ fn is_separator(line: &str) -> bool {
 fn layout_value(t: &str) -> Option<String> {
     let v = t.strip_prefix("layout:")?.trim();
     let unq = |q: char| v.len() >= 2 && v.starts_with(q) && v.ends_with(q);
-    Some(if unq('"') || unq('\'') { v[1..v.len() - 1].to_string() } else { v.to_string() })
+    Some(if unq('"') || unq('\'') {
+        v[1..v.len() - 1].to_string()
+    } else {
+        v.to_string()
+    })
 }
 
 /// The layout `layout: v` stands for (§5.3): the one named `v`, else the one
@@ -128,7 +148,10 @@ fn find_layout<'l>(layouts: &'l [Layout], v: &str) -> Result<&'l Layout, String>
     if let Some(l) = layouts.iter().find(|x| x.name == v) {
         return Ok(l);
     }
-    let typed: Vec<&Layout> = layouts.iter().filter(|x| x.ty.as_deref() == Some(v)).collect();
+    let typed: Vec<&Layout> = layouts
+        .iter()
+        .filter(|x| x.ty.as_deref() == Some(v))
+        .collect();
     match typed[..] {
         [l] => Ok(l),
         [] => {
@@ -156,7 +179,8 @@ fn find_layout<'l>(layouts: &'l [Layout], v: &str) -> Result<&'l Layout, String>
 fn key_value(t: &str) -> Option<&str> {
     let (k, rest) = t.split_once(':')?;
     let ok = k.chars().next().is_some_and(|c| c.is_ascii_alphabetic())
-        && k.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
+        && k.chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-');
     (ok && (rest.is_empty() || rest.starts_with(' '))).then_some(k)
 }
 
@@ -177,7 +201,8 @@ fn marker_parts(inner: &str) -> (&str, usize) {
 
 fn valid_slot_name(s: &str) -> bool {
     s.chars().next().is_some_and(|c| c.is_ascii_lowercase())
-        && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        && s.chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 fn is_shape_line(t: &str) -> bool {
@@ -236,17 +261,26 @@ const BOX_FORM: &str = "box=\"x y w h\": the left edge, top edge, width and heig
 
 /// `box`, `rot` and `flip` attributes → the geometry they write; the error
 /// is at a column. `None` without a box.
-pub(crate) fn geom_of(attrs: &[(String, String, usize)], col: usize) -> Result<Option<Geom>, (usize, String)> {
+pub(crate) fn geom_of(
+    attrs: &[(String, String, usize)],
+    col: usize,
+) -> Result<Option<Geom>, (usize, String)> {
     let get = |k: &str| attrs.iter().find(|a| a.0 == k);
     let Some((_, b, bcol)) = get("box") else {
         return match attrs.first() {
-            Some((k, _, c)) => Err((*c, format!("{k}=\"…\" goes with a box: write {BOX_FORM}, then {k}."))),
+            Some((k, _, c)) => Err((
+                *c,
+                format!("{k}=\"…\" goes with a box: write {BOX_FORM}, then {k}."),
+            )),
             None => Ok(None),
         };
     };
     let n: Vec<Option<i64>> = b.split_whitespace().map(parse_pt).collect();
     let [Some(x), Some(y), Some(w), Some(h)] = n.as_slice() else {
-        return Err((*bcol, format!("box=\"{b}\" is not a box; it is {BOX_FORM}.")));
+        return Err((
+            *bcol,
+            format!("box=\"{b}\" is not a box; it is {BOX_FORM}."),
+        ));
     };
     if *w < 0 || *h < 0 {
         return Err((
@@ -254,14 +288,24 @@ pub(crate) fn geom_of(attrs: &[(String, String, usize)], col: usize) -> Result<O
             format!("box=\"{b}\" has a negative width or height; a box's width and height are 0 or more."),
         ));
     }
-    let mut g = Geom { x: *x, y: *y, w: *w, h: *h, ..Default::default() };
+    let mut g = Geom {
+        x: *x,
+        y: *y,
+        w: *w,
+        h: *h,
+        ..Default::default()
+    };
     if let Some((_, r, rcol)) = get("rot") {
         match parse_num(r) {
-            Some(d) if (-360.0..=360.0).contains(&d) => g.rot = ((d * 60_000.0).round() as i64).rem_euclid(FULL_TURN),
+            Some(d) if (-360.0..=360.0).contains(&d) => {
+                g.rot = ((d * 60_000.0).round() as i64).rem_euclid(FULL_TURN)
+            }
             _ => {
                 return Err((
                     *rcol,
-                    format!("rot=\"{r}\" is not a rotation; it is degrees clockwise, such as rot=\"15\"."),
+                    format!(
+                    "rot=\"{r}\" is not a rotation; it is degrees clockwise, such as rot=\"15\"."
+                ),
                 ))
             }
         }
@@ -274,7 +318,9 @@ pub(crate) fn geom_of(attrs: &[(String, String, usize)], col: usize) -> Result<O
             _ => {
                 return Err((
                     *fcol,
-                    format!("flip=\"{f}\" is not a flip; it is flip=\"h\", flip=\"v\" or flip=\"hv\"."),
+                    format!(
+                        "flip=\"{f}\" is not a flip; it is flip=\"h\", flip=\"v\" or flip=\"hv\"."
+                    ),
                 ))
             }
         }
@@ -329,7 +375,10 @@ fn split_attrs_of(
         } else if geometry && matches!(k.as_str(), "box" | "rot" | "flip") {
             geo.push((k.clone(), v.clone(), *col));
         } else {
-            return Err((*col, format!("<{tag_name}> has no attribute \"{k}\": {form}.")));
+            return Err((
+                *col,
+                format!("<{tag_name}> has no attribute \"{k}\": {form}."),
+            ));
         }
     }
     Ok((vals, geom_of(&geo, tag_col)?))
@@ -388,8 +437,11 @@ fn keep_line_id(p: &Parser, i: usize) -> Option<String> {
     }
     let src = chars_of(line, line.indent());
     let (tag, after) = parse_tag(&src, 0)?;
-    let alone = tag.name == "keep" && tag.self_closing && src[after..].iter().all(|c| c.2.is_whitespace());
-    alone.then(|| tag.attrs.iter().find(|a| a.0 == "id").map(|a| a.1.clone())).flatten()
+    let alone =
+        tag.name == "keep" && tag.self_closing && src[after..].iter().all(|c| c.2.is_whitespace());
+    alone
+        .then(|| tag.attrs.iter().find(|a| a.0 == "id").map(|a| a.1.clone()))
+        .flatten()
 }
 
 /// Whether line `i` is a slide object's `<keep/>` line: one with a box, one
@@ -407,7 +459,8 @@ fn is_object_line(p: &Parser, i: usize, in_slot: bool) -> bool {
     }
 }
 
-const SLOT_TEXT: &str = "Slot text is plain lines, - and 1. list items, <p/> empty paragraphs and <keep/> placeholders";
+const SLOT_TEXT: &str =
+    "Slot text is plain lines, - and 1. list items, <p/> empty paragraphs and <keep/> placeholders";
 
 /// A slide object's `<keep/>` line: the head stands on the tag's `<`, the
 /// placeholder block on the rest of the line (distinct offsets, so an exact
@@ -423,29 +476,51 @@ fn object(p: &mut Parser, i: usize) -> Option<(ObjectItem, ItemMap)> {
     let geom = p.object_geom.take();
     let (b, m, _) = parsed?;
     let keep = match b {
-        Block::Para(Para { style: ParaStyle::Plain, content, .. }) if content.units.len() == 1 => {
-            match &content.units[0].atom {
-                Atom::Keep(k) => k.clone(),
-                _ => return None,
-            }
-        }
+        Block::Para(Para {
+            style: ParaStyle::Plain,
+            content,
+            ..
+        }) if content.units.len() == 1 => match &content.units[0].atom {
+            Atom::Keep(k) => k.clone(),
+            _ => return None,
+        },
         Block::Keep(k) => k,
         _ => return None,
     };
     let line = &p.lines[i];
     let tag = line.at + line.indent();
-    let head = HeadMap { start: line.at, end: tag + 1, mark: tag };
+    let head = HeadMap {
+        start: line.at,
+        end: tag + 1,
+        mark: tag,
+    };
     let mark = match &m.kind {
         BlockMapKind::Para(pm) => pm.mark,
         _ => line.end,
     };
-    let block =
-        BlockMap { start: tag + 1, end: m.end, kind: BlockMapKind::Para(ParaMap { units: vec![tag + 1], mark }) };
-    Some((ObjectItem { keep, geom }, ItemMap { head, blocks: vec![block] }))
+    let block = BlockMap {
+        start: tag + 1,
+        end: m.end,
+        kind: BlockMapKind::Para(ParaMap {
+            units: vec![tag + 1],
+            mark,
+        }),
+    };
+    Some((
+        ObjectItem { keep, geom },
+        ItemMap {
+            head,
+            blocks: vec![block],
+        },
+    ))
 }
 
 fn slot_list(slots: &[String]) -> String {
-    slots.iter().map(|s| format!("::{s}::")).collect::<Vec<_>>().join(", ")
+    slots
+        .iter()
+        .map(|s| format!("::{s}::"))
+        .collect::<Vec<_>>()
+        .join(", ")
 }
 
 /// Whether line `j` ends the slot before it: another object or slot.
@@ -466,9 +541,12 @@ fn slide(p: &mut Parser, a: usize, b: usize, slidev: Option<usize>) -> Option<(S
     let names = p.names;
     let i0 = (a..b).find(|&i| !p.lines[i].text.trim().is_empty())?;
     let layouts = names.layouts.as_deref();
-    let layout_names = || layouts.map(|l| quoted(&l.iter().map(|x| x.name.clone()).collect::<Vec<_>>()));
+    let layout_names =
+        || layouts.map(|l| quoted(&l.iter().map(|x| x.name.clone()).collect::<Vec<_>>()));
     let Some(layout) = layout_value(p.lines[i0].text.trim()) else {
-        let list = layout_names().map(|l| format!(" Layouts: {l}.")).unwrap_or_default();
+        let list = layout_names()
+            .map(|l| format!(" Layouts: {l}."))
+            .unwrap_or_default();
         match slidev {
             Some(sep) => p.err(sep, 1, format!("this --- starts a new slide, and a slide begins with layout: Name. Slidev closes a slide's front matter with a second ---; here the layout: line is the slide's first line and needs no closing line. Delete this ---.{list}")),
             None => p.err(i0, 1, format!("every slide begins with a line layout: Name, the name of one of the file's layouts.{list}")),
@@ -485,9 +563,19 @@ fn slide(p: &mut Parser, a: usize, b: usize, slidev: Option<usize>) -> Option<(S
     // A layout given by its type is its name from here on: the text the
     // write returns shows the name.
     let layout = lay.map_or(layout, |l| l.name.clone());
-    let slots: Option<Vec<String>> = lay.map(|l| l.slots.iter().cloned().chain(["notes".to_string()]).collect());
+    let slots: Option<Vec<String>> = lay.map(|l| {
+        l.slots
+            .iter()
+            .cloned()
+            .chain(["notes".to_string()])
+            .collect()
+    });
     let line = &p.lines[i0];
-    let head = HeadMap { start: line.at, end: line.next, mark: line.end };
+    let head = HeadMap {
+        start: line.at,
+        end: line.next,
+        mark: line.end,
+    };
     let (mut items, mut maps) = (vec![], vec![]);
     let mut seen: Vec<String> = vec![];
     let mut i = i0 + 1;
@@ -609,10 +697,12 @@ fn slot(
         let line = &p.lines[i];
         let lead = line.indent();
         let col0 = line.text[..lead].chars().count() + 2 + inner[..at].chars().count() + 1;
-        let split = marker_attrs(&inner[at..], col0).and_then(|a| style::split_text_keys(&a)).and_then(|(st, a)| {
-            let (look, rest) = look::split_look_keys(&a)?;
-            Ok((st, look, rest))
-        });
+        let split = marker_attrs(&inner[at..], col0)
+            .and_then(|a| style::split_text_keys(&a))
+            .and_then(|(st, a)| {
+                let (look, rest) = look::split_look_keys(&a)?;
+                Ok((st, look, rest))
+            });
         match split {
             Ok((st, look, attrs)) => match attrs.iter().find(|a| !matches!(a.0.as_str(), "box" | "rot" | "flip")) {
                 Some((k, _, col)) => Err((
@@ -635,7 +725,11 @@ fn slot(
             none()
         }
         Ok((_, look, _)) if look.start.is_some() || look.end.is_some() => {
-            p.err(i, 1, "arrowheads are a line's: <line … start=… end=…/>; a slot has none.");
+            p.err(
+                i,
+                1,
+                "arrowheads are a line's: <line … start=… end=…/>; a slot has none.",
+            );
             none()
         }
         Ok(g) => g,
@@ -674,7 +768,11 @@ fn slot(
     }
     seen.push(name.to_string());
     let line = &p.lines[i];
-    let head = HeadMap { start: line.at, end: line.next, mark: line.end };
+    let head = HeadMap {
+        start: line.at,
+        end: line.next,
+        mark: line.end,
+    };
     let (mut bl, mut bm) = (vec![], vec![]);
     p.stop = end;
     p.text_styles = name != "notes";
@@ -709,7 +807,15 @@ fn slot(
         p.err(i, 1, format!("::{name}:: has no text. An unfilled slot is left out: delete this marker line, or write the slot's text after it."));
         return None;
     }
-    Some((Slot { name: name.to_string(), geom, look, blocks: bl }, ItemMap { head, blocks: bm }))
+    Some((
+        Slot {
+            name: name.to_string(),
+            geom,
+            look,
+            blocks: bl,
+        },
+        ItemMap { head, blocks: bm },
+    ))
 }
 
 /// Why a block cannot be slot text.
@@ -731,7 +837,12 @@ fn not_slot_text(b: &Block) -> Option<&'static str> {
 const SHAPE_FORM: &str = "a shape line is <shape id=\"…\" name=\"…\" box=\"…\">text</shape>, its id and name as they are in the file; a shape without text is <shape id=\"…\" name=\"…\" box=\"…\"/>, and a new text box is <shape box=\"…\">text</shape>";
 
 /// A `<shape …>text</shape>` or `<shape …/>` line; `member`: one of a group's objects.
-fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Option<(ShapeText, ItemMap)> {
+fn shape(
+    p: &mut Parser,
+    i: usize,
+    seen: &mut Vec<String>,
+    member: bool,
+) -> Option<(ShapeText, ItemMap)> {
     let form = SHAPE_FORM;
     let line = &p.lines[i];
     let (at, next, lead) = (line.at, line.next, line.indent());
@@ -749,23 +860,39 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
     let (id, name) = match (&vals[0], &vals[1]) {
         (Some(id), Some(name)) => (id.clone(), name.clone()),
         (None, None) if member => {
-            p.err(i, tag.col, "a group's objects are never added here: a new text box goes outside the group.");
+            p.err(
+                i,
+                tag.col,
+                "a group's objects are never added here: a new text box goes outside the group.",
+            );
             return None;
         }
         (None, None) => (String::new(), String::new()),
         _ => {
-            p.err(i, tag.col, format!("<shape> needs both id and name, or neither for a new text box: {form}."));
+            p.err(
+                i,
+                tag.col,
+                format!("<shape> needs both id and name, or neither for a new text box: {form}."),
+            );
             return None;
         }
     };
     let new = id.is_empty();
     if new && geom.is_none() {
-        p.err(i, tag.col, "a new text box needs its box: <shape box=\"x y w h\">text</shape>.");
+        p.err(
+            i,
+            tag.col,
+            "a new text box needs its box: <shape box=\"x y w h\">text</shape>.",
+        );
         return None;
     }
     let (paras, pmaps, open_end) = if tag.self_closing {
         if let Err(col) = rest_blank(&src, after) {
-            p.err(i, col, format!("nothing may follow a shape's tag on its line: {form}."));
+            p.err(
+                i,
+                col,
+                format!("nothing may follow a shape's tag on its line: {form}."),
+            );
             return None;
         }
         (vec![], vec![], next)
@@ -786,13 +913,24 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
         };
         let stop = after + stop;
         if let Some(extra) = src[stop..].iter().find(|c| !c.2.is_whitespace()) {
-            p.err(i, extra.1, format!("nothing may follow </shape> on its line: {form}."));
+            p.err(
+                i,
+                extra.1,
+                format!("nothing may follow </shape> on its line: {form}."),
+            );
             return None;
         }
-        let close = (after..stop).rev().find(|&k| src[k].2 == '<').map_or(at, |k| src[k].0);
+        let close = (after..stop)
+            .rev()
+            .find(|&k| src[k].2 == '<')
+            .map_or(at, |k| src[k].0);
         let (paras, pmaps, _) = out.cell_paras(close);
         if paras.iter().any(|x| x.style.is_some()) {
-            p.err(i, lead + 1, "a slide has no paragraph styles: a shape's paragraphs are started by <p/> alone.");
+            p.err(
+                i,
+                lead + 1,
+                "a slide has no paragraph styles: a shape's paragraphs are started by <p/> alone.",
+            );
             return None;
         }
         let open_end = src.get(after).map_or(p.lines[i].end, |c| c.0);
@@ -803,7 +941,11 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
         }
     };
     if new && paras.is_empty() {
-        p.err(i, tag.col, "a new text box holds its text: <shape box=\"x y w h\">text</shape>.");
+        p.err(
+            i,
+            tag.col,
+            "a new text box holds its text: <shape box=\"x y w h\">text</shape>.",
+        );
         return None;
     }
     if !new && !member {
@@ -823,12 +965,20 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
     if !new {
         let key = format!("<shape id=\"{id}\">");
         if seen.contains(&key) {
-            p.err(i, tag.col, format!("{key} appears twice on this slide; a shape is written once."));
+            p.err(
+                i,
+                tag.col,
+                format!("{key} appears twice on this slide; a shape is written once."),
+            );
             return None;
         }
         seen.push(key);
     }
-    let head = HeadMap { start: at, end: open_end, mark: at + lead };
+    let head = HeadMap {
+        start: at,
+        end: open_end,
+        mark: at + lead,
+    };
     let n = pmaps.len();
     let mut starts = vec![open_end];
     if n > 0 {
@@ -858,30 +1008,57 @@ fn shape(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Opti
         return None;
     }
     if look.start.is_some() || look.end.is_some() {
-        p.err(i, tag.col, "arrowheads are a line's: <line … start=… end=…/>; a shape has none.");
+        p.err(
+            i,
+            tag.col,
+            "arrowheads are a line's: <line … start=… end=…/>; a shape has none.",
+        );
         return None;
     }
-    let sh = ShapeText { id, name, geom, look, paras };
+    let sh = ShapeText {
+        id,
+        name,
+        geom,
+        look,
+        paras,
+    };
     Some((sh, ItemMap { head, blocks }))
 }
 
 const LINE_FORM: &str = "a line is <line id=\"…\" name=\"…\" from=\"x y\" to=\"x y\"/>, its two ends in points (a connector's end attached to an object is that object's id and connection site, from=\"s3.2\"), its id and name as they are in the file, with kind=\"bentConnector3\" (or another connector) when it is not straight, border=\"<width>pt <style> <colour>\" and start= and end= arrowheads (triangle, stealth, diamond, oval, arrow) when it has them; a new line is <line from=\"x y\" to=\"x y\"/>";
 
 /// A `<line …/>` line.
-fn line_item(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Option<(LineItem, ItemMap)> {
+fn line_item(
+    p: &mut Parser,
+    i: usize,
+    seen: &mut Vec<String>,
+    member: bool,
+) -> Option<(LineItem, ItemMap)> {
     let form = LINE_FORM;
     let line = &p.lines[i];
     let (at, next, lead) = (line.at, line.next, line.indent());
-    let Some((tag, after, src)) = line_tag(p, i).filter(|t| t.0.self_closing && !t.0.closing) else {
+    let Some((tag, after, src)) = line_tag(p, i).filter(|t| t.0.self_closing && !t.0.closing)
+    else {
         p.err(i, lead + 1, format!("expected {form}."));
         return None;
     };
     if let Err(col) = rest_blank(&src, after) {
-        p.err(i, col, format!("nothing may follow a line's tag on its line: {form}."));
+        p.err(
+            i,
+            col,
+            format!("nothing may follow a line's tag on its line: {form}."),
+        );
         return None;
     }
     let split = look::split_look_keys(&tag.attrs).and_then(|(look, rest)| {
-        let (vals, _) = split_attrs_of(&rest, &tag.name, tag.col, &["id", "name", "from", "to"], false, form)?;
+        let (vals, _) = split_attrs_of(
+            &rest,
+            &tag.name,
+            tag.col,
+            &["id", "name", "from", "to"],
+            false,
+            form,
+        )?;
         Ok((vals, look))
     });
     let (vals, look) = match split {
@@ -892,7 +1069,11 @@ fn line_item(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> 
         }
     };
     if look.fill.is_some() {
-        p.err(i, tag.col, format!("a line has no fill; its colour is its border=: {form}."));
+        p.err(
+            i,
+            tag.col,
+            format!("a line has no fill; its colour is its border=: {form}."),
+        );
         return None;
     }
     // An end is a point, or (a connector's) the connection site it is attached to.
@@ -909,19 +1090,31 @@ fn line_item(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> 
             return None;
         }
         _ => {
-            p.err(i, tag.col, format!("a line has both its ends, from and to: {form}."));
+            p.err(
+                i,
+                tag.col,
+                format!("a line has both its ends, from and to: {form}."),
+            );
             return None;
         }
     };
     let (id, name) = match (&vals[0], &vals[1]) {
         (Some(id), Some(name)) => (id.clone(), name.clone()),
         (None, None) if member => {
-            p.err(i, tag.col, "a group's objects are never added here: a new line goes outside the group.");
+            p.err(
+                i,
+                tag.col,
+                "a group's objects are never added here: a new line goes outside the group.",
+            );
             return None;
         }
         (None, None) => (String::new(), String::new()),
         _ => {
-            p.err(i, tag.col, format!("<line> needs both id and name, or neither for a new line: {form}."));
+            p.err(
+                i,
+                tag.col,
+                format!("<line> needs both id and name, or neither for a new line: {form}."),
+            );
             return None;
         }
     };
@@ -934,13 +1127,37 @@ fn line_item(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> 
         }
         let key = format!("<line id=\"{id}\">");
         if seen.contains(&key) {
-            p.err(i, tag.col, format!("{key} appears twice on this slide; a line is written once."));
+            p.err(
+                i,
+                tag.col,
+                format!("{key} appears twice on this slide; a line is written once."),
+            );
             return None;
         }
         seen.push(key);
     }
-    let head = HeadMap { start: at, end: next, mark: at + lead };
-    Some((LineItem { id, name, ends: Ends { from, to, from_at, to_at }, look }, ItemMap { head, blocks: vec![] }))
+    let head = HeadMap {
+        start: at,
+        end: next,
+        mark: at + lead,
+    };
+    Some((
+        LineItem {
+            id,
+            name,
+            ends: Ends {
+                from,
+                to,
+                from_at,
+                to_at,
+            },
+            look,
+        },
+        ItemMap {
+            head,
+            blocks: vec![],
+        },
+    ))
 }
 
 const PICTURE_FORM: &str = "a picture is <picture id=\"…\" name=\"…\" box=\"…\" src=\"…\"/>, its id and name as they are in the file, with crop=\"left top right bottom\" (percent cut off each edge), mask=\"ellipse\" (the preset shape it is cut to) and alt=\"…\" (its alternative text) when it has them; a new picture is <picture box=\"…\" src=\"…\"/>";
@@ -952,30 +1169,53 @@ fn parse_crop(v: &str) -> Result<Crop, String> {
         return Err(format!("crop=\"{v}\" is not a crop; it is four numbers, the percent of the image cut off at its left, top, right and bottom edges, such as crop=\"10 0 10 0\"."));
     };
     let k = |x: f64| (x * PER_PERCENT as f64).round() as i64;
-    let c = Crop { l: k(*l), t: k(*t), r: k(*r), b: k(*b) };
+    let c = Crop {
+        l: k(*l),
+        t: k(*t),
+        r: k(*r),
+        b: k(*b),
+    };
     if c.l + c.r >= 100 * PER_PERCENT || c.t + c.b >= 100 * PER_PERCENT {
         return Err(format!("crop=\"{v}\" cuts off the whole image: left and right together, and top and bottom together, stay under 100."));
     }
-    if [c.l, c.t, c.r, c.b].iter().any(|x| *x < -1000 * PER_PERCENT) {
+    if [c.l, c.t, c.r, c.b]
+        .iter()
+        .any(|x| *x < -1000 * PER_PERCENT)
+    {
         return Err(format!("crop=\"{v}\" has a value below -1000; a negative crop leaves space beside the image, at most ten times its size."));
     }
     Ok(c)
 }
 
 /// A `<picture …/>` line; `member`: one of a group's objects.
-fn picture(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Option<(PictureItem, ItemMap)> {
+fn picture(
+    p: &mut Parser,
+    i: usize,
+    seen: &mut Vec<String>,
+    member: bool,
+) -> Option<(PictureItem, ItemMap)> {
     let form = PICTURE_FORM;
     let line = &p.lines[i];
     let (at, next, lead) = (line.at, line.next, line.indent());
-    let Some((tag, after, src)) = line_tag(p, i).filter(|t| t.0.self_closing && !t.0.closing) else {
+    let Some((tag, after, src)) = line_tag(p, i).filter(|t| t.0.self_closing && !t.0.closing)
+    else {
         p.err(i, lead + 1, format!("expected {form}."));
         return None;
     };
     if let Err(col) = rest_blank(&src, after) {
-        p.err(i, col, format!("nothing may follow a picture's tag on its line: {form}."));
+        p.err(
+            i,
+            col,
+            format!("nothing may follow a picture's tag on its line: {form}."),
+        );
         return None;
     }
-    let (vals, geom) = match split_attrs(&tag, &["id", "name", "src", "crop", "mask", "alt"], true, form) {
+    let (vals, geom) = match split_attrs(
+        &tag,
+        &["id", "name", "src", "crop", "mask", "alt"],
+        true,
+        form,
+    ) {
         Ok(v) => v,
         Err((col, msg)) => {
             p.err(i, col, msg);
@@ -986,21 +1226,37 @@ fn picture(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Op
     let (id, name) = match (&vals[0], &vals[1]) {
         (Some(id), Some(name)) => (id.clone(), name.clone()),
         (None, None) if member => {
-            p.err(i, tag.col, "a group's objects are never added here: a new picture goes outside the group.");
+            p.err(
+                i,
+                tag.col,
+                "a group's objects are never added here: a new picture goes outside the group.",
+            );
             return None;
         }
         (None, None) => (String::new(), String::new()),
         _ => {
-            p.err(i, tag.col, format!("<picture> needs both id and name, or neither for a new picture: {form}."));
+            p.err(
+                i,
+                tag.col,
+                format!("<picture> needs both id and name, or neither for a new picture: {form}."),
+            );
             return None;
         }
     };
     let Some(src_v) = vals[2].clone().filter(|s| !s.trim().is_empty()) else {
-        p.err(i, tag.col, format!("a picture names its image, src=\"…\": {form}."));
+        p.err(
+            i,
+            tag.col,
+            format!("a picture names its image, src=\"…\": {form}."),
+        );
         return None;
     };
     if id.is_empty() && geom.is_none() {
-        p.err(i, tag.col, "a new picture needs its box: <picture box=\"x y w h\" src=\"…\"/>.");
+        p.err(
+            i,
+            tag.col,
+            "a new picture needs its box: <picture box=\"x y w h\" src=\"…\"/>.",
+        );
         return None;
     }
     if geom.is_none() {
@@ -1028,7 +1284,9 @@ fn picture(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Op
             p.err(
                 i,
                 col_of("mask"),
-                format!("mask=\"{m}\" is not a preset shape; a mask is a DrawingML preset name{hint}."),
+                format!(
+                    "mask=\"{m}\" is not a preset shape; a mask is a DrawingML preset name{hint}."
+                ),
             );
             return None;
         }
@@ -1043,31 +1301,64 @@ fn picture(p: &mut Parser, i: usize, seen: &mut Vec<String>, member: bool) -> Op
         }
         let key = format!("<picture id=\"{id}\">");
         if seen.contains(&key) {
-            p.err(i, tag.col, format!("{key} appears twice on this slide; a picture is written once."));
+            p.err(
+                i,
+                tag.col,
+                format!("{key} appears twice on this slide; a picture is written once."),
+            );
             return None;
         }
         seen.push(key);
     }
-    let head = HeadMap { start: at, end: next, mark: at + lead };
+    let head = HeadMap {
+        start: at,
+        end: next,
+        mark: at + lead,
+    };
     let crop = crop.filter(|c| !c.is_zero());
     let mask = mask.filter(|m| m != "rect");
-    Some((PictureItem { id, name, geom, src: src_v, crop, mask, alt }, ItemMap { head, blocks: vec![] }))
+    Some((
+        PictureItem {
+            id,
+            name,
+            geom,
+            src: src_v,
+            crop,
+            mask,
+            alt,
+        },
+        ItemMap {
+            head,
+            blocks: vec![],
+        },
+    ))
 }
 
 const GROUP_FORM: &str = "a group is a line <group id=\"…\" name=\"…\" box=\"…\">, its objects' lines, then a line </group>, its id and name as they are in the file";
 
 /// The group opened on line `i` and closed on line `close`.
-fn group(p: &mut Parser, i: usize, close: usize, seen: &mut Vec<String>, member: bool) -> Option<(GroupItem, ItemMap)> {
+fn group(
+    p: &mut Parser,
+    i: usize,
+    close: usize,
+    seen: &mut Vec<String>,
+    member: bool,
+) -> Option<(GroupItem, ItemMap)> {
     let form = GROUP_FORM;
     let before = p.errors.len();
     let line = &p.lines[i];
     let (at, lead) = (line.at, line.indent());
-    let Some((tag, after, src)) = line_tag(p, i).filter(|t| !t.0.self_closing && !t.0.closing) else {
+    let Some((tag, after, src)) = line_tag(p, i).filter(|t| !t.0.self_closing && !t.0.closing)
+    else {
         p.err(i, lead + 1, format!("expected {form}."));
         return None;
     };
     if let Err(col) = rest_blank(&src, after) {
-        p.err(i, col, format!("the group's objects go on the lines after its <group> line: {form}."));
+        p.err(
+            i,
+            col,
+            format!("the group's objects go on the lines after its <group> line: {form}."),
+        );
         return None;
     }
     let (vals, geom) = match split_attrs(&tag, &["id", "name"], true, form) {
@@ -1078,7 +1369,13 @@ fn group(p: &mut Parser, i: usize, close: usize, seen: &mut Vec<String>, member:
         }
     };
     let (Some(id), Some(name)) = (vals[0].clone(), vals[1].clone()) else {
-        p.err(i, tag.col, format!("groups are never created here, and a group line keeps its id and name: {form}."));
+        p.err(
+            i,
+            tag.col,
+            format!(
+                "groups are never created here, and a group line keeps its id and name: {form}."
+            ),
+        );
         return None;
     };
     if !member {
@@ -1090,7 +1387,11 @@ fn group(p: &mut Parser, i: usize, close: usize, seen: &mut Vec<String>, member:
         }
         let key = format!("<group id=\"{id}\">");
         if seen.contains(&key) {
-            p.err(i, tag.col, format!("{key} appears twice on this slide; a group is written once."));
+            p.err(
+                i,
+                tag.col,
+                format!("{key} appears twice on this slide; a group is written once."),
+            );
             return None;
         }
         seen.push(key);
@@ -1106,7 +1407,11 @@ fn group(p: &mut Parser, i: usize, close: usize, seen: &mut Vec<String>, member:
         }
         if is_group_open(t) {
             let Some(k) = group_close(p, j, close) else {
-                p.err(j, 1, format!("this <group> is not closed inside its group: {form}."));
+                p.err(
+                    j,
+                    1,
+                    format!("this <group> is not closed inside its group: {form}."),
+                );
                 return None;
             };
             if let Some((g, _)) = group(p, j, k, &mut local, true) {
@@ -1145,7 +1450,11 @@ fn group(p: &mut Parser, i: usize, close: usize, seen: &mut Vec<String>, member:
         j += 1;
     }
     if p.lines[close].text.trim() != "</group>" {
-        p.err(close, 1, "a group is closed by a line holding only </group>.");
+        p.err(
+            close,
+            1,
+            "a group is closed by a line holding only </group>.",
+        );
     }
     if p.errors.len() > before {
         return None;
@@ -1154,27 +1463,52 @@ fn group(p: &mut Parser, i: usize, close: usize, seen: &mut Vec<String>, member:
         p.err(i, 1, "a group without objects: to delete a group, delete its lines, from <group> to </group>.");
         return None;
     }
-    let head = HeadMap { start: at, end: p.lines[close].next, mark: at + lead };
-    Some((GroupItem { id, name, geom, items }, ItemMap { head, blocks: vec![] }))
+    let head = HeadMap {
+        start: at,
+        end: p.lines[close].next,
+        mark: at + lead,
+    };
+    Some((
+        GroupItem {
+            id,
+            name,
+            geom,
+            items,
+        },
+        ItemMap {
+            head,
+            blocks: vec![],
+        },
+    ))
 }
 
 /// A group's `<keep id kind summary box/>` line: the id is the object's shape id.
 fn member_keep(p: &mut Parser, j: usize) -> Option<ObjectItem> {
     let form = "an object in a group is <keep id=\"…\" kind=\"…\" summary=\"…\" box=\"…\"/>, kept as it is";
     let lead = p.lines[j].indent();
-    let Some((tag, after, src)) = line_tag(p, j).filter(|t| t.0.self_closing && t.0.name == "keep") else {
+    let Some((tag, after, src)) = line_tag(p, j).filter(|t| t.0.self_closing && t.0.name == "keep")
+    else {
         p.err(j, lead + 1, format!("expected {form}."));
         return None;
     };
     if let Err(col) = rest_blank(&src, after) {
-        p.err(j, col, format!("nothing may follow the tag on its line: {form}."));
+        p.err(
+            j,
+            col,
+            format!("nothing may follow the tag on its line: {form}."),
+        );
         return None;
     }
     match split_attrs(&tag, &["id", "kind", "summary"], true, form) {
         Ok((v, geom)) => match (&v[0], &v[1], &v[2]) {
-            (Some(id), Some(kind), Some(summary)) => {
-                Some(ObjectItem { keep: Keep { id: id.clone(), kind: kind.clone(), summary: summary.clone() }, geom })
-            }
+            (Some(id), Some(kind), Some(summary)) => Some(ObjectItem {
+                keep: Keep {
+                    id: id.clone(),
+                    kind: kind.clone(),
+                    summary: summary.clone(),
+                },
+                geom,
+            }),
             _ => {
                 p.err(j, tag.col, format!("{form}."));
                 None
@@ -1214,8 +1548,17 @@ fn item_lines(out: &mut Vec<String>, items: &[SlideItem]) {
                 // paragraph's own at its line's end, the rest in [text]{…}.
                 let mut bl = sl.blocks.clone();
                 let (obj, ends) = lifted(&mut bl);
-                let st = if obj.is_empty() { String::new() } else { format!(" {}", obj.attrs()) };
-                out.push(format!("::{}{}{}{st}::", sl.name, geom_attrs(&sl.geom), look_attrs(&sl.look)));
+                let st = if obj.is_empty() {
+                    String::new()
+                } else {
+                    format!(" {}", obj.attrs())
+                };
+                out.push(format!(
+                    "::{}{}{}{st}::",
+                    sl.name,
+                    geom_attrs(&sl.geom),
+                    look_attrs(&sl.look)
+                ));
                 let from = out.len();
                 blocks_with(out, &bl, true, &ends);
                 for l in &mut out[from..] {
@@ -1227,7 +1570,12 @@ fn item_lines(out: &mut Vec<String>, items: &[SlideItem]) {
             SlideItem::Line(l) => out.push(line_line(l)),
             SlideItem::Picture(pic) => out.push(picture_line(pic)),
             SlideItem::Group(g) => {
-                out.push(format!("<group id=\"{}\" name=\"{}\"{}>", attr(&g.id), attr(&g.name), geom_attrs(&g.geom)));
+                out.push(format!(
+                    "<group id=\"{}\" name=\"{}\"{}>",
+                    attr(&g.id),
+                    attr(&g.name),
+                    geom_attrs(&g.geom)
+                ));
                 item_lines(out, &g.items);
                 out.push("</group>".into());
             }
@@ -1262,15 +1610,37 @@ pub fn shape_line(sh: &ShapeText) -> String {
         g.push(' ');
         g.push_str(&obj.attrs());
     }
-    let ps: Vec<CellPara> =
-        stated.into_iter().map(|c| CellPara { style: None, content: c, props: Default::default() }).collect();
-    let ends: Vec<String> =
-        own.iter().map(|o| if o.is_empty() { String::new() } else { format!(" {{{}}}", o.attrs()) }).collect();
+    let ps: Vec<CellPara> = stated
+        .into_iter()
+        .map(|c| CellPara {
+            style: None,
+            content: c,
+            props: Default::default(),
+        })
+        .collect();
+    let ends: Vec<String> = own
+        .iter()
+        .map(|o| {
+            if o.is_empty() {
+                String::new()
+            } else {
+                format!(" {{{}}}", o.attrs())
+            }
+        })
+        .collect();
     let text = cell_text_with(&ps, true, &ends);
     match (sh.id.is_empty(), sh.paras.is_empty()) {
         (true, _) => format!("<shape{g}>{text}</shape>"),
-        (false, true) => format!("<shape id=\"{}\" name=\"{}\"{g}/>", attr(&sh.id), attr(&sh.name)),
-        (false, false) => format!("<shape id=\"{}\" name=\"{}\"{g}>{text}</shape>", attr(&sh.id), attr(&sh.name)),
+        (false, true) => format!(
+            "<shape id=\"{}\" name=\"{}\"{g}/>",
+            attr(&sh.id),
+            attr(&sh.name)
+        ),
+        (false, false) => format!(
+            "<shape id=\"{}\" name=\"{}\"{g}>{text}</shape>",
+            attr(&sh.id),
+            attr(&sh.name)
+        ),
     }
 }
 
@@ -1302,7 +1672,13 @@ fn lifted(bl: &mut [Block]) -> (TextStyle, Vec<Vec<String>>) {
         v
     };
     let (obj, own, stated) = style::lift(&refs.iter().collect::<Vec<_>>());
-    let end = |o: &TextStyle| if o.is_empty() { String::new() } else { format!(" {{{}}}", o.attrs()) };
+    let end = |o: &TextStyle| {
+        if o.is_empty() {
+            String::new()
+        } else {
+            format!(" {{{}}}", o.attrs())
+        }
+    };
     let mut k = 0;
     let mut ends = vec![];
     for b in bl.iter_mut() {
@@ -1335,32 +1711,55 @@ pub fn object_line(o: &ObjectItem) -> String {
 pub fn picture_line(pic: &PictureItem) -> String {
     let mut out = String::from("<picture");
     if !pic.id.is_empty() {
-        out.push_str(&format!(" id=\"{}\" name=\"{}\"", attr(&pic.id), attr(&pic.name)));
+        out.push_str(&format!(
+            " id=\"{}\" name=\"{}\"",
+            attr(&pic.id),
+            attr(&pic.name)
+        ));
     }
     out.push_str(&geom_attrs(&pic.geom));
     out.push_str(&format!(" src=\"{}\"", attr(&pic.src)));
     if let Some(c) = pic.crop.filter(|c| !c.is_zero()) {
-        out.push_str(&format!(" crop=\"{} {} {} {}\"", shown_pct(c.l), shown_pct(c.t), shown_pct(c.r), shown_pct(c.b)));
+        out.push_str(&format!(
+            " crop=\"{} {} {} {}\"",
+            shown_pct(c.l),
+            shown_pct(c.t),
+            shown_pct(c.r),
+            shown_pct(c.b)
+        ));
     }
     if let Some(m) = &pic.mask {
         out.push_str(&format!(" mask=\"{}\"", attr(m)));
     }
     if let Some(a) = &pic.alt {
         // Alternative text may hold line breaks; the line cannot.
-        out.push_str(&format!(" alt=\"{}\"", attr(a).replace('\n', "&#10;").replace('\r', "&#13;")));
+        out.push_str(&format!(
+            " alt=\"{}\"",
+            attr(a).replace('\n', "&#10;").replace('\r', "&#13;")
+        ));
     }
     out.push_str("/>");
     out
 }
 
 pub fn line_line(l: &LineItem) -> String {
-    let p =
-        |(x, y): (i64, i64), at: Option<Attach>| at.map_or_else(|| format!("{} {}", pt(x), pt(y)), |a| a.to_string());
+    let p = |(x, y): (i64, i64), at: Option<Attach>| {
+        at.map_or_else(|| format!("{} {}", pt(x), pt(y)), |a| a.to_string())
+    };
     let e = &l.ends;
-    let ends = format!("from=\"{}\" to=\"{}\"{}", p(e.from, e.from_at), p(e.to, e.to_at), look_attrs(&l.look));
+    let ends = format!(
+        "from=\"{}\" to=\"{}\"{}",
+        p(e.from, e.from_at),
+        p(e.to, e.to_at),
+        look_attrs(&l.look)
+    );
     if l.id.is_empty() {
         format!("<line {ends}/>")
     } else {
-        format!("<line id=\"{}\" name=\"{}\" {ends}/>", attr(&l.id), attr(&l.name))
+        format!(
+            "<line id=\"{}\" name=\"{}\" {ends}/>",
+            attr(&l.id),
+            attr(&l.name)
+        )
     }
 }

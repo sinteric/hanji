@@ -11,13 +11,15 @@ use hanji_xlsx::book::{Book, SheetKind, Shell};
 use hanji_xlsx::store::{Cell, Row};
 use hanji_xlsx::value::CellValue;
 use oxml_layout::{
-    Color, FontId, GlyphRun, GroupElement, LayoutResult, PageFrame, Path, Point, PositionedElement, Rect, Transform,
+    Color, FontId, GlyphRun, GroupElement, LayoutResult, PageFrame, Path, Point, PositionedElement,
+    Rect, Transform,
 };
 use serde::Serialize;
 
+use crate::fonts::{Fonts, Script};
 use crate::{
-    fonts::{Fonts, Script},
-    Diagnostic, FaceInfo, FontOptions, FontResolver, FontsReport, PageFormat, PageInfo, Preview, RenderedPage,
+    Diagnostic, FaceInfo, FontOptions, FontResolver, FontsReport, PageFormat, PageInfo, Preview,
+    RenderedPage,
 };
 use styles::Style;
 
@@ -95,13 +97,19 @@ pub struct Window {
     pub cells: Vec<CellInfo>,
 }
 fn diagnostic(path: impl Into<String>, message: impl Into<String>) -> Diagnostic {
-    Diagnostic { path: path.into(), message: message.into() }
+    Diagnostic {
+        path: path.into(),
+        message: message.into(),
+    }
 }
 fn yes(s: Option<String>) -> bool {
     s.is_some_and(|s| s == "1" || s == "true")
 }
 fn attr(attrs: &[(String, String)], key: &str) -> Option<String> {
-    attrs.iter().find(|(k, _)| k == key).map(|(_, v)| xml::unescape(v))
+    attrs
+        .iter()
+        .find(|(k, _)| k == key)
+        .map(|(_, v)| xml::unescape(v))
 }
 fn size(s: Option<String>, default: f64, max: f64) -> Result<f64, String> {
     let n = match s {
@@ -132,17 +140,32 @@ pub fn open_xlsx(bytes: &[u8], options: XlsxOptions) -> Result<Workbook, String>
     }
     let parts = package::read_limited(bytes, options.max_unpacked_bytes)?;
     let mut diagnostics = vec![];
-    if parts.iter().any(|p| p.name.to_ascii_lowercase().ends_with("vbaproject.bin")) {
-        diagnostics.push(diagnostic("workbook.macros", "macro content is ignored and never executed"));
+    if parts
+        .iter()
+        .any(|p| p.name.to_ascii_lowercase().ends_with("vbaproject.bin"))
+    {
+        diagnostics.push(diagnostic(
+            "workbook.macros",
+            "macro content is ignored and never executed",
+        ));
     }
-    if parts.iter().filter(|p| p.name.ends_with(".rels")).any(|p| opc::parse_rels(&p.data).iter().any(|r| r.external)) {
+    if parts
+        .iter()
+        .filter(|p| p.name.ends_with(".rels"))
+        .any(|p| opc::parse_rels(&p.data).iter().any(|r| r.external))
+    {
         diagnostics.push(diagnostic(
             "workbook.externalLinks",
             "external relationships are not fetched, activated or refreshed",
         ));
     }
     let book = Book::load(parts, vec![], Shell::default())?;
-    if book.styles.fmts.values().any(|s| s.len() > options.max_number_format_bytes) {
+    if book
+        .styles
+        .fmts
+        .values()
+        .any(|s| s.len() > options.max_number_format_bytes)
+    {
         return Err("number format exceeds the configured metadata budget".into());
     }
     let theme_part = book
@@ -151,16 +174,27 @@ pub fn open_xlsx(bytes: &[u8], options: XlsxOptions) -> Result<Workbook, String>
         .find(|r| r.short_type() == "theme" && !r.external)
         .map(|r| opc::resolve_target(&book.wb_part, &r.target));
     let (styles, normal_font) = styles::parse(
-        book.styles.part.as_deref().and_then(|p| package::get(&book.parts, p)),
-        theme_part.as_deref().and_then(|p| package::get(&book.parts, p)),
+        book.styles
+            .part
+            .as_deref()
+            .and_then(|p| package::get(&book.parts, p)),
+        theme_part
+            .as_deref()
+            .and_then(|p| package::get(&book.parts, p)),
         options.max_font_family_bytes,
     )?;
-    let possibly_stale = book.wb.root.elements().find(|e| e.local() == "calcPr").is_some_and(|c| {
-        yes(c.get("fullCalcOnLoad"))
-            || yes(c.get("forceFullCalc"))
-            || c.get("calcMode").as_deref() == Some("manual")
-            || c.get("calcCompleted").is_some_and(|v| v == "0" || v == "false")
-    });
+    let possibly_stale = book
+        .wb
+        .root
+        .elements()
+        .find(|e| e.local() == "calcPr")
+        .is_some_and(|c| {
+            yes(c.get("fullCalcOnLoad"))
+                || yes(c.get("forceFullCalc"))
+                || c.get("calcMode").as_deref() == Some("manual")
+                || c.get("calcCompleted")
+                    .is_some_and(|v| v == "0" || v == "false")
+        });
     let sheets = book
         .sheets
         .iter()
@@ -172,14 +206,27 @@ pub fn open_xlsx(bytes: &[u8], options: XlsxOptions) -> Result<Workbook, String>
             is_worksheet: s.kind == SheetKind::Work,
         })
         .collect();
-    Ok(Workbook { book, styles, normal_font, options, possibly_stale, sheets, diagnostics })
+    Ok(Workbook {
+        book,
+        styles,
+        normal_font,
+        options,
+        possibly_stale,
+        sheets,
+        diagnostics,
+    })
 }
 
 impl Workbook {
     /// Native host-font adapter. Selection/layout stay in this library; the
     /// byte-only APIs remain available without filesystem or host discovery.
     #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
-    pub fn render_window(&mut self, sheet: usize, range: &str, opts: &crate::Options) -> Result<Window, String> {
+    pub fn render_window(
+        &mut self,
+        sheet: usize,
+        range: &str,
+        opts: &crate::Options,
+    ) -> Result<Window, String> {
         let window = {
             let fonts = Fonts::load(&opts.font_dirs, &[], opts.system_fonts);
             self.layout_window(sheet, range, &fonts)?
@@ -211,8 +258,14 @@ impl Workbook {
         finish_window(self.layout_window(sheet, range, fonts)?)
     }
 
-    fn layout_window(&mut self, sheet: usize, range: &str, fonts: &dyn FontResolver) -> Result<Window, String> {
-        let range = CellRange::parse(range).ok_or("invalid worksheet window; expected an A1 range")?;
+    fn layout_window(
+        &mut self,
+        sheet: usize,
+        range: &str,
+        fonts: &dyn FontResolver,
+    ) -> Result<Window, String> {
+        let range =
+            CellRange::parse(range).ok_or("invalid worksheet window; expected an A1 range")?;
         if range.rows() > self.options.max_window_rows
             || range.cols() > self.options.max_window_columns
             || u64::from(range.rows()) * u64::from(range.cols()) > self.options.max_window_cells
@@ -221,7 +274,11 @@ impl Workbook {
                 "worksheet window exceeds the configured row/column/cell budget; request a smaller range".into()
             );
         }
-        let info = self.sheets.get(sheet).ok_or("worksheet index is out of range")?.clone();
+        let info = self
+            .sheets
+            .get(sheet)
+            .ok_or("worksheet index is out of range")?
+            .clone();
         if !info.is_worksheet {
             return Err("chart/macro/dialog sheets do not have a worksheet grid preview".into());
         }
@@ -233,7 +290,10 @@ impl Workbook {
         let mut merges = vec![];
         if let Some(list) = store.child("mergeCells") {
             for e in list.elements().filter(|e| e.local() == "mergeCell") {
-                let m = e.get("ref").and_then(|s| CellRange::parse(&s)).ok_or("invalid merged-cell range")?;
+                let m = e
+                    .get("ref")
+                    .and_then(|s| CellRange::parse(&s))
+                    .ok_or("invalid merged-cell range")?;
                 if !m.intersects(&range) {
                     continue;
                 }
@@ -274,7 +334,10 @@ impl Workbook {
         }
         let mut rows = BTreeMap::<u32, Row>::new();
         for r in range.first.row..=range.last.row {
-            if let Some(row) = store.try_row(r).map_err(|e| format!("{prefix}.rows[{r}]: {e}"))? {
+            if let Some(row) = store
+                .try_row(r)
+                .map_err(|e| format!("{prefix}.rows[{r}]: {e}"))?
+            {
                 rows.insert(r, row);
             }
         }
@@ -285,13 +348,23 @@ impl Workbook {
         let mut col_styles = vec![0usize; widths.len()];
         if let Some(cols) = store.child("cols") {
             for c in cols.elements().filter(|c| c.local() == "col") {
-                let min = c.get("min").and_then(|s| s.parse::<u32>().ok()).ok_or("invalid column min")?;
-                let max = c.get("max").and_then(|s| s.parse::<u32>().ok()).ok_or("invalid column max")?;
+                let min = c
+                    .get("min")
+                    .and_then(|s| s.parse::<u32>().ok())
+                    .ok_or("invalid column min")?;
+                let max = c
+                    .get("max")
+                    .and_then(|s| s.parse::<u32>().ok())
+                    .ok_or("invalid column max")?;
                 if min == 0 || min > max || max > MAX_COL {
                     return Err("invalid column span".into());
                 }
                 let width = size(c.get("width"), default_width, 255.0)?;
-                let width = if yes(c.get("hidden")) || width == 0.0 { 0.0 } else { (width * 7.0 + 5.0) * 0.75 };
+                let width = if yes(c.get("hidden")) || width == 0.0 {
+                    0.0
+                } else {
+                    (width * 7.0 + 5.0) * 0.75
+                };
                 for col in (min - 1).max(range.first.col)..=(max - 1).min(range.last.col) {
                     widths[(col - range.first.col) as usize] = width;
                     col_styles[(col - range.first.col) as usize] =
@@ -300,7 +373,8 @@ impl Workbook {
             }
         }
         let default_hidden = yes(format.and_then(|f| f.get("zeroHeight")));
-        let mut heights = vec![if default_hidden { 0.0 } else { default_height }; range.rows() as usize];
+        let mut heights =
+            vec![if default_hidden { 0.0 } else { default_height }; range.rows() as usize];
         for (&r, row) in &rows {
             if r == 0 || r > MAX_ROW {
                 return Err("invalid row address".into());
@@ -321,17 +395,39 @@ impl Workbook {
         };
         let xs = offsets(&widths, 36.0);
         let ys = offsets(&heights, 18.0);
-        let mut builder = GridBuilder::new(fonts, &self.normal_font, self.options.max_window_text_bytes, diagnostics);
+        let mut builder = GridBuilder::new(
+            fonts,
+            &self.normal_font,
+            self.options.max_window_text_bytes,
+            diagnostics,
+        );
         for (ci, &w) in widths.iter().enumerate().filter(|(_, w)| **w > 0.0) {
-            let rect = Rect { x: xs[ci], y: 0.0, width: w, height: 18.0 };
-            builder.cell(rect, &col_letters(range.first.col + ci as u32), &Style::default(), false, false, "header")?;
+            let rect = Rect {
+                x: xs[ci],
+                y: 0.0,
+                width: w,
+                height: 18.0,
+            };
+            builder.cell(
+                rect,
+                &col_letters(range.first.col + ci as u32),
+                &Style::default(),
+                false,
+                false,
+                "header",
+            )?;
         }
         let mut cells = vec![];
         let mut used_styles = BTreeSet::new();
         for (ri, &h) in heights.iter().enumerate().filter(|(_, h)| **h > 0.0) {
             let r = range.first.row + ri as u32;
             builder.cell(
-                Rect { x: 0.0, y: ys[ri], width: 36.0, height: h },
+                Rect {
+                    x: 0.0,
+                    y: ys[ri],
+                    width: 36.0,
+                    height: h,
+                },
                 &r.to_string(),
                 &Style::default(),
                 true,
@@ -339,16 +435,24 @@ impl Workbook {
                 "header",
             )?;
             let row = rows.get(&r);
-            let values: BTreeMap<u32, &Cell> = row.into_iter().flat_map(|r| &r.cells).map(|c| (c.col, c)).collect();
+            let values: BTreeMap<u32, &Cell> = row
+                .into_iter()
+                .flat_map(|r| &r.cells)
+                .map(|c| (c.col, c))
+                .collect();
             if row.is_some_and(|row| {
                 row.r != r
                     || values.len() != row.cells.len()
                     || row.cells.iter().any(|c| {
                         c.col >= MAX_COL
-                            || c.get("r").and_then(CellRef::parse).is_none_or(|a| a.row != r || a.col != c.col)
+                            || c.get("r")
+                                .and_then(CellRef::parse)
+                                .is_none_or(|a| a.row != r || a.col != c.col)
                     })
             }) {
-                return Err(format!("{prefix}.rows[{r}]: duplicate or invalid cell column"));
+                return Err(format!(
+                    "{prefix}.rows[{r}]: duplicate or invalid cell column"
+                ));
             }
             for (ci, _) in widths.iter().enumerate().filter(|(_, w)| **w > 0.0) {
                 let col = range.first.col + ci as u32;
@@ -374,13 +478,14 @@ impl Workbook {
                             .and_then(|s| s.parse().ok())
                     })
                     .unwrap_or(col_styles[ci]);
-                let style = self
-                    .styles
-                    .get(style_index)
-                    .ok_or_else(|| format!("{prefix}.cells[{address}]: invalid cell style {style_index}"))?;
+                let style = self.styles.get(style_index).ok_or_else(|| {
+                    format!("{prefix}.cells[{address}]: invalid cell style {style_index}")
+                })?;
                 if used_styles.insert(style_index) {
                     for loss in &style.losses {
-                        builder.diagnostics.push(diagnostic(format!("{prefix}.styles[{style_index}]"), loss));
+                        builder
+                            .diagnostics
+                            .push(diagnostic(format!("{prefix}.styles[{style_index}]"), loss));
                     }
                 }
                 let path = format!("{prefix}.cells[{address}]");
@@ -395,12 +500,17 @@ impl Workbook {
                         return Err(format!("{path}: invalid shared-string reference"));
                     }
                     if c.ty() == "b"
-                        && c.v.as_deref().is_some_and(|v| !matches!(v.trim(), "0" | "1" | "true" | "false"))
+                        && c.v
+                            .as_deref()
+                            .is_some_and(|v| !matches!(v.trim(), "0" | "1" | "true" | "false"))
                     {
                         return Err(format!("{path}: invalid boolean value"));
                     }
                     if c.ty() == "n"
-                        && c.v.as_deref().and_then(|s| s.parse::<f64>().ok()).is_some_and(|v| !v.is_finite())
+                        && c.v
+                            .as_deref()
+                            .and_then(|s| s.parse::<f64>().ok())
+                            .is_some_and(|v| !v.is_finite())
                     {
                         return Err(format!("{path}: nonfinite numeric value"));
                     }
@@ -413,7 +523,11 @@ impl Workbook {
                 let mut display = cell
                     .map(|c| {
                         let format = self.book.styles.format_of(style_index as u32);
-                        hanji_xlsx::numfmt::display(&self.book.value(c), &format, self.book.date1904)
+                        hanji_xlsx::numfmt::display(
+                            &self.book.value(c),
+                            &format,
+                            self.book.date1904,
+                        )
                     })
                     .unwrap_or_default();
                 let formula = cell.and_then(Cell::formula);
@@ -422,9 +536,10 @@ impl Workbook {
                         || (c.ty() != "str" && c.v.as_deref().is_some_and(|v| v.trim().is_empty()))
                     {
                         display = "#UNEVALUATED".into();
-                        builder
-                            .diagnostics
-                            .push(diagnostic(format!("{path}.formula"), crate::quality::FORMULA_MISSING));
+                        builder.diagnostics.push(diagnostic(
+                            format!("{path}.formula"),
+                            crate::quality::FORMULA_MISSING,
+                        ));
                         FormulaResult::Missing
                     } else {
                         builder.diagnostics.push(diagnostic(format!("{path}.formula"), if self.possibly_stale {
@@ -439,10 +554,24 @@ impl Workbook {
                 } else {
                     FormulaResult::NotFormula
                 };
-                let numeric = cell.is_some_and(|c| c.ty() == "d" || matches!(self.book.value(c), CellValue::Number(_)));
-                builder.cell(rect, &display, style, numeric, formula_result == FormulaResult::Missing, &path)?;
+                let numeric = cell.is_some_and(|c| {
+                    c.ty() == "d" || matches!(self.book.value(c), CellValue::Number(_))
+                });
+                builder.cell(
+                    rect,
+                    &display,
+                    style,
+                    numeric,
+                    formula_result == FormulaResult::Missing,
+                    &path,
+                )?;
                 if cell.is_some() {
-                    cells.push(CellInfo { address: address.to_string(), display, formula, formula_result });
+                    cells.push(CellInfo {
+                        address: address.to_string(),
+                        display,
+                        formula,
+                        formula_result,
+                    });
                 }
             }
         }
@@ -490,7 +619,12 @@ impl Window {
     /// A self-contained static window. No scripts, external links or event handlers.
     pub fn html(&self, title: &str) -> String {
         let esc = crate::svg::escape_xml_text;
-        let warnings: String = self.preview.warnings.iter().map(|w| format!("<li>{}</li>", esc(w))).collect();
+        let warnings: String = self
+            .preview
+            .warnings
+            .iter()
+            .map(|w| format!("<li>{}</li>", esc(w)))
+            .collect();
         let cells: String = self
             .cells
             .iter()
@@ -510,7 +644,14 @@ impl Window {
         let description: String = self
             .cells
             .iter()
-            .map(|c| format!("{}: {}; {}. ", c.address, c.display, formula_description(&c.formula_result)))
+            .map(|c| {
+                format!(
+                    "{}: {}; {}. ",
+                    c.address,
+                    c.display,
+                    formula_description(&c.formula_result)
+                )
+            })
             .collect();
         let heading = format!("{}: {}", self.sheet.name, self.range);
         let prefix = svg.find('>').expect("own SVG has a root start tag");
@@ -584,12 +725,17 @@ impl<'a> GridBuilder<'a> {
             let resolved = self
                 .resolver
                 .resolve_font_for_text(&s.family, Script::Latin, s.bold, s.italic, " ")
-                .or_else(|| self.resolver.resolve_font(&s.family, Script::Latin, s.bold, s.italic))
+                .or_else(|| {
+                    self.resolver
+                        .resolve_font(&s.family, Script::Latin, s.bold, s.italic)
+                })
                 .ok_or("no font available to measure Normal style indentation")?;
             let face = ttf_parser::Face::parse(&resolved.font.data, resolved.font.face_index)
                 .map_err(|e| format!("Normal style font: {e}"))?;
-            if matches!(resolved.metrics, crate::fonts::Metrics::Substitute | crate::fonts::Metrics::Table)
-                || resolved.ea_advance.is_some()
+            if matches!(
+                resolved.metrics,
+                crate::fonts::Metrics::Substitute | crate::fonts::Metrics::Table
+            ) || resolved.ea_advance.is_some()
                 || (s.bold && !face.is_bold())
                 || (s.italic && !face.is_italic())
             {
@@ -622,10 +768,19 @@ impl<'a> GridBuilder<'a> {
                 }
             }
         }
-        let drawn = self.resolver.resolve_font_for_text(&style.family, script, style.bold, style.italic, text);
+        let drawn = self.resolver.resolve_font_for_text(
+            &style.family,
+            script,
+            style.bold,
+            style.italic,
+            text,
+        );
         let face = drawn
             .clone()
-            .or_else(|| self.resolver.resolve_font(&style.family, Script::Latin, style.bold, style.italic))
+            .or_else(|| {
+                self.resolver
+                    .resolve_font(&style.family, Script::Latin, style.bold, style.italic)
+            })
             .ok_or("no font available to lay out worksheet text")?;
         if let Some(ids) = self.keys.get(&key) {
             if let Some(id) = ids.iter().find(|id| {
@@ -683,24 +838,72 @@ impl<'a> GridBuilder<'a> {
         missing_formula: bool,
         path: &str,
     ) -> Result<(), String> {
-        self.remaining_text =
-            self.remaining_text.checked_sub(text.len()).ok_or("worksheet window exceeds the configured text budget")?;
+        self.remaining_text = self
+            .remaining_text
+            .checked_sub(text.len())
+            .ok_or("worksheet window exceeds the configured text budget")?;
         if text.chars().any(|c| matches!(c as u32, 0x0300..=0x036F | 0x0590..=0x10FF | 0x1780..=0x17FF | 0x200C..=0x200F | 0x202A..=0x202E | 0x2066..=0x2069)) {
             self.diagnostics.push(diagnostic(format!("{path}.text"), "complex-script shaping and bidirectional reordering are not performed; scalar-positioned text may differ"));
         }
         if let Some(color) = style.fill {
-            self.elements.push(PositionedElement::FilledRect { rect, color });
+            self.elements
+                .push(PositionedElement::FilledRect { rect, color });
         }
         let corners = [
-            (Point { x: rect.x, y: rect.y }, Point { x: rect.x, y: rect.y + rect.height }),
-            (Point { x: rect.x + rect.width, y: rect.y }, Point { x: rect.x + rect.width, y: rect.y + rect.height }),
-            (Point { x: rect.x, y: rect.y }, Point { x: rect.x + rect.width, y: rect.y }),
-            (Point { x: rect.x, y: rect.y + rect.height }, Point { x: rect.x + rect.width, y: rect.y + rect.height }),
+            (
+                Point {
+                    x: rect.x,
+                    y: rect.y,
+                },
+                Point {
+                    x: rect.x,
+                    y: rect.y + rect.height,
+                },
+            ),
+            (
+                Point {
+                    x: rect.x + rect.width,
+                    y: rect.y,
+                },
+                Point {
+                    x: rect.x + rect.width,
+                    y: rect.y + rect.height,
+                },
+            ),
+            (
+                Point {
+                    x: rect.x,
+                    y: rect.y,
+                },
+                Point {
+                    x: rect.x + rect.width,
+                    y: rect.y,
+                },
+            ),
+            (
+                Point {
+                    x: rect.x,
+                    y: rect.y + rect.height,
+                },
+                Point {
+                    x: rect.x + rect.width,
+                    y: rect.y + rect.height,
+                },
+            ),
         ];
         for (k, (start, end)) in corners.into_iter().enumerate() {
-            let (width, color, dash_pattern) =
-                style.edges[k].as_ref().map_or((0.3, Color::from_hex("D0D0D0"), None), |e| (e.width, e.color, e.dash));
-            self.elements.push(PositionedElement::Line { start, end, width, color, dash_pattern });
+            let (width, color, dash_pattern) = style.edges[k]
+                .as_ref()
+                .map_or((0.3, Color::from_hex("D0D0D0"), None), |e| {
+                    (e.width, e.color, e.dash)
+                });
+            self.elements.push(PositionedElement::Line {
+                start,
+                end,
+                width,
+                color,
+                dash_pattern,
+            });
         }
         if text.is_empty() {
             return Ok(());
@@ -721,7 +924,8 @@ impl<'a> GridBuilder<'a> {
         }
         let id = self.font(style, text)?;
         let font = &self.fonts[id.0 as usize];
-        let face = ttf_parser::Face::parse(&font.data, font.face_index).map_err(|e| format!("worksheet font: {e}"))?;
+        let face = ttf_parser::Face::parse(&font.data, font.face_index)
+            .map_err(|e| format!("worksheet font: {e}"))?;
         let scale = style.size / f64::from(face.units_per_em());
         if (style.bold && !font.bold) || (style.italic && !font.italic) {
             self.diagnostics.push(diagnostic(
@@ -736,10 +940,19 @@ impl<'a> GridBuilder<'a> {
             let advance = if crate::fonts::is_joining_control(c) {
                 0.0
             } else {
-                f64::from(face.glyph_hor_advance(glyph).unwrap_or(face.units_per_em() / 2)) * scale
+                f64::from(
+                    face.glyph_hor_advance(glyph)
+                        .unwrap_or(face.units_per_em() / 2),
+                ) * scale
             };
-            if c == '\n' || (style.wrap && !guarded && width + advance > text_width && !line.is_empty()) {
-                lines.push((std::mem::take(&mut line), std::mem::take(&mut glyphs), std::mem::take(&mut advances)));
+            if c == '\n'
+                || (style.wrap && !guarded && width + advance > text_width && !line.is_empty())
+            {
+                lines.push((
+                    std::mem::take(&mut line),
+                    std::mem::take(&mut glyphs),
+                    std::mem::take(&mut advances),
+                ));
                 width = 0.0;
             }
             if c != '\n' {
@@ -785,7 +998,10 @@ impl<'a> GridBuilder<'a> {
                 }
             }
             children.push(PositionedElement::Text(GlyphRun {
-                origin: Point { x, y: top + style.size + i as f64 * line_height },
+                origin: Point {
+                    x,
+                    y: top + style.size + i as f64 * line_height,
+                },
                 font_id: id,
                 font_size: style.size,
                 glyph_ids,
@@ -868,18 +1084,32 @@ fn overflow_indicator(
     marker: char,
 ) -> Vec<PositionedElement> {
     if let Some(glyph) = face.glyph_index(marker) {
-        if let (Some(advance), Some(bounds)) = (face.glyph_hor_advance(glyph), face.glyph_bounding_box(glyph)) {
+        if let (Some(advance), Some(bounds)) = (
+            face.glyph_hor_advance(glyph),
+            face.glyph_bounding_box(glyph),
+        ) {
             let upem = f64::from(face.units_per_em());
-            let count =
-                if marker == '#' && f64::from(advance) * style.size / upem * 3.0 <= rect.width - 4.0 { 3 } else { 1 };
-            let ink_width = f64::from(bounds.x_max) - f64::from(bounds.x_min) + (count - 1) as f64 * f64::from(advance);
+            let count = if marker == '#'
+                && f64::from(advance) * style.size / upem * 3.0 <= rect.width - 4.0
+            {
+                3
+            } else {
+                1
+            };
+            let ink_width = f64::from(bounds.x_max) - f64::from(bounds.x_min)
+                + (count - 1) as f64 * f64::from(advance);
             let ink_height = f64::from(bounds.y_max) - f64::from(bounds.y_min);
             if ink_width > 0.0 && ink_height > 0.0 {
-                let scale = (style.size / upem).min(rect.width * 0.8 / ink_width).min(rect.height * 0.8 / ink_height);
+                let scale = (style.size / upem)
+                    .min(rect.width * 0.8 / ink_width)
+                    .min(rect.height * 0.8 / ink_height);
                 return vec![PositionedElement::Text(GlyphRun {
                     origin: Point {
-                        x: rect.x + (rect.width - ink_width * scale) / 2.0 - f64::from(bounds.x_min) * scale,
-                        y: rect.y + (rect.height - ink_height * scale) / 2.0 + f64::from(bounds.y_max) * scale,
+                        x: rect.x + (rect.width - ink_width * scale) / 2.0
+                            - f64::from(bounds.x_min) * scale,
+                        y: rect.y
+                            + (rect.height - ink_height * scale) / 2.0
+                            + f64::from(bounds.y_max) * scale,
                     },
                     font_id: id,
                     font_size: scale * upem,
@@ -904,8 +1134,14 @@ fn overflow_indicator(
     [(0.2, 0.2, 0.8, 0.8), (0.2, 0.8, 0.8, 0.2)]
         .into_iter()
         .map(|(x1, y1, x2, y2)| PositionedElement::Line {
-            start: Point { x: rect.x + rect.width * x1, y: rect.y + rect.height * y1 },
-            end: Point { x: rect.x + rect.width * x2, y: rect.y + rect.height * y2 },
+            start: Point {
+                x: rect.x + rect.width * x1,
+                y: rect.y + rect.height * y1,
+            },
+            end: Point {
+                x: rect.x + rect.width * x2,
+                y: rect.y + rect.height * y2,
+            },
             width: (rect.width.min(rect.height) * 0.1).min(1.0),
             color: style.color,
             dash_pattern: None,
