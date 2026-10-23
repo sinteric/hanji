@@ -1,0 +1,1115 @@
+{
+  "command": "cargo run --locked -p hanji-store --example keep_census -- --write",
+  "corpora": [
+    {
+      "corpus": "prototype/remainder/corpus/*.docx",
+      "files": 13
+    },
+    {
+      "corpus": "crates/hanji-hwpx/corpus/*.hwpx",
+      "files": 16
+    },
+    {
+      "corpus": "crates/hanji-pptx/corpus/*.pptx",
+      "files": 20
+    },
+    {
+      "corpus": "crates/hanji-pptx/corpus/*.pptm",
+      "files": 2
+    },
+    {
+      "corpus": "crates/hanji-pptx/corpus/audit/*.pptx",
+      "files": 5
+    },
+    {
+      "corpus": "crates/hanji-xlsx/corpus/*.xlsx",
+      "files": 43
+    },
+    {
+      "corpus": "crates/hanji-xlsx/corpus/*.xlsm",
+      "files": 3
+    }
+  ],
+  "total": {
+    "files": 102,
+    "failed": 0,
+    "with_keeps": 64,
+    "keeps": 387
+  },
+  "formats": [
+    {
+      "format": "docx",
+      "files": 13,
+      "failed": 0,
+      "with_keeps": 13,
+      "keeps": 225
+    },
+    {
+      "format": "hwpx",
+      "files": 16,
+      "failed": 0,
+      "with_keeps": 12,
+      "keeps": 54
+    },
+    {
+      "format": "pptx",
+      "files": 27,
+      "failed": 0,
+      "with_keeps": 16,
+      "keeps": 44
+    },
+    {
+      "format": "xlsx",
+      "files": 46,
+      "failed": 0,
+      "with_keeps": 23,
+      "keeps": 64
+    }
+  ],
+  "kinds": [
+    {
+      "format": "docx",
+      "kind": "field",
+      "keeps": 85,
+      "files": 7
+    },
+    {
+      "format": "docx",
+      "kind": "drawing",
+      "keeps": 26,
+      "files": 10
+    },
+    {
+      "format": "docx",
+      "kind": "content-control",
+      "keeps": 19,
+      "files": 5
+    },
+    {
+      "format": "docx",
+      "kind": "comment",
+      "keeps": 18,
+      "files": 5
+    },
+    {
+      "format": "xlsx",
+      "kind": "merged-cells",
+      "keeps": 18,
+      "files": 7
+    },
+    {
+      "format": "docx",
+      "kind": "tracked-insert",
+      "keeps": 17,
+      "files": 4
+    },
+    {
+      "format": "hwpx",
+      "kind": "math",
+      "keeps": 16,
+      "files": 1
+    },
+    {
+      "format": "pptx",
+      "kind": "table",
+      "keeps": 15,
+      "files": 10
+    },
+    {
+      "format": "docx",
+      "kind": "tracked-delete",
+      "keeps": 14,
+      "files": 3
+    },
+    {
+      "format": "hwpx",
+      "kind": "table",
+      "keeps": 13,
+      "files": 6
+    },
+    {
+      "format": "docx",
+      "kind": "field-part",
+      "keeps": 12,
+      "files": 1
+    },
+    {
+      "format": "pptx",
+      "kind": "field",
+      "keeps": 11,
+      "files": 4
+    },
+    {
+      "format": "hwpx",
+      "kind": "footnote",
+      "keeps": 10,
+      "files": 2
+    },
+    {
+      "format": "docx",
+      "kind": "object",
+      "keeps": 8,
+      "files": 2
+    },
+    {
+      "format": "xlsx",
+      "kind": "chart",
+      "keeps": 8,
+      "files": 6
+    },
+    {
+      "format": "docx",
+      "kind": "footnote",
+      "keeps": 7,
+      "files": 7
+    },
+    {
+      "format": "docx",
+      "kind": "symbol",
+      "keeps": 7,
+      "files": 1
+    },
+    {
+      "format": "pptx",
+      "kind": "picture",
+      "keeps": 7,
+      "files": 6
+    },
+    {
+      "format": "xlsx",
+      "kind": "hyperlinks",
+      "keeps": 7,
+      "files": 7
+    },
+    {
+      "format": "xlsx",
+      "kind": "notes",
+      "keeps": 7,
+      "files": 7
+    },
+    {
+      "format": "xlsx",
+      "kind": "picture",
+      "keeps": 7,
+      "files": 3
+    },
+    {
+      "format": "hwpx",
+      "kind": "drawing",
+      "keeps": 6,
+      "files": 5
+    },
+    {
+      "format": "pptx",
+      "kind": "diagram",
+      "keeps": 6,
+      "files": 3
+    },
+    {
+      "format": "hwpx",
+      "kind": "form-control",
+      "keeps": 5,
+      "files": 1
+    },
+    {
+      "format": "pptx",
+      "kind": "chart",
+      "keeps": 5,
+      "files": 5
+    },
+    {
+      "format": "xlsx",
+      "kind": "conditional-format",
+      "keeps": 5,
+      "files": 5
+    },
+    {
+      "format": "xlsx",
+      "kind": "shape",
+      "keeps": 5,
+      "files": 3
+    },
+    {
+      "format": "docx",
+      "kind": "table",
+      "keeps": 4,
+      "files": 3
+    },
+    {
+      "format": "xlsx",
+      "kind": "data-validation",
+      "keeps": 4,
+      "files": 4
+    },
+    {
+      "format": "docx",
+      "kind": "endnote",
+      "keeps": 3,
+      "files": 3
+    },
+    {
+      "format": "hwpx",
+      "kind": "text",
+      "keeps": 3,
+      "files": 1
+    },
+    {
+      "format": "docx",
+      "kind": "math",
+      "keeps": 2,
+      "files": 2
+    },
+    {
+      "format": "docx",
+      "kind": "tracked-move",
+      "keeps": 2,
+      "files": 1
+    },
+    {
+      "format": "xlsx",
+      "kind": "pivot-table",
+      "keeps": 2,
+      "files": 1
+    },
+    {
+      "format": "docx",
+      "kind": "break",
+      "keeps": 1,
+      "files": 1
+    },
+    {
+      "format": "hwpx",
+      "kind": "number",
+      "keeps": 1,
+      "files": 1
+    },
+    {
+      "format": "xlsx",
+      "kind": "group",
+      "keeps": 1,
+      "files": 1
+    }
+  ],
+  "files": [
+    {
+      "path": "prototype/remainder/corpus/Bug54849.docx",
+      "format": "docx",
+      "keeps": 10,
+      "kinds": {
+        "content-control": 7,
+        "endnote": 1,
+        "footnote": 1,
+        "table": 1
+      }
+    },
+    {
+      "path": "prototype/remainder/corpus/WordWithAttachments.docx",
+      "format": "docx",
+      "keeps": 12,
+      "kinds": {
+        "comment": 3,
+        "drawing": 4,
+        "object": 5
+      }
+    },
+    {
+      "path": "prototype/remainder/corpus/delins.docx",
+      "format": "docx",
+      "keeps": 17,
+      "kinds": {
+        "field": 2,
+        "tracked-delete": 2,
+        "tracked-insert": 13
+      }
+    },
+    {
+      "path": "prototype/remainder/corpus/docx4j-tables.docx",
+      "format": "docx",
+      "keeps": 3,
+      "kinds": {
+        "drawing": 1,
+        "table": 2
+      }
+    },
+    {
+      "path": "prototype/remainder/corpus/fdo76098.docx",
+      "format": "docx",
+      "keeps": 3,
+      "kinds": {
+        "drawing": 2,
+        "field": 1
+      }
+    },
+    {
+      "path": "prototype/remainder/corpus/form_footnotes.docx",
+      "format": "docx",
+      "keeps": 82,
+      "kinds": {
+        "drawing": 5,
+        "field": 69,
+        "footnote": 1,
+        "symbol": 7
+      }
+    },
+    {
+      "path": "prototype/remainder/corpus/korean-report.docx",
+      "format": "docx",
+      "keeps": 4,
+      "kinds": {
+        "comment": 1,
+        "drawing": 1,
+        "footnote": 1,
+        "tracked-insert": 1
+      }
+    },
+    {
+      "path": "prototype/remainder/corpus/loadAndSave.docx",
+      "format": "docx",
+      "keeps": 9,
+      "kinds": {
+        "comment": 1,
+        "content-control": 1,
+        "drawing": 3,
+        "endnote": 1,
+        "field": 1,
+        "footnote": 1,
+        "math": 1
+      }
+    },
+    {
+      "path": "prototype/remainder/corpus/sample-docx.docx",
+      "format": "docx",
+      "keeps": 5,
+      "kinds": {
+        "drawing": 3,
+        "tracked-delete": 1,
+        "tracked-insert": 1
+      }
+    },
+    {
+      "path": "prototype/remainder/corpus/tdf124637_sectionMargin.docx",
+      "format": "docx",
+      "keeps": 3,
+      "kinds": {
+        "break": 1,
+        "content-control": 1,
+        "footnote": 1
+      }
+    },
+    {
+      "path": "prototype/remainder/corpus/tdf154481.docx",
+      "format": "docx",
+      "keeps": 21,
+      "kinds": {
+        "comment": 12,
+        "content-control": 1,
+        "drawing": 1,
+        "field": 7
+      }
+    },
+    {
+      "path": "prototype/remainder/corpus/testWORD_2006ml.docx",
+      "format": "docx",
+      "keeps": 53,
+      "kinds": {
+        "comment": 1,
+        "content-control": 9,
+        "drawing": 5,
+        "endnote": 1,
+        "field": 4,
+        "field-part": 12,
+        "footnote": 1,
+        "math": 1,
+        "object": 3,
+        "table": 1,
+        "tracked-delete": 11,
+        "tracked-insert": 2,
+        "tracked-move": 2
+      }
+    },
+    {
+      "path": "prototype/remainder/corpus/testWORD_various.docx",
+      "format": "docx",
+      "keeps": 3,
+      "kinds": {
+        "drawing": 1,
+        "field": 1,
+        "footnote": 1
+      }
+    },
+    {
+      "path": "crates/hanji-hwpx/corpus/basic-table-01.hwpx",
+      "format": "hwpx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-hwpx/corpus/eq-002.hwpx",
+      "format": "hwpx",
+      "keeps": 17,
+      "kinds": {
+        "math": 16,
+        "number": 1
+      }
+    },
+    {
+      "path": "crates/hanji-hwpx/corpus/fdi-2025q2.hwpx",
+      "format": "hwpx",
+      "keeps": 3,
+      "kinds": {
+        "drawing": 1,
+        "table": 2
+      }
+    },
+    {
+      "path": "crates/hanji-hwpx/corpus/field-multipara-clickhere.hwpx",
+      "format": "hwpx",
+      "keeps": 2,
+      "kinds": {
+        "table": 2
+      }
+    },
+    {
+      "path": "crates/hanji-hwpx/corpus/footnote-01.hwpx",
+      "format": "hwpx",
+      "keeps": 9,
+      "kinds": {
+        "footnote": 9
+      }
+    },
+    {
+      "path": "crates/hanji-hwpx/corpus/footnote-tbox-01.hwpx",
+      "format": "hwpx",
+      "keeps": 2,
+      "kinds": {
+        "drawing": 1,
+        "footnote": 1
+      }
+    },
+    {
+      "path": "crates/hanji-hwpx/corpus/form-01.hwpx",
+      "format": "hwpx",
+      "keeps": 5,
+      "kinds": {
+        "form-control": 5
+      }
+    },
+    {
+      "path": "crates/hanji-hwpx/corpus/hcar-001.hwpx",
+      "format": "hwpx",
+      "keeps": 3,
+      "kinds": {
+        "table": 3
+      }
+    },
+    {
+      "path": "crates/hanji-hwpx/corpus/hy-002.hwpx",
+      "format": "hwpx",
+      "keeps": 2,
+      "kinds": {
+        "drawing": 2
+      }
+    },
+    {
+      "path": "crates/hanji-hwpx/corpus/issue1535_coanchored_float_exclusion.hwpx",
+      "format": "hwpx",
+      "keeps": 3,
+      "kinds": {
+        "table": 3
+      }
+    },
+    {
+      "path": "crates/hanji-hwpx/corpus/issue1948_cross_para_fieldend.hwpx",
+      "format": "hwpx",
+      "keeps": 2,
+      "kinds": {
+        "table": 2
+      }
+    },
+    {
+      "path": "crates/hanji-hwpx/corpus/landscape-001.hwpx",
+      "format": "hwpx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-hwpx/corpus/mel-001.hwpx",
+      "format": "hwpx",
+      "keeps": 5,
+      "kinds": {
+        "drawing": 1,
+        "table": 1,
+        "text": 3
+      }
+    },
+    {
+      "path": "crates/hanji-hwpx/corpus/para-001.hwpx",
+      "format": "hwpx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-hwpx/corpus/table-text.hwpx",
+      "format": "hwpx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-hwpx/corpus/tb-img-03.hwpx",
+      "format": "hwpx",
+      "keeps": 1,
+      "kinds": {
+        "drawing": 1
+      }
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/45545_Comment.pptx",
+      "format": "pptx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/60810.pptx",
+      "format": "pptx",
+      "keeps": 6,
+      "kinds": {
+        "diagram": 4,
+        "field": 2
+      }
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/EmbeddedVideo.pptx",
+      "format": "pptx",
+      "keeps": 1,
+      "kinds": {
+        "picture": 1
+      }
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/SampleShow.pptx",
+      "format": "pptx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/SimpleMacro.pptm",
+      "format": "pptx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/act-props.pptm",
+      "format": "pptx",
+      "keeps": 1,
+      "kinds": {
+        "picture": 1
+      }
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/audit/o09_Performance_typical.pptx",
+      "format": "pptx",
+      "keeps": 2,
+      "kinds": {
+        "picture": 1,
+        "table": 1
+      }
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/audit/onlyoffice-sample.pptx",
+      "format": "pptx",
+      "keeps": 9,
+      "kinds": {
+        "chart": 1,
+        "field": 7,
+        "table": 1
+      }
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/audit/slide-section-test.pptx",
+      "format": "pptx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/audit/synth-korean-report.pptx",
+      "format": "pptx",
+      "keeps": 1,
+      "kinds": {
+        "chart": 1
+      }
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/audit/synth-modern-pitch.pptx",
+      "format": "pptx",
+      "keeps": 2,
+      "kinds": {
+        "chart": 1,
+        "table": 1
+      }
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/ext-rels.pptx",
+      "format": "pptx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/korean-deck.pptx",
+      "format": "pptx",
+      "keeps": 1,
+      "kinds": {
+        "table": 1
+      }
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/layouts.pptx",
+      "format": "pptx",
+      "keeps": 2,
+      "kinds": {
+        "field": 1,
+        "picture": 1
+      }
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/ph-populated-placeholders.pptx",
+      "format": "pptx",
+      "keeps": 5,
+      "kinds": {
+        "chart": 1,
+        "diagram": 1,
+        "picture": 2,
+        "table": 1
+      }
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/ph-unpopulated-placeholders.pptx",
+      "format": "pptx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/prs-notes.pptx",
+      "format": "pptx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/shapes.pptx",
+      "format": "pptx",
+      "keeps": 3,
+      "kinds": {
+        "table": 3
+      }
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/shp-access-ole-object.pptx",
+      "format": "pptx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/shp-groupshape.pptx",
+      "format": "pptx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/shp-shapes.pptx",
+      "format": "pptx",
+      "keeps": 3,
+      "kinds": {
+        "chart": 1,
+        "diagram": 1,
+        "table": 1
+      }
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/sld-notes.pptx",
+      "format": "pptx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/tbl-cell.pptx",
+      "format": "pptx",
+      "keeps": 4,
+      "kinds": {
+        "table": 4
+      }
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/turns-deck.pptx",
+      "format": "pptx",
+      "keeps": 1,
+      "kinds": {
+        "picture": 1
+      }
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/txt-font-props.pptx",
+      "format": "pptx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/txt-text.pptx",
+      "format": "pptx",
+      "keeps": 2,
+      "kinds": {
+        "field": 1,
+        "table": 1
+      }
+    },
+    {
+      "path": "crates/hanji-pptx/corpus/with_japanese.pptx",
+      "format": "pptx",
+      "keeps": 1,
+      "kinds": {
+        "table": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/50867_with_table.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/54084-Greek-beyond-BMP.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/57893-many-merges.xlsx",
+      "format": "xlsx",
+      "keeps": 1,
+      "kinds": {
+        "merged-cells": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/DataValidations-49244.xlsx",
+      "format": "xlsx",
+      "keeps": 2,
+      "kinds": {
+        "data-validation": 1,
+        "merged-cells": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/DateFormatTests.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/ExcelPivotTableSample.xlsx",
+      "format": "xlsx",
+      "keeps": 2,
+      "kinds": {
+        "pivot-table": 2
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/ExcelTables.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/ExcelWithAttachments.xlsm",
+      "format": "xlsx",
+      "keeps": 6,
+      "kinds": {
+        "group": 1,
+        "hyperlinks": 1,
+        "notes": 1,
+        "shape": 3
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/GeneralFormatTests.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/InlineStrings.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/SampleSS.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/SimpleMacro.xlsm",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/SimpleWithComments.xlsx",
+      "format": "xlsx",
+      "keeps": 1,
+      "kinds": {
+        "notes": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/StructuredReferences.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/Tables.xlsx",
+      "format": "xlsx",
+      "keeps": 12,
+      "kinds": {
+        "merged-cells": 12
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/WithChart.xlsx",
+      "format": "xlsx",
+      "keeps": 1,
+      "kinds": {
+        "chart": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/WithConditionalFormatting.xlsx",
+      "format": "xlsx",
+      "keeps": 1,
+      "kinds": {
+        "conditional-format": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/WithDrawing.xlsx",
+      "format": "xlsx",
+      "keeps": 6,
+      "kinds": {
+        "picture": 5,
+        "shape": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/WithTable.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/WithThreeCharts.xlsx",
+      "format": "xlsx",
+      "keeps": 3,
+      "kinds": {
+        "chart": 3
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/WithVariousData.xlsx",
+      "format": "xlsx",
+      "keeps": 2,
+      "kinds": {
+        "hyperlinks": 1,
+        "notes": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/korean-sales-lo.xlsx",
+      "format": "xlsx",
+      "keeps": 6,
+      "kinds": {
+        "chart": 1,
+        "conditional-format": 1,
+        "data-validation": 1,
+        "hyperlinks": 1,
+        "merged-cells": 1,
+        "notes": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/korean-sales.xlsx",
+      "format": "xlsx",
+      "keeps": 6,
+      "kinds": {
+        "chart": 1,
+        "conditional-format": 1,
+        "data-validation": 1,
+        "hyperlinks": 1,
+        "merged-cells": 1,
+        "notes": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/link-external-workbook-b.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/rx_array_formula01.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/rx_autofilter01.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/rx_chart_bar01.xlsx",
+      "format": "xlsx",
+      "keeps": 1,
+      "kinds": {
+        "chart": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/rx_comment01.xlsx",
+      "format": "xlsx",
+      "keeps": 1,
+      "kinds": {
+        "notes": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/rx_cond_format01.xlsx",
+      "format": "xlsx",
+      "keeps": 1,
+      "kinds": {
+        "conditional-format": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/rx_data_validation01.xlsx",
+      "format": "xlsx",
+      "keeps": 1,
+      "kinds": {
+        "data-validation": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/rx_defined_name01.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/rx_dynamic_array01.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/rx_hyperlink01.xlsx",
+      "format": "xlsx",
+      "keeps": 1,
+      "kinds": {
+        "hyperlinks": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/rx_image01.xlsx",
+      "format": "xlsx",
+      "keeps": 1,
+      "kinds": {
+        "picture": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/rx_macro01.xlsm",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/rx_merge_range01.xlsx",
+      "format": "xlsx",
+      "keeps": 1,
+      "kinds": {
+        "merged-cells": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/rx_rich_string01.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/rx_table01.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/rx_table05.xlsx",
+      "format": "xlsx",
+      "keeps": 3,
+      "kinds": {
+        "hyperlinks": 1,
+        "notes": 1,
+        "picture": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/rx_table14.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/shared_formulas.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/sharedhyperlink.xlsx",
+      "format": "xlsx",
+      "keeps": 1,
+      "kinds": {
+        "hyperlinks": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/simple-monthly-budget.xlsx",
+      "format": "xlsx",
+      "keeps": 4,
+      "kinds": {
+        "chart": 1,
+        "conditional-format": 1,
+        "merged-cells": 1,
+        "shape": 1
+      }
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/table-sample.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/unicodeSheetName.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    },
+    {
+      "path": "crates/hanji-xlsx/corpus/xlookup.xlsx",
+      "format": "xlsx",
+      "keeps": 0,
+      "kinds": {}
+    }
+  ]
+}

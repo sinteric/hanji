@@ -285,6 +285,10 @@ These are not supported yet:
   formula and unsupported-feature diagnostics. Korean text needs a supplied
   or installed Korean font.
 
+What the test files still show as placeholders, by format, kind and file,
+is counted in [docs/keep-census.md](docs/keep-census.md), which also says how
+to regenerate it.
+
 For the details of each engine, see [crates/README.md](crates/README.md).
 
 ## License
