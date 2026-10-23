@@ -6,6 +6,9 @@
   9999-12-31, as Excel does, instead of panicking on huge values (`1e300` as
   `yyyy-mm-dd`), and stop long `ss.000…` runs from showing float noise or the
   wrong date.
+- Stop XLSX percent formats from panicking in display text and previews when
+  scaling leaves f64's range (`0%` on `1e307`, or hundreds of `%` signs):
+  the decimal point is moved in the digits instead.
 
 ## 0.5.0 — 2026-10-21
 

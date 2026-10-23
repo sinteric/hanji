@@ -338,13 +338,18 @@ pub fn general(x: f64) -> String {
 /// `x` rounded half away from zero to `places` decimals, on its 15-digit
 /// decimal value: (negative, integer digits, fraction digits).
 pub fn round_decimal(x: f64, places: usize) -> (bool, String, String) {
+    round_shifted(x, 0, places)
+}
+
+/// [`round_decimal`] of `x × 10^shift`, without computing it in f64.
+fn round_shifted(x: f64, shift: i32, places: usize) -> (bool, String, String) {
     let neg = x < 0.0;
     let s = format!("{:.14e}", x.abs());
     let (m, e) = s.split_once('e').unwrap();
     let e: i32 = e.parse().unwrap();
     let digits: Vec<u8> = m.bytes().filter(|b| b.is_ascii_digit()).map(|b| b - b'0').collect();
-    // value = 0.d1d2d3… × 10^(e+1)
-    let point = e + 1;
+    // value = 0.d1d2d3… × 10^(e+1+shift)
+    let point = e + 1 + shift;
     let keep = point + places as i32;
     let mut ds: Vec<u8> = if keep <= 0 { vec![] } else { digits.iter().copied().take(keep as usize).collect() };
     while (ds.len() as i32) < keep {
@@ -446,6 +451,12 @@ fn numeric(x: f64, toks: &[Tk]) -> String {
         k += 1;
     }
     let mut v = x * 10f64.powi(2 * percent) / 1000f64.powi(scale);
+    // Past f64's range (`0%` on 1e307, or hundreds of `%`), keep `x` and move
+    // the decimal point by `shift` instead.
+    let mut shift = 0;
+    if !v.is_finite() {
+        (v, shift) = (x, 2 * percent - 3 * scale);
+    }
     let mut exp_text = String::new();
     if let Some(e) = exp_at {
         let sign_plus = matches!(toks.get(e + 1), Some(Tk::Code('+')));
@@ -456,13 +467,14 @@ fn numeric(x: f64, toks: &[Tk]) -> String {
         if v != 0.0 {
             // Engineering form (`##0.0E+0`): the exponent a multiple of the integer placeholders.
             let step = if int_ph.len() > 1 && int_ph.contains(&'#') { int_ph.len() as i32 } else { 1 };
-            ex = v.abs().log10().floor() as i32;
+            ex = v.abs().log10().floor() as i32 + shift;
             if step > 1 {
                 ex = ex.div_euclid(step) * step;
             } else {
                 ex -= int_ph.len().saturating_sub(1) as i32;
             }
-            v /= 10f64.powi(ex);
+            v /= 10f64.powi(ex - shift);
+            shift = 0;
             let (_, i, _) = round_decimal(v, frac_ph.len());
             if i.len() > int_ph.len().max(1) && step == 1 {
                 ex += 1;
@@ -484,7 +496,7 @@ fn numeric(x: f64, toks: &[Tk]) -> String {
             "0".repeat(width.saturating_sub(digits.len())) + &digits
         );
     }
-    let (neg, int, frac) = round_decimal(v, frac_ph.len());
+    let (neg, int, frac) = round_shifted(v, shift, frac_ph.len());
     // Integer digits with the placeholders' minimum width.
     let min_int = int_ph.iter().filter(|c| **c == '0').count();
     let q_int = int_ph.iter().filter(|c| **c == '?').count();
@@ -1041,6 +1053,19 @@ mod tests {
             n(x, &format!("yyyy-mm-dd hh:mm:ss.{}", "0".repeat(400))),
             format!("2026-03-01 12:34:56.789{}", "0".repeat(397))
         );
+    }
+
+    #[test]
+    fn percent_past_f64_range() {
+        // `%` used to scale in f64: 1e307 × 100 is infinite, and 0 × 10^400
+        // is NaN, both panicking when the digits were taken.
+        assert_eq!(n(1e307, "0%"), format!("1{}%", "0".repeat(309)));
+        assert_eq!(n(-1.5e307, "0.0%"), format!("-15{}.0%", "0".repeat(308)));
+        assert_eq!(n(1e307, "0.00E+00%"), "1.00E+309%");
+        assert_eq!(n(1.7e308, "0,%"), format!("17{}%", "0".repeat(306)));
+        assert_eq!(n(0.0, &format!("0{}", "%".repeat(200))), format!("0{}", "%".repeat(200)));
+        assert_eq!(n(2.0, &format!("0{}", "%".repeat(200))), format!("2{}{}", "0".repeat(400), "%".repeat(200)));
+        assert_eq!(n(0.5, "0%"), "50%");
     }
 
     #[test]
