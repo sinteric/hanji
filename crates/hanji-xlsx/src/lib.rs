@@ -34,7 +34,10 @@ pub mod view;
 
 pub use hanji_package::{package, xml};
 
-use hanji_core::{Capabilities, Engine, EngineError, ImportOptions, ImportReport, Imported, Kind, Remainder, StyleSet};
+use hanji_core::{
+    Capabilities, Engine, EngineError, ImportOptions, ImportReport, Imported, Kind, Remainder,
+    StyleSet,
+};
 use hanji_format::sheet::{parse_spreadsheet, serialize_spreadsheet, Spreadsheet, WindowOf};
 use hanji_format::Names;
 
@@ -58,10 +61,17 @@ fn pkg(m: String) -> EngineError {
 /// The book of a remainder (its range entries; placeholders are derived again).
 pub(crate) fn book_of(rem: &Remainder) -> Result<Book, EngineError> {
     let shell: Shell = match rem.shell.first() {
-        Some(s) => serde_json::from_str(s).map_err(|e| pkg(format!("the remainder's shell: {e}")))?,
+        Some(s) => {
+            serde_json::from_str(s).map_err(|e| pkg(format!("the remainder's shell: {e}")))?
+        }
         None => Shell::default(),
     };
-    let entries = rem.entries.iter().filter(|e| e.kind == Kind::Range).cloned().collect();
+    let entries = rem
+        .entries
+        .iter()
+        .filter(|e| e.kind == Kind::Range)
+        .cloned()
+        .collect();
     Book::load(rem.parts.clone(), entries, shell).map_err(pkg)
 }
 
@@ -83,7 +93,10 @@ pub(crate) fn remainder_of(book: Book, mut next_id: u64) -> Remainder {
 
 impl XlsxEngine {
     /// Import into a remainder, with the §8 report.
-    pub fn split(package: &[u8], opts: &ImportOptions) -> Result<(Remainder, ImportReport), EngineError> {
+    pub fn split(
+        package: &[u8],
+        opts: &ImportOptions,
+    ) -> Result<(Remainder, ImportReport), EngineError> {
         let parts = package::read(package).map_err(pkg)?;
         let mut book = Book::load(parts, vec![], Shell::default()).map_err(pkg)?;
         let mut report = ImportReport::default();
@@ -108,7 +121,11 @@ impl XlsxEngine {
 
     /// The names the text may use: its placeholders.
     pub fn names(rem: &Remainder) -> Names {
-        Names { keeps: Some(rem.keep_list()), formats: Some(vec!["xlsx".into()]), ..Default::default() }
+        Names {
+            keeps: Some(rem.keep_list()),
+            formats: Some(vec!["xlsx".into()]),
+            ..Default::default()
+        }
     }
 
     pub fn text_of(rem: &Remainder, template: Option<&str>) -> Result<String, EngineError> {
@@ -167,13 +184,21 @@ impl Engine for XlsxEngine {
     fn import(&self, package: &[u8], opts: &ImportOptions) -> Result<Imported, EngineError> {
         let (remainder, report) = Self::split(package, opts)?;
         let text = Self::text_of(&remainder, opts.template.as_deref())?;
-        Ok(Imported { text, remainder, report })
+        Ok(Imported {
+            text,
+            remainder,
+            report,
+        })
     }
 
     fn export(&self, text: &str, rem: &Remainder) -> Result<Vec<u8>, EngineError> {
         let parsed = parse_spreadsheet(text, &Self::names(rem)).map_err(EngineError::Invalid)?;
         let current = Self::structure(rem, parsed.front.template.as_deref())?;
-        let rem = if structure::same(&parsed, &current) { rem.clone() } else { ops::apply(text, rem, "[]")?.remainder };
+        let rem = if structure::same(&parsed, &current) {
+            rem.clone()
+        } else {
+            ops::apply(text, rem, "[]")?.remainder
+        };
         let mut book = book_of(&rem)?;
         for i in 0..book.sheets.len() {
             model::restore_entries(&mut book, i).map_err(pkg)?;

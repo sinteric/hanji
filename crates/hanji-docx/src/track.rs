@@ -29,7 +29,9 @@ use std::cell::Cell as Counter;
 use std::collections::{HashMap, HashSet};
 
 use hanji_core::revision::{paragraphs, same_shape};
-use hanji_core::{Block, EngineError, Entry, Kept, Kind, Para, Path, Pos, Reanchored, Remainder, Table};
+use hanji_core::{
+    Block, EngineError, Entry, Kept, Kind, Para, Path, Pos, Reanchored, Remainder, Table,
+};
 use hanji_format::{Atom, Cell, CellPara, Inline, Marks, Props, Unit};
 
 use crate::export::{with_marks, Exporter};
@@ -98,7 +100,9 @@ impl History {
     /// spans cannot be derived without guessing.
     pub fn push(&mut self, r: &Reanchored) -> Result<(), EngineError> {
         if r.old != self.blocks {
-            return Err(refused("the edit does not start from the current revision of this history"));
+            return Err(refused(
+                "the edit does not start from the current revision of this history",
+            ));
         }
         if !r.report.refused.is_empty() {
             return Err(refused(format!(
@@ -128,7 +132,8 @@ impl History {
     /// no record of the edits that made it): each run of changed lines
     /// becomes an exact edit, the last first so earlier offsets hold.
     pub fn push_text(&mut self, new_text: &str) -> Result<(), EngineError> {
-        let lines = |t: &str| -> Vec<String> { t.split_inclusive('\n').map(String::from).collect() };
+        let lines =
+            |t: &str| -> Vec<String> { t.split_inclusive('\n').map(String::from).collect() };
         let (old, new) = (lines(&self.text), lines(new_text));
         let at: Vec<usize> = std::iter::once(0)
             .chain(old.iter().scan(0, |n, l| {
@@ -142,12 +147,15 @@ impl History {
                 continue;
             }
             let repl = new[op.j1..op.j2].concat();
-            let r = hanji_core::reanchor_span(&self.rem, &self.text, at[op.i1], at[op.i2], &repl, caps)
-                .map_err(|e| refused(e.to_string()))?;
+            let r =
+                hanji_core::reanchor_span(&self.rem, &self.text, at[op.i1], at[op.i2], &repl, caps)
+                    .map_err(|e| refused(e.to_string()))?;
             self.push(&r)?;
         }
         if self.text != new_text {
-            return Err(refused("the revision's text could not be rebuilt from exact edits"));
+            return Err(refused(
+                "the revision's text could not be rebuilt from exact edits",
+            ));
         }
         Ok(())
     }
@@ -169,22 +177,34 @@ impl DocxEngine {
             return hanji_core::Engine::export(self, text, rem);
         };
         let h = history.ok_or_else(|| {
-            refused("tracked changes are written from the edits made since import: pass their History")
+            refused(
+                "tracked changes are written from the edits made since import: pass their History",
+            )
         })?;
         if text != h.text || rem.entries != h.rem.entries || rem.next_id != h.rem.next_id {
-            return Err(refused("the text and remainder are not the current revision of the history"));
+            return Err(refused(
+                "the text and remainder are not the current revision of the history",
+            ));
         }
         export_tracked(h, rem, reviewer)
     }
 }
 
-fn export_tracked(h: &History, rem: &Remainder, reviewer: &Reviewer) -> Result<Vec<u8>, EngineError> {
+fn export_tracked(
+    h: &History,
+    rem: &Remainder,
+    reviewer: &Reviewer,
+) -> Result<Vec<u8>, EngineError> {
     let shell = DocShell::of(rem)?;
     let mut numbering = Numbering::read(&rem.parts);
-    let lists = hanji_core::plan_lists(&h.blocks, &rem.entries, &mut numbering).map_err(EngineError::Refused)?;
+    let lists = hanji_core::plan_lists(&h.blocks, &rem.entries, &mut numbering)
+        .map_err(EngineError::Refused)?;
     let mut m = Merge::new(h, rem);
     m.build().map_err(EngineError::Refused)?;
-    let lists = lists.into_iter().filter_map(|(bi, plan)| m.new_mark.get(&vec![bi]).map(|p| (p[0], plan))).collect();
+    let lists = lists
+        .into_iter()
+        .filter_map(|(bi, plan)| m.new_mark.get(&vec![bi]).map(|p| (p[0], plan)))
+        .collect();
     let entries = m.entries().map_err(EngineError::Refused)?;
     let scope: Scope = rem.namespaces.iter().cloned().collect();
     let track = Track {
@@ -206,11 +226,21 @@ fn export_tracked(h: &History, rem: &Remainder, reviewer: &Reviewer) -> Result<V
     }
     let mut ex = Exporter::new(&styles, &entries, &numbering, lists).tracked(&track);
     if styles.formatting {
-        ex = ex.formatted(crate::export::Fmt::new(&styles, crate::format::Theme::read(&rem.parts)));
+        ex = ex.formatted(crate::export::Fmt::new(
+            &styles,
+            crate::format::Theme::read(&rem.parts),
+        ));
     }
     let body = ex.body(&m.blocks).map_err(EngineError::Refused)?;
     let document = shell.document(&body).into_bytes();
-    write_package(rem, Exported { document, numbering: numbering.part(), styles: None })
+    write_package(
+        rem,
+        Exported {
+            document,
+            numbering: numbering.part(),
+            styles: None,
+        },
+    )
 }
 
 /// The largest numeric `w:id` anywhere in the package, so revision ids are new.
@@ -225,7 +255,11 @@ fn max_id(base: &Remainder, rem: &Remainder) -> u64 {
             max = max.max(n.parse::<u64>().unwrap_or(0));
         }
     };
-    for p in rem.parts.iter().filter(|p| p.name.ends_with(".xml") || p.name.ends_with(".rels")) {
+    for p in rem
+        .parts
+        .iter()
+        .filter(|p| p.name.ends_with(".xml") || p.name.ends_with(".rels"))
+    {
         scan(&String::from_utf8_lossy(&p.data));
     }
     for s in &rem.shell {
@@ -320,9 +354,16 @@ impl Track {
                         r.children.insert(0, Node::El(Element::new("w:rPr")));
                     }
                     let mut change = self.rev("w:rPrChange");
-                    let before = if old.is_empty() { Element::new("w:rPr") } else { fragment(old) };
+                    let before = if old.is_empty() {
+                        Element::new("w:rPr")
+                    } else {
+                        fragment(old)
+                    };
                     change.children.push(Node::El(before));
-                    r.child_mut("w:rPr").unwrap().children.push(Node::El(change));
+                    r.child_mut("w:rPr")
+                        .unwrap()
+                        .children
+                        .push(Node::El(change));
                 }
                 r
             }
@@ -332,9 +373,16 @@ impl Track {
     /// A merged paragraph's mark: inserted or deleted in `w:pPr/w:rPr`, or
     /// a `w:pPrChange` / `w:rPrChange` when a kept mark's properties changed.
     pub fn mark(&self, p: &mut Element, path: &[usize]) -> Result<(), String> {
-        let Some(m) = self.marks.get(path) else { return Ok(()) };
+        let Some(m) = self.marks.get(path) else {
+            return Ok(());
+        };
         if m.st == St::Eq {
-            let old = m.old_ppr.clone().flatten().map(|x| fragment(&x)).unwrap_or_else(|| Element::new("w:pPr"));
+            let old = m
+                .old_ppr
+                .clone()
+                .flatten()
+                .map(|x| fragment(&x))
+                .unwrap_or_else(|| Element::new("w:pPr"));
             return self.ppr_change(p, &old);
         }
         let ppr = ensure_ppr(p);
@@ -347,7 +395,10 @@ impl Track {
             insert_ordered(ppr, Element::new("w:rPr"), PPR_ORDER);
         }
         let rpr = ppr.child_mut("w:rPr").unwrap();
-        if rpr.elements().any(|e| matches!(e.local(), "ins" | "del" | "moveFrom" | "moveTo")) {
+        if rpr
+            .elements()
+            .any(|e| matches!(e.local(), "ins" | "del" | "moveFrom" | "moveTo"))
+        {
             return Err("the edit inserts or deletes a paragraph mark that is already a tracked change of another \
                         author; accept or reject that change first"
                 .into());
@@ -358,10 +409,16 @@ impl Track {
     }
 
     fn ppr_change(&self, p: &mut Element, old: &Element) -> Result<(), String> {
-        let new = p.child("w:pPr").cloned().unwrap_or_else(|| Element::new("w:pPr"));
+        let new = p
+            .child("w:pPr")
+            .cloned()
+            .unwrap_or_else(|| Element::new("w:pPr"));
         let part = |e: &Element, n: &str| e.child(n).map(|x| self.canon(x));
         if part(&new, "w:sectPr") != part(old, "w:sectPr") {
-            return Err("the edit changes a section break, which is not written as a tracked change yet".into());
+            return Err(
+                "the edit changes a section break, which is not written as a tracked change yet"
+                    .into(),
+            );
         }
         let base = |e: &Element| {
             let mut x = e.clone();
@@ -375,7 +432,10 @@ impl Track {
         // The default style by name, as Word writes it: an empty stored pPr
         // reads as "no change" to some applications.
         if para_changed && bo.child("w:pStyle").is_none() && bn.child("w:pStyle").is_some() {
-            bo.children.insert(0, Node::El(Element::new("w:pStyle").with_attr("w:val", &self.default_style)));
+            bo.children.insert(
+                0,
+                Node::El(Element::new("w:pStyle").with_attr("w:val", &self.default_style)),
+            );
         }
         let rpr_changed = part(&new, "w:rPr") != part(old, "w:rPr");
         if !para_changed && !rpr_changed {
@@ -393,7 +453,10 @@ impl Track {
             ppr.children.push(Node::El(change));
         }
         if rpr_changed {
-            let mut before = old.child("w:rPr").cloned().unwrap_or_else(|| Element::new("w:rPr"));
+            let mut before = old
+                .child("w:rPr")
+                .cloned()
+                .unwrap_or_else(|| Element::new("w:rPr"));
             before.children.retain(|n| {
                 !matches!(n, Node::El(e) if matches!(e.local(), "ins" | "del" | "moveFrom" | "moveTo" | "rPrChange"))
             });
@@ -421,12 +484,18 @@ impl Track {
             _ => return,
         };
         if tr.child("w:trPr").is_none() {
-            let at =
-                tr.children.iter().position(|n| matches!(n, Node::El(e) if e.is("w:tblPrEx"))).map_or(0, |k| k + 1);
+            let at = tr
+                .children
+                .iter()
+                .position(|n| matches!(n, Node::El(e) if e.is("w:tblPrEx")))
+                .map_or(0, |k| k + 1);
             tr.children.insert(at, Node::El(Element::new("w:trPr")));
         }
         let trpr = tr.child_mut("w:trPr").unwrap();
-        let at = trpr.children.iter().position(|n| matches!(n, Node::El(e) if e.is("w:trPrChange")));
+        let at = trpr
+            .children
+            .iter()
+            .position(|n| matches!(n, Node::El(e) if e.is("w:trPrChange")));
         let mark = Node::El(self.rev(name));
         match at {
             Some(k) => trpr.children.insert(k, mark),
@@ -494,7 +563,10 @@ impl<'a> Side<'a> {
     }
 
     fn unit(&self, path: &Path, u: usize) -> Unit {
-        hanji_core::model::content_at(self.blocks, path).expect("a paragraph").units[u].clone()
+        hanji_core::model::content_at(self.blocks, path)
+            .expect("a paragraph")
+            .units[u]
+            .clone()
     }
 
     fn len(&self, path: &Path) -> usize {
@@ -504,13 +576,19 @@ impl<'a> Side<'a> {
     /// The `w:rPr` unit `u` of `path` is written with.
     fn rpr(&self, path: &Path, u: usize) -> String {
         let own = self.owner[path][u];
-        with_marks(own.and_then(|o| o.xml.get(1)).map(|x| fragment(x)), self.eff[path][u])
-            .map(|x| x.to_xml())
-            .unwrap_or_default()
+        with_marks(
+            own.and_then(|o| o.xml.get(1)).map(|x| fragment(x)),
+            self.eff[path][u],
+        )
+        .map(|x| x.to_xml())
+        .unwrap_or_default()
     }
 
     fn has_sect(&self, mark: &Path) -> bool {
-        self.ppr.get(mark).and_then(|e| e.xml.get(1)).is_some_and(|x| fragment(x).child("w:sectPr").is_some())
+        self.ppr
+            .get(mark)
+            .and_then(|e| e.xml.get(1))
+            .is_some_and(|x| fragment(x).child("w:sectPr").is_some())
     }
 
     /// A paragraph's style, list item, cell paragraph style and own properties.
@@ -518,7 +596,12 @@ impl<'a> Side<'a> {
         match (&self.blocks[path[0]], path.len()) {
             (Block::Para(p), 1) => (p.style.clone(), p.item, None, p.props.clone()),
             (Block::Table(t), 4) => match &t.rows[path[1]][path[2]] {
-                Cell::Text(ps) => (String::new(), None, ps[path[3]].style.clone(), ps[path[3]].props.clone()),
+                Cell::Text(ps) => (
+                    String::new(),
+                    None,
+                    ps[path[3]].style.clone(),
+                    ps[path[3]].props.clone(),
+                ),
                 _ => (String::new(), None, None, Props::new()),
             },
             _ => (String::new(), None, None, Props::new()),
@@ -567,7 +650,11 @@ fn mark_path(p: &Option<Pos>) -> Option<&Path> {
 /// The heaviest chain of pairs increasing on both sides (pairs are sorted
 /// by the old side, new sides distinct): a Fenwick tree of best chains by
 /// new position.
-fn chain(pairs: &[(usize, usize)], weight: &dyn Fn(usize) -> u64, n_new: usize) -> Vec<(usize, usize)> {
+fn chain(
+    pairs: &[(usize, usize)],
+    weight: &dyn Fn(usize) -> u64,
+    n_new: usize,
+) -> Vec<(usize, usize)> {
     // tree[i]: the best (weight, pair index) over a range of new positions ending at i.
     let mut tree: Vec<(u64, usize)> = vec![(0, usize::MAX); n_new + 1];
     let mut prev = vec![usize::MAX; pairs.len()];
@@ -617,7 +704,11 @@ fn top_tokens(blocks: &[Block]) -> Vec<Pos> {
 fn cell_tokens(ps: &[CellPara], base: &[usize]) -> Vec<Pos> {
     let mut out = vec![];
     for (k, p) in ps.iter().enumerate() {
-        para_tokens(&base.iter().copied().chain([k]).collect(), p.content.units.len(), &mut out);
+        para_tokens(
+            &base.iter().copied().chain([k]).collect(),
+            p.content.units.len(),
+            &mut out,
+        );
     }
     out
 }
@@ -695,7 +786,12 @@ impl<'a> Merge<'a> {
         let pairs: Vec<(usize, usize)> = old
             .iter()
             .enumerate()
-            .filter_map(|(a, p)| self.kept.get(p).and_then(|q| at_new.get(q)).map(|&b| (a, b)))
+            .filter_map(|(a, p)| {
+                self.kept
+                    .get(p)
+                    .and_then(|q| at_new.get(q))
+                    .map(|&b| (a, b))
+            })
             .collect();
         let mut seq = vec![];
         let (mut i, mut j) = (0, 0);
@@ -706,19 +802,37 @@ impl<'a> Merge<'a> {
             Pos::Unit(p, u) if matches!(self.old.unit(p, *u).atom, Atom::Keep(_)) => 1 << 32,
             _ => 1,
         };
-        for (a, b) in chain(&pairs, &heavy, new.len()).into_iter().chain([(old.len(), new.len())]) {
-            seq.extend(old[i..a].iter().map(|p| It { st: St::Del, old: Some(p.clone()), new: None }));
-            seq.extend(new[j..b].iter().map(|p| It { st: St::Ins, old: None, new: Some(p.clone()) }));
+        for (a, b) in chain(&pairs, &heavy, new.len())
+            .into_iter()
+            .chain([(old.len(), new.len())])
+        {
+            seq.extend(old[i..a].iter().map(|p| It {
+                st: St::Del,
+                old: Some(p.clone()),
+                new: None,
+            }));
+            seq.extend(new[j..b].iter().map(|p| It {
+                st: St::Ins,
+                old: None,
+                new: Some(p.clone()),
+            }));
             if a < old.len() {
-                seq.push(It { st: St::Eq, old: Some(old[a].clone()), new: Some(new[b].clone()) });
+                seq.push(It {
+                    st: St::Eq,
+                    old: Some(old[a].clone()),
+                    new: Some(new[b].clone()),
+                });
             }
             (i, j) = (a + 1, b + 1);
         }
         // Deleted paragraphs replaced by inserted ones: the last deleted mark
         // and the last inserted mark are one kept mark whose properties
         // changed, so the replacement ends in a mark kept on both sides.
-        let run_end =
-            |seq: &[It], from: usize, st: St| (from..seq.len()).find(|&x| seq[x].st != st).unwrap_or(seq.len());
+        let run_end = |seq: &[It], from: usize, st: St| {
+            (from..seq.len())
+                .find(|&x| seq[x].st != st)
+                .unwrap_or(seq.len())
+        };
         let mut out = Vec::with_capacity(seq.len());
         let mut k = 0;
         while k < seq.len() {
@@ -731,8 +845,16 @@ impl<'a> Merge<'a> {
             let a = run_end(&seq, k, st);
             let b = run_end(&seq, a, if st == St::Del { St::Ins } else { St::Del });
             if b > a && seq[a - 1].is_mark() && seq[b - 1].is_mark() {
-                let (d, n) = if st == St::Del { (&seq[a - 1], &seq[b - 1]) } else { (&seq[b - 1], &seq[a - 1]) };
-                let kept = It { st: St::Eq, old: d.old.clone(), new: n.new.clone() };
+                let (d, n) = if st == St::Del {
+                    (&seq[a - 1], &seq[b - 1])
+                } else {
+                    (&seq[b - 1], &seq[a - 1])
+                };
+                let kept = It {
+                    st: St::Eq,
+                    old: d.old.clone(),
+                    new: n.new.clone(),
+                };
                 out.extend_from_slice(&seq[k..a - 1]);
                 out.extend_from_slice(&seq[a..b - 1]);
                 out.push(kept);
@@ -789,7 +911,8 @@ impl<'a> Merge<'a> {
             let last = e - 1;
             let before_block = !seq.get(e).is_some_and(It::is_para);
             let (o, n) = (mark_path(&seq[k - 1].old), mark_path(&seq[k - 1].new));
-            let sect = o.is_some_and(|p| self.old.has_sect(p)) || n.is_some_and(|p| self.new.has_sect(p));
+            let sect =
+                o.is_some_and(|p| self.old.has_sect(p)) || n.is_some_and(|p| self.new.has_sect(p));
             let sect_last = match st {
                 St::Del => mark_path(&seq[last].old).is_some_and(|p| self.old.has_sect(p)),
                 _ => mark_path(&seq[last].new).is_some_and(|p| self.new.has_sect(p)),
@@ -802,12 +925,28 @@ impl<'a> Merge<'a> {
                 let prev = seq[k - 1].clone();
                 match st {
                     St::Ins => {
-                        seq[k - 1] = It { st: St::Ins, old: None, new: prev.new };
-                        seq[last] = It { st: St::Eq, old: prev.old, new: seq[last].new.clone() };
+                        seq[k - 1] = It {
+                            st: St::Ins,
+                            old: None,
+                            new: prev.new,
+                        };
+                        seq[last] = It {
+                            st: St::Eq,
+                            old: prev.old,
+                            new: seq[last].new.clone(),
+                        };
                     }
                     _ => {
-                        seq[k - 1] = It { st: St::Del, old: prev.old, new: None };
-                        seq[last] = It { st: St::Eq, old: seq[last].old.clone(), new: prev.new };
+                        seq[k - 1] = It {
+                            st: St::Del,
+                            old: prev.old,
+                            new: None,
+                        };
+                        seq[last] = It {
+                            st: St::Eq,
+                            old: seq[last].old.clone(),
+                            new: prev.new,
+                        };
                     }
                 }
             }
@@ -826,7 +965,9 @@ impl<'a> Merge<'a> {
                 units.push(it);
             } else {
                 if !units.is_empty() {
-                    return Err("the edit puts a table or block placeholder inside a paragraph".into());
+                    return Err(
+                        "the edit puts a table or block placeholder inside a paragraph".into(),
+                    );
                 }
                 out.push(Item::Block(it));
             }
@@ -844,7 +985,12 @@ impl<'a> Merge<'a> {
             match item {
                 Item::Para(units, mark) => {
                     let (inline, style, item, props) = self.para(&units, &mark, &[mi])?;
-                    self.blocks.push(Block::Para(Para { props, style, content: inline, item }));
+                    self.blocks.push(Block::Para(Para {
+                        props,
+                        style,
+                        content: inline,
+                        item,
+                    }));
                 }
                 Item::Block(it) => {
                     let b = self.block(&it, mi)?;
@@ -885,7 +1031,9 @@ impl<'a> Merge<'a> {
                     };
                     (unit, self.new.eff[np][*nu], old_rpr)
                 }
-                (Some(Pos::Unit(op, ou)), None) => (self.old.unit(op, *ou), self.old.eff[op][*ou], None),
+                (Some(Pos::Unit(op, ou)), None) => {
+                    (self.old.unit(op, *ou), self.old.eff[op][*ou], None)
+                }
                 _ => unreachable!("a paragraph unit"),
             };
             if let Atom::Keep(kp) = &unit.atom {
@@ -912,7 +1060,11 @@ impl<'a> Merge<'a> {
                 self.old_unit.insert(p.clone(), (mp.clone(), k));
             }
             out.push(unit);
-            revs.push(UnitRev { st: it.st, eff, old_rpr });
+            revs.push(UnitRev {
+                st: it.st,
+                eff,
+                old_rpr,
+            });
         }
         self.lens.insert(mp.clone(), out.len());
         let (np, op) = (mark_path(&mark.new).cloned(), mark_path(&mark.old).cloned());
@@ -923,7 +1075,11 @@ impl<'a> Merge<'a> {
             self.old_mark.insert(op.clone(), mp.clone());
         }
         // The first merged paragraph a new paragraph's content is in.
-        for p in units.iter().filter_map(|it| it.new.as_ref()).chain(mark.new.as_ref()) {
+        for p in units
+            .iter()
+            .filter_map(|it| it.new.as_ref())
+            .chain(mark.new.as_ref())
+        {
             if let Pos::Unit(np, _) | Pos::Mark(np) = p {
                 if np.len() == 1 {
                     self.new_block.entry(np[0]).or_insert(mp[0]);
@@ -938,9 +1094,17 @@ impl<'a> Merge<'a> {
             _ => None,
         };
         self.units.insert(mp.clone(), revs);
-        self.marks.insert(mp.clone(), MarkRev { st: mark.st, old_ppr });
+        self.marks.insert(
+            mp.clone(),
+            MarkRev {
+                st: mark.st,
+                old_ppr,
+            },
+        );
         if let Some(np) = &np {
-            if hanji_core::model::content_at(self.new.blocks, np).is_some_and(hanji_format::styled::shows) {
+            if hanji_core::model::content_at(self.new.blocks, np)
+                .is_some_and(hanji_format::styled::shows)
+            {
                 self.stated.insert(mp.clone());
             }
         }
@@ -949,7 +1113,15 @@ impl<'a> Merge<'a> {
             (None, Some(op)) => self.old.para(op),
             _ => unreachable!("a mark"),
         };
-        Ok((Inline { units: out, spans: vec![] }, style, item, props))
+        Ok((
+            Inline {
+                units: out,
+                spans: vec![],
+            },
+            style,
+            item,
+            props,
+        ))
     }
 
     /// Why a placeholder cannot be inserted or deleted as a tracked change, if it cannot.
@@ -961,7 +1133,11 @@ impl<'a> Merge<'a> {
                  without tracked changes"
             ));
         }
-        let in_run = self.old.keeps.get(k.id.as_str()).is_some_and(|e| e.meta.run.is_some());
+        let in_run = self
+            .old
+            .keeps
+            .get(k.id.as_str())
+            .is_some_and(|e| e.meta.run.is_some());
         if k.kind.starts_with("tracked") {
             return Err(format!(
                 "the edit deletes {what}, a tracked change of another author: a deletion would nest inside it. \
@@ -969,11 +1145,17 @@ impl<'a> Merge<'a> {
             ));
         }
         if k.kind.starts_with("field") {
-            return Err(format!("the edit deletes {what}: edits to fields cannot be tracked"));
+            return Err(format!(
+                "the edit deletes {what}: edits to fields cannot be tracked"
+            ));
         }
-        let run_content = ["drawing", "object", "symbol", "tab", "hyphen", "break", "text"];
+        let run_content = [
+            "drawing", "object", "symbol", "tab", "hyphen", "break", "text",
+        ];
         if !in_run || !run_content.contains(&k.kind.as_str()) {
-            return Err(format!("the edit deletes {what}, which is not written as a tracked deletion yet"));
+            return Err(format!(
+                "the edit deletes {what}, which is not written as a tracked deletion yet"
+            ));
         }
         Ok(())
     }
@@ -992,33 +1174,54 @@ impl<'a> Merge<'a> {
             self.new_block.insert(n, mi);
             self.new_last.insert(n, mi);
         }
-        let (ob, nb) = (o.map(|o| &self.old.blocks[o]), n.map(|n| &self.new.blocks[n]));
+        let (ob, nb) = (
+            o.map(|o| &self.old.blocks[o]),
+            n.map(|n| &self.new.blocks[n]),
+        );
         match (ob, nb) {
             (_, Some(Block::Keep(id))) if it.st == St::Eq => Ok(Block::Keep(id.clone())),
             (Some(Block::Keep(id)), _) | (_, Some(Block::Keep(id))) => {
-                let k = self.old.keeps.get(id.as_str()).or(self.new.keeps.get(id.as_str()));
+                let k = self
+                    .old
+                    .keeps
+                    .get(id.as_str())
+                    .or(self.new.keeps.get(id.as_str()));
                 let k = k.and_then(|e| e.meta.keep.as_ref());
-                let what = k.map_or(id.clone(), |k| format!("{} ({}: {})", k.id, k.kind, k.summary));
+                let what = k.map_or(id.clone(), |k| {
+                    format!("{} ({}: {})", k.id, k.kind, k.summary)
+                });
                 Err(format!(
                     "the edit {} the block placeholder {what}, which is not written as a tracked change yet",
                     if it.st == St::Del { "deletes" } else { "moves" }
                 ))
             }
-            (Some(Block::Table(a)), Some(Block::Table(b))) => self.table_eq(o.unwrap(), a, n.unwrap(), b, mi),
+            (Some(Block::Table(a)), Some(Block::Table(b))) => {
+                self.table_eq(o.unwrap(), a, n.unwrap(), b, mi)
+            }
             (Some(Block::Table(a)), None) => self.table_whole(a, &[o.unwrap()], mi, St::Del),
             (None, Some(Block::Table(b))) => self.table_whole(b, &[n.unwrap()], mi, St::Ins),
             _ => Err("a block that is neither a table nor a placeholder".into()),
         }
     }
 
-    fn table_eq(&mut self, i: usize, a: &Table, j: usize, b: &Table, mi: usize) -> Result<Block, String> {
+    fn table_eq(
+        &mut self,
+        i: usize,
+        a: &Table,
+        j: usize,
+        b: &Table,
+        mi: usize,
+    ) -> Result<Block, String> {
         if !same_shape(&a.rows, &b.rows) {
             return Err("the edit adds, removes or merges table rows or cells, which is not written as a tracked \
                         change yet; make the text edits in one export and the table change in another"
                 .into());
         }
         if a.style != b.style {
-            return Err("the edit changes a table's style, which is not written as a tracked change yet".into());
+            return Err(
+                "the edit changes a table's style, which is not written as a tracked change yet"
+                    .into(),
+            );
         }
         if a.place != b.place {
             return Err("the edit changes a table's position (table-align, table-indent), which is not written as a \
@@ -1036,7 +1239,8 @@ impl<'a> Merge<'a> {
             for (c, (ca, cb)) in ra.iter().zip(rb).enumerate() {
                 row.push(match (ca, cb) {
                     (Cell::Text(pa), Cell::Text(pb)) => {
-                        let seq = self.sequence(&cell_tokens(pa, &[i, r, c]), &cell_tokens(pb, &[j, r, c]))?;
+                        let seq = self
+                            .sequence(&cell_tokens(pa, &[i, r, c]), &cell_tokens(pb, &[j, r, c]))?;
                         Cell::Text(self.cell(seq, &[mi, r, c])?)
                     }
                     (Cell::Up, _) => {
@@ -1049,7 +1253,12 @@ impl<'a> Merge<'a> {
             }
             rows.push(row);
         }
-        Ok(Block::Table(Table { boxes: b.boxes.clone(), style: b.style.clone(), rows, place: b.place.clone() }))
+        Ok(Block::Table(Table {
+            boxes: b.boxes.clone(),
+            style: b.style.clone(),
+            rows,
+            place: b.place.clone(),
+        }))
     }
 
     /// A table inserted or deleted whole.
@@ -1065,14 +1274,26 @@ impl<'a> Merge<'a> {
                         let seq = cell_tokens(ps, &base)
                             .into_iter()
                             .map(|p| match st {
-                                St::Del => It { st, old: Some(p), new: None },
-                                _ => It { st, old: None, new: Some(p) },
+                                St::Del => It {
+                                    st,
+                                    old: Some(p),
+                                    new: None,
+                                },
+                                _ => It {
+                                    st,
+                                    old: None,
+                                    new: Some(p),
+                                },
                             })
                             .collect();
                         Cell::Text(self.cell(seq, &[mi, r, c])?)
                     }
                     Cell::Up => {
-                        let m = if st == St::Del { &mut self.old_covered } else { &mut self.new_covered };
+                        let m = if st == St::Del {
+                            &mut self.old_covered
+                        } else {
+                            &mut self.new_covered
+                        };
                         m.insert(base.to_vec(), mi);
                         Cell::Up
                     }
@@ -1082,18 +1303,35 @@ impl<'a> Merge<'a> {
             rows.push(out);
         }
         let style = t.style.clone();
-        Ok(Block::Table(Table { boxes: t.boxes.clone(), style, rows, place: t.place.clone() }))
+        Ok(Block::Table(Table {
+            boxes: t.boxes.clone(),
+            style,
+            rows,
+            place: t.place.clone(),
+        }))
     }
 
     fn cell(&mut self, seq: Vec<It>, at: &[usize]) -> Result<Vec<CellPara>, String> {
         let mut out = vec![];
         for item in Self::items(seq)? {
-            let Item::Para(units, mark) = item else { unreachable!("a cell holds paragraphs") };
+            let Item::Para(units, mark) = item else {
+                unreachable!("a cell holds paragraphs")
+            };
             let mp: Path = at.iter().copied().chain([out.len()]).collect();
-            let side = if mark.new.is_some() { &self.new } else { &self.old };
-            let style = side.para(mark_path(&mark.new).or(mark_path(&mark.old)).unwrap()).2;
+            let side = if mark.new.is_some() {
+                &self.new
+            } else {
+                &self.old
+            };
+            let style = side
+                .para(mark_path(&mark.new).or(mark_path(&mark.old)).unwrap())
+                .2;
             let (content, _, _, props) = self.para(&units, &mark, &mp)?;
-            out.push(CellPara { props, style, content });
+            out.push(CellPara {
+                props,
+                style,
+                content,
+            });
         }
         self.cell_len.insert(at.to_vec(), out.len());
         Ok(out)
@@ -1121,13 +1359,21 @@ impl<'a> Merge<'a> {
     /// A block-level path (a block, row, cell or cell paragraph, or one past
     /// the last of them) of a new (`new`) or old table → merged.
     fn block_path(&self, path: &Path, new: bool) -> Option<Path> {
-        let blocks = if new { &self.new_block } else { &self.old_block };
+        let blocks = if new {
+            &self.new_block
+        } else {
+            &self.old_block
+        };
         let mi = *blocks.get(&path[0])?;
         let mut out = vec![mi];
         out.extend(&path[1..]);
         if path.len() == 4 {
             let cell = vec![mi, path[1], path[2]];
-            let covered = if new { &self.new_covered } else { &self.old_covered };
+            let covered = if new {
+                &self.new_covered
+            } else {
+                &self.old_covered
+            };
             if new && !covered.contains_key(&path[..3]) {
                 out[3] = match self.new_cell_para.get(path) {
                     Some(k) => *k,
@@ -1149,7 +1395,8 @@ impl<'a> Merge<'a> {
             next
         };
         let live: HashSet<u64> = self.new.rem.entries.iter().map(|e| e.id).collect();
-        let lost = || "an entry of the current revision has no place in the merged document".to_string();
+        let lost =
+            || "an entry of the current revision has no place in the merged document".to_string();
         for e in &self.new.rem.entries {
             let at = |x: Option<(Path, usize)>| x.ok_or_else(lost);
             let covered = e.path.len() >= 3 && self.new_covered.contains_key(&e.path[..3]);
@@ -1161,7 +1408,11 @@ impl<'a> Merge<'a> {
                 // deleted paragraph stays next to the paragraph it joins.
                 Kind::Bmarker if e.path.len() == 1 => {
                     let j = e.path[0];
-                    x.path = vec![if j == 0 { 0 } else { self.new_last.get(&(j - 1)).ok_or_else(lost)? + 1 }];
+                    x.path = vec![if j == 0 {
+                        0
+                    } else {
+                        self.new_last.get(&(j - 1)).ok_or_else(lost)? + 1
+                    }];
                 }
                 Kind::Bkeep | Kind::Bmarker | Kind::Tbl | Kind::Tr | Kind::Tc => {
                     x.path = self.block_path(&e.path, true).ok_or_else(lost)?
@@ -1195,7 +1446,10 @@ impl<'a> Merge<'a> {
                         (p.clone(), a)
                     };
                     if p != q {
-                        return Err("a hyperlink or other wrapper would span a tracked paragraph mark".into());
+                        return Err(
+                            "a hyperlink or other wrapper would span a tracked paragraph mark"
+                                .into(),
+                        );
                     }
                     (x.path, x.start, x.end) = (p, Some(a), Some(b));
                 }
@@ -1209,18 +1463,26 @@ impl<'a> Merge<'a> {
         // What was deleted: its runs, placeholders and paragraph properties as imported.
         for e in &self.old.rem.entries {
             let covered = e.path.len() >= 3 && self.old_covered.contains_key(&e.path[..3]);
-            let deleted_table = self.old_block.get(&e.path.first().copied().unwrap_or(usize::MAX)).is_some_and(|&mi| {
-                matches!(self.old.blocks[e.path[0]], Block::Table(_)) && self.rows.contains_key(&vec![mi, 0])
-            });
+            let deleted_table = self
+                .old_block
+                .get(&e.path.first().copied().unwrap_or(usize::MAX))
+                .is_some_and(|&mi| {
+                    matches!(self.old.blocks[e.path[0]], Block::Table(_))
+                        && self.rows.contains_key(&vec![mi, 0])
+                });
             let mut x = e.clone();
             x.id = fresh();
             match e.kind {
                 Kind::Tbl | Kind::Tr | Kind::Tc if deleted_table => {
                     x.path = self.block_path(&e.path, false).ok_or_else(lost)?
                 }
-                _ if covered && deleted_table => x.path = self.block_path(&e.path, false).ok_or_else(lost)?,
+                _ if covered && deleted_table => {
+                    x.path = self.block_path(&e.path, false).ok_or_else(lost)?
+                }
                 Kind::Ppr => {
-                    let Some(mp) = self.old_mark.get(&e.path) else { continue };
+                    let Some(mp) = self.old_mark.get(&e.path) else {
+                        continue;
+                    };
                     if self.marks[mp].st != St::Del {
                         continue;
                     }
@@ -1246,7 +1508,9 @@ impl<'a> Merge<'a> {
                     continue;
                 }
                 Kind::Keep => {
-                    let Some((p, s)) = self.old_pos(&e.path, e.start.unwrap()) else { continue };
+                    let Some((p, s)) = self.old_pos(&e.path, e.start.unwrap()) else {
+                        continue;
+                    };
                     if self.units[&p].get(s).is_none_or(|u| u.st != St::Del) {
                         continue;
                     }
@@ -1257,7 +1521,9 @@ impl<'a> Merge<'a> {
                     if en <= s {
                         continue;
                     }
-                    let (Some((p, a)), Some((q, b))) = (self.old_pos(&e.path, s), self.old_pos(&e.path, en - 1)) else {
+                    let (Some((p, a)), Some((q, b))) =
+                        (self.old_pos(&e.path, s), self.old_pos(&e.path, en - 1))
+                    else {
                         continue;
                     };
                     if p != q || !(a..=b).all(|k| self.units[&p][k].st == St::Del) {

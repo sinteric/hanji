@@ -35,25 +35,23 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 use hanji_core::presentation::{
-    group_head, kind, line_head, object_head, picture_head, shape_head, slide_head, slot_head, HeadKind,
+    group_head, kind, line_head, object_head, picture_head, shape_head, slide_head, slot_head,
+    HeadKind,
 };
 use hanji_core::{Block, Entry, KeepIds, Kind, ListItem, Meta, Para};
 use hanji_format::{
-    Atom, Crop, Geom, GroupItem, Inline, Keep, LineItem, Marks, ObjectItem, PictureItem, ShapeText, SlideItem, Unit,
+    Atom, Crop, Geom, GroupItem, Inline, Keep, LineItem, Marks, ObjectItem, PictureItem, ShapeText,
+    SlideItem, Unit,
 };
 use hanji_package::clip;
 use hanji_package::xml::{canon, fp, is_blank, Element, Node, Scope};
 
 use crate::deck::{LayoutInfo, SlotInfo};
-use crate::effects;
-use crate::fill;
 use crate::geom::{self, Frame};
-use crate::kind;
 use crate::members::{self, Styling};
-use crate::outline;
 use crate::pml::*;
-use crate::route;
 use crate::text::{self, RunStyle, ThemeFonts};
+use crate::{effects, fill, kind, outline, route};
 use hanji_format::inline_style::{self as istyle, TextStyle};
 
 /// Where a slide came from, stored on its `Slide` entry.
@@ -195,7 +193,17 @@ impl Importer<'_> {
         if meta.part.is_none() && xml.iter().any(|x| refers(x)) {
             meta.part = Some(self.part.clone());
         }
-        self.entries.push(Entry { id, kind, xml, fp, path: path.to_vec(), start, end, seq, meta });
+        self.entries.push(Entry {
+            id,
+            kind,
+            xml,
+            fp,
+            path: path.to_vec(),
+            start,
+            end,
+            seq,
+            meta,
+        });
         self.entries.len() - 1
     }
 
@@ -222,8 +230,10 @@ impl Importer<'_> {
                 ids.extend(e.get("id").and_then(|v| v.parse::<u32>().ok()));
             }
         });
-        let tree =
-            skel.child_mut("p:cSld").and_then(|c| c.child_mut("p:spTree")).ok_or("the slide has no p:cSld/p:spTree")?;
+        let tree = skel
+            .child_mut("p:cSld")
+            .and_then(|c| c.child_mut("p:spTree"))
+            .ok_or("the slide has no p:cSld/p:spTree")?;
         let mut used: Vec<String> = vec![];
         let mut k = 0;
         // Each connector's head, and its ends' attachments (shown after the loop).
@@ -244,7 +254,8 @@ impl Importer<'_> {
                 What::Latent(slot) => {
                     used.push(slot.name.clone());
                     self.stats.latent += 1;
-                    tree.children.push(Node::El(wrap(LATENT, &[("slot", &slot.name)], Some(el))));
+                    tree.children
+                        .push(Node::El(wrap(LATENT, &[("slot", &slot.name)], Some(el))));
                 }
                 What::Slot(slot) => {
                     used.push(slot.name.clone());
@@ -269,7 +280,8 @@ impl Importer<'_> {
                     used.push(slot.name.clone());
                     k += 1;
                     self.stats.keep_slots += 1;
-                    tree.children.push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
+                    tree.children
+                        .push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
                     let g = object_geom(&el).or(slot.geom);
                     self.blocks.push(slot_head(&slot.name, g));
                     let bj = self.blocks.len();
@@ -280,18 +292,21 @@ impl Importer<'_> {
                 What::Object => {
                     k += 1;
                     self.stats.objects += 1;
-                    tree.children.push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
+                    tree.children
+                        .push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
                     let g = object_geom(&el);
                     self.blocks.push(object_head(g));
                     let bj = self.blocks.len();
-                    let keep = self.keep_entry(Kind::Bkeep, &el, &[bj], None, &k.to_string(), OBJECT_TAG);
+                    let keep =
+                        self.keep_entry(Kind::Bkeep, &el, &[bj], None, &k.to_string(), OBJECT_TAG);
                     self.entries.last_mut().unwrap().meta.aux.push(shown(g));
                     self.blocks.push(Block::Keep(keep.id));
                 }
                 What::Shape(id, name) => {
                     k += 1;
                     self.stats.shapes += 1;
-                    tree.children.push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
+                    tree.children
+                        .push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
                     let g = geom::own(&el);
                     self.blocks.push(shape_head(&id, &name, g));
                     self.show_kind(&el, None, false);
@@ -305,15 +320,19 @@ impl Importer<'_> {
                 What::Picture(pic) => {
                     k += 1;
                     self.stats.pictures += 1;
-                    tree.children.push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
+                    tree.children
+                        .push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
                     self.blocks.push(picture_head(&pic));
                     self.name_shape(pic.id, pic.name);
                     self.whole(&el, &k.to_string());
                 }
-                What::Bare(ref id, ref name) | What::Line(ref id, ref name) | What::Group(ref id, ref name) => {
+                What::Bare(ref id, ref name)
+                | What::Line(ref id, ref name)
+                | What::Group(ref id, ref name) => {
                     let (id, name) = (id.clone(), name.clone());
                     k += 1;
-                    tree.children.push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
+                    tree.children
+                        .push(Node::El(wrap(ITEM, &[("k", &k.to_string())], None)));
                     let head = match &what {
                         What::Bare(..) => {
                             self.stats.bare += 1;
@@ -326,8 +345,13 @@ impl Importer<'_> {
                         }
                         _ => {
                             self.stats.groups += 1;
-                            let g = group_item(&el, &Frame::SLIDE, &self.rels, Some(Styling::of(layout)))
-                                .ok_or("a group that cannot be shown")?;
+                            let g = group_item(
+                                &el,
+                                &Frame::SLIDE,
+                                &self.rels,
+                                Some(Styling::of(layout)),
+                            )
+                            .ok_or("a group that cannot be shown")?;
                             group_head(&g)
                         }
                     };
@@ -351,9 +375,28 @@ impl Importer<'_> {
         let attachment_targets = show_attachments(&mut self.blocks[bi..], &attached, bi);
         let fpv = canon(&without_stand_ins(&skel), &self.scope);
         let named = named_rel_ids(root).into_iter().collect();
-        let aux = vec![serde_json::to_string(&SlideInfo { ids, attachment_targets, named, ..info }).unwrap()];
-        let meta = Meta { tag: "slide".into(), aux, part: Some(self.part.clone()), ..Default::default() };
-        self.entry(Kind::Slide, vec![skel.to_xml()], fpv, &[bi], None, None, meta);
+        let aux = vec![serde_json::to_string(&SlideInfo {
+            ids,
+            attachment_targets,
+            named,
+            ..info
+        })
+        .unwrap()];
+        let meta = Meta {
+            tag: "slide".into(),
+            aux,
+            part: Some(self.part.clone()),
+            ..Default::default()
+        };
+        self.entry(
+            Kind::Slide,
+            vec![skel.to_xml()],
+            fpv,
+            &[bi],
+            None,
+            None,
+            meta,
+        );
         if let Some((ni, nroot, bullets)) = notes {
             self.notes(bi, ni, nroot, bullets)?;
         }
@@ -361,7 +404,13 @@ impl Importer<'_> {
     }
 
     /// A notes page: its body placeholder's text is the `notes` slot.
-    fn notes(&mut self, bi: usize, info: NotesInfo, root: &Element, bullets: [Bu; 9]) -> Result<(), String> {
+    fn notes(
+        &mut self,
+        bi: usize,
+        info: NotesInfo,
+        root: &Element,
+        bullets: [Bu; 9],
+    ) -> Result<(), String> {
         self.part = info.part.clone();
         self.stats.notes += 1;
         let mut skel = root.clone();
@@ -379,7 +428,11 @@ impl Importer<'_> {
             done = true;
             let shape = std::mem::take(el);
             if has_text(&shape) {
-                *el = wrap(ITEM, &[("k", "notes"), ("slot", "notes")], Some(emptied(&shape)));
+                *el = wrap(
+                    ITEM,
+                    &[("k", "notes"), ("slot", "notes")],
+                    Some(emptied(&shape)),
+                );
                 self.blocks.push(slot_head("notes", None));
                 self.text_shape(&shape, &bullets, "notes", true, None, None)?;
             } else {
@@ -393,7 +446,15 @@ impl Importer<'_> {
             part: Some(self.part.clone()),
             ..Default::default()
         };
-        self.entry(Kind::Slide, vec![skel.to_xml()], fpv, &[bi], None, None, meta);
+        self.entry(
+            Kind::Slide,
+            vec![skel.to_xml()],
+            fpv,
+            &[bi],
+            None,
+            None,
+            meta,
+        );
         Ok(())
     }
 
@@ -407,7 +468,13 @@ impl Importer<'_> {
     /// entry on the head just pushed.
     /// The head just pushed shows the fill `el` has (§5.3).
     /// The head just pushed shows the outline `el` draws (§5.3).
-    fn show_outline(&mut self, el: &Element, parent: Option<&outline::Ln>, theme: &fill::ThemeFills, line: bool) {
+    fn show_outline(
+        &mut self,
+        el: &Element,
+        parent: Option<&outline::Ln>,
+        theme: &fill::ThemeFills,
+        line: bool,
+    ) {
         if let Some(Block::Head(h)) = self.blocks.last_mut() {
             let l = outline::effective(el, parent, theme).look(line);
             (h.look.border, h.look.start, h.look.end) = (l.border, l.start, l.end);
@@ -420,13 +487,23 @@ impl Importer<'_> {
         }
     }
 
-    fn show_effects(&mut self, el: &Element, parent: Option<&effects::EffectsXml>, theme: &fill::ThemeFills) {
+    fn show_effects(
+        &mut self,
+        el: &Element,
+        parent: Option<&effects::EffectsXml>,
+        theme: &fill::ThemeFills,
+    ) {
         if let Some(Block::Head(h)) = self.blocks.last_mut() {
             h.look.effects = effects::shown(effects::effective(el, parent, theme).as_ref());
         }
     }
 
-    fn show_fill(&mut self, el: &Element, parent: Option<&fill::FillXml>, theme: &fill::ThemeFills) {
+    fn show_fill(
+        &mut self,
+        el: &Element,
+        parent: Option<&fill::FillXml>,
+        theme: &fill::ThemeFills,
+    ) {
         if let Some(Block::Head(h)) = self.blocks.last_mut() {
             h.look.fill = fill::shown(fill::effective(el, parent, theme).as_ref());
         }
@@ -436,16 +513,22 @@ impl Importer<'_> {
         let hi = self.blocks.len() - 1;
         // A shape's fill is the text's (§5.3), as its geometry is.
         let bare = geom::without_geometry(&match el.name.as_str() {
-            "p:sp" => effects::without_effects(&kind::without_kind(&outline::without_outline(&fill::without_fill(el)))),
-            // A connector's attachments are the text's too.
-            "p:cxnSp" => route::without_attachments(&effects::without_effects(&kind::without_kind(
-                &outline::without_outline(el),
+            "p:sp" => effects::without_effects(&kind::without_kind(&outline::without_outline(
+                &fill::without_fill(el),
             ))),
+            // A connector's attachments are the text's too.
+            "p:cxnSp" => route::without_attachments(&effects::without_effects(
+                &kind::without_kind(&outline::without_outline(el)),
+            )),
             // A group's shapes' text and fills are the text's too.
             "p:grpSp" => members::without_shown(el),
             _ => el.clone(),
         });
-        let f = self.fp(&[Some(&if el.is("p:pic") { unmodelled_picture(&bare) } else { bare })]);
+        let f = self.fp(&[Some(&if el.is("p:pic") {
+            unmodelled_picture(&bare)
+        } else {
+            bare
+        })]);
         let meta = Meta {
             tag: el.name.clone(),
             aux: vec![k.to_string(), self.part.clone(), shown(geom::own(el))],
@@ -473,25 +556,38 @@ impl Importer<'_> {
         self.base = text.map(|(t, f)| text::base(el, t, f));
         self.fonts = text.map(|t| t.1.clone()).unwrap_or_default();
         let mut shell = el.clone();
-        let tx = shell.child_mut("p:txBody").ok_or("a text shape without p:txBody")?;
+        let tx = shell
+            .child_mut("p:txBody")
+            .ok_or("a text shape without p:txBody")?;
         let paras: Vec<Element> = tx.elements().filter(|e| e.is("a:p")).cloned().collect();
-        tx.children.retain(|n| !matches!(n, Node::El(e) if e.is("a:p")));
+        tx.children
+            .retain(|n| !matches!(n, Node::El(e) if e.is("a:p")));
         let bullets = over(levels_of(tx.child("a:lstStyle")), *inherited);
         let mut fshell = shell.clone();
         if let Some(nv) = fshell.elements_mut().find(|e| e.name.starts_with("p:nv")) {
             if let Some(pr) = nv.child_mut("p:nvPr") {
-                pr.children.retain(|n| !matches!(n, Node::El(e) if e.is("p:ph")));
+                pr.children
+                    .retain(|n| !matches!(n, Node::El(e) if e.is("p:ph")));
             }
         }
-        let bare =
-            effects::without_effects(&kind::without_kind(&outline::without_outline(&fill::without_fill(&fshell))));
+        let bare = effects::without_effects(&kind::without_kind(&outline::without_outline(
+            &fill::without_fill(&fshell),
+        )));
         let f = self.fp(&[Some(&geom::without_geometry(&bare))]);
         let meta = Meta {
             tag: shell.name.clone(),
             aux: vec![k.to_string(), self.part.clone(), shown(g)],
             ..Default::default()
         };
-        self.entry(Kind::Shape, vec![shell.to_xml()], f, &[hi], None, None, meta);
+        self.entry(
+            Kind::Shape,
+            vec![shell.to_xml()],
+            f,
+            &[hi],
+            None,
+            None,
+            meta,
+        );
         self.list = None;
         let bullets = if lists { bullets } else { [Bu::None; 9] };
         let first = self.blocks.len();
@@ -513,7 +609,13 @@ impl Importer<'_> {
     fn shown_styles(&mut self, first: usize) {
         let mut inls: Vec<&mut Inline> = self.blocks[first..]
             .iter_mut()
-            .filter_map(|b| if let Block::Para(p) = b { Some(&mut p.content) } else { None })
+            .filter_map(|b| {
+                if let Block::Para(p) = b {
+                    Some(&mut p.content)
+                } else {
+                    None
+                }
+            })
             .collect();
         istyle::normalize(&mut inls);
         for i in inls {
@@ -522,22 +624,61 @@ impl Importer<'_> {
     }
 
     /// A placeholder entry for `el`; `tag` marks a slide object's.
-    fn keep_entry(&mut self, kind: Kind, el: &Element, path: &[usize], pos: Option<usize>, k: &str, tag: &str) -> Keep {
+    fn keep_entry(
+        &mut self,
+        kind: Kind,
+        el: &Element,
+        path: &[usize],
+        pos: Option<usize>,
+        k: &str,
+        tag: &str,
+    ) -> Keep {
         // Geometry is the text's (§5.3): neither the id nor the fingerprint holds it.
         let fpv = self.fp(&[Some(&geom::without_geometry(el))]);
         let id = self.keep_ids.next(&fpv);
-        let keep = Keep { id, kind: keep_kind(el), summary: summary(el) };
-        let aux = if kind == Kind::Bkeep { vec![k.to_string(), self.part.clone()] } else { vec![] };
-        let meta = Meta { keep: Some(keep.clone()), aux, tag: tag.into(), ..Default::default() };
-        self.entry(kind, vec![el.to_xml()], fpv, path, pos, pos.map(|p| p + 1), meta);
+        let keep = Keep {
+            id,
+            kind: keep_kind(el),
+            summary: summary(el),
+        };
+        let aux = if kind == Kind::Bkeep {
+            vec![k.to_string(), self.part.clone()]
+        } else {
+            vec![]
+        };
+        let meta = Meta {
+            keep: Some(keep.clone()),
+            aux,
+            tag: tag.into(),
+            ..Default::default()
+        };
+        self.entry(
+            kind,
+            vec![el.to_xml()],
+            fpv,
+            path,
+            pos,
+            pos.map(|p| p + 1),
+            meta,
+        );
         keep
     }
 
-    fn para(&mut self, p: &Element, bi: usize, bullets: &[Bu; 9], lists: bool) -> Result<Para, String> {
+    fn para(
+        &mut self,
+        p: &Element,
+        bi: usize,
+        bullets: &[Bu; 9],
+        lists: bool,
+    ) -> Result<Para, String> {
         let path = [bi];
         let ppr = p.child("a:pPr");
         let end = p.child("a:endParaRPr");
-        let lvl: u32 = ppr.and_then(|x| x.get("lvl")).and_then(|v| v.parse().ok()).unwrap_or(0).min(8);
+        let lvl: u32 = ppr
+            .and_then(|x| x.get("lvl"))
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0)
+            .min(8);
         let under = self.base.as_ref().map(|b| b[lvl as usize].clone());
         let kind = match bu_of(ppr).filter_lists(lists) {
             Bu::Unset => bullets[lvl as usize],
@@ -551,13 +692,15 @@ impl Importer<'_> {
             }
         };
         let shell = p.shell();
-        let xml: Vec<String> =
-            std::iter::once(shell.to_xml()).chain([ppr, end].into_iter().flatten().map(Element::to_xml)).collect();
+        let xml: Vec<String> = std::iter::once(shell.to_xml())
+            .chain([ppr, end].into_iter().flatten().map(Element::to_xml))
+            .collect();
         // The level and the bullet are the text's (as a run's marks are).
         let unmodelled = ppr.map(|x| {
             let mut x = x.clone();
             x.remove_attr("lvl");
-            x.children.retain(|n| !matches!(n, Node::El(e) if BU.contains(&e.name.as_str())));
+            x.children
+                .retain(|n| !matches!(n, Node::El(e) if BU.contains(&e.name.as_str())));
             x
         });
         let f = if shell.attrs.is_empty() && ppr.is_none() && end.is_none() {
@@ -565,7 +708,11 @@ impl Importer<'_> {
         } else {
             self.fp(&[Some(&shell), unmodelled.as_ref(), end])
         };
-        let meta = Meta { item, aux: vec![lvl.to_string()], ..Default::default() };
+        let meta = Meta {
+            item,
+            aux: vec![lvl.to_string()],
+            ..Default::default()
+        };
         self.entry(Kind::Ppr, xml, f, &path, None, None, meta);
         self.buf.clear();
         self.ustyle.clear();
@@ -599,14 +746,20 @@ impl Importer<'_> {
                 }
             }
         }
-        let mut content = Inline { units: std::mem::take(&mut self.buf), spans: vec![] };
+        let mut content = Inline {
+            units: std::mem::take(&mut self.buf),
+            spans: vec![],
+        };
         if under.is_some() {
             istyle::set_unit_styles(&mut content, &std::mem::take(&mut self.ustyle));
         }
         // Whitespace alone has no line form: the paragraph is empty in the
         // text, and its runs keep their text.
         if !content.units.is_empty()
-            && content.units.iter().all(|u| matches!(u.atom, Atom::Char(c) if c.is_whitespace()))
+            && content
+                .units
+                .iter()
+                .all(|u| matches!(u.atom, Atom::Char(c) if c.is_whitespace()))
         {
             for (ix, t) in texts {
                 let e = &mut self.entries[ix];
@@ -634,11 +787,19 @@ impl Importer<'_> {
                     stack.pop();
                 }
                 stack.push(lvl);
-                ListItem { ordered, level: stack.len() - 1, first: false }
+                ListItem {
+                    ordered,
+                    level: stack.len() - 1,
+                    first: false,
+                }
             }
             None => {
                 self.list = Some(vec![lvl]);
-                ListItem { ordered, level: 0, first: true }
+                ListItem {
+                    ordered,
+                    level: 0,
+                    first: true,
+                }
             }
         }
     }
@@ -656,8 +817,11 @@ impl Importer<'_> {
         hangul: bool,
     ) -> usize {
         let rpr = r.child("a:rPr");
-        let shown =
-            under.map(|u| rpr.map_or(RunStyle::default(), |x| RunStyle::of(x, &self.fonts)).over(u).shown_for(hangul));
+        let shown = under.map(|u| {
+            rpr.map_or(RunStyle::default(), |x| RunStyle::of(x, &self.fonts))
+                .over(u)
+                .shown_for(hangul)
+        });
         let marks = marks_of(rpr);
         let shell = r.shell();
         let mut rest = rpr.cloned();
@@ -670,19 +834,32 @@ impl Importer<'_> {
                 text::without_shown(x);
             }
         }
-        let trivial =
-            shell.attrs.is_empty() && rest.as_ref().is_none_or(|x| x.attrs.is_empty() && x.children.is_empty());
-        let f = if trivial { String::new() } else { self.fp(&[Some(&shell), rest.as_ref()]) };
-        let xml = std::iter::once(shell.to_xml()).chain(rpr.map(Element::to_xml)).collect();
+        let trivial = shell.attrs.is_empty()
+            && rest
+                .as_ref()
+                .is_none_or(|x| x.attrs.is_empty() && x.children.is_empty());
+        let f = if trivial {
+            String::new()
+        } else {
+            self.fp(&[Some(&shell), rest.as_ref()])
+        };
+        let xml = std::iter::once(shell.to_xml())
+            .chain(rpr.map(Element::to_xml))
+            .collect();
         let start = self.buf.len();
         if br {
             self.buf.push(Unit::new(Atom::Break, marks));
         } else {
-            self.buf.extend(text.chars().map(|c| Unit::new(Atom::Char(c), marks)));
+            self.buf
+                .extend(text.chars().map(|c| Unit::new(Atom::Char(c), marks)));
         }
         let end = self.buf.len();
         self.ustyle.resize(end, shown.clone().unwrap_or_default());
-        let meta = Meta { marks, tag: r.name.clone(), ..Default::default() };
+        let meta = Meta {
+            marks,
+            tag: r.name.clone(),
+            ..Default::default()
+        };
         self.entry(Kind::Run, xml, f, path, Some(start), Some(end), meta)
     }
 }
@@ -703,11 +880,15 @@ fn what<'s>(el: &Element, layout: &'s LayoutInfo, used: &[String], rels: &Rels) 
             };
         }
     }
-    let id = c_nv_pr(el).and_then(|c| c.get("id")).filter(|v| v.parse::<u32>().is_ok());
+    let id = c_nv_pr(el)
+        .and_then(|c| c.get("id"))
+        .filter(|v| v.parse::<u32>().is_ok());
     let name = || c_nv_pr(el).and_then(|c| c.get("name")).unwrap_or_default();
     match (text, id) {
         (true, Some(id)) => What::Shape(format!("s{id}"), name()),
-        (_, Some(id)) if el.is("p:grpSp") && group_item(el, &Frame::SLIDE, rels, None).is_some() => {
+        (_, Some(id))
+            if el.is("p:grpSp") && group_item(el, &Frame::SLIDE, rels, None).is_some() =>
+        {
             What::Group(format!("g{id}"), name())
         }
         _ if el.is("p:pic") && picture_item(el, &Frame::SLIDE, rels).is_some() => {
@@ -715,7 +896,9 @@ fn what<'s>(el: &Element, layout: &'s LayoutInfo, used: &[String], rels: &Rels) 
         }
         _ if is_object(el) => What::Object,
         (false, Some(id)) if el.is("p:sp") && ph.is_none() => What::Bare(format!("s{id}"), name()),
-        (_, Some(id)) if el.is("p:cxnSp") && geom::own(el).is_some() => What::Line(format!("s{id}"), name()),
+        (_, Some(id)) if el.is("p:cxnSp") && geom::own(el).is_some() => {
+            What::Line(format!("s{id}"), name())
+        }
         _ => What::Other,
     }
 }
@@ -727,7 +910,9 @@ pub fn shown(g: Option<Geom>) -> String {
 
 /// The box an entry's `aux` says the text showed (see [`shown`]).
 pub fn shown_of(aux: &[String]) -> Option<Geom> {
-    aux.get(2).and_then(|a| serde_json::from_str(a).ok()).flatten()
+    aux.get(2)
+        .and_then(|a| serde_json::from_str(a).ok())
+        .flatten()
 }
 
 /// An object's own box; an alternate-content object's is its first choice's.
@@ -743,7 +928,12 @@ pub fn object_geom(el: &Element) -> Option<Geom> {
 /// flipped group's objects as they are in it before its turn and flips.
 /// `None` for a group with an object the text cannot show: it is one
 /// `<keep/>`.
-pub fn group_item(el: &Element, parent: &Frame, rels: &Rels, sty: Option<Styling>) -> Option<GroupItem> {
+pub fn group_item(
+    el: &Element,
+    parent: &Frame,
+    rels: &Rels,
+    sty: Option<Styling>,
+) -> Option<GroupItem> {
     let id = geom::shape_id(el)?;
     let name = c_nv_pr(el)?.get("name").unwrap_or_default();
     let own = geom::own(el)?;
@@ -755,7 +945,12 @@ pub fn group_item(el: &Element, parent: &Frame, rels: &Rels, sty: Option<Styling
             _ => items.push(member(c, &f, rels, sty)?),
         }
     }
-    (!items.is_empty()).then(|| GroupItem { id: format!("g{id}"), name, geom: Some(parent.out(&own)), items })
+    (!items.is_empty()).then(|| GroupItem {
+        id: format!("g{id}"),
+        name,
+        geom: Some(parent.out(&own)),
+        items,
+    })
 }
 
 /// One object of a group, in slide coordinates through `f`.
@@ -779,10 +974,18 @@ fn member(c: &Element, f: &Frame, rels: &Rels, sty: Option<Styling>) -> Option<S
                 look: members::line_look(c, sty),
             })
         }
-        "p:grpSp" if group_item(c, f, rels, sty).is_some() => SlideItem::Group(group_item(c, f, rels, sty)?),
-        "p:pic" if picture_item(c, f, rels).is_some() => SlideItem::Picture(picture_item(c, f, rels)?),
+        "p:grpSp" if group_item(c, f, rels, sty).is_some() => {
+            SlideItem::Group(group_item(c, f, rels, sty)?)
+        }
+        "p:pic" if picture_item(c, f, rels).is_some() => {
+            SlideItem::Picture(picture_item(c, f, rels)?)
+        }
         _ if is_object(c) => SlideItem::Object(ObjectItem {
-            keep: Keep { id: format!("s{id}"), kind: keep_kind(c), summary: summary(c) },
+            keep: Keep {
+                id: format!("s{id}"),
+                kind: keep_kind(c),
+                summary: summary(c),
+            },
             geom: object_geom(c).map(|g| f.out(&g)),
         }),
         _ => return None,
@@ -798,7 +1001,12 @@ pub fn rels_of(parts: &[hanji_core::Part], part: &str) -> Rels {
     hanji_package::opc::rels_of(parts, part)
         .into_iter()
         .filter(|r| !r.external)
-        .map(|r| (r.id, src_of(&hanji_package::opc::resolve_target(part, &r.target))))
+        .map(|r| {
+            (
+                r.id,
+                src_of(&hanji_package::opc::resolve_target(part, &r.target)),
+            )
+        })
         .collect()
 }
 
@@ -835,7 +1043,10 @@ pub fn picture_item(el: &Element, f: &Frame, rels: &Rels) -> Option<PictureItem>
     let mut media = false;
     if let Some(pr) = nv.child("p:nvPr") {
         pr.walk(&mut |e| {
-            media |= matches!(e.local(), "videoFile" | "audioFile" | "quickTimeFile" | "wavAudioFile" | "media")
+            media |= matches!(
+                e.local(),
+                "videoFile" | "audioFile" | "quickTimeFile" | "wavAudioFile" | "media"
+            )
         });
     }
     if media {
@@ -847,7 +1058,9 @@ pub fn picture_item(el: &Element, f: &Frame, rels: &Rels) -> Option<PictureItem>
         return None;
     }
     let mut artistic = false;
-    blip.walk(&mut |e| artistic |= e.is("a:ext") && e.get("uri").as_deref() == Some(ARTISTIC_EFFECTS));
+    blip.walk(&mut |e| {
+        artistic |= e.is("a:ext") && e.get("uri").as_deref() == Some(ARTISTIC_EFFECTS)
+    });
     if artistic {
         return None;
     }
@@ -856,7 +1069,10 @@ pub fn picture_item(el: &Element, f: &Frame, rels: &Rels) -> Option<PictureItem>
     if sppr.child("a:custGeom").is_some() {
         return None;
     }
-    let mask = sppr.child("a:prstGeom").and_then(|g| g.get("prst")).filter(|m| m != "rect");
+    let mask = sppr
+        .child("a:prstGeom")
+        .and_then(|g| g.get("prst"))
+        .filter(|m| m != "rect");
     let geom = geom::own(el).map(|g| f.out(&g))?;
     let id = geom::shape_id(el)?;
     let c = c_nv_pr(el)?;
@@ -891,7 +1107,10 @@ fn unmodelled_picture(el: &Element) -> Element {
         bf.children
             .retain(|n| !matches!(n, Node::El(x) if x.is("a:srcRect") && x.attrs.is_empty() && !x.has_elements()));
     }
-    if let Some(g) = e.child_mut("p:spPr").and_then(|s| s.child_mut("a:prstGeom")) {
+    if let Some(g) = e
+        .child_mut("p:spPr")
+        .and_then(|s| s.child_mut("a:prstGeom"))
+    {
         g.remove_attr("prst");
         g.children.clear();
     }
@@ -901,13 +1120,21 @@ fn unmodelled_picture(el: &Element) -> Element {
 /// The crop an `a:srcRect` stores.
 pub fn crop_of(r: &Element) -> Crop {
     let v = |k: &str| r.get(k).and_then(|x| x.trim().parse().ok()).unwrap_or(0);
-    Crop { l: v("l"), t: v("t"), r: v("r"), b: v("b") }
+    Crop {
+        l: v("l"),
+        t: v("t"),
+        r: v("r"),
+        b: v("b"),
+    }
 }
 
 /// A picture, graphic frame (chart, table, SmartArt, OLE object), group,
 /// ink or alternate-content object: what rule 8 shows as a `<keep/>` line.
 fn is_object(el: &Element) -> bool {
-    matches!(el.name.as_str(), "p:pic" | "p:graphicFrame" | "p:grpSp" | "p:contentPart" | "mc:AlternateContent")
+    matches!(
+        el.name.as_str(),
+        "p:pic" | "p:graphicFrame" | "p:grpSp" | "p:contentPart" | "mc:AlternateContent"
+    )
 }
 
 /// The layout slot a slide placeholder of type `ty` and index `idx` fills:
@@ -923,13 +1150,20 @@ pub fn match_slot<'s>(layout: &'s LayoutInfo, ty: &str, idx: u32) -> Option<&'s 
         .slots
         .iter()
         .find(|s| s.idx == idx && (s.ty == ty || (title(ty) && title(&s.ty))))
-        .or_else(|| layout.slots.iter().find(|s| s.ty == ty || (title(ty) && title(&s.ty))))
+        .or_else(|| {
+            layout
+                .slots
+                .iter()
+                .find(|s| s.ty == ty || (title(ty) && title(&s.ty)))
+        })
 }
 
 /// A `p:sp` whose text body holds any text (whitespace alone is none) or
 /// inline object.
 pub fn has_text(sp: &Element) -> bool {
-    let Some(tx) = sp.child("p:txBody") else { return false };
+    let Some(tx) = sp.child("p:txBody") else {
+        return false;
+    };
     tx.elements().filter(|p| p.is("a:p")).any(|p| {
         p.elements().any(|c| match c.name.as_str() {
             "a:pPr" | "a:endParaRPr" => false,
@@ -941,8 +1175,12 @@ pub fn has_text(sp: &Element) -> bool {
 
 /// A run the text can hold: `a:rPr` and `a:t` only, no control characters.
 fn run_modellable(r: &Element) -> bool {
-    r.elements().all(|c| c.is("a:rPr") || (c.is("a:t") && !c.has_elements()))
-        && !r.text_of(&["a:t"]).chars().any(|c| (c as u32) < 0x20 && c != '\t')
+    r.elements()
+        .all(|c| c.is("a:rPr") || (c.is("a:t") && !c.has_elements()))
+        && !r
+            .text_of(&["a:t"])
+            .chars()
+            .any(|c| (c as u32) < 0x20 && c != '\t')
 }
 
 /// A placeholder with no text: its element with one empty paragraph (the
@@ -960,8 +1198,10 @@ fn emptied(el: &Element) -> Element {
                 .collect();
             q
         });
-        tx.children.retain(|n| !matches!(n, Node::El(x) if x.is("a:p")));
-        tx.children.push(Node::El(first.unwrap_or_else(|| Element::new("a:p"))));
+        tx.children
+            .retain(|n| !matches!(n, Node::El(x) if x.is("a:p")));
+        tx.children
+            .push(Node::El(first.unwrap_or_else(|| Element::new("a:p"))));
     }
     e
 }
@@ -981,7 +1221,10 @@ pub fn wrap(name: &str, attrs: &[(&str, &str)], child: Option<Element>) -> Eleme
 fn without_stand_ins(skel: &Element) -> Element {
     let mut s = skel.clone();
     let empty = |x: &Element| x.is("p:sp") && placeholder(x).is_some() && !has_text(x);
-    s.walk_mut(&mut |e| e.children.retain(|n| !matches!(n, Node::El(x) if x.is(ITEM) || x.is(LATENT) || empty(x))));
+    s.walk_mut(&mut |e| {
+        e.children
+            .retain(|n| !matches!(n, Node::El(x) if x.is(ITEM) || x.is(LATENT) || empty(x)))
+    });
     s
 }
 
@@ -990,9 +1233,12 @@ pub(crate) fn refers(xml: &str) -> bool {
     if !xml.contains(" r:") {
         return false;
     }
-    let Ok(d) = hanji_package::xml::parse(xml.as_bytes()) else { return false };
+    let Ok(d) = hanji_package::xml::parse(xml.as_bytes()) else {
+        return false;
+    };
     let mut found = false;
-    d.root.walk(&mut |e| found |= e.attrs.iter().any(|a| a.0.starts_with("r:")));
+    d.root
+        .walk(&mut |e| found |= e.attrs.iter().any(|a| a.0.starts_with("r:")));
     found
 }
 
@@ -1068,7 +1314,9 @@ fn summary(el: &Element) -> String {
         }
         "pic" | "graphicFrame" | "grpSp" | "contentPart" => {
             let c = c_nv_pr(el);
-            let descr = c.and_then(|c| c.get("descr")).filter(|d| !d.trim().is_empty());
+            let descr = c
+                .and_then(|c| c.get("descr"))
+                .filter(|d| !d.trim().is_empty());
             let name = c.and_then(|c| c.get("name")).unwrap_or_default();
             let text = paragraphs_text(el);
             match (descr, text.trim().is_empty()) {
@@ -1092,7 +1340,11 @@ fn summary(el: &Element) -> String {
 /// A connector's end attached to an object the text shows by its id shows
 /// as that object's connection site (§5.3), `s3.2`; one attached to a slot or
 /// an object shown as `<keep/>` shows its point.
-fn show_attachments(blocks: &mut [Block], attached: &[(usize, geom::Attachments)], base: usize) -> Vec<u32> {
+fn show_attachments(
+    blocks: &mut [Block],
+    attached: &[(usize, geom::Attachments)],
+    base: usize,
+) -> Vec<u32> {
     fn ids(items: &[SlideItem], out: &mut Vec<(bool, u32)>) {
         for it in items {
             match it {
@@ -1113,7 +1365,9 @@ fn show_attachments(blocks: &mut [Block], attached: &[(usize, geom::Attachments)
     for b in blocks.iter() {
         let Some(h) = b.head() else { continue };
         match (kind(h), &h.place) {
-            (HeadKind::Shape { id, .. } | HeadKind::Picture { id, .. }, _) => shown.extend(num(id).map(|n| (false, n))),
+            (HeadKind::Shape { id, .. } | HeadKind::Picture { id, .. }, _) => {
+                shown.extend(num(id).map(|n| (false, n)))
+            }
             (HeadKind::Group { id, .. }, Some(hanji_core::Place::Group(g))) => {
                 shown.extend(num(id).map(|n| (true, n)));
                 ids(&g.items, &mut shown);
@@ -1122,12 +1376,20 @@ fn show_attachments(blocks: &mut [Block], attached: &[(usize, geom::Attachments)
         }
     }
     for (b, [st, en]) in attached {
-        let Some(Block::Head(h)) = blocks.get_mut(b - base) else { continue };
-        let Some(hanji_core::Place::Line(e)) = &mut h.place else { continue };
+        let Some(Block::Head(h)) = blocks.get_mut(b - base) else {
+            continue;
+        };
+        let Some(hanji_core::Place::Line(e)) = &mut h.place else {
+            continue;
+        };
         let at = |a: &Option<(u32, u32)>| {
             let (id, site) = (*a)?;
             let (group, _) = shown.iter().find(|x| x.1 == id)?;
-            Some(hanji_format::Attach { group: *group, id, site })
+            Some(hanji_format::Attach {
+                group: *group,
+                id,
+                site,
+            })
         };
         (e.from_at, e.to_at) = (at(st), at(en));
     }

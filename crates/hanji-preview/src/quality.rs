@@ -209,7 +209,10 @@ pub struct QualityRefusal {
 }
 impl std::fmt::Display for QualityRefusal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "preview refused: detected critical loss; inspect quality.diagnostics")
+        write!(
+            f,
+            "preview refused: detected critical loss; inspect quality.diagnostics"
+        )
     }
 }
 impl std::error::Error for QualityRefusal {}
@@ -226,7 +229,10 @@ fn bracket_index(path: &str, prefix: &str) -> Option<usize> {
     path.strip_prefix(prefix)?.split_once(']')?.0.parse().ok()
 }
 fn location(path: &str) -> DiagnosticLocation {
-    let cell = path.split_once(".cells[").and_then(|(_, s)| s.split_once(']')).map(|(s, _)| s.to_owned());
+    let cell = path
+        .split_once(".cells[")
+        .and_then(|(_, s)| s.split_once(']'))
+        .map(|(s, _)| s.to_owned());
     // Report-array indices and aggregate HWPX table/image counters do not
     // identify a document object. Preserve their legacy path without inventing one.
     let object_known = cell.is_some()
@@ -269,9 +275,15 @@ fn classify(source: PreviewSource, d: &Diagnostic) -> (DiagnosticCode, Severity,
         if d.path.ends_with(".formula") {
             return if d.message == FORMULA_MISSING {
                 (FormulaCacheMissing, Error, ValueUnavailable)
-            } else if d.message.starts_with("stored formula result shown; workbook requests recalculation") {
+            } else if d
+                .message
+                .starts_with("stored formula result shown; workbook requests recalculation")
+            {
                 (FormulaCacheStale, Warning, Unverified)
-            } else if d.message.starts_with("stored formula result shown; cache freshness is unverified;") {
+            } else if d
+                .message
+                .starts_with("stored formula result shown; cache freshness is unverified;")
+            {
                 (FormulaCacheUnverified, Warning, Unverified)
             } else {
                 (UnclassifiedDiagnostic, Warning, Unclassified)
@@ -281,7 +293,10 @@ fn classify(source: PreviewSource, d: &Diagnostic) -> (DiagnosticCode, Severity,
             if d.path.starts_with("header.") {
                 return (TextClipped, Warning, Clipping);
             }
-            return if d.message.starts_with("cell text is omitted because its visible size") {
+            return if d
+                .message
+                .starts_with("cell text is omitted because its visible size")
+            {
                 (TextOmitted, Error, MissingText)
             } else {
                 (TextClipped, Warning, Clipping)
@@ -327,7 +342,9 @@ fn classify(source: PreviewSource, d: &Diagnostic) -> (DiagnosticCode, Severity,
         }
     }
     if source == PreviewSource::Hwpx {
-        if d.message == "external image reference omitted; preview does not fetch external resources" {
+        if d.message
+            == "external image reference omitted; preview does not fetch external resources"
+        {
             return (HwpxImageOmitted, Error, UnsupportedOmission);
         }
         if d.path.ends_with(".tables") && d.message.starts_with("rhwp reports ") {
@@ -376,7 +393,12 @@ fn classify(source: PreviewSource, d: &Diagnostic) -> (DiagnosticCode, Severity,
 
 impl QualityReport {
     /// Inspect preflight evidence without implying an output was written.
-    pub fn inspect(source: PreviewSource, legacy: &[Diagnostic], fonts: &FontsReport, warnings: &[String]) -> Self {
+    pub fn inspect(
+        source: PreviewSource,
+        legacy: &[Diagnostic],
+        fonts: &FontsReport,
+        warnings: &[String],
+    ) -> Self {
         let mut diagnostics: Vec<_> = legacy
             .iter()
             .map(|d| {
@@ -393,13 +415,21 @@ impl QualityReport {
             })
             .collect();
         for missing in &fonts.missing_glyphs {
-            let pages: Vec<_> = missing.pages.iter().filter_map(|p| p.checked_sub(1)).collect();
+            let pages: Vec<_> = missing
+                .pages
+                .iter()
+                .filter_map(|p| p.checked_sub(1))
+                .collect();
             diagnostics.push(QualityDiagnostic {
                 code: DiagnosticCode::MissingGlyphs,
                 severity: Severity::Error,
                 source,
                 location: DiagnosticLocation {
-                    page_index: if pages.len() == 1 { Some(pages[0]) } else { None },
+                    page_index: if pages.len() == 1 {
+                        Some(pages[0])
+                    } else {
+                        None
+                    },
                     page_indices: pages,
                     ..Default::default()
                 },
@@ -426,13 +456,21 @@ impl QualityReport {
             });
         }
         for substitution in &fonts.substituted {
-            let pages: Vec<_> = substitution.pages.iter().filter_map(|p| p.checked_sub(1)).collect();
+            let pages: Vec<_> = substitution
+                .pages
+                .iter()
+                .filter_map(|p| p.checked_sub(1))
+                .collect();
             diagnostics.push(QualityDiagnostic {
                 code: DiagnosticCode::FontSubstituted,
                 severity: Severity::Warning,
                 source,
                 location: DiagnosticLocation {
-                    page_index: if pages.len() == 1 { Some(pages[0]) } else { None },
+                    page_index: if pages.len() == 1 {
+                        Some(pages[0])
+                    } else {
+                        None
+                    },
                     page_indices: pages,
                     ..Default::default()
                 },
@@ -446,7 +484,8 @@ impl QualityReport {
         }
         for warning in warnings {
             if legacy.iter().any(|d| {
-                warning.contains(&d.message) || warning.contains(crate::warning_text_for_diagnostic(&d.message))
+                warning.contains(&d.message)
+                    || warning.contains(crate::warning_text_for_diagnostic(&d.message))
             }) {
                 continue;
             }
@@ -458,15 +497,26 @@ impl QualityReport {
                 } else {
                     DiagnosticCode::UnclassifiedWarning
                 },
-                severity: if experimental { Severity::Info } else { Severity::Warning },
+                severity: if experimental {
+                    Severity::Info
+                } else {
+                    Severity::Warning
+                },
                 source,
                 location: DiagnosticLocation::default(),
-                consequence: if experimental { Consequence::Unverified } else { Consequence::Unclassified },
+                consequence: if experimental {
+                    Consequence::Unverified
+                } else {
+                    Consequence::Unclassified
+                },
                 path: "warnings".into(),
                 message: warning.clone(),
             });
         }
-        let status = if diagnostics.iter().any(|d| d.consequence == Consequence::UnsupportedOmission) {
+        let status = if diagnostics
+            .iter()
+            .any(|d| d.consequence == Consequence::UnsupportedOmission)
+        {
             QualityStatus::UnsupportedContent
         } else if diagnostics.iter().any(|d| d.severity != Severity::Info) {
             QualityStatus::Degraded
@@ -481,7 +531,11 @@ impl QualityReport {
                 unchecked.push("exhaustive-document-feature-detection");
             }
             PreviewSource::Hwpx => {
-                checked.extend(["external-image-references", "reported-table-overflow", "reported-table-overlap"]);
+                checked.extend([
+                    "external-image-references",
+                    "reported-table-overflow",
+                    "reported-table-overlap",
+                ]);
                 unchecked.extend(["exhaustive-hancom-control-detection", "exact-font-reflow"]);
             }
             PreviewSource::Xlsx => {
@@ -503,7 +557,11 @@ impl QualityReport {
             source,
             rendering: RenderingStatus::Ready,
             status,
-            coverage: DiagnosticCoverage { complete: false, checked, unchecked },
+            coverage: DiagnosticCoverage {
+                complete: false,
+                checked,
+                unchecked,
+            },
             diagnostics,
         }
     }
@@ -517,10 +575,18 @@ impl QualityReport {
     /// Call before rendering/writing when detected critical loss must refuse.
     /// A successful check does not assert complete detection or native fidelity.
     pub fn enforce(&self, strictness: Strictness) -> Result<(), QualityRefusal> {
-        if strictness == Strictness::CriticalLosses && self.diagnostics.iter().any(|d| d.severity == Severity::Error) {
+        if strictness == Strictness::CriticalLosses
+            && self
+                .diagnostics
+                .iter()
+                .any(|d| d.severity == Severity::Error)
+        {
             let mut quality = self.clone();
             quality.rendering = RenderingStatus::Refused;
-            return Err(QualityRefusal { code: "preview.critical-loss-refused", quality });
+            return Err(QualityRefusal {
+                code: "preview.critical-loss-refused",
+                quality,
+            });
         }
         Ok(())
     }

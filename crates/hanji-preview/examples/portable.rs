@@ -18,17 +18,25 @@ fn main() -> Result<(), String> {
     )?;
     let options = FontOptions {
         fonts: vec![FontData::new(font)],
-        aliases: Some(fonts::Aliases::parse("[[family]]\nnames = [\"Calibri\"]\nmetric = [\"Caller Sans\"]\n")?),
+        aliases: Some(fonts::Aliases::parse(
+            "[[family]]\nnames = [\"Calibri\"]\nmetric = [\"Caller Sans\"]\n",
+        )?),
     };
     let preview = hanji_preview::render_pptx_with_fonts(bytes, &options)?;
     assert_eq!(preview.slide_count(), 6);
     assert_eq!(preview.fonts.missing_glyphs_total, 0);
-    assert!(preview.fonts.substituted.iter().any(|f| f.source == Some(fonts::Source::Supplied)));
+    assert!(preview
+        .fonts
+        .substituted
+        .iter()
+        .any(|f| f.source == Some(fonts::Source::Supplied)));
     let mut pages = vec![];
     for index in 0..preview.slide_count() {
         let svg = preview.render_page(index, PageFormat::Svg)?;
         let png = preview.render_page(index, PageFormat::Png { dpi: 48.0 })?;
-        let (PageData::Svg(svg_data), PageData::Png(png_data)) = (svg.data, png.data) else { unreachable!() };
+        let (PageData::Svg(svg_data), PageData::Png(png_data)) = (svg.data, png.data) else {
+            unreachable!()
+        };
         assert!(png_data.starts_with(b"\x89PNG"));
         pages.push(serde_json::json!({"page":svg.page, "svg":svg_data,
             "png":base64::engine::general_purpose::STANDARD.encode(png_data), "diagnostics":svg.diagnostics}));

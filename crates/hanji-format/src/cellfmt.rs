@@ -19,7 +19,14 @@ use crate::vocab::{self, Border, Color, Fill};
 
 /// Horizontal alignment in a cell: the vocabulary's, and `general` (Excel's
 /// default: text left, numbers right), which a line never writes.
-pub const ALIGN: &[&str] = &["general", "left", "center", "right", "justify", "distribute"];
+pub const ALIGN: &[&str] = &[
+    "general",
+    "left",
+    "center",
+    "right",
+    "justify",
+    "distribute",
+];
 /// The keys of a cell, in canonical order.
 pub const KEYS: &[&str] = &[
     "fill",
@@ -71,7 +78,12 @@ impl CellFormat {
     pub fn implicit() -> CellFormat {
         CellFormat {
             fill: Some(Fill::None),
-            borders: [Some(Border::None), Some(Border::None), Some(Border::None), Some(Border::None)],
+            borders: [
+                Some(Border::None),
+                Some(Border::None),
+                Some(Border::None),
+                Some(Border::None),
+            ],
             valign: Some("bottom".into()),
             align: Some("general".into()),
             bold: Some(false),
@@ -184,7 +196,10 @@ impl CellFormat {
         if let Some(f) = &self.fill {
             out.push(kv("fill", f.to_string()));
         }
-        let all = self.borders.iter().all(|b| b.is_some() && *b == self.borders[0]);
+        let all = self
+            .borders
+            .iter()
+            .all(|b| b.is_some() && *b == self.borders[0]);
         if all {
             out.push(kv("border", self.borders[0].as_ref().unwrap().to_string()));
         } else {
@@ -209,9 +224,12 @@ impl CellFormat {
         if let Some(v) = &self.color {
             out.push(kv("color", v.to_string()));
         }
-        for (k, f) in
-            [("bold", self.bold), ("italic", self.italic), ("underline", self.underline), ("strike", self.strike)]
-        {
+        for (k, f) in [
+            ("bold", self.bold),
+            ("italic", self.italic),
+            ("underline", self.underline),
+            ("strike", self.strike),
+        ] {
             match f {
                 Some(true) => out.push(k.to_string()),
                 Some(false) => out.push(format!("{k}=no")),
@@ -243,17 +261,29 @@ impl fmt::Display for CellFormat {
 /// The refusal for a key a cell does not have, with a hint where one helps.
 pub fn unknown(key: &str) -> String {
     let hint = match key {
-        "style" => " A cell's named style is shown (style=\"Name\") but not written by an operation yet.".to_string(),
-        k if k.contains(':') || k == "background" || k == "background-color" || k == "font-size" => {
+        "style" => {
+            " A cell's named style is shown (style=\"Name\") but not written by an operation yet."
+                .to_string()
+        }
+        k if k.contains(':')
+            || k == "background"
+            || k == "background-color"
+            || k == "font-size" =>
+        {
             format!(" {}", vocab::css_refusal())
         }
-        "outline" => " outline is an operation's key: it sets the outer edges of the range.".to_string(),
+        "outline" => {
+            " outline is an operation's key: it sets the outer edges of the range.".to_string()
+        }
         "indent-left" | "first-line" | "line-spacing" | "space-before" | "space-after" => {
             " A cell's indent is indent=N, in levels.".to_string()
         }
         _ => String::new(),
     };
-    format!("{key} is not a cell's formatting key; a cell has {}.{hint}", KEYS.join(", "))
+    format!(
+        "{key} is not a cell's formatting key; a cell has {}.{hint}",
+        KEYS.join(", ")
+    )
 }
 
 /// A `<format …/>` line of a sheet: a rectangle of cells and what they
@@ -324,7 +354,11 @@ pub fn parse_line(t: &str) -> Result<Parsed, (usize, String)> {
     }
     match (default, range) {
         (true, None) if style.is_none() => Ok(Parsed::Default(f)),
-        (false, Some(range)) => Ok(Parsed::Range(FormatLine { range, style, format: f })),
+        (false, Some(range)) => Ok(Parsed::Range(FormatLine {
+            range,
+            style,
+            format: f,
+        })),
         _ => Err((1, format!("a format line is {FORM}"))),
     }
 }
@@ -358,7 +392,10 @@ pub fn rectangles<T: Clone + PartialEq>(cells: &[(u32, u32, T)]) -> Vec<(u32, u3
                 k += 1;
             }
         }
-        match open.iter_mut().find(|o| o.1 == c1 && o.3 == c2 && o.4 == v && o.2 + 1 == r) {
+        match open
+            .iter_mut()
+            .find(|o| o.1 == c1 && o.3 == c2 && o.4 == v && o.2 + 1 == r)
+        {
             Some(o) => o.2 = r,
             None => open.push((r, c1, r, c2, v)),
         }
@@ -374,35 +411,72 @@ mod tests {
 
     #[test]
     fn a_line_reads_and_writes_in_canonical_order() {
-        let Parsed::Range(l) =
-            parse_line("<format range=\"A1:B2\" bold fill=#D9D9D9 border=\"0.75pt solid #000000\" indent=1/>").unwrap()
+        let Parsed::Range(l) = parse_line(
+            "<format range=\"A1:B2\" bold fill=#D9D9D9 border=\"0.75pt solid #000000\" indent=1/>",
+        )
+        .unwrap() else {
+            panic!()
+        };
+        assert_eq!(
+            l.line(),
+            "<format range=\"A1:B2\" fill=#D9D9D9 border=\"0.75pt solid #000000\" bold indent=1/>"
+        );
+        let Parsed::Default(d) =
+            parse_line("<format default font=Calibri size=11pt color=tx1/>").unwrap()
         else {
             panic!()
         };
-        assert_eq!(l.line(), "<format range=\"A1:B2\" fill=#D9D9D9 border=\"0.75pt solid #000000\" bold indent=1/>");
-        let Parsed::Default(d) = parse_line("<format default font=Calibri size=11pt color=tx1/>").unwrap() else {
-            panic!()
-        };
-        assert_eq!(default_line(&d), "<format default font=Calibri size=11pt color=tx1/>");
-        assert!(parse_line("<format range=\"A1\" indent=10pt/>").unwrap_err().1.contains("indent levels"));
-        assert!(parse_line("<format range=\"A1\" first-line=10pt/>").unwrap_err().1.contains("indent=N"));
+        assert_eq!(
+            default_line(&d),
+            "<format default font=Calibri size=11pt color=tx1/>"
+        );
+        assert!(parse_line("<format range=\"A1\" indent=10pt/>")
+            .unwrap_err()
+            .1
+            .contains("indent levels"));
+        assert!(parse_line("<format range=\"A1\" first-line=10pt/>")
+            .unwrap_err()
+            .1
+            .contains("indent=N"));
     }
 
     #[test]
     fn a_format_operation_reads_its_set() {
         use crate::ops::{parse_ops, RangeOp};
         let ops = parse_ops(r##"[{"op": "format", "range": "S!A1:D1", "set": {"fill": "accent2+80%", "bold": true, "italic": false, "size": 14, "indent": 2, "border": "0.75pt solid #000000", "outline": "2pt solid #1F3864"}}]"##).unwrap();
-        let RangeOp::Format { range, set, outline } = &ops[0] else { panic!() };
+        let RangeOp::Format {
+            range,
+            set,
+            outline,
+        } = &ops[0]
+        else {
+            panic!()
+        };
         assert_eq!(range, "S!A1:D1");
-        assert_eq!(set.write(), "fill=accent2+80% border=\"0.75pt solid #000000\" size=14pt bold italic=no indent=2");
+        assert_eq!(
+            set.write(),
+            "fill=accent2+80% border=\"0.75pt solid #000000\" size=14pt bold italic=no indent=2"
+        );
         assert_eq!(outline.as_ref().unwrap().to_string(), "2pt solid #1F3864");
-        let e = parse_ops(r##"[{"op": "format", "range": "S!A1", "set": {"bold": "maybe"}}]"##).unwrap_err();
+        let e = parse_ops(r##"[{"op": "format", "range": "S!A1", "set": {"bold": "maybe"}}]"##)
+            .unwrap_err();
         assert!(e[0].to_string().contains("true or false"), "{}", e[0]);
     }
 
     #[test]
     fn equal_cells_become_rectangles() {
-        let cells = vec![(1, 1, 'a'), (1, 2, 'a'), (2, 1, 'a'), (2, 2, 'a'), (2, 3, 'b'), (4, 1, 'a'), (4, 2, 'a')];
-        assert_eq!(rectangles(&cells), vec![(1, 1, 2, 2, 'a'), (2, 3, 2, 3, 'b'), (4, 1, 4, 2, 'a')]);
+        let cells = vec![
+            (1, 1, 'a'),
+            (1, 2, 'a'),
+            (2, 1, 'a'),
+            (2, 2, 'a'),
+            (2, 3, 'b'),
+            (4, 1, 'a'),
+            (4, 2, 'a'),
+        ];
+        assert_eq!(
+            rectangles(&cells),
+            vec![(1, 1, 2, 2, 'a'), (2, 3, 2, 3, 'b'), (4, 1, 4, 2, 'a')]
+        );
     }
 }

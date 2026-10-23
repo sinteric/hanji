@@ -21,7 +21,13 @@ pub struct StyleTable {
 pub fn implicit() -> Props {
     let mut p = Props::new();
     p.set(Key::Align, Value::Choice("left".into()));
-    for k in [Key::IndentLeft, Key::IndentRight, Key::FirstLine, Key::SpaceBefore, Key::SpaceAfter] {
+    for k in [
+        Key::IndentLeft,
+        Key::IndentRight,
+        Key::FirstLine,
+        Key::SpaceBefore,
+        Key::SpaceAfter,
+    ] {
         p.set(k, Value::Len(0));
     }
     p.set(Key::Fill, Value::Fill(crate::vocab::Fill::None));
@@ -102,14 +108,22 @@ impl StyleTable {
 
     /// The default style's values, complete.
     pub fn default_values(&self) -> Props {
-        let own = self.default.as_deref().and_then(|d| self.line(d)).map(|l| l.props.clone()).unwrap_or_default();
+        let own = self
+            .default
+            .as_deref()
+            .and_then(|d| self.line(d))
+            .map(|l| l.props.clone())
+            .unwrap_or_default();
         implicit().overlay(&own)
     }
 
     /// The values of style `name` (`None`: the default style).
     pub fn values(&self, name: Option<&str>) -> Props {
         let base = self.default_values();
-        match name.filter(|n| Some(*n) != self.default.as_deref()).and_then(|n| self.line(n)) {
+        match name
+            .filter(|n| Some(*n) != self.default.as_deref())
+            .and_then(|n| self.line(n))
+        {
             Some(l) => base.overlay(&l.props),
             None => base,
         }
@@ -131,7 +145,9 @@ impl StyleTable {
 /// unit takes properties).
 pub fn common_text(inl: &Inline) -> Props {
     let mut units = inl.units.iter().filter(|u| u.takes_props());
-    let Some(first) = units.next() else { return Props::new() };
+    let Some(first) = units.next() else {
+        return Props::new();
+    };
     let mut out = first.props.only(&Key::TEXT);
     for u in units {
         out.0.retain(|k, v| u.props.get(*k) == Some(v));

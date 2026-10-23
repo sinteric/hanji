@@ -22,7 +22,10 @@ fn named(data: &[u8], family: &str) -> Vec<u8> {
 /// The same actual glyph is exposed in Unicode and Macintosh Symbol byte B7.
 /// A format-6 table allows the real Carlito glyph ID to exceed 255.
 fn encoding_fixture(legacy_char: char) -> Vec<u8> {
-    let mut font = named(oxml_layout::bundled_fonts::bundled_font_data()[0].1, "Symbol");
+    let mut font = named(
+        oxml_layout::bundled_fonts::bundled_font_data()[0].1,
+        "Symbol",
+    );
     let face = Face::parse(&font, 0).unwrap();
     let glyph = face.glyph_index(legacy_char).unwrap();
     let raw = face.raw_face().table(Tag::from_bytes(b"cmap")).unwrap();
@@ -54,10 +57,15 @@ fn encoding_fixture(legacy_char: char) -> Vec<u8> {
         cmap.extend(o.to_be_bytes());
     }
     cmap.extend(raw);
-    for n in [6u16, 12, 0, 0xB7, 1, glyph.0] {
+    for n in [6u16, 12, 0, 0xb7, 1, glyph.0] {
         cmap.extend(n.to_be_bytes());
     }
-    let record = face.raw_face().table_records.into_iter().position(|r| r.tag == Tag::from_bytes(b"cmap")).unwrap();
+    let record = face
+        .raw_face()
+        .table_records
+        .into_iter()
+        .position(|r| r.tag == Tag::from_bytes(b"cmap"))
+        .unwrap();
     // Carlito's post format 3 has no glyph names. This explicit metadata
     // fixture names its actual Unicode bullet, as the native Symbol face does.
     let bullet = face.glyph_index('\u{2022}').unwrap();
@@ -69,8 +77,12 @@ fn encoding_fixture(legacy_char: char) -> Vec<u8> {
     }
     post.push(6);
     post.extend(b"bullet");
-    let post_record =
-        face.raw_face().table_records.into_iter().position(|r| r.tag == Tag::from_bytes(b"post")).unwrap();
+    let post_record = face
+        .raw_face()
+        .table_records
+        .into_iter()
+        .position(|r| r.tag == Tag::from_bytes(b"post"))
+        .unwrap();
     let at = 12 + record * 16;
     let offset = font.len() as u32;
     font[at + 8..at + 12].copy_from_slice(&offset.to_be_bytes());
@@ -87,7 +99,9 @@ fn encoding_fixture(legacy_char: char) -> Vec<u8> {
 fn document(charset: &str, marker_font: &str, numbered: bool) -> Vec<u8> {
     // Retain valid package relationships from an existing fixture; only this
     // in-memory test package's body, numbering and font table are replaced.
-    let original = include_bytes!("../../../prototype/preview/baseline/04-docx-untouched-testword-various.docx");
+    let original = include_bytes!(
+        "../../../prototype/preview/baseline/04-docx-untouched-testword-various.docx"
+    );
     let mut parts = hanji_package::package::read(original).unwrap();
     let (ppr, run_font, text, format, marker) = if numbered {
         (
@@ -114,7 +128,11 @@ fn document(charset: &str, marker_font: &str, numbered: bool) -> Vec<u8> {
     let fonts = format!(
         r#"<w:fonts xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:font w:name="{marker_font}"><w:charset w:val="{charset}"/></w:font></w:fonts>"#
     );
-    for (name, xml) in [("word/document.xml", doc), ("word/numbering.xml", numbering), ("word/fontTable.xml", fonts)] {
+    for (name, xml) in [
+        ("word/document.xml", doc),
+        ("word/numbering.xml", numbering),
+        ("word/fontTable.xml", fonts),
+    ] {
         parts.iter_mut().find(|p| p.name == name).unwrap().data = xml.into_bytes();
     }
     hanji_package::package::write(&parts).unwrap()
@@ -130,10 +148,24 @@ impl OutlineBuilder for Outline {
         self.0.push(vec![1, x.to_bits(), y.to_bits()]);
     }
     fn quad_to(&mut self, x: f32, y: f32, x1: f32, y1: f32) {
-        self.0.push(vec![2, x.to_bits(), y.to_bits(), x1.to_bits(), y1.to_bits()]);
+        self.0.push(vec![
+            2,
+            x.to_bits(),
+            y.to_bits(),
+            x1.to_bits(),
+            y1.to_bits(),
+        ]);
     }
     fn curve_to(&mut self, x: f32, y: f32, x1: f32, y1: f32, x2: f32, y2: f32) {
-        self.0.push(vec![3, x.to_bits(), y.to_bits(), x1.to_bits(), y1.to_bits(), x2.to_bits(), y2.to_bits()]);
+        self.0.push(vec![
+            3,
+            x.to_bits(),
+            y.to_bits(),
+            x1.to_bits(),
+            y1.to_bits(),
+            x2.to_bits(),
+            y2.to_bits(),
+        ]);
     }
     fn close(&mut self) {
         self.0.push(vec![4]);
@@ -148,7 +180,10 @@ fn outline(face: &Face<'_>, glyph: GlyphId) -> Outline {
 fn embedded_fonts(svg: &str) -> Vec<Vec<u8>> {
     svg.split("url('data:font/")
         .skip(1)
-        .filter_map(|s| s.split_once(";base64,").and_then(|(_, s)| s.split('\'').next()))
+        .filter_map(|s| {
+            s.split_once(";base64,")
+                .and_then(|(_, s)| s.split('\'').next())
+        })
         .map(|s| base64::engine::general_purpose::STANDARD.decode(s).unwrap())
         .collect()
 }
@@ -163,12 +198,17 @@ fn declared_symbol_numbering_retains_the_private_code_and_actual_legacy_glyph() 
     let bytes = document("02", "Symbol", true);
     let preview = hanji_preview::docx::render_with_fonts(
         &bytes,
-        &FontOptions { fonts: vec![FontData::new(font.clone())], ..Default::default() },
+        &FontOptions {
+            fonts: vec![FontData::new(font.clone())],
+            ..Default::default()
+        },
     )
     .unwrap();
     assert_eq!(preview.page_count(), 1);
     assert_eq!(preview.fonts.missing_glyphs_total, 0);
-    let PageData::Svg(svg) = preview.render_page(0, PageFormat::Svg).unwrap().data else { panic!() };
+    let PageData::Svg(svg) = preview.render_page(0, PageFormat::Svg).unwrap().data else {
+        panic!()
+    };
     assert!(svg.contains('\u{F0B7}') && !svg.contains('\u{2022}'));
     assert!(svg.contains("Latin") && svg.contains("42"));
     assert!(svg.contains('Α'));
@@ -182,56 +222,98 @@ fn declared_symbol_numbering_retains_the_private_code_and_actual_legacy_glyph() 
             })
             .expect("the original private code survives into the drawing cmap");
         assert_eq!(outline(&drawing, glyph), outline(&source, bullet));
-        assert_eq!(drawing.glyph_hor_advance(glyph), source.glyph_hor_advance(bullet));
-        let alpha = drawing.glyph_index('Α').expect("existing Symbol Unicode mappings survive");
-        assert_eq!(outline(&drawing, alpha), outline(&source, source.glyph_index('Α').unwrap()));
+        assert_eq!(
+            drawing.glyph_hor_advance(glyph),
+            source.glyph_hor_advance(bullet)
+        );
+        let alpha = drawing
+            .glyph_index('Α')
+            .expect("existing Symbol Unicode mappings survive");
+        assert_eq!(
+            outline(&drawing, alpha),
+            outline(&source, source.glyph_index('Α').unwrap())
+        );
     }
 }
 
 #[test]
 fn absent_or_disagreeing_legacy_mapping_does_not_preserve_the_private_code() {
-    for font in [named(oxml_layout::bundled_fonts::bundled_font_data()[0].1, "Symbol"), encoding_fixture('A')] {
+    for font in [
+        named(
+            oxml_layout::bundled_fonts::bundled_font_data()[0].1,
+            "Symbol",
+        ),
+        encoding_fixture('A'),
+    ] {
         let preview = hanji_preview::docx::render_with_fonts(
             &document("02", "Symbol", true),
-            &FontOptions { fonts: vec![FontData::new(font)], ..Default::default() },
+            &FontOptions {
+                fonts: vec![FontData::new(font)],
+                ..Default::default()
+            },
         )
         .unwrap();
-        let PageData::Svg(svg) = preview.render_page(0, PageFormat::Svg).unwrap().data else { panic!() };
+        let PageData::Svg(svg) = preview.render_page(0, PageFormat::Svg).unwrap().data else {
+            panic!()
+        };
         // Hanji's cmap alias still requires a verified Macintosh B7 mapping.
         // S92 remaps an uncovered Symbol numbering bullet to U+2022 instead of
         // leaving the original private code missing.
-        assert!(preview.fonts.missing_glyphs.iter().all(|g| g.char != "U+F0B7"));
-        assert!(svg.contains('\u{2022}') && !svg.contains('\u{F0B7}'));
-        assert!(embedded_fonts(&svg)
+        assert!(preview
+            .fonts
+            .missing_glyphs
             .iter()
-            .all(|data| Face::parse(data, 0).unwrap().glyph_index('\u{F0B7}').is_none()));
+            .all(|g| g.char != "U+F0B7"));
+        assert!(svg.contains('\u{2022}') && !svg.contains('\u{F0B7}'));
+        assert!(embedded_fonts(&svg).iter().all(|data| Face::parse(data, 0)
+            .unwrap()
+            .glyph_index('\u{F0B7}')
+            .is_none()));
     }
 }
 
 #[test]
 fn a_family_name_or_unrelated_private_text_is_insufficient_to_activate_the_bridge() {
-    for (charset, family, numbered) in [("00", "Symbol", true), ("02", "Other Symbols", true), ("02", "Symbol", false)]
-    {
+    for (charset, family, numbered) in [
+        ("00", "Symbol", true),
+        ("02", "Other Symbols", true),
+        ("02", "Symbol", false),
+    ] {
         let preview = hanji_preview::docx::render_with_fonts(
             &document(charset, family, numbered),
-            &FontOptions { fonts: vec![FontData::new(encoding_fixture('\u{2022}'))], ..Default::default() },
+            &FontOptions {
+                fonts: vec![FontData::new(encoding_fixture('\u{2022}'))],
+                ..Default::default()
+            },
         )
         .unwrap();
-        let PageData::Svg(svg) = preview.render_page(0, PageFormat::Svg).unwrap().data else { panic!() };
+        let PageData::Svg(svg) = preview.render_page(0, PageFormat::Svg).unwrap().data else {
+            panic!()
+        };
         if family.eq_ignore_ascii_case("Symbol") && numbered {
             // Charset 00 is not the Hanji bridge, but S92 still substitutes a
             // Symbol numbering bullet that lacks original-code coverage.
-            assert!(preview.fonts.missing_glyphs.iter().all(|g| g.char != "U+F0B7"));
+            assert!(preview
+                .fonts
+                .missing_glyphs
+                .iter()
+                .all(|g| g.char != "U+F0B7"));
             assert!(svg.contains('\u{2022}') && !svg.contains('\u{F0B7}'));
             continue;
         }
-        assert!(preview.fonts.missing_glyphs.iter().any(|g| g.char == "U+F0B7"));
+        assert!(preview
+            .fonts
+            .missing_glyphs
+            .iter()
+            .any(|g| g.char == "U+F0B7"));
         assert!(preview
             .quality(hanji_preview::DocumentKind::Docx)
             .diagnostics
             .iter()
-            .any(|d| d.code == hanji_preview::quality::DiagnosticCode::MissingGlyphs
-                && d.severity == hanji_preview::quality::Severity::Error));
+            .any(
+                |d| d.code == hanji_preview::quality::DiagnosticCode::MissingGlyphs
+                    && d.severity == hanji_preview::quality::Severity::Error
+            ));
         assert!(svg.contains('\u{F0B7}'));
     }
 }

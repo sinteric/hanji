@@ -49,14 +49,21 @@ struct Case {
 
 fn cases() -> Vec<Case> {
     use Map::*;
-    let ins = |at, n| RowShift::Insert { cols: (0, 5), at, n };
+    let ins = |at, n| RowShift::Insert {
+        cols: (0, 5),
+        at,
+        n,
+    };
     vec![
         Case {
             name: "set a number",
             file: "korean-sales.xlsx",
             ops: r##"[{"op": "set", "range": "매출!D5", "values": [[18420000]]}]"##,
             expect: Ok(Cells("매출", &["D5"])),
-            shows: &[("Sales", "| 5 | 2026-01 | 강남 | 모바일 | 18,420,000 | 6,480,000 | 11,940,000 |")],
+            shows: &[(
+                "Sales",
+                "| 5 | 2026-01 | 강남 | 모바일 | 18,420,000 | 6,480,000 | 11,940,000 |",
+            )],
         },
         Case {
             name: "set an ID as text",
@@ -84,7 +91,10 @@ fn cases() -> Vec<Case> {
             file: "korean-sales.xlsx",
             ops: r##"[{"op": "set", "range": "매출!H3", "values": [["=SUM(A1:A3)"]]}]"##,
             expect: Ok(Cells("매출", &["H3"])),
-            shows: &[("매출!H3", "| 3 | =SUM(A1:A3) |"), ("notice", "formula-text")],
+            shows: &[
+                ("매출!H3", "| 3 | =SUM(A1:A3) |"),
+                ("notice", "formula-text"),
+            ],
         },
         Case {
             name: "set into a merged area",
@@ -97,7 +107,9 @@ fn cases() -> Vec<Case> {
             name: "set breaking a validation",
             file: "korean-sales.xlsx",
             ops: r##"[{"op": "set", "range": "매출!B5", "values": [["부산"]]}]"##,
-            expect: Err("breaks the data validation of B4:B48 (one of 강남, 서초, 송파, 분당, 일산)"),
+            expect: Err(
+                "breaks the data validation of B4:B48 (one of 강남, 서초, 송파, 분당, 일산)",
+            ),
             shows: &[],
         },
         Case {
@@ -126,41 +138,78 @@ fn cases() -> Vec<Case> {
             file: "korean-sales.xlsx",
             ops: r##"[{"op": "append_rows", "table": "Sales", "rows": [{"월": "2026-04", "지점": "강남", "제품군": "가전", "매출": 12400000, "원가": 9000000}, {"월": "2026-04", "지점": "서초", "제품군": "가전", "매출": 11000000, "원가": 8000000}]}]"##,
             expect: Ok(Shift("매출", ins(49, 2))),
-            shows: &[("Sales", "| 50 | 2026-04 | 서초 | 가전 | 11,000,000 | 8,000,000 | 3,000,000 |")],
+            shows: &[(
+                "Sales",
+                "| 50 | 2026-04 | 서초 | 가전 | 11,000,000 | 8,000,000 | 3,000,000 |",
+            )],
         },
         Case {
             name: "append above a totals row",
             file: "table-sample.xlsx",
             ops: r##"[{"op": "append_rows", "table": "Tabelle1", "rows": [{"Field 1": "new", "Field 2": 2, "Field 3": 3}]}]"##,
-            expect: Ok(Shift("Tabelle1", RowShift::Insert { cols: (2, 6), at: 9, n: 1 })),
+            expect: Ok(Shift(
+                "Tabelle1",
+                RowShift::Insert {
+                    cols: (2, 6),
+                    at: 9,
+                    n: 1,
+                },
+            )),
             shows: &[("Tabelle1", "| 9 | new | 2 | 3 | 5 |")],
         },
         Case {
             name: "insert rows",
             file: "korean-sales.xlsx",
             ops: r##"[{"op": "insert_rows", "table": "Staff", "before": 3, "rows": [{"사번": "00417", "이름": "홍길동", "지점": "강남", "휴대전화": "010-1111-2222", "입사일": "2026-09-01"}]}]"##,
-            expect: Ok(Shift("담당자", RowShift::Insert { cols: (0, 4), at: 3, n: 1 })),
-            shows: &[("Staff", "| 3 | 00417 | 홍길동 | 강남 | 010-1111-2222 | 2026-09-01 |")],
+            expect: Ok(Shift(
+                "담당자",
+                RowShift::Insert {
+                    cols: (0, 4),
+                    at: 3,
+                    n: 1,
+                },
+            )),
+            shows: &[(
+                "Staff",
+                "| 3 | 00417 | 홍길동 | 강남 | 010-1111-2222 | 2026-09-01 |",
+            )],
         },
         Case {
             name: "insert rows under a chart's data",
             file: "korean-sales.xlsx",
             ops: r##"[{"op": "insert_rows", "table": "Sales", "before": 10, "rows": [{"월": "2026-01", "지점": "송파", "제품군": "기타", "매출": 1000000, "원가": 500000}]}]"##,
             expect: Ok(Shift("매출", ins(10, 1))),
-            shows: &[("Sales", "| 10 | 2026-01 | 송파 | 기타 | 1,000,000 | 500,000 | 500,000 |")],
+            shows: &[(
+                "Sales",
+                "| 10 | 2026-01 | 송파 | 기타 | 1,000,000 | 500,000 | 500,000 |",
+            )],
         },
         Case {
             name: "delete rows",
             file: "korean-sales.xlsx",
             ops: r##"[{"op": "delete_rows", "table": "Sales", "rows": "6:7"}]"##,
-            expect: Ok(Shift("매출", RowShift::Delete { cols: (0, 5), first: 6, last: 7 })),
+            expect: Ok(Shift(
+                "매출",
+                RowShift::Delete {
+                    cols: (0, 5),
+                    first: 6,
+                    last: 7,
+                },
+            )),
             shows: &[("Sales", "| 6 | 2026-01 | 서초 | 모바일 |")],
         },
         Case {
             name: "delete rows below a merge",
             file: "simple-monthly-budget.xlsx",
             ops: r##"[{"op": "delete_rows", "table": "tblIncome", "rows": "6"}]"##,
-            expect: Ok(Shift("Simple Monthly Budget", RowShift::Delete { cols: (1, 2), first: 6, last: 6 })),
+            expect: Ok(Shift(
+                "Simple Monthly Budget",
+                RowShift::Delete {
+                    cols: (1, 2),
+                    first: 6,
+                    last: 6,
+                },
+            )),
             shows: &[],
         },
         Case {
@@ -168,7 +217,10 @@ fn cases() -> Vec<Case> {
             file: "korean-sales.xlsx",
             ops: r##"[{"op": "fill_formula", "table": "Sales", "column": "이익", "formula": "=ROUND(([@매출]-[@원가])/1000,0)*1000"}]"##,
             expect: Ok(Column("매출", 5, 4, 48)),
-            shows: &[("Sales", "| 4 | 2026-01 | 강남 | 가전 | 10,269,000 | 7,410,000 | 2,859,000 |")],
+            shows: &[(
+                "Sales",
+                "| 4 | 2026-01 | 강남 | 가전 | 10,269,000 | 7,410,000 | 2,859,000 |",
+            )],
         },
         Case {
             name: "fill a formula over A1 cells",
@@ -196,14 +248,20 @@ fn cases() -> Vec<Case> {
             file: "korean-sales.xlsx",
             ops: r##"[{"op": "add_column", "table": "Staff", "column": {"name": "이메일", "type": "text", "format": "@"}}, {"op": "set", "range": "담당자!F2", "values": [["kim@example.com"]]}]"##,
             expect: Ok(Cells("담당자", &["F1", "F2"])),
-            shows: &[("Staff", "| 2 | 18867 | 김서연 | 강남 | 010-5934-8996 | 2019-01-02 | kim@example.com |")],
+            shows: &[(
+                "Staff",
+                "| 2 | 18867 | 김서연 | 강남 | 010-5934-8996 | 2019-01-02 | kim@example.com |",
+            )],
         },
         Case {
             name: "add a formula column",
             file: "korean-sales.xlsx",
             ops: r##"[{"op": "add_column", "table": "Sales", "column": {"name": "이익률", "type": "number", "format": "0.0%", "formula": "=[@이익]/[@매출]"}}]"##,
             expect: Ok(Nothing),
-            shows: &[("Sales", "| 4 | 2026-01 | 강남 | 가전 | 10,269,000 | 7,410,000 | 2,859,000 | 27.8% |")],
+            shows: &[(
+                "Sales",
+                "| 4 | 2026-01 | 강남 | 가전 | 10,269,000 | 7,410,000 | 2,859,000 | 27.8% |",
+            )],
         },
         Case {
             name: "add a column to a writer-made table",
@@ -244,14 +302,31 @@ fn cases() -> Vec<Case> {
             name: "append to a pivot table's source",
             file: "ExcelPivotTableSample.xlsx",
             ops: r##"[{"op": "append_rows", "table": "Tabelle1", "rows": [{"Field1": "w", "Field2": 44, "Field3": "2026-11-14"}]}]"##,
-            expect: Ok(Shift("Tabelle1", RowShift::Insert { cols: (4, 6), at: 5, n: 1 })),
-            shows: &[("Tabelle1", "| 5 | w | 44 | 14-Nov |"), ("notice", "pivot-refresh")],
+            expect: Ok(Shift(
+                "Tabelle1",
+                RowShift::Insert {
+                    cols: (4, 6),
+                    at: 5,
+                    n: 1,
+                },
+            )),
+            shows: &[
+                ("Tabelle1", "| 5 | w | 44 | 14-Nov |"),
+                ("notice", "pivot-refresh"),
+            ],
         },
         Case {
             name: "delete the only rows of a format and a validation",
             file: "@gone",
             ops: r##"[{"op": "delete_rows", "table": "T", "rows": "3"}]"##,
-            expect: Ok(Shift("S", RowShift::Delete { cols: (0, 1), first: 3, last: 3 })),
+            expect: Ok(Shift(
+                "S",
+                RowShift::Delete {
+                    cols: (0, 1),
+                    first: 3,
+                    last: 3,
+                },
+            )),
             shows: &[("T", "| 3 | 3 | 30 |"), ("notice", "removed")],
         },
         Case {
@@ -343,7 +418,10 @@ fn cases() -> Vec<Case> {
             file: "korean-sales.xlsx",
             ops: r##"[{"op": "set", "range": "매출!D10", "values": [[99000000]]}, {"op": "delete_rows", "table": "Sales", "rows": "4:5"}]"##,
             expect: Ok(Many),
-            shows: &[("Sales", "| 8 | 2026-01 | 송파 | 가전 | 99,000,000 | 9,900,000 | 89,100,000 |")],
+            shows: &[(
+                "Sales",
+                "| 8 | 2026-01 | 송파 | 가전 | 99,000,000 | 9,900,000 | 89,100,000 |",
+            )],
         },
         Case {
             name: "every kind at once",
@@ -359,7 +437,10 @@ fn cases() -> Vec<Case> {
             {"op": "add_sheet", "name": "계획"},
             {"op": "add_table", "sheet": "계획", "name": "Plan", "anchor": "B2", "columns": [{"name": "지점", "type": "text"}, {"name": "합계", "type": "number", "format": "#,##0", "formula": "=SUMIFS(Sales[매출],Sales[지점],[@지점])"}], "rows": [{"지점": "강남"}]}]"##,
             expect: Ok(Many),
-            shows: &[("Plan", "| 3 | 강남 | 105,663,000 |"), ("Staff", "| 2 | 00417 | 홍길동 | 강남 |  |  |")],
+            shows: &[
+                ("Plan", "| 3 | 강남 | 105,663,000 |"),
+                ("Staff", "| 2 | 00417 | 홍길동 | 강남 |  |  |"),
+            ],
         },
     ]
 }
@@ -375,7 +456,12 @@ fn cells(rem: &Remainder) -> HashMap<(String, u32, u32), (bool, String, u32)> {
         book.load_store(i).unwrap();
         let name = book.sheets[i].name.clone();
         book.store(i).for_each_cell(&mut |r, c| {
-            let body = format!("{}|{:?}|{:?}", c.ty(), c.v, c.is.as_ref().map(|x| x.to_xml()));
+            let body = format!(
+                "{}|{:?}|{:?}",
+                c.ty(),
+                c.v,
+                c.is.as_ref().map(|x| x.to_xml())
+            );
             out.insert((name.clone(), r, c.col), (c.f.is_some(), body, c.style()));
         });
     }
@@ -392,14 +478,30 @@ fn fixture(which: &str) -> Vec<u8> {
         col: 0,
         row: 1,
         cols: vec![
-            Col { name: "a".into(), format: "0".into(), formula: None },
-            Col { name: "b".into(), format: "0".into(), formula: None },
+            Col {
+                name: "a".into(),
+                format: "0".into(),
+                formula: None,
+            },
+            Col {
+                name: "b".into(),
+                format: "0".into(),
+                formula: None,
+            },
         ],
-        rows: (1..=4).map(|k| vec![V::Num(k as f64), V::Num(10.0 * k as f64)]).collect(),
+        rows: (1..=4)
+            .map(|k| vec![V::Num(k as f64), V::Num(10.0 * k as f64)])
+            .collect(),
     };
-    let pkg = build(&[SheetSpec { name: "S".into(), tables: vec![t] }]);
+    let pkg = build(&[SheetSpec {
+        name: "S".into(),
+        tables: vec![t],
+    }]);
     let mut parts = package::read(&pkg).unwrap();
-    let sheet = parts.iter_mut().find(|p| p.name == "xl/worksheets/sheet1.xml").unwrap();
+    let sheet = parts
+        .iter_mut()
+        .find(|p| p.name == "xl/worksheets/sheet1.xml")
+        .unwrap();
     let mut s = String::from_utf8(sheet.data.clone()).unwrap();
     match which {
         "@gone" => s = s.replace("</sheetData>", "</sheetData><conditionalFormatting sqref=\"A3:B3\"><cfRule type=\"cellIs\" priority=\"1\" operator=\"greaterThan\"><formula>5</formula></cfRule></conditionalFormatting><dataValidations count=\"1\"><dataValidation type=\"whole\" sqref=\"A3\"><formula1>0</formula1></dataValidation></dataValidations>"),
@@ -443,9 +545,14 @@ fn op_set() {
     let soffice = std::env::var("HANJI_SOFFICE").is_ok();
     for case in cases() {
         t.cases += 1;
-        let bytes =
-            if case.file.starts_with('@') { fixture(case.file) } else { std::fs::read(dir.join(case.file)).unwrap() };
-        let imp = XlsxEngine.import(&bytes, &ImportOptions::default()).unwrap();
+        let bytes = if case.file.starts_with('@') {
+            fixture(case.file)
+        } else {
+            std::fs::read(dir.join(case.file)).unwrap()
+        };
+        let imp = XlsxEngine
+            .import(&bytes, &ImportOptions::default())
+            .unwrap();
         let (rem, _) = XlsxEngine::recalculate(&imp.remainder).unwrap();
         let text = XlsxEngine::text_of(&rem, None).unwrap();
         let fail = |m: String| format!("{}: {m}", case.name);
@@ -456,7 +563,11 @@ fn op_set() {
                 if !e.to_string().contains(want) {
                     failures.push(fail(format!("refused, but not for {want:?}: {e}")));
                 }
-                t.entries_kept_on_refusal += rem.entries.iter().filter(|e| e.kind == hanji_core::Kind::Range).count();
+                t.entries_kept_on_refusal += rem
+                    .entries
+                    .iter()
+                    .filter(|e| e.kind == hanji_core::Kind::Range)
+                    .count();
                 continue;
             }
             (Err(want), Ok(_)) => {
@@ -480,8 +591,14 @@ fn op_set() {
                 continue;
             }
             let of = match target.split_once('!') {
-                Some((s, r)) => WindowOf::Range { sheet: s.into(), range: r.into() },
-                None => WindowOf::Table { name: target.to_string(), rows: None },
+                Some((s, r)) => WindowOf::Range {
+                    sheet: s.into(),
+                    range: r.into(),
+                },
+                None => WindowOf::Table {
+                    name: target.to_string(),
+                    rows: None,
+                },
             };
             let w = XlsxEngine::window(&applied.remainder, &of).unwrap();
             if !w.contains(want) {
@@ -489,20 +606,35 @@ fn op_set() {
             }
         }
         // Entries: every one lands or is reported removed.
-        let removed: Vec<&str> =
-            applied.report.notices.iter().filter(|n| n.kind == "removed").map(|n| n.location.as_str()).collect();
-        let gone = applied.report.entries.iter().filter(|e| e.after.is_none()).count();
+        let removed: Vec<&str> = applied
+            .report
+            .notices
+            .iter()
+            .filter(|n| n.kind == "removed")
+            .map(|n| n.location.as_str())
+            .collect();
+        let gone = applied
+            .report
+            .entries
+            .iter()
+            .filter(|e| e.after.is_none())
+            .count();
         for e in &applied.report.entries {
             let at = format!("{}!{}", e.sheet, e.before);
             match &e.after {
                 Some(_) => t.entries_landed += 1,
                 // After several operations an entry may have moved before it went.
-                None if removed.contains(&at.as_str()) || (matches!(map, Map::Many) && removed.len() >= gone) => {
+                None if removed.contains(&at.as_str())
+                    || (matches!(map, Map::Many) && removed.len() >= gone) =>
+                {
                     t.entries_removed += 1
                 }
                 None => {
                     t.entries_lost += 1;
-                    failures.push(fail(format!("entry {} {} {} went without a report", e.id, e.tag, e.before)));
+                    failures.push(fail(format!(
+                        "entry {} {} {} went without a report",
+                        e.id, e.tag, e.before
+                    )));
                 }
             }
         }
@@ -512,7 +644,10 @@ fn op_set() {
             let target: Option<(u32, bool)> = match &map {
                 Map::Many => None,
                 Map::Nothing => Some((*r, true)),
-                Map::Cells(s, list) => Some((*r, !(s == sheet && list.iter().any(|x| a1(x) == CellRef::new(*c, *r))))),
+                Map::Cells(s, list) => Some((
+                    *r,
+                    !(s == sheet && list.iter().any(|x| a1(x) == CellRef::new(*c, *r))),
+                )),
                 Map::Shift(s, sh) => {
                     let s = sheet_named(&rem, s);
                     if &s == sheet {
@@ -521,10 +656,13 @@ fn op_set() {
                         Some((*r, true))
                     }
                 }
-                Map::Column(s, col, a, b) => Some((*r, !(s == sheet && c == col && (*a..=*b).contains(r)))),
-                Map::Block(s, (c0, c1), (a, b)) => {
-                    Some((*r, !(s == sheet && (*c0..=*c1).contains(c) && (*a..=*b).contains(r))))
+                Map::Column(s, col, a, b) => {
+                    Some((*r, !(s == sheet && c == col && (*a..=*b).contains(r))))
                 }
+                Map::Block(s, (c0, c1), (a, b)) => Some((
+                    *r,
+                    !(s == sheet && (*c0..=*c1).contains(c) && (*a..=*b).contains(r)),
+                )),
             };
             let Some((nr, check)) = target else { continue };
             if !check {
@@ -555,15 +693,20 @@ fn op_set() {
             }
         }
         // PutGet and well-formed parts.
-        let out = XlsxEngine.export(&applied.text, &applied.remainder).unwrap();
+        let out = XlsxEngine
+            .export(&applied.text, &applied.remainder)
+            .unwrap();
         for p in package::read(&out).unwrap() {
-            if (p.name.ends_with(".xml") || p.name.ends_with(".rels")) && xml::parse(&p.data).is_err() {
+            if (p.name.ends_with(".xml") || p.name.ends_with(".rels"))
+                && xml::parse(&p.data).is_err()
+            {
                 failures.push(fail(format!("{} is not well-formed", p.name)));
             }
         }
         let again = XlsxEngine.import(&out, &ImportOptions::default()).unwrap();
         if again.text == applied.text
-            && XlsxEngine::view(&again.remainder, 500).unwrap() == XlsxEngine::view(&applied.remainder, 500).unwrap()
+            && XlsxEngine::view(&again.remainder, 500).unwrap()
+                == XlsxEngine::view(&applied.remainder, 500).unwrap()
         {
             t.putget += 1;
         } else {
@@ -571,14 +714,19 @@ fn op_set() {
         }
         #[cfg(not(target_os = "wasi"))]
         if soffice {
-            let d = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("ops-soffice").join(t.cases.to_string());
+            let d = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+                .join("ops-soffice")
+                .join(t.cases.to_string());
             match soffice_agrees(&applied.remainder, &out, &d) {
                 Some((same, total, diffs)) => {
                     t.soffice_same += same;
                     t.soffice_total += total;
                     // LibreOffice rebuilds pivot tables with its own labels.
                     if !diffs.is_empty() && case.file != "ExcelPivotTableSample.xlsx" {
-                        failures.push(fail(format!("LibreOffice shows otherwise: {}", diffs.join("; "))));
+                        failures.push(fail(format!(
+                            "LibreOffice shows otherwise: {}",
+                            diffs.join("; ")
+                        )));
                     }
                 }
                 None => failures.push(fail("LibreOffice could not convert the export".into())),
@@ -588,7 +736,12 @@ fn op_set() {
             println!(
                 "{}: ok; notices {:?}; recalc {:?}",
                 case.name,
-                applied.report.notices.iter().map(|n| &n.kind).collect::<Vec<_>>(),
+                applied
+                    .report
+                    .notices
+                    .iter()
+                    .map(|n| &n.kind)
+                    .collect::<Vec<_>>(),
                 applied.report.recalc
             );
         }
@@ -611,26 +764,54 @@ fn sheet_named(rem: &Remainder, table_or_sheet: &str) -> String {
 /// conditional format goes and is reported, and the export reads back so.
 #[test]
 fn structure_edits_in_the_text() {
-    let bytes = std::fs::read(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("corpus/korean-sales.xlsx")).unwrap();
-    let imp = XlsxEngine.import(&bytes, &ImportOptions::default()).unwrap();
+    let bytes =
+        std::fs::read(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("corpus/korean-sales.xlsx"))
+            .unwrap();
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
     let (rem, _) = XlsxEngine::recalculate(&imp.remainder).unwrap();
     let text = XlsxEngine::text_of(&rem, None).unwrap();
-    let cf = text.lines().find(|l| l.contains("kind=\"conditional-format\"")).unwrap().to_string();
+    let cf = text
+        .lines()
+        .find(|l| l.contains("kind=\"conditional-format\""))
+        .unwrap()
+        .to_string();
     let edited = text
-        .replace("| 매출 | number | #,##0 |  |", "| 매출 | number | #,##0.00 |  |")
+        .replace(
+            "| 매출 | number | #,##0 |  |",
+            "| 매출 | number | #,##0.00 |  |",
+        )
         .replace(&format!("{cf}\n\n"), "");
     assert_ne!(edited, text);
     let a = XlsxEngine::apply(&edited, &rem, "[]").unwrap();
     assert_eq!(a.text, edited);
-    let w = XlsxEngine::window(&a.remainder, &WindowOf::Table { name: "Sales".into(), rows: None }).unwrap();
-    assert!(w.contains("| 4 | 2026-01 | 강남 | 가전 | 10,269,000.00 | 7,410,000 | 2,859,000 |"), "{w}");
+    let w = XlsxEngine::window(
+        &a.remainder,
+        &WindowOf::Table {
+            name: "Sales".into(),
+            rows: None,
+        },
+    )
+    .unwrap();
     assert!(
-        a.report.notices.iter().any(|n| n.kind == "removed" && n.location.contains("conditional-format")),
+        w.contains("| 4 | 2026-01 | 강남 | 가전 | 10,269,000.00 | 7,410,000 | 2,859,000 |"),
+        "{w}"
+    );
+    assert!(
+        a.report
+            .notices
+            .iter()
+            .any(|n| n.kind == "removed" && n.location.contains("conditional-format")),
         "{:?}",
         a.report.notices
     );
     let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
-    let sheet = package::read(&out).unwrap().into_iter().find(|p| p.name == "xl/worksheets/sheet1.xml").unwrap();
+    let sheet = package::read(&out)
+        .unwrap()
+        .into_iter()
+        .find(|p| p.name == "xl/worksheets/sheet1.xml")
+        .unwrap();
     assert!(!String::from_utf8_lossy(&sheet.data).contains("<conditionalFormatting"));
     let again = XlsxEngine.import(&out, &ImportOptions::default()).unwrap();
     assert_eq!(again.text, a.text);
@@ -653,12 +834,26 @@ fn dependents_get_new_cached_values() {
             col: 0,
             row: 1,
             cols: vec![
-                Col { name: "a".into(), format: "0".into(), formula: None },
-                Col { name: "b".into(), format: "0".into(), formula: None },
+                Col {
+                    name: "a".into(),
+                    format: "0".into(),
+                    formula: None,
+                },
+                Col {
+                    name: "b".into(),
+                    format: "0".into(),
+                    formula: None,
+                },
             ],
-            rows: (1..=4).map(|k| vec![V::Num(k as f64), V::Num(10.0 * k as f64)]).collect(),
+            rows: (1..=4)
+                .map(|k| vec![V::Num(k as f64), V::Num(10.0 * k as f64)])
+                .collect(),
         };
-        let mut parts = package::read(&build(&[SheetSpec { name: "S".into(), tables: vec![t] }])).unwrap();
+        let mut parts = package::read(&build(&[SheetSpec {
+            name: "S".into(),
+            tables: vec![t],
+        }]))
+        .unwrap();
         for p in parts.iter_mut() {
             let mut s = String::from_utf8(p.data.clone()).unwrap();
             if p.name == "xl/worksheets/sheet1.xml" {
@@ -674,14 +869,29 @@ fn dependents_get_new_cached_values() {
         }
         let pkg = package::write(&parts).unwrap();
         let imp = XlsxEngine.import(&pkg, &ImportOptions::default()).unwrap();
-        let a = XlsxEngine::apply(&imp.text, &imp.remainder, r##"[{"op": "set", "range": "S!B3", "values": [[25]]}]"##)
-            .unwrap();
+        let a = XlsxEngine::apply(
+            &imp.text,
+            &imp.remainder,
+            r##"[{"op": "set", "range": "S!B3", "values": [[25]]}]"##,
+        )
+        .unwrap();
         let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
         let again = XlsxEngine.import(&out, &ImportOptions::default()).unwrap();
-        let w = XlsxEngine::window(&again.remainder, &WindowOf::Range { sheet: "S".into(), range: "D1:G1".into() })
-            .unwrap();
+        let w = XlsxEngine::window(
+            &again.remainder,
+            &WindowOf::Range {
+                sheet: "S".into(),
+                range: "D1:G1".into(),
+            },
+        )
+        .unwrap();
         let wb = String::from_utf8(
-            package::read(&out).unwrap().into_iter().find(|p| p.name == "xl/workbook.xml").unwrap().data,
+            package::read(&out)
+                .unwrap()
+                .into_iter()
+                .find(|p| p.name == "xl/workbook.xml")
+                .unwrap()
+                .data,
         )
         .unwrap();
         if date1904 {
@@ -697,7 +907,9 @@ fn dependents_get_new_cached_values() {
         }
         #[cfg(not(target_os = "wasi"))]
         if std::env::var("HANJI_SOFFICE").is_ok() {
-            let d = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("ops-dependents").join(date1904.to_string());
+            let d = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+                .join("ops-dependents")
+                .join(date1904.to_string());
             let lo = soffice_csv(&out, &d).expect("LibreOffice converts the export");
             let row1 = &lo[0].1[0];
             assert_eq!(&row1[3..5], ["105", "105"], "{row1:?}");
@@ -710,29 +922,51 @@ fn dependents_get_new_cached_values() {
 #[test]
 fn formulas_follow_rows_on_a_sheet_with_an_escaped_name() {
     use common::fixture::{build, Col, SheetSpec, TableSpec, V};
-    let col = |n: &str| Col { name: n.into(), format: "0".into(), formula: None };
+    let col = |n: &str| Col {
+        name: n.into(),
+        format: "0".into(),
+        formula: None,
+    };
     let t = |name: &str| TableSpec {
         name: name.into(),
         col: 0,
         row: 1,
         cols: vec![col("a"), col("b")],
-        rows: (1..=4).map(|k| vec![V::Num(k as f64), V::Num(10.0 * k as f64)]).collect(),
+        rows: (1..=4)
+            .map(|k| vec![V::Num(k as f64), V::Num(10.0 * k as f64)])
+            .collect(),
     };
     let sheets = [
-        SheetSpec { name: "R&D".into(), tables: vec![t("T")] },
-        SheetSpec { name: "Sum".into(), tables: vec![t("U")] },
+        SheetSpec {
+            name: "R&D".into(),
+            tables: vec![t("T")],
+        },
+        SheetSpec {
+            name: "Sum".into(),
+            tables: vec![t("U")],
+        },
     ];
     let mut parts = package::read(&build(&sheets)).unwrap();
-    let p = parts.iter_mut().find(|p| p.name == "xl/worksheets/sheet2.xml").unwrap();
+    let p = parts
+        .iter_mut()
+        .find(|p| p.name == "xl/worksheets/sheet2.xml")
+        .unwrap();
     let mut s = String::from_utf8(p.data.clone()).unwrap();
     let at = s.find("</row>").unwrap();
     s.insert_str(at, "<c r=\"D1\"><f>'R&amp;D'!B5</f><v>40</v></c>");
     p.data = s.into_bytes();
-    let imp = XlsxEngine.import(&package::write(&parts).unwrap(), &ImportOptions::default()).unwrap();
-    let ops = r##"[{"op": "insert_rows", "table": "T", "before": 3, "rows": [{"a": 9, "b": 90}]}]"##;
+    let imp = XlsxEngine
+        .import(&package::write(&parts).unwrap(), &ImportOptions::default())
+        .unwrap();
+    let ops =
+        r##"[{"op": "insert_rows", "table": "T", "before": 3, "rows": [{"a": 9, "b": 90}]}]"##;
     let a = XlsxEngine::apply(&imp.text, &imp.remainder, ops).unwrap();
     let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
-    let sheet = package::read(&out).unwrap().into_iter().find(|p| p.name == "xl/worksheets/sheet2.xml").unwrap();
+    let sheet = package::read(&out)
+        .unwrap()
+        .into_iter()
+        .find(|p| p.name == "xl/worksheets/sheet2.xml")
+        .unwrap();
     let xml = String::from_utf8(sheet.data).unwrap();
     assert!(xml.contains("<f>'R&amp;D'!B6</f><v>40</v>"), "{xml}");
 }
@@ -743,7 +977,11 @@ fn formulas_follow_rows_on_a_sheet_with_an_escaped_name() {
 #[test]
 fn a_formula_written_over_a_shared_one_keeps_the_others() {
     use common::fixture::{build, Col, SheetSpec, TableSpec, V};
-    let col = |n: &str, f: Option<&str>| Col { name: n.into(), format: "0".into(), formula: f.map(Into::into) };
+    let col = |n: &str, f: Option<&str>| Col {
+        name: n.into(),
+        format: "0".into(),
+        formula: f.map(Into::into),
+    };
     let t = TableSpec {
         name: "T".into(),
         col: 0,
@@ -751,42 +989,93 @@ fn a_formula_written_over_a_shared_one_keeps_the_others() {
         cols: vec![col("a", None), col("b", Some("T[[#This Row],[a]]*2"))],
         rows: (1..=4).map(|k| vec![V::Num(k as f64)]).collect(),
     };
-    let mut parts = package::read(&build(&[SheetSpec { name: "S".into(), tables: vec![t] }])).unwrap();
-    let p = parts.iter_mut().find(|p| p.name == "xl/worksheets/sheet1.xml").unwrap();
+    let mut parts = package::read(&build(&[SheetSpec {
+        name: "S".into(),
+        tables: vec![t],
+    }]))
+    .unwrap();
+    let p = parts
+        .iter_mut()
+        .find(|p| p.name == "xl/worksheets/sheet1.xml")
+        .unwrap();
     let mut s = String::from_utf8(p.data.clone()).unwrap();
     s = s.replace("<f>T[[#This Row],[a]]*2</f>", "<f/>");
-    s = s.replacen("<f/>", "<f t=\"shared\" ref=\"B2:B6\" si=\"0\">A2*2</f><v>2</v>", 1);
+    s = s.replacen(
+        "<f/>",
+        "<f t=\"shared\" ref=\"B2:B6\" si=\"0\">A2*2</f><v>2</v>",
+        1,
+    );
     s = s.replace("<f/>", "<f t=\"shared\" si=\"0\"/>");
     s = s.replace(
         "</sheetData>",
         "<row r=\"6\"><c r=\"A6\"><v>5</v></c><c r=\"B6\"><f t=\"shared\" si=\"0\"/><v>10</v></c></row></sheetData>",
     );
     p.data = s.into_bytes();
-    let imp = XlsxEngine.import(&package::write(&parts).unwrap(), &ImportOptions::default()).unwrap();
+    let imp = XlsxEngine
+        .import(&package::write(&parts).unwrap(), &ImportOptions::default())
+        .unwrap();
     let ops = r##"[{"op": "fill_formula", "table": "T", "column": "b", "formula": "=[@a]*3"}]"##;
     let a = XlsxEngine::apply(&imp.text, &imp.remainder, ops).unwrap();
     let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
     let xml = String::from_utf8(
-        package::read(&out).unwrap().into_iter().find(|p| p.name == "xl/worksheets/sheet1.xml").unwrap().data,
+        package::read(&out)
+            .unwrap()
+            .into_iter()
+            .find(|p| p.name == "xl/worksheets/sheet1.xml")
+            .unwrap()
+            .data,
     )
     .unwrap();
     assert!(!xml.contains("t=\"shared\""), "{xml}");
-    assert!(xml.contains("<c r=\"B6\"><f>A6*2</f><v>10</v></c>"), "{xml}");
-    let w = XlsxEngine::window(&a.remainder, &WindowOf::Table { name: "T".into(), rows: None }).unwrap();
+    assert!(
+        xml.contains("<c r=\"B6\"><f>A6*2</f><v>10</v></c>"),
+        "{xml}"
+    );
+    let w = XlsxEngine::window(
+        &a.remainder,
+        &WindowOf::Table {
+            name: "T".into(),
+            rows: None,
+        },
+    )
+    .unwrap();
     assert!(w.contains("| 5 | 4 | 12 |"), "{w}");
 }
 
 /// The corpus workbook's `name`, imported, with `ops` applied: the report,
 /// and the export's cell values over `range` and its `workbook.xml`.
-fn applied(name: &str, ops: &str, sheet: &str, range: &str) -> (hanji_xlsx::calc::Recalc, String, String) {
-    let bytes = std::fs::read(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("corpus").join(name)).unwrap();
-    let imp = XlsxEngine.import(&bytes, &ImportOptions::default()).unwrap();
+fn applied(
+    name: &str,
+    ops: &str,
+    sheet: &str,
+    range: &str,
+) -> (hanji_xlsx::calc::Recalc, String, String) {
+    let bytes = std::fs::read(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("corpus")
+            .join(name),
+    )
+    .unwrap();
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
     let a = XlsxEngine::apply(&imp.text, &imp.remainder, ops).unwrap();
     let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
     let again = XlsxEngine.import(&out, &ImportOptions::default()).unwrap();
-    let w =
-        XlsxEngine::window(&again.remainder, &WindowOf::Range { sheet: sheet.into(), range: range.into() }).unwrap();
-    let wb = package::read(&out).unwrap().into_iter().find(|p| p.name == "xl/workbook.xml").unwrap().data;
+    let w = XlsxEngine::window(
+        &again.remainder,
+        &WindowOf::Range {
+            sheet: sheet.into(),
+            range: range.into(),
+        },
+    )
+    .unwrap();
+    let wb = package::read(&out)
+        .unwrap()
+        .into_iter()
+        .find(|p| p.name == "xl/workbook.xml")
+        .unwrap()
+        .data;
     (a.report.recalc, w, String::from_utf8(wb).unwrap())
 }
 
@@ -804,8 +1093,18 @@ fn a_binary_search_over_unsorted_data_is_left_to_the_application() {
         "E2:F2",
     );
     assert!(w.contains("| 2 | 250000 | 0.22 |"), "{w}");
-    assert!(rc.left.iter().any(|l| l.starts_with("Sheet2!F2 (a lookup that bisects")), "{rc:?}");
-    assert!(rc.left.iter().any(|l| l.starts_with("Sheet1!C2:D2 (volatile or array formula)")), "{rc:?}");
+    assert!(
+        rc.left
+            .iter()
+            .any(|l| l.starts_with("Sheet2!F2 (a lookup that bisects")),
+        "{rc:?}"
+    );
+    assert!(
+        rc.left
+            .iter()
+            .any(|l| l.starts_with("Sheet1!C2:D2 (volatile or array formula)")),
+        "{rc:?}"
+    );
     assert_eq!(rc.written, 0, "{rc:?}");
     assert!(wb.contains("fullCalcOnLoad=\"1\""), "{wb}");
 }
@@ -823,7 +1122,11 @@ fn a_name_that_is_a_formula_is_left_to_the_application() {
         "E9:G9",
     );
     assert!(w.contains("| 9 | $3,750 | $2,336 | $1,414 |"), "{w}");
-    let names: Vec<&String> = rc.left.iter().filter(|l| l.contains("reads the defined name Total")).collect();
+    let names: Vec<&String> = rc
+        .left
+        .iter()
+        .filter(|l| l.contains("reads the defined name Total"))
+        .collect();
     assert_eq!(names.len(), 5, "{rc:?}");
     assert!(wb.contains("fullCalcOnLoad=\"1\""), "{wb}");
 }
@@ -840,12 +1143,26 @@ fn approximate_matches_are_computed_over_sorted_data_only() {
         col: 0,
         row: 1,
         cols: vec![
-            Col { name: "k".into(), format: "0".into(), formula: None },
-            Col { name: "v".into(), format: "0".into(), formula: None },
+            Col {
+                name: "k".into(),
+                format: "0".into(),
+                formula: None,
+            },
+            Col {
+                name: "v".into(),
+                format: "0".into(),
+                formula: None,
+            },
         ],
-        rows: (1..=4).map(|k| vec![V::Num(10.0 * k as f64), V::Num(k as f64)]).collect(),
+        rows: (1..=4)
+            .map(|k| vec![V::Num(10.0 * k as f64), V::Num(k as f64)])
+            .collect(),
     };
-    let mut parts = package::read(&build(&[SheetSpec { name: "S".into(), tables: vec![t] }])).unwrap();
+    let mut parts = package::read(&build(&[SheetSpec {
+        name: "S".into(),
+        tables: vec![t],
+    }]))
+    .unwrap();
     // Keys 10, 20, 30, 40 in A2:A5; values 1–4 in B2:B5; the key looked up in D1.
     let formulas = [
         ("E1", "VLOOKUP(D1,A2:B5,2)"),
@@ -874,8 +1191,14 @@ fn approximate_matches_are_computed_over_sorted_data_only() {
         let a = XlsxEngine::apply(&imp.text, &imp.remainder, ops).unwrap();
         let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
         let again = XlsxEngine.import(&out, &ImportOptions::default()).unwrap();
-        let w = XlsxEngine::window(&again.remainder, &WindowOf::Range { sheet: "S".into(), range: "D1:J1".into() })
-            .unwrap();
+        let w = XlsxEngine::window(
+            &again.remainder,
+            &WindowOf::Range {
+                sheet: "S".into(),
+                range: "D1:J1".into(),
+            },
+        )
+        .unwrap();
         (a.report.recalc, w)
     };
     // Sorted: every formula computed (35 → key 30, row 3; exact 35 is #N/A).
@@ -888,6 +1211,9 @@ fn approximate_matches_are_computed_over_sorted_data_only() {
         r#"[{"op": "set", "range": "S!A3", "values": [[50]]}, {"op": "set", "range": "S!D1", "values": [[30]]}]"#,
     );
     assert_eq!(rc.left.len(), 5, "{rc:?}");
-    assert!(rc.left.iter().all(|l| l.contains("a lookup that bisects")), "{rc:?}");
+    assert!(
+        rc.left.iter().all(|l| l.contains("a lookup that bisects")),
+        "{rc:?}"
+    );
     assert!(w.contains("| 1 | 30 | 99 | 99 | 99 | 99 | 3 | 99 |"), "{w}");
 }

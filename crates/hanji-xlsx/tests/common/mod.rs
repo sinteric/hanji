@@ -36,7 +36,8 @@ pub fn getput(a: &[u8], b: &[u8]) -> Result<(), String> {
         if x.data == y.data {
             continue;
         }
-        if is_split_part(&x.name) && xml::canon_part(&x.data).ok() == xml::canon_part(&y.data).ok() {
+        if is_split_part(&x.name) && xml::canon_part(&x.data).ok() == xml::canon_part(&y.data).ok()
+        {
             continue;
         }
         return Err(format!("{} differs", x.name));
@@ -69,11 +70,14 @@ pub fn soffice_csv(xlsx: &[u8], dir: &std::path::Path) -> Option<Vec<(String, Ve
         .arg(&src)
         .output()
         .ok()?;
-    let log = String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr);
+    let log =
+        String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr);
     let mut sheets = vec![];
     for line in log.lines() {
         // "Writing sheet 매출 -> /dir/book-매출.csv"
-        let Some(rest) = line.strip_prefix("Writing sheet ") else { continue };
+        let Some(rest) = line.strip_prefix("Writing sheet ") else {
+            continue;
+        };
         let (name, path) = rest.split_once(" -> ")?;
         let text = std::fs::read_to_string(path.trim()).ok()?;
         sheets.push((name.to_string(), parse_csv(&text)));
@@ -134,11 +138,16 @@ pub fn soffice_agrees(
         .iter()
         .filter(|s| {
             s.range.is_some()
-                || !s.items.iter().any(|i| matches!(i, hanji_format::sheet::SheetItem::Keep(k) if k.kind == "chart"))
+                || !s.items.iter().any(
+                    |i| matches!(i, hanji_format::sheet::SheetItem::Keep(k) if k.kind == "chart"),
+                )
         })
         .collect();
     for (name, rows) in &lo {
-        let Some(sh) = worksheets.iter().find(|s| &s.name == name || (name.is_empty() && worksheets.len() == 1)) else {
+        let Some(sh) = worksheets
+            .iter()
+            .find(|s| &s.name == name || (name.is_empty() && worksheets.len() == 1))
+        else {
             continue;
         };
         let Some(range) = &sh.range else { continue };
@@ -146,16 +155,27 @@ pub fn soffice_agrees(
         // The CSV starts at A1.
         let last_row = r.last.row.min(r.first.row + 499);
         let first = hanji_core::cells::CellRef::new(0, 1.max(r.first.row));
-        let win =
-            hanji_core::cells::CellRange::new(first, hanji_core::cells::CellRef::new(r.last.col.min(63), last_row));
-        let w =
-            hanji_xlsx::XlsxEngine::window(rem, &WindowOf::Range { sheet: sh.name.clone(), range: win.to_string() })
-                .ok()?;
+        let win = hanji_core::cells::CellRange::new(
+            first,
+            hanji_core::cells::CellRef::new(r.last.col.min(63), last_row),
+        );
+        let w = hanji_xlsx::XlsxEngine::window(
+            rem,
+            &WindowOf::Range {
+                sheet: sh.name.clone(),
+                range: win.to_string(),
+            },
+        )
+        .ok()?;
         for line in w.lines().skip(3).take_while(|l| !l.starts_with("</data>")) {
             let cells = split_pipe_row(line)?;
             let rn: usize = cells[0].parse().ok()?;
             for (k, ours) in cells[1..].iter().enumerate() {
-                let theirs = rows.get(rn - 1).and_then(|r| r.get(k)).map(String::as_str).unwrap_or("");
+                let theirs = rows
+                    .get(rn - 1)
+                    .and_then(|r| r.get(k))
+                    .map(String::as_str)
+                    .unwrap_or("");
                 let ours = ours.replace("<br/>", "\n");
                 if ours.trim().is_empty() && theirs.trim().is_empty() {
                     continue;

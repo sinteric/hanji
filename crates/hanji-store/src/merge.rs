@@ -51,7 +51,11 @@ pub fn unified(a: &str, b: &str, a_name: &str, b_name: &str) -> String {
                 o.i2 = o.i2.min(o.i1 + CONTEXT);
                 o.j2 = o.j2.min(o.j1 + CONTEXT);
             } else if o.i2 - o.i1 > 2 * CONTEXT {
-                cur.push(Op { i2: o.i1 + CONTEXT, j2: o.j1 + CONTEXT, ..o });
+                cur.push(Op {
+                    i2: o.i1 + CONTEXT,
+                    j2: o.j1 + CONTEXT,
+                    ..o
+                });
                 groups.push(std::mem::take(&mut cur));
                 o.i1 = o.i2 - CONTEXT;
                 o.j1 = o.j2 - CONTEXT;
@@ -77,7 +81,11 @@ pub fn unified(a: &str, b: &str, a_name: &str, b_name: &str) -> String {
     };
     for g in groups {
         let (f, l) = (g[0], g[g.len() - 1]);
-        out.push_str(&format!("@@ -{} +{} @@\n", range(f.i1, l.i2), range(f.j1, l.j2)));
+        out.push_str(&format!(
+            "@@ -{} +{} @@\n",
+            range(f.i1, l.i2),
+            range(f.j1, l.j2)
+        ));
         for o in g {
             match o.tag {
                 Tag::Equal => al[o.i1..o.i2].iter().for_each(|l| push(&mut out, ' ', l)),
@@ -113,14 +121,21 @@ pub enum Merged {
 /// two are the same change.
 pub fn merge(base: &str, ours: &str, theirs: &str) -> Merged {
     let (bl, ol, tl) = (lines(base), lines(ours), lines(theirs));
-    let changes = |ops: Vec<Op>| ops.into_iter().filter(|o| o.tag != Tag::Equal).collect::<Vec<_>>();
+    let changes = |ops: Vec<Op>| {
+        ops.into_iter()
+            .filter(|o| o.tag != Tag::Equal)
+            .collect::<Vec<_>>()
+    };
     let theirs_ops = opcodes(&bl, &tl);
     let (ours_ch, theirs_ch) = (changes(opcodes(&bl, &ol)), changes(theirs_ops.clone()));
     let t_starts = starts(&tl);
     let mut hunks = vec![];
     let mut conflicts = vec![];
     for c in &ours_ch {
-        let hit: Vec<&Op> = theirs_ch.iter().filter(|t| c.i1 <= t.i2 && t.i1 <= c.i2).collect();
+        let hit: Vec<&Op> = theirs_ch
+            .iter()
+            .filter(|t| c.i1 <= t.i2 && t.i1 <= c.i2)
+            .collect();
         if !hit.is_empty() {
             let same = hit.len() == 1 && {
                 let t = hit[0];
@@ -138,7 +153,11 @@ pub fn merge(base: &str, ours: &str, theirs: &str) -> Merged {
             .iter()
             .find(|o| o.tag == Tag::Equal && o.i1 <= c.i1 && c.i2 <= o.i2)
             .map_or(c.i1, |o| o.j1 + (c.i1 - o.i1));
-        hunks.push(Hunk { start: t_starts[j], end: t_starts[j + (c.i2 - c.i1)], text: ol[c.j1..c.j2].concat() });
+        hunks.push(Hunk {
+            start: t_starts[j],
+            end: t_starts[j + (c.i2 - c.i1)],
+            text: ol[c.j1..c.j2].concat(),
+        });
     }
     if conflicts.is_empty() {
         Merged::Clean(hunks)
@@ -169,23 +188,36 @@ mod tests {
         let base = "a\n\nb\n\nc\n\nd\n";
         let theirs = "a\n\nB\n\nc\n\nd\n";
         let ours = "a\n\nb\n\nc\n\nD!\n";
-        let Merged::Clean(h) = merge(base, ours, theirs) else { panic!() };
+        let Merged::Clean(h) = merge(base, ours, theirs) else {
+            panic!()
+        };
         assert_eq!(apply(theirs, &h), "a\n\nB\n\nc\n\nD!\n");
         // Both change b.
-        assert_eq!(merge(base, "a\n\nx\n\nc\n\nd\n", theirs), Merged::Conflict(vec![(3, 3)]));
+        assert_eq!(
+            merge(base, "a\n\nx\n\nc\n\nd\n", theirs),
+            Merged::Conflict(vec![(3, 3)])
+        );
         // The same change on both sides is taken once.
         assert_eq!(merge(base, theirs, theirs), Merged::Clean(vec![]));
         // Lines added on both sides at the same place conflict.
-        assert!(matches!(merge("a\n", "a\nx\n", "a\ny\n"), Merged::Conflict(_)));
+        assert!(matches!(
+            merge("a\n", "a\nx\n", "a\ny\n"),
+            Merged::Conflict(_)
+        ));
         // A change to the last line without a newline.
-        let Merged::Clean(h) = merge("a\nb", "a\nc", "z\na\nb") else { panic!() };
+        let Merged::Clean(h) = merge("a\nb", "a\nc", "z\na\nb") else {
+            panic!()
+        };
         assert_eq!(apply("z\na\nb", &h), "z\na\nc");
     }
 
     #[test]
     fn unified_diff() {
         assert_eq!(unified("a\nb\n", "a\nb\n", "r1", "r2"), "");
-        assert_eq!(unified("a\nb\nc\n", "a\nx\nc\n", "r1", "r2"), "--- r1\n+++ r2\n@@ -1,3 +1,3 @@\n a\n-b\n+x\n c\n");
+        assert_eq!(
+            unified("a\nb\nc\n", "a\nx\nc\n", "r1", "r2"),
+            "--- r1\n+++ r2\n@@ -1,3 +1,3 @@\n a\n-b\n+x\n c\n"
+        );
         let mut v: Vec<String> = (1..=20).map(|k| format!("{k}\n")).collect();
         let long = v.concat();
         (v[1], v[18]) = ("two\n".into(), "nineteen\n".into());

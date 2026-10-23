@@ -52,7 +52,10 @@ pub fn plan_lists(
     defs: &mut dyn ListDefs,
 ) -> Result<HashMap<usize, ListPlan>, String> {
     let mut ppr: HashMap<usize, &Entry> = HashMap::new();
-    for e in entries.iter().filter(|e| e.kind == Kind::Ppr && e.path.len() == 1) {
+    for e in entries
+        .iter()
+        .filter(|e| e.kind == Kind::Ppr && e.path.len() == 1)
+    {
         ppr.entry(e.path[0]).or_insert(e);
     }
     let item = |bi: usize| match &blocks[bi] {
@@ -70,29 +73,37 @@ pub fn plan_lists(
             }
             continue;
         };
-        let kept = stored.filter(|s| s.0.ordered == it.ordered).and_then(|(si, num, ilvl)| {
-            let nl = ilvl as i64 + it.level as i64 - si.level as i64;
-            let nl = u32::try_from(nl).ok().filter(|&l| l <= 8)?;
-            (defs.ordered(num, nl) == Some(it.ordered)).then_some((num, nl, nl == ilvl))
-        });
+        let kept = stored
+            .filter(|s| s.0.ordered == it.ordered)
+            .and_then(|(si, num, ilvl)| {
+                let nl = ilvl as i64 + it.level as i64 - si.level as i64;
+                let nl = u32::try_from(nl).ok().filter(|&l| l <= 8)?;
+                (defs.ordered(num, nl) == Some(it.ordered)).then_some((num, nl, nl == ilvl))
+            });
         match kept {
             Some((num, ilvl, same)) => {
                 assigned.insert(bi, (num, ilvl));
-                plan.insert(bi, if same { ListPlan::Keep } else { ListPlan::Set { num, ilvl } });
+                plan.insert(
+                    bi,
+                    if same {
+                        ListPlan::Keep
+                    } else {
+                        ListPlan::Set { num, ilvl }
+                    },
+                );
             }
             None => pending.push(bi),
         }
     }
     // The text list an item belongs to: from its first item to the next first.
     let list_of = |bi: usize| {
-        let lo = (0..=bi).rev().find(|&k| item(k).is_none_or(|i| i.first)).map_or(0, |k| {
-            if item(k).is_some() {
-                k
-            } else {
-                k + 1
-            }
-        });
-        let hi = (bi + 1..blocks.len()).find(|&k| item(k).is_none_or(|i| i.first)).unwrap_or(blocks.len());
+        let lo = (0..=bi)
+            .rev()
+            .find(|&k| item(k).is_none_or(|i| i.first))
+            .map_or(0, |k| if item(k).is_some() { k } else { k + 1 });
+        let hi = (bi + 1..blocks.len())
+            .find(|&k| item(k).is_none_or(|i| i.first))
+            .unwrap_or(blocks.len());
         (lo, hi)
     };
     let mut new_lists: HashMap<usize, u32> = HashMap::new();
@@ -109,8 +120,9 @@ pub fn plan_lists(
                 let (num, ilvl) = assigned[&k];
                 let sib = item(k).unwrap();
                 let nl = u32::try_from(ilvl as i64 + it.level as i64 - sib.level as i64).ok()?;
-                (sib.ordered == it.ordered && (sib.level == it.level || defs.ordered(num, nl) == Some(it.ordered)))
-                    .then_some((num, nl))
+                (sib.ordered == it.ordered
+                    && (sib.level == it.level || defs.ordered(num, nl) == Some(it.ordered)))
+                .then_some((num, nl))
             });
             match pick {
                 Some((num, ilvl)) => {
@@ -132,7 +144,13 @@ pub fn plan_lists(
         let (num, base) = defs.default_list(it.ordered).ok_or_else(|| {
             format!("this file has no {what} list to take numbering from, so the new list item cannot be written; write it as a paragraph, or add it next to an existing {what} item")
         })?;
-        let num = if it.ordered { *new_lists.entry(list_of(bi).0).or_insert_with(|| defs.new_list(base)) } else { num };
+        let num = if it.ordered {
+            *new_lists
+                .entry(list_of(bi).0)
+                .or_insert_with(|| defs.new_list(base))
+        } else {
+            num
+        };
         let ilvl = it.level as u32;
         assigned.insert(bi, (num, ilvl));
         plan.insert(bi, ListPlan::Set { num, ilvl });

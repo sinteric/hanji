@@ -9,8 +9,8 @@ use hanji_package::{package, xml};
 
 use crate::fonts::{FontResolver, Fonts, Metrics, Script};
 use crate::{
-    subset, AsRequested, Diagnostic, FaceInfo, FontOptions, FontsReport, MissingGlyph, PageData, PageFormat, PageInfo,
-    RenderedPage, Substituted,
+    subset, AsRequested, Diagnostic, FaceInfo, FontOptions, FontsReport, MissingGlyph, PageData,
+    PageFormat, PageInfo, RenderedPage, Substituted,
 };
 
 struct Face {
@@ -74,8 +74,8 @@ fn resolve(bytes: &[u8]) -> Result<Resolved, String> {
         let svg = document
             .render_page_svg_layer_with_profile_native(index, rhwp::paint::RenderProfile::Screen)
             .map_err(|e| format!("rhwp cannot render page {}: {e}", index + 1))?;
-        let mut tree =
-            xml::parse(svg.as_bytes()).map_err(|e| format!("rhwp page {} produced invalid SVG: {e}", index + 1))?;
+        let mut tree = xml::parse(svg.as_bytes())
+            .map_err(|e| format!("rhwp page {} produced invalid SVG: {e}", index + 1))?;
         tree.root.walk_mut(&mut |element| {
             if element.local() == "image" {
                 for key in ["href", "xlink:href"] {
@@ -109,7 +109,9 @@ fn resolve(bytes: &[u8]) -> Result<Resolved, String> {
         if overflow > 0 {
             diagnostics.push(Diagnostic {
                 path: format!("pages[{index}].tables"),
-                message: format!("rhwp reports {overflow} overflowing cell lines; table content may be clipped"),
+                message: format!(
+                    "rhwp reports {overflow} overflowing cell lines; table content may be clipped"
+                ),
             });
         }
         let overlaps = document.take_table_overlaps();
@@ -121,7 +123,10 @@ fn resolve(bytes: &[u8]) -> Result<Resolved, String> {
         }
         pages.push(tree);
     }
-    let embedded = embedded.into_iter().map(|(family, data)| oxml_layout::FontFile { family, data }).collect();
+    let embedded = embedded
+        .into_iter()
+        .map(|(family, data)| oxml_layout::FontFile { family, data })
+        .collect();
     Ok((pages, embedded, diagnostics))
 }
 
@@ -154,9 +159,19 @@ fn text_request(element: &xml::Element) -> Option<(FontRequest, String)> {
         return None;
     }
     let family = element.get("font-family").unwrap_or_else(|| "Arial".into());
-    let requested = family.split(',').next().unwrap_or("Arial").trim().trim_matches(['\'', '"']).to_string();
-    let bold = element.get("font-weight").is_some_and(|v| v == "bold" || v.parse::<u16>().is_ok_and(|n| n >= 600));
-    let italic = element.get("font-style").is_some_and(|v| matches!(v.as_str(), "italic" | "oblique"));
+    let requested = family
+        .split(',')
+        .next()
+        .unwrap_or("Arial")
+        .trim()
+        .trim_matches(['\'', '"'])
+        .to_string();
+    let bold = element
+        .get("font-weight")
+        .is_some_and(|v| v == "bold" || v.parse::<u16>().is_ok_and(|n| n >= 600));
+    let italic = element
+        .get("font-style")
+        .is_some_and(|v| matches!(v.as_str(), "italic" | "oblique"));
     Some(((requested, Script::of(&text), bold, italic), text))
 }
 
@@ -192,11 +207,15 @@ fn finish(
                 *id
             } else {
                 let needed: String = used_chars[&key].iter().collect();
-                let resolved = resolver.resolve_font_for_text(&requested, script, bold, italic, &needed);
+                let resolved =
+                    resolver.resolve_font_for_text(&requested, script, bold, italic, &needed);
                 let draws_script = resolved.is_some();
-                let Some(font) = resolved.or_else(|| resolver.resolve_font(&requested, Script::Latin, bold, italic))
+                let Some(font) = resolved
+                    .or_else(|| resolver.resolve_font(&requested, Script::Latin, bold, italic))
                 else {
-                    error = Some(format!("no usable font for HWPX text requesting {requested}"));
+                    error = Some(format!(
+                        "no usable font for HWPX text requesting {requested}"
+                    ));
                     return;
                 };
                 let id = faces.len();
@@ -261,8 +280,14 @@ fn finish(
                     });
                 }
                 for c in text.chars().filter(|c| !c.is_whitespace()) {
-                    if crate::fonts::last_resort(&parsed) || parsed.glyph_index(c).is_none_or(|g| g.0 == 0) {
-                        missing.entry(c).or_insert_with(|| (requested.clone(), BTreeSet::new())).1.insert(index + 1);
+                    if crate::fonts::last_resort(&parsed)
+                        || parsed.glyph_index(c).is_none_or(|g| g.0 == 0)
+                    {
+                        missing
+                            .entry(c)
+                            .or_insert_with(|| (requested.clone(), BTreeSet::new()))
+                            .1
+                            .insert(index + 1);
                     }
                 }
             }
@@ -272,7 +297,9 @@ fn finish(
             if face.info.substituted() {
                 element.set("data-font-substituted", "true");
                 let mut title = xml::Element::new("title");
-                title.children.push(xml::Node::Text(xml::escape_text(&face.info.tooltip())));
+                title
+                    .children
+                    .push(xml::Node::Text(xml::escape_text(&face.info.tooltip())));
                 element.children.push(xml::Node::El(title));
             }
         });
@@ -280,14 +307,28 @@ fn finish(
             return Err(error);
         }
         let size = tree.root.get("viewBox").unwrap_or_default();
-        let values: Vec<f64> = size.split_whitespace().filter_map(|v| v.parse().ok()).collect();
-        if values.len() != 4 || !values[2].is_finite() || !values[3].is_finite() || values[2] <= 0.0 || values[3] <= 0.0
+        let values: Vec<f64> = size
+            .split_whitespace()
+            .filter_map(|v| v.parse().ok())
+            .collect();
+        if values.len() != 4
+            || !values[2].is_finite()
+            || !values[3].is_finite()
+            || values[2] <= 0.0
+            || values[3] <= 0.0
         {
-            return Err(format!("HWPX page {} has an invalid SVG viewBox", index + 1));
+            return Err(format!(
+                "HWPX page {} has an invalid SVG viewBox",
+                index + 1
+            ));
         }
         pages.push(Page {
             svg: tree.root,
-            info: PageInfo { index, width: values[2] * 0.75, height: values[3] * 0.75 },
+            info: PageInfo {
+                index,
+                width: values[2] * 0.75,
+                height: values[3] * 0.75,
+            },
             chars,
             subsets: BTreeMap::new(),
         });
@@ -342,16 +383,33 @@ fn finish(
             Ok(data) => {
                 document_subsets.insert(id, Arc::from(data));
             }
-            Err(e) => diagnostics.push(Diagnostic { path: format!("viewer.fonts[{id}].subset"), message: e }),
+            Err(e) => diagnostics.push(Diagnostic {
+                path: format!("viewer.fonts[{id}].subset"),
+                message: e,
+            }),
         }
     }
     let mut warnings = resolver.warnings().to_vec();
     warnings.push("HWPX preview is experimental: rhwp uses source/table font geometry; drawing substitutions can differ from Hancom, and complex controls or table reflow need visual review.".into());
-    if faces.iter().any(|f| f.info.script == Script::Hangul && f.info.drawn.is_none()) {
+    if faces
+        .iter()
+        .any(|f| f.info.script == Script::Hangul && f.info.drawn.is_none())
+    {
         warnings.push(crate::NO_KOREAN_FONT.into());
     }
-    warnings.extend(diagnostics.iter().map(|d| format!("{}: {}", d.path, d.message)));
-    Ok(Preview { pages, faces, document_subsets, fonts, warnings, diagnostics })
+    warnings.extend(
+        diagnostics
+            .iter()
+            .map(|d| format!("{}: {}", d.path, d.message)),
+    );
+    Ok(Preview {
+        pages,
+        faces,
+        document_subsets,
+        fonts,
+        warnings,
+        diagnostics,
+    })
 }
 
 /// Scope local CSS IRIs without changing colors, external/data URLs, comments
@@ -379,14 +437,20 @@ fn scoped_urls(value: &str, prefix: &str) -> String {
             continue;
         }
         if bytes[i..].starts_with(b"/*") {
-            i = value[i + 2..].find("*/").map_or(bytes.len(), |end| i + 2 + end + 2);
+            i = value[i + 2..]
+                .find("*/")
+                .map_or(bytes.len(), |end| i + 2 + end + 2);
             continue;
         }
         let boundary = i == 0
             || !(bytes[i - 1].is_ascii_alphanumeric()
                 || matches!(bytes[i - 1], b'_' | b'-' | b'\\')
                 || bytes[i - 1] >= 128);
-        if boundary && bytes.get(i..i + 3).is_some_and(|s| s.eq_ignore_ascii_case(b"url")) {
+        if boundary
+            && bytes
+                .get(i..i + 3)
+                .is_some_and(|s| s.eq_ignore_ascii_case(b"url"))
+        {
             let mut start = i + 3;
             while bytes.get(start).is_some_and(u8::is_ascii_whitespace) {
                 start += 1;
@@ -452,12 +516,16 @@ fn viewer_svg(page: &xml::Element, index: usize) -> String {
                 | "aria-flowto"
                 | "aria-activedescendant"
                 | "aria-details"
-                | "aria-errormessage" => {
-                    value.split_whitespace().map(|id| format!("{prefix}{id}")).collect::<Vec<_>>().join(" ")
+                | "aria-errormessage" => value
+                    .split_whitespace()
+                    .map(|id| format!("{prefix}{id}"))
+                    .collect::<Vec<_>>()
+                    .join(" "),
+                "style" | "clip-path" | "mask" | "filter" | "fill" | "stroke" | "cursor"
+                | "marker" | "marker-start" | "marker-mid" | "marker-end" | "color-profile"
+                | "shape-inside" | "shape-subtract" | "background" | "background-image" => {
+                    scoped_urls(&value, &prefix)
                 }
-                "style" | "clip-path" | "mask" | "filter" | "fill" | "stroke" | "cursor" | "marker"
-                | "marker-start" | "marker-mid" | "marker-end" | "color-profile" | "shape-inside"
-                | "shape-subtract" | "background" | "background-image" => scoped_urls(&value, &prefix),
                 _ => value,
             };
             *raw = xml::escape_attr(&scoped);
@@ -465,7 +533,9 @@ fn viewer_svg(page: &xml::Element, index: usize) -> String {
         if e.local() == "style" {
             for node in &mut e.children {
                 match node {
-                    xml::Node::Text(value) => *value = xml::escape_text(&scoped_urls(&xml::unescape(value), &prefix)),
+                    xml::Node::Text(value) => {
+                        *value = xml::escape_text(&scoped_urls(&xml::unescape(value), &prefix))
+                    }
                     xml::Node::CData(value) => *value = scoped_urls(value, &prefix),
                     _ => {}
                 }
@@ -503,62 +573,85 @@ impl Preview {
     }
 
     fn svg(&self, index: usize) -> Result<String, String> {
-        let page = self.pages.get(index).ok_or_else(|| format!("page index {index} is out of range"))?;
+        let page = self
+            .pages
+            .get(index)
+            .ok_or_else(|| format!("page index {index} is out of range"))?;
         let prefix = format!("hanji-page-{index}-font-");
         let mut tree = page.svg.clone();
         tree.walk_mut(&mut |e| {
-            if let Some(family) = e.get("font-family").filter(|f| f.starts_with("hanji-font-")) {
+            if let Some(family) = e
+                .get("font-family")
+                .filter(|f| f.starts_with("hanji-font-"))
+            {
                 e.set("font-family", &family.replacen("hanji-font-", &prefix, 1));
             }
         });
         let svg = tree.to_xml();
         let position = svg.find('>').ok_or("SVG root is absent")? + 1;
-        Ok(format!("{}<style>{}</style>{}", &svg[..position], self.css(&page.subsets, &prefix), &svg[position..]))
+        Ok(format!(
+            "{}<style>{}</style>{}",
+            &svg[..position],
+            self.css(&page.subsets, &prefix),
+            &svg[position..]
+        ))
     }
 
     pub fn render_page(&self, index: usize, format: PageFormat) -> Result<RenderedPage, String> {
-        let page = self.pages.get(index).ok_or_else(|| format!("page index {index} is out of range"))?;
-        let data = match format {
-            PageFormat::Svg => PageData::Svg(self.svg(index)?),
-            PageFormat::Png { dpi } => {
-                if !dpi.is_finite() || dpi <= 0.0 {
-                    return Err("PNG DPI must be finite and positive".into());
-                }
-                let mut options = resvg::usvg::Options::default();
-                let mut ids = BTreeMap::new();
-                for (&id, data) in &page.subsets {
-                    let loaded = options
-                        .fontdb_mut()
-                        .load_font_source(resvg::usvg::fontdb::Source::Binary(Arc::new(data.clone())));
-                    if let Some(&loaded) = loaded.first() {
-                        ids.insert(format!("hanji-font-{id}"), loaded);
+        let page = self
+            .pages
+            .get(index)
+            .ok_or_else(|| format!("page index {index} is out of range"))?;
+        let data =
+            match format {
+                PageFormat::Svg => PageData::Svg(self.svg(index)?),
+                PageFormat::Png { dpi } => {
+                    if !dpi.is_finite() || dpi <= 0.0 {
+                        return Err("PNG DPI must be finite and positive".into());
                     }
+                    let mut options = resvg::usvg::Options::default();
+                    let mut ids = BTreeMap::new();
+                    for (&id, data) in &page.subsets {
+                        let loaded = options.fontdb_mut().load_font_source(
+                            resvg::usvg::fontdb::Source::Binary(Arc::new(data.clone())),
+                        );
+                        if let Some(&loaded) = loaded.first() {
+                            ids.insert(format!("hanji-font-{id}"), loaded);
+                        }
+                    }
+                    options.font_resolver = resvg::usvg::FontResolver {
+                        select_font: Box::new(move |font, _| {
+                            font.families()
+                                .iter()
+                                .find_map(|f| ids.get(f.to_string().trim_matches('"')).copied())
+                        }),
+                        select_fallback: Box::new(|_, _, _| None),
+                    };
+                    let tree = resvg::usvg::Tree::from_str(&page.svg.to_xml(), &options)
+                        .map_err(|e| format!("usvg: {e}"))?;
+                    let scale = dpi / 96.0;
+                    let (width, height) = (
+                        (tree.size().width() as f64 * scale).round(),
+                        (tree.size().height() as f64 * scale).round(),
+                    );
+                    if width < 1.0
+                        || height < 1.0
+                        || width > u32::MAX as f64
+                        || height > u32::MAX as f64
+                    {
+                        return Err("HWPX page dimensions cannot be rasterized at this DPI".into());
+                    }
+                    let mut pixels = resvg::tiny_skia::Pixmap::new(width as u32, height as u32)
+                        .ok_or("HWPX page is too large to rasterize")?;
+                    pixels.fill(resvg::tiny_skia::Color::WHITE);
+                    resvg::render(
+                        &tree,
+                        resvg::tiny_skia::Transform::from_scale(scale as f32, scale as f32),
+                        &mut pixels.as_mut(),
+                    );
+                    PageData::Png(pixels.encode_png().map_err(|e| format!("PNG: {e}"))?)
                 }
-                options.font_resolver = resvg::usvg::FontResolver {
-                    select_font: Box::new(move |font, _| {
-                        font.families().iter().find_map(|f| ids.get(f.to_string().trim_matches('"')).copied())
-                    }),
-                    select_fallback: Box::new(|_, _, _| None),
-                };
-                let tree =
-                    resvg::usvg::Tree::from_str(&page.svg.to_xml(), &options).map_err(|e| format!("usvg: {e}"))?;
-                let scale = dpi / 96.0;
-                let (width, height) =
-                    ((tree.size().width() as f64 * scale).round(), (tree.size().height() as f64 * scale).round());
-                if width < 1.0 || height < 1.0 || width > u32::MAX as f64 || height > u32::MAX as f64 {
-                    return Err("HWPX page dimensions cannot be rasterized at this DPI".into());
-                }
-                let mut pixels = resvg::tiny_skia::Pixmap::new(width as u32, height as u32)
-                    .ok_or("HWPX page is too large to rasterize")?;
-                pixels.fill(resvg::tiny_skia::Color::WHITE);
-                resvg::render(
-                    &tree,
-                    resvg::tiny_skia::Transform::from_scale(scale as f32, scale as f32),
-                    &mut pixels.as_mut(),
-                );
-                PageData::Png(pixels.encode_png().map_err(|e| format!("PNG: {e}"))?)
-            }
-        };
+            };
         let prefix = format!("pages[{index}].");
         Ok(RenderedPage {
             page: page.info,
@@ -584,7 +677,13 @@ impl Preview {
             .pages
             .iter()
             .enumerate()
-            .map(|(i, p)| format!("<section id=\"page-{}\">{}</section>", i + 1, viewer_svg(&p.svg, i)))
+            .map(|(i, p)| {
+                format!(
+                    "<section id=\"page-{}\">{}</section>",
+                    i + 1,
+                    viewer_svg(&p.svg, i)
+                )
+            })
             .collect::<String>();
         format!("<!doctype html><html lang=\"ko\"><meta charset=\"utf-8\"><title>{}</title><style>{}\nbody{{background:#eee;font:14px sans-serif}}header{{background:white;padding:12px}}section{{margin:20px auto;background:white;width:fit-content}}svg{{display:block;max-width:100%;height:auto}}[data-font-substituted=true]{{text-decoration:underline dotted}}</style><header><h1>{}</h1><ul>{warnings}</ul></header><main>{pages}</main></html>", esc(title), self.css(&self.document_subsets, "hanji-font-"), esc(title))
     }
@@ -613,38 +712,72 @@ mod tests {
         let before = page.to_xml();
         for index in [0, 1] {
             let prefix = format!("hanji-hwpx-p{}-", index + 1);
-            let scoped = xml::parse(viewer_svg(&page, index).as_bytes()).unwrap().root;
+            let scoped = xml::parse(viewer_svg(&page, index).as_bytes())
+                .unwrap()
+                .root;
             let defs = scoped.child("defs").unwrap();
-            assert!(defs.elements().all(|e| e.get("id").unwrap().starts_with(&prefix)));
-            assert_eq!(defs.child("linearGradient").unwrap().get("id"), Some(format!("{prefix}paint")));
-            let gradient = defs.elements().find(|e| e.get("id") == Some(format!("{prefix}paint-copy"))).unwrap();
+            assert!(defs
+                .elements()
+                .all(|e| e.get("id").unwrap().starts_with(&prefix)));
+            assert_eq!(
+                defs.child("linearGradient").unwrap().get("id"),
+                Some(format!("{prefix}paint"))
+            );
+            let gradient = defs
+                .elements()
+                .find(|e| e.get("id") == Some(format!("{prefix}paint-copy")))
+                .unwrap();
             assert_eq!(gradient.get("xlink:href"), Some(format!("#{prefix}paint")));
             let group = scoped.child("g").unwrap();
-            assert_eq!(group.get("clip-path"), Some(format!("url(#{prefix}clip-long)")));
+            assert_eq!(
+                group.get("clip-path"),
+                Some(format!("url(#{prefix}clip-long)"))
+            );
             assert_eq!(group.get("mask"), Some(format!("url('#{prefix}mask')")));
-            assert_eq!(group.get("filter"), Some(format!("url( \"#{prefix}filter\" )")));
+            assert_eq!(
+                group.get("filter"),
+                Some(format!("url( \"#{prefix}filter\" )"))
+            );
             assert_eq!(group.get("fill"), Some(format!("url(#{prefix}paint)")));
             assert_eq!(group.get("stroke"), Some("#fff".into()));
-            assert_eq!(group.get("marker-end"), Some(format!("url(#{prefix}arrow)")));
-            assert_eq!(group.get("aria-labelledby"), Some(format!("{prefix}title&label {prefix}description")));
+            assert_eq!(
+                group.get("marker-end"),
+                Some(format!("url(#{prefix}arrow)"))
+            );
+            assert_eq!(
+                group.get("aria-labelledby"),
+                Some(format!("{prefix}title&label {prefix}description"))
+            );
             assert_eq!(group.get("data-font-requested"), Some("url(#clip)".into()));
             assert_eq!(
                 group.get("style"),
-                Some(format!("clip-path:url(#{prefix}clip);fill:url(#{prefix}missing);color:#fff"))
+                Some(format!(
+                    "clip-path:url(#{prefix}clip);fill:url(#{prefix}missing);color:#fff"
+                ))
             );
             let uses: Vec<_> = group.elements().filter(|e| e.local() == "use").collect();
             assert_eq!(uses[0].get("href"), Some(format!("#{prefix}fff")));
             assert_eq!(uses[1].get("xlink:href"), Some(format!("#{prefix}paint")));
-            assert_eq!(group.child("a").unwrap().get("href"), Some("https://example.invalid/#paint".into()));
+            assert_eq!(
+                group.child("a").unwrap().get("href"),
+                Some("https://example.invalid/#paint".into())
+            );
             let css = text_content(scoped.child("style").unwrap());
             assert!(css.contains(&format!("URL( '#{prefix}clip' )")));
             assert!(css.contains(&format!("mask: url( #{prefix}mask )")));
             assert!(css.contains(&format!("fill: url(\"#{prefix}paint\")")));
             assert!(css.contains("stroke: #fff") && css.contains("content: \"url(#clip)\""));
-            assert!(css.contains("/* url(#clip) */") && css.contains("https://example.invalid/vector.svg#paint"));
+            assert!(
+                css.contains("/* url(#clip) */")
+                    && css.contains("https://example.invalid/vector.svg#paint")
+            );
             assert!(css.contains("data:font/ttf;base64,AAAA"));
         }
-        assert_eq!(page.to_xml(), before, "viewer serialization leaves standalone page data unchanged");
+        assert_eq!(
+            page.to_xml(),
+            before,
+            "viewer serialization leaves standalone page data unchanged"
+        );
     }
 
     #[test]
@@ -663,7 +796,10 @@ mod tests {
             },
         )
         .unwrap();
-        let options = FontOptions { fonts: vec![crate::FontData::new(sparse)], ..Default::default() };
+        let options = FontOptions {
+            fonts: vec![crate::FontData::new(sparse)],
+            ..Default::default()
+        };
         let fonts = Fonts::from_bytes(&options.fonts, &[], None).unwrap();
         let tree = xml::parse(br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="5" y="20" font-family="Sparse Test">A</text><text x="5" y="40" font-family="Sparse Test">123</text></svg>"#).unwrap();
         let preview = finish(vec![tree], vec![], &fonts).unwrap();
@@ -672,11 +808,23 @@ mod tests {
             .fonts
             .substituted
             .iter()
-            .any(|f| f.requested == "Sparse Test" && f.drawn.as_deref() == Some("Liberation Sans") && f.chars == 4));
-        let PageData::Svg(svg) = preview.render_page(0, PageFormat::Svg).unwrap().data else { panic!("SVG") };
-        assert!(xml::parse(svg.as_bytes()).unwrap().root.text_of(&["text", "tspan"]).contains("123"));
+            .any(|f| f.requested == "Sparse Test"
+                && f.drawn.as_deref() == Some("Liberation Sans")
+                && f.chars == 4));
+        let PageData::Svg(svg) = preview.render_page(0, PageFormat::Svg).unwrap().data else {
+            panic!("SVG")
+        };
+        assert!(xml::parse(svg.as_bytes())
+            .unwrap()
+            .root
+            .text_of(&["text", "tspan"])
+            .contains("123"));
         assert!(svg.contains("data:font/"));
-        let PageData::Png(png) = preview.render_page(0, PageFormat::Png { dpi: 96.0 }).unwrap().data else {
+        let PageData::Png(png) = preview
+            .render_page(0, PageFormat::Png { dpi: 96.0 })
+            .unwrap()
+            .data
+        else {
             panic!("PNG")
         };
         assert!(png.starts_with(b"\x89PNG"));

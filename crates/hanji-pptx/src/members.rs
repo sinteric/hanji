@@ -10,12 +10,10 @@ use hanji_format::{Atom, Inline, Marks, Unit};
 use hanji_package::xml::{self, Element, Node};
 
 use crate::deck::LayoutInfo;
-use crate::effects;
 use crate::fill::{self, ThemeFills};
-use crate::kind;
-use crate::outline;
 use crate::pml::*;
 use crate::text::{self, RunStyle, ThemeFonts};
+use crate::{effects, kind, outline};
 
 /// What a group's shapes inherit: the text formatting of shapes that are
 /// not placeholders, the theme's fonts and fill styles.
@@ -28,19 +26,33 @@ pub struct Styling<'a> {
 
 impl<'a> Styling<'a> {
     pub fn of(l: &'a LayoutInfo) -> Styling<'a> {
-        Styling { text: &l.other_text, fonts: &l.fonts, fills: &l.fills }
+        Styling {
+            text: &l.other_text,
+            fonts: &l.fonts,
+            fills: &l.fills,
+        }
     }
 }
 
 /// The level (0–8) of paragraph `p`.
 fn level(p: &Element) -> usize {
-    p.child("a:pPr").and_then(|x| x.get("lvl")).and_then(|v| v.parse().ok()).unwrap_or(0usize).min(8)
+    p.child("a:pPr")
+        .and_then(|x| x.get("lvl"))
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0usize)
+        .min(8)
 }
 
 /// The preset shape, fill and outline a group's shape shows.
 pub fn look(sp: &Element, sty: Option<Styling>) -> Look {
     let (kind, adj) = kind::shown(sp, None, false);
-    let Some(s) = sty else { return Look { kind, adj, ..Default::default() } };
+    let Some(s) = sty else {
+        return Look {
+            kind,
+            adj,
+            ..Default::default()
+        };
+    };
     Look {
         kind,
         adj,
@@ -76,10 +88,16 @@ fn sources(p: &Element) -> Vec<Src> {
                 let rpr = c.child("a:rPr").cloned();
                 let m = marks_of(rpr.as_ref());
                 for ch in c.text_of(&["a:t"]).chars().filter(|ch| *ch as u32 >= 0x20) {
-                    out.push(Src { unit: Unit::new(Atom::Char(ch), m), rpr: rpr.clone() });
+                    out.push(Src {
+                        unit: Unit::new(Atom::Char(ch), m),
+                        rpr: rpr.clone(),
+                    });
                 }
             }
-            "a:br" => out.push(Src { unit: Unit::new(Atom::Break, Marks::NONE), rpr: c.child("a:rPr").cloned() }),
+            "a:br" => out.push(Src {
+                unit: Unit::new(Atom::Break, Marks::NONE),
+                rpr: c.child("a:rPr").cloned(),
+            }),
             _ => {}
         }
     }
@@ -90,15 +108,23 @@ fn sources(p: &Element) -> Vec<Src> {
 /// their text with their marks, line breaks, and (with `sty`) each run's
 /// font, size and colour; none when it has no text.
 pub fn paras(sp: &Element, sty: Option<Styling>) -> Vec<Inline> {
-    let Some(tx) = sp.child("p:txBody").filter(|_| crate::import::has_text(sp)) else { return vec![] };
+    let Some(tx) = sp.child("p:txBody").filter(|_| crate::import::has_text(sp)) else {
+        return vec![];
+    };
     let base = sty.map(|s| text::base(sp, s.text, s.fonts));
     let mut out: Vec<Inline> = tx
         .elements()
         .filter(|p| p.is("a:p"))
         .map(|p| {
             let src = sources(p);
-            let mut i = Inline { units: src.iter().map(|s| s.unit.clone()).collect(), spans: vec![] };
-            if i.units.iter().all(|u| matches!(u.atom, Atom::Char(c) if c.is_whitespace())) {
+            let mut i = Inline {
+                units: src.iter().map(|s| s.unit.clone()).collect(),
+                spans: vec![],
+            };
+            if i.units
+                .iter()
+                .all(|u| matches!(u.atom, Atom::Char(c) if c.is_whitespace()))
+            {
                 return Inline::default();
             }
             if let (Some(b), Some(s)) = (&base, sty) {
@@ -134,41 +160,68 @@ pub fn paras(sp: &Element, sty: Option<Styling>) -> Vec<Inline> {
 /// a changed one keeps its `a:pPr` and `a:endParaRPr`, and each character
 /// takes the run of the old character it aligns with (marks and formatting
 /// set where the text changes them). New paragraphs follow the last one.
-pub fn write(sp: &mut Element, old: &[Inline], new: &[Inline], sty: Option<Styling>, what: &str) -> Result<(), String> {
+pub fn write(
+    sp: &mut Element,
+    old: &[Inline],
+    new: &[Inline],
+    sty: Option<Styling>,
+    what: &str,
+) -> Result<(), String> {
     if old == new {
         return Ok(());
     }
     let base = sty.map(|s| text::base(sp, s.text, s.fonts));
     let Some(tx) = sp.child_mut("p:txBody") else {
-        return Err(format!("{what} has no text body: its text cannot be written here"));
+        return Err(format!(
+            "{what} has no text body: its text cannot be written here"
+        ));
     };
     let ps: Vec<Element> = tx.elements().filter(|p| p.is("a:p")).cloned().collect();
     let empty = Inline::default();
     let mut out: Vec<Element> = vec![];
     for (k, n) in new.iter().enumerate() {
         let o = old.get(k).unwrap_or(&empty);
-        let p = ps.get(k).or(ps.last()).cloned().unwrap_or_else(|| Element::new("a:p"));
+        let p = ps
+            .get(k)
+            .or(ps.last())
+            .cloned()
+            .unwrap_or_else(|| Element::new("a:p"));
         if k < ps.len() && o == n {
             out.push(p);
             continue;
         }
-        if let Some(c) = p.elements().find(|c| !matches!(c.name.as_str(), "a:pPr" | "a:r" | "a:br" | "a:endParaRPr")) {
+        if let Some(c) = p
+            .elements()
+            .find(|c| !matches!(c.name.as_str(), "a:pPr" | "a:r" | "a:br" | "a:endParaRPr"))
+        {
             return Err(format!(
                 "a paragraph of {what} holds {} the text does not show: its text cannot be written here; edit it in PowerPoint",
                 c.name
             ));
         }
         let under = base.as_ref().map(|b| &b[level(&p)]);
-        out.push(paragraph(&p, if k < ps.len() { o } else { &empty }, n, under, sty.map(|s| s.fonts))?);
+        out.push(paragraph(
+            &p,
+            if k < ps.len() { o } else { &empty },
+            n,
+            under,
+            sty.map(|s| s.fonts),
+        )?);
     }
     // Paragraphs of the old text that the new one no longer has go; a shape keeps one.
     if out.is_empty() {
         let mut p = ps.first().cloned().unwrap_or_else(|| Element::new("a:p"));
-        p.children.retain(|c| matches!(c, Node::El(e) if e.is("a:pPr") || e.is("a:endParaRPr")));
+        p.children
+            .retain(|c| matches!(c, Node::El(e) if e.is("a:pPr") || e.is("a:endParaRPr")));
         out.push(p);
     }
-    let first = tx.children.iter().position(|c| matches!(c, Node::El(e) if e.is("a:p"))).unwrap_or(tx.children.len());
-    tx.children.retain(|c| !matches!(c, Node::El(e) if e.is("a:p")));
+    let first = tx
+        .children
+        .iter()
+        .position(|c| matches!(c, Node::El(e) if e.is("a:p")))
+        .unwrap_or(tx.children.len());
+    tx.children
+        .retain(|c| !matches!(c, Node::El(e) if e.is("a:p")));
     let at = first.min(tx.children.len());
     for (j, p) in out.into_iter().enumerate() {
         tx.children.insert(at + j, Node::El(p));
@@ -186,7 +239,8 @@ fn paragraph(
 ) -> Result<Element, String> {
     let src = sources(p);
     // The old text's units map onto the paragraph's runs only when they are the same units.
-    let mapped = src.len() == o.units.len() && src.iter().zip(&o.units).all(|(s, u)| s.unit.atom == u.atom);
+    let mapped =
+        src.len() == o.units.len() && src.iter().zip(&o.units).all(|(s, u)| s.unit.atom == u.atom);
     let first = src.first().and_then(|s| s.rpr.clone()).or_else(|| {
         p.child("a:endParaRPr").map(|e| {
             let mut r = e.clone();
@@ -195,7 +249,11 @@ fn paragraph(
         })
     });
     // Each new unit's template run: the old unit it aligns with.
-    let pairs = if mapped { align(&o.units, &n.units) } else { vec![] };
+    let pairs = if mapped {
+        align(&o.units, &n.units)
+    } else {
+        vec![]
+    };
     let mut tpl: Vec<Option<Element>> = vec![None; n.units.len()];
     for &(a, b) in &pairs {
         tpl[b] = src[a].rpr.clone();
@@ -246,7 +304,9 @@ fn paragraph(
         let a = k;
         let mut t = String::new();
         while k < n.units.len() {
-            let Atom::Char(c) = n.units[k].atom else { break };
+            let Atom::Char(c) = n.units[k].atom else {
+                break;
+            };
             let same = k == a
                 || (tpl[k] == tpl[a]
                     && marks[k] == marks[a]
@@ -281,7 +341,11 @@ fn align(a: &[Unit], b: &[Unit]) -> Vec<(usize, usize)> {
     let mut t = vec![vec![0u32; m + 1]; n + 1];
     for i in (0..n).rev() {
         for j in (0..m).rev() {
-            t[i][j] = if a[i].atom == b[j].atom { t[i + 1][j + 1] + 1 } else { t[i + 1][j].max(t[i][j + 1]) };
+            t[i][j] = if a[i].atom == b[j].atom {
+                t[i + 1][j + 1] + 1
+            } else {
+                t[i + 1][j].max(t[i][j + 1])
+            };
         }
     }
     let (mut i, mut j, mut out) = (0, 0, vec![]);
@@ -305,11 +369,16 @@ pub fn without_shown(group: &Element) -> Element {
     let mut g = group.clone();
     for c in g.elements_mut() {
         match c.name.as_str() {
-            "p:cxnSp" => *c = effects::without_effects(&kind::without_kind(&outline::without_outline(c))),
+            "p:cxnSp" => {
+                *c = effects::without_effects(&kind::without_kind(&outline::without_outline(c)))
+            }
             "p:sp" => {
-                *c = effects::without_effects(&kind::without_kind(&outline::without_outline(&fill::without_fill(c))));
+                *c = effects::without_effects(&kind::without_kind(&outline::without_outline(
+                    &fill::without_fill(c),
+                )));
                 if let Some(tx) = c.child_mut("p:txBody") {
-                    tx.children.retain(|n| !matches!(n, Node::El(e) if e.is("a:p")));
+                    tx.children
+                        .retain(|n| !matches!(n, Node::El(e) if e.is("a:p")));
                 }
             }
             "p:grpSp" => *c = without_shown(c),

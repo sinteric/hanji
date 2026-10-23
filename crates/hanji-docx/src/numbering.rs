@@ -33,13 +33,18 @@ pub struct Numbering {
 }
 
 fn val(e: &Element, child: &str) -> Option<u32> {
-    e.child(child).and_then(|c| c.get("w:val")).and_then(|v| v.parse().ok())
+    e.child(child)
+        .and_then(|c| c.get("w:val"))
+        .and_then(|v| v.parse().ok())
 }
 
 /// `w:numPr` → (numId, ilvl); either may be missing.
 pub fn num_pr(ppr: Option<&Element>) -> (Option<u32>, Option<u32>) {
     let np = ppr.and_then(|p| p.child("w:numPr"));
-    (np.and_then(|n| val(n, "w:numId")), np.and_then(|n| val(n, "w:ilvl")))
+    (
+        np.and_then(|n| val(n, "w:numId")),
+        np.and_then(|n| val(n, "w:ilvl")),
+    )
 }
 
 impl Numbering {
@@ -49,24 +54,31 @@ impl Numbering {
             for e in d.root.elements() {
                 let id = |k: &str| e.get(k).and_then(|v| v.parse::<u32>().ok());
                 if e.is("w:abstractNum") {
-                    let Some(a) = id("w:abstractNumId") else { continue };
+                    let Some(a) = id("w:abstractNumId") else {
+                        continue;
+                    };
                     if let Some(s) = e.child("w:numStyleLink").and_then(|s| s.get("w:val")) {
                         n.style_links.insert(a, s);
                     }
                     for l in e.elements().filter(|l| l.is("w:lvl")) {
-                        let (Some(k), Some(f)) = (l.get("w:ilvl").and_then(|v| v.parse().ok()), l.child("w:numFmt"))
-                        else {
+                        let (Some(k), Some(f)) = (
+                            l.get("w:ilvl").and_then(|v| v.parse().ok()),
+                            l.child("w:numFmt"),
+                        ) else {
                             continue;
                         };
                         n.formats.insert((a, k), f.get("w:val").unwrap_or_default());
                     }
                 } else if e.is("w:num") {
-                    let (Some(num), Some(a)) = (id("w:numId"), val(e, "w:abstractNumId")) else { continue };
+                    let (Some(num), Some(a)) = (id("w:numId"), val(e, "w:abstractNumId")) else {
+                        continue;
+                    };
                     n.nums.insert(num, a);
                     for o in e.elements().filter(|o| o.is("w:lvlOverride")) {
                         let k = o.get("w:ilvl").and_then(|v| v.parse().ok()).unwrap_or(0);
                         if let Some(f) = o.child("w:lvl").and_then(|l| l.child("w:numFmt")) {
-                            n.overrides.insert((num, k), f.get("w:val").unwrap_or_default());
+                            n.overrides
+                                .insert((num, k), f.get("w:val").unwrap_or_default());
                         }
                     }
                 }
@@ -77,18 +89,27 @@ impl Numbering {
             // Style id → its own (numId, ilvl) and the style it is based on.
             let mut own: HashMap<String, StyleNum> = HashMap::new();
             for st in d.root.elements().filter(|e| e.is("w:style")) {
-                let Some(id) = st.get("w:styleId") else { continue };
-                if st.child("w:name").and_then(|x| x.get("w:val")).as_deref() == Some("List Paragraph") {
+                let Some(id) = st.get("w:styleId") else {
+                    continue;
+                };
+                if st.child("w:name").and_then(|x| x.get("w:val")).as_deref()
+                    == Some("List Paragraph")
+                {
                     n.list_paragraph = Some(id.clone());
                 }
                 let (num, lvl) = num_pr(st.child("w:pPr"));
-                own.insert(id, (num, lvl, st.child("w:basedOn").and_then(|b| b.get("w:val"))));
+                own.insert(
+                    id,
+                    (num, lvl, st.child("w:basedOn").and_then(|b| b.get("w:val"))),
+                );
             }
             for id in own.keys() {
                 // Follow basedOn (bounded) for the first style with a numId.
                 let (mut cur, mut lvl) = (Some(id.clone()), None);
                 for _ in 0..16 {
-                    let Some((num, l, base)) = cur.as_ref().and_then(|c| own.get(c)) else { break };
+                    let Some((num, l, base)) = cur.as_ref().and_then(|c| own.get(c)) else {
+                        break;
+                    };
                     lvl = lvl.or(*l);
                     if let Some(num) = num {
                         n.style_num.insert(id.clone(), (*num, lvl.unwrap_or(0)));
@@ -146,9 +167,13 @@ impl Numbering {
             .unwrap_or(d.root.children.len());
         for (k, (id, a)) in self.added.iter().enumerate() {
             let mut num = Element::new("w:num").with_attr("w:numId", &id.to_string());
-            num.children.push(Node::El(Element::new("w:abstractNumId").with_attr("w:val", &a.to_string())));
+            num.children.push(Node::El(
+                Element::new("w:abstractNumId").with_attr("w:val", &a.to_string()),
+            ));
             let mut o = Element::new("w:lvlOverride").with_attr("w:ilvl", "0");
-            o.children.push(Node::El(Element::new("w:startOverride").with_attr("w:val", "1")));
+            o.children.push(Node::El(
+                Element::new("w:startOverride").with_attr("w:val", "1"),
+            ));
             num.children.push(Node::El(o));
             d.root.children.insert(at + k, Node::El(num));
         }
@@ -167,12 +192,19 @@ impl ListDefs for Numbering {
         let mut nums: Vec<(&u32, &u32)> = self.nums.iter().collect();
         nums.sort();
         let want = if ordered { "decimal" } else { "bullet" };
-        nums.into_iter().find(|(n, _)| self.format(**n, 0) == Some(want)).map(|(n, a)| (*n, *a))
+        nums.into_iter()
+            .find(|(n, _)| self.format(**n, 0) == Some(want))
+            .map(|(n, a)| (*n, *a))
     }
 
     /// A new `w:num` over `abstract_id` that starts again at 1.
     fn new_list(&mut self, abstract_id: u32) -> u32 {
-        let id = self.nums.keys().chain(self.added.iter().map(|a| &a.0)).max().map_or(1, |m| m + 1);
+        let id = self
+            .nums
+            .keys()
+            .chain(self.added.iter().map(|a| &a.0))
+            .max()
+            .map_or(1, |m| m + 1);
         self.added.push((id, abstract_id));
         self.nums.insert(id, abstract_id);
         id

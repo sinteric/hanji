@@ -147,21 +147,31 @@ impl Aliases {
     /// `over`'s entries replace those that share a name with them; its classes replace these.
     pub fn merge(&mut self, over: Aliases) {
         for f in over.family {
-            self.family.retain(|g| !g.names.iter().any(|n| f.names.iter().any(|m| same_name(m, n))));
+            self.family.retain(|g| {
+                !g.names
+                    .iter()
+                    .any(|n| f.names.iter().any(|m| same_name(m, n)))
+            });
             self.family.push(f);
         }
         self.class.extend(over.class);
     }
 
     pub fn family(&self, name: &str) -> Option<&Family> {
-        self.family.iter().find(|f| f.names.iter().any(|n| same_name(n, name)))
+        self.family
+            .iter()
+            .find(|f| f.names.iter().any(|n| same_name(n, name)))
     }
 }
 
 /// Font names match ignoring case, spaces and hyphens (`Malgun Gothic` = `MalgunGothic`).
 pub fn same_name(a: &str, b: &str) -> bool {
-    let key =
-        |s: &str| s.chars().filter(|c| !matches!(c, ' ' | '-' | '_')).flat_map(char::to_lowercase).collect::<String>();
+    let key = |s: &str| {
+        s.chars()
+            .filter(|c| !matches!(c, ' ' | '-' | '_'))
+            .flat_map(char::to_lowercase)
+            .collect::<String>()
+    };
     key(a) == key(b)
 }
 
@@ -187,7 +197,10 @@ pub struct FontData {
 
 impl FontData {
     pub fn new(data: impl Into<Arc<[u8]>>) -> FontData {
-        FontData { data: data.into(), face_index: 0 }
+        FontData {
+            data: data.into(),
+            face_index: 0,
+        }
     }
 }
 
@@ -204,7 +217,13 @@ pub struct ResolvedFont {
 /// Font selection inside a document job. Implementations return bytes, never paths.
 /// Select the nearest available style when an exact bold/italic face is absent.
 pub trait FontResolver {
-    fn resolve_font(&self, requested: &str, script: Script, bold: bool, italic: bool) -> Option<ResolvedFont>;
+    fn resolve_font(
+        &self,
+        requested: &str,
+        script: Script,
+        bold: bool,
+        italic: bool,
+    ) -> Option<ResolvedFont>;
 
     /// Select a drawing face for the actual repertoire. Existing resolvers
     /// retain their behavior; missing glyphs are still reported by the job.
@@ -255,7 +274,10 @@ pub(crate) fn requires_glyph(c: char) -> bool {
 pub(crate) fn covers_text(data: &[u8], index: u32, text: &str) -> bool {
     ttf_parser::Face::parse(data, index).is_ok_and(|face| {
         !last_resort(&face)
-            && text.chars().filter(|c| requires_glyph(*c)).all(|c| face.glyph_index(c).is_some_and(|g| g.0 != 0))
+            && text
+                .chars()
+                .filter(|c| requires_glyph(*c))
+                .all(|c| face.glyph_index(c).is_some_and(|g| g.0 != 0))
     })
 }
 
@@ -273,7 +295,11 @@ pub struct Fonts {
 #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 pub fn env_font_dirs() -> Vec<PathBuf> {
     std::env::var_os("HANJI_FONT_DIR")
-        .map(|v| std::env::split_paths(&v).filter(|p| !p.as_os_str().is_empty()).collect())
+        .map(|v| {
+            std::env::split_paths(&v)
+                .filter(|p| !p.as_os_str().is_empty())
+                .collect()
+        })
         .unwrap_or_default()
 }
 
@@ -287,19 +313,30 @@ impl Fonts {
     ) -> Result<Fonts, String> {
         let mut supplied_db = fontdb::Database::new();
         for (i, font) in supplied.iter().enumerate() {
-            ttf_parser::Face::parse(&font.data, font.face_index)
-                .map_err(|e| format!("supplied font {i}, face {} is invalid: {e}", font.face_index))?;
-            let ids = supplied_db.load_font_source(fontdb::Source::Binary(Arc::new(font.data.clone())));
+            ttf_parser::Face::parse(&font.data, font.face_index).map_err(|e| {
+                format!(
+                    "supplied font {i}, face {} is invalid: {e}",
+                    font.face_index
+                )
+            })?;
+            let ids =
+                supplied_db.load_font_source(fontdb::Source::Binary(Arc::new(font.data.clone())));
             let mut loaded = false;
             for id in ids {
-                if supplied_db.face(id).is_some_and(|face| face.index == font.face_index) {
+                if supplied_db
+                    .face(id)
+                    .is_some_and(|face| face.index == font.face_index)
+                {
                     loaded = true;
                 } else {
                     supplied_db.remove_face(id);
                 }
             }
             if !loaded {
-                return Err(format!("supplied font {i}, face {} has no usable family name", font.face_index));
+                return Err(format!(
+                    "supplied font {i}, face {} has no usable family name",
+                    font.face_index
+                ));
             }
         }
         let mut fonts = Self::from_tiers(vec![(Source::Supplied, supplied_db)], embedded, vec![]);
@@ -330,7 +367,10 @@ impl Fonts {
             dir_db.load_fonts_dir(d);
             let table = d.join("aliases.toml");
             if table.is_file() {
-                match std::fs::read_to_string(&table).map_err(|e| e.to_string()).and_then(|s| Aliases::parse(&s)) {
+                match std::fs::read_to_string(&table)
+                    .map_err(|e| e.to_string())
+                    .and_then(|s| Aliases::parse(&s))
+                {
                     Ok(t) => aliases.merge(t),
                     Err(e) => warnings.push(format!("{} is not used: {e}", table.display())),
                 }
@@ -340,7 +380,11 @@ impl Fonts {
         if system {
             system_db.load_system_fonts();
         }
-        let mut fonts = Self::from_tiers(vec![(Source::FontDir, dir_db)], embedded, vec![(Source::System, system_db)]);
+        let mut fonts = Self::from_tiers(
+            vec![(Source::FontDir, dir_db)],
+            embedded,
+            vec![(Source::System, system_db)],
+        );
         fonts.aliases = aliases;
         fonts.warnings = warnings;
         fonts
@@ -362,7 +406,12 @@ impl Fonts {
         before.push((Source::Embedded, embedded_db));
         before.extend(after);
         before.push((Source::Bundled, bundled));
-        Fonts { tiers: before, any_face: Default::default(), aliases: Aliases::builtin(), warnings: vec![] }
+        Fonts {
+            tiers: before,
+            any_face: Default::default(),
+            aliases: Aliases::builtin(),
+            warnings: vec![],
+        }
     }
 
     /// The face of tier `tier` named `name` (any of its localized family
@@ -376,15 +425,31 @@ impl Fonts {
         probe: Option<char>,
     ) -> Option<(fontdb::ID, String)> {
         let db = &self.tiers[tier].1;
-        let exact = db.faces().flat_map(|f| f.families.iter()).find(|(n, _)| same_name(n, name))?.0.clone();
+        let exact = db
+            .faces()
+            .flat_map(|f| f.families.iter())
+            .find(|(n, _)| same_name(n, name))?
+            .0
+            .clone();
         let q = fontdb::Query {
             families: &[fontdb::Family::Name(&exact)],
-            weight: if bold { fontdb::Weight::BOLD } else { fontdb::Weight::NORMAL },
-            style: if italic { fontdb::Style::Italic } else { fontdb::Style::Normal },
+            weight: if bold {
+                fontdb::Weight::BOLD
+            } else {
+                fontdb::Weight::NORMAL
+            },
+            style: if italic {
+                fontdb::Style::Italic
+            } else {
+                fontdb::Style::Normal
+            },
             stretch: fontdb::Stretch::Normal,
         };
         let id = db.query(&q)?;
-        if db.with_face_data(id, |d, i| ttf_parser::Face::parse(d, i).is_ok_and(|f| last_resort(&f))) == Some(true) {
+        if db.with_face_data(id, |d, i| {
+            ttf_parser::Face::parse(d, i).is_ok_and(|f| last_resort(&f))
+        }) == Some(true)
+        {
             return None;
         }
         if probe.is_some_and(|c| !draws(db, id, c)) {
@@ -396,10 +461,22 @@ impl Fonts {
     }
 
     /// The first tier with a face named `name` that draws `script`.
-    fn find(&self, name: &str, script: Script, metrics: Metrics, ea_advance: Option<f64>) -> Option<Drawn> {
+    fn find(
+        &self,
+        name: &str,
+        script: Script,
+        metrics: Metrics,
+        ea_advance: Option<f64>,
+    ) -> Option<Drawn> {
         (0..self.tiers.len()).find_map(|tier| {
             let (_, family) = self.query(tier, name, false, false, script.probe())?;
-            Some(Drawn { family, source: self.tiers[tier].0, metrics: metrics.clone(), ea_advance, tier })
+            Some(Drawn {
+                family,
+                source: self.tiers[tier].0,
+                metrics: metrics.clone(),
+                ea_advance,
+                tier,
+            })
         })
     }
 
@@ -413,10 +490,21 @@ impl Fonts {
             names.extend(e.names.iter().map(String::as_str));
         }
         let advance = entry.and_then(|e| e.ea_advance).filter(|_| ea);
-        let as_substitute = if advance.is_some() { Metrics::Table } else { Metrics::Substitute };
+        let as_substitute = if advance.is_some() {
+            Metrics::Table
+        } else {
+            Metrics::Substitute
+        };
         let class = entry.and_then(|e| e.class.as_deref()).unwrap_or("sans");
-        let fallbacks = self.aliases.class.get(class).or_else(|| self.aliases.class.get("sans"));
-        let by_class = fallbacks.map(|c| if ea { &c.hangul } else { &c.latin }).into_iter().flatten();
+        let fallbacks = self
+            .aliases
+            .class
+            .get(class)
+            .or_else(|| self.aliases.class.get("sans"));
+        let by_class = fallbacks
+            .map(|c| if ea { &c.hangul } else { &c.latin })
+            .into_iter()
+            .flatten();
         names
             .iter()
             .find_map(|n| self.find(n, script, Metrics::Original, None))
@@ -425,7 +513,10 @@ impl Fonts {
                 metric.find_map(|m| self.find(m, script, Metrics::Compatible(m.clone()), None))
             })
             .or_else(|| {
-                let mut substitutes = entry.into_iter().flat_map(|e| &e.substitute).chain(by_class);
+                let mut substitutes = entry
+                    .into_iter()
+                    .flat_map(|e| &e.substitute)
+                    .chain(by_class);
                 substitutes.find_map(|s| self.find(s, script, as_substitute.clone(), advance))
             })
             .or_else(|| self.any_face(script))
@@ -437,11 +528,20 @@ impl Fonts {
         let mut memo = self.any_face.borrow_mut();
         memo.entry(script)
             .or_insert_with(|| {
-                self.tiers.iter().enumerate().find_map(|(tier, (source, db))| {
-                    let face = db.faces().find(|f| draws(db, f.id, probe))?;
-                    let family = face.families.first()?.0.clone();
-                    Some(Drawn { family, source: *source, metrics: Metrics::Substitute, ea_advance: None, tier })
-                })
+                self.tiers
+                    .iter()
+                    .enumerate()
+                    .find_map(|(tier, (source, db))| {
+                        let face = db.faces().find(|f| draws(db, f.id, probe))?;
+                        let family = face.families.first()?.0.clone();
+                        Some(Drawn {
+                            family,
+                            source: *source,
+                            metrics: Metrics::Substitute,
+                            ea_advance: None,
+                            tier,
+                        })
+                    })
             })
             .clone()
     }
@@ -451,12 +551,20 @@ impl Fonts {
         let (id, _) = self
             .query(drawn.tier, &drawn.family, bold, italic, None)
             .or_else(|| self.query(drawn.tier, &drawn.family, false, false, None))?;
-        self.tiers[drawn.tier].1.with_face_data(id, |d, i| (d.to_vec(), i))
+        self.tiers[drawn.tier]
+            .1
+            .with_face_data(id, |d, i| (d.to_vec(), i))
     }
 }
 
 impl FontResolver for Fonts {
-    fn resolve_font(&self, requested: &str, script: Script, bold: bool, italic: bool) -> Option<ResolvedFont> {
+    fn resolve_font(
+        &self,
+        requested: &str,
+        script: Script,
+        bold: bool,
+        italic: bool,
+    ) -> Option<ResolvedFont> {
         let drawn = self.resolve(requested, script)?;
         let (data, face_index) = self.face_data(&drawn, bold, italic)?;
         Some(ResolvedFont {
@@ -464,7 +572,10 @@ impl FontResolver for Fonts {
             source: drawn.source,
             metrics: drawn.metrics,
             ea_advance: drawn.ea_advance,
-            font: FontData { data: data.into(), face_index },
+            font: FontData {
+                data: data.into(),
+                face_index,
+            },
         })
     }
 
@@ -477,7 +588,10 @@ impl FontResolver for Fonts {
         text: &str,
     ) -> Option<ResolvedFont> {
         let primary = self.resolve_font(requested, script, bold, italic);
-        if primary.as_ref().is_some_and(|f| covers_text(&f.font.data, f.font.face_index, text)) {
+        if primary
+            .as_ref()
+            .is_some_and(|f| covers_text(&f.font.data, f.font.face_index, text))
+        {
             return primary;
         }
         // Private-use symbols have meaning only in their authored font. An
@@ -498,20 +612,29 @@ impl FontResolver for Fonts {
             }
         }
         for (tier, (source, db)) in self.tiers.iter().enumerate() {
-            let families: std::collections::BTreeSet<_> =
-                db.faces().filter_map(|f| f.families.first().map(|(name, _)| name.as_str())).collect();
+            let families: std::collections::BTreeSet<_> = db
+                .faces()
+                .filter_map(|f| f.families.first().map(|(name, _)| name.as_str()))
+                .collect();
             for family in families {
-                let Some((id, family)) = self.query(tier, family, bold, italic, None) else { continue };
-                if db.with_face_data(id, |data, index| covers_text(data, index, text)) != Some(true) {
+                let Some((id, family)) = self.query(tier, family, bold, italic, None) else {
+                    continue;
+                };
+                if db.with_face_data(id, |data, index| covers_text(data, index, text)) != Some(true)
+                {
                     continue;
                 }
-                let (data, face_index) = db.with_face_data(id, |data, index| (data.to_vec(), index))?;
+                let (data, face_index) =
+                    db.with_face_data(id, |data, index| (data.to_vec(), index))?;
                 return Some(ResolvedFont {
                     family,
                     source: *source,
                     metrics: Metrics::Substitute,
                     ea_advance: None,
-                    font: FontData { data: data.into(), face_index },
+                    font: FontData {
+                        data: data.into(),
+                        face_index,
+                    },
                 });
             }
         }
@@ -554,18 +677,37 @@ mod tests {
         }
         assert_eq!(a.family("malgungothic").unwrap().names[0], "맑은 고딕");
         assert_eq!(a.family("Calibri").unwrap().metric, vec!["Carlito"]);
-        assert!(a.class.contains_key("sans") && a.class.contains_key("serif") && a.class.contains_key("mono"));
+        assert!(
+            a.class.contains_key("sans")
+                && a.class.contains_key("serif")
+                && a.class.contains_key("mono")
+        );
     }
 
     #[test]
     fn an_org_table_replaces_entries_by_name() {
         let mut a = Aliases::builtin();
         let n = a.family.len();
-        a.merge(Aliases::parse("[[family]]\nnames = [\"Malgun Gothic\"]\nsubstitute = [\"Org Sans\"]\n").unwrap());
+        a.merge(
+            Aliases::parse(
+                "[[family]]\nnames = [\"Malgun Gothic\"]\nsubstitute = [\"Org Sans\"]\n",
+            )
+            .unwrap(),
+        );
         assert_eq!(a.family.len(), n);
-        assert_eq!(a.family("맑은 고딕").map(|f| f.substitute.clone()), None, "the old entry went");
-        assert_eq!(a.family("Malgun Gothic").unwrap().substitute, vec!["Org Sans"]);
-        assert!(Aliases::parse("[[family]]\nname = \"x\"\n").is_err(), "unknown keys are refused");
+        assert_eq!(
+            a.family("맑은 고딕").map(|f| f.substitute.clone()),
+            None,
+            "the old entry went"
+        );
+        assert_eq!(
+            a.family("Malgun Gothic").unwrap().substitute,
+            vec!["Org Sans"]
+        );
+        assert!(
+            Aliases::parse("[[family]]\nname = \"x\"\n").is_err(),
+            "unknown keys are refused"
+        );
     }
 
     #[test]
@@ -581,12 +723,20 @@ mod tests {
         let d = f.resolve("Carlito", Script::Latin).unwrap();
         assert_eq!(d.metrics, Metrics::Original);
         let d = f.resolve("Aptos", Script::Latin).unwrap();
-        assert_eq!((d.family.as_str(), d.metrics.clone()), ("Carlito", Metrics::Substitute));
+        assert_eq!(
+            (d.family.as_str(), d.metrics.clone()),
+            ("Carlito", Metrics::Substitute)
+        );
         // A face nobody knows falls back to its class, sans: Carlito, as
         // PowerPoint draws a missing face in Calibri.
         let d = f.resolve("Nonexistent Grotesk", Script::Latin).unwrap();
-        assert_eq!((d.family.as_str(), d.metrics), ("Carlito", Metrics::Substitute));
-        let (data, _) = f.face_data(&f.resolve("Arial", Script::Latin).unwrap(), true, false).unwrap();
+        assert_eq!(
+            (d.family.as_str(), d.metrics),
+            ("Carlito", Metrics::Substitute)
+        );
+        let (data, _) = f
+            .face_data(&f.resolve("Arial", Script::Latin).unwrap(), true, false)
+            .unwrap();
         assert!(ttf_parser::Face::parse(&data, 0).unwrap().is_bold());
     }
 
@@ -609,7 +759,10 @@ mod tests {
 
     #[test]
     fn names_match_across_spelling() {
-        assert!(same_name("Malgun Gothic", "MalgunGothic") && same_name("noto sans cjk kr", "Noto Sans CJK KR"));
+        assert!(
+            same_name("Malgun Gothic", "MalgunGothic")
+                && same_name("noto sans cjk kr", "Noto Sans CJK KR")
+        );
         assert!(!same_name("Gulim", "GulimChe"));
         assert_eq!(Script::of("abc 1"), Script::Latin);
         assert_eq!(Script::of("매출"), Script::Hangul);

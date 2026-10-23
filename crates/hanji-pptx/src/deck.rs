@@ -139,7 +139,8 @@ impl LayoutInfo {
 
     /// [`slot`](Self::slot), or the error the export gives for a slot the layout lacks.
     pub fn need_slot(&self, name: &str) -> Result<&SlotInfo, String> {
-        self.slot(name).ok_or_else(|| format!("::{name}:: is not a slot of layout {:?}", self.name))
+        self.slot(name)
+            .ok_or_else(|| format!("::{name}:: is not a slot of layout {:?}", self.name))
     }
 }
 
@@ -153,14 +154,21 @@ impl Deck {
     }
 
     pub fn read(parts: &[Part], pres_part: &str, pres: &Element) -> Result<Deck, String> {
-        let size = pres.child("p:sldSz").and_then(|s| Some((s.get("cx")?.parse().ok()?, s.get("cy")?.parse().ok()?)));
-        let mut deck = Deck { size, ..Default::default() };
+        let size = pres
+            .child("p:sldSz")
+            .and_then(|s| Some((s.get("cx")?.parse().ok()?, s.get("cy")?.parse().ok()?)));
+        let mut deck = Deck {
+            size,
+            ..Default::default()
+        };
         let ids: Vec<String> = pres
             .child("p:sldMasterIdLst")
             .map(|l| l.elements().filter_map(|e| e.get("r:id")).collect())
             .unwrap_or_default();
         for id in ids {
-            let Some(mpart) = opc::target_of(parts, pres_part, &id) else { continue };
+            let Some(mpart) = opc::target_of(parts, pres_part, &id) else {
+                continue;
+            };
             let master = parse(parts, &mpart)?;
             let theme = opc::rels_of(parts, &mpart)
                 .into_iter()
@@ -172,31 +180,51 @@ impl Deck {
                 &text::levels(pres.child("p:defaultTextStyle"), &fonts),
                 &std::array::from_fn(|_| text::defaults(&fonts)),
             );
-            let text_levels = |n: &str| text::over(&text::levels(styles_of(&master, n), &fonts), &deflt);
-            let (title_t, body_t, other_t) =
-                (text_levels("p:titleStyle"), text_levels("p:bodyStyle"), text_levels("p:otherStyle"));
+            let text_levels =
+                |n: &str| text::over(&text::levels(styles_of(&master, n), &fonts), &deflt);
+            let (title_t, body_t, other_t) = (
+                text_levels("p:titleStyle"),
+                text_levels("p:bodyStyle"),
+                text_levels("p:otherStyle"),
+            );
             let layouts: Vec<String> = master
                 .child("p:sldLayoutIdLst")
                 .map(|l| l.elements().filter_map(|e| e.get("r:id")).collect())
                 .unwrap_or_default();
             let styles = master.child("p:txStyles");
             let text_style = |n: &str| levels_of(styles.and_then(|s| s.child(n)));
-            let (title, body, other) =
-                (text_style("p:titleStyle"), text_style("p:bodyStyle"), text_style("p:otherStyle"));
+            let (title, body, other) = (
+                text_style("p:titleStyle"),
+                text_style("p:bodyStyle"),
+                text_style("p:otherStyle"),
+            );
             let mphs = placeholders(&master, &fills);
             let mtexts = placeholder_texts(&master, &fonts);
             for lid in layouts {
-                let Some(lpart) = opc::target_of(parts, &mpart, &lid) else { continue };
+                let Some(lpart) = opc::target_of(parts, &mpart, &lid) else {
+                    continue;
+                };
                 let layout = parse(parts, &lpart)?;
-                let stem = lpart.rsplit('/').next().unwrap_or(&lpart).trim_end_matches(".xml").to_string();
-                let base = layout.child("p:cSld").and_then(|c| c.get("name")).filter(|n| !n.is_empty()).unwrap_or(stem);
+                let stem = lpart
+                    .rsplit('/')
+                    .next()
+                    .unwrap_or(&lpart)
+                    .trim_end_matches(".xml")
+                    .to_string();
+                let base = layout
+                    .child("p:cSld")
+                    .and_then(|c| c.get("name"))
+                    .filter(|n| !n.is_empty())
+                    .unwrap_or(stem);
                 let name = unique(&base, |n| deck.layout(n).is_some());
                 let ty = layout.get("type").unwrap_or_else(|| "cust".into());
                 let ty = LAYOUT_TYPES.contains(&ty.as_str()).then_some(ty);
                 let mut slots = vec![];
                 let phs = placeholders(&layout, &fills);
                 let ltexts = placeholder_texts(&layout, &fonts);
-                let body_like: Vec<usize> = (0..phs.len()).filter(|&k| is_body_type(&phs[k].ty)).collect();
+                let body_like: Vec<usize> = (0..phs.len())
+                    .filter(|&k| is_body_type(&phs[k].ty))
+                    .collect();
                 let mut body_names: Vec<String> = match body_like.len() {
                     1 => vec!["body".into()],
                     2 => {
@@ -207,7 +235,15 @@ impl Deck {
                             vec!["left".into(), "right".into()]
                         }
                     }
-                    n => (1..=n).map(|k| if k == 1 { "body".into() } else { format!("body{k}") }).collect(),
+                    n => (1..=n)
+                        .map(|k| {
+                            if k == 1 {
+                                "body".into()
+                            } else {
+                                format!("body{k}")
+                            }
+                        })
+                        .collect(),
                 };
                 body_names.reverse();
                 for (pk, ph) in phs.iter().enumerate() {
@@ -235,15 +271,27 @@ impl Deck {
                         TextClass::Other => other,
                         _ => body,
                     };
-                    let bullets = over(ph.lst, over(master_ph.map_or([Bu::Unset; 9], |m| m.lst), base_bu));
+                    let bullets = over(
+                        ph.lst,
+                        over(master_ph.map_or([Bu::Unset; 9], |m| m.lst), base_bu),
+                    );
                     let geom = ph.geom.or(master_ph.and_then(|m| m.geom));
-                    let fill = ph.fill.clone().or_else(|| master_ph.and_then(|m| m.fill.clone()));
+                    let fill = ph
+                        .fill
+                        .clone()
+                        .or_else(|| master_ph.and_then(|m| m.fill.clone()));
                     let line = match (ph.line.clone(), master_ph.and_then(|m| m.line.clone())) {
                         (Some(a), Some(b)) => Some(a.over(&b)),
                         (a, b) => a.or(b),
                     };
-                    let geo = ph.geo.clone().or_else(|| master_ph.and_then(|m| m.geo.clone()));
-                    let fx = ph.fx.clone().or_else(|| master_ph.and_then(|m| m.fx.clone()));
+                    let geo = ph
+                        .geo
+                        .clone()
+                        .or_else(|| master_ph.and_then(|m| m.geo.clone()));
+                    let fx = ph
+                        .fx
+                        .clone()
+                        .or_else(|| master_ph.and_then(|m| m.fx.clone()));
                     slots.push(SlotInfo {
                         name,
                         ty: ph.ty.clone(),
@@ -272,13 +320,20 @@ impl Deck {
                 });
             }
         }
-        let nm = pres.child("p:notesMasterIdLst").and_then(|l| l.elements().next()).and_then(|e| e.get("r:id"));
+        let nm = pres
+            .child("p:notesMasterIdLst")
+            .and_then(|l| l.elements().next())
+            .and_then(|e| e.get("r:id"));
         if let Some(npart) = nm.and_then(|id| opc::target_of(parts, pres_part, &id)) {
             let master = parse(parts, &npart)?;
             let style = levels_of(master.child("p:notesStyle"));
-            let body = placeholders(&master, &ThemeFills::default()).into_iter().find(|p| p.ty == "body");
-            deck.notes =
-                Some(NotesMaster { part: npart, bullets: over(body.map_or([Bu::Unset; 9], |b| b.lst), style) });
+            let body = placeholders(&master, &ThemeFills::default())
+                .into_iter()
+                .find(|p| p.ty == "body");
+            deck.notes = Some(NotesMaster {
+                part: npart,
+                bullets: over(body.map_or([Bu::Unset; 9], |b| b.lst), style),
+            });
         }
         Ok(deck)
     }
@@ -309,10 +364,17 @@ fn styles_of<'e>(master: &'e Element, name: &str) -> Option<&'e Element> {
 /// Per placeholder of a master's or layout's shape tree (in the order of
 /// [`placeholders`]), the text formatting its list style sets.
 fn placeholder_texts(root: &Element, fonts: &ThemeFonts) -> Vec<[RunStyle; 9]> {
-    let Some(tree) = root.child("p:cSld").and_then(|c| c.child("p:spTree")) else { return vec![] };
+    let Some(tree) = root.child("p:cSld").and_then(|c| c.child("p:spTree")) else {
+        return vec![];
+    };
     tree.elements()
         .filter(|sh| placeholder(sh).is_some())
-        .map(|sh| text::levels(sh.child("p:txBody").and_then(|t| t.child("a:lstStyle")), fonts))
+        .map(|sh| {
+            text::levels(
+                sh.child("p:txBody").and_then(|t| t.child("a:lstStyle")),
+                fonts,
+            )
+        })
         .collect()
 }
 
@@ -341,7 +403,9 @@ pub(crate) struct Ph {
 
 /// The placeholders of a master's or layout's shape tree, in order.
 pub(crate) fn placeholders(root: &Element, fills: &ThemeFills) -> Vec<Ph> {
-    let Some(tree) = root.child("p:cSld").and_then(|c| c.child("p:spTree")) else { return vec![] };
+    let Some(tree) = root.child("p:cSld").and_then(|c| c.child("p:spTree")) else {
+        return vec![];
+    };
     tree.elements()
         .filter_map(|sh| {
             let (ty, idx, ph) = placeholder(sh)?;

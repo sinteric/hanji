@@ -10,7 +10,15 @@ use hanji_package::clip;
 use hanji_package::opc::{is_macro_package, rels_part, resolve_target, source_of_rels};
 
 /// Field instructions that fetch or run something when the file opens or updates.
-const FETCHING_FIELDS: &[&str] = &["DDE", "DDEAUTO", "INCLUDEPICTURE", "INCLUDETEXT", "LINK", "IMPORT", "RD"];
+const FETCHING_FIELDS: &[&str] = &[
+    "DDE",
+    "DDEAUTO",
+    "INCLUDEPICTURE",
+    "INCLUDETEXT",
+    "LINK",
+    "IMPORT",
+    "RD",
+];
 
 struct Removed {
     source: String,
@@ -18,20 +26,31 @@ struct Removed {
     kind: &'static str,
 }
 
-pub fn neutralise(parts: &mut Vec<Part>, doc: &mut Element, report: &mut ImportReport) -> Result<(), String> {
+pub fn neutralise(
+    parts: &mut Vec<Part>,
+    doc: &mut Element,
+    report: &mut ImportReport,
+) -> Result<(), String> {
     let out = &mut report.neutralised;
     let mut removed_rels: Vec<Removed> = vec![];
     let mut drop_parts: Vec<String> = vec![];
-    let macro_parts: std::collections::BTreeSet<String> =
-        parts.iter().filter(|p| p.name != DOC_PART && is_macro_package(p)).map(|p| p.name.clone()).collect();
+    let macro_parts: std::collections::BTreeSet<String> = parts
+        .iter()
+        .filter(|p| p.name != DOC_PART && is_macro_package(p))
+        .map(|p| p.name.clone())
+        .collect();
     // Relationships that fetch (external, not a hyperlink) or run (OLE, ActiveX,
     // macros, packages that carry macros).
     for part in parts.iter_mut() {
         if !part.name.ends_with(".rels") {
             continue;
         }
-        let Some(source) = source_of_rels(&part.name) else { continue };
-        let Ok(mut d) = xml::parse(&part.data) else { continue };
+        let Some(source) = source_of_rels(&part.name) else {
+            continue;
+        };
+        let Ok(mut d) = xml::parse(&part.data) else {
+            continue;
+        };
         let before = d.root.children.len();
         let mut kept = vec![];
         for n in std::mem::take(&mut d.root.children) {
@@ -48,7 +67,9 @@ pub fn neutralise(parts: &mut Vec<Part>, doc: &mut Element, report: &mut ImportR
                 "attachedTemplate" if external => Some("remote-template"),
                 "image" if external => Some("linked-image"),
                 "oleObject" if external => Some("linked-object"),
-                _ if !external && macro_parts.contains(&resolve_target(&source, &target)) => Some("macro-package"),
+                _ if !external && macro_parts.contains(&resolve_target(&source, &target)) => {
+                    Some("macro-package")
+                }
                 "oleObject" | "package" if source == DOC_PART => Some("ole-object"),
                 "control" | "activeXControl" => Some("activex-control"),
                 "vbaProject" | "wordVbaData" | "keyMapCustomizations" => Some("macros"),
@@ -57,8 +78,17 @@ pub fn neutralise(parts: &mut Vec<Part>, doc: &mut Element, report: &mut ImportR
             };
             match kind {
                 Some(kind) => {
-                    notice(out, kind, format!("{} {}", part.name, r.get("Id").unwrap_or_default()), target.clone());
-                    removed_rels.push(Removed { source: source.clone(), id: r.get("Id").unwrap_or_default(), kind });
+                    notice(
+                        out,
+                        kind,
+                        format!("{} {}", part.name, r.get("Id").unwrap_or_default()),
+                        target.clone(),
+                    );
+                    removed_rels.push(Removed {
+                        source: source.clone(),
+                        id: r.get("Id").unwrap_or_default(),
+                        kind,
+                    });
                     if !external {
                         drop_parts.push(resolve_target(&source, &target));
                     }
@@ -72,14 +102,22 @@ pub fn neutralise(parts: &mut Vec<Part>, doc: &mut Element, report: &mut ImportR
         }
     }
     // The XML that points at them.
-    for src in removed_rels.iter().map(|r| r.source.clone()).collect::<std::collections::BTreeSet<_>>() {
+    for src in removed_rels
+        .iter()
+        .map(|r| r.source.clone())
+        .collect::<std::collections::BTreeSet<_>>()
+    {
         let ids: Vec<&Removed> = removed_rels.iter().filter(|r| r.source == src).collect();
         if src == DOC_PART {
             strip_refs(doc, &ids, out, DOC_PART);
             continue;
         }
-        let Some(p) = parts.iter_mut().find(|p| p.name == src) else { continue };
-        let Ok(mut d) = xml::parse(&p.data) else { continue };
+        let Some(p) = parts.iter_mut().find(|p| p.name == src) else {
+            continue;
+        };
+        let Ok(mut d) = xml::parse(&p.data) else {
+            continue;
+        };
         strip_refs(&mut d.root, &ids, out, &src);
         p.data = xml::write_doc(&d);
     }
@@ -90,7 +128,12 @@ pub fn neutralise(parts: &mut Vec<Part>, doc: &mut Element, report: &mut ImportR
     // Macro-carrying packages that no relationship reached go too.
     for name in &macro_parts {
         if !drop_parts.contains(name) {
-            notice(out, "macro-package", name.clone(), "embedded package that can carry macros");
+            notice(
+                out,
+                "macro-package",
+                name.clone(),
+                "embedded package that can carry macros",
+            );
             drop_parts.push(name.clone());
         }
     }
@@ -109,7 +152,8 @@ pub fn neutralise(parts: &mut Vec<Part>, doc: &mut Element, report: &mut ImportR
             let mut changed = d.root.children.len() != n;
             if gone.iter().any(|g| g.ends_with("vbaProject.bin")) {
                 for e in d.root.elements_mut() {
-                    if e.get("ContentType").as_deref() == Some("application/vnd.ms-word.document.macroEnabled.main+xml")
+                    if e.get("ContentType").as_deref()
+                        == Some("application/vnd.ms-word.document.macroEnabled.main+xml")
                     {
                         e.set(
                             "ContentType",
@@ -138,15 +182,27 @@ fn strip_refs(root: &mut Element, ids: &[&Removed], out: &mut Vec<Notice>, part:
                 "w:attachedTemplate" | "o:OLEObject" | "w:control" | "w:subDoc" | "c:externalData"
             );
             !(reaches
-                && ids.iter().any(|r| c.attrs.iter().any(|a| a.0.starts_with("r:") && xml::unescape(&a.1) == r.id)))
+                && ids.iter().any(|r| {
+                    c.attrs
+                        .iter()
+                        .any(|a| a.0.starts_with("r:") && xml::unescape(&a.1) == r.id)
+                }))
         });
         for c in e.elements_mut() {
             let before = c.attrs.len();
             c.attrs.retain(|a| {
-                !(a.0.starts_with("r:") && ids.iter().any(|r| xml::unescape(&a.1) == r.id && r.kind != "ole-object"))
+                !(a.0.starts_with("r:")
+                    && ids
+                        .iter()
+                        .any(|r| xml::unescape(&a.1) == r.id && r.kind != "ole-object"))
             });
             if c.attrs.len() != before {
-                notice(out, "reference-removed", format!("{part} <{}>", c.name), "points at a removed relationship");
+                notice(
+                    out,
+                    "reference-removed",
+                    format!("{part} <{}>", c.name),
+                    "points at a removed relationship",
+                );
             }
             rec(c, ids, out, part);
         }
@@ -157,10 +213,16 @@ fn strip_refs(root: &mut Element, ids: &[&Removed], out: &mut Vec<Notice>, part:
 fn neutralise_objects(doc: &mut Element, out: &mut Vec<Notice>) {
     fn rec(e: &mut Element, out: &mut Vec<Notice>) {
         let n = e.children.len();
-        e.children.retain(|c| !matches!(c, Node::El(x) if x.is("o:OLEObject") || x.is("w:control")));
+        e.children
+            .retain(|c| !matches!(c, Node::El(x) if x.is("o:OLEObject") || x.is("w:control")));
         if e.children.len() != n {
             let detail = "embedded object or control removed; its preview picture stays";
-            notice(out, "ole-object", format!("{DOC_PART} <{}>", e.name), detail);
+            notice(
+                out,
+                "ole-object",
+                format!("{DOC_PART} <{}>", e.name),
+                detail,
+            );
         }
         for c in e.elements_mut() {
             rec(c, out);
@@ -172,7 +234,11 @@ fn neutralise_objects(doc: &mut Element, out: &mut Vec<Notice>) {
 /// `fldSimple` and complex fields whose instruction fetches content.
 fn neutralise_fields(doc: &mut Element, out: &mut Vec<Notice>) {
     fn fetches(instr: &str) -> bool {
-        let first = instr.split_whitespace().next().unwrap_or("").to_ascii_uppercase();
+        let first = instr
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .to_ascii_uppercase();
         FETCHING_FIELDS.contains(&first.as_str())
     }
     // fldSimple → its result runs.
@@ -181,8 +247,15 @@ fn neutralise_fields(doc: &mut Element, out: &mut Vec<Notice>) {
         while k < e.children.len() {
             if let Node::El(c) = &e.children[k] {
                 if c.is("w:fldSimple") && fetches(&c.get("w:instr").unwrap_or_default()) {
-                    notice(out, "fetching-field", DOC_PART, clip(&c.get("w:instr").unwrap_or_default(), 60));
-                    let Node::El(c) = e.children.remove(k) else { unreachable!() };
+                    notice(
+                        out,
+                        "fetching-field",
+                        DOC_PART,
+                        clip(&c.get("w:instr").unwrap_or_default(), 60),
+                    );
+                    let Node::El(c) = e.children.remove(k) else {
+                        unreachable!()
+                    };
                     for (j, x) in c.children.into_iter().enumerate() {
                         e.children.insert(k + j, x);
                     }
@@ -217,7 +290,9 @@ fn neutralise_fields(doc: &mut Element, out: &mut Vec<Notice>) {
                 }
             }
             Tok::End => {
-                let Some((start, instr, _)) = stack.pop() else { continue };
+                let Some((start, instr, _)) = stack.pop() else {
+                    continue;
+                };
                 if !fetches(&instr) {
                     continue;
                 }
@@ -299,32 +374,57 @@ pub fn surface(parts: &[Part], doc: &Element, report: &mut ImportReport) {
             para += 1;
         }
         if e.is("w:r") {
-            let hidden = e.child("w:rPr").and_then(|p| p.child("w:vanish")).is_some_and(|v| crate::ooxml::on(Some(v)));
+            let hidden = e
+                .child("w:rPr")
+                .and_then(|p| p.child("w:vanish"))
+                .is_some_and(|v| crate::ooxml::on(Some(v)));
             let t = e.text_of(&["w:t"]);
             if hidden && !t.trim().is_empty() {
-                notice(out, "hidden-text", format!("paragraph {para}"), clip(&t, 60));
+                notice(
+                    out,
+                    "hidden-text",
+                    format!("paragraph {para}"),
+                    clip(&t, 60),
+                );
             }
         }
         if e.is("w:del") || e.is("w:moveFrom") {
             let t = e.text_of(&["w:delText", "w:t"]);
             if !t.trim().is_empty() {
                 let who = e.get("w:author").unwrap_or_else(|| "?".into());
-                notice(out, "tracked-deletion", format!("paragraph {para}"), format!("{who}: {}", clip(&t, 60)));
+                notice(
+                    out,
+                    "tracked-deletion",
+                    format!("paragraph {para}"),
+                    format!("{who}: {}", clip(&t, 60)),
+                );
             }
         }
     });
-    if let Some(d) = crate::package::get(parts, "word/comments.xml").and_then(|d| xml::parse(d).ok()) {
+    if let Some(d) =
+        crate::package::get(parts, "word/comments.xml").and_then(|d| xml::parse(d).ok())
+    {
         for c in d.root.elements().filter(|e| e.is("w:comment")) {
             let who = c.get("w:author").unwrap_or_else(|| "?".into());
             let location = format!("comment {}", c.get("w:id").unwrap_or_default());
-            notice(out, "comment", location, format!("{who}: {}", clip(&c.text_of(&["w:t"]), 60)));
+            notice(
+                out,
+                "comment",
+                location,
+                format!("{who}: {}", clip(&c.text_of(&["w:t"]), 60)),
+            );
         }
     }
     for (part, tags) in [
-        ("docProps/core.xml", &["dc:creator", "cp:lastModifiedBy"][..]),
+        (
+            "docProps/core.xml",
+            &["dc:creator", "cp:lastModifiedBy"][..],
+        ),
         ("docProps/app.xml", &["Company", "Manager"][..]),
     ] {
-        let Some(d) = crate::package::get(parts, part).and_then(|d| xml::parse(d).ok()) else { continue };
+        let Some(d) = crate::package::get(parts, part).and_then(|d| xml::parse(d).ok()) else {
+            continue;
+        };
         for tag in tags {
             for e in d.root.elements().filter(|e| e.name == *tag) {
                 let v = e.text_of(&[tag]);

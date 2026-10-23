@@ -30,17 +30,33 @@ const ROUND: &[&str] = &["ellipse", "flowChartConnector"];
 /// coordinates (before its flips and rotation).
 fn sites(g: &Geo, w: f64, h: f64) -> Result<Vec<(f64, f64)>, String> {
     match g {
-        Geo::Preset { prst, .. } if SIDES.contains(&prst.as_str()) => {
-            Ok(vec![(w / 2.0, 0.0), (0.0, h / 2.0), (w / 2.0, h), (w, h / 2.0)])
-        }
+        Geo::Preset { prst, .. } if SIDES.contains(&prst.as_str()) => Ok(vec![
+            (w / 2.0, 0.0),
+            (0.0, h / 2.0),
+            (w / 2.0, h),
+            (w, h / 2.0),
+        ]),
         Geo::Preset { prst, .. } if ROUND.contains(&prst.as_str()) => {
             let k = std::f64::consts::FRAC_1_SQRT_2;
             let (il, ir) = (w / 2.0 * (1.0 - k), w / 2.0 * (1.0 + k));
             let (it, ib) = (h / 2.0 * (1.0 - k), h / 2.0 * (1.0 + k));
-            Ok(vec![(w / 2.0, 0.0), (il, it), (0.0, h / 2.0), (il, ib), (w / 2.0, h), (ir, ib), (w, h / 2.0), (ir, it)])
+            Ok(vec![
+                (w / 2.0, 0.0),
+                (il, it),
+                (0.0, h / 2.0),
+                (il, ib),
+                (w / 2.0, h),
+                (ir, ib),
+                (w, h / 2.0),
+                (ir, it),
+            ])
         }
-        Geo::Preset { prst, .. } => Err(format!("the connection sites of kind=\"{prst}\" are not known here")),
-        Geo::Custom => Err("its connection sites are custom geometry, which is not evaluated here".into()),
+        Geo::Preset { prst, .. } => Err(format!(
+            "the connection sites of kind=\"{prst}\" are not known here"
+        )),
+        Geo::Custom => {
+            Err("its connection sites are custom geometry, which is not evaluated here".into())
+        }
     }
 }
 
@@ -50,19 +66,31 @@ fn site_point(el: &Element, site: u32, frame: &Frame) -> Result<(i64, i64), Stri
         return Err("a group's connection sites are not known here".into());
     }
     let g = geom::own(el).ok_or("it has no box")?;
-    let geo = kind::own(el).unwrap_or(Geo::Preset { prst: "rect".into(), av: vec![] });
+    let geo = kind::own(el).unwrap_or(Geo::Preset {
+        prst: "rect".into(),
+        av: vec![],
+    });
     let all = sites(&geo, g.w as f64, g.h as f64)?;
-    let &(mut x, mut y) = all.get(site as usize).ok_or_else(|| format!("it has no connection site {site}"))?;
+    let &(mut x, mut y) = all
+        .get(site as usize)
+        .ok_or_else(|| format!("it has no connection site {site}"))?;
     if g.flip_h {
         x = g.w as f64 - x;
     }
     if g.flip_v {
         y = g.h as f64 - y;
     }
-    let p = ((g.x as f64 + x).round() as i64, (g.y as f64 + y).round() as i64);
+    let p = (
+        (g.x as f64 + x).round() as i64,
+        (g.y as f64 + y).round() as i64,
+    );
     let c = (g.x as f64 + g.w as f64 / 2.0, g.y as f64 + g.h as f64 / 2.0);
     let (px, py) = geom::turned(p, c, g.rot);
-    let s = frame.out(&Geom { x: px, y: py, ..Default::default() });
+    let s = frame.out(&Geom {
+        x: px,
+        y: py,
+        ..Default::default()
+    });
     Ok((s.x, s.y))
 }
 
@@ -81,7 +109,12 @@ struct Found<'a> {
 fn find<'a>(items: &[&'a Element], id: u32, frame: Frame) -> Option<Found<'a>> {
     for &e in items {
         if geom::shape_id(e) == Some(id) {
-            return Some(Found { el: e, frame, up: vec![], turned: false });
+            return Some(Found {
+                el: e,
+                frame,
+                up: vec![],
+                turned: false,
+            });
         }
         if e.is("p:grpSp") {
             let kids: Vec<&Element> = e.elements().collect();
@@ -100,22 +133,35 @@ fn find<'a>(items: &[&'a Element], id: u32, frame: Frame) -> Option<Found<'a>> {
 /// so a re-attached connector is found again.
 pub fn without_attachments(el: &Element) -> Element {
     let mut e = el.clone();
-    if let Some(c) = e.child_mut("p:nvCxnSpPr").and_then(|n| n.child_mut("p:cNvCxnSpPr")) {
-        c.children.retain(|n| !matches!(n, Node::El(x) if x.is("a:stCxn") || x.is("a:endCxn")));
+    if let Some(c) = e
+        .child_mut("p:nvCxnSpPr")
+        .and_then(|n| n.child_mut("p:cNvCxnSpPr"))
+    {
+        c.children
+            .retain(|n| !matches!(n, Node::El(x) if x.is("a:stCxn") || x.is("a:endCxn")));
     }
     e
 }
 
 /// `cNvCxnSpPr`'s `a:stCxn` or `a:endCxn`.
 fn set_cxn(cxn: &mut Element, name: &str, at: Option<(u32, u32)>) {
-    let Some(nv) = cxn.child_mut("p:nvCxnSpPr") else { return };
+    let Some(nv) = cxn.child_mut("p:nvCxnSpPr") else {
+        return;
+    };
     if nv.child("p:cNvCxnSpPr").is_none() {
-        let at = nv.children.iter().position(|n| matches!(n, Node::El(c) if c.is("p:cNvPr"))).map_or(0, |k| k + 1);
-        nv.children.insert(at, Node::El(Element::new("p:cNvCxnSpPr")));
+        let at = nv
+            .children
+            .iter()
+            .position(|n| matches!(n, Node::El(c) if c.is("p:cNvPr")))
+            .map_or(0, |k| k + 1);
+        nv.children
+            .insert(at, Node::El(Element::new("p:cNvCxnSpPr")));
     }
     let c = nv.child_mut("p:cNvCxnSpPr").expect("p:cNvCxnSpPr");
     match at {
-        None => c.children.retain(|n| !matches!(n, Node::El(x) if x.is(name))),
+        None => c
+            .children
+            .retain(|n| !matches!(n, Node::El(x) if x.is(name))),
         Some((id, idx)) => {
             let (id, idx) = (id.to_string(), idx.to_string());
             match c.child_mut(name) {
@@ -129,7 +175,9 @@ fn set_cxn(cxn: &mut Element, name: &str, at: Option<(u32, u32)>) {
                 }
                 None => insert_ordered(
                     c,
-                    Element::new(name).with_attr("id", &id).with_attr("idx", &idx),
+                    Element::new(name)
+                        .with_attr("id", &id)
+                        .with_attr("idx", &idx),
                     &["cxnSpLocks", "stCxn", "endCxn", "extLst"],
                 ),
             }
@@ -157,7 +205,10 @@ pub fn write(
     let had = geom::attachments(cxn);
     let mut ends = if created { *w } else { stored.merged(w) };
     let mut rerouted = false;
-    for (i, (want, name)) in [(w.from_at, "a:stCxn"), (w.to_at, "a:endCxn")].into_iter().enumerate() {
+    for (i, (want, name)) in [(w.from_at, "a:stCxn"), (w.to_at, "a:endCxn")]
+        .into_iter()
+        .enumerate()
+    {
         let end = if i == 0 { "from" } else { "to" };
         match want {
             None => {
@@ -205,19 +256,28 @@ pub fn write(
         match kind::own(cxn) {
             None => {}
             Some(Geo::Preset { prst, .. })
-                if matches!(prst.as_str(), "line" | "straightConnector1" | "bentConnector2") => {}
+                if matches!(
+                    prst.as_str(),
+                    "line" | "straightConnector1" | "bentConnector2"
+                ) => {}
             // An elbow's bend goes back to the midpoint.
             Some(Geo::Preset { prst, av }) if prst == "bentConnector3" => {
                 if !av.is_empty() {
-                    let g = cxn.child_mut("p:spPr").and_then(|s| s.child_mut("a:prstGeom")).expect("a:prstGeom");
-                    g.children.retain(|n| !matches!(n, Node::El(c) if c.is("a:avLst")));
+                    let g = cxn
+                        .child_mut("p:spPr")
+                        .and_then(|s| s.child_mut("a:prstGeom"))
+                        .expect("a:prstGeom");
+                    g.children
+                        .retain(|n| !matches!(n, Node::El(c) if c.is("a:avLst")));
                     g.children.insert(0, Node::El(Element::new("a:avLst")));
                 }
             }
             Some(Geo::Preset { prst, .. }) => {
                 return Err(format!("it is kind=\"{prst}\", and only straight and elbow connectors (bentConnector2, bentConnector3) are rerouted here: attach it where its object is, write its ends as points, or leave the object where it is"));
             }
-            Some(Geo::Custom) => return Err("it is drawn with custom geometry, which is not rerouted here".into()),
+            Some(Geo::Custom) => {
+                return Err("it is drawn with custom geometry, which is not rerouted here".into())
+            }
         }
     }
     geom::write(cxn, &geom::box_of(&ends, st.rot))?;

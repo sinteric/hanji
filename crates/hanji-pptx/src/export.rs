@@ -18,19 +18,15 @@ use hanji_package::package;
 use hanji_package::xml::{self, fragment, insert_ordered, Element, Node};
 
 use crate::deck::{LayoutInfo, SlotInfo};
-use crate::effects;
-use crate::fill;
 use crate::geom::{self, Frame};
 use crate::import::{
-    crop_of, group_item, object_geom, part_of_src, picture_item, shown_of, NotesInfo, Rels, SlideInfo, OBJECT_TAG,
+    crop_of, group_item, object_geom, part_of_src, picture_item, shown_of, NotesInfo, Rels,
+    SlideInfo, OBJECT_TAG,
 };
-use crate::kind;
 use crate::members::{self, Styling};
-use crate::outline;
 use crate::pml::*;
-use crate::route;
 use crate::text::{self, RunStyle, ThemeFonts};
-use crate::DeckShell;
+use crate::{effects, fill, kind, outline, route, DeckShell};
 use hanji_format::inline_style::{self as istyle, TextStyle};
 
 fn el(name: &str) -> Element {
@@ -54,15 +50,27 @@ fn group(blocks: &[Block]) -> Result<Vec<SlideG<'_>>, String> {
     let mut out: Vec<SlideG> = vec![];
     let mut k = 0;
     while k < blocks.len() {
-        let Block::Head(h) = &blocks[k] else { return Err("a block outside any slide or slot".into()) };
-        let end = (k + 1..blocks.len()).find(|&x| blocks[x].head().is_some()).unwrap_or(blocks.len());
+        let Block::Head(h) = &blocks[k] else {
+            return Err("a block outside any slide or slot".into());
+        };
+        let end = (k + 1..blocks.len())
+            .find(|&x| blocks[x].head().is_some())
+            .unwrap_or(blocks.len());
         match kind(h) {
-            HeadKind::Slide { layout } => out.push(SlideG { head: k, layout, items: vec![] }),
-            other => out.last_mut().ok_or("a slot before the first slide")?.items.push(ItemG {
+            HeadKind::Slide { layout } => out.push(SlideG {
                 head: k,
-                kind: other,
-                body: k + 1..end,
+                layout,
+                items: vec![],
             }),
+            other => out
+                .last_mut()
+                .ok_or("a slot before the first slide")?
+                .items
+                .push(ItemG {
+                    head: k,
+                    kind: other,
+                    body: k + 1..end,
+                }),
         }
         k = end;
     }
@@ -171,14 +179,23 @@ impl<'a> Exporter<'a> {
             outs.push(out);
         }
         self.presentation(&mut parts, &outs)?;
-        let template = parts.iter().find(|p| p.name == self.shell.pres_part).cloned().ok_or("no presentation part")?;
+        let template = parts
+            .iter()
+            .find(|p| p.name == self.shell.pres_part)
+            .cloned()
+            .ok_or("no presentation part")?;
         let mut added: Vec<(String, String)> = vec![];
         for o in &outs {
             if put(&mut parts, &template, &o.info.part, o.xml.clone()) {
                 added.push((o.info.part.clone(), CT_SLIDE.into()));
             }
             if let Some(r) = &o.rels {
-                put(&mut parts, &template, &opc::rels_part(&o.info.part), r.clone());
+                put(
+                    &mut parts,
+                    &template,
+                    &opc::rels_part(&o.info.part),
+                    r.clone(),
+                );
             }
             for (name, data, ct) in &o.media {
                 if put(&mut parts, &template, name, data.clone()) {
@@ -196,7 +213,12 @@ impl<'a> Exporter<'a> {
         }
         // Slides the text no longer has go, with what only they used.
         let kept: BTreeSet<&str> = outs.iter().map(|o| o.info.part.as_str()).collect();
-        let deleted: Vec<&String> = self.shell.slides.iter().filter(|p| !kept.contains(p.as_str())).collect();
+        let deleted: Vec<&String> = self
+            .shell
+            .slides
+            .iter()
+            .filter(|p| !kept.contains(p.as_str()))
+            .collect();
         // Only a deleted slide or a slide's changed relationships can leave parts unreached.
         let gone = if deleted.is_empty() && outs.iter().all(|o| o.rels.is_none()) {
             BTreeSet::new()
@@ -213,18 +235,23 @@ impl<'a> Exporter<'a> {
     // ------------------------------------------------------------ slides
 
     fn slide(&self, s: &SlideG, numbers: &mut Numbers) -> Result<SlideOut, String> {
-        let layout =
-            self.shell.deck.layout(s.layout).ok_or_else(|| format!("layout {:?} is not in the file", s.layout))?;
+        let layout = self
+            .shell
+            .deck
+            .layout(s.layout)
+            .ok_or_else(|| format!("layout {:?} is not in the file", s.layout))?;
         let (mut info, skel, new) = match self.slide.get(&s.head) {
             Some(e) => {
-                let info: SlideInfo = serde_json::from_str(&e.meta.aux[0]).map_err(|e| e.to_string())?;
+                let info: SlideInfo =
+                    serde_json::from_str(&e.meta.aux[0]).map_err(|e| e.to_string())?;
                 (info, fragment(&e.xml[0]), false)
             }
             None => {
                 let part = numbers.next("ppt/slides/slide");
                 let info = SlideInfo {
                     part,
-                    prolog: "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n".into(),
+                    prolog: "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+                        .into(),
                     layout: layout.part.clone(),
                     ..Default::default()
                 };
@@ -233,11 +260,17 @@ impl<'a> Exporter<'a> {
         };
         let relayout = info.layout != layout.part;
         let part = info.part.clone();
-        let items: Vec<&ItemG> = s.items.iter().filter(|i| i.kind != HeadKind::Slot { name: "notes" }).collect();
+        let items: Vec<&ItemG> = s
+            .items
+            .iter()
+            .filter(|i| i.kind != HeadKind::Slot { name: "notes" })
+            .collect();
         let bullets_of = |it: &ItemG, el: &Element| -> [Bu; 9] {
             let own = levels_of(el.child("p:txBody").and_then(|t| t.child("a:lstStyle")));
             match it.kind {
-                HeadKind::Slot { name } => over(own, layout.slot(name).map_or(layout.other, |x| x.bullets)),
+                HeadKind::Slot { name } => {
+                    over(own, layout.slot(name).map_or(layout.other, |x| x.bullets))
+                }
                 _ => over(own, layout.other),
             }
         };
@@ -280,8 +313,11 @@ impl<'a> Exporter<'a> {
             let Some(e) = e else { continue };
             self.check_part(e, &part)?;
             if e.meta.aux.get(1) == Some(&part) {
-                claims[n] =
-                    k.and_then(|k| stands.iter().position(|x| matches!(x, Stand::Item { k: kk, .. } if kk == k)));
+                claims[n] = k.and_then(|k| {
+                    stands
+                        .iter()
+                        .position(|x| matches!(x, Stand::Item { k: kk, .. } if kk == k))
+                });
             } else {
                 fresh[n] = true;
             }
@@ -300,7 +336,9 @@ impl<'a> Exporter<'a> {
                     (fresh[n], created[n]) = (true, true);
                 }
                 HeadKind::Line { id: "", .. } => {
-                    let Some(Place::Line(ends)) = &head.place else { return Err("a line without its ends".into()) };
+                    let Some(Place::Line(ends)) = &head.place else {
+                        return Err("a line without its ends".into());
+                    };
                     els[n] = Some(new_line(ends));
                     (fresh[n], created[n]) = (true, true);
                 }
@@ -330,7 +368,10 @@ impl<'a> Exporter<'a> {
                 }
                 HeadKind::Slot { name } => {
                     let taken: Vec<usize> = claims.iter().flatten().copied().collect();
-                    let found = stands.iter().enumerate().find(|(x, st)| !taken.contains(x) && st.slot() == Some(name));
+                    let found = stands
+                        .iter()
+                        .enumerate()
+                        .find(|(x, st)| !taken.contains(x) && st.slot() == Some(name));
                     match found {
                         Some((x, st)) => {
                             let el = st.element().ok_or("a stand-in without its placeholder")?;
@@ -379,7 +420,12 @@ impl<'a> Exporter<'a> {
             let text = matches!(it.kind, HeadKind::Slot { .. } | HeadKind::Shape { .. });
             // Its fill (§5.3): written where the text changes what it shows.
             if text && e.is("p:sp") && self.keep_slot(it)?.is_none() {
-                let old = self.shell.deck.layouts.iter().find(|l| l.part == info.layout);
+                let old = self
+                    .shell
+                    .deck
+                    .layouts
+                    .iter()
+                    .find(|l| l.part == info.layout);
                 let (now, then) = match it.kind {
                     HeadKind::Slot { name } => (
                         layout.slot(name).and_then(|s| s.fill.as_ref()),
@@ -388,7 +434,11 @@ impl<'a> Exporter<'a> {
                     _ => (None, None),
                 };
                 let then = if old.is_some() { then } else { now };
-                let p = fill::Parents { now, then, theme: &layout.fills };
+                let p = fill::Parents {
+                    now,
+                    then,
+                    theme: &layout.fills,
+                };
                 fill::write(&mut e, self.head(it).look.fill.as_deref(), p)?;
             }
             // Its outline (and a line's arrowheads), and its preset shape, likewise.
@@ -399,9 +449,20 @@ impl<'a> Exporter<'a> {
                     _ => None,
                 };
                 let look = &self.head(it).look;
-                outline::write(&mut e, look, slot.and_then(|s| s.line.as_ref()), &layout.fills, lined)?;
-                effects::write(&mut e, look.effects.as_deref(), slot.and_then(|s| s.fx.as_ref()), &layout.fills)
-                    .map_err(|m| format!("{}: {m}", item_label(it)))?;
+                outline::write(
+                    &mut e,
+                    look,
+                    slot.and_then(|s| s.line.as_ref()),
+                    &layout.fills,
+                    lined,
+                )?;
+                effects::write(
+                    &mut e,
+                    look.effects.as_deref(),
+                    slot.and_then(|s| s.fx.as_ref()),
+                    &layout.fills,
+                )
+                .map_err(|m| format!("{}: {m}", item_label(it)))?;
                 kind::write(&mut e, look, slot.and_then(|s| s.geo.as_ref()), lined)
                     .map_err(|m| format!("{}: {m}", item_label(it)))?;
             }
@@ -415,13 +476,21 @@ impl<'a> Exporter<'a> {
                 };
                 let base = inherited.map(|t| text::base(&e, t, &layout.fonts));
                 // What they inherited from the layout the slide had, when it changes.
-                let before = self.shell.deck.layouts.iter().find(|l| l.part == info.layout).map(|old| {
-                    let t = match it.kind {
-                        HeadKind::Slot { name } => old.slot(name).map_or(&old.other_text, |x| &x.text),
-                        _ => &old.other_text,
-                    };
-                    text::base(&e, t, &old.fonts)
-                });
+                let before = self
+                    .shell
+                    .deck
+                    .layouts
+                    .iter()
+                    .find(|l| l.part == info.layout)
+                    .map(|old| {
+                        let t = match it.kind {
+                            HeadKind::Slot { name } => {
+                                old.slot(name).map_or(&old.other_text, |x| &x.text)
+                            }
+                            _ => &old.other_text,
+                        };
+                        text::base(&e, t, &old.fonts)
+                    });
                 let inherit = base.as_ref().map(|now| Inherit {
                     now,
                     then: before.as_ref().unwrap_or(now),
@@ -432,13 +501,16 @@ impl<'a> Exporter<'a> {
                     if !e.is("p:sp") {
                         return Err("only a shape can hold text".into());
                     }
-                    e.children.push(Node::El(fragment("<p:txBody><a:bodyPr/><a:lstStyle/></p:txBody>")));
+                    e.children.push(Node::El(fragment(
+                        "<p:txBody><a:bodyPr/><a:lstStyle/></p:txBody>",
+                    )));
                 }
                 if let Some(tx) = e.child_mut("p:txBody") {
                     let had = tx.elements().any(|p| p.is("a:p"));
                     // A shape without text keeps its empty paragraphs; a text body has at least one.
                     if !paras.is_empty() || !had || !it.body.is_empty() {
-                        tx.children.retain(|x| !matches!(x, Node::El(p) if p.is("a:p")));
+                        tx.children
+                            .retain(|x| !matches!(x, Node::El(p) if p.is("a:p")));
                         if paras.is_empty() {
                             tx.children.push(Node::El(Element::new("a:p")));
                         }
@@ -461,11 +533,22 @@ impl<'a> Exporter<'a> {
                     HeadKind::Slot { name } => layout.slot(name).and_then(|s| s.geom),
                     _ => None,
                 };
-                let stored = (!created[n]).then(|| shown[n].or(object_geom(e)).or(slot)).flatten();
+                let stored = (!created[n])
+                    .then(|| shown[n].or(object_geom(e)).or(slot))
+                    .flatten();
                 match &self.head(it).place {
-                    Some(Place::Box(g)) => geom::Written { stored, written: Some(*g) },
-                    Some(Place::Picture(p)) => geom::Written { stored, written: p.geom },
-                    Some(Place::Group(g)) => geom::Written { stored: geom::own(e), written: g.geom },
+                    Some(Place::Box(g)) => geom::Written {
+                        stored,
+                        written: Some(*g),
+                    },
+                    Some(Place::Picture(p)) => geom::Written {
+                        stored,
+                        written: p.geom,
+                    },
+                    Some(Place::Group(g)) => geom::Written {
+                        stored: geom::own(e),
+                        written: g.geom,
+                    },
                     _ => geom::Written::default(),
                 }
             })
@@ -485,7 +568,9 @@ impl<'a> Exporter<'a> {
             let mut changed = vec![];
             match (&it.kind, &head.place) {
                 (HeadKind::Line { .. }, Some(Place::Line(w)))
-                    if w.from_at.is_some() || w.to_at.is_some() || geom::attachments(e).iter().any(Option::is_some) =>
+                    if w.from_at.is_some()
+                        || w.to_at.is_some()
+                        || geom::attachments(e).iter().any(Option::is_some) =>
                 {
                     attached.push(n);
                 }
@@ -493,15 +578,20 @@ impl<'a> Exporter<'a> {
                     let st = geom::own(e).unwrap_or_default();
                     let ends = geom::ends_of(&st);
                     if !created[n] && !w.shows_as(&ends) {
-                        geom::write(e, &geom::box_of(&ends.merged(w), st.rot)).map_err(|m| format!("{what}: {m}"))?;
+                        geom::write(e, &geom::box_of(&ends.merged(w), st.rot))
+                            .map_err(|m| format!("{what}: {m}"))?;
                         lines_written.extend(geom::shape_id(e));
                     }
                 }
                 (HeadKind::Group { .. }, Some(Place::Group(w))) => {
-                    let w = GroupItem { geom: snapped, ..w.clone() };
+                    let w = GroupItem {
+                        geom: snapped,
+                        ..w.clone()
+                    };
                     let map = rels_map(&rels, &part);
-                    changed = apply_group(e, &w, &geom::Frame::SLIDE, &map, Some(Styling::of(layout)))
-                        .map_err(|m| format!("{what}: {m}"))?;
+                    changed =
+                        apply_group(e, &w, &geom::Frame::SLIDE, &map, Some(Styling::of(layout)))
+                            .map_err(|m| format!("{what}: {m}"))?;
                     lines_written.extend(changed.iter().filter(|x| x.1).map(|x| x.0));
                 }
                 (kind, place) => {
@@ -510,8 +600,16 @@ impl<'a> Exporter<'a> {
                         _ => None,
                     };
                     if let Some(Place::Picture(pic)) = place {
-                        self.picture(e, pic, &part, &mut rels, &mut rels_changed, &mut media, numbers)
-                            .map_err(|m| format!("{what}: {m}"))?;
+                        self.picture(
+                            e,
+                            pic,
+                            &part,
+                            &mut rels,
+                            &mut rels_changed,
+                            &mut media,
+                            numbers,
+                        )
+                        .map_err(|m| format!("{what}: {m}"))?;
                     }
                     if created[n] {
                         // A new text box, made at its box as written.
@@ -543,10 +641,16 @@ impl<'a> Exporter<'a> {
             // connector's point must detach it, unlike an unshown attachment.
             visible.extend(&info.attachment_targets);
             for &n in &attached {
-                let Some(Place::Line(w)) = &self.head(items[n]).place else { continue };
+                let Some(Place::Line(w)) = &self.head(items[n]).place else {
+                    continue;
+                };
                 let mut e = out_items[n].clone();
-                let others: Vec<&Element> =
-                    out_items.iter().enumerate().filter(|(k, _)| *k != n).map(|x| x.1).collect();
+                let others: Vec<&Element> = out_items
+                    .iter()
+                    .enumerate()
+                    .filter(|(k, _)| *k != n)
+                    .map(|x| x.1)
+                    .collect();
                 let what = item_label(items[n]);
                 route::write(&mut e, w, &others, &moved_ids, &visible, created[n])
                     .map_err(|m| format!("{what}: {m}"))?;
@@ -556,9 +660,16 @@ impl<'a> Exporter<'a> {
             }
         }
         check_connectors(&stands, &out_items, &moved, &lines_written)?;
-        let tree_children =
-            assemble(std::mem::take(&mut stands), &claims, out_items, &|slot: &str| layout.slot(slot).is_some())?;
-        let tree = xml_root.child_mut("p:cSld").and_then(|c| c.child_mut("p:spTree")).unwrap();
+        let tree_children = assemble(
+            std::mem::take(&mut stands),
+            &claims,
+            out_items,
+            &|slot: &str| layout.slot(slot).is_some(),
+        )?;
+        let tree = xml_root
+            .child_mut("p:cSld")
+            .and_then(|c| c.child_mut("p:spTree"))
+            .unwrap();
         tree.children = tree_children;
         check_timing(&xml_root, &info)?;
         if relayout && !new {
@@ -582,11 +693,22 @@ impl<'a> Exporter<'a> {
         let notes = self.notes_page(s, &part, &mut rels, &mut rels_changed, numbers)?;
         let xml = format!("{}{}{}", info.prolog, xml_root.to_xml(), info.epilog).into_bytes();
         let rels_data = if rels_changed {
-            Some(if new { opc::write_rels(&rels) } else { rewrite_rels(self.parts, &part, &rels)? })
+            Some(if new {
+                opc::write_rels(&rels)
+            } else {
+                rewrite_rels(self.parts, &part, &rels)?
+            })
         } else {
             None
         };
-        Ok(SlideOut { info, xml, rels: rels_data, new, notes, media })
+        Ok(SlideOut {
+            info,
+            xml,
+            rels: rels_data,
+            new,
+            notes,
+            media,
+        })
     }
 
     /// A picture's image, crop, mask and alternative text as the text
@@ -609,17 +731,30 @@ impl<'a> Exporter<'a> {
             return Err("this picture is kept as it is (it is not shown as a <picture/>)".into());
         }
         // A new picture starts with no image, crop, mask or alternative text.
-        let st =
-            st.unwrap_or_else(|| PictureItem { src: String::new(), crop: None, mask: None, alt: None, ..w.clone() });
+        let st = st.unwrap_or_else(|| PictureItem {
+            src: String::new(),
+            crop: None,
+            mask: None,
+            alt: None,
+            ..w.clone()
+        });
         if st.src != w.src {
             let target = self.image_part(&w.src, media, numbers)?;
             let rel = target_rel(rels, part, &target, rels_changed);
-            let blip =
-                e.child_mut("p:blipFill").and_then(|b| b.child_mut("a:blip")).ok_or("the picture has no a:blip")?;
+            let blip = e
+                .child_mut("p:blipFill")
+                .and_then(|b| b.child_mut("a:blip"))
+                .ok_or("the picture has no a:blip")?;
             blip.set("r:embed", &rel);
         }
-        if !w.crop.unwrap_or_default().shows_as(&st.crop.unwrap_or_default()) {
-            let bf = e.child_mut("p:blipFill").ok_or("the picture has no p:blipFill")?;
+        if !w
+            .crop
+            .unwrap_or_default()
+            .shows_as(&st.crop.unwrap_or_default())
+        {
+            let bf = e
+                .child_mut("p:blipFill")
+                .ok_or("the picture has no p:blipFill")?;
             let stored = bf.child("a:srcRect").map(crop_of).unwrap_or_default();
             let c = stored.merged(&w.crop.unwrap_or_default());
             set_crop(bf, &c);
@@ -658,7 +793,8 @@ impl<'a> Exporter<'a> {
         let Some(data) = self.files.get(src) else {
             return Err(format!("src=\"{src}\" is neither an image of this file (such as media/image1.png, as another picture shows it) nor a file handed to this write: a picture from a file needs the host to hand over the image"));
         };
-        let (ext, ct) = image_type(data).ok_or_else(|| format!("{src} is not a PNG, JPEG, GIF or BMP image"))?;
+        let (ext, ct) = image_type(data)
+            .ok_or_else(|| format!("{src} is not a PNG, JPEG, GIF or BMP image"))?;
         let name = numbers.next_media(ext);
         numbers.host.insert(src.to_string(), name.clone());
         media.push((name.clone(), data.clone(), ct));
@@ -671,7 +807,13 @@ impl<'a> Exporter<'a> {
         let body = &self.blocks[it.body.clone()];
         let keeps: Vec<&Entry> = body
             .iter()
-            .filter_map(|b| if let Block::Keep(id) = b { self.keep.get(id.as_str()).copied() } else { None })
+            .filter_map(|b| {
+                if let Block::Keep(id) = b {
+                    self.keep.get(id.as_str()).copied()
+                } else {
+                    None
+                }
+            })
             .filter(|e| e.kind == Kind::Bkeep)
             .collect();
         let object = it.kind == HeadKind::Object;
@@ -722,7 +864,9 @@ impl<'a> Exporter<'a> {
             let p = match &self.blocks[bi] {
                 Block::Para(p) => p,
                 Block::Keep(id) => {
-                    return Err(format!("placeholder {id} holds a slot's object and cannot sit among paragraphs"))
+                    return Err(format!(
+                        "placeholder {id} holds a slot's object and cannot sit among paragraphs"
+                    ))
                 }
                 _ => return Err("a table cannot be written in a slide yet".into()),
             };
@@ -730,7 +874,10 @@ impl<'a> Exporter<'a> {
             if let Some(e) = ppr_e {
                 self.check_part(e, part)?;
             }
-            let stored_lvl: u32 = ppr_e.and_then(|e| e.meta.aux.first()).and_then(|v| v.parse().ok()).unwrap_or(0);
+            let stored_lvl: u32 = ppr_e
+                .and_then(|e| e.meta.aux.first())
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
             if !lists {
                 out.push(self.para(p, bi, ppr_e, None, bullets, &lang, part, base)?);
                 continue;
@@ -743,7 +890,9 @@ impl<'a> Exporter<'a> {
                 Some(it) => {
                     let t = it.level;
                     let cand = match ppr_e.and_then(|e| e.meta.item) {
-                        Some(si) => (stored_lvl as i64 + t as i64 - si.level as i64).clamp(0, 8) as u32,
+                        Some(si) => {
+                            (stored_lvl as i64 + t as i64 - si.level as i64).clamp(0, 8) as u32
+                        }
                         None if ppr_e.is_some() => stored_lvl,
                         None => t as u32,
                     };
@@ -752,8 +901,13 @@ impl<'a> Exporter<'a> {
                     }
                     let sib = open.get(t).copied();
                     let parent = t.checked_sub(1).and_then(|k| open.get(k)).copied();
-                    let fits = |l: u32| parent.is_none_or(|lp| l > lp) && sib.is_none_or(|ls| l <= ls);
-                    let l = if fits(cand) { cand } else { sib.unwrap_or_else(|| parent.map_or(0, |lp| lp + 1)) };
+                    let fits =
+                        |l: u32| parent.is_none_or(|lp| l > lp) && sib.is_none_or(|ls| l <= ls);
+                    let l = if fits(cand) {
+                        cand
+                    } else {
+                        sib.unwrap_or_else(|| parent.map_or(0, |lp| lp + 1))
+                    };
                     if l > 8 {
                         return Err("a slide's lists nest at most nine levels".into());
                     }
@@ -771,7 +925,12 @@ impl<'a> Exporter<'a> {
     fn lang_of(&self, it: &ItemG) -> String {
         for bi in it.body.clone() {
             for r in self.at(bi, Kind::Run) {
-                if let Some(l) = r.xml.get(1).map(|x| fragment(x)).and_then(|x| x.get("lang")) {
+                if let Some(l) = r
+                    .xml
+                    .get(1)
+                    .map(|x| fragment(x))
+                    .and_then(|x| x.get("lang"))
+                {
                     return l;
                 }
             }
@@ -802,7 +961,10 @@ impl<'a> Exporter<'a> {
         };
         // Level and bullet as the text says (a shape's paragraphs keep theirs).
         if let Some(lvl) = lvl {
-            let stored_lvl: u32 = ppr_e.and_then(|e| e.meta.aux.first()).and_then(|v| v.parse().ok()).unwrap_or(0);
+            let stored_lvl: u32 = ppr_e
+                .and_then(|e| e.meta.aux.first())
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(0);
             if lvl != stored_lvl || ppr_e.is_none() && lvl > 0 {
                 let x = ppr.get_or_insert_with(|| el("a:pPr"));
                 if lvl == 0 {
@@ -821,7 +983,10 @@ impl<'a> Exporter<'a> {
         if let Some(x) = ppr {
             pel.children.push(Node::El(x));
         }
-        let stored_lvl: u32 = ppr_e.and_then(|e| e.meta.aux.first()).and_then(|v| v.parse().ok()).unwrap_or(0);
+        let stored_lvl: u32 = ppr_e
+            .and_then(|e| e.meta.aux.first())
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(0);
         let under = base.map(|b| b.at(lvl.unwrap_or(stored_lvl).min(8) as usize));
         self.runs(&mut pel, &p.content, bi, lang, part, under)?;
         if let Some(x) = end {
@@ -866,7 +1031,10 @@ impl<'a> Exporter<'a> {
                     .copied()
                     .ok_or_else(|| format!("placeholder {} has no remainder entry", kp.id))?;
                 if e.kind == Kind::Bkeep {
-                    return Err(format!("placeholder {} holds a slot's object and cannot sit in a paragraph", kp.id));
+                    return Err(format!(
+                        "placeholder {} holds a slot's object and cannot sit in a paragraph",
+                        kp.id
+                    ));
                 }
                 self.check_part(e, part)?;
                 keeps.insert(k, e);
@@ -883,7 +1051,9 @@ impl<'a> Exporter<'a> {
                 if under.is_none() || istyle::visible(&c.units[k].atom) {
                     return Some(want[k].clone());
                 }
-                let Some(o) = owner[k] else { return Some(want[k].clone()) };
+                let Some(o) = owner[k] else {
+                    return Some(want[k].clone());
+                };
                 let mine = |j: &usize| owner[*j].is_some_and(|x| x.id == o.id);
                 let shows = |j: &usize| istyle::visible(&c.units[*j].atom);
                 let prev = (0..k).rev().take_while(mine).find(shows);
@@ -931,7 +1101,13 @@ impl<'a> Exporter<'a> {
                     }
                     if r.is("a:r") {
                         // Its own text: whitespace the text shows as an empty paragraph.
-                        let t = z.meta.aux.first().filter(|_| n == 0).cloned().unwrap_or_default();
+                        let t = z
+                            .meta
+                            .aux
+                            .first()
+                            .filter(|_| n == 0)
+                            .cloned()
+                            .unwrap_or_default();
                         let mut te = el("a:t");
                         if !t.is_empty() {
                             te.children.push(Node::Text(xml::escape_text(&t)));
@@ -941,7 +1117,16 @@ impl<'a> Exporter<'a> {
                     pel.children.push(Node::El(r));
                 }
                 It::Keep(e) => pel.children.push(Node::El(fragment(&e.xml[0]))),
-                It::Seg(a, b) => self.seg(pel, c, &eff, a, b, owner[a], lang, under.zip(wanted[a].as_ref()))?,
+                It::Seg(a, b) => self.seg(
+                    pel,
+                    c,
+                    &eff,
+                    a,
+                    b,
+                    owner[a],
+                    lang,
+                    under.zip(wanted[a].as_ref()),
+                )?,
             }
         }
         Ok(())
@@ -962,8 +1147,16 @@ impl<'a> Exporter<'a> {
         lang: &str,
         style: Option<(Under, &TextStyle)>,
     ) -> Result<(), String> {
-        let text: String =
-            c.units[a..b].iter().filter_map(|u| if let Atom::Char(ch) = u.atom { Some(ch) } else { None }).collect();
+        let text: String = c.units[a..b]
+            .iter()
+            .filter_map(|u| {
+                if let Atom::Char(ch) = u.atom {
+                    Some(ch)
+                } else {
+                    None
+                }
+            })
+            .collect();
         let (shell, rpr) = match own {
             Some(o) => {
                 let s = fragment(&o.xml[0]);
@@ -990,7 +1183,9 @@ impl<'a> Exporter<'a> {
             // What the text leaves unsaid, the run inherits.
             let hangul = text::has_hangul(&c.units);
             let mut want = want.over(&u.now.shown_for(hangul));
-            let own = rpr.as_ref().map_or_else(RunStyle::default, |r| RunStyle::of(r, u.fonts));
+            let own = rpr
+                .as_ref()
+                .map_or_else(RunStyle::default, |r| RunStyle::of(r, u.fonts));
             let had = own.over(u.now).shown_for(hangul);
             // A colour kept as the file stores it (`*`, a gradient…) is not
             // written from the text: one the run showed under the slide's old
@@ -1054,11 +1249,15 @@ impl<'a> Exporter<'a> {
         rels_changed: &mut bool,
         numbers: &mut Numbers,
     ) -> Result<Option<NotesOut>, String> {
-        let item = s.items.iter().find(|i| i.kind == HeadKind::Slot { name: "notes" });
+        let item = s
+            .items
+            .iter()
+            .find(|i| i.kind == HeadKind::Slot { name: "notes" });
         let entry = self.notes.get(&s.head).copied();
         let (info, skel, new) = match entry {
             Some(e) => {
-                let info: NotesInfo = serde_json::from_str(&e.meta.aux[0]).map_err(|e| e.to_string())?;
+                let info: NotesInfo =
+                    serde_json::from_str(&e.meta.aux[0]).map_err(|e| e.to_string())?;
                 (info, fragment(&e.xml[0]), false)
             }
             None if item.is_none() => return Ok(None),
@@ -1070,7 +1269,8 @@ impl<'a> Exporter<'a> {
                 let part = numbers.next("ppt/notesSlides/notesSlide");
                 let info = NotesInfo {
                     part,
-                    prolog: "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n".into(),
+                    prolog: "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n"
+                        .into(),
                     epilog: String::new(),
                 };
                 (info, new_notes(), true)
@@ -1091,7 +1291,9 @@ impl<'a> Exporter<'a> {
                 Some(sh) => {
                     self.check_part(sh, &info.part)?;
                     if sh.meta.aux.get(1) == Some(&info.part) {
-                        claim = stands.iter().position(|x| matches!(x, Stand::Item { k, .. } if k == "notes"));
+                        claim = stands
+                            .iter()
+                            .position(|x| matches!(x, Stand::Item { k, .. } if k == "notes"));
                     }
                     fragment(&sh.xml[0])
                 }
@@ -1106,18 +1308,30 @@ impl<'a> Exporter<'a> {
             fresh.push(claim.is_none());
             let bullets = over(
                 levels_of(body.child("p:txBody").and_then(|t| t.child("a:lstStyle"))),
-                self.shell.deck.notes.as_ref().map_or([Bu::Unset; 9], |n| n.bullets),
+                self.shell
+                    .deck
+                    .notes
+                    .as_ref()
+                    .map_or([Bu::Unset; 9], |n| n.bullets),
             );
             let paras = self.paras(it, &bullets, &info.part, true, None)?;
-            let tx = body.child_mut("p:txBody").ok_or("the notes placeholder has no p:txBody")?;
-            tx.children.retain(|x| !matches!(x, Node::El(p) if p.is("a:p")));
+            let tx = body
+                .child_mut("p:txBody")
+                .ok_or("the notes placeholder has no p:txBody")?;
+            tx.children
+                .retain(|x| !matches!(x, Node::El(p) if p.is("a:p")));
             tx.children.extend(paras.into_iter().map(Node::El));
             items.push(body);
             claims.push(claim);
         }
         assign_ids(&stands, &mut items, &fresh);
-        let children = assemble(std::mem::take(&mut stands), &claims, items, &|slot| slot == "notes")?;
-        let tree = root.child_mut("p:cSld").and_then(|c| c.child_mut("p:spTree")).unwrap();
+        let children = assemble(std::mem::take(&mut stands), &claims, items, &|slot| {
+            slot == "notes"
+        })?;
+        let tree = root
+            .child_mut("p:cSld")
+            .and_then(|c| c.child_mut("p:spTree"))
+            .unwrap();
         tree.children = children;
         let xml = format!("{}{}{}", info.prolog, root.to_xml(), info.epilog).into_bytes();
         let rels = if new {
@@ -1146,7 +1360,11 @@ impl<'a> Exporter<'a> {
         } else {
             None
         };
-        Ok(Some(NotesOut { part: info.part, xml, rels }))
+        Ok(Some(NotesOut {
+            part: info.part,
+            xml,
+            rels,
+        }))
     }
 
     // ------------------------------------------------------------ presentation.xml
@@ -1166,7 +1384,10 @@ impl<'a> Exporter<'a> {
         let mut ids = vec![];
         let mut list = vec![];
         let kept: BTreeSet<&str> = outs.iter().map(|o| o.info.part.as_str()).collect();
-        rels.retain(|r| r.ty != REL_SLIDE || kept.contains(opc::resolve_target(&sh.pres_part, &r.target).as_str()));
+        rels.retain(|r| {
+            r.ty != REL_SLIDE
+                || kept.contains(opc::resolve_target(&sh.pres_part, &r.target).as_str())
+        });
         for o in outs {
             let e = if o.new {
                 let rid = opc::free_rel_id(&rels);
@@ -1177,7 +1398,9 @@ impl<'a> Exporter<'a> {
                     external: false,
                 });
                 max_id += 1;
-                el("p:sldId").with_attr("id", &max_id.to_string()).with_attr("r:id", &rid)
+                el("p:sldId")
+                    .with_attr("id", &max_id.to_string())
+                    .with_attr("r:id", &rid)
             } else {
                 let e = fragment(&o.info.sld_id);
                 if e.get("r:id").as_deref() != rid_of.get(&o.info.part).map(String::as_str) {
@@ -1189,11 +1412,18 @@ impl<'a> Exporter<'a> {
             list.push(Node::El(e));
         }
         // Custom shows name slides by relationship: a slide one names cannot go.
-        let gone_rids: BTreeSet<String> = before.iter().filter(|r| !rels.contains(r)).map(|r| r.id.clone()).collect();
+        let gone_rids: BTreeSet<String> = before
+            .iter()
+            .filter(|r| !rels.contains(r))
+            .map(|r| r.id.clone())
+            .collect();
         if let Some(cs) = root.child("p:custShowLst") {
             let mut bad = None;
             cs.walk(&mut |e| {
-                if e.is("p:sld") && e.get("r:id").is_some_and(|r| gone_rids.contains(&r)) && bad.is_none() {
+                if e.is("p:sld")
+                    && e.get("r:id").is_some_and(|r| gone_rids.contains(&r))
+                    && bad.is_none()
+                {
                     bad = Some(e.get("r:id").unwrap());
                 }
             });
@@ -1253,15 +1483,29 @@ impl<'a> Exporter<'a> {
         // Nothing that stays may point at a deleted slide.
         let mut view = None;
         for p in parts.iter().filter(|p| p.name.ends_with(".rels")) {
-            let Some(src) = opc::source_of_rels(&p.name) else { continue };
+            let Some(src) = opc::source_of_rels(&p.name) else {
+                continue;
+            };
             if gone.contains(&src) || src == self.shell.pres_part {
                 continue;
             }
             let rels = opc::parse_rels(&p.data);
-            let to_deleted = |r: &Rel| !r.external && dset.contains(opc::resolve_target(&src, &r.target).as_str());
-            if src.ends_with("/viewProps.xml") && rels.iter().any(|r| to_deleted(r) && r.ty == REL_SLIDE) {
-                let ids: BTreeSet<String> = rels.iter().filter(|r| to_deleted(r)).map(|r| r.id.clone()).collect();
-                let kept: Vec<Rel> = rels.iter().filter(|r| !ids.contains(&r.id)).cloned().collect();
+            let to_deleted = |r: &Rel| {
+                !r.external && dset.contains(opc::resolve_target(&src, &r.target).as_str())
+            };
+            if src.ends_with("/viewProps.xml")
+                && rels.iter().any(|r| to_deleted(r) && r.ty == REL_SLIDE)
+            {
+                let ids: BTreeSet<String> = rels
+                    .iter()
+                    .filter(|r| to_deleted(r))
+                    .map(|r| r.id.clone())
+                    .collect();
+                let kept: Vec<Rel> = rels
+                    .iter()
+                    .filter(|r| !ids.contains(&r.id))
+                    .cloned()
+                    .collect();
                 view = Some((src.clone(), ids, kept));
                 continue;
             }
@@ -1294,7 +1538,11 @@ impl<'a> Exporter<'a> {
         }
         // What only the deleted slides and objects reached.
         let before = opc::reachable(self.parts);
-        let rest: Vec<Part> = parts.iter().filter(|p| !gone.contains(&p.name)).cloned().collect();
+        let rest: Vec<Part> = parts
+            .iter()
+            .filter(|p| !gone.contains(&p.name))
+            .cloned()
+            .collect();
         let after = opc::reachable(&rest);
         for p in before.difference(&after) {
             gone.insert(opc::rels_part(p));
@@ -1317,7 +1565,11 @@ fn put(parts: &mut Vec<Part>, template: &Part, name: &str, data: Vec<u8>) -> boo
             false
         }
         None => {
-            parts.push(Part { name: name.into(), data, ..template.clone() });
+            parts.push(Part {
+                name: name.into(),
+                data,
+                ..template.clone()
+            });
             true
         }
     }
@@ -1332,7 +1584,10 @@ struct Numbers {
 
 impl Numbers {
     fn new(names: &BTreeSet<String>) -> Self {
-        Numbers { names: names.clone(), host: BTreeMap::new() }
+        Numbers {
+            names: names.clone(),
+            host: BTreeMap::new(),
+        }
     }
 
     /// `ppt/media/image7.png`: the next image number of the package.
@@ -1354,7 +1609,12 @@ impl Numbers {
         let n = self
             .names
             .iter()
-            .filter_map(|p| p.strip_prefix(base)?.strip_suffix(".xml")?.parse::<u32>().ok())
+            .filter_map(|p| {
+                p.strip_prefix(base)?
+                    .strip_suffix(".xml")?
+                    .parse::<u32>()
+                    .ok()
+            })
             .max()
             .unwrap_or(0);
         let name = format!("{base}{}.xml", n + 1);
@@ -1383,7 +1643,11 @@ enum Stand {
 impl Stand {
     fn slot(&self) -> Option<&str> {
         match self {
-            Stand::Item { slot: Some(s), fallback: Some(_), .. } => Some(s),
+            Stand::Item {
+                slot: Some(s),
+                fallback: Some(_),
+                ..
+            } => Some(s),
             Stand::Latent { slot, .. } => Some(slot),
             _ => None,
         }
@@ -1392,12 +1656,15 @@ impl Stand {
     /// The placeholder a slot takes: with no paragraphs.
     fn element(&self) -> Option<Element> {
         let mut e = match self {
-            Stand::Item { fallback: Some(f), .. } => f.clone(),
+            Stand::Item {
+                fallback: Some(f), ..
+            } => f.clone(),
             Stand::Latent { el, .. } => el.clone(),
             _ => return None,
         };
         if let Some(tx) = e.child_mut("p:txBody") {
-            tx.children.retain(|x| !matches!(x, Node::El(p) if p.is("a:p")));
+            tx.children
+                .retain(|x| !matches!(x, Node::El(p) if p.is("a:p")));
         }
         Some(e)
     }
@@ -1424,7 +1691,13 @@ fn stand_ins(children: Vec<Node>) -> Vec<Stand> {
 /// Whether a placeholder the text does not show as a slot (one in a group
 /// or another object, a second one of the slot) already fills slot `name`.
 fn occupied(stands: &[Stand], objects: &[&Element], layout: &LayoutInfo, name: &str) -> bool {
-    let raw = stands.iter().filter_map(|st| if let Stand::Raw(Node::El(e)) = st { Some(e) } else { None });
+    let raw = stands.iter().filter_map(|st| {
+        if let Stand::Raw(Node::El(e)) = st {
+            Some(e)
+        } else {
+            None
+        }
+    });
     raw.chain(objects.iter().copied()).any(|e| {
         let mut hit = false;
         e.walk(&mut |x| {
@@ -1447,7 +1720,11 @@ fn assemble(
     items: Vec<Element>,
     in_layout: &dyn Fn(&str) -> bool,
 ) -> Result<Vec<Node>, String> {
-    let claimed: HashMap<usize, usize> = claims.iter().enumerate().filter_map(|(n, c)| c.map(|x| (x, n))).collect();
+    let claimed: HashMap<usize, usize> = claims
+        .iter()
+        .enumerate()
+        .filter_map(|(n, c)| c.map(|x| (x, n)))
+        .collect();
     let mut head = vec![];
     let mut before: Vec<Vec<Node>> = vec![vec![]; items.len()];
     let mut pending: Vec<Node> = vec![];
@@ -1457,10 +1734,16 @@ fn assemble(
             continue;
         }
         match st {
-            Stand::Raw(Node::El(e)) if e.is("p:nvGrpSpPr") || e.is("p:grpSpPr") => head.push(Node::El(e)),
+            Stand::Raw(Node::El(e)) if e.is("p:nvGrpSpPr") || e.is("p:grpSpPr") => {
+                head.push(Node::El(e))
+            }
             Stand::Raw(n) => pending.push(n),
             Stand::Latent { el, .. } => pending.push(Node::El(el)),
-            Stand::Item { slot: Some(s), fallback: Some(f), .. } if in_layout(&s) => pending.push(Node::El(f)),
+            Stand::Item {
+                slot: Some(s),
+                fallback: Some(f),
+                ..
+            } if in_layout(&s) => pending.push(Node::El(f)),
             Stand::Item { .. } => {}
         }
     }
@@ -1470,7 +1753,11 @@ fn assemble(
         out.push(Node::El(it));
     }
     // An extension list stays last.
-    let ext: Vec<Node> = pending.iter().filter(|n| matches!(n, Node::El(e) if e.is("p:extLst"))).cloned().collect();
+    let ext: Vec<Node> = pending
+        .iter()
+        .filter(|n| matches!(n, Node::El(e) if e.is("p:extLst")))
+        .cloned()
+        .collect();
     pending.retain(|n| !matches!(n, Node::El(e) if e.is("p:extLst")));
     out.extend(pending);
     out.extend(ext);
@@ -1490,7 +1777,11 @@ fn assign_ids(stands: &[Stand], items: &mut [Element], fresh: &[bool]) {
     };
     for st in stands {
         match st {
-            Stand::Raw(Node::El(e)) | Stand::Latent { el: e, .. } | Stand::Item { fallback: Some(e), .. } => note(e),
+            Stand::Raw(Node::El(e))
+            | Stand::Latent { el: e, .. }
+            | Stand::Item {
+                fallback: Some(e), ..
+            } => note(e),
             _ => {}
         }
     }
@@ -1585,13 +1876,22 @@ pub fn sig(items: &[SlideItem]) -> Vec<String> {
         .map(|it| match it {
             // A shape's text and fill are written (§5.3); its id and name are what it is.
             SlideItem::Shape(sh) => format!("<shape id=\"{}\" name=\"{}\"/>", sh.id, sh.name),
-            SlideItem::Object(o) => {
-                hanji_format::pres::object_line(&hanji_format::ObjectItem { geom: None, ..o.clone() })
-            }
+            SlideItem::Object(o) => hanji_format::pres::object_line(&hanji_format::ObjectItem {
+                geom: None,
+                ..o.clone()
+            }),
             SlideItem::Line(l) => format!("<line id=\"{}\" name=\"{}\"/>", l.id, l.name),
-            SlideItem::Picture(p) => hanji_format::pres::picture_line(&PictureItem { geom: None, ..p.clone() }),
+            SlideItem::Picture(p) => hanji_format::pres::picture_line(&PictureItem {
+                geom: None,
+                ..p.clone()
+            }),
             SlideItem::Group(g) => {
-                format!("<group id=\"{}\" name=\"{}\">{}</group>", g.id, g.name, sig(&g.items).join(""))
+                format!(
+                    "<group id=\"{}\" name=\"{}\">{}</group>",
+                    g.id,
+                    g.name,
+                    sig(&g.items).join("")
+                )
             }
             SlideItem::Slot(_) => "::slot::".into(),
         })
@@ -1616,7 +1916,10 @@ fn member_changed(st: &SlideItem, w: &SlideItem) -> bool {
         (SlideItem::Line(a), SlideItem::Line(b)) => !b.ends.shows_as(&a.ends),
         (SlideItem::Group(a), SlideItem::Group(b)) => {
             b.geom.zip(a.geom).is_some_and(|(x, y)| !x.shows_as(&y))
-                || a.items.iter().zip(&b.items).any(|(x, y)| member_changed(x, y))
+                || a.items
+                    .iter()
+                    .zip(&b.items)
+                    .any(|(x, y)| member_changed(x, y))
         }
         _ => match (member_box(st), member_box(w)) {
             (Some(a), Some(b)) => !b.shows_as(&a),
@@ -1630,7 +1933,11 @@ fn ids_in(el: &Element) -> Vec<(u32, bool)> {
     let mut out = vec![];
     el.walk(&mut |x| {
         if x.is("p:cNvPr") {
-            out.extend(x.get("id").and_then(|v| v.parse().ok()).map(|id| (id, false)));
+            out.extend(
+                x.get("id")
+                    .and_then(|v| v.parse().ok())
+                    .map(|id| (id, false)),
+            );
         }
     });
     let mut cxn = vec![];
@@ -1657,38 +1964,65 @@ pub fn apply_group(
     rels: &Rels,
     sty: Option<Styling>,
 ) -> Result<Vec<(u32, bool)>, String> {
-    let st = group_item(el, parent, rels, sty).ok_or("the group's objects are not as they were read")?;
+    let st =
+        group_item(el, parent, rels, sty).ok_or("the group's objects are not as they were read")?;
     let ids = group_geometry(el, w, parent, rels, sty)?;
     group_text(el, &st, w, sty)?;
     Ok(ids)
 }
 
 /// The text and fill of a group's shapes, where the text changes them.
-fn group_text(el: &mut Element, st: &GroupItem, w: &GroupItem, sty: Option<Styling>) -> Result<(), String> {
-    let kids = el.elements_mut().filter(|e| !matches!(e.name.as_str(), "p:nvGrpSpPr" | "p:grpSpPr" | "p:extLst"));
+fn group_text(
+    el: &mut Element,
+    st: &GroupItem,
+    w: &GroupItem,
+    sty: Option<Styling>,
+) -> Result<(), String> {
+    let kids = el
+        .elements_mut()
+        .filter(|e| !matches!(e.name.as_str(), "p:nvGrpSpPr" | "p:grpSpPr" | "p:extLst"));
     for ((c, a), b) in kids.zip(&st.items).zip(&w.items) {
         match (a, b) {
             (SlideItem::Shape(a), SlideItem::Shape(b)) => {
                 let what = format!("<shape id=\"{}\" name=\"{}\">", b.id, b.name);
-                members::write(c, &a.paras, &b.paras, sty, &what).map_err(|m| format!("{what}: {m}"))?;
+                members::write(c, &a.paras, &b.paras, sty, &what)
+                    .map_err(|m| format!("{what}: {m}"))?;
                 if a.look != b.look {
-                    let theme = sty.map(|s| s.fills).ok_or("a group's fills are written only on a slide")?;
-                    fill::write(c, b.look.fill.as_deref(), fill::Parents { now: None, then: None, theme })
+                    let theme = sty
+                        .map(|s| s.fills)
+                        .ok_or("a group's fills are written only on a slide")?;
+                    fill::write(
+                        c,
+                        b.look.fill.as_deref(),
+                        fill::Parents {
+                            now: None,
+                            then: None,
+                            theme,
+                        },
+                    )
+                    .map_err(|m| format!("{what}: {m}"))?;
+                    outline::write(c, &b.look, None, theme, false)
                         .map_err(|m| format!("{what}: {m}"))?;
-                    outline::write(c, &b.look, None, theme, false).map_err(|m| format!("{what}: {m}"))?;
                 }
                 kind::write(c, &b.look, None, false).map_err(|m| format!("{what}: {m}"))?;
                 if a.look != b.look {
-                    let theme = sty.map(|s| s.fills).ok_or("a group's effects are written only on a slide")?;
-                    effects::write(c, b.look.effects.as_deref(), None, theme).map_err(|m| format!("{what}: {m}"))?;
+                    let theme = sty
+                        .map(|s| s.fills)
+                        .ok_or("a group's effects are written only on a slide")?;
+                    effects::write(c, b.look.effects.as_deref(), None, theme)
+                        .map_err(|m| format!("{what}: {m}"))?;
                 }
             }
             (SlideItem::Line(a), SlideItem::Line(b)) if a.look != b.look => {
                 let what = format!("<line id=\"{}\" name=\"{}\">", b.id, b.name);
-                let theme = sty.map(|s| s.fills).ok_or("a group's outlines are written only on a slide")?;
-                outline::write(c, &b.look, None, theme, true).map_err(|m| format!("{what}: {m}"))?;
+                let theme = sty
+                    .map(|s| s.fills)
+                    .ok_or("a group's outlines are written only on a slide")?;
+                outline::write(c, &b.look, None, theme, true)
+                    .map_err(|m| format!("{what}: {m}"))?;
                 kind::write(c, &b.look, None, true).map_err(|m| format!("{what}: {m}"))?;
-                effects::write(c, b.look.effects.as_deref(), None, theme).map_err(|m| format!("{what}: {m}"))?;
+                effects::write(c, b.look.effects.as_deref(), None, theme)
+                    .map_err(|m| format!("{what}: {m}"))?;
             }
             (SlideItem::Group(a), SlideItem::Group(b)) => group_text(c, a, b, sty)?,
             _ => {}
@@ -1705,13 +2039,18 @@ fn group_geometry(
     rels: &Rels,
     sty: Option<Styling>,
 ) -> Result<Vec<(u32, bool)>, String> {
-    let st = group_item(el, parent, rels, sty).ok_or("the group's objects are not as they were read")?;
+    let st =
+        group_item(el, parent, rels, sty).ok_or("the group's objects are not as they were read")?;
     if sig(&st.items) != sig(&w.items) {
         return Err("a group's objects can be moved and resized here, and their shapes' text and fill changed, but never added, deleted, reordered, renamed or otherwise edited: keep each object's id and name as they are, or change the group in PowerPoint".into());
     }
-    let (Some(sg), wg) = (st.geom, w.geom) else { return Err("the group has no box".into()) };
+    let (Some(sg), wg) = (st.geom, w.geom) else {
+        return Err("the group has no box".into());
+    };
     let box_changed = wg.is_some_and(|g| !g.shows_as(&sg));
-    let members: Vec<usize> = (0..st.items.len()).filter(|&k| member_changed(&st.items[k], &w.items[k])).collect();
+    let members: Vec<usize> = (0..st.items.len())
+        .filter(|&k| member_changed(&st.items[k], &w.items[k]))
+        .collect();
     if !box_changed && members.is_empty() {
         return Ok(vec![]);
     }
@@ -1720,10 +2059,18 @@ fn group_geometry(
     // canonical text shows them after a box edit): its objects follow.
     if box_changed && !members.is_empty() {
         let mut alone = el.clone();
-        let only = GroupItem { items: st.items.clone(), ..w.clone() };
+        let only = GroupItem {
+            items: st.items.clone(),
+            ..w.clone()
+        };
         if let Ok(ids) = group_geometry(&mut alone, &only, parent, rels, sty) {
             let after = group_item(&alone, parent, rels, sty);
-            if after.is_some_and(|a| a.items.iter().zip(&w.items).all(|(x, y)| !member_changed(x, y))) {
+            if after.is_some_and(|a| {
+                a.items
+                    .iter()
+                    .zip(&w.items)
+                    .all(|(x, y)| !member_changed(x, y))
+            }) {
                 *el = alone;
                 return Ok(ids);
             }
@@ -1778,9 +2125,13 @@ fn group_geometry(
         .map(|(k, _)| k)
         .collect();
     for &m in &members {
-        let Node::El(c) = &mut el.children[kids[m]] else { unreachable!() };
+        let Node::El(c) = &mut el.children[kids[m]] else {
+            unreachable!()
+        };
         match (&st.items[m], &w.items[m]) {
-            (SlideItem::Group(_), SlideItem::Group(wg)) => moved.extend(group_geometry(c, wg, &f, rels, sty)?),
+            (SlideItem::Group(_), SlideItem::Group(wg)) => {
+                moved.extend(group_geometry(c, wg, &f, rels, sty)?)
+            }
             (SlideItem::Line(a), SlideItem::Line(b)) => {
                 let own = geom::own(c).unwrap_or_default();
                 let ends = a.ends.merged(&b.ends);
@@ -1789,7 +2140,9 @@ fn group_geometry(
                 moved.extend(geom::shape_id(c).map(|id| (id, true)));
             }
             (a, b) => {
-                let (Some(sa), Some(sb)) = (member_box(a), member_box(b)) else { continue };
+                let (Some(sa), Some(sb)) = (member_box(a), member_box(b)) else {
+                    continue;
+                };
                 let own = geom::own(c).ok_or("an object in the group has no box")?;
                 let merged = sa.merged(&sb);
                 let at = f.back(&merged);
@@ -1823,23 +2176,52 @@ fn group_geometry(
     let boxes: Vec<Geom> = kids
         .iter()
         .filter_map(|&k| match &el.children[k] {
-            Node::El(c) => object_geom(c).map(|g| Geom { rot: 0, flip_h: false, flip_v: false, ..g }),
+            Node::El(c) => object_geom(c).map(|g| Geom {
+                rot: 0,
+                flip_h: false,
+                flip_v: false,
+                ..g
+            }),
             _ => None,
         })
         .collect();
     let u = geom::union(&boxes).ok_or("a group without objects")?;
-    let turned = geom::own(el).is_some_and(|g| g.rot.rem_euclid(hanji_format::FULL_TURN) != 0 || g.flip_h || g.flip_v);
-    let refit = (u.x, u.y, u.w, u.h) != (local.ch_off.0, local.ch_off.1, local.ch_ext.0, local.ch_ext.1);
+    let turned = geom::own(el)
+        .is_some_and(|g| g.rot.rem_euclid(hanji_format::FULL_TURN) != 0 || g.flip_h || g.flip_v);
+    let refit = (u.x, u.y, u.w, u.h)
+        != (
+            local.ch_off.0,
+            local.ch_off.1,
+            local.ch_ext.0,
+            local.ch_ext.1,
+        );
     if turned && refit {
         return Err("it is turned or flipped, and its objects are moved or resized beyond the box they fill: its turn is about that box's centre, so the others would move on the slide. Move them within it, move, resize or turn the whole group, or ungroup it in PowerPoint".into());
     }
     if refit && u.w > 0 && u.h > 0 {
         let out = local.out(&u);
         let own = geom::own(el).unwrap_or_default();
-        geom::write(el, &Geom { x: out.x, y: out.y, w: out.w, h: out.h, ..own })?;
-        let x = el.child_mut("p:grpSpPr").and_then(|p| p.child_mut("a:xfrm")).ok_or("the group has no a:xfrm")?;
-        for (name, a, b, va, vb) in [("a:chOff", "x", "y", u.x, u.y), ("a:chExt", "cx", "cy", u.w, u.h)] {
-            let c = x.child_mut(name).ok_or("the group has no child offset and extent")?;
+        geom::write(
+            el,
+            &Geom {
+                x: out.x,
+                y: out.y,
+                w: out.w,
+                h: out.h,
+                ..own
+            },
+        )?;
+        let x = el
+            .child_mut("p:grpSpPr")
+            .and_then(|p| p.child_mut("a:xfrm"))
+            .ok_or("the group has no a:xfrm")?;
+        for (name, a, b, va, vb) in [
+            ("a:chOff", "x", "y", u.x, u.y),
+            ("a:chExt", "cx", "cy", u.w, u.h),
+        ] {
+            let c = x
+                .child_mut(name)
+                .ok_or("the group has no child offset and extent")?;
             c.set(a, &va.to_string());
             c.set(b, &vb.to_string());
         }
@@ -1918,7 +2300,11 @@ struct Inherit<'a> {
 
 impl<'a> Inherit<'a> {
     fn at(self, lvl: usize) -> Under<'a> {
-        Under { now: &self.now[lvl], then: &self.then[lvl], fonts: self.fonts }
+        Under {
+            now: &self.now[lvl],
+            then: &self.then[lvl],
+            fonts: self.fonts,
+        }
     }
 }
 
@@ -1955,15 +2341,20 @@ fn new_picture(g: &Geom) -> Element {
 fn rels_map(rels: &[Rel], part: &str) -> Rels {
     rels.iter()
         .filter(|r| !r.external)
-        .map(|r| (r.id.clone(), crate::import::src_of(&opc::resolve_target(part, &r.target))))
+        .map(|r| {
+            (
+                r.id.clone(),
+                crate::import::src_of(&opc::resolve_target(part, &r.target)),
+            )
+        })
         .collect()
 }
 
 /// The id of the slide's image relationship to `target`, added when it has none.
 fn target_rel(rels: &mut Vec<Rel>, part: &str, target: &str, changed: &mut bool) -> String {
-    if let Some(r) =
-        rels.iter().find(|r| !r.external && r.ty == REL_IMAGE && opc::resolve_target(part, &r.target) == target)
-    {
+    if let Some(r) = rels.iter().find(|r| {
+        !r.external && r.ty == REL_IMAGE && opc::resolve_target(part, &r.target) == target
+    }) {
         return r.id.clone();
     }
     let id = opc::free_rel_id(rels);
@@ -1981,7 +2372,7 @@ fn target_rel(rels: &mut Vec<Rel>, part: &str, target: &str, changed: &mut bool)
 fn image_type(d: &[u8]) -> Option<(&'static str, &'static str)> {
     if d.starts_with(b"\x89PNG\r\n\x1a\n") {
         Some(("png", "image/png"))
-    } else if d.starts_with(&[0xFF, 0xD8, 0xFF]) {
+    } else if d.starts_with(&[0xff, 0xd8, 0xff]) {
         Some(("jpeg", "image/jpeg"))
     } else if d.starts_with(b"GIF87a") || d.starts_with(b"GIF89a") {
         Some(("gif", "image/gif"))
@@ -2000,12 +2391,19 @@ fn set_crop(bf: &mut Element, c: &Crop) {
         if c.is_zero() {
             return;
         }
-        let at = bf.children.iter().position(|n| matches!(n, Node::El(e) if e.is("a:blip"))).map_or(0, |k| k + 1);
+        let at = bf
+            .children
+            .iter()
+            .position(|n| matches!(n, Node::El(e) if e.is("a:blip")))
+            .map_or(0, |k| k + 1);
         bf.children.insert(at, Node::El(el("a:srcRect")));
     }
     let r = bf.child_mut("a:srcRect").unwrap();
     for (k, v) in [("l", c.l), ("t", c.t), ("r", c.r), ("b", c.b)] {
-        let had = r.get(k).and_then(|x| x.trim().parse::<i64>().ok()).unwrap_or(0);
+        let had = r
+            .get(k)
+            .and_then(|x| x.trim().parse::<i64>().ok())
+            .unwrap_or(0);
         if had != v || (v == 0 && r.get(k).is_some()) {
             if v == 0 {
                 r.remove_attr(k);
@@ -2015,7 +2413,8 @@ fn set_crop(bf: &mut Element, c: &Crop) {
         }
     }
     if r.attrs.is_empty() && r.children.is_empty() {
-        bf.children.retain(|n| !matches!(n, Node::El(e) if e.is("a:srcRect")));
+        bf.children
+            .retain(|n| !matches!(n, Node::El(e) if e.is("a:srcRect")));
     }
 }
 
@@ -2048,9 +2447,13 @@ fn set_preset(sp: &mut Element, prst: &str) {
                 av.children.clear();
             }
         }
-        None => {
-            insert_ordered(sp, fragment(&format!("<a:prstGeom prst=\"{prst}\"><a:avLst/></a:prstGeom>")), SPPR_ORDER)
-        }
+        None => insert_ordered(
+            sp,
+            fragment(&format!(
+                "<a:prstGeom prst=\"{prst}\"><a:avLst/></a:prstGeom>"
+            )),
+            SPPR_ORDER,
+        ),
     }
 }
 
@@ -2068,12 +2471,19 @@ fn new_line(ends: &hanji_format::Ends) -> Element {
 /// Animations may not lose their shape: an animated shape that was on the
 /// slide and is gone, or a paragraph range past its shape's paragraphs, is refused.
 fn check_timing(root: &Element, info: &SlideInfo) -> Result<(), String> {
-    let Some(timing) = root.child("p:timing") else { return Ok(()) };
+    let Some(timing) = root.child("p:timing") else {
+        return Ok(());
+    };
     let mut paras: HashMap<u32, usize> = HashMap::new();
     if let Some(tree) = root.child("p:cSld").and_then(|c| c.child("p:spTree")) {
         tree.walk(&mut |e| {
-            if let Some(id) = c_nv_pr(e).and_then(|c| c.get("id")).and_then(|v| v.parse().ok()) {
-                let n = e.child("p:txBody").map_or(0, |t| t.elements().filter(|p| p.is("a:p")).count());
+            if let Some(id) = c_nv_pr(e)
+                .and_then(|c| c.get("id"))
+                .and_then(|v| v.parse().ok())
+            {
+                let n = e
+                    .child("p:txBody")
+                    .map_or(0, |t| t.elements().filter(|p| p.is("a:p")).count());
                 paras.insert(id, n);
             }
         });
@@ -2129,22 +2539,35 @@ fn sections(root: &mut Element, new: &[u32]) -> Result<(), String> {
     }
     let mut assigned: Vec<(u32, usize)> = vec![];
     for &id in new {
-        let s = of.get(&id).copied().or_else(|| assigned.last().map(|a| a.1)).unwrap_or(0);
+        let s = of
+            .get(&id)
+            .copied()
+            .or_else(|| assigned.last().map(|a| a.1))
+            .unwrap_or(0);
         assigned.push((id, s));
     }
     if assigned.windows(2).any(|w| w[1].1 < w[0].1) {
         return Err("the new slide order takes slides out of their sections: move slides within their section, or change sections in PowerPoint".into());
     }
     let mut new_lst = lst.clone();
-    for (k, s) in new_lst.elements_mut().filter(|e| e.local() == "section").enumerate() {
+    for (k, s) in new_lst
+        .elements_mut()
+        .filter(|e| e.local() == "section")
+        .enumerate()
+    {
         let ids: Vec<u32> = assigned.iter().filter(|a| a.1 == k).map(|a| a.0).collect();
-        let Some(list) = s.elements_mut().find(|e| e.local() == "sldIdLst") else { continue };
+        let Some(list) = s.elements_mut().find(|e| e.local() == "sldIdLst") else {
+            continue;
+        };
         let prefix = list.name.split_once(':').map(|x| x.0.to_string());
         let name = match &prefix {
             Some(p) => format!("{p}:sldId"),
             None => "sldId".into(),
         };
-        list.children = ids.iter().map(|id| Node::El(el(&name).with_attr("id", &id.to_string()))).collect();
+        list.children = ids
+            .iter()
+            .map(|id| Node::El(el(&name).with_attr("id", &id.to_string())))
+            .collect();
     }
     let mut done = false;
     root.walk_mut(&mut |e| {
@@ -2198,7 +2621,11 @@ fn set_ph(e: &mut Element, slot: &SlotInfo) {
     ph.remove_attr("hasCustomPrompt");
     if let Some(nv) = e.elements_mut().find(|x| x.name.starts_with("p:nv")) {
         if let Some(pr) = nv.child_mut("p:nvPr") {
-            match pr.children.iter().position(|n| matches!(n, Node::El(x) if x.is("p:ph"))) {
+            match pr
+                .children
+                .iter()
+                .position(|n| matches!(n, Node::El(x) if x.is("p:ph")))
+            {
                 Some(k) => pr.children[k] = Node::El(ph),
                 None => pr.children.insert(0, Node::El(ph)),
             }
@@ -2224,7 +2651,8 @@ fn set_bullet(ppr: &mut Option<Element>, lvl: u32, want: Bu, bullets: &[Bu; 9]) 
         return;
     }
     let p = ppr.get_or_insert_with(|| el("a:pPr"));
-    p.children.retain(|n| !matches!(n, Node::El(e) if BU.contains(&e.name.as_str())));
+    p.children
+        .retain(|n| !matches!(n, Node::El(e) if BU.contains(&e.name.as_str())));
     if reads(Some(p), lvl, bullets) == want {
         return;
     }
@@ -2251,7 +2679,11 @@ fn set_bullet(ppr: &mut Option<Element>, lvl: u32, want: Bu, bullets: &[Bu; 9]) 
         }
         Bu::Number => {
             indent(p);
-            insert_ordered(p, el("a:buAutoNum").with_attr("type", "arabicPeriod"), PPR_ORDER);
+            insert_ordered(
+                p,
+                el("a:buAutoNum").with_attr("type", "arabicPeriod"),
+                PPR_ORDER,
+            );
         }
         Bu::Unset => {}
     }
@@ -2283,17 +2715,28 @@ fn is_hangul(c: char) -> bool {
 /// A part's relationships rewritten: its `.rels` with `rels` in place of what it had.
 fn rewrite_rels(parts: &[Part], part: &str, rels: &[Rel]) -> Result<Vec<u8>, String> {
     let rp = opc::rels_part(part);
-    let Some(data) = package::get(parts, &rp) else { return Ok(opc::write_rels(rels)) };
+    let Some(data) = package::get(parts, &rp) else {
+        return Ok(opc::write_rels(rels));
+    };
     let mut d = xml::parse(data).map_err(|e| format!("{rp}: {e}"))?;
     let old = opc::parse_rels(data);
     // Keep each unchanged relationship element as it was.
     let mut kids = vec![];
     for r in rels {
         let same = old.iter().position(|o| o == r);
-        let existing = same.and_then(|k| d.root.elements().filter(|e| e.local() == "Relationship").nth(k)).cloned();
+        let existing = same
+            .and_then(|k| {
+                d.root
+                    .elements()
+                    .filter(|e| e.local() == "Relationship")
+                    .nth(k)
+            })
+            .cloned();
         kids.push(Node::El(existing.unwrap_or_else(|| {
-            let mut e =
-                el("Relationship").with_attr("Id", &r.id).with_attr("Type", &r.ty).with_attr("Target", &r.target);
+            let mut e = el("Relationship")
+                .with_attr("Id", &r.id)
+                .with_attr("Type", &r.ty)
+                .with_attr("Target", &r.target);
             if r.external {
                 e = e.with_attr("TargetMode", "External");
             }
@@ -2327,9 +2770,9 @@ fn visible_ids<'b>(items: &[&ItemG], head: impl Fn(&ItemG) -> &'b Head) -> Vec<u
     let mut out = vec![];
     for it in items {
         match it.kind {
-            HeadKind::Shape { id, .. } | HeadKind::Picture { id, .. } | HeadKind::Line { id, .. } => {
-                out.extend(num(id))
-            }
+            HeadKind::Shape { id, .. }
+            | HeadKind::Picture { id, .. }
+            | HeadKind::Line { id, .. } => out.extend(num(id)),
             HeadKind::Group { id, .. } => {
                 out.extend(num(id));
                 if let Some(Place::Group(g)) = &head(it).place {

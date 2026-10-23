@@ -1,0 +1,5 @@
+# Commits blame skips: whole-tree formatting with no change in meaning.
+# Local blame reads this after: git config blame.ignoreRevsFile .git-blame-ignore-revs
+
+# The one-time reformat to the Google Rust Style Guide's rustfmt options (STYLE.md).
+c20489647f06c21cfd2d0049ce2d5d71d6277afb

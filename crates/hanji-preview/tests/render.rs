@@ -12,12 +12,15 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use base64::Engine as _;
+use hanji_preview::fonts::Script;
 use hanji_preview::store::{self, Output};
-use hanji_preview::{fonts::Script, Options, Preview};
+use hanji_preview::{Options, Preview};
 use hanji_store::{MemStorage, TextEdit, Workspace};
 
 fn corpus(name: &str) -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../hanji-pptx/corpus").join(name)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../hanji-pptx/corpus")
+        .join(name)
 }
 
 /// `name` opened into a fresh in-memory store: (workspace, doc id).
@@ -29,7 +32,10 @@ fn opened(name: &str) -> (Workspace<MemStorage>, String) {
 }
 
 fn no_fonts() -> Options {
-    Options { font_dirs: vec![], system_fonts: false }
+    Options {
+        font_dirs: vec![],
+        system_fonts: false,
+    }
 }
 
 /// A font file that draws Hangul, for the Korean tests.
@@ -42,7 +48,9 @@ fn korean_font() -> Option<PathBuf> {
     let mut found: Vec<(bool, PathBuf)> = db
         .faces()
         .filter_map(|f| {
-            let fontdb::Source::File(path) = &f.source else { return None };
+            let fontdb::Source::File(path) = &f.source else {
+                return None;
+            };
             let has = db.with_face_data(f.id, |d, i| {
                 ttf_parser::Face::parse(d, i)
                     .is_ok_and(|x| x.glyph_index('가').is_some() && x.glyph_index('A').is_some())
@@ -54,7 +62,10 @@ fn korean_font() -> Option<PathBuf> {
     found.sort();
     let font = found.into_iter().next().map(|(_, p)| p);
     if font.is_none() {
-        assert!(std::env::var_os("CI").is_none(), "CI has no Korean font: install fonts-noto-cjk");
+        assert!(
+            std::env::var_os("CI").is_none(),
+            "CI has no Korean font: install fonts-noto-cjk"
+        );
         eprintln!("no Korean font found: set HANJI_TEST_FONT_DIR to test Hangul rendering");
     }
     font
@@ -64,8 +75,15 @@ fn korean_font() -> Option<PathBuf> {
 fn embedded_fonts(page: &str) -> Vec<Vec<u8>> {
     page.split("url('data:font/")
         .skip(1)
-        .filter_map(|rest| rest.split_once(";base64,").and_then(|(_, r)| r.split('\'').next()))
-        .map(|b64| base64::engine::general_purpose::STANDARD.decode(b64).unwrap())
+        .filter_map(|rest| {
+            rest.split_once(";base64,")
+                .and_then(|(_, r)| r.split('\'').next())
+        })
+        .map(|b64| {
+            base64::engine::general_purpose::STANDARD
+                .decode(b64)
+                .unwrap()
+        })
         .collect()
 }
 
@@ -75,13 +93,30 @@ fn check_pages(p: &Preview, slides: usize, max_page: usize) {
     assert_eq!(p.slide_count(), slides);
     for k in 0..slides {
         let svg = p.slide_svg(k);
-        assert!(svg.len() < max_page, "slide {} is {} bytes", k + 1, svg.len());
+        assert!(
+            svg.len() < max_page,
+            "slide {} is {} bytes",
+            k + 1,
+            svg.len()
+        );
         resvg::usvg::Tree::from_str(&svg, &resvg::usvg::Options::default())
             .unwrap_or_else(|e| panic!("slide {} is not valid SVG: {e}", k + 1));
-        let used: BTreeSet<&str> = svg.split("font-family=\"").skip(1).filter_map(|r| r.split('"').next()).collect();
-        let declared: BTreeSet<&str> =
-            svg.split("@font-face{font-family:'").skip(1).filter_map(|r| r.split('\'').next()).collect();
-        assert_eq!(used, declared, "slide {}: every font drawn is embedded", k + 1);
+        let used: BTreeSet<&str> = svg
+            .split("font-family=\"")
+            .skip(1)
+            .filter_map(|r| r.split('"').next())
+            .collect();
+        let declared: BTreeSet<&str> = svg
+            .split("@font-face{font-family:'")
+            .skip(1)
+            .filter_map(|r| r.split('\'').next())
+            .collect();
+        assert_eq!(
+            used,
+            declared,
+            "slide {}: every font drawn is embedded",
+            k + 1
+        );
         for font in embedded_fonts(&svg) {
             let face = ttf_parser::Face::parse(&font, 0).expect("an embedded font parses");
             assert!(
@@ -103,34 +138,91 @@ fn the_korean_deck_without_a_korean_font_warns_and_reports_what_is_missing() {
     let (out, p) = store::render(&ws, &id, None, &no_fonts()).unwrap();
     check_pages(&p, 7, 1 << 20);
     assert_eq!(out.slides, 7);
-    assert!(p.warnings.iter().any(|w| w == hanji_preview::NO_KOREAN_FONT), "{:?}", p.warnings);
-    let hangul = p.fonts.substituted.iter().find(|s| s.requested == "맑은 고딕" && s.script == Script::Hangul).unwrap();
+    assert!(
+        p.warnings
+            .iter()
+            .any(|w| w == hanji_preview::NO_KOREAN_FONT),
+        "{:?}",
+        p.warnings
+    );
+    let hangul = p
+        .fonts
+        .substituted
+        .iter()
+        .find(|s| s.requested == "맑은 고딕" && s.script == Script::Hangul)
+        .unwrap();
     assert_eq!(hangul.drawn, None);
-    assert!(hangul.chars > 100 && hangul.pages == (1..=7).collect::<Vec<_>>(), "{hangul:?}");
-    assert!(p.fonts.missing_glyphs.iter().any(|m| m.char == "U+D575"), "핵 is missing: {:?}", p.fonts.missing_glyphs);
+    assert!(
+        hangul.chars > 100 && hangul.pages == (1..=7).collect::<Vec<_>>(),
+        "{hangul:?}"
+    );
+    assert!(
+        p.fonts.missing_glyphs.iter().any(|m| m.char == "U+D575"),
+        "핵 is missing: {:?}",
+        p.fonts.missing_glyphs
+    );
     assert_eq!(p.fonts.missing_glyphs_total, p.fonts.missing_glyphs.len());
     // Latin text is drawn by the faces compiled in.
-    let calibri = p.fonts.substituted.iter().find(|s| s.requested == "Calibri").unwrap();
-    assert_eq!((calibri.drawn.as_deref(), calibri.metrics.name()), (Some("Carlito"), "compatible:Carlito".to_string()));
+    let calibri = p
+        .fonts
+        .substituted
+        .iter()
+        .find(|s| s.requested == "Calibri")
+        .unwrap();
+    assert_eq!(
+        (calibri.drawn.as_deref(), calibri.metrics.name()),
+        (Some("Carlito"), "compatible:Carlito".to_string())
+    );
     assert_eq!(calibri.source, Some(hanji_preview::fonts::Source::Bundled));
-    assert!(out.summary.starts_with("fonts: ") && out.summary.contains("Calibri → Carlito"), "{}", out.summary);
+    assert!(
+        out.summary.starts_with("fonts: ") && out.summary.contains("Calibri → Carlito"),
+        "{}",
+        out.summary
+    );
     let json = serde_json::to_value(&out).unwrap();
     assert_eq!(json["fonts"]["substituted"][0]["requested"], "맑은 고딕");
-    assert!(json["fonts"]["missing_glyphs"][0]["char"].as_str().unwrap().starts_with("U+"));
+    assert!(json["fonts"]["missing_glyphs"][0]["char"]
+        .as_str()
+        .unwrap()
+        .starts_with("U+"));
 }
 
 #[test]
 fn the_korean_deck_with_a_korean_font_draws_every_character() {
     let Some(font) = korean_font() else { return };
     let (ws, id) = opened("korean-deck.pptx");
-    let opts = Options { font_dirs: vec![font], system_fonts: false };
+    let opts = Options {
+        font_dirs: vec![font],
+        system_fonts: false,
+    };
     let (_, p) = store::render(&ws, &id, None, &opts).unwrap();
     // A Korean slide with its subset fonts stays small (a whole CJK face is 16 MB or more).
     check_pages(&p, 7, 300 << 10);
-    assert!(!p.warnings.iter().any(|w| w == hanji_preview::NO_KOREAN_FONT), "{:?}", p.warnings);
-    assert!(p.warnings.iter().all(|w| w.contains("multilingual shaping")), "{:?}", p.warnings);
-    assert!(p.fonts.missing_glyphs.is_empty(), "{:?}", p.fonts.missing_glyphs);
-    let hangul = p.fonts.substituted.iter().find(|s| s.requested == "맑은 고딕" && s.script == Script::Hangul).unwrap();
+    assert!(
+        !p.warnings
+            .iter()
+            .any(|w| w == hanji_preview::NO_KOREAN_FONT),
+        "{:?}",
+        p.warnings
+    );
+    assert!(
+        p.warnings
+            .iter()
+            .all(|w| w.contains("multilingual shaping")),
+        "{:?}",
+        p.warnings
+    );
+    assert!(
+        p.fonts.missing_glyphs.is_empty(),
+        "{:?}",
+        p.fonts.missing_glyphs
+    );
+    let hangul = p
+        .fonts
+        .substituted
+        .iter()
+        .find(|s| s.requested == "맑은 고딕" && s.script == Script::Hangul)
+        .unwrap();
     assert_eq!(hangul.source, Some(hanji_preview::fonts::Source::FontDir));
     assert!(hangul.drawn.is_some());
     // The PNG is drawn with the same subset faces.
@@ -145,9 +237,17 @@ fn the_shapes_deck_renders_every_slide() {
     let (ws, id) = opened("shapes.pptx");
     let (_, p) = store::render(&ws, &id, None, &no_fonts()).unwrap();
     check_pages(&p, 6, 1 << 20);
-    assert!(p.fonts.missing_glyphs.is_empty(), "{:?}", p.fonts.missing_glyphs);
+    assert!(
+        p.fonts.missing_glyphs.is_empty(),
+        "{:?}",
+        p.fonts.missing_glyphs
+    );
     let total: usize = p.fonts.substituted.iter().map(|s| s.chars).sum::<usize>()
-        + p.fonts.drawn_as_requested.iter().map(|s| s.chars).sum::<usize>();
+        + p.fonts
+            .drawn_as_requested
+            .iter()
+            .map(|s| s.chars)
+            .sum::<usize>();
     assert!(total > 100, "{:?}", p.fonts);
 }
 
@@ -166,7 +266,8 @@ fn the_korean_font_can_be_supplied_as_bytes_without_host_discovery() {
         .fonts
         .substituted
         .iter()
-        .any(|f| f.script == Script::Hangul && f.source == Some(hanji_preview::fonts::Source::Supplied)));
+        .any(|f| f.script == Script::Hangul
+            && f.source == Some(hanji_preview::fonts::Source::Supplied)));
 }
 
 #[test]
@@ -182,25 +283,40 @@ fn chart_korean_and_mixed_legends_use_the_embedded_font_advances() {
     let family = db
         .faces()
         .find(|f| {
-            db.with_face_data(f.id, |d, i| ttf_parser::Face::parse(d, i).is_ok_and(|f| f.glyph_index('가').is_some()))
-                .unwrap_or(false)
+            db.with_face_data(f.id, |d, i| {
+                ttf_parser::Face::parse(d, i).is_ok_and(|f| f.glyph_index('가').is_some())
+            })
+            .unwrap_or(false)
         })
         .unwrap()
         .families[0]
         .0
         .clone();
-    let original = include_bytes!("../../../prototype/preview/baseline/14-pptx-untouched-korean-report-deck.pptx");
-    for explicit in [None, Some(family.as_str()), Some("Hanji Missing Chart Face")] {
+    let original = include_bytes!(
+        "../../../prototype/preview/baseline/14-pptx-untouched-korean-report-deck.pptx"
+    );
+    for explicit in [
+        None,
+        Some(family.as_str()),
+        Some("Hanji Missing Chart Face"),
+    ] {
         for label in ["라이선스", "라이선스 30%", "License 라이선스", "API 서비스"] {
             let mut parts = package::read(original).unwrap();
-            let chart = parts.iter_mut().find(|p| p.name == "ppt/charts/chart1.xml").unwrap();
-            let mut xml = String::from_utf8(chart.data.clone()).unwrap().replace("라이선스", label);
+            let chart = parts
+                .iter_mut()
+                .find(|p| p.name == "ppt/charts/chart1.xml")
+                .unwrap();
+            let mut xml = String::from_utf8(chart.data.clone())
+                .unwrap()
+                .replace("라이선스", label);
             if let Some(family) = explicit {
                 let properties = format!("<c:txPr><a:bodyPr/><a:lstStyle/><a:p><a:pPr><a:defRPr sz=\"900\"><a:latin typeface=\"{}\"/></a:defRPr></a:pPr></a:p></c:txPr></c:legend>", xml::escape_attr(family));
                 xml = xml.replace("</c:legend>", &properties);
             }
             chart.data = xml.into_bytes();
-            let p = hanji_preview::render_pptx_with_fonts(&package::write(&parts).unwrap(), &options).unwrap();
+            let p =
+                hanji_preview::render_pptx_with_fonts(&package::write(&parts).unwrap(), &options)
+                    .unwrap();
             assert_eq!(p.fonts.missing_glyphs_total, 0);
             let svg = p.slide_svg(5);
             let root = xml::parse(svg.as_bytes()).unwrap().root;
@@ -215,9 +331,18 @@ fn chart_korean_and_mixed_legends_use_the_embedded_font_advances() {
                 let fonts = embedded_fonts(rules);
                 let face = ttf_parser::Face::parse(&fonts[0], 0).unwrap();
                 let size: f64 = e.get("font-size").unwrap().parse().unwrap();
-                let positions: Vec<f64> = e.get("x").unwrap().split_whitespace().map(|x| x.parse().unwrap()).collect();
+                let positions: Vec<f64> = e
+                    .get("x")
+                    .unwrap()
+                    .split_whitespace()
+                    .map(|x| x.parse().unwrap())
+                    .collect();
                 let chars: Vec<_> = label.chars().collect();
-                assert_eq!(positions.len(), chars.len(), "the chart label has positioned characters");
+                assert_eq!(
+                    positions.len(),
+                    chars.len(),
+                    "the chart label has positioned characters"
+                );
                 for (i, pair) in positions.windows(2).enumerate() {
                     assert!(pair[1] > pair[0], "readable positioned characters");
                     // Latin pairs may kern. Independent hmtx metrics validate the
@@ -226,8 +351,8 @@ fn chart_korean_and_mixed_legends_use_the_embedded_font_advances() {
                         continue;
                     }
                     let glyph = face.glyph_index(chars[i]).unwrap();
-                    let advance =
-                        f64::from(face.glyph_hor_advance(glyph).unwrap()) * size / f64::from(face.units_per_em());
+                    let advance = f64::from(face.glyph_hor_advance(glyph).unwrap()) * size
+                        / f64::from(face.units_per_em());
                     assert!(
                         (pair[1] - pair[0] - advance).abs() < 0.02,
                         "{label}: character {} uses advance {}, but the drawn font needs {advance}",
@@ -237,7 +362,10 @@ fn chart_korean_and_mixed_legends_use_the_embedded_font_advances() {
                 }
                 checked = true;
             });
-            assert!(checked, "the chart's own Korean/mixed category label is rendered");
+            assert!(
+                checked,
+                "the chart's own Korean/mixed category label is rendered"
+            );
         }
     }
 }
@@ -248,18 +376,33 @@ fn rendering_diagnostics_reach_json_and_every_output_mode_without_refusing_the_d
     let (mut out, p) = store::render(&ws, &id, None, &no_fonts()).unwrap();
     let message = "unsupported slide hyperlink action `ppaction://hlinksldjump`";
     assert_eq!(
-        p.diagnostics.iter().filter(|d| d.message == message).count(),
+        p.diagnostics
+            .iter()
+            .filter(|d| d.message == message)
+            .count(),
         1,
         "document-wide diagnostics are not repeated for every slide"
     );
-    assert!(p.diagnostics.iter().any(|d| d.path.starts_with("layout.diagnostics[") && d.message == message));
+    assert!(p
+        .diagnostics
+        .iter()
+        .any(|d| d.path.starts_with("layout.diagnostics[") && d.message == message));
     assert!(p.warnings.iter().any(|w| w.contains(message)));
-    let dir = std::env::temp_dir().join(format!("hanji-preview-diagnostics-{}", std::process::id()));
+    let dir =
+        std::env::temp_dir().join(format!("hanji-preview-diagnostics-{}", std::process::id()));
     for output in [Output::Html, Output::Svg, Output::Png] {
         store::write(&p, &mut out, output, &dir).unwrap();
         let json = serde_json::to_value(&out).unwrap();
-        assert!(json["diagnostics"].as_array().unwrap().iter().any(|d| d["message"] == message));
-        assert!(json["warnings"].as_array().unwrap().iter().any(|w| w.as_str().unwrap().contains(message)));
+        assert!(json["diagnostics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|d| d["message"] == message));
+        assert!(json["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|w| w.as_str().unwrap().contains(message)));
         assert_eq!(out.files.len(), if output == Output::Html { 1 } else { 6 });
         if output == Output::Html {
             let html = std::fs::read_to_string(&out.files[0]).unwrap();
@@ -274,21 +417,43 @@ fn rendering_diagnostics_reach_json_and_every_output_mode_without_refusing_the_d
 fn an_unsupported_picture_is_reported_instead_of_silently_omitted() {
     let bytes = std::fs::read(corpus("korean-deck.pptx")).unwrap();
     let mut parts = hanji_package::package::read(&bytes).unwrap();
-    let media = parts.iter_mut().find(|p| p.name.starts_with("ppt/media/")).unwrap();
+    let media = parts
+        .iter_mut()
+        .find(|p| p.name.starts_with("ppt/media/"))
+        .unwrap();
     let name = media.name.clone();
-    media.data =
-        base64::engine::general_purpose::STANDARD.decode("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==").unwrap();
-    let types = parts.iter_mut().find(|p| p.name == "[Content_Types].xml").unwrap();
+    media.data = base64::engine::general_purpose::STANDARD
+        .decode("R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==")
+        .unwrap();
+    let types = parts
+        .iter_mut()
+        .find(|p| p.name == "[Content_Types].xml")
+        .unwrap();
     types.data = String::from_utf8(types.data.clone())
         .unwrap()
-        .replace("</Types>", &format!("<Override PartName=\"/{name}\" ContentType=\"image/gif\"/></Types>"))
+        .replace(
+            "</Types>",
+            &format!("<Override PartName=\"/{name}\" ContentType=\"image/gif\"/></Types>"),
+        )
         .into_bytes();
     let mut ws = Workspace::new(MemStorage::new());
-    let id = ws.open_bytes("gif.pptx", &hanji_package::package::write(&parts).unwrap(), None).unwrap().doc_id;
+    let id = ws
+        .open_bytes(
+            "gif.pptx",
+            &hanji_package::package::write(&parts).unwrap(),
+            None,
+        )
+        .unwrap()
+        .doc_id;
     let (out, p) = store::render(&ws, &id, None, &no_fonts()).unwrap();
     assert_eq!(p.slide_count(), 7);
-    assert!(out.diagnostics.iter().any(|d| d.message.contains("missing slide picture image relationship")));
-    assert!(out.warnings.iter().any(|w| w.contains("missing slide picture image relationship")));
+    assert!(out.diagnostics.iter().any(|d| d
+        .message
+        .contains("missing slide picture image relationship")));
+    assert!(out
+        .warnings
+        .iter()
+        .any(|w| w.contains("missing slide picture image relationship")));
     assert!(!p.slide_svg(0).contains("<image "));
 }
 
@@ -299,13 +464,25 @@ fn the_viewer_embeds_each_font_once_and_marks_substituted_text() {
     let html = p.html("korean-deck");
     assert_eq!(html.matches("<section class=\"slide\"").count(), 7);
     assert_eq!(html.matches("<svg ").count(), 7);
-    let faces: Vec<&str> =
-        html.split("@font-face{font-family:'").skip(1).filter_map(|r| r.split('\'').next()).collect();
+    let faces: Vec<&str> = html
+        .split("@font-face{font-family:'")
+        .skip(1)
+        .filter_map(|r| r.split('\'').next())
+        .collect();
     let distinct: BTreeSet<&&str> = faces.iter().collect();
-    assert_eq!(faces.len(), distinct.len(), "one @font-face per face for the whole deck");
-    assert!(html.contains("<g class=\"hanji-subst\"><title>Calibri → Carlito (metrics: compatible:Carlito)</title>"));
+    assert_eq!(
+        faces.len(),
+        distinct.len(),
+        "one @font-face per face for the whole deck"
+    );
+    assert!(html.contains(
+        "<g class=\"hanji-subst\"><title>Calibri → Carlito (metrics: compatible:Carlito)</title>"
+    ));
     assert!(html.contains("class=\"hanji-mark\""));
-    assert!(html.contains("<li>Calibri → Carlito, "), "the banner lists substitutions");
+    assert!(
+        html.contains("<li>Calibri → Carlito, "),
+        "the banner lists substitutions"
+    );
     assert!(html.contains("data-font-requested=\"맑은 고딕\""));
     // Definition ids are per slide, so slides inlined together do not share them.
     assert!(!html.contains("rdocx-"));
@@ -321,23 +498,40 @@ fn the_viewer_embeds_each_font_once_and_marks_substituted_text() {
 #[test]
 fn a_revision_is_previewed_from_its_export_not_the_original() {
     let (mut ws, id) = opened("korean-deck.pptx");
-    ws.edit(&id, 1, &[TextEdit { old: "3분기 영업 보고".into(), new: "4분기 영업 보고".into() }]).unwrap();
+    ws.edit(
+        &id,
+        1,
+        &[TextEdit {
+            old: "3분기 영업 보고".into(),
+            new: "4분기 영업 보고".into(),
+        }],
+    )
+    .unwrap();
     let text = |rev| {
         let (_, p) = store::render(&ws, &id, Some(rev), &no_fonts()).unwrap();
         p.slide_svg(0)
     };
     // The title is split at the script change: "4" and "분기 영업 보고".
     let (old, new) = (text(1), text(2));
-    assert!(new.contains(">4</text>") && !new.contains(">3</text>"), "{new}");
+    assert!(
+        new.contains(">4</text>") && !new.contains(">3</text>"),
+        "{new}"
+    );
     assert!(old.contains(">3</text>"));
 }
 
 #[test]
 fn blank_documents_have_an_experimental_page_preview() {
     let mut ws = Workspace::new(MemStorage::new());
-    let id = ws.create(hanji_store::DocType::Document, None, None).unwrap().doc_id;
+    let id = ws
+        .create(hanji_store::DocType::Document, None, None)
+        .unwrap()
+        .doc_id;
     let (out, preview) = store::render(&ws, &id, None, &no_fonts()).unwrap();
     assert!(preview.page_count() >= 1);
     assert_eq!(out.pages, preview.page_count());
-    assert!(out.warnings.iter().any(|warning| warning.contains("experimental")));
+    assert!(out
+        .warnings
+        .iter()
+        .any(|warning| warning.contains("experimental")));
 }

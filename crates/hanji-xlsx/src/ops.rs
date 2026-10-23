@@ -24,15 +24,25 @@ use hanji_package::xml::{self, Element, Node};
 
 use crate::book::{Book, SheetInfo, SheetKind, TableCol, TableInfo, CT_SHEET, MAIN_NS, R_NS};
 use crate::calc::{self, Changed, Recalc};
-use crate::numfmt;
 use crate::shift::{self, f_element};
 use crate::store::{has_formula, holds, Cell, SHEET_ORDER};
 use crate::value::CellValue;
-use crate::{book_of, model, remainder_of, structure, Applied, XlsxEngine};
+use crate::{book_of, model, numfmt, remainder_of, structure, Applied, XlsxEngine};
 
 /// Number formats round 4 lists, allowed in every workbook besides its own and the built-in ones.
-pub const ROUND4_FORMATS: &[&str] =
-    &["#,##0", "#,##0.0", "0", "0.0", "0.0%", "0000", "00000", "000000", "yyyy-mm", "yyyy-mm-dd", "@"];
+pub const ROUND4_FORMATS: &[&str] = &[
+    "#,##0",
+    "#,##0.0",
+    "0",
+    "0.0",
+    "0.0%",
+    "0000",
+    "00000",
+    "000000",
+    "yyyy-mm",
+    "yyyy-mm-dd",
+    "@",
+];
 
 /// What happened to one range entry.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -80,8 +90,12 @@ pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, Eng
     let template = parsed.front.template.as_deref();
     let current = model::structure(&mut book, template).map_err(EngineError::Package)?;
     let (text_ops, drops) = structure::reconcile(&parsed, &current).map_err(refused)?;
-    let user_ops =
-        parse_ops(ops_json).map_err(|e| refused(format!("the operations are not valid:\n{}", render_errors(&e))))?;
+    let user_ops = parse_ops(ops_json).map_err(|e| {
+        refused(format!(
+            "the operations are not valid:\n{}",
+            render_errors(&e)
+        ))
+    })?;
     let mut formats: Vec<String> = book.styles.all_codes();
     for f in ROUND4_FORMATS {
         if !formats.iter().any(|x| x == f) {
@@ -96,7 +110,11 @@ pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, Eng
             }
         }
     }
-    let all: Vec<RangeOp> = text_ops.iter().cloned().chain(user_ops.iter().cloned()).collect();
+    let all: Vec<RangeOp> = text_ops
+        .iter()
+        .cloned()
+        .chain(user_ops.iter().cloned())
+        .collect();
     if let Err(errs) = check_ops(&all, &current, &Formats(formats)) {
         let n = text_ops.len();
         let lines: Vec<String> = errs
@@ -112,19 +130,44 @@ pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, Eng
                 }
             })
             .collect();
-        return Err(refused(format!("the operations are not valid:\n{}", lines.join("\n"))));
+        return Err(refused(format!(
+            "the operations are not valid:\n{}",
+            lines.join("\n")
+        )));
     }
     let before: Vec<(u64, String, usize, String)> = book
         .entries
         .iter()
         .filter(|e| e.kind == Kind::Range)
-        .map(|e| (e.id, e.meta.tag.clone(), e.path[0], e.meta.range.clone().unwrap_or_default()))
+        .map(|e| {
+            (
+                e.id,
+                e.meta.tag.clone(),
+                e.path[0],
+                e.meta.range.clone().unwrap_or_default(),
+            )
+        })
         .collect();
-    let mut cx = Ctx { changed: Changed::default(), notices: vec![], cols: HashMap::new(), arrays: HashMap::new() };
+    let mut cx = Ctx {
+        changed: Changed::default(),
+        notices: vec![],
+        cols: HashMap::new(),
+        arrays: HashMap::new(),
+    };
     for (_, t) in current.tables() {
         cx.cols.insert(
             t.name.to_lowercase(),
-            t.columns.iter().map(|c| (c.name.clone(), c.ty.clone(), c.format.clone(), c.formula.clone())).collect(),
+            t.columns
+                .iter()
+                .map(|c| {
+                    (
+                        c.name.clone(),
+                        c.ty.clone(),
+                        c.format.clone(),
+                        c.formula.clone(),
+                    )
+                })
+                .collect(),
         );
     }
     for id in &drops {
@@ -154,13 +197,28 @@ pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, Eng
             tag,
             sheet: names[sheet].clone(),
             before: range,
-            after: book.entries.iter().find(|e| e.id == id).and_then(|e| e.meta.range.clone()),
+            after: book
+                .entries
+                .iter()
+                .find(|e| e.id == id)
+                .and_then(|e| e.meta.range.clone()),
         })
         .collect();
-    let report = OpReport { applied: all.len(), entries, notices: cx.notices, recalc };
-    let text = serialize_spreadsheet(&model::structure(&mut book, template).map_err(EngineError::Package)?);
+    let report = OpReport {
+        applied: all.len(),
+        entries,
+        notices: cx.notices,
+        recalc,
+    };
+    let text = serialize_spreadsheet(
+        &model::structure(&mut book, template).map_err(EngineError::Package)?,
+    );
     let remainder = remainder_of(book, rem.next_id);
-    Ok(Applied { text, remainder, report })
+    Ok(Applied {
+        text,
+        remainder,
+        report,
+    })
 }
 
 /// Remove what a deleted placeholder stood for (§2 rule 8: an explicit act).
@@ -196,11 +254,19 @@ fn drop_keep(book: &mut Book, rem: &Remainder, id: &str, cx: &mut Ctx) -> Result
             .iter()
             .filter(|x| gone.contains(&x.id))
             .filter_map(|x| {
-                xml::fragment(&x.xml[0]).attrs.iter().find(|a| a.0.ends_with(":id")).map(|a| xml::unescape(&a.1))
+                xml::fragment(&x.xml[0])
+                    .attrs
+                    .iter()
+                    .find(|a| a.0.ends_with(":id"))
+                    .map(|a| xml::unescape(&a.1))
             })
             .collect();
         let part = book.sheets[sheet].part.clone();
-        let rels: Vec<_> = book.rels_of(&part).into_iter().filter(|r| !ids.contains(&r.id)).collect();
+        let rels: Vec<_> = book
+            .rels_of(&part)
+            .into_iter()
+            .filter(|r| !ids.contains(&r.id))
+            .collect();
         book.set_rels(&part, rels);
     }
     book.entries.retain(|x| !gone.contains(&x.id));
@@ -215,11 +281,13 @@ fn drop_keep(book: &mut Book, rem: &Remainder, id: &str, cx: &mut Ctx) -> Result
 }
 
 fn sheet_of(book: &Book, name: &str) -> Result<usize, String> {
-    book.sheet_index(name).ok_or_else(|| format!("there is no sheet \"{name}\""))
+    book.sheet_index(name)
+        .ok_or_else(|| format!("there is no sheet \"{name}\""))
 }
 
 fn table_of(book: &Book, name: &str) -> Result<usize, String> {
-    book.table_index(name).ok_or_else(|| format!("there is no table \"{name}\""))
+    book.table_index(name)
+        .ok_or_else(|| format!("there is no table \"{name}\""))
 }
 
 fn apply_op(book: &mut Book, op: &RangeOp, cx: &mut Ctx) -> Result<(), String> {
@@ -243,24 +311,52 @@ fn apply_op(book: &mut Book, op: &RangeOp, cx: &mut Ctx) -> Result<(), String> {
             let at = book.tables[k].data_rows().1 + 1;
             insert_rows(book, k, at, rows, cx)
         }
-        RangeOp::InsertRows { table, before, rows } => {
+        RangeOp::InsertRows {
+            table,
+            before,
+            rows,
+        } => {
             let k = table_of(book, table)?;
             insert_rows(book, k, *before, rows, cx)
         }
-        RangeOp::DeleteRows { table, first, last } => delete_rows(book, table_of(book, table)?, *first, *last, cx),
-        RangeOp::FillFormula { table, column, formula } => {
-            fill_formula(book, table_of(book, table)?, column, formula, cx)
+        RangeOp::DeleteRows { table, first, last } => {
+            delete_rows(book, table_of(book, table)?, *first, *last, cx)
         }
-        RangeOp::SetType { table, column, ty, format } => {
-            set_type(book, table_of(book, table)?, column, ty, format.as_deref(), cx)
+        RangeOp::FillFormula {
+            table,
+            column,
+            formula,
+        } => fill_formula(book, table_of(book, table)?, column, formula, cx),
+        RangeOp::SetType {
+            table,
+            column,
+            ty,
+            format,
+        } => set_type(
+            book,
+            table_of(book, table)?,
+            column,
+            ty,
+            format.as_deref(),
+            cx,
+        ),
+        RangeOp::AddColumn { table, column } => {
+            add_column(book, table_of(book, table)?, column, cx)
         }
-        RangeOp::AddColumn { table, column } => add_column(book, table_of(book, table)?, column, cx),
         RangeOp::Sort { table, keys } => sort(book, table_of(book, table)?, keys, cx),
-        RangeOp::AddTable { sheet, name, anchor, columns, rows } => {
-            add_table(book, sheet, name, anchor, columns, rows, cx)
-        }
+        RangeOp::AddTable {
+            sheet,
+            name,
+            anchor,
+            columns,
+            rows,
+        } => add_table(book, sheet, name, anchor, columns, rows, cx),
         RangeOp::AddSheet { name } => add_sheet(book, name),
-        RangeOp::Format { range, set, outline } => op_format(book, range, set, outline.as_ref()),
+        RangeOp::Format {
+            range,
+            set,
+            outline,
+        } => op_format(book, range, set, outline.as_ref()),
     }
 }
 
@@ -286,7 +382,10 @@ fn op_format(
         if outline.is_none() {
             return 0;
         }
-        (row == r0) as u8 | ((col == c1) as u8) << 1 | ((row == r1) as u8) << 2 | ((col == c0) as u8) << 3
+        (row == r0) as u8
+            | ((col == c1) as u8) << 1
+            | ((row == r1) as u8) << 2
+            | ((col == c0) as u8) << 3
     };
     let mut wanted: std::collections::BTreeSet<(u32, u8)> = Default::default();
     let mut present: HashMap<(u32, u32), u32> = HashMap::new();
@@ -308,7 +407,10 @@ fn op_format(
     });
     for row in r0..=r1 {
         for col in c0..=c1 {
-            let s = present.get(&(row, col)).copied().unwrap_or_else(|| row_style.get(&row).copied().unwrap_or(0));
+            let s = present
+                .get(&(row, col))
+                .copied()
+                .unwrap_or_else(|| row_style.get(&row).copied().unwrap_or(0));
             wanted.insert((s, edges(row, col)));
         }
     }
@@ -333,7 +435,9 @@ fn op_format(
         let new_style = styles_of_new(row);
         for col in c0..=c1 {
             let s = row.cell(col).map_or(new_style, |c| c.style());
-            let Some(&n) = to.get(&(s, edges(rr, col))) else { continue };
+            let Some(&n) = to.get(&(s, edges(rr, col))) else {
+                continue;
+            };
             if n == s {
                 continue;
             }
@@ -359,7 +463,8 @@ enum W {
 /// The write for `v` into a column of type `ty` (`None`: outside tables,
 /// typed by the cell's own format).
 fn to_write(book: &Book, v: &Value, ty: Option<&str>, fmt: &str, at: &str) -> Result<W, String> {
-    let date = |s: &str| date_of(s).map(|(y, m, d)| numfmt::serial_of(y as i64, m, d, book.date1904));
+    let date =
+        |s: &str| date_of(s).map(|(y, m, d)| numfmt::serial_of(y as i64, m, d, book.date1904));
     Ok(match (ty, v) {
         (_, Value::Null) => W::Clear,
         (Some("date"), Value::Text(s)) => {
@@ -446,7 +551,14 @@ fn write_formula(
     style: Option<u32>,
     cx: &mut Ctx,
 ) -> Result<(), String> {
-    prepare_cell(book, i, row, col, &format!("{}!{}{row}", book.sheets[i].name, col_letters(col)), cx)?;
+    prepare_cell(
+        book,
+        i,
+        row,
+        col,
+        &format!("{}!{}{row}", book.sheets[i].name, col_letters(col)),
+        cx,
+    )?;
     let st = book.store_mut(i)?;
     let prefix = st.prefix.clone();
     let cell = st.row_mut(row).cell_mut(col);
@@ -467,14 +579,23 @@ fn write_formula(
 /// a data table (the engine does not model them); the sheet's shared
 /// formulas become plain ones when the cell holds one (a shared formula's
 /// other cells read their text from its first cell).
-fn prepare_cell(book: &mut Book, i: usize, row: u32, col: u32, at: &str, cx: &mut Ctx) -> Result<(), String> {
+fn prepare_cell(
+    book: &mut Book,
+    i: usize,
+    row: u32,
+    col: u32,
+    at: &str,
+    cx: &mut Ctx,
+) -> Result<(), String> {
     if let std::collections::hash_map::Entry::Vacant(slot) = cx.arrays.entry(i) {
         let mut found = vec![];
         book.store(i).for_each_cell_if(
             &|b| has_formula(b) && (holds(b, b"array") || holds(b, b"dataTable")),
             &mut |r, c| {
-                if let Some(f) =
-                    c.f.as_ref().filter(|f| matches!(f.get("t").as_deref(), Some("array") | Some("dataTable")))
+                if let Some(f) = c
+                    .f
+                    .as_ref()
+                    .filter(|f| matches!(f.get("t").as_deref(), Some("array") | Some("dataTable")))
                 {
                     found.push(
                         f.get("ref")
@@ -486,13 +607,17 @@ fn prepare_cell(book: &mut Book, i: usize, row: u32, col: u32, at: &str, cx: &mu
         );
         slot.insert(found);
     }
-    if let Some(a) = cx.arrays[&i].iter().find(|a| a.contains(CellRef::new(col, row))) {
+    if let Some(a) = cx.arrays[&i]
+        .iter()
+        .find(|a| a.contains(CellRef::new(col, row)))
+    {
         return Err(format!("{at} is part of the array formula or data table at {a}, which the engine does not model"));
     }
-    let shared = book
-        .store(i)
-        .row(row)
-        .and_then(|r| r.cell(col).and_then(|c| c.f.as_ref()).map(|f| f.get("t").as_deref() == Some("shared")));
+    let shared = book.store(i).row(row).and_then(|r| {
+        r.cell(col)
+            .and_then(|c| c.f.as_ref())
+            .map(|f| f.get("t").as_deref() == Some("shared"))
+    });
     if shared == Some(true) {
         shift::unshare(book, i)?;
     }
@@ -501,7 +626,9 @@ fn prepare_cell(book: &mut Book, i: usize, row: u32, col: u32, at: &str, cx: &mu
 
 /// The table holding cell (`col`, `row`) of sheet `i`.
 fn table_at(book: &Book, i: usize, col: u32, row: u32) -> Option<usize> {
-    book.tables.iter().position(|t| t.sheet == i && t.range.contains(CellRef::new(col, row)))
+    book.tables
+        .iter()
+        .position(|t| t.sheet == i && t.range.contains(CellRef::new(col, row)))
 }
 
 fn op_set(book: &mut Book, range: &str, values: &[Vec<Value>], cx: &mut Ctx) -> Result<(), String> {
@@ -538,7 +665,11 @@ fn op_set(book: &mut Book, range: &str, values: &[Vec<Value>], cx: &mut Ctx) -> 
                     (Some(c.1.clone()), c.2.clone(), None)
                 }
                 None => {
-                    let s = book.store(i).row(rr).and_then(|x| x.cell(col).map(Cell::style)).unwrap_or(0);
+                    let s = book
+                        .store(i)
+                        .row(rr)
+                        .and_then(|x| x.cell(col).map(Cell::style))
+                        .unwrap_or(0);
                     (None, book.styles.format_of(s), None)
                 }
             };
@@ -598,8 +729,16 @@ fn check_validation(
     for (rule_xml, range) in rules {
         let x = xml::fragment(&rule_xml);
         let ty = x.get("type").unwrap_or_else(|| "none".into());
-        let f = |n: &str| x.elements().find(|c| c.local() == n).map(|c| xml::unescape(&c.text_of(&[c.name.as_str()])));
-        let fail = |what: String| Err(format!("{at}: {v} breaks the data validation of {range} ({what})"));
+        let f = |n: &str| {
+            x.elements()
+                .find(|c| c.local() == n)
+                .map(|c| xml::unescape(&c.text_of(&[c.name.as_str()])))
+        };
+        let fail = |what: String| {
+            Err(format!(
+                "{at}: {v} breaks the data validation of {range} ({what})"
+            ))
+        };
         let text = match v {
             Value::Text(s) => s.clone(),
             Value::Number(n) => numfmt::general(*n),
@@ -630,7 +769,8 @@ fn check_validation(
             format!(
                 "{op} {}{}",
                 a.map(numfmt::general).unwrap_or_default(),
-                b.map(|b| format!(" and {}", numfmt::general(b))).unwrap_or_default()
+                b.map(|b| format!(" and {}", numfmt::general(b)))
+                    .unwrap_or_default()
             )
         };
         // `None`: the rule cannot be checked (why).
@@ -656,7 +796,9 @@ fn check_validation(
                 None => Some("it has no list".into()),
             },
             "whole" | "decimal" => {
-                let Value::Number(n) = v else { return fail(format!("a {ty} number")) };
+                let Value::Number(n) = v else {
+                    return fail(format!("a {ty} number"));
+                };
                 if ty == "whole" && n.fract() != 0.0 {
                     return fail("a whole number".into());
                 }
@@ -670,10 +812,14 @@ fn check_validation(
             "date" => {
                 let serial = match v {
                     Value::Number(n) => Some(*n),
-                    Value::Text(t) => date_of(t).map(|(y, m, d)| numfmt::serial_of(y as i64, m, d, book.date1904)),
+                    Value::Text(t) => {
+                        date_of(t).map(|(y, m, d)| numfmt::serial_of(y as i64, m, d, book.date1904))
+                    }
                     _ => None,
                 };
-                let Some(n) = serial else { return fail("a date".into()) };
+                let Some(n) = serial else {
+                    return fail("a date".into());
+                };
                 let (a, b) = bounds();
                 match within(n, a, b) {
                     Some(true) => None,
@@ -693,7 +839,9 @@ fn check_validation(
         };
         if let Some(why) = unchecked {
             // Excel refuses a value only when the rule shows its error, in the `stop` style.
-            let refuses = x.get("showErrorMessage").is_some_and(|v| v == "1" || v == "true")
+            let refuses = x
+                .get("showErrorMessage")
+                .is_some_and(|v| v == "1" || v == "true")
                 && x.get("errorStyle").is_none_or(|v| v == "stop");
             match refuses {
                 false => notice(
@@ -717,14 +865,26 @@ fn check_validation(
 fn list_cells(book: &mut Book, i: usize, formula: &str) -> Option<Vec<String>> {
     let toks = formula::tokenize(formula.trim_start_matches('='));
     // One reference and nothing else.
-    let mut toks = toks.iter().filter(|t| !matches!(t.kind, formula::Tok::Space));
-    let (Some(formula::Token { kind: formula::Tok::Ref(r), .. }), None) = (toks.next(), toks.next()) else {
+    let mut toks = toks
+        .iter()
+        .filter(|t| !matches!(t.kind, formula::Tok::Space));
+    let (
+        Some(formula::Token {
+            kind: formula::Tok::Ref(r),
+            ..
+        }),
+        None,
+    ) = (toks.next(), toks.next())
+    else {
         return None;
     };
     let (a, b) = (r.first?, r.last.or(r.first)?);
     let sheet = match &r.sheet {
         Some(p) if p.external || p.to.is_some() => return None,
-        Some(p) => book.sheets.iter().position(|s| s.name.eq_ignore_ascii_case(&p.name))?,
+        Some(p) => book
+            .sheets
+            .iter()
+            .position(|s| s.name.eq_ignore_ascii_case(&p.name))?,
         None => i,
     };
     let area = CellRange::new(CellRef::new(a.col?, a.row?), CellRef::new(b.col?, b.row?));
@@ -734,7 +894,11 @@ fn list_cells(book: &mut Book, i: usize, formula: &str) -> Option<Vec<String>> {
     book.load_store(sheet).ok()?;
     let mut out = vec![];
     for row in book.store(sheet).rows_in(area.first.row, area.last.row) {
-        for c in row.cells.iter().filter(|c| (area.first.col..=area.last.col).contains(&c.col)) {
+        for c in row
+            .cells
+            .iter()
+            .filter(|c| (area.first.col..=area.last.col).contains(&c.col))
+        {
             // As shown, and as the value is written (`1` for a `1.00`).
             let shown = book.display(c);
             let value = match book.value(c) {
@@ -742,7 +906,12 @@ fn list_cells(book: &mut Book, i: usize, formula: &str) -> Option<Vec<String>> {
                 CellValue::Text(t) => t,
                 _ => String::new(),
             };
-            out.extend([shown, value].into_iter().map(|x| x.trim().to_string()).filter(|x| !x.is_empty()));
+            out.extend(
+                [shown, value]
+                    .into_iter()
+                    .map(|x| x.trim().to_string())
+                    .filter(|x| !x.is_empty()),
+            );
         }
     }
     Some(out)
@@ -750,7 +919,13 @@ fn list_cells(book: &mut Book, i: usize, formula: &str) -> Option<Vec<String>> {
 
 /// The style a new cell of table `k`'s column `ci` takes: its neighbour's in
 /// the column (the row above, else below), with the column's format.
-fn column_style(book: &mut Book, k: usize, ci: usize, near: &[u32], fmt: &str) -> Result<u32, String> {
+fn column_style(
+    book: &mut Book,
+    k: usize,
+    ci: usize,
+    near: &[u32],
+    fmt: &str,
+) -> Result<u32, String> {
     let t = &book.tables[k];
     let col = t.range.first.col + ci as u32;
     let st = book.store(t.sheet);
@@ -762,7 +937,9 @@ fn column_style(book: &mut Book, k: usize, ci: usize, near: &[u32], fmt: &str) -
         }
     }
     let s = s.unwrap_or(0);
-    if fmt.is_empty() || book.styles.format_of(s) == fmt || (fmt == "General" && book.styles.format_of(s) == "General")
+    if fmt.is_empty()
+        || book.styles.format_of(s) == fmt
+        || (fmt == "General" && book.styles.format_of(s) == "General")
     {
         return Ok(s);
     }
@@ -770,16 +947,33 @@ fn column_style(book: &mut Book, k: usize, ci: usize, near: &[u32], fmt: &str) -
 }
 
 fn cols_of(cx: &Ctx, t: &TableInfo) -> Cols {
-    cx.cols.get(&t.name.to_lowercase()).cloned().unwrap_or_default()
+    cx.cols
+        .get(&t.name.to_lowercase())
+        .cloned()
+        .unwrap_or_default()
 }
 
-fn insert_rows(book: &mut Book, k: usize, at: u32, rows: &[Row], cx: &mut Ctx) -> Result<(), String> {
+fn insert_rows(
+    book: &mut Book,
+    k: usize,
+    at: u32,
+    rows: &[Row],
+    cx: &mut Ctx,
+) -> Result<(), String> {
     let n = rows.len() as u32;
     if n == 0 {
         return Ok(());
     }
-    let (i, (c0, c1), (d0, d1)) = (book.tables[k].sheet, book.tables[k].cols_span(), book.tables[k].data_rows());
-    let sh = RowShift::Insert { cols: (c0, c1), at, n };
+    let (i, (c0, c1), (d0, d1)) = (
+        book.tables[k].sheet,
+        book.tables[k].cols_span(),
+        book.tables[k].data_rows(),
+    );
+    let sh = RowShift::Insert {
+        cols: (c0, c1),
+        at,
+        n,
+    };
     shift::check(book, i, &sh, Some(k))?;
     let old_last = book.tables[k].range.last.row;
     let rewritten = shift::apply(book, i, &sh, &mut cx.notices)?;
@@ -792,14 +986,27 @@ fn insert_rows(book: &mut Book, k: usize, at: u32, rows: &[Row], cx: &mut Ctx) -
     let (name, head) = (t.name.clone(), t.range.first.row);
     if at == d1 + 1 {
         // Conditional formats and validations over a whole column of the table grow with it, as in Excel.
-        for e in book.entries.iter_mut().filter(|e| e.kind == Kind::Range && e.path[0] == i) {
-            if !matches!(e.meta.tag.as_str(), "conditionalFormatting" | "dataValidation") {
+        for e in book
+            .entries
+            .iter_mut()
+            .filter(|e| e.kind == Kind::Range && e.path[0] == i)
+        {
+            if !matches!(
+                e.meta.tag.as_str(),
+                "conditionalFormatting" | "dataValidation"
+            ) {
                 continue;
             }
-            let Some(mut rs) = parse_sqref(e.meta.range.as_deref().unwrap_or("")) else { continue };
+            let Some(mut rs) = parse_sqref(e.meta.range.as_deref().unwrap_or("")) else {
+                continue;
+            };
             let mut grew = false;
             for r in rs.iter_mut() {
-                if r.first.col >= c0 && r.last.col <= c1 && r.last.row == d1 && (head..=d0).contains(&r.first.row) {
+                if r.first.col >= c0
+                    && r.last.col <= c1
+                    && r.last.row == d1
+                    && (head..=d0).contains(&r.first.row)
+                {
                     r.last.row += n;
                     grew = true;
                 }
@@ -809,12 +1016,19 @@ fn insert_rows(book: &mut Book, k: usize, at: u32, rows: &[Row], cx: &mut Ctx) -
             }
         }
     }
-    cx.changed.moved.push((i, CellRange::new(CellRef::new(c0, at), CellRef::new(c1, MAX_ROW))));
+    cx.changed.moved.push((
+        i,
+        CellRange::new(CellRef::new(c0, at), CellRef::new(c1, MAX_ROW)),
+    ));
     cx.changed.tables.insert(name.clone());
     let cols = cols_of(cx, &book.tables[k]);
     let calc: Vec<Option<String>> = book.tables[k].cols.iter().map(|c| c.calc.clone()).collect();
     // Neighbours for the new cells' style: the data row above, else the one pushed below.
-    let near: Vec<u32> = if at > d0 && d1 >= d0 { vec![at - 1] } else { vec![at + n] };
+    let near: Vec<u32> = if at > d0 && d1 >= d0 {
+        vec![at - 1]
+    } else {
+        vec![at + n]
+    };
     for (j, row) in rows.iter().enumerate() {
         let r = at + j as u32;
         for (ci, (cname, ty, fmt, _)) in cols.iter().enumerate() {
@@ -824,7 +1038,11 @@ fn insert_rows(book: &mut Book, k: usize, at: u32, rows: &[Row], cx: &mut Ctx) -
                 write_formula(book, i, r, col, f, Some(style), cx)?;
                 continue;
             }
-            let v = row.iter().find(|(c, _)| c == cname).map(|x| &x.1).unwrap_or(&Value::Null);
+            let v = row
+                .iter()
+                .find(|(c, _)| c == cname)
+                .map(|x| &x.1)
+                .unwrap_or(&Value::Null);
             let at_s = format!("{}!{}{r}", book.sheets[i].name, col_letters(col));
             check_validation(book, i, col, r, v, &at_s, cx)?;
             let w = to_write(book, v, Some(ty), fmt, &at_s)?;
@@ -837,12 +1055,30 @@ fn insert_rows(book: &mut Book, k: usize, at: u32, rows: &[Row], cx: &mut Ctx) -
     Ok(())
 }
 
-fn delete_rows(book: &mut Book, k: usize, first: u32, last: u32, cx: &mut Ctx) -> Result<(), String> {
-    let (i, (c0, c1), (d0, d1)) = (book.tables[k].sheet, book.tables[k].cols_span(), book.tables[k].data_rows());
+fn delete_rows(
+    book: &mut Book,
+    k: usize,
+    first: u32,
+    last: u32,
+    cx: &mut Ctx,
+) -> Result<(), String> {
+    let (i, (c0, c1), (d0, d1)) = (
+        book.tables[k].sheet,
+        book.tables[k].cols_span(),
+        book.tables[k].data_rows(),
+    );
     // A table keeps one data row: deleting them all leaves the first one, emptied.
-    let (from, keep_one) = if first == d0 && last == d1 { (first + 1, true) } else { (first, false) };
+    let (from, keep_one) = if first == d0 && last == d1 {
+        (first + 1, true)
+    } else {
+        (first, false)
+    };
     if from <= last {
-        let sh = RowShift::Delete { cols: (c0, c1), first: from, last };
+        let sh = RowShift::Delete {
+            cols: (c0, c1),
+            first: from,
+            last,
+        };
         shift::check(book, i, &sh, Some(k))?;
         let rewritten = shift::apply(book, i, &sh, &mut cx.notices)?;
         cx.arrays.remove(&i);
@@ -851,7 +1087,10 @@ fn delete_rows(book: &mut Book, k: usize, first: u32, last: u32, cx: &mut Ctx) -
     }
     if keep_one {
         for col in c0..=c1 {
-            let exists = book.store(i).row(first).is_some_and(|r| r.cell(col).is_some());
+            let exists = book
+                .store(i)
+                .row(first)
+                .is_some_and(|r| r.cell(col).is_some());
             if exists {
                 write_cell(book, i, first, col, W::Clear, None, cx)?;
             }
@@ -861,14 +1100,25 @@ fn delete_rows(book: &mut Book, k: usize, first: u32, last: u32, cx: &mut Ctx) -
         }
     }
     book.tables[k].changed = true;
-    cx.changed.moved.push((i, CellRange::new(CellRef::new(c0, first), CellRef::new(c1, MAX_ROW))));
+    cx.changed.moved.push((
+        i,
+        CellRange::new(CellRef::new(c0, first), CellRef::new(c1, MAX_ROW)),
+    ));
     cx.changed.tables.insert(book.tables[k].name.clone());
     Ok(())
 }
 
-fn fill_formula(book: &mut Book, k: usize, column: &str, f: &str, cx: &mut Ctx) -> Result<(), String> {
+fn fill_formula(
+    book: &mut Book,
+    k: usize,
+    column: &str,
+    f: &str,
+    cx: &mut Ctx,
+) -> Result<(), String> {
     let t = &book.tables[k];
-    let ci = t.col_index(column).ok_or_else(|| format!("table {} has no column {column}", t.name))?;
+    let ci = t
+        .col_index(column)
+        .ok_or_else(|| format!("table {} has no column {column}", t.name))?;
     let file = formula::to_file_form(f.trim(), &t.name);
     let file = file.strip_prefix('=').unwrap_or(&file).to_string();
     let (i, col, (d0, d1)) = (t.sheet, t.range.first.col + ci as u32, t.data_rows());
@@ -876,10 +1126,17 @@ fn fill_formula(book: &mut Book, k: usize, column: &str, f: &str, cx: &mut Ctx) 
     book.tables[k].cols[ci].calc = Some(file.clone());
     book.tables[k].changed = true;
     for r in d0..=d1 {
-        let st = book.store(i).row(r).and_then(|x| x.cell(col).map(Cell::style));
+        let st = book
+            .store(i)
+            .row(r)
+            .and_then(|x| x.cell(col).map(Cell::style));
         write_formula(book, i, r, col, &file, st, cx)?;
     }
-    if let Some(c) = cx.cols.get_mut(&name.to_lowercase()).and_then(|v| v.get_mut(ci)) {
+    if let Some(c) = cx
+        .cols
+        .get_mut(&name.to_lowercase())
+        .and_then(|v| v.get_mut(ci))
+    {
         c.3 = f.trim().to_string();
     }
     cx.changed.tables.insert(name);
@@ -895,7 +1152,10 @@ fn number_of(s: &str) -> Option<f64> {
     };
     let plain = t.replace(',', "");
     let ok = !plain.is_empty()
-        && plain.chars().enumerate().all(|(k, c)| c.is_ascii_digit() || c == '.' || (k == 0 && (c == '-' || c == '+')));
+        && plain
+            .chars()
+            .enumerate()
+            .all(|(k, c)| c.is_ascii_digit() || c == '.' || (k == 0 && (c == '-' || c == '+')));
     let v: f64 = if ok { plain.parse().ok()? } else { return None };
     Some(if pct { v / 100.0 } else { v })
 }
@@ -910,7 +1170,9 @@ fn set_type(
 ) -> Result<(), String> {
     let t = &book.tables[k];
     let tname = t.name.clone();
-    let ci = t.col_index(column).ok_or_else(|| format!("table {tname} has no column {column}"))?;
+    let ci = t
+        .col_index(column)
+        .ok_or_else(|| format!("table {tname} has no column {column}"))?;
     let (i, col, (d0, d1)) = (t.sheet, t.range.first.col + ci as u32, t.data_rows());
     let old = cols_of(cx, t)[ci].clone();
     let fmt = match format {
@@ -926,7 +1188,10 @@ fn set_type(
         let style = book.styles.with_format(cell.style(), &fmt)?;
         if is_formula {
             if style != cell.style() {
-                book.store_mut(i)?.row_mut(row.r).cell_mut(col).set("s", &style.to_string());
+                book.store_mut(i)?
+                    .row_mut(row.r)
+                    .cell_mut(col)
+                    .set("s", &style.to_string());
             }
             continue;
         }
@@ -939,23 +1204,32 @@ fn set_type(
             (_, "text") => W::Str(shown),
             (CellValue::Number(n), "number") if old.1 != "date" => W::Num(*n),
             (CellValue::Number(n), "date") if old.1 == "date" => W::Num(*n),
-            (CellValue::Text(s), "number") => W::Num(
-                number_of(s)
-                    .ok_or_else(|| format!("{at} holds {s:?}, which is not a number as displayed; set it first"))?,
-            ),
+            (CellValue::Text(s), "number") => W::Num(number_of(s).ok_or_else(|| {
+                format!("{at} holds {s:?}, which is not a number as displayed; set it first")
+            })?),
             (CellValue::Text(s), "date") => {
-                let (y, m, d) = date_of(s)
-                    .ok_or_else(|| format!("{at} holds {s:?}, which is not a date YYYY-MM-DD; set it first"))?;
+                let (y, m, d) = date_of(s).ok_or_else(|| {
+                    format!("{at} holds {s:?}, which is not a date YYYY-MM-DD; set it first")
+                })?;
                 W::Num(numfmt::serial_of(y as i64, m, d, book.date1904))
             }
-            (v, _) => return Err(format!("{at} holds {}, which a {ty} column cannot hold; set it first", show(v))),
+            (v, _) => {
+                return Err(format!(
+                    "{at} holds {}, which a {ty} column cannot hold; set it first",
+                    show(v)
+                ))
+            }
         };
         write_cell(book, i, row.r, col, w, Some(style), cx)?;
     }
     let dxf = book.styles.dxf_with_format(&fmt)?;
     book.tables[k].cols[ci].dxf = Some(dxf);
     book.tables[k].changed = true;
-    if let Some(c) = cx.cols.get_mut(&tname.to_lowercase()).and_then(|v| v.get_mut(ci)) {
+    if let Some(c) = cx
+        .cols
+        .get_mut(&tname.to_lowercase())
+        .and_then(|v| v.get_mut(ci))
+    {
         c.1 = ty.to_string();
         c.2 = fmt;
     }
@@ -982,9 +1256,16 @@ fn area_problem(book: &Book, i: usize, area: &CellRange, except: Option<usize>) 
         .find(|(k, t)| t.sheet == i && Some(*k) != except && t.range.intersects(area))
         .map(|x| x.1)
     {
-        return Some(format!("table {} ({}) is there; tables on a sheet never overlap", t.name, t.range));
+        return Some(format!(
+            "table {} ({}) is there; tables on a sheet never overlap",
+            t.name, t.range
+        ));
     }
-    for e in book.entries.iter().filter(|e| e.kind == Kind::Range && e.path[0] == i && e.meta.tag == "mergeCell") {
+    for e in book
+        .entries
+        .iter()
+        .filter(|e| e.kind == Kind::Range && e.path[0] == i && e.meta.tag == "mergeCell")
+    {
         if let Some(m) = e.meta.range.as_deref().and_then(CellRange::parse) {
             if m.intersects(area) {
                 return Some(format!("the merged cells {m} are there"));
@@ -992,8 +1273,17 @@ fn area_problem(book: &Book, i: usize, area: &CellRange, except: Option<usize>) 
         }
     }
     for row in book.store(i).rows_in(area.first.row, area.last.row) {
-        if let Some(c) = row.cells.iter().find(|c| (area.first.col..=area.last.col).contains(&c.col) && !c.is_blank()) {
-            return Some(format!("cell {}{} holds {}", col_letters(c.col), row.r, show(&book.value(c))));
+        if let Some(c) = row
+            .cells
+            .iter()
+            .find(|c| (area.first.col..=area.last.col).contains(&c.col) && !c.is_blank())
+        {
+            return Some(format!(
+                "cell {}{} holds {}",
+                col_letters(c.col),
+                row.r,
+                show(&book.value(c))
+            ));
         }
     }
     None
@@ -1007,19 +1297,35 @@ fn add_column(book: &mut Book, k: usize, spec: &ColumnSpec, cx: &mut Ctx) -> Res
     let area = CellRange::new(CellRef::new(col, r0), CellRef::new(col, r1));
     book.load_store(i)?;
     if let Some(p) = area_problem(book, i, &area, Some(k)) {
-        return Err(format!("the column after table {tname} ({}) is not free: {p}", col_letters(col)));
+        return Err(format!(
+            "the column after table {tname} ({}) is not free: {p}",
+            col_letters(col)
+        ));
     }
-    let fmt = spec.format.clone().unwrap_or_else(|| if spec.ty == "text" { "@".into() } else { "General".into() });
+    let fmt = spec.format.clone().unwrap_or_else(|| {
+        if spec.ty == "text" {
+            "@".into()
+        } else {
+            "General".into()
+        }
+    });
     let file = spec.formula.as_ref().map(|f| {
         let x = formula::to_file_form(f.trim(), &tname);
         x.strip_prefix('=').unwrap_or(&x).to_string()
     });
     if book.tables[k].header {
-        let hs = book.store(i).row(r0).and_then(|r| r.cell(col - 1).map(Cell::style));
+        let hs = book
+            .store(i)
+            .row(r0)
+            .and_then(|r| r.cell(col - 1).map(Cell::style));
         write_cell(book, i, r0, col, W::Str(spec.name.clone()), hs, cx)?;
     }
     for r in d0..=d1 {
-        let left = book.store(i).row(r).and_then(|x| x.cell(col - 1).map(Cell::style)).unwrap_or(0);
+        let left = book
+            .store(i)
+            .row(r)
+            .and_then(|x| x.cell(col - 1).map(Cell::style))
+            .unwrap_or(0);
         let style = book.styles.with_format(left, &fmt)?;
         match &file {
             Some(f) => write_formula(book, i, r, col, f, Some(style), cx)?,
@@ -1029,7 +1335,11 @@ fn add_column(book: &mut Book, k: usize, spec: &ColumnSpec, cx: &mut Ctx) -> Res
     }
     let dxf = book.styles.dxf_with_format(&fmt)?;
     let t = &mut book.tables[k];
-    t.cols.push(TableCol { name: spec.name.clone(), calc: file, dxf: Some(dxf) });
+    t.cols.push(TableCol {
+        name: spec.name.clone(),
+        calc: file,
+        dxf: Some(dxf),
+    });
     t.range.last.col = col;
     t.changed = true;
     cx.cols.entry(tname.to_lowercase()).or_default().push((
@@ -1061,7 +1371,11 @@ fn sort(book: &mut Book, k: usize, keys: &[SortKey], cx: &mut Ctx) -> Result<(),
     }
     let block = CellRange::new(CellRef::new(c0, a), CellRef::new(c1, b));
     let sheet = book.sheets[i].name.clone();
-    for e in book.entries.iter().filter(|e| e.kind == Kind::Range && e.path[0] == i) {
+    for e in book
+        .entries
+        .iter()
+        .filter(|e| e.kind == Kind::Range && e.path[0] == i)
+    {
         for r in parse_sqref(e.meta.range.as_deref().unwrap_or("")).unwrap_or_default() {
             let covers = r.first.row <= a && r.last.row >= b;
             if r.intersects(&block) && !covers {
@@ -1070,19 +1384,25 @@ fn sort(book: &mut Book, k: usize, keys: &[SortKey], cx: &mut Ctx) -> Result<(),
         }
     }
     book.load_store(i)?;
-    let notes =
-        book.rels_of(&book.sheets[i].part).iter().any(|r| matches!(r.short_type(), "comments" | "threadedComment"));
+    let notes = book
+        .rels_of(&book.sheets[i].part)
+        .iter()
+        .any(|r| matches!(r.short_type(), "comments" | "threadedComment"));
     let mut arrays = false;
     book.store(i).for_each_cell(&mut |r, c| {
         if (a..=b).contains(&r)
             && (c0..=c1).contains(&c.col)
-            && c.f.as_ref().is_some_and(|f| matches!(f.get("t").as_deref(), Some("array") | Some("dataTable")))
+            && c.f
+                .as_ref()
+                .is_some_and(|f| matches!(f.get("t").as_deref(), Some("array") | Some("dataTable")))
         {
             arrays = true;
         }
     });
     if arrays {
-        return Err(format!("the rows of {tname} hold an array formula, which the engine does not move"));
+        return Err(format!(
+            "the rows of {tname} hold an array formula, which the engine does not move"
+        ));
     }
     if notes {
         let refs = note_refs(book, i);
@@ -1114,7 +1434,8 @@ fn sort(book: &mut Book, k: usize, keys: &[SortKey], cx: &mut Ctx) -> Result<(),
             .collect()
     };
     let mut order: Vec<u32> = (a..=b).collect();
-    let keys_of: HashMap<u32, Vec<(u8, f64, String)>> = order.iter().map(|&r| (r, keyrow(r))).collect();
+    let keys_of: HashMap<u32, Vec<(u8, f64, String)>> =
+        order.iter().map(|&r| (r, keyrow(r))).collect();
     order.sort_by(|x, y| {
         let (kx, ky) = (&keys_of[x], &keys_of[y]);
         for (j, (_, desc)) in kidx.iter().enumerate() {
@@ -1123,7 +1444,9 @@ fn sort(book: &mut Book, k: usize, keys: &[SortKey], cx: &mut Ctx) -> Result<(),
                 p.0.cmp(&q.0)
             } else {
                 let o =
-                    p.0.cmp(&q.0).then(p.1.partial_cmp(&q.1).unwrap_or(std::cmp::Ordering::Equal)).then(p.2.cmp(&q.2));
+                    p.0.cmp(&q.0)
+                        .then(p.1.partial_cmp(&q.1).unwrap_or(std::cmp::Ordering::Equal))
+                        .then(p.2.cmp(&q.2));
                 if *desc {
                     o.reverse()
                 } else {
@@ -1145,7 +1468,10 @@ fn sort(book: &mut Book, k: usize, keys: &[SortKey], cx: &mut Ctx) -> Result<(),
     let mut stay: HashMap<u32, crate::store::Row> = HashMap::new();
     let mut moving: HashMap<u32, Vec<Cell>> = HashMap::new();
     for mut row in taken {
-        let (inside, outside): (Vec<Cell>, Vec<Cell>) = row.cells.drain(..).partition(|c| (c0..=c1).contains(&c.col));
+        let (inside, outside): (Vec<Cell>, Vec<Cell>) = row
+            .cells
+            .drain(..)
+            .partition(|c| (c0..=c1).contains(&c.col));
         row.cells = outside;
         moving.insert(row.r, inside);
         stay.insert(row.r, row);
@@ -1153,7 +1479,9 @@ fn sort(book: &mut Book, k: usize, keys: &[SortKey], cx: &mut Ctx) -> Result<(),
     let mut back = vec![];
     for (j, old) in order.iter().enumerate() {
         let nr = a + j as u32;
-        let mut row = stay.remove(&nr).unwrap_or_else(|| crate::store::Row::new(nr));
+        let mut row = stay
+            .remove(&nr)
+            .unwrap_or_else(|| crate::store::Row::new(nr));
         for mut c in moving.remove(old).unwrap_or_default() {
             c.set_row(nr);
             if let Some(text) = c.formula() {
@@ -1173,8 +1501,16 @@ fn sort(book: &mut Book, k: usize, keys: &[SortKey], cx: &mut Ctx) -> Result<(),
     back.extend(stay.into_values());
     st.put_rows(back);
     // Hyperlinks on single cells of the block go with their rows.
-    let pos: HashMap<u32, u32> = order.iter().enumerate().map(|(j, old)| (*old, a + j as u32)).collect();
-    for e in book.entries.iter_mut().filter(|e| e.kind == Kind::Range && e.path[0] == i && e.meta.tag == "hyperlink") {
+    let pos: HashMap<u32, u32> = order
+        .iter()
+        .enumerate()
+        .map(|(j, old)| (*old, a + j as u32))
+        .collect();
+    for e in book
+        .entries
+        .iter_mut()
+        .filter(|e| e.kind == Kind::Range && e.path[0] == i && e.meta.tag == "hyperlink")
+    {
         if let Some(r) = e.meta.range.as_deref().and_then(CellRange::parse) {
             if r.first == r.last && block.contains(r.first) {
                 e.meta.range = Some(CellRef::new(r.first.col, pos[&r.first.row]).to_string());
@@ -1190,9 +1526,15 @@ fn sort(book: &mut Book, k: usize, keys: &[SortKey], cx: &mut Ctx) -> Result<(),
 fn note_refs(book: &Book, i: usize) -> Vec<CellRef> {
     let part = &book.sheets[i].part;
     let mut out = vec![];
-    for r in book.rels_of(part).iter().filter(|r| matches!(r.short_type(), "comments" | "threadedComment")) {
+    for r in book
+        .rels_of(part)
+        .iter()
+        .filter(|r| matches!(r.short_type(), "comments" | "threadedComment"))
+    {
         let target = hanji_package::opc::resolve_target(part, &r.target);
-        if let Some(d) = hanji_package::package::get(&book.parts, &target).and_then(|d| xml::parse(d).ok()) {
+        if let Some(d) =
+            hanji_package::package::get(&book.parts, &target).and_then(|d| xml::parse(d).ok())
+        {
             d.root.walk(&mut |e| {
                 if let Some(c) = (matches!(e.local(), "comment" | "threadedComment"))
                     .then(|| e.get("ref"))
@@ -1222,18 +1564,28 @@ fn add_table(
         return Err(format!("sheet {sheet} is a chart sheet"));
     }
     book.load_store(i)?;
-    let a = CellRef::parse(&anchor.replace('$', "")).ok_or_else(|| format!("{anchor} is not a cell"))?;
+    let a = CellRef::parse(&anchor.replace('$', ""))
+        .ok_or_else(|| format!("{anchor} is not a cell"))?;
     let w = columns.len() as u32;
     let last_row = a.row + (rows.len() as u32).max(1);
     let area = CellRange::new(a, CellRef::new(a.col + w - 1, last_row));
     if let Some(p) = area_problem(book, i, &area, None) {
-        return Err(format!("the table's area {area} on sheet {sheet} is not free: {p}"));
+        return Err(format!(
+            "the table's area {area} on sheet {sheet} is not free: {p}"
+        ));
     }
     // The new table part.
-    let id =
-        book.tables.iter().filter_map(|t| t.doc.root.get("id").and_then(|v| v.parse::<u32>().ok())).max().unwrap_or(0)
-            + 1;
-    let dir = book.wb_part.rsplit_once('/').map_or(String::new(), |x| format!("{}/", x.0));
+    let id = book
+        .tables
+        .iter()
+        .filter_map(|t| t.doc.root.get("id").and_then(|v| v.parse::<u32>().ok()))
+        .max()
+        .unwrap_or(0)
+        + 1;
+    let dir = book
+        .wb_part
+        .rsplit_once('/')
+        .map_or(String::new(), |x| format!("{}/", x.0));
     let part = book.free_part(&format!("{dir}tables"), "table");
     let src = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<table xmlns=\"{MAIN_NS}\" id=\"{id}\" name=\"{n}\" displayName=\"{n}\" ref=\"{area}\" totalsRowShown=\"0\"><autoFilter ref=\"{area}\"/><tableColumns count=\"0\"/><tableStyleInfo name=\"TableStyleMedium2\" showFirstColumn=\"0\" showLastColumn=\"0\" showRowStripes=\"1\" showColumnStripes=\"0\"/></table>",
@@ -1243,13 +1595,28 @@ fn add_table(
     let mut cols = vec![];
     let mut decl: Cols = vec![];
     for c in columns {
-        let fmt = c.format.clone().unwrap_or_else(|| if c.ty == "text" { "@".into() } else { "General".into() });
+        let fmt = c.format.clone().unwrap_or_else(|| {
+            if c.ty == "text" {
+                "@".into()
+            } else {
+                "General".into()
+            }
+        });
         let calc = c.formula.as_ref().map(|f| {
             let x = formula::to_file_form(f.trim(), name);
             x.strip_prefix('=').unwrap_or(&x).to_string()
         });
-        cols.push(TableCol { name: c.name.clone(), calc, dxf: Some(book.styles.dxf_with_format(&fmt)?) });
-        decl.push((c.name.clone(), c.ty.clone(), fmt, c.formula.clone().unwrap_or_default()));
+        cols.push(TableCol {
+            name: c.name.clone(),
+            calc,
+            dxf: Some(book.styles.dxf_with_format(&fmt)?),
+        });
+        decl.push((
+            c.name.clone(),
+            c.ty.clone(),
+            fmt,
+            c.formula.clone().unwrap_or_default(),
+        ));
     }
     let info = TableInfo {
         part: part.clone(),
@@ -1271,7 +1638,12 @@ fn add_table(
         let st = book.store_mut(i)?;
         let p = st.prefix.clone();
         let root = &mut st.skel.root;
-        let rp = match root.attrs.iter().find(|x| x.1 == R_NS).and_then(|x| x.0.strip_prefix("xmlns:")) {
+        let rp = match root
+            .attrs
+            .iter()
+            .find(|x| x.1 == R_NS)
+            .and_then(|x| x.0.strip_prefix("xmlns:"))
+        {
             Some(p) => p.to_string(),
             None => {
                 root.attrs.push(("xmlns:r".into(), R_NS.into()));
@@ -1279,16 +1651,33 @@ fn add_table(
             }
         };
         if !root.elements().any(|e| e.local() == "tableParts") {
-            xml::insert_ordered(root, Element::new(&format!("{p}tableParts")).with_attr("count", "0"), SHEET_ORDER);
+            xml::insert_ordered(
+                root,
+                Element::new(&format!("{p}tableParts")).with_attr("count", "0"),
+                SHEET_ORDER,
+            );
         }
-        let tp = root.elements_mut().find(|e| e.local() == "tableParts").unwrap();
-        tp.children.push(Node::El(Element::new(&format!("{p}tablePart")).with_attr(&format!("{rp}:id"), &rid)));
+        let tp = root
+            .elements_mut()
+            .find(|e| e.local() == "tableParts")
+            .unwrap();
+        tp.children.push(Node::El(
+            Element::new(&format!("{p}tablePart")).with_attr(&format!("{rp}:id"), &rid),
+        ));
         let n = tp.elements().count();
         tp.set("count", &n.to_string());
     }
     // Header and cells.
     for (ci, c) in columns.iter().enumerate() {
-        write_cell(book, i, a.row, a.col + ci as u32, W::Str(c.name.clone()), None, cx)?;
+        write_cell(
+            book,
+            i,
+            a.row,
+            a.col + ci as u32,
+            W::Str(c.name.clone()),
+            None,
+            cx,
+        )?;
     }
     let k = book.tables.len() - 1;
     let calcs: Vec<Option<String>> = book.tables[k].cols.iter().map(|c| c.calc.clone()).collect();
@@ -1301,7 +1690,9 @@ fn add_table(
                 write_formula(book, i, r, col, f, Some(style), cx)?;
                 continue;
             }
-            let v = row.and_then(|row| row.iter().find(|(c, _)| c == cname).map(|x| &x.1)).unwrap_or(&Value::Null);
+            let v = row
+                .and_then(|row| row.iter().find(|(c, _)| c == cname).map(|x| &x.1))
+                .unwrap_or(&Value::Null);
             let at = format!("{sheet}!{}{r}", col_letters(col));
             let w = to_write(book, v, Some(ty), fmt, &at)?;
             write_cell(book, i, r, col, w, Some(style), cx)?;
@@ -1313,7 +1704,10 @@ fn add_table(
 }
 
 fn add_sheet(book: &mut Book, name: &str) -> Result<(), String> {
-    let dir = book.wb_part.rsplit_once('/').map_or(String::new(), |x| format!("{}/", x.0));
+    let dir = book
+        .wb_part
+        .rsplit_once('/')
+        .map_or(String::new(), |x| format!("{}/", x.0));
     let part = book.free_part(&format!("{dir}worksheets"), "sheet");
     let data = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<worksheet xmlns=\"{MAIN_NS}\" xmlns:r=\"{R_NS}\"><dimension ref=\"A1\"/><sheetViews><sheetView workbookViewId=\"0\"/></sheetViews><sheetFormatPr defaultRowHeight=\"15\"/><sheetData/><pageMargins left=\"0.7\" right=\"0.7\" top=\"0.75\" bottom=\"0.75\" header=\"0.3\" footer=\"0.3\"/></worksheet>"
@@ -1323,16 +1717,28 @@ fn add_sheet(book: &mut Book, name: &str) -> Result<(), String> {
     let rid = book.add_rel(&wb, "worksheet", &part);
     let root = &mut book.wb.root;
     let p = root.name.strip_suffix("workbook").unwrap_or("").to_string();
-    let rp = match root.attrs.iter().find(|x| x.1 == R_NS).and_then(|x| x.0.strip_prefix("xmlns:")) {
+    let rp = match root
+        .attrs
+        .iter()
+        .find(|x| x.1 == R_NS)
+        .and_then(|x| x.0.strip_prefix("xmlns:"))
+    {
         Some(p) => p.to_string(),
         None => {
             root.attrs.push(("xmlns:r".into(), R_NS.into()));
             "r".into()
         }
     };
-    let sheets = root.elements_mut().find(|e| e.local() == "sheets").ok_or("the workbook has no sheet list")?;
-    let id =
-        sheets.elements().filter_map(|s| s.get("sheetId").and_then(|v| v.parse::<u32>().ok())).max().unwrap_or(0) + 1;
+    let sheets = root
+        .elements_mut()
+        .find(|e| e.local() == "sheets")
+        .ok_or("the workbook has no sheet list")?;
+    let id = sheets
+        .elements()
+        .filter_map(|s| s.get("sheetId").and_then(|v| v.parse::<u32>().ok()))
+        .max()
+        .unwrap_or(0)
+        + 1;
     sheets.children.push(Node::El(
         Element::new(&format!("{p}sheet"))
             .with_attr("name", name)
@@ -1340,7 +1746,13 @@ fn add_sheet(book: &mut Book, name: &str) -> Result<(), String> {
             .with_attr(&format!("{rp}:id"), &rid),
     ));
     book.wb_changed = true;
-    book.push_sheet(SheetInfo { name: name.to_string(), part, rid, kind: SheetKind::Work, state: "visible".into() });
+    book.push_sheet(SheetInfo {
+        name: name.to_string(),
+        part,
+        rid,
+        kind: SheetKind::Work,
+        state: "visible".into(),
+    });
     Ok(())
 }
 
@@ -1349,7 +1761,9 @@ fn fix_dimension(book: &mut Book, i: usize) -> Result<(), String> {
     let st = book.store_mut(i)?;
     let used = st
         .used()
-        .map(|(c0, r0, c1, r1)| CellRange::new(CellRef::new(c0, r0), CellRef::new(c1, r1)).to_string())
+        .map(|(c0, r0, c1, r1)| {
+            CellRange::new(CellRef::new(c0, r0), CellRef::new(c1, r1)).to_string()
+        })
         .unwrap_or_else(|| "A1".into());
     let p = st.prefix.clone();
     match st.child_mut("dimension") {

@@ -129,7 +129,9 @@ impl Entry {
 
 /// 64-bit FNV-1a: a stable hash (the same in every build and on wasm).
 pub fn fnv1a(bytes: impl IntoIterator<Item = u8>) -> u64 {
-    bytes.into_iter().fold(0xcbf2_9ce4_8422_2325, |h, b| (h ^ b as u64).wrapping_mul(0x0100_0000_01b3))
+    bytes.into_iter().fold(0xcbf2_9ce4_8422_2325, |h, b| {
+        (h ^ b as u64).wrapping_mul(0x0100_0000_01b3)
+    })
 }
 
 /// Placeholder ids, stable across imports of the same file: `k` and four
@@ -148,7 +150,10 @@ impl KeepIds {
         if self.0.insert(base.clone()) {
             return base;
         }
-        (2..).map(|k| format!("{base}-{k}")).find(|id| self.0.insert(id.clone())).unwrap()
+        (2..)
+            .map(|k| format!("{base}-{k}"))
+            .find(|id| self.0.insert(id.clone()))
+            .unwrap()
     }
 
     /// Give back an id (an import step that was rolled back).
@@ -197,7 +202,9 @@ impl Remainder {
     }
 
     pub fn keeps(&self) -> impl Iterator<Item = (&Keep, bool)> {
-        self.entries.iter().filter_map(|e| e.meta.keep.as_ref().map(|k| (k, e.kind == Kind::Bkeep)))
+        self.entries
+            .iter()
+            .filter_map(|e| e.meta.keep.as_ref().map(|k| (k, e.kind == Kind::Bkeep)))
     }
 
     pub fn keep_list(&self) -> Vec<Keep> {
@@ -214,22 +221,32 @@ impl Remainder {
 
     /// The entry list as JSON lines (one entry per line, for inspection).
     pub fn entries_jsonl(&self) -> String {
-        self.entries.iter().map(|e| serde_json::to_string(e).unwrap() + "\n").collect()
+        self.entries
+            .iter()
+            .map(|e| serde_json::to_string(e).unwrap() + "\n")
+            .collect()
     }
 }
 
 /// Standard base64 (RFC 4648, padded) for part bytes.
 mod base64 {
-    use serde::{de::Error, Deserialize, Deserializer, Serializer};
+    use serde::de::Error;
+    use serde::{Deserialize, Deserializer, Serializer};
 
     const ABC: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
     pub fn encode(data: &[u8]) -> String {
         let mut out = String::with_capacity(data.len().div_ceil(3) * 4);
         for c in data.chunks(3) {
-            let n = (c[0] as u32) << 16 | (*c.get(1).unwrap_or(&0) as u32) << 8 | *c.get(2).unwrap_or(&0) as u32;
+            let n = (c[0] as u32) << 16
+                | (*c.get(1).unwrap_or(&0) as u32) << 8
+                | *c.get(2).unwrap_or(&0) as u32;
             for k in 0..4 {
-                out.push(if k <= c.len() { ABC[(n >> (18 - 6 * k) & 63) as usize] as char } else { '=' });
+                out.push(if k <= c.len() {
+                    ABC[(n >> (18 - 6 * k) & 63) as usize] as char
+                } else {
+                    '='
+                });
             }
         }
         out
@@ -269,7 +286,13 @@ mod base64 {
     mod tests {
         #[test]
         fn roundtrip() {
-            for (raw, enc) in [("", ""), ("f", "Zg=="), ("fo", "Zm8="), ("foo", "Zm9v"), ("foobar", "Zm9vYmFy")] {
+            for (raw, enc) in [
+                ("", ""),
+                ("f", "Zg=="),
+                ("fo", "Zm8="),
+                ("foo", "Zm9v"),
+                ("foobar", "Zm9vYmFy"),
+            ] {
                 assert_eq!(super::encode(raw.as_bytes()), enc);
                 assert_eq!(super::decode(enc).unwrap(), raw.as_bytes());
             }

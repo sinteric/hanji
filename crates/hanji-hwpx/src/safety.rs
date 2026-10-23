@@ -38,7 +38,9 @@ fn edit_part(
     name: &str,
     f: &mut dyn FnMut(&mut Element) -> Result<bool, String>,
 ) -> Result<(), String> {
-    let Some(p) = parts.iter_mut().find(|p| p.name == name) else { return Ok(()) };
+    let Some(p) = parts.iter_mut().find(|p| p.name == name) else {
+        return Ok(());
+    };
     let mut d = xml::parse(&p.data).map_err(|e| format!("{name}: {e}"))?;
     if f(&mut d.root)? {
         p.data = xml::write_doc(&d);
@@ -56,7 +58,11 @@ pub fn neutralise(
     // which are copied through: what they hold is neutralised in place.
     let others: Vec<String> = parts
         .iter()
-        .filter(|p| p.name.starts_with("Contents/") && p.name.ends_with(".xml") && section_number(&p.name).is_none())
+        .filter(|p| {
+            p.name.starts_with("Contents/")
+                && p.name.ends_with(".xml")
+                && section_number(&p.name).is_none()
+        })
         .map(|p| p.name.clone())
         .collect();
     // Embedded OLE objects: the object and its data go.
@@ -65,7 +71,12 @@ pub fn neutralise(
         let gone = remove_where(root, &|e| e.is("hp:ole"));
         for o in &gone {
             let item = o.get("binaryItemIDRef").unwrap_or_default();
-            notice(out, "ole-object", format!("{name} <hp:ole>"), format!("embedded object {item} removed"));
+            notice(
+                out,
+                "ole-object",
+                format!("{name} <hp:ole>"),
+                format!("embedded object {item} removed"),
+            );
             ole_items.insert(item);
         }
         !gone.is_empty()
@@ -77,8 +88,11 @@ pub fn neutralise(
         edit_part(parts, name, &mut |root| Ok(drop_ole(root, name, out)))?;
     }
     // The package manifest: scripts, linked files and the OLE data.
-    let mut gone_parts: BTreeSet<String> =
-        parts.iter().filter(|p| p.name.starts_with("Scripts/")).map(|p| p.name.clone()).collect();
+    let mut gone_parts: BTreeSet<String> = parts
+        .iter()
+        .filter(|p| p.name.starts_with("Scripts/"))
+        .map(|p| p.name.clone())
+        .collect();
     let mut gone_ids = BTreeSet::new();
     edit_part(parts, CONTENT_PART, &mut |root| {
         let mut changed = false;
@@ -94,12 +108,19 @@ pub fn neutralise(
             });
             for it in items {
                 changed = true;
-                let (id, href) = (it.get("id").unwrap_or_default(), it.get("href").unwrap_or_default());
+                let (id, href) = (
+                    it.get("id").unwrap_or_default(),
+                    it.get("href").unwrap_or_default(),
+                );
                 let media = it.get("media-type").unwrap_or_default();
                 if href.starts_with("Scripts/") || media.contains("javascript") {
                     notice(out, "macros", format!("{CONTENT_PART} {id}"), href.clone());
                 } else if it.get("isEmbeded").as_deref() == Some("0") {
-                    let kind = if media.starts_with("image/") { "linked-image" } else { "linked-object" };
+                    let kind = if media.starts_with("image/") {
+                        "linked-image"
+                    } else {
+                        "linked-object"
+                    };
                     notice(out, kind, format!("{CONTENT_PART} {id}"), href.clone());
                 }
                 gone_parts.insert(href);
@@ -107,7 +128,10 @@ pub fn neutralise(
             }
         }
         for s in root.elements_mut().filter(|e| e.is("opf:spine")) {
-            changed |= !remove_where(s, &|e| e.get("idref").is_some_and(|r| gone_ids.contains(&r))).is_empty();
+            changed |= !remove_where(s, &|e| {
+                e.get("idref").is_some_and(|r| gone_ids.contains(&r))
+            })
+            .is_empty();
         }
         Ok(changed)
     })?;
@@ -117,7 +141,11 @@ pub fn neutralise(
         }
     }
     edit_part(parts, "META-INF/manifest.xml", &mut |root| {
-        Ok(!remove_where(root, &|e| e.get("manifest:full-path").is_some_and(|f| gone_parts.contains(&f))).is_empty())
+        Ok(!remove_where(root, &|e| {
+            e.get("manifest:full-path")
+                .is_some_and(|f| gone_parts.contains(&f))
+        })
+        .is_empty())
     })?;
     parts.retain(|p| !gone_parts.contains(&p.name));
     // What showed a removed item goes with it: no reference may point at a
@@ -126,7 +154,9 @@ pub fn neutralise(
         drop_references(&mut d.root, &gone_ids, name, out)?;
     }
     for name in others.iter().filter(|_| !gone_ids.is_empty()) {
-        edit_part(parts, name, &mut |root| Ok(drop_references(root, &gone_ids, name, out)? > 0))?;
+        edit_part(parts, name, &mut |root| {
+            Ok(drop_references(root, &gone_ids, name, out)? > 0)
+        })?;
     }
     // A linked source document (`hh:linkinfo path`) is fetched to inherit pages.
     edit_part(parts, HEADER_PART, &mut |root| {
@@ -163,8 +193,10 @@ fn drop_references(
         let mut found = None;
         e.walk(&mut |x| {
             if found.is_none() {
-                found =
-                    ITEM_REFS.iter().find_map(|a| x.get(a).filter(|r| gone.contains(r))).map(|r| (x.name.clone(), r));
+                found = ITEM_REFS
+                    .iter()
+                    .find_map(|a| x.get(a).filter(|r| gone.contains(r)))
+                    .map(|r| (x.name.clone(), r));
             }
         });
         found
@@ -174,16 +206,32 @@ fn drop_references(
     }
     // An image fill first (its shape stays; a fill that was only that image
     // goes whole), then a picture whose own image went.
-    let only_image = |e: &Element| e.elements().all(|c| c.is("hc:imgBrush") && refers(c).is_some());
-    let mut fills: Vec<Element> = remove_where(root, &|e| e.is("hc:fillBrush") && e.has_elements() && only_image(e))
-        .into_iter()
-        .flat_map(|f| f.elements().cloned().collect::<Vec<_>>())
-        .collect();
-    fills.extend(remove_where(root, &|e| e.is("hc:imgBrush") && refers(e).is_some()));
+    let only_image = |e: &Element| {
+        e.elements()
+            .all(|c| c.is("hc:imgBrush") && refers(c).is_some())
+    };
+    let mut fills: Vec<Element> = remove_where(root, &|e| {
+        e.is("hc:fillBrush") && e.has_elements() && only_image(e)
+    })
+    .into_iter()
+    .flat_map(|f| f.elements().cloned().collect::<Vec<_>>())
+    .collect();
+    fills.extend(remove_where(root, &|e| {
+        e.is("hc:imgBrush") && refers(e).is_some()
+    }));
     let pics = remove_where(root, &|e| e.is("hp:pic") && refers(e).is_some());
-    for (what, e) in fills.iter().map(|e| ("image fill", e)).chain(pics.iter().map(|e| ("picture", e))) {
+    for (what, e) in fills
+        .iter()
+        .map(|e| ("image fill", e))
+        .chain(pics.iter().map(|e| ("picture", e)))
+    {
         let item = refers(e).map(|r| r.1).unwrap_or_default();
-        notice(out, "linked-image", format!("{part} <{}>", e.name), format!("{what} of removed item {item} removed"));
+        notice(
+            out,
+            "linked-image",
+            format!("{part} <{}>", e.name),
+            format!("{what} of removed item {item} removed"),
+        );
     }
     match refers(root) {
         Some((name, item)) => Err(format!(
@@ -205,10 +253,23 @@ pub fn surface(parts: &[Part], sections: &[(String, Doc)], report: &mut ImportRe
             }
             if e.is("hp:ctrl") {
                 if let Some(h) = e.child("hp:hiddenComment") {
-                    notice(out, "hidden-text", format!("{name} paragraph {para}"), clip(&h.text_of(&["hp:t"]), 60));
+                    notice(
+                        out,
+                        "hidden-text",
+                        format!("{name} paragraph {para}"),
+                        clip(&h.text_of(&["hp:t"]), 60),
+                    );
                 }
-                if let Some(f) = e.child("hp:fieldBegin").filter(|f| f.get("type").as_deref() == Some("MEMO")) {
-                    notice(out, "comment", format!("{name} paragraph {para}"), clip(&f.text_of(&["hp:t"]), 60));
+                if let Some(f) = e
+                    .child("hp:fieldBegin")
+                    .filter(|f| f.get("type").as_deref() == Some("MEMO"))
+                {
+                    notice(
+                        out,
+                        "comment",
+                        format!("{name} paragraph {para}"),
+                        clip(&f.text_of(&["hp:t"]), 60),
+                    );
                 }
             }
             if e.is("hp:t") {
@@ -220,18 +281,27 @@ pub fn surface(parts: &[Part], sections: &[(String, Doc)], report: &mut ImportRe
                         Node::El(x) if x.is("hp:deleteEnd") => {
                             deleting.remove(&x.get("Id").unwrap_or_default());
                             if deleting.is_empty() && !deleted.trim().is_empty() {
-                                notice(out, "tracked-deletion", format!("{name} paragraph {para}"), clip(&deleted, 60));
+                                notice(
+                                    out,
+                                    "tracked-deletion",
+                                    format!("{name} paragraph {para}"),
+                                    clip(&deleted, 60),
+                                );
                                 deleted.clear();
                             }
                         }
-                        Node::Text(t) if !deleting.is_empty() => deleted.push_str(&xml::unescape(t)),
+                        Node::Text(t) if !deleting.is_empty() => {
+                            deleted.push_str(&xml::unescape(t))
+                        }
                         _ => {}
                     }
                 }
             }
         });
     }
-    if let Some(d) = hanji_package::package::get(parts, CONTENT_PART).and_then(|d| xml::parse(d).ok()) {
+    if let Some(d) =
+        hanji_package::package::get(parts, CONTENT_PART).and_then(|d| xml::parse(d).ok())
+    {
         d.root.walk(&mut |e| {
             let name = e.get("name").unwrap_or_default();
             if e.is("opf:meta") && ["creator", "lastsaveby"].contains(&name.as_str()) {

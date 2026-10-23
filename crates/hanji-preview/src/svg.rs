@@ -14,8 +14,8 @@ use crate::images::ImagePlan;
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
 use oxml_layout::{
-    Color, Effect, FillRule, FontId, GlyphRun, GroupElement, LayoutResult, LineCap, LineJoin, Paint, Path, PathCommand,
-    PathElement, PositionedElement, Rect, Stroke, Transform,
+    Color, Effect, FillRule, FontId, GlyphRun, GroupElement, LayoutResult, LineCap, LineJoin,
+    Paint, Path, PathCommand, PathElement, PositionedElement, Rect, Stroke, Transform,
 };
 
 /// One stable diagnostic produced while lowering a page to SVG.
@@ -53,7 +53,14 @@ pub(crate) fn render_page(
     images: &ImagePlan,
 ) -> Option<SvgRenderResult> {
     let page = layout.pages.get(page_index)?;
-    let mut state = SvgState::new(layout, Some(hooks), page_index, page.width, page.height, images);
+    let mut state = SvgState::new(
+        layout,
+        Some(hooks),
+        page_index,
+        page.width,
+        page.height,
+        images,
+    );
 
     let mut used_fonts = Vec::new();
     let mut seen_fonts = HashSet::new();
@@ -80,7 +87,12 @@ pub(crate) fn render_page(
             .unwrap();
         }
     }
-    state.emit_elements(&page.elements, &format!("pages[{page_index}].elements"), &mut body, Transform::IDENTITY);
+    state.emit_elements(
+        &page.elements,
+        &format!("pages[{page_index}].elements"),
+        &mut body,
+        Transform::IDENTITY,
+    );
 
     let mut svg = String::new();
     write!(
@@ -98,7 +110,10 @@ pub(crate) fn render_page(
     svg.push_str(&body);
     svg.push_str("</svg>");
 
-    Some(SvgRenderResult { svg, diagnostics: state.diagnostics })
+    Some(SvgRenderResult {
+        svg,
+        diagnostics: state.diagnostics,
+    })
 }
 
 pub fn layout_diagnostics(layout: &LayoutResult) -> Vec<SvgDiagnostic> {
@@ -122,10 +137,19 @@ pub(crate) fn page_diagnostics(
     let page = layout.pages.get(page_index)?;
     let mut state = SvgState::new(layout, None, page_index, page.width, page.height, images);
     if let Some(background) = &page.background {
-        state.paint_attributes(background, "fill", &format!("pages[{page_index}].background"));
+        state.paint_attributes(
+            background,
+            "fill",
+            &format!("pages[{page_index}].background"),
+        );
     }
     let mut output = String::new();
-    state.emit_elements(&page.elements, &format!("pages[{page_index}].elements"), &mut output, Transform::IDENTITY);
+    state.emit_elements(
+        &page.elements,
+        &format!("pages[{page_index}].elements"),
+        &mut output,
+        Transform::IDENTITY,
+    );
     debug_assert!(output.is_empty() && state.defs.is_empty());
     Some(state.diagnostics)
 }
@@ -168,13 +192,20 @@ impl<'a> SvgState<'a> {
     }
 
     fn definition_id(&mut self) -> String {
-        let id = format!("hanji-p{}-def-{}", self.page_index + 1, self.next_definition);
+        let id = format!(
+            "hanji-p{}-def-{}",
+            self.page_index + 1,
+            self.next_definition
+        );
         self.next_definition += 1;
         id
     }
 
     fn diagnose(&mut self, path: &str, message: &str) {
-        self.diagnostics.push(SvgDiagnostic { path: path.to_owned(), message: message.to_owned() });
+        self.diagnostics.push(SvgDiagnostic {
+            path: path.to_owned(),
+            message: message.to_owned(),
+        });
     }
 
     fn emit_font_definitions(&mut self, used_fonts: &[FontId]) {
@@ -216,7 +247,13 @@ impl<'a> SvgState<'a> {
                         );
                     }
                 }
-                PositionedElement::Line { start, end, width, color, dash_pattern } => {
+                PositionedElement::Line {
+                    start,
+                    end,
+                    width,
+                    color,
+                    dash_pattern,
+                } => {
                     if self.hooks.is_none() {
                         continue;
                     }
@@ -233,7 +270,13 @@ impl<'a> SvgState<'a> {
                     )
                     .unwrap();
                     if let Some((on, off)) = dash_pattern {
-                        write!(output, " stroke-dasharray=\"{} {}\"", number(*on), number(*off)).unwrap();
+                        write!(
+                            output,
+                            " stroke-dasharray=\"{} {}\"",
+                            number(*on),
+                            number(*off)
+                        )
+                        .unwrap();
                     }
                     output.push_str("/>");
                 }
@@ -253,20 +296,36 @@ impl<'a> SvgState<'a> {
                     )
                     .unwrap();
                 }
-                PositionedElement::Image { rect, data, .. } => self.emit_image(*rect, data, &element_path, output),
-                PositionedElement::LinkAnnotation { rect, url } => self.emit_link(*rect, url, &element_path, output),
-                PositionedElement::Path(path_element) => self.emit_path_element(path_element, &element_path, output),
-                PositionedElement::Group(group) => self.emit_group(group, &element_path, output, accumulated),
+                PositionedElement::Image { rect, data, .. } => {
+                    self.emit_image(*rect, data, &element_path, output)
+                }
+                PositionedElement::LinkAnnotation { rect, url } => {
+                    self.emit_link(*rect, url, &element_path, output)
+                }
+                PositionedElement::Path(path_element) => {
+                    self.emit_path_element(path_element, &element_path, output)
+                }
+                PositionedElement::Group(group) => {
+                    self.emit_group(group, &element_path, output, accumulated)
+                }
                 PositionedElement::MarkedContent { children, .. } => {
                     if self.hooks.is_some() {
                         output.push_str("<g>");
                     }
-                    self.emit_elements(children, &format!("{element_path}.children"), output, accumulated);
+                    self.emit_elements(
+                        children,
+                        &format!("{element_path}.children"),
+                        output,
+                        accumulated,
+                    );
                     if self.hooks.is_some() {
                         output.push_str("</g>");
                     }
                 }
-                _ => self.diagnose(&element_path, "unsupported positioned element was omitted from SVG output"),
+                _ => self.diagnose(
+                    &element_path,
+                    "unsupported positioned element was omitted from SVG output",
+                ),
             }
         }
     }
@@ -277,17 +336,29 @@ impl<'a> SvgState<'a> {
         }
         self.diagnose_font_on_first_use(run.font_id);
         let scalar_count = run.text.chars().count();
-        let simple = scalar_count == run.glyph_ids.len() && run.advances.len() == run.glyph_ids.len();
+        let simple =
+            scalar_count == run.glyph_ids.len() && run.advances.len() == run.glyph_ids.len();
         if !simple {
-            self.diagnose(path, "complex shaping kept searchable text with total-advance positioning");
+            self.diagnose(
+                path,
+                "complex shaping kept searchable text with total-advance positioning",
+            );
         }
         if run.text.chars().any(|c| !is_xml_character(c)) {
-            self.diagnose(path, "XML-invalid text characters were replaced with U+FFFD");
+            self.diagnose(
+                path,
+                "XML-invalid text characters were replaced with U+FFFD",
+            );
         }
         let Some(hooks) = self.hooks else { return };
         let mark = hooks.mark(run.font_id);
         if let Some(title) = &mark {
-            write!(output, "<g class=\"hanji-subst\"><title>{}</title>", escape_text(title)).unwrap();
+            write!(
+                output,
+                "<g class=\"hanji-subst\"><title>{}</title>",
+                escape_text(title)
+            )
+            .unwrap();
         }
 
         write!(
@@ -375,7 +446,10 @@ impl<'a> SvgState<'a> {
         }
         let data = self.images.normalized(path).unwrap_or(data);
         let Some(mime) = image_mime(data) else {
-            self.diagnose(path, "image bytes are neither PNG nor JPEG and were omitted");
+            self.diagnose(
+                path,
+                "image bytes are neither PNG nor JPEG and were omitted",
+            );
             return;
         };
         if self.hooks.is_none() {
@@ -423,11 +497,18 @@ impl<'a> SvgState<'a> {
             }
             return;
         }
-        write!(output, "<path d=\"{}\" fill-rule=\"{}\"", path_data(&element.path), fill_rule(element.path.fill_rule))
-            .unwrap();
+        write!(
+            output,
+            "<path d=\"{}\" fill-rule=\"{}\"",
+            path_data(&element.path),
+            fill_rule(element.path.fill_rule)
+        )
+        .unwrap();
         match &element.fill {
             Some(paint) => {
-                if let Some(attributes) = self.paint_attributes(paint, "fill", &format!("{path}.fill")) {
+                if let Some(attributes) =
+                    self.paint_attributes(paint, "fill", &format!("{path}.fill"))
+                {
                     write!(output, " {attributes}").unwrap();
                 } else {
                     output.push_str(" fill=\"none\"");
@@ -466,11 +547,22 @@ impl<'a> SvgState<'a> {
         }
     }
 
-    fn emit_group(&mut self, group: &GroupElement, path: &str, output: &mut String, accumulated: Transform) {
+    fn emit_group(
+        &mut self,
+        group: &GroupElement,
+        path: &str,
+        output: &mut String,
+        accumulated: Transform,
+    ) {
         let group_to_page = group.transform.then(accumulated);
         let filter_region = self.diagnose_group_effects(group, path, group_to_page);
         if self.hooks.is_none() {
-            self.emit_elements(&group.children, &format!("{path}.children"), output, group_to_page);
+            self.emit_elements(
+                &group.children,
+                &format!("{path}.children"),
+                output,
+                group_to_page,
+            );
             return;
         }
         let mut attributes = String::new();
@@ -501,14 +593,25 @@ impl<'a> SvgState<'a> {
             None
         };
         if group.opacity < 1.0 {
-            write!(attributes, " opacity=\"{}\"", number(group.opacity.clamp(0.0, 1.0))).unwrap();
+            write!(
+                attributes,
+                " opacity=\"{}\"",
+                number(group.opacity.clamp(0.0, 1.0))
+            )
+            .unwrap();
         }
         if !group.effects.is_empty() {
             let id = self.definition_id();
             let mut filter = String::new();
             let mut shadows = Vec::new();
             for (index, effect) in group.effects.iter().enumerate() {
-                if let Effect::OuterShadow { dx, dy, blur, color } = effect {
+                if let Effect::OuterShadow {
+                    dx,
+                    dy,
+                    blur,
+                    color,
+                } = effect
+                {
                     let blur_id = format!("{id}-blur-{index}");
                     let offset_id = format!("{id}-offset-{index}");
                     let flood_id = format!("{id}-flood-{index}");
@@ -555,7 +658,12 @@ impl<'a> SvgState<'a> {
         if let Some(clip_id) = clip_id {
             write!(output, "<g clip-path=\"url(#{clip_id})\">").unwrap();
         }
-        self.emit_elements(&group.children, &format!("{path}.children"), output, group_to_page);
+        self.emit_elements(
+            &group.children,
+            &format!("{path}.children"),
+            output,
+            group_to_page,
+        );
         if group.clip.is_some() {
             output.push_str("</g>");
         }
@@ -576,7 +684,10 @@ impl<'a> SvgState<'a> {
         for (index, effect) in group.effects.iter().enumerate() {
             match effect {
                 Effect::OuterShadow { blur, .. } => {
-                    if *blur > 0.0 && !preserves_isotropic_blur(group_to_page) && matches!(region, Some(Ok(Some(_)))) {
+                    if *blur > 0.0
+                        && !preserves_isotropic_blur(group_to_page)
+                        && matches!(region, Some(Ok(Some(_))))
+                    {
                         self.diagnose(
                             &format!("{path}.effects[{index}]"),
                             "non-uniform or skewed transform makes SVG shadow blur anisotropic instead of the raster backend's average-scale isotropic blur",
@@ -598,7 +709,11 @@ impl<'a> SvgState<'a> {
         region
     }
 
-    fn filter_region(&self, group: &GroupElement, group_to_page: Transform) -> Result<Option<Rect>, ()> {
+    fn filter_region(
+        &self,
+        group: &GroupElement,
+        group_to_page: Transform,
+    ) -> Result<Option<Rect>, ()> {
         if let Some(region) = inverse_transform(group_to_page)
             .map(|page_to_group| {
                 page_to_group.transform_rect_bbox(Rect {
@@ -620,7 +735,10 @@ impl<'a> SvgState<'a> {
             Paint::Linear { extend, .. } | Paint::Radial { extend, .. } => {
                 self.diagnose_gradient_extension(*extend, path)
             }
-            Paint::Tile { .. } => self.diagnose(path, "tile paint was omitted because its carrier has no media bytes"),
+            Paint::Tile { .. } => self.diagnose(
+                path,
+                "tile paint was omitted because its carrier has no media bytes",
+            ),
             Paint::Solid(_) | Paint::Grid { .. } => {}
         }
         self.hooks?;
@@ -630,7 +748,9 @@ impl<'a> SvgState<'a> {
                 color_hex(*color),
                 number(color.a.clamp(0.0, 1.0))
             )),
-            Paint::Linear { start, end, stops, .. } => {
+            Paint::Linear {
+                start, end, stops, ..
+            } => {
                 let id = self.definition_id();
                 let mut definition = format!(
                     "<linearGradient id=\"{id}\" gradientUnits=\"userSpaceOnUse\" x1=\"{}\" y1=\"{}\" x2=\"{}\" y2=\"{}\">",
@@ -644,7 +764,13 @@ impl<'a> SvgState<'a> {
                 self.defs.push_str(&definition);
                 Some(format!("{property}=\"url(#{id})\""))
             }
-            Paint::Radial { center, radius, focal, stops, .. } => {
+            Paint::Radial {
+                center,
+                radius,
+                focal,
+                stops,
+                ..
+            } => {
                 let id = self.definition_id();
                 let mut definition = format!(
                     "<radialGradient id=\"{id}\" gradientUnits=\"userSpaceOnUse\" cx=\"{}\" cy=\"{}\" r=\"{}\" fx=\"{}\" fy=\"{}\">",
@@ -659,7 +785,12 @@ impl<'a> SvgState<'a> {
                 self.defs.push_str(&definition);
                 Some(format!("{property}=\"url(#{id})\""))
             }
-            Paint::Grid { bounds, columns, rows, colors } => {
+            Paint::Grid {
+                bounds,
+                columns,
+                rows,
+                colors,
+            } => {
                 Paint::grid(*bounds, *columns, *rows, colors.clone())?;
                 let id = self.definition_id();
                 let dx = bounds.width / f64::from(*columns);
@@ -676,7 +807,9 @@ impl<'a> SvgState<'a> {
                     while col < usize::from(*columns) {
                         let color = colors[row * usize::from(*columns) + col];
                         let mut end = col + 1;
-                        while end < usize::from(*columns) && colors[row * usize::from(*columns) + end] == color {
+                        while end < usize::from(*columns)
+                            && colors[row * usize::from(*columns) + end] == color
+                        {
                             end += 1;
                         }
                         let _ = write!(
@@ -702,12 +835,19 @@ impl<'a> SvgState<'a> {
 
     fn diagnose_gradient_extension(&mut self, extend: (bool, bool), path: &str) {
         if extend != (true, true) {
-            self.diagnose(path, "asymmetric or disabled gradient extension uses SVG pad extension");
+            self.diagnose(
+                path,
+                "asymmetric or disabled gradient extension uses SVG pad extension",
+            );
         }
     }
 }
 
-fn collect_used_fonts(elements: &[PositionedElement], seen: &mut HashSet<FontId>, ordered: &mut Vec<FontId>) {
+fn collect_used_fonts(
+    elements: &[PositionedElement],
+    seen: &mut HashSet<FontId>,
+    ordered: &mut Vec<FontId>,
+) {
     for element in elements {
         match element {
             PositionedElement::Text(run) if !run.text.is_empty() => {
@@ -721,7 +861,9 @@ fn collect_used_fonts(elements: &[PositionedElement], seen: &mut HashSet<FontId>
                 }
             }
             PositionedElement::Group(group) => collect_used_fonts(&group.children, seen, ordered),
-            PositionedElement::MarkedContent { children, .. } => collect_used_fonts(children, seen, ordered),
+            PositionedElement::MarkedContent { children, .. } => {
+                collect_used_fonts(children, seen, ordered)
+            }
             _ => {}
         }
     }
@@ -740,10 +882,12 @@ fn inverse_transform(transform: Transform) -> Option<Transform> {
         e: (transform.c * transform.f - transform.d * transform.e) / determinant,
         f: (transform.b * transform.e - transform.a * transform.f) / determinant,
     };
-    [inverse.a, inverse.b, inverse.c, inverse.d, inverse.e, inverse.f]
-        .iter()
-        .all(|value| value.is_finite())
-        .then_some(inverse)
+    [
+        inverse.a, inverse.b, inverse.c, inverse.d, inverse.e, inverse.f,
+    ]
+    .iter()
+    .all(|value| value.is_finite())
+    .then_some(inverse)
 }
 
 fn preserves_isotropic_blur(transform: Transform) -> bool {
@@ -803,7 +947,9 @@ fn element_bounds(element: &PositionedElement) -> Result<Option<Rect>, ()> {
     match element {
         PositionedElement::Text(run) if !run.text.is_empty() => Err(()),
         PositionedElement::MultilingualText(run) if !run.logical_text.is_empty() => Err(()),
-        PositionedElement::Line { start, end, width, .. } => {
+        PositionedElement::Line {
+            start, end, width, ..
+        } => {
             let margin = width.abs() / 2.0 + 1.0;
             Ok(Some(Rect {
                 x: start.x.min(end.x) - margin,
@@ -832,7 +978,8 @@ fn element_bounds(element: &PositionedElement) -> Result<Option<Rect>, ()> {
             }
         })),
         PositionedElement::Group(group) => {
-            Ok(group_effect_bounds(group)?.map(|bounds| group.transform.transform_rect_bbox(bounds)))
+            Ok(group_effect_bounds(group)?
+                .map(|bounds| group.transform.transform_rect_bbox(bounds)))
         }
         PositionedElement::MarkedContent { children, .. } => elements_bounds(children),
         PositionedElement::LinkAnnotation { .. }
@@ -858,7 +1005,12 @@ fn intersect_rect(left: Rect, right: Rect) -> Option<Rect> {
     let y = left.y.max(right.y);
     let right_edge = (left.x + left.width).min(right.x + right.width);
     let bottom = (left.y + left.height).min(right.y + right.height);
-    (right_edge >= x && bottom >= y).then_some(Rect { x, y, width: right_edge - x, height: bottom - y })
+    (right_edge >= x && bottom >= y).then_some(Rect {
+        x,
+        y,
+        width: right_edge - x,
+        height: bottom - y,
+    })
 }
 
 fn union_rect(left: Rect, right: Rect) -> Rect {
@@ -868,18 +1020,29 @@ fn union_rect(left: Rect, right: Rect) -> Rect {
     let y = left.y.min(right.y);
     let right_edge = (left.x + left.width).max(right.x + right.width);
     let bottom = (left.y + left.height).max(right.y + right.height);
-    Rect { x, y, width: right_edge - x, height: bottom - y }
+    Rect {
+        x,
+        y,
+        width: right_edge - x,
+        height: bottom - y,
+    }
 }
 
 fn rect_is_finite(rect: &Rect) -> bool {
-    [rect.x, rect.y, rect.width, rect.height].iter().all(|value| value.is_finite())
+    [rect.x, rect.y, rect.width, rect.height]
+        .iter()
+        .all(|value| value.is_finite())
 }
 
 fn emit_stops(stops: &[oxml_layout::GradientStop], output: &mut String) {
     let mut normalized = stops
         .iter()
         .map(|stop| oxml_layout::GradientStop {
-            offset: if stop.offset.is_nan() { 0.0 } else { stop.offset.clamp(0.0, 1.0) },
+            offset: if stop.offset.is_nan() {
+                0.0
+            } else {
+                stop.offset.clamp(0.0, 1.0)
+            },
             color: stop.color,
         })
         .collect::<Vec<_>>();
@@ -911,8 +1074,12 @@ fn path_data(path: &Path) -> String {
             data.push(' ');
         }
         match command {
-            PathCommand::MoveTo(point) => write!(data, "M{} {}", number(point.x), number(point.y)).unwrap(),
-            PathCommand::LineTo(point) => write!(data, "L{} {}", number(point.x), number(point.y)).unwrap(),
+            PathCommand::MoveTo(point) => {
+                write!(data, "M{} {}", number(point.x), number(point.y)).unwrap()
+            }
+            PathCommand::LineTo(point) => {
+                write!(data, "L{} {}", number(point.x), number(point.y)).unwrap()
+            }
             PathCommand::CurveTo { c1, c2, to } => write!(
                 data,
                 "C{} {} {} {} {} {}",
@@ -946,7 +1113,12 @@ fn number(value: f64) -> String {
 
 fn color_hex(color: Color) -> String {
     let channel = |value: f64| (value.clamp(0.0, 1.0) * 255.0).round() as u8;
-    format!("#{:02X}{:02X}{:02X}", channel(color.r), channel(color.g), channel(color.b))
+    format!(
+        "#{:02X}{:02X}{:02X}",
+        channel(color.r),
+        channel(color.g),
+        channel(color.b)
+    )
 }
 
 fn line_cap(cap: LineCap) -> &'static str {
@@ -975,7 +1147,7 @@ fn fill_rule(rule: FillRule) -> &'static str {
 fn image_mime(data: &[u8]) -> Option<&'static str> {
     if data.starts_with(b"\x89PNG\r\n\x1a\n") {
         Some("image/png")
-    } else if data.starts_with(&[0xFF, 0xD8, 0xFF]) {
+    } else if data.starts_with(&[0xff, 0xd8, 0xff]) {
         Some("image/jpeg")
     } else {
         None
@@ -983,7 +1155,11 @@ fn image_mime(data: &[u8]) -> Option<&'static str> {
 }
 
 fn is_safe_link(target: &str) -> bool {
-    if target.is_empty() || target.chars().any(|character| character.is_control() || !is_xml_character(character)) {
+    if target.is_empty()
+        || target
+            .chars()
+            .any(|character| character.is_control() || !is_xml_character(character))
+    {
         return false;
     }
     let target = target.trim();
@@ -993,7 +1169,10 @@ fn is_safe_link(target: &str) -> bool {
     let Some(colon) = target.find(':') else {
         return true;
     };
-    if target[..colon].chars().any(|character| matches!(character, '/' | '?' | '#')) {
+    if target[..colon]
+        .chars()
+        .any(|character| matches!(character, '/' | '?' | '#'))
+    {
         return true;
     }
     let scheme = &target[..colon];
@@ -1001,16 +1180,25 @@ fn is_safe_link(target: &str) -> bool {
         || !scheme.chars().enumerate().all(|(index, character)| {
             character.is_ascii_alphabetic()
                 || (index > 0
-                    && (character.is_ascii_digit() || character == '+' || character == '-' || character == '.'))
+                    && (character.is_ascii_digit()
+                        || character == '+'
+                        || character == '-'
+                        || character == '.'))
         })
     {
         return false;
     }
-    matches!(scheme.to_ascii_lowercase().as_str(), "http" | "https" | "mailto")
+    matches!(
+        scheme.to_ascii_lowercase().as_str(),
+        "http" | "https" | "mailto"
+    )
 }
 
 fn escape_text(value: &str) -> String {
-    value.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;")
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
 }
 
 fn sanitize_xml_text(value: &str) -> (String, bool) {
@@ -1039,5 +1227,7 @@ fn is_xml_character(character: char) -> bool {
 }
 
 fn escape_attribute(value: &str) -> String {
-    escape_text(value).replace('"', "&quot;").replace('\'', "&apos;")
+    escape_text(value)
+        .replace('"', "&quot;")
+        .replace('\'', "&apos;")
 }

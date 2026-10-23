@@ -12,7 +12,18 @@ use crate::ast::{Atom, Inline, Span, SpanKind};
 /// A run's text formatting as the text shows it. `size` is in hundredths
 /// of a point (`a:rPr sz`); `color` is a canonical colour (see
 /// [`parse_color`]).
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone,
+    Debug,
+    Default,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    serde::Serialize,
+    serde::Deserialize,
+)]
 pub struct TextStyle {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub font: Option<String>,
@@ -53,7 +64,9 @@ impl TextStyle {
     /// The values every one of `all` has (none when `all` is empty).
     pub fn shared<'a>(all: impl IntoIterator<Item = &'a TextStyle>) -> TextStyle {
         let mut it = all.into_iter();
-        let Some(first) = it.next() else { return TextStyle::default() };
+        let Some(first) = it.next() else {
+            return TextStyle::default();
+        };
         let mut out = first.clone();
         for s in it {
             if out.font != s.font {
@@ -92,10 +105,15 @@ pub fn size_text(sz: i64) -> String {
 
 /// `24pt`, `10.5pt` or a bare number of points → hundredths of a point.
 pub fn parse_size(v: &str) -> Result<i64, String> {
-    let sz = crate::vocab::parse_length(v, false)
-        .map_err(|_| format!("size={v} is not a size; it is a length in points, such as size=24pt or size=10.5pt"))?;
+    let sz = crate::vocab::parse_length(v, false).map_err(|_| {
+        format!(
+            "size={v} is not a size; it is a length in points, such as size=24pt or size=10.5pt"
+        )
+    })?;
     if !(100..=400_000).contains(&sz) {
-        return Err(format!("size={v} is out of range: a text size is from 1pt to 4000pt"));
+        return Err(format!(
+            "size={v} is out of range: a text size is from 1pt to 4000pt"
+        ));
     }
     Ok(sz)
 }
@@ -121,12 +139,21 @@ pub fn split_text_keys(
     let mut st = TextStyle::default();
     let mut rest = vec![];
     for (k, v, col) in attrs {
-        let twice = |s: bool| if s { Err((*col, format!("{k}= is written twice."))) } else { Ok(()) };
+        let twice = |s: bool| {
+            if s {
+                Err((*col, format!("{k}= is written twice.")))
+            } else {
+                Ok(())
+            }
+        };
         match k.as_str() {
             "font" => {
                 twice(st.font.is_some())?;
                 if v.trim().is_empty() {
-                    return Err((*col, "font= names a font, such as font=Arial or font=\"맑은 고딕\".".into()));
+                    return Err((
+                        *col,
+                        "font= names a font, such as font=Arial or font=\"맑은 고딕\".".into(),
+                    ));
                 }
                 st.font = Some(v.clone());
             }
@@ -157,7 +184,9 @@ pub fn parse_braces(src: &str) -> Result<TextStyle, String> {
     for (k, v, c) in crate::vocab::attrs(src).map_err(|e| e.1)? {
         match v {
             Some(v) => kv.push((k, v, c)),
-            None if TEXT_KEYS.contains(&k.as_str()) => return Err(format!("{k} needs a value, such as {k}=…")),
+            None if TEXT_KEYS.contains(&k.as_str()) => {
+                return Err(format!("{k} needs a value, such as {k}=…"))
+            }
             None => return Err(unknown_key(&k)),
         }
     }
@@ -166,7 +195,10 @@ pub fn parse_braces(src: &str) -> Result<TextStyle, String> {
         return Err(unknown_key(k));
     }
     if st.is_empty() {
-        return Err("empty braces {}: write the formatting, such as {size=24pt}, or leave the braces out".into());
+        return Err(
+            "empty braces {}: write the formatting, such as {size=24pt}, or leave the braces out"
+                .into(),
+        );
     }
     Ok(st)
 }
@@ -202,7 +234,11 @@ pub fn unit_styles(inl: &Inline) -> Vec<TextStyle> {
     let mut out = vec![TextStyle::default(); inl.units.len()];
     for s in &inl.spans {
         if let SpanKind::Style(st) = &s.kind {
-            for o in out.iter_mut().take(s.end.min(inl.units.len())).skip(s.start) {
+            for o in out
+                .iter_mut()
+                .take(s.end.min(inl.units.len()))
+                .skip(s.start)
+            {
                 *o = st.clone();
             }
         }
@@ -226,7 +262,11 @@ pub fn set_unit_styles(inl: &mut Inline, styles: &[TextStyle]) {
             k += 1;
         }
         if !styles[a].is_empty() {
-            inl.spans.push(Span { start: a, end: k, kind: SpanKind::Style(styles[a].clone()) });
+            inl.spans.push(Span {
+                start: a,
+                end: k,
+                kind: SpanKind::Style(styles[a].clone()),
+            });
         }
     }
 }
@@ -251,7 +291,9 @@ pub fn fold_under(paras: &mut [&mut Inline], under: &TextStyle) {
 pub fn normalize(paras: &mut [&mut Inline]) {
     let all: Vec<Vec<TextStyle>> = paras.iter().map(|p| unit_styles(p)).collect();
     for (p, st) in paras.iter_mut().zip(all) {
-        let vis: Vec<usize> = (0..p.units.len()).filter(|&i| visible(&p.units[i].atom)).collect();
+        let vis: Vec<usize> = (0..p.units.len())
+            .filter(|&i| visible(&p.units[i].atom))
+            .collect();
         let mut out = st.clone();
         if vis.is_empty() {
             // Nothing shows: nothing is stated, and the file keeps what it has.
@@ -283,13 +325,19 @@ pub fn normalize(paras: &mut [&mut Inline]) {
 /// ending on shown text.
 pub fn lift(paras: &[&Inline]) -> (TextStyle, Vec<TextStyle>, Vec<Inline>) {
     let all: Vec<Vec<TextStyle>> = paras.iter().map(|p| unit_styles(p)).collect();
-    let obj = TextStyle::shared(
-        paras.iter().zip(&all).flat_map(|(p, s)| p.units.iter().zip(s).filter(|(u, _)| visible(&u.atom)).map(|x| x.1)),
-    );
+    let obj = TextStyle::shared(paras.iter().zip(&all).flat_map(|(p, s)| {
+        p.units
+            .iter()
+            .zip(s)
+            .filter(|(u, _)| visible(&u.atom))
+            .map(|x| x.1)
+    }));
     let mut own = vec![];
     let mut out = vec![];
     for (p, st) in paras.iter().zip(&all) {
-        let vis: Vec<usize> = (0..p.units.len()).filter(|&i| visible(&p.units[i].atom)).collect();
+        let vis: Vec<usize> = (0..p.units.len())
+            .filter(|&i| visible(&p.units[i].atom))
+            .collect();
         let mut q = (*p).clone();
         q.spans.retain(|s| !matches!(s.kind, SpanKind::Style(_)));
         if vis.is_empty() {
@@ -319,7 +367,11 @@ pub fn lift(paras: &[&Inline]) -> (TextStyle, Vec<TextStyle>, Vec<Inline>) {
                     e -= 1;
                 }
                 if s < e {
-                    q.spans.push(Span { start: s, end: e, kind: SpanKind::Style(stated[a].clone()) });
+                    q.spans.push(Span {
+                        start: s,
+                        end: e,
+                        kind: SpanKind::Style(stated[a].clone()),
+                    });
                 }
             }
         }
@@ -345,6 +397,10 @@ mod tests {
         assert_eq!(parse_color("#ff7f50").as_deref(), Ok("#FF7F50"));
         assert_eq!(parse_color("accent2/50%").as_deref(), Ok("accent2/50%"));
         assert_eq!(parse_color("accent1*/100%").as_deref(), Ok("accent1*"));
-        assert!(parse_color("red").is_err() && parse_color("#FF7F5").is_err() && parse_color("accent7").is_err());
+        assert!(
+            parse_color("red").is_err()
+                && parse_color("#FF7F5").is_err()
+                && parse_color("accent7").is_err()
+        );
     }
 }

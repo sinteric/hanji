@@ -35,8 +35,13 @@ pub struct Adjust {
 }
 
 /// Hangul, Hangul jamo, CJK symbols, punctuation and ideographs, and full-width forms.
-const EA_RANGES: &[(u32, u32)] =
-    &[(0x1100, 0x11FF), (0x2E80, 0x9FFF), (0xAC00, 0xD7AF), (0xF900, 0xFAFF), (0xFF00, 0xFF60)];
+const EA_RANGES: &[(u32, u32)] = &[
+    (0x1100, 0x11ff),
+    (0x2e80, 0x9fff),
+    (0xac00, 0xd7af),
+    (0xf900, 0xfaff),
+    (0xff00, 0xff60),
+];
 
 fn be16(d: &[u8], at: usize) -> u16 {
     u16::from_be_bytes([d[at], d[at + 1]])
@@ -52,7 +57,9 @@ fn tables(data: &[u8], index: u32) -> Result<Vec<(Tag, Vec<u8>)>, String> {
     let mut out = vec![];
     for r in raw.table_records {
         let (start, len) = (r.offset as usize, r.length as usize);
-        let bytes = data.get(start..start + len).ok_or_else(|| format!("table {} is outside the file", r.tag))?;
+        let bytes = data
+            .get(start..start + len)
+            .ok_or_else(|| format!("table {} is outside the file", r.tag))?;
         out.push((r.tag, bytes.to_vec()));
     }
     Ok(out)
@@ -71,10 +78,26 @@ fn name_table(family: &str, bold: bool, italic: bool) -> Vec<u8> {
         (false, true) => "Italic",
         (true, true) => "Bold Italic",
     };
-    let full = if style == "Regular" { family.to_string() } else { format!("{family} {style}") };
-    let ps: String = format!("{family}-{style}").chars().filter(|c| c.is_ascii_alphanumeric() || *c == '-').collect();
-    let ps = if ps.trim_matches('-').is_empty() { format!("HanjiPreview-{style}") } else { ps };
-    let records = [(1u16, utf16(family)), (2, utf16(style)), (4, utf16(&full)), (6, utf16(&ps))];
+    let full = if style == "Regular" {
+        family.to_string()
+    } else {
+        format!("{family} {style}")
+    };
+    let ps: String = format!("{family}-{style}")
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || *c == '-')
+        .collect();
+    let ps = if ps.trim_matches('-').is_empty() {
+        format!("HanjiPreview-{style}")
+    } else {
+        ps
+    };
+    let records = [
+        (1u16, utf16(family)),
+        (2, utf16(style)),
+        (4, utf16(&full)),
+        (6, utf16(&ps)),
+    ];
     let mut head = vec![];
     head.extend_from_slice(&0u16.to_be_bytes());
     head.extend_from_slice(&(records.len() as u16).to_be_bytes());
@@ -103,8 +126,11 @@ fn checksum(d: &[u8]) -> u32 {
 fn write(mut tables: Vec<(Tag, Vec<u8>)>) -> Vec<u8> {
     tables.sort_by_key(|(t, _)| t.0);
     let n = tables.len() as u16;
-    let flavor: u32 =
-        if tables.iter().any(|(t, _)| *t == Tag::from_bytes(b"CFF ")) { 0x4F54_544F } else { 0x0001_0000 };
+    let flavor: u32 = if tables.iter().any(|(t, _)| *t == Tag::from_bytes(b"CFF ")) {
+        0x4f54_544f
+    } else {
+        0x0001_0000
+    };
     let entry_selector = 15 - n.leading_zeros() as u16; // floor(log2 n)
     let search_range = (1u16 << entry_selector) * 16;
     let mut out = vec![];
@@ -132,7 +158,7 @@ fn write(mut tables: Vec<(Tag, Vec<u8>)>) -> Vec<u8> {
         out.resize(out.len().next_multiple_of(4), 0);
     }
     if let Some(at) = head_at.filter(|at| out.len() >= at + 12) {
-        let adj = 0xB1B0_AFBAu32.wrapping_sub(checksum(&out));
+        let adj = 0xb1b0_afbau32.wrapping_sub(checksum(&out));
         out[at + 8..at + 12].copy_from_slice(&adj.to_be_bytes());
     }
     out
@@ -152,7 +178,10 @@ pub fn build(data: &[u8], index: u32, adj: &Adjust) -> Result<Vec<u8>, String> {
         None => vec![],
     };
     let mut tables = tables(data, index)?;
-    let num_h_metrics = tables.iter().find(|(t, _)| *t == Tag::from_bytes(b"hhea")).map(|(_, d)| be16(d, 34));
+    let num_h_metrics = tables
+        .iter()
+        .find(|(t, _)| *t == Tag::from_bytes(b"hhea"))
+        .map(|(_, d)| be16(d, 34));
     for (tag, d) in &mut tables {
         match &tag.to_bytes() {
             b"name" => *d = name_table(&adj.family, adj.bold, adj.italic),
@@ -166,7 +195,8 @@ pub fn build(data: &[u8], index: u32, adj: &Adjust) -> Result<Vec<u8>, String> {
             }
             b"OS/2" if d.len() >= 78 => {
                 if let Some(em) = adj.line_em {
-                    let (asc, desc) = line_metrics(be16(d, 68) as i16, be16(d, 70) as i16, em * upem);
+                    let (asc, desc) =
+                        line_metrics(be16(d, 68) as i16, be16(d, 70) as i16, em * upem);
                     put16(d, 68, asc as u16);
                     put16(d, 70, (-desc) as u16);
                     put16(d, 72, 0);
@@ -200,15 +230,20 @@ pub(crate) fn symbol_bullet_encoding(data: &[u8]) -> Result<Option<Vec<u8>>, Str
     if crate::fonts::last_resort(&face) || face.glyph_index('\u{F0B7}').is_some() {
         return Ok(None);
     }
-    let Some(bullet) = face.glyph_index('\u{2022}').filter(|g| g.0 != 0 && g.0 < face.number_of_glyphs()) else {
+    let Some(bullet) = face
+        .glyph_index('\u{2022}')
+        .filter(|g| g.0 != 0 && g.0 < face.number_of_glyphs())
+    else {
         return Ok(None);
     };
-    let Some(cmap) = face.tables().cmap else { return Ok(None) };
+    let Some(cmap) = face.tables().cmap else {
+        return Ok(None);
+    };
     if face.glyph_name(bullet) != Some("bullet")
         || !cmap.subtables.into_iter().any(|s| {
             s.platform_id == ttf_parser::PlatformId::Macintosh
                 && s.encoding_id == 0
-                && s.glyph_index(0xB7) == Some(bullet)
+                && s.glyph_index(0xb7) == Some(bullet)
         })
     {
         return Ok(None);
@@ -224,7 +259,7 @@ pub(crate) fn symbol_bullet_encoding(data: &[u8]) -> Result<Option<Vec<u8>>, Str
             }
         });
     }
-    mappings.insert(0xF0B7, bullet.0);
+    mappings.insert(0xf0b7, bullet.0);
     let mut unicode = Vec::new();
     unicode.extend_from_slice(&12u16.to_be_bytes());
     unicode.extend_from_slice(&0u16.to_be_bytes());
@@ -236,9 +271,14 @@ pub(crate) fn symbol_bullet_encoding(data: &[u8]) -> Result<Option<Vec<u8>>, Str
             unicode.extend_from_slice(&value.to_be_bytes());
         }
     }
-    let raw = face.raw_face().table(Tag::from_bytes(b"cmap")).ok_or("font cmap is absent")?;
+    let raw = face
+        .raw_face()
+        .table(Tag::from_bytes(b"cmap"))
+        .ok_or("font cmap is absent")?;
     let count = usize::from(be16(raw, 2));
-    let records = raw.get(4..4 + count * 8).ok_or("font cmap records are incomplete")?;
+    let records = raw
+        .get(4..4 + count * 8)
+        .ok_or("font cmap records are incomplete")?;
     let mut records: Vec<_> = records
         .as_chunks::<8>()
         .0
@@ -252,7 +292,9 @@ pub(crate) fn symbol_bullet_encoding(data: &[u8]) -> Result<Option<Vec<u8>>, Str
         .collect();
     let header = 4 + 8 * (records.len() + 1);
     for (_, _, offset) in &mut records {
-        *offset = offset.checked_add(header as u32).ok_or("font cmap offset exceeds the file format")?;
+        *offset = offset
+            .checked_add(header as u32)
+            .ok_or("font cmap offset exceeds the file format")?;
     }
     records.push((3, 10, (header + raw.len()) as u32));
     records.sort_unstable();
@@ -268,7 +310,10 @@ pub(crate) fn symbol_bullet_encoding(data: &[u8]) -> Result<Option<Vec<u8>>, Str
     adapted.extend_from_slice(raw);
     adapted.extend(unicode);
     let mut tables = tables(data, 0)?;
-    let table = tables.iter_mut().find(|(tag, _)| *tag == Tag::from_bytes(b"cmap")).ok_or("font cmap is absent")?;
+    let table = tables
+        .iter_mut()
+        .find(|(tag, _)| *tag == Tag::from_bytes(b"cmap"))
+        .ok_or("font cmap is absent")?;
     table.1 = adapted;
     Ok(Some(write(tables)))
 }
@@ -287,19 +332,31 @@ mod tests {
     use super::*;
 
     fn carlito() -> &'static [u8] {
-        oxml_layout::bundled_fonts::bundled_font_data().into_iter().find(|(f, _)| *f == "Carlito").unwrap().1
+        oxml_layout::bundled_fonts::bundled_font_data()
+            .into_iter()
+            .find(|(f, _)| *f == "Carlito")
+            .unwrap()
+            .1
     }
 
     #[test]
     fn a_face_is_renamed_and_keeps_its_glyphs() {
-        let adj =
-            Adjust { family: "맑은 고딕".into(), bold: false, italic: false, line_em: None, ea_advance: None };
+        let adj = Adjust {
+            family: "맑은 고딕".into(),
+            bold: false,
+            italic: false,
+            line_em: None,
+            ea_advance: None,
+        };
         let out = build(carlito(), 0, &adj).unwrap();
         let mut db = fontdb::Database::new();
         db.load_font_data(out.clone());
         let face = db.faces().next().unwrap();
         assert_eq!(face.families[0].0, "맑은 고딕");
-        let (a, b) = (ttf_parser::Face::parse(carlito(), 0).unwrap(), ttf_parser::Face::parse(&out, 0).unwrap());
+        let (a, b) = (
+            ttf_parser::Face::parse(carlito(), 0).unwrap(),
+            ttf_parser::Face::parse(&out, 0).unwrap(),
+        );
         for c in ['A', 'g', '1'] {
             let (ga, gb) = (a.glyph_index(c).unwrap(), b.glyph_index(c).unwrap());
             assert_eq!(ga, gb);
@@ -310,7 +367,13 @@ mod tests {
 
     #[test]
     fn the_line_becomes_1_2_em_in_the_face_s_proportion() {
-        let adj = Adjust { family: "X".into(), bold: true, italic: false, line_em: Some(1.2), ea_advance: None };
+        let adj = Adjust {
+            family: "X".into(),
+            bold: true,
+            italic: false,
+            line_em: Some(1.2),
+            ea_advance: None,
+        };
         let out = build(carlito(), 0, &adj).unwrap();
         let f = ttf_parser::Face::parse(&out, 0).unwrap();
         let em = f64::from(f.units_per_em());
@@ -324,9 +387,18 @@ mod tests {
     #[test]
     fn east_asian_advances_change_only_east_asian_glyphs() {
         // Carlito has no Hangul: the Latin advances stay.
-        let adj = Adjust { family: "X".into(), bold: false, italic: false, line_em: None, ea_advance: Some(1.0) };
+        let adj = Adjust {
+            family: "X".into(),
+            bold: false,
+            italic: false,
+            line_em: None,
+            ea_advance: Some(1.0),
+        };
         let out = build(carlito(), 0, &adj).unwrap();
-        let (a, b) = (ttf_parser::Face::parse(carlito(), 0).unwrap(), ttf_parser::Face::parse(&out, 0).unwrap());
+        let (a, b) = (
+            ttf_parser::Face::parse(carlito(), 0).unwrap(),
+            ttf_parser::Face::parse(&out, 0).unwrap(),
+        );
         let g = a.glyph_index('W').unwrap();
         assert_eq!(a.glyph_hor_advance(g), b.glyph_hor_advance(g));
     }

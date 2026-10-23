@@ -33,8 +33,8 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use hanji_core::{
-    Block, BlockSrc, Capabilities, Engine, EngineError, ImportOptions, ImportReport, Imported, Part, Remainder,
-    StyleSet, TextModel,
+    Block, BlockSrc, Capabilities, Engine, EngineError, ImportOptions, ImportReport, Imported,
+    Part, Remainder, StyleSet, TextModel,
 };
 use hanji_format::{self as fmt, Diagnostic, FrontMatter, Layout, Names};
 use hanji_package::opc;
@@ -67,7 +67,8 @@ pub struct DeckShell {
 
 impl DeckShell {
     pub fn of(rem: &Remainder) -> Result<DeckShell, String> {
-        serde_json::from_str(rem.shell.first().ok_or("the remainder has no deck shell")?).map_err(|e| e.to_string())
+        serde_json::from_str(rem.shell.first().ok_or("the remainder has no deck shell")?)
+            .map_err(|e| e.to_string())
     }
 
     /// The names the text may use: layouts and their slots, shapes,
@@ -90,7 +91,9 @@ impl DeckShell {
             objects: Some(
                 rem.entries
                     .iter()
-                    .filter(|e| e.kind == hanji_core::Kind::Bkeep && e.meta.tag == import::OBJECT_TAG)
+                    .filter(|e| {
+                        e.kind == hanji_core::Kind::Bkeep && e.meta.tag == import::OBJECT_TAG
+                    })
                     .filter_map(|e| e.meta.keep.as_ref().map(|k| k.id.clone()))
                     .collect(),
             ),
@@ -113,31 +116,48 @@ impl TextModel for PptxModel {
         rem: &Remainder,
         caps: Capabilities,
     ) -> Result<(Vec<Block>, Vec<BlockSrc>), Vec<Diagnostic>> {
-        let shell = DeckShell::of(rem).map_err(|m| vec![Diagnostic { line: 1, col: 1, message: m }])?;
+        let shell = DeckShell::of(rem).map_err(|m| {
+            vec![Diagnostic {
+                line: 1,
+                col: 1,
+                message: m,
+            }]
+        })?;
         check_size(text, shell.deck.size)?;
         let (mut blocks, maps) =
-            hanji_core::presentation::model_of(text, &shell.names(rem), caps, &|id| rem.is_block_keep(id))?;
+            hanji_core::presentation::model_of(text, &shell.names(rem), caps, &|id| {
+                rem.is_block_keep(id)
+            })?;
         // A bare slot marker is the slot where its layout puts it (§5.3): its
         // box is the layout's, which the canonical text shows.
         let mut layout = None;
         for b in &mut blocks {
             let Block::Head(h) = b else { continue };
             match hanji_core::presentation::kind(h) {
-                hanji_core::presentation::HeadKind::Slide { layout: l } => layout = shell.deck.layout(l),
+                hanji_core::presentation::HeadKind::Slide { layout: l } => {
+                    layout = shell.deck.layout(l)
+                }
                 // A new line is drawn as the write draws it unless its text says otherwise.
-                hanji_core::presentation::HeadKind::Line { id: "", .. } if h.look.border.is_none() => {
+                hanji_core::presentation::HeadKind::Line { id: "", .. }
+                    if h.look.border.is_none() =>
+                {
                     h.look.border = Some(NEW_LINE_BORDER.into());
                 }
-                hanji_core::presentation::HeadKind::Slot { name } if h.place.is_none() && name != "notes" => {
+                hanji_core::presentation::HeadKind::Slot { name }
+                    if h.place.is_none() && name != "notes" =>
+                {
                     let slot = layout.and_then(|l| l.slot(name));
-                    h.place = slot.and_then(|s| s.geom).map(|g| hanji_core::Place::Box(g.shown()));
+                    h.place = slot
+                        .and_then(|s| s.geom)
+                        .map(|g| hanji_core::Place::Box(g.shown()));
                     // …and looks as its layout has it.
                     if h.look.is_empty() {
                         h.look.fill = fill::shown(slot.and_then(|s| s.fill.as_ref()));
                         h.look.border = slot.and_then(|s| s.line.as_ref()).and_then(|l| l.border());
                         h.look.effects = crate::effects::shown(slot.and_then(|s| s.fx.as_ref()));
-                        (h.look.kind, h.look.adj) =
-                            slot.and_then(|s| s.geo.as_ref()).map_or((None, None), |g| g.shown(false));
+                        (h.look.kind, h.look.adj) = slot
+                            .and_then(|s| s.geo.as_ref())
+                            .map_or((None, None), |g| g.shown(false));
                     }
                 }
                 _ => {}
@@ -148,7 +168,9 @@ impl TextModel for PptxModel {
         let mut layout = None;
         for b in &mut blocks {
             let Block::Head(h) = b else { continue };
-            if let hanji_core::presentation::HeadKind::Slide { layout: l } = hanji_core::presentation::kind(h) {
+            if let hanji_core::presentation::HeadKind::Slide { layout: l } =
+                hanji_core::presentation::kind(h)
+            {
                 layout = shell.deck.layout(l);
             }
             if let Some(hanji_core::Place::Group(g)) = &h.place {
@@ -174,13 +196,23 @@ impl TextModel for PptxModel {
 /// The group `g` as the write leaves it: its stored element (the one group
 /// of the file with its id, name and objects) with `g` applied, read back.
 /// `None` when no group or more than one matches, or the write refuses it.
-fn canonical_group(g: &fmt::GroupItem, rem: &Remainder, sty: Option<members::Styling>) -> Option<fmt::GroupItem> {
+fn canonical_group(
+    g: &fmt::GroupItem,
+    rem: &Remainder,
+    sty: Option<members::Styling>,
+) -> Option<fmt::GroupItem> {
     let frame = geom::Frame::SLIDE;
     let mut out: Option<fmt::GroupItem> = None;
-    for e in rem.entries.iter().filter(|e| e.kind == hanji_core::Kind::Shape && e.meta.tag == "p:grpSp") {
+    for e in rem
+        .entries
+        .iter()
+        .filter(|e| e.kind == hanji_core::Kind::Shape && e.meta.tag == "p:grpSp")
+    {
         let el = xml::fragment(&e.xml[0]);
         let rels = import::rels_of(&rem.parts, e.meta.aux.get(1).map_or("", String::as_str));
-        let Some(st) = import::group_item(&el, &frame, &rels, sty) else { continue };
+        let Some(st) = import::group_item(&el, &frame, &rels, sty) else {
+            continue;
+        };
         if st.id != g.id || st.name != g.name || export::sig(&st.items) != export::sig(&g.items) {
             continue;
         }
@@ -242,24 +274,38 @@ fn show_inherited(out: &mut [Block], rem: &Remainder, shell: &DeckShell) {
                 })
             }),
             HeadKind::Shape { id, .. } => layout.and_then(|l| match shapes.get(&hi) {
-                Some(e) => Some(text::base(&xml::fragment(&e.xml[0]), &l.other_text, &l.fonts)),
+                Some(e) => Some(text::base(
+                    &xml::fragment(&e.xml[0]),
+                    &l.other_text,
+                    &l.fonts,
+                )),
                 None if id.is_empty() => Some(l.other_text.clone()),
                 None => None,
             }),
             _ => None,
         };
-        let end = (k..out.len()).find(|&j| matches!(out[j], Block::Head(_))).unwrap_or(out.len());
+        let end = (k..out.len())
+            .find(|&j| matches!(out[j], Block::Head(_)))
+            .unwrap_or(out.len());
         let Some(base) = base else { continue };
         let mut paras: Vec<&mut fmt::Inline> = vec![];
         for (bi, b) in out[hi + 1..end].iter_mut().enumerate() {
             let Block::Para(p) = b else { continue };
-            let lvl =
-                p.item.as_ref().map_or_else(|| levels.get(&(hi + 1 + bi)).copied().unwrap_or(0) as usize, |i| i.level);
+            let lvl = p.item.as_ref().map_or_else(
+                || levels.get(&(hi + 1 + bi)).copied().unwrap_or(0) as usize,
+                |i| i.level,
+            );
             let under = base[lvl.min(8)].shown_for(text::has_hangul(&p.content.units));
             let st: Vec<istyle::TextStyle> = istyle::unit_styles(&p.content)
                 .into_iter()
                 .zip(&p.content.units)
-                .map(|(s, u)| if istyle::visible(&u.atom) { s.over(&under) } else { s })
+                .map(|(s, u)| {
+                    if istyle::visible(&u.atom) {
+                        s.over(&under)
+                    } else {
+                        s
+                    }
+                })
                 .collect();
             istyle::set_unit_styles(&mut p.content, &st);
             paras.push(&mut p.content);
@@ -298,12 +344,23 @@ fn shown_group(mut g: fmt::GroupItem) -> fmt::GroupItem {
 /// The front matter's `size:` line, when there is one, is the deck's slide
 /// size: it is shown, never changed here.
 fn check_size(text: &str, size: Option<(i64, i64)>) -> Result<(), Vec<Diagnostic>> {
-    let Some(end) = text.strip_prefix("---\n").and_then(|t| t.find("\n---")) else { return Ok(()) };
-    let Some((k, line)) = text[..end + 4].lines().enumerate().find(|(_, l)| l.trim_start().starts_with("size:")) else {
+    let Some(end) = text.strip_prefix("---\n").and_then(|t| t.find("\n---")) else {
+        return Ok(());
+    };
+    let Some((k, line)) = text[..end + 4]
+        .lines()
+        .enumerate()
+        .find(|(_, l)| l.trim_start().starts_with("size:"))
+    else {
         return Ok(());
     };
     let want = size.map(|(w, h)| format!("{} x {} pt", fmt::pres::pt(w), fmt::pres::pt(h)));
-    let got = line.trim_start().trim_start_matches("size:").split_whitespace().collect::<Vec<_>>().join(" ");
+    let got = line
+        .trim_start()
+        .trim_start_matches("size:")
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ");
     match want {
         Some(w) if w == got => Ok(()),
         Some(w) => Err(vec![Diagnostic {
@@ -326,8 +383,9 @@ impl PptxEngine {
     pub fn text_of(blocks: &[Block], rem: &Remainder, template: Option<&str>) -> String {
         let mut front = FrontMatter::presentation("pptx", template);
         front.size = DeckShell::of(rem).ok().and_then(|s| s.deck.size);
-        let p =
-            hanji_core::presentation::unresolve(blocks, front, &|id| rem.keep(id).cloned().expect("keep in remainder"));
+        let p = hanji_core::presentation::unresolve(blocks, front, &|id| {
+            rem.keep(id).cloned().expect("keep in remainder")
+        });
         fmt::serialize_presentation(&p)
     }
 
@@ -338,8 +396,9 @@ impl PptxEngine {
     ) -> Result<(Vec<Block>, Remainder, ImportReport, Stats), EngineError> {
         let pkg = EngineError::Package;
         let mut parts = package::read(package).map_err(pkg)?;
-        let root_rels =
-            opc::parse_rels(package::get(&parts, "_rels/.rels").ok_or_else(|| pkg("no _rels/.rels".into()))?);
+        let root_rels = opc::parse_rels(
+            package::get(&parts, "_rels/.rels").ok_or_else(|| pkg("no _rels/.rels".into()))?,
+        );
         let pres_part = root_rels
             .iter()
             .find(|r| r.short_type() == "officeDocument" && !r.external)
@@ -353,12 +412,15 @@ impl PptxEngine {
         check_prefixes(&pres_doc.root, &pres_part, "p:presentation")?;
         // The slides, in slide-list order, and their notes pages.
         let mut slides: Vec<(Element, String)> = vec![];
-        for s in
-            pres_doc.root.child("p:sldIdLst").map(|l| l.elements().cloned().collect::<Vec<_>>()).unwrap_or_default()
+        for s in pres_doc
+            .root
+            .child("p:sldIdLst")
+            .map(|l| l.elements().cloned().collect::<Vec<_>>())
+            .unwrap_or_default()
         {
             let rid = s.get("r:id").unwrap_or_default();
-            let part =
-                opc::target_of(&parts, &pres_part, &rid).ok_or_else(|| pkg(format!("slide {rid} has no part")))?;
+            let part = opc::target_of(&parts, &pres_part, &rid)
+                .ok_or_else(|| pkg(format!("slide {rid} has no part")))?;
             slides.push((s, part));
         }
         let mut docs: BTreeMap<String, xml::Doc> = BTreeMap::new();
@@ -367,7 +429,10 @@ impl PptxEngine {
             let d = parse(&parts, part)?;
             check_prefixes(&d.root, part, "p:sld")?;
             docs.insert(part.clone(), d);
-            if let Some(r) = opc::rels_of(&parts, part).into_iter().find(|r| r.ty == REL_NOTES && !r.external) {
+            if let Some(r) = opc::rels_of(&parts, part)
+                .into_iter()
+                .find(|r| r.ty == REL_NOTES && !r.external)
+            {
                 let n = opc::resolve_target(part, &r.target);
                 let d = parse(&parts, &n)?;
                 check_prefixes(&d.root, &n, "p:notes")?;
@@ -376,13 +441,17 @@ impl PptxEngine {
             }
         }
         let mut report = ImportReport::default();
-        let mut roots: BTreeMap<String, Element> = docs.iter().map(|(k, d)| (k.clone(), d.root.clone())).collect();
+        let mut roots: BTreeMap<String, Element> = docs
+            .iter()
+            .map(|(k, d)| (k.clone(), d.root.clone()))
+            .collect();
         roots.insert(pres_part.clone(), pres_doc.root.clone());
         if opts.neutralise {
             safety::neutralise(&mut parts, &mut roots, &mut report).map_err(pkg)?;
         }
         {
-            let view: Vec<(String, &Element)> = slides.iter().map(|(_, p)| (p.clone(), &roots[p])).collect();
+            let view: Vec<(String, &Element)> =
+                slides.iter().map(|(_, p)| (p.clone(), &roots[p])).collect();
             safety::surface(&parts, &view, &mut report);
         }
         let pres_root = roots.remove(&pres_part).unwrap();
@@ -396,9 +465,11 @@ impl PptxEngine {
                 .find(|r| r.ty == REL_LAYOUT)
                 .map(|r| opc::resolve_target(part, &r.target))
                 .ok_or_else(|| pkg(format!("{part} has no layout")))?;
-            let layout = deck
-                .layout_of_part(&lpart)
-                .ok_or_else(|| pkg(format!("{part}: its layout {lpart} is not one of a master's layouts")))?;
+            let layout = deck.layout_of_part(&lpart).ok_or_else(|| {
+                pkg(format!(
+                    "{part}: its layout {lpart} is not one of a master's layouts"
+                ))
+            })?;
             let info = SlideInfo {
                 part: part.clone(),
                 prolog: d.prolog.clone(),
@@ -411,14 +482,26 @@ impl PptxEngine {
             };
             let notes = notes_of.get(part).map(|n| {
                 let nd = &docs[n];
-                let ni = NotesInfo { part: n.clone(), prolog: nd.prolog.clone(), epilog: nd.epilog.clone() };
-                (ni, &roots[n], deck.notes.as_ref().map_or([Bu::Unset; 9], |m| m.bullets))
+                let ni = NotesInfo {
+                    part: n.clone(),
+                    prolog: nd.prolog.clone(),
+                    epilog: nd.epilog.clone(),
+                };
+                (
+                    ni,
+                    &roots[n],
+                    deck.notes.as_ref().map_or([Bu::Unset; 9], |m| m.bullets),
+                )
             });
             imp.rels = import::rels_of(&parts, part);
-            imp.slide(info, &roots[part], layout, notes).map_err(|e| pkg(format!("{part}: {e}")))?;
+            imp.slide(info, &roots[part], layout, notes)
+                .map_err(|e| pkg(format!("{part}: {e}")))?;
         }
         let mut skel = pres_root.clone();
-        let ids: Vec<u32> = slides.iter().filter_map(|(s, _)| s.get("id").and_then(|v| v.parse().ok())).collect();
+        let ids: Vec<u32> = slides
+            .iter()
+            .filter_map(|(s, _)| s.get("id").and_then(|v| v.parse().ok()))
+            .collect();
         if let Some(l) = skel.child_mut("p:sldIdLst") {
             l.children.retain(|n| !matches!(n, Node::El(_)));
         }
@@ -433,8 +516,11 @@ impl PptxEngine {
             slide_ids: ids,
             shapes: imp.shapes.clone(),
         };
-        let namespaces =
-            pres_root.attrs.iter().filter_map(|(k, v)| xml::ns_prefix(k).map(|p| (p.to_string(), v.clone()))).collect();
+        let namespaces = pres_root
+            .attrs
+            .iter()
+            .filter_map(|(k, v)| xml::ns_prefix(k).map(|p| (p.to_string(), v.clone())))
+            .collect();
         let split: std::collections::BTreeSet<&String> = docs.keys().chain([&pres_part]).collect();
         for p in &mut parts {
             if split.contains(&p.name) {
@@ -457,8 +543,14 @@ impl PptxEngine {
 
 /// PresentationML must use the prefixes `p:` and `a:` (other prefixes are not supported yet).
 fn check_prefixes(root: &Element, part: &str, name: &str) -> Result<(), EngineError> {
-    let bound = |prefix: &str, ns: &str| root.attr(&format!("xmlns:{prefix}")).is_some_and(|v| v == ns);
-    if root.name != name || !bound("p", P_NS) || (root.name != "p:presentation" && !bound("a", A_NS)) {
+    let bound = |prefix: &str, ns: &str| {
+        root.attr(&format!("xmlns:{prefix}"))
+            .is_some_and(|v| v == ns)
+    };
+    if root.name != name
+        || !bound("p", P_NS)
+        || (root.name != "p:presentation" && !bound("a", A_NS))
+    {
         return Err(EngineError::Package(format!(
             "{part}: PresentationML must use the prefixes p: and a: (other prefixes are not supported yet)"
         )));
@@ -478,11 +570,17 @@ impl Engine for PptxEngine {
     fn import(&self, package: &[u8], opts: &ImportOptions) -> Result<Imported, EngineError> {
         let (blocks, remainder, report, _) = Self::split(package, opts)?;
         let text = Self::text_of(&blocks, &remainder, opts.template.as_deref());
-        Ok(Imported { text, remainder, report })
+        Ok(Imported {
+            text,
+            remainder,
+            report,
+        })
     }
 
     fn export(&self, text: &str, rem: &Remainder) -> Result<Vec<u8>, EngineError> {
-        let (blocks, _) = PptxModel.resolve(text, rem, self.capabilities()).map_err(EngineError::Invalid)?;
+        let (blocks, _) = PptxModel
+            .resolve(text, rem, self.capabilities())
+            .map_err(EngineError::Invalid)?;
         write_package(&export_parts(&blocks, rem)?)
     }
 }
@@ -494,9 +592,16 @@ pub fn export_parts(blocks: &[Block], rem: &Remainder) -> Result<Vec<Part>, Engi
 
 /// [`export_parts`] with the files the host hands the write: a picture's
 /// `src` may name one (§5.3, a picture from a file).
-pub fn export_parts_with(blocks: &[Block], rem: &Remainder, files: &export::Files) -> Result<Vec<Part>, EngineError> {
+pub fn export_parts_with(
+    blocks: &[Block],
+    rem: &Remainder,
+    files: &export::Files,
+) -> Result<Vec<Part>, EngineError> {
     let shell = DeckShell::of(rem).map_err(EngineError::Package)?;
-    export::Exporter::new(blocks, rem, &shell).with_files(files).package().map_err(EngineError::Refused)
+    export::Exporter::new(blocks, rem, &shell)
+        .with_files(files)
+        .package()
+        .map_err(EngineError::Refused)
 }
 
 impl PptxEngine {
@@ -508,7 +613,9 @@ impl PptxEngine {
         rem: &Remainder,
         files: &export::Files,
     ) -> Result<Vec<u8>, EngineError> {
-        let (blocks, _) = PptxModel.resolve(text, rem, self.capabilities()).map_err(EngineError::Invalid)?;
+        let (blocks, _) = PptxModel
+            .resolve(text, rem, self.capabilities())
+            .map_err(EngineError::Invalid)?;
         write_package(&export_parts_with(&blocks, rem, files)?)
     }
 }

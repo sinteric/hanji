@@ -59,10 +59,17 @@ pub struct OutlineEntry {
 
 /// `"a:b"`, `"a-b"` or `"a"` → 1-based inclusive `(a, b)`.
 pub fn span(s: &str, what: &str) -> Result<(usize, usize)> {
-    let bad = || Error::bad(format!("{what} {s:?} is not a range such as \"3:8\" or \"3\" (1-based, inclusive)."));
+    let bad = || {
+        Error::bad(format!(
+            "{what} {s:?} is not a range such as \"3:8\" or \"3\" (1-based, inclusive)."
+        ))
+    };
     let s = s.trim();
     let (a, b) = s.split_once([':', '-']).unwrap_or((s, s));
-    let (a, b): (usize, usize) = (a.trim().parse().map_err(|_| bad())?, b.trim().parse().map_err(|_| bad())?);
+    let (a, b): (usize, usize) = (
+        a.trim().parse().map_err(|_| bad())?,
+        b.trim().parse().map_err(|_| bad())?,
+    );
     if a == 0 || b < a {
         return Err(bad());
     }
@@ -74,7 +81,10 @@ fn body_start(ls: &[&str]) -> usize {
     if ls.first().map(|l| l.trim_end()) != Some("---") {
         return 0;
     }
-    ls.iter().skip(1).position(|l| l.trim_end() == "---").map_or(0, |k| k + 2)
+    ls.iter()
+        .skip(1)
+        .position(|l| l.trim_end() == "---")
+        .map_or(0, |k| k + 2)
 }
 
 fn heading(line: &str) -> Option<(usize, &str)> {
@@ -103,16 +113,25 @@ fn slide_starts(ls: &[&str]) -> Vec<usize> {
 /// The headings, slides, or sheets and tables of a text.
 pub fn outline(ty: DocType, text: &str) -> Vec<OutlineEntry> {
     let ls: Vec<&str> = text.lines().collect();
-    let entry = |k: usize, t: String| OutlineEntry { line: k + 1, text: t };
+    let entry = |k: usize, t: String| OutlineEntry {
+        line: k + 1,
+        text: t,
+    };
     match ty {
-        DocType::Document => {
-            ls.iter().enumerate().filter(|(_, l)| heading(l).is_some()).map(|(k, l)| entry(k, l.to_string())).collect()
-        }
+        DocType::Document => ls
+            .iter()
+            .enumerate()
+            .filter(|(_, l)| heading(l).is_some())
+            .map(|(k, l)| entry(k, l.to_string()))
+            .collect(),
         DocType::Presentation => slide_starts(&ls)
             .iter()
             .enumerate()
             .map(|(n, &k)| {
-                let end = ls[k..].iter().position(|l| l.trim_end() == "---").map_or(ls.len(), |e| k + e);
+                let end = ls[k..]
+                    .iter()
+                    .position(|l| l.trim_end() == "---")
+                    .map_or(ls.len(), |e| k + e);
                 let title = ls[k..end]
                     .iter()
                     .position(|l| {
@@ -136,7 +155,10 @@ pub fn outline(ty: DocType, text: &str) -> Vec<OutlineEntry> {
 
 /// The 0-based line range `[a, b)` a window asks for.
 pub fn part(ty: DocType, text: &str, w: &Window) -> Result<Option<(usize, usize)>> {
-    let asked = [w.lines.is_some(), w.section.is_some(), w.slides.is_some()].iter().filter(|x| **x).count();
+    let asked = [w.lines.is_some(), w.section.is_some(), w.slides.is_some()]
+        .iter()
+        .filter(|x| **x)
+        .count();
     if asked > 1 {
         return Err(Error::bad("ask for one of lines, section and slides."));
     }
@@ -145,25 +167,38 @@ pub fn part(ty: DocType, text: &str, w: &Window) -> Result<Option<(usize, usize)
     if let Some(s) = &w.lines {
         let (a, b) = span(s, "lines")?;
         if a > n {
-            return Err(Error::bad(format!("line {a} is past the end: the revision has {n} lines.")));
+            return Err(Error::bad(format!(
+                "line {a} is past the end: the revision has {n} lines."
+            )));
         }
         return Ok(Some((a - 1, b.min(n))));
     }
     if let Some(name) = &w.section {
         if ty != DocType::Document {
-            return Err(Error::bad("sections are a Document's; read a Presentation by slides, or any text by lines."));
+            return Err(Error::bad(
+                "sections are a Document's; read a Presentation by slides, or any text by lines.",
+            ));
         }
         let want = heading(name).map_or(name.trim(), |h| h.1);
-        let hits: Vec<(usize, usize)> =
-            ls.iter().enumerate().filter_map(|(k, l)| heading(l).filter(|h| h.1 == want).map(|h| (k, h.0))).collect();
+        let hits: Vec<(usize, usize)> = ls
+            .iter()
+            .enumerate()
+            .filter_map(|(k, l)| heading(l).filter(|h| h.1 == want).map(|h| (k, h.0)))
+            .collect();
         let (k, level) = match hits.as_slice() {
             [one] => *one,
             [] => {
-                let all: Vec<String> =
-                    outline(ty, text).iter().map(|e| format!("{} (line {})", e.text, e.line)).collect();
+                let all: Vec<String> = outline(ty, text)
+                    .iter()
+                    .map(|e| format!("{} (line {})", e.text, e.line))
+                    .collect();
                 let mut e = Error::not_found(format!(
                     "no heading reads {want:?}. The headings are: {}.",
-                    if all.is_empty() { "none (read by lines)".into() } else { all.join("; ") }
+                    if all.is_empty() {
+                        "none (read by lines)".into()
+                    } else {
+                        all.join("; ")
+                    }
                 ));
                 e.detail.matches = Some(0);
                 return Err(e);
@@ -178,22 +213,34 @@ pub fn part(ty: DocType, text: &str, w: &Window) -> Result<Option<(usize, usize)
                 return Err(e);
             }
         };
-        let end = ls.iter().enumerate().skip(k + 1).find(|(_, l)| heading(l).is_some_and(|h| h.0 <= level));
+        let end = ls
+            .iter()
+            .enumerate()
+            .skip(k + 1)
+            .find(|(_, l)| heading(l).is_some_and(|h| h.0 <= level));
         return Ok(Some((k, end.map_or(n, |x| x.0))));
     }
     if let Some(s) = &w.slides {
         if ty != DocType::Presentation {
-            return Err(Error::bad("slides are a Presentation's; read a Document by section or lines."));
+            return Err(Error::bad(
+                "slides are a Presentation's; read a Document by section or lines.",
+            ));
         }
         let (a, b) = span(s, "slides")?;
         let starts = slide_starts(&ls);
         if a > starts.len() {
-            return Err(Error::bad(format!("slide {a} is past the end: the deck has {} slides.", starts.len())));
+            return Err(Error::bad(format!(
+                "slide {a} is past the end: the deck has {} slides.",
+                starts.len()
+            )));
         }
         let b = b.min(starts.len());
         let end = starts.get(b).map_or(n, |&next| {
             // Up to the separator before the next slide.
-            (starts[b - 1]..next).rev().find(|&k| ls[k].trim_end() == "---").unwrap_or(next)
+            (starts[b - 1]..next)
+                .rev()
+                .find(|&k| ls[k].trim_end() == "---")
+                .unwrap_or(next)
         });
         return Ok(Some((starts[a - 1], end)));
     }
@@ -208,7 +255,10 @@ pub fn clip(ls: &[&str], a: usize, b: usize, limit: usize) -> usize {
         size += ls[k].len();
         if size > limit {
             let floor = a + ((k - a) * 3 / 4);
-            let blank = (floor..k).rev().find(|&j| ls[j].trim().is_empty()).map(|j| j + 1);
+            let blank = (floor..k)
+                .rev()
+                .find(|&j| ls[j].trim().is_empty())
+                .map(|j| j + 1);
             return blank.unwrap_or(k.max(a + 1));
         }
     }
@@ -219,7 +269,8 @@ pub fn clip(ls: &[&str], a: usize, b: usize, limit: usize) -> usize {
 mod tests {
     use super::*;
 
-    const DOC: &str = "---\ntype: document\nformat: docx\nschema: 1\n---\n# A\na\n\n## A1\nx\n\n# B\nb\n";
+    const DOC: &str =
+        "---\ntype: document\nformat: docx\nschema: 1\n---\n# A\na\n\n## A1\nx\n\n# B\nb\n";
     const DECK: &str = "---\ntype: presentation\nformat: pptx\nschema: 1\n---\n\nlayout: Title Slide\n::title::\n하나\n\n---\n\nlayout: Title and Content\n::title::\n둘\n::body::\n- x\n\n---\n\nlayout: Blank\n";
 
     fn lines_of(ty: DocType, text: &str, w: Window) -> String {
@@ -229,20 +280,41 @@ mod tests {
 
     #[test]
     fn sections_slides_and_lines() {
-        let sec = |s: &str| Window { section: Some(s.into()), ..Default::default() };
-        assert_eq!(lines_of(DocType::Document, DOC, sec("A")), "# A\na\n\n## A1\nx\n\n");
-        assert_eq!(lines_of(DocType::Document, DOC, sec("## A1")), "## A1\nx\n\n");
+        let sec = |s: &str| Window {
+            section: Some(s.into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            lines_of(DocType::Document, DOC, sec("A")),
+            "# A\na\n\n## A1\nx\n\n"
+        );
+        assert_eq!(
+            lines_of(DocType::Document, DOC, sec("## A1")),
+            "## A1\nx\n\n"
+        );
         assert_eq!(lines_of(DocType::Document, DOC, sec("B")), "# B\nb\n");
-        assert!(part(DocType::Document, DOC, &sec("C")).unwrap_err().message.contains("# A (line 6)"));
-        let sl = |s: &str| Window { slides: Some(s.into()), ..Default::default() };
-        assert_eq!(lines_of(DocType::Presentation, DECK, sl("1")), "layout: Title Slide\n::title::\n하나\n\n");
+        assert!(part(DocType::Document, DOC, &sec("C"))
+            .unwrap_err()
+            .message
+            .contains("# A (line 6)"));
+        let sl = |s: &str| Window {
+            slides: Some(s.into()),
+            ..Default::default()
+        };
+        assert_eq!(
+            lines_of(DocType::Presentation, DECK, sl("1")),
+            "layout: Title Slide\n::title::\n하나\n\n"
+        );
         assert_eq!(
             lines_of(DocType::Presentation, DECK, sl("2:3")),
             "layout: Title and Content\n::title::\n둘\n::body::\n- x\n\n---\n\nlayout: Blank\n"
         );
         let o = outline(DocType::Presentation, DECK);
         assert_eq!(o[1].text, "slide 2: layout: Title and Content · 둘");
-        let ln = Window { lines: Some("6:7".into()), ..Default::default() };
+        let ln = Window {
+            lines: Some("6:7".into()),
+            ..Default::default()
+        };
         assert_eq!(lines_of(DocType::Document, DOC, ln), "# A\na\n");
         assert!(span("0:3", "lines").is_err() && span("5:3", "lines").is_err());
     }

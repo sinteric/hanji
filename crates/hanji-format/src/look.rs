@@ -37,8 +37,16 @@ pub struct Look {
 pub const LOOK_KEYS: &[&str] = &["kind", "adj", "fill", "border", "start", "end", "effects"];
 
 /// The effects a summary names; `custom` is an effect graph.
-pub const EFFECTS: &[&str] =
-    &["shadow", "inner-shadow", "glow", "soft-edges", "reflection", "blur", "fill-overlay", "custom"];
+pub const EFFECTS: &[&str] = &[
+    "shadow",
+    "inner-shadow",
+    "glow",
+    "soft-edges",
+    "reflection",
+    "blur",
+    "fill-overlay",
+    "custom",
+];
 
 /// Arrowheads (DrawingML's line end types), `none` for none.
 pub const ARROWS: &[&str] = &["triangle", "stealth", "diamond", "oval", "arrow"];
@@ -93,7 +101,10 @@ pub fn parse_effects(v: &str) -> Result<Option<String>, String> {
     let mut out: Vec<&str> = vec![];
     for n in names {
         if !EFFECTS.contains(&n) {
-            return Err(format!("effects=\"{v}\": {n} is not an effect; they are {}.", EFFECTS.join(", ")));
+            return Err(format!(
+                "effects=\"{v}\": {n} is not an effect; they are {}.",
+                EFFECTS.join(", ")
+            ));
         }
         if !out.contains(&n) {
             out.push(n);
@@ -153,7 +164,11 @@ pub fn adj_values(v: &str) -> Result<Vec<(String, i64)>, String> {
 pub fn adj_text(vals: &[(String, i64)]) -> String {
     match vals {
         [(k, n)] if k == "adj" => n.to_string(),
-        _ => vals.iter().map(|(k, n)| format!("{k}={n}")).collect::<Vec<_>>().join(" "),
+        _ => vals
+            .iter()
+            .map(|(k, n)| format!("{k}={n}"))
+            .collect::<Vec<_>>()
+            .join(" "),
     }
 }
 
@@ -186,7 +201,10 @@ pub fn parse_arrow(k: &str, v: &str) -> Result<Option<String>, String> {
     match v.trim() {
         "none" => Ok(None),
         a if ARROWS.contains(&a) => Ok(Some(a.to_string())),
-        _ => Err(format!("{k}={v} is not an arrowhead; it is none, {}", ARROWS.join(", "))),
+        _ => Err(format!(
+            "{k}={v} is not an arrowhead; it is none, {}",
+            ARROWS.join(", ")
+        )),
     }
 }
 
@@ -206,13 +224,21 @@ impl Linear {
         let rest = v.trim().strip_prefix("linear")?;
         let form = "a linear gradient is linear <angle> <from> <to>, such as fill=\"linear 90 accent1 #FFFFFF\": its angle in whole degrees clockwise from left-to-right, and two colours";
         let parts: Vec<&str> = rest.split_whitespace().collect();
-        let [a, f, t] = parts.as_slice() else { return Some(Err(format!("fill=\"{v}\": {form}."))) };
+        let [a, f, t] = parts.as_slice() else {
+            return Some(Err(format!("fill=\"{v}\": {form}.")));
+        };
         let angle = match a.parse::<i64>() {
             Ok(n) => n.rem_euclid(360),
             Err(_) => return Some(Err(format!("fill=\"{v}\": {a} is not an angle; {form}."))),
         };
         let col = |c: &str| vocab::Color::parse(c).map_err(|m| format!("fill=\"{v}\": {m}"));
-        Some(col(f).and_then(|from| Ok(Linear { angle, from, to: col(t)? })))
+        Some(col(f).and_then(|from| {
+            Ok(Linear {
+                angle,
+                from,
+                to: col(t)?,
+            })
+        }))
     }
 
     pub fn is_writable(&self) -> bool {
@@ -293,7 +319,12 @@ pub fn split_look_keys(
                 ));
             }
             "background" | "background-color" | "bg" => {
-                return Err((*col, format!("{k}= is not a key here: an object's fill is fill=, as in fill=accent1.")));
+                return Err((
+                    *col,
+                    format!(
+                        "{k}= is not a key here: an object's fill is fill=, as in fill=accent1."
+                    ),
+                ));
             }
             _ => rest.push((k.clone(), v.clone(), *col)),
         }
@@ -308,18 +339,36 @@ mod tests {
     #[test]
     fn fills_parse_and_write_canonically() {
         let a = |s: &str| vec![("fill".to_string(), s.to_string(), 1)];
-        assert_eq!(split_look_keys(&a("accent1")).unwrap().0.attrs(), "fill=accent1");
-        assert_eq!(split_look_keys(&a("#ff7f50")).unwrap().0.attrs(), "fill=#FF7F50");
-        assert_eq!(split_look_keys(&a("accent1+40%/50%")).unwrap().0.attrs(), "fill=accent1+40%/50%");
+        assert_eq!(
+            split_look_keys(&a("accent1")).unwrap().0.attrs(),
+            "fill=accent1"
+        );
+        assert_eq!(
+            split_look_keys(&a("#ff7f50")).unwrap().0.attrs(),
+            "fill=#FF7F50"
+        );
+        assert_eq!(
+            split_look_keys(&a("accent1+40%/50%")).unwrap().0.attrs(),
+            "fill=accent1+40%/50%"
+        );
         assert!(split_look_keys(&a("none")).unwrap().0.is_empty());
-        assert_eq!(split_look_keys(&a("gradient")).unwrap().0.attrs(), "fill=gradient");
+        assert_eq!(
+            split_look_keys(&a("gradient")).unwrap().0.attrs(),
+            "fill=gradient"
+        );
         assert!(split_look_keys(&a("red")).is_err());
         assert!(is_kept_fill("gradient") && is_kept_fill("accent1*") && !is_kept_fill("accent1"));
         let b = |s: &str| vec![("border".to_string(), s.to_string(), 1)];
-        assert_eq!(split_look_keys(&b("1pt solid #000000")).unwrap().0.attrs(), "border=\"1pt solid #000000\"");
+        assert_eq!(
+            split_look_keys(&b("1pt solid #000000")).unwrap().0.attrs(),
+            "border=\"1pt solid #000000\""
+        );
         assert!(split_look_keys(&b("none")).unwrap().0.is_empty());
         assert!(split_look_keys(&b("1pt wavy red")).is_err());
-        let a = vec![("end".to_string(), "triangle".to_string(), 1), ("start".to_string(), "none".to_string(), 5)];
+        let a = vec![
+            ("end".to_string(), "triangle".to_string(), 1),
+            ("start".to_string(), "none".to_string(), 5),
+        ];
         assert_eq!(split_look_keys(&a).unwrap().0.attrs(), "end=triangle");
         assert!(split_look_keys(&[("end".to_string(), "big".to_string(), 1)]).is_err());
     }
@@ -327,24 +376,41 @@ mod tests {
     #[test]
     fn kinds_and_adjustments_parse_and_write_canonically() {
         let k = |kind: &str, adj: &str| {
-            let mut a = vec![("fill".to_string(), "accent1".to_string(), 1), ("kind".to_string(), kind.to_string(), 9)];
+            let mut a = vec![
+                ("fill".to_string(), "accent1".to_string(), 1),
+                ("kind".to_string(), kind.to_string(), 9),
+            ];
             if !adj.is_empty() {
                 a.push(("adj".to_string(), adj.to_string(), 20));
             }
             split_look_keys(&a).map(|l| l.0.attrs())
         };
-        assert_eq!(k("roundRect", "").unwrap(), "kind=\"roundRect\" fill=accent1");
-        assert_eq!(k("roundRect", " 16667 ").unwrap(), "kind=\"roundRect\" adj=\"16667\" fill=accent1");
-        assert_eq!(k("roundRect", "adj=16667").unwrap(), "kind=\"roundRect\" adj=\"16667\" fill=accent1");
+        assert_eq!(
+            k("roundRect", "").unwrap(),
+            "kind=\"roundRect\" fill=accent1"
+        );
+        assert_eq!(
+            k("roundRect", " 16667 ").unwrap(),
+            "kind=\"roundRect\" adj=\"16667\" fill=accent1"
+        );
+        assert_eq!(
+            k("roundRect", "adj=16667").unwrap(),
+            "kind=\"roundRect\" adj=\"16667\" fill=accent1"
+        );
         assert_eq!(
             k("rightArrow", "adj1=50000  adj2=-5").unwrap(),
             "kind=\"rightArrow\" adj=\"adj1=50000 adj2=-5\" fill=accent1"
         );
         let e = k("roundedRectangle", "").unwrap_err().1;
-        assert!(e.contains("not a preset shape") && e.contains("kind"), "{e}");
+        assert!(
+            e.contains("not a preset shape") && e.contains("kind"),
+            "{e}"
+        );
         assert!(k("hexagon", "adj=1 adj=2").unwrap_err().1.contains("twice"));
         assert!(k("hexagon", "25%").unwrap_err().1.contains("adjustments"));
-        let e = split_look_keys(&[("shape".to_string(), "ellipse".to_string(), 3)]).unwrap_err().1;
+        let e = split_look_keys(&[("shape".to_string(), "ellipse".to_string(), 3)])
+            .unwrap_err()
+            .1;
         assert!(e.contains("kind="), "{e}");
     }
 }

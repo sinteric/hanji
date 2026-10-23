@@ -11,14 +11,20 @@ use std::path::{Path as FsPath, PathBuf};
 use hanji_core::diff::{span_ops, Op};
 use hanji_core::place::{self, Alignment, Outcome, Status};
 use hanji_core::{
-    Block, Capabilities, DocumentModel, Engine, EngineError, Entry, ImportOptions, ImportReport, Kind, Para, Path,
-    Remainder, TextModel,
+    Block, Capabilities, DocumentModel, Engine, EngineError, Entry, ImportOptions, ImportReport,
+    Kind, Para, Path, Remainder, TextModel,
 };
 use hanji_format::{Atom, Cell, Inline, Marks, Unit};
 use hanji_package::{package, xml};
 
-pub const CAPS: Capabilities =
-    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: true, table_place: true };
+pub const CAPS: Capabilities = Capabilities {
+    links: false,
+    fields: false,
+    footnotes: false,
+    math: false,
+    formatting: true,
+    table_place: true,
+};
 
 /// What the harness needs from an engine.
 pub trait Format {
@@ -34,7 +40,11 @@ pub trait Format {
     fn text_of(&self, blocks: &[Block], rem: &Remainder) -> String;
     /// The package for resolved blocks placed against `rem`, and whether
     /// every part the engine wrote is well-formed XML.
-    fn export_blocks(&self, blocks: &[Block], rem: &Remainder) -> Result<(Vec<u8>, bool), EngineError>;
+    fn export_blocks(
+        &self,
+        blocks: &[Block],
+        rem: &Remainder,
+    ) -> Result<(Vec<u8>, bool), EngineError>;
     /// A part the engine splits: GetPut compares it canonically, the rest byte for byte.
     fn is_split_part(&self, name: &str) -> bool;
     /// A run entry whose formatting shows (colour, size, …): what E3 and E7 look for.
@@ -62,16 +72,31 @@ pub fn corpus(dir: &FsPath, ext: &str) -> Vec<(String, Vec<u8>)> {
         .filter(|p| p.extension().is_some_and(|x| x == ext))
         .collect();
     v.sort();
-    v.into_iter().map(|p| (p.file_name().unwrap().to_string_lossy().into_owned(), std::fs::read(&p).unwrap())).collect()
+    v.into_iter()
+        .map(|p| {
+            (
+                p.file_name().unwrap().to_string_lossy().into_owned(),
+                std::fs::read(&p).unwrap(),
+            )
+        })
+        .collect()
 }
 
 /// GetPut on two packages: the split parts canonically equal, and every other part byte-equal.
 pub fn getput_equal(fmt: &dyn Format, original: &[u8], out: &[u8]) -> (bool, bool) {
-    let (a, b) = (package::read(original).unwrap(), package::read(out).unwrap());
+    let (a, b) = (
+        package::read(original).unwrap(),
+        package::read(out).unwrap(),
+    );
     let canon = |d: &[u8]| xml::canon_part(d).ok();
-    let split = a.iter().zip(&b).all(|(x, y)| !fmt.is_split_part(&x.name) || canon(&x.data) == canon(&y.data));
+    let split = a
+        .iter()
+        .zip(&b)
+        .all(|(x, y)| !fmt.is_split_part(&x.name) || canon(&x.data) == canon(&y.data));
     let others = a.len() == b.len()
-        && a.iter().zip(&b).all(|(x, y)| x.name == y.name && (fmt.is_split_part(&x.name) || x.data == y.data));
+        && a.iter()
+            .zip(&b)
+            .all(|(x, y)| x.name == y.name && (fmt.is_split_part(&x.name) || x.data == y.data));
     (split, others)
 }
 
@@ -115,7 +140,11 @@ fn paras(blocks: &[Block]) -> Vec<(Path, &Inline)> {
                 for (r, row) in t.rows.iter().enumerate() {
                     for (c, cell) in row.iter().enumerate() {
                         if let Cell::Text(ps) = cell {
-                            out.extend(ps.iter().enumerate().map(|(k, p)| (vec![i, r, c, k], &p.content)));
+                            out.extend(
+                                ps.iter()
+                                    .enumerate()
+                                    .map(|(k, p)| (vec![i, r, c, k], &p.content)),
+                            );
                         }
                     }
                 }
@@ -148,7 +177,9 @@ fn is_page_break(i: &Inline) -> bool {
 
 /// Characters `s..e` hold no placeholder, atom, tab or line break.
 pub fn clean(p: &[char], s: usize, e: usize) -> bool {
-    p[s..e].iter().all(|&c| c != KEEP_CH && c != '\u{F0001}' && c != '\t' && c != '\n')
+    p[s..e]
+        .iter()
+        .all(|&c| c != KEEP_CH && c != '\u{F0001}' && c != '\t' && c != '\n')
 }
 
 pub type Xmap = HashMap<Path, Vec<(usize, usize, Path, usize)>>;
@@ -207,9 +238,15 @@ impl Edit {
 }
 
 /// `rem` with the styles `styles` says, when it says any.
-pub fn with_styles<'a>(rem: &'a Remainder, styles: Option<&hanji_core::StyleSet>) -> std::borrow::Cow<'a, Remainder> {
+pub fn with_styles<'a>(
+    rem: &'a Remainder,
+    styles: Option<&hanji_core::StyleSet>,
+) -> std::borrow::Cow<'a, Remainder> {
     match styles {
-        Some(st) => std::borrow::Cow::Owned(Remainder { styles: st.clone(), ..rem.clone() }),
+        Some(st) => std::borrow::Cow::Owned(Remainder {
+            styles: st.clone(),
+            ..rem.clone()
+        }),
         None => std::borrow::Cow::Borrowed(rem),
     }
 }
@@ -227,8 +264,17 @@ pub fn block_ranges(cx: &Cx, d: &Doc) -> Vec<(usize, usize)> {
 
 /// The exact text edit from `d` to `new` when the new text is the old with
 /// `old[a..b]` replaced: `(a, b, replacement)`.
-pub fn span_of(cx: &Cx, d: &Doc, new: &[Block], a: usize, b: usize) -> Option<(usize, usize, String)> {
-    let (ot, nt) = (cx.fmt.text_of(&d.blocks, cx.rem), cx.fmt.text_of(new, cx.rem));
+pub fn span_of(
+    cx: &Cx,
+    d: &Doc,
+    new: &[Block],
+    a: usize,
+    b: usize,
+) -> Option<(usize, usize, String)> {
+    let (ot, nt) = (
+        cx.fmt.text_of(&d.blocks, cx.rem),
+        cx.fmt.text_of(new, cx.rem),
+    );
     let tail = ot.len() - b;
     (nt.len() >= a + tail && nt[..a] == ot[..a] && nt[nt.len() - tail..] == ot[b..])
         .then(|| (a, b, nt[a..nt.len() - tail].to_string()))
@@ -239,7 +285,13 @@ pub fn span_of(cx: &Cx, d: &Doc, new: &[Block], a: usize, b: usize) -> Option<(u
 /// and the separator after them when they come first. The smallest
 /// differing span can start and end inside lines when neighbours begin
 /// alike, and an exact edit cutting a line keeps the wrong block's content.
-pub fn deleted_span(cx: &Cx, d: &Doc, new: &[Block], a: usize, b: usize) -> Option<(usize, usize, String)> {
+pub fn deleted_span(
+    cx: &Cx,
+    d: &Doc,
+    new: &[Block],
+    a: usize,
+    b: usize,
+) -> Option<(usize, usize, String)> {
     let m = block_ranges(cx, d);
     if a > 0 {
         span_of(cx, d, new, m[a - 1].1, m[b - 1].1)
@@ -251,7 +303,10 @@ pub fn deleted_span(cx: &Cx, d: &Doc, new: &[Block], a: usize, b: usize) -> Opti
 /// A block as a description names it: `block 12 ("Its first words…")`.
 pub fn quote(d: &Doc, i: usize) -> String {
     let text: String = match &d.blocks[i] {
-        Block::Para(p) => chars(&p.content).into_iter().filter(|&c| c != KEEP_CH && c != '\u{F0001}').collect(),
+        Block::Para(p) => chars(&p.content)
+            .into_iter()
+            .filter(|&c| c != KEEP_CH && c != '\u{F0001}')
+            .collect(),
         Block::Table(_) => return format!("block {i} (a table)"),
         Block::Keep(_) => return format!("block {i} (an object)"),
         Block::Head(h) => h.label.clone(),
@@ -268,14 +323,25 @@ pub fn quote(d: &Doc, i: usize) -> String {
 /// Units `s..e` of the paragraph at `path` become `new`, with the marks of
 /// the first replaced unit and the text properties of the nearest character
 /// (as typing takes them, §5.2).
-pub fn replace_span(d: &Doc, path: &[usize], s: usize, e: usize, new: &str, name: &'static str, what: String) -> Edit {
+pub fn replace_span(
+    d: &Doc,
+    path: &[usize],
+    s: usize,
+    e: usize,
+    new: &str,
+    name: &'static str,
+    what: String,
+) -> Edit {
     let mut blocks = d.blocks.clone();
     let p = get_para(&mut blocks, path);
     let n = p.units.len();
     let src = if e > s { s } else { s.saturating_sub(1) };
     let marks = p.units.get(src).map_or(Marks::NONE, |u| u.marks);
-    let near =
-        p.units[..(src + 1).min(n)].iter().rev().chain(p.units[(src + 1).min(n)..].iter()).find(|u| u.takes_props());
+    let near = p.units[..(src + 1).min(n)]
+        .iter()
+        .rev()
+        .chain(p.units[(src + 1).min(n)..].iter())
+        .find(|u| u.takes_props());
     let props = near.map(|u| u.props.clone()).unwrap_or_default();
     let ins: Vec<Unit> = new
         .chars()
@@ -290,7 +356,10 @@ pub fn replace_span(d: &Doc, path: &[usize], s: usize, e: usize, new: &str, name
     let k = ins.len();
     // Formatting spans: the new text takes the formatting of the text it
     // replaces (or follows).
-    let styled = !p.spans.is_empty() && p.spans.iter().all(|x| matches!(x.kind, hanji_format::SpanKind::Style(_)));
+    let styled = !p.spans.is_empty()
+        && p.spans
+            .iter()
+            .all(|x| matches!(x.kind, hanji_format::SpanKind::Style(_)));
     let mut styles = styled.then(|| hanji_format::inline_style::unit_styles(p));
     if let Some(st) = &mut styles {
         let like = st.get(src).cloned().unwrap_or_default();
@@ -351,7 +420,11 @@ fn is_word(c: char) -> bool {
 pub fn figure_or_word(p: &[char]) -> Option<(usize, usize, String)> {
     for (s, e) in runs_of(p, |c| c.is_ascii_digit(), 1) {
         if clean(p, s, e) {
-            return Some((s, e, times_ten_plus_five(&p[s..e].iter().collect::<String>())));
+            return Some((
+                s,
+                e,
+                times_ten_plus_five(&p[s..e].iter().collect::<String>()),
+            ));
         }
     }
     for (s, e) in runs_of(p, is_word, 3) {
@@ -373,12 +446,17 @@ fn e1_figure(d: &Doc, _: &Cx) -> Option<Edit> {
     for (path, p) in paras(&d.blocks) {
         let ms: Vec<&Entry> = entries_at(d, &path)
             .into_iter()
-            .filter(|e| e.kind == Kind::Marker && (tag(e).starts_with("comment") || tag(e).starts_with("bookmark")))
+            .filter(|e| {
+                e.kind == Kind::Marker
+                    && (tag(e).starts_with("comment") || tag(e).starts_with("bookmark"))
+            })
             .collect();
         if ms.is_empty() {
             continue;
         }
-        let Some(f) = figure_or_word(&chars(p)) else { continue };
+        let Some(f) = figure_or_word(&chars(p)) else {
+            continue;
+        };
         let score = (
             ms.iter().any(|e| tag(e).starts_with("comment")),
             ms.iter().any(|m| m.start.unwrap() >= f.1),
@@ -389,8 +467,16 @@ fn e1_figure(d: &Doc, _: &Cx) -> Option<Edit> {
         }
     }
     let (score, path, (s, e, new)) = best?;
-    let old: String =
-        chars(&paras(&d.blocks).into_iter().find(|x| x.0 == path).unwrap().1.clone())[s..e].iter().collect();
+    let old: String = chars(
+        &paras(&d.blocks)
+            .into_iter()
+            .find(|x| x.0 == path)
+            .unwrap()
+            .1
+            .clone(),
+    )[s..e]
+        .iter()
+        .collect();
     Some(replace_span(
         d,
         &path,
@@ -398,7 +484,10 @@ fn e1_figure(d: &Doc, _: &Cx) -> Option<Edit> {
         e,
         &new,
         "E1 figure",
-        format!("change {old:?} to {new:?} in a paragraph with a {}", if score.0 { "comment" } else { "bookmark" }),
+        format!(
+            "change {old:?} to {new:?} in a paragraph with a {}",
+            if score.0 { "comment" } else { "bookmark" }
+        ),
     ))
 }
 
@@ -421,12 +510,22 @@ fn has_drawing(d: &Doc, cx: &Cx, b: &Block) -> bool {
                     .rows
                     .iter()
                     .flatten()
-                    .filter_map(|c| if let Cell::Text(ps) = c { Some(ps.iter().map(|p| &p.content)) } else { None })
+                    .filter_map(|c| {
+                        if let Cell::Text(ps) = c {
+                            Some(ps.iter().map(|p| &p.content))
+                        } else {
+                            None
+                        }
+                    })
                     .flatten()
                     .collect(),
                 _ => vec![],
             };
-            ps.iter().any(|p| p.units.iter().any(|u| matches!(&u.atom, Atom::Keep(k) if kind_of(&k.id) == "drawing")))
+            ps.iter().any(|p| {
+                p.units
+                    .iter()
+                    .any(|u| matches!(&u.atom, Atom::Keep(k) if kind_of(&k.id) == "drawing"))
+            })
         }
     }
 }
@@ -445,7 +544,9 @@ fn e2_insert_before_drawing(d: &Doc, cx: &Cx) -> Option<Edit> {
             item: None,
         }),
     );
-    let bmap = (0..d.blocks.len()).map(|k| Some(if k < i { k } else { k + 1 })).collect();
+    let bmap = (0..d.blocks.len())
+        .map(|k| Some(if k < i { k } else { k + 1 }))
+        .collect();
     Some(Edit {
         name: "E2 insert before drawing",
         what: format!("new paragraph before {}", quote(d, i)),
@@ -515,8 +616,12 @@ fn level(rem: &Remainder, b: &Block) -> Option<u8> {
 fn e4_move_section(d: &Doc, cx: &Cx) -> Option<Edit> {
     let rem = cx.rem;
     let n = d.blocks.len();
-    let heads: Vec<(usize, u8)> =
-        d.blocks.iter().enumerate().filter_map(|(i, b)| level(rem, b).map(|l| (i, l))).collect();
+    let heads: Vec<(usize, u8)> = d
+        .blocks
+        .iter()
+        .enumerate()
+        .filter_map(|(i, b)| level(rem, b).map(|l| (i, l)))
+        .collect();
     let mut secs = vec![];
     for (k, &(i, lv)) in heads.iter().enumerate() {
         let end = heads[k + 1..].iter().find(|x| x.1 <= lv).map_or(n, |x| x.0);
@@ -535,7 +640,12 @@ fn e4_move_section(d: &Doc, cx: &Cx) -> Option<Edit> {
             a0,
             b0,
             b1,
-            format!("move the section at {} ({} blocks) before the one at {}", quote(d, b0), b1 - b0, quote(d, a0)),
+            format!(
+                "move the section at {} ({} blocks) before the one at {}",
+                quote(d, b0),
+                b1 - b0,
+                quote(d, a0)
+            ),
         ),
         None => {
             let body: Vec<usize> = d
@@ -549,7 +659,16 @@ fn e4_move_section(d: &Doc, cx: &Cx) -> Option<Edit> {
                 return None;
             }
             let (b0, b1, a0) = (body[body.len() - 3], body[body.len() - 1], body[0]);
-            (a0, b0, b1, format!("no same-level headings: move blocks {b0}–{} before {}", b1 - 1, quote(d, a0)))
+            (
+                a0,
+                b0,
+                b1,
+                format!(
+                    "no same-level headings: move blocks {b0}–{} before {}",
+                    b1 - 1,
+                    quote(d, a0)
+                ),
+            )
         }
     };
     let order: Vec<usize> = (0..a0).chain(b0..b1).chain(a0..b0).chain(b1..n).collect();
@@ -583,8 +702,17 @@ fn e5_restyle(d: &Doc, cx: &Cx) -> Option<Edit> {
         .map(|s| s.name.clone())
         .filter(|n| *n != st.default_paragraph && st.heading_level(n).is_none())
         .collect();
-    let used: HashSet<&str> =
-        d.blocks.iter().filter_map(|b| if let Block::Para(p) = b { Some(p.style.as_str()) } else { None }).collect();
+    let used: HashSet<&str> = d
+        .blocks
+        .iter()
+        .filter_map(|b| {
+            if let Block::Para(p) = b {
+                Some(p.style.as_str())
+            } else {
+                None
+            }
+        })
+        .collect();
     let mut sorted = names.clone();
     sorted.sort();
     let pick = cx
@@ -597,10 +725,16 @@ fn e5_restyle(d: &Doc, cx: &Cx) -> Option<Edit> {
         .or_else(|| sorted.first().cloned())?;
     for (i, b) in d.blocks.iter().enumerate() {
         let Block::Para(p) = b else { continue };
-        if p.content.units.is_empty() || is_page_break(&p.content) || p.style != st.default_paragraph {
+        if p.content.units.is_empty()
+            || is_page_break(&p.content)
+            || p.style != st.default_paragraph
+        {
             continue;
         }
-        if entries_at(d, &[i]).iter().any(|e| matches!(e.kind, Kind::Run | Kind::Marker) && !e.fp.is_empty()) {
+        if entries_at(d, &[i])
+            .iter()
+            .any(|e| matches!(e.kind, Kind::Run | Kind::Marker) && !e.fp.is_empty())
+        {
             let mut blocks = d.blocks.clone();
             if let Block::Para(p) = &mut blocks[i] {
                 p.style = pick.clone();
@@ -636,8 +770,8 @@ fn e6_cell_next_to_merge(d: &Doc, _: &Cx) -> Option<Edit> {
                 if ps[0].content.units.is_empty() {
                     continue;
                 }
-                let is_anchor =
-                    row.get(c + 1) == Some(&Cell::Left) || rows.get(r + 1).and_then(|x| x.get(c)) == Some(&Cell::Up);
+                let is_anchor = row.get(c + 1) == Some(&Cell::Left)
+                    || rows.get(r + 1).and_then(|x| x.get(c)) == Some(&Cell::Up);
                 let nb = [
                     (r as isize, c as isize - 1),
                     (r as isize, c as isize + 1),
@@ -672,7 +806,13 @@ fn e6_cell_next_to_merge(d: &Doc, _: &Cx) -> Option<Edit> {
 }
 
 fn cell_edit(d: &Doc, path: &[usize], why: &str) -> Edit {
-    let p = chars(paras(&d.blocks).into_iter().find(|x| x.0 == path).unwrap().1);
+    let p = chars(
+        paras(&d.blocks)
+            .into_iter()
+            .find(|x| x.0 == path)
+            .unwrap()
+            .1,
+    );
     for (s, e) in runs_of(&p, |c| c.is_ascii_digit(), 1) {
         if clean(&p, s, e) {
             let old: String = p[s..e].iter().collect();
@@ -689,15 +829,25 @@ fn cell_edit(d: &Doc, path: &[usize], why: &str) -> Edit {
         }
     }
     let n = p.len();
-    replace_span(d, path, n, n, " (rev.)", "E6 table cell", format!("{why}: append ' (rev.)' to cell {:?}", &path[1..]))
+    replace_span(
+        d,
+        path,
+        n,
+        n,
+        " (rev.)",
+        "E6 table cell",
+        format!("{why}: append ' (rev.)' to cell {:?}", &path[1..]),
+    )
 }
 
 fn e7_overlap_run(d: &Doc, cx: &Cx) -> Option<Edit> {
     let mut cands: Vec<((bool, bool), Path, usize)> = vec![];
     for (path, p) in paras(&d.blocks) {
         let ch = chars(p);
-        let mut runs: Vec<&Entry> =
-            entries_at(d, &path).into_iter().filter(|e| e.kind == Kind::Run && e.end > e.start).collect();
+        let mut runs: Vec<&Entry> = entries_at(d, &path)
+            .into_iter()
+            .filter(|e| e.kind == Kind::Run && e.end > e.start)
+            .collect();
         runs.sort_by_key(|e| e.start);
         for w in runs.windows(2) {
             let (x, y) = (w[0], w[1]);
@@ -710,14 +860,27 @@ fn e7_overlap_run(d: &Doc, cx: &Cx) -> Option<Edit> {
                 && b + 2 <= ch.len()
                 && clean(&ch, b - 2, b + 2)
             {
-                cands.push(((path.len() == 1, cx.fmt.visible_run(x) || cx.fmt.visible_run(y)), path.clone(), b));
+                cands.push((
+                    (
+                        path.len() == 1,
+                        cx.fmt.visible_run(x) || cx.fmt.visible_run(y),
+                    ),
+                    path.clone(),
+                    b,
+                ));
             }
         }
     }
     // Python's sort(reverse=True) is stable.
     cands.sort_by_key(|c| std::cmp::Reverse(c.0));
     let (_, path, b) = cands.into_iter().next()?;
-    let p = chars(paras(&d.blocks).into_iter().find(|x| x.0 == path).unwrap().1);
+    let p = chars(
+        paras(&d.blocks)
+            .into_iter()
+            .find(|x| x.0 == path)
+            .unwrap()
+            .1,
+    );
     let old: String = p[b - 2..b + 2].iter().collect();
     Some(replace_span(
         d,
@@ -743,14 +906,19 @@ fn e8_split(d: &Doc, _: &Cx) -> Option<Edit> {
             .into_iter()
             .filter(|e| !e.fp.is_empty() && matches!(e.kind, Kind::Run | Kind::Marker | Kind::Wrap))
             .collect();
-        let runs: Vec<&&Entry> =
-            ents.iter().filter(|e| e.kind == Kind::Run && e.end.unwrap() - e.start.unwrap() >= 4).collect();
+        let runs: Vec<&&Entry> = ents
+            .iter()
+            .filter(|e| e.kind == Kind::Run && e.end.unwrap() - e.start.unwrap() >= 4)
+            .collect();
         for k in 2..n - 2 {
             if ch[k - 1] != ' ' || !clean(&ch, k - 1, k + 1) {
                 continue;
             }
-            let straddle = runs.iter().any(|r| r.start.unwrap() < k && k < r.end.unwrap());
-            let both = ents.iter().any(|e| e.start.unwrap() < k) && ents.iter().any(|e| e.start.unwrap() >= k);
+            let straddle = runs
+                .iter()
+                .any(|r| r.start.unwrap() < k && k < r.end.unwrap());
+            let both = ents.iter().any(|e| e.start.unwrap() < k)
+                && ents.iter().any(|e| e.start.unwrap() >= k);
             let score = (straddle && both, both, -((k as i64) - (n as i64) / 2).abs());
             if best.as_ref().is_none_or(|b| score > b.0) {
                 best = Some((score, i, k));
@@ -759,7 +927,9 @@ fn e8_split(d: &Doc, _: &Cx) -> Option<Edit> {
     }
     let (_, i, k) = best?;
     let mut blocks = d.blocks.clone();
-    let Block::Para(p) = &mut blocks[i] else { unreachable!() };
+    let Block::Para(p) = &mut blocks[i] else {
+        unreachable!()
+    };
     let n = p.content.units.len();
     let tail = p.content.units.split_off(k);
     // A split list item gives two items of that list.
@@ -767,11 +937,16 @@ fn e8_split(d: &Doc, _: &Cx) -> Option<Edit> {
     let q = Block::Para(Para {
         props: Default::default(),
         style: p.style.clone(),
-        content: Inline { units: tail, spans: vec![] },
+        content: Inline {
+            units: tail,
+            spans: vec![],
+        },
         item,
     });
     blocks.insert(i + 1, q);
-    let bmap = (0..d.blocks.len()).map(|x| Some(if x <= i { x } else { x + 1 })).collect();
+    let bmap = (0..d.blocks.len())
+        .map(|x| Some(if x <= i { x } else { x + 1 }))
+        .collect();
     let xmap = HashMap::from([(vec![i], vec![(0, k, vec![i], 0), (k, n, vec![i + 1], 0)])]);
     Some(Edit {
         name: "E8 split paragraph",
@@ -793,7 +968,9 @@ fn e8_split(d: &Doc, _: &Cx) -> Option<Edit> {
 fn e9_merge(d: &Doc, cx: &Cx) -> Option<Edit> {
     let mut best: Option<((bool, bool, usize), usize)> = None;
     for i in 0..d.blocks.len().saturating_sub(1) {
-        let (Block::Para(a), Block::Para(b)) = (&d.blocks[i], &d.blocks[i + 1]) else { continue };
+        let (Block::Para(a), Block::Para(b)) = (&d.blocks[i], &d.blocks[i + 1]) else {
+            continue;
+        };
         if a.content.units.is_empty()
             || b.content.units.is_empty()
             || is_page_break(&a.content)
@@ -809,15 +986,23 @@ fn e9_merge(d: &Doc, cx: &Cx) -> Option<Edit> {
         if ents.is_empty() {
             continue;
         }
-        let score = (a.style == b.style, ents.iter().any(|e| e.kind == Kind::Marker), ents.len());
+        let score = (
+            a.style == b.style,
+            ents.iter().any(|e| e.kind == Kind::Marker),
+            ents.len(),
+        );
         if best.as_ref().is_none_or(|b| score > b.0) {
             best = Some((score, i));
         }
     }
     let (_, i) = best?;
     let mut blocks = d.blocks.clone();
-    let Block::Para(b) = blocks.remove(i + 1) else { unreachable!() };
-    let Block::Para(a) = &mut blocks[i] else { unreachable!() };
+    let Block::Para(b) = blocks.remove(i + 1) else {
+        unreachable!()
+    };
+    let Block::Para(a) = &mut blocks[i] else {
+        unreachable!()
+    };
     let (n1, n2) = (a.content.units.len(), b.content.units.len());
     a.content.units.extend(b.content.units);
     let bmap = (0..d.blocks.len())
@@ -831,7 +1016,10 @@ fn e9_merge(d: &Doc, cx: &Cx) -> Option<Edit> {
             }
         })
         .collect();
-    let xmap = HashMap::from([(vec![i], vec![(0, n1, vec![i], 0)]), (vec![i + 1], vec![(0, n2, vec![i], n1)])]);
+    let xmap = HashMap::from([
+        (vec![i], vec![(0, n1, vec![i], 0)]),
+        (vec![i + 1], vec![(0, n2, vec![i], n1)]),
+    ]);
     Some(Edit {
         name: "E9 merge paragraphs",
         what: format!("join {} and {}", quote(d, i), quote(d, i + 1)),
@@ -904,17 +1092,25 @@ fn f1_first_line(d: &Doc, cx: &Cx) -> Option<Edit> {
     }
     let indent = val(Key::FirstLine, "10pt");
     let set = |i: usize| {
-        body_para(d, cx.rem, i) && !matches!(&d.blocks[i], Block::Para(p) if p.props.get(Key::FirstLine).is_some())
+        body_para(d, cx.rem, i)
+            && !matches!(&d.blocks[i], Block::Para(p) if p.props.get(Key::FirstLine).is_some())
     };
     let first = (0..d.blocks.len()).find(|&i| set(i))?;
-    let run: Vec<usize> = (first..d.blocks.len()).take_while(|&i| set(i)).take(3).collect();
+    let run: Vec<usize> = (first..d.blocks.len())
+        .take_while(|&i| set(i))
+        .take(3)
+        .collect();
     let mut blocks = d.blocks.clone();
     for &i in &run {
         if let Block::Para(p) = &mut blocks[i] {
             p.props.set(Key::FirstLine, indent.clone());
         }
     }
-    let named = run.iter().map(|&i| quote(d, i)).collect::<Vec<_>>().join(", ");
+    let named = run
+        .iter()
+        .map(|&i| quote(d, i))
+        .collect::<Vec<_>>()
+        .join(", ");
     let mut ed = Edit::blocks(
         "F1 first-line indent",
         format!("first-line=10pt on body paragraphs {named}"),
@@ -929,9 +1125,15 @@ fn f1_first_line(d: &Doc, cx: &Cx) -> Option<Edit> {
 
 /// The paragraphs in style `name`, as a description names them.
 fn in_style(d: &Doc, name: &str) -> (Vec<usize>, String) {
-    let at: Vec<usize> =
-        (0..d.blocks.len()).filter(|&i| matches!(&d.blocks[i], Block::Para(p) if p.style == name)).collect();
-    let mut named = at.iter().take(2).map(|&i| quote(d, i)).collect::<Vec<_>>().join(", ");
+    let at: Vec<usize> = (0..d.blocks.len())
+        .filter(|&i| matches!(&d.blocks[i], Block::Para(p) if p.style == name))
+        .collect();
+    let mut named = at
+        .iter()
+        .take(2)
+        .map(|&i| quote(d, i))
+        .collect::<Vec<_>>()
+        .join(", ");
     if at.len() > 2 {
         named.push_str(&format!(" and {} more", at.len() - 2));
     }
@@ -950,7 +1152,9 @@ fn f2_restyle_heading(d: &Doc, cx: &Cx) -> Option<Edit> {
     // A style the revision shows (a line it did not show cannot change, §5.2).
     let used = |n: &str| {
         st.paragraph_def(n).is_some_and(|s| s.shown)
-            && d.blocks.iter().any(|b| matches!(b, Block::Para(p) if p.style == n && !p.content.units.is_empty()))
+            && d.blocks
+                .iter()
+                .any(|b| matches!(b, Block::Para(p) if p.style == n && !p.content.units.is_empty()))
     };
     let pick = st.headings[1]
         .clone()
@@ -958,7 +1162,9 @@ fn f2_restyle_heading(d: &Doc, cx: &Cx) -> Option<Edit> {
         .or_else(|| st.headings.iter().flatten().find(|h| used(h)).cloned())
         .or_else(|| {
             d.blocks.iter().find_map(|b| match b {
-                Block::Para(p) if p.style != st.default_paragraph && !p.style.is_empty() && used(&p.style) => {
+                Block::Para(p)
+                    if p.style != st.default_paragraph && !p.style.is_empty() && used(&p.style) =>
+                {
                     Some(p.style.clone())
                 }
                 _ => None,
@@ -966,9 +1172,14 @@ fn f2_restyle_heading(d: &Doc, cx: &Cx) -> Option<Edit> {
         })?;
     let mut styles = st.clone();
     let def = styles.paragraph.iter_mut().find(|s| s.name == pick)?;
-    let color = if def.props.get(Key::Color) == Some(&val(Key::Color, "#1F4E79")) { "#C00000" } else { "#1F4E79" };
+    let color = if def.props.get(Key::Color) == Some(&val(Key::Color, "#1F4E79")) {
+        "#C00000"
+    } else {
+        "#1F4E79"
+    };
     def.props.set(Key::Color, val(Key::Color, color));
-    def.props.set(Key::SpaceBefore, val(Key::SpaceBefore, "18pt"));
+    def.props
+        .set(Key::SpaceBefore, val(Key::SpaceBefore, "18pt"));
     let (at, named) = in_style(d, &pick);
     let mut ed = Edit::blocks(
         "F2 restyle",
@@ -992,8 +1203,15 @@ fn f3_new_style(d: &Doc, cx: &Cx) -> Option<Edit> {
     if !st.formatting {
         return None;
     }
-    let taken = |n: &str| st.paragraph.iter().chain(&st.table).any(|s| s.name.eq_ignore_ascii_case(n));
-    let name = ["Callout", "hanji Callout", "hanji Callout 2"].into_iter().find(|n| !taken(n))?;
+    let taken = |n: &str| {
+        st.paragraph
+            .iter()
+            .chain(&st.table)
+            .any(|s| s.name.eq_ignore_ascii_case(n))
+    };
+    let name = ["Callout", "hanji Callout", "hanji Callout 2"]
+        .into_iter()
+        .find(|n| !taken(n))?;
     // One that sets nothing itself (not the one F1 indented), else any.
     let bare = |i: usize| matches!(&d.blocks[i], Block::Para(p) if p.props.is_empty());
     let i = (0..d.blocks.len())
@@ -1002,7 +1220,10 @@ fn f3_new_style(d: &Doc, cx: &Cx) -> Option<Edit> {
     let mut def = hanji_core::StyleDef::new("", name);
     def.shown = true;
     def.props.set(Key::Fill, val(Key::Fill, "#FFF2CC"));
-    def.props.set(Key::BorderLeft, val(Key::BorderLeft, "2.25pt solid #C00000"));
+    def.props.set(
+        Key::BorderLeft,
+        val(Key::BorderLeft, "2.25pt solid #C00000"),
+    );
     def.props.set(Key::IndentLeft, val(Key::IndentLeft, "10pt"));
     let mut styles = st.clone();
     styles.paragraph.push(def);
@@ -1012,7 +1233,10 @@ fn f3_new_style(d: &Doc, cx: &Cx) -> Option<Edit> {
     }
     let mut ed = Edit::blocks(
         "F3 new style",
-        format!("new style {name:?} (fill=#FFF2CC border-left=\"2.25pt solid #C00000\") given to {}", quote(d, i)),
+        format!(
+            "new style {name:?} (fill=#FFF2CC border-left=\"2.25pt solid #C00000\") given to {}",
+            quote(d, i)
+        ),
         blocks,
         ident(d.blocks.len()),
         HashSet::from([i]),
@@ -1031,11 +1255,17 @@ fn f4_cell_fill(d: &Doc, cx: &Cx) -> Option<Edit> {
         return None;
     }
     let fill = val(Key::Fill, "#DDEBF7");
-    let text_cells =
-        |t: &hanji_core::Table| t.rows.first().map_or(0, |r| r.iter().filter(|c| matches!(c, Cell::Text(_))).count());
-    let i = (0..d.blocks.len()).find(|&i| matches!(&d.blocks[i], Block::Table(t) if text_cells(t) >= 2))?;
+    let text_cells = |t: &hanji_core::Table| {
+        t.rows.first().map_or(0, |r| {
+            r.iter().filter(|c| matches!(c, Cell::Text(_))).count()
+        })
+    };
+    let i = (0..d.blocks.len())
+        .find(|&i| matches!(&d.blocks[i], Block::Table(t) if text_cells(t) >= 2))?;
     let mut blocks = d.blocks.clone();
-    let Block::Table(t) = &mut blocks[i] else { unreachable!() };
+    let Block::Table(t) = &mut blocks[i] else {
+        unreachable!()
+    };
     let cols = t.rows[0].len();
     if t.boxes.is_empty() {
         t.boxes = vec![vec![]; t.rows.len()];
@@ -1046,11 +1276,21 @@ fn f4_cell_fill(d: &Doc, cx: &Cx) -> Option<Edit> {
         if let Cell::Text(ps) = &t.rows[0][c] {
             t.boxes[0][c].set(Key::Fill, fill.clone());
             if first.is_empty() {
-                first = ps.iter().map(|p| p.content.text()).collect::<Vec<_>>().join(" ");
+                first = ps
+                    .iter()
+                    .map(|p| p.content.text())
+                    .collect::<Vec<_>>()
+                    .join(" ");
             }
         }
     }
-    let first: String = first.split_whitespace().collect::<Vec<_>>().join(" ").chars().take(30).collect();
+    let first: String = first
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .chars()
+        .take(30)
+        .collect();
     let mut ed = Edit::blocks(
         "F4 cell fill",
         format!("fill=#DDEBF7 on the header row of the table at block {i} (cells {first:?} to the last)"),
@@ -1067,7 +1307,10 @@ fn f4_cell_fill(d: &Doc, cx: &Cx) -> Option<Edit> {
 
 /// The blocks of a text, as the engine's grammar reads it.
 pub fn written(fmt: &dyn Format, text: &str, rem: &Remainder) -> Vec<Block> {
-    fmt.model().resolve(text, rem, CAPS).unwrap_or_else(|e| panic!("{}\n{text}", hanji_format::diag::render(&e))).0
+    fmt.model()
+        .resolve(text, rem, CAPS)
+        .unwrap_or_else(|e| panic!("{}\n{text}", hanji_format::diag::render(&e)))
+        .0
 }
 
 fn oracle(d: &Doc, new: &[Block], ed: &Edit) -> HashMap<u64, Outcome> {
@@ -1087,7 +1330,12 @@ fn combined(
     d0: &Doc,
     cx: &Cx,
     edits: &[(&str, EditFn)],
-) -> (Vec<Block>, HashMap<u64, Outcome>, Vec<String>, Option<hanji_core::StyleSet>) {
+) -> (
+    Vec<Block>,
+    HashMap<u64, Outcome>,
+    Vec<String>,
+    Option<hanji_core::StyleSet>,
+) {
     let mut cur = d0.clone();
     let mut origin: HashMap<u64, u64> = d0.entries.iter().map(|e| (e.id, e.id)).collect();
     let mut next_id = 1_000_000;
@@ -1098,9 +1346,22 @@ fn combined(
     let mut styles = cx.rem.styles.clone();
     for (_, f) in edits {
         let rem_now = with_styles(cx.rem, Some(&styles));
-        let Some(ed) = f(&cur, &Cx { fmt: cx.fmt, rem: &rem_now }) else { continue };
+        let Some(ed) = f(
+            &cur,
+            &Cx {
+                fmt: cx.fmt,
+                rem: &rem_now,
+            },
+        ) else {
+            continue;
+        };
         let after = ed.styles.as_ref().unwrap_or(&styles);
-        let new = written(cx.fmt, &cx.fmt.text_of(&ed.blocks, &with_styles(cx.rem, Some(after))), &rem_now);
+        let new = written(
+            cx.fmt,
+            &cx.fmt
+                .text_of(&ed.blocks, &with_styles(cx.rem, Some(after))),
+            &rem_now,
+        );
         styles = after.clone();
         let outs = oracle(&cur, &new, &ed);
         let mut nxt = vec![];
@@ -1111,7 +1372,12 @@ fn combined(
                 gone.insert(oid, "lenient");
             }
             let Status::Placed { entry, pieces } = &o.status else {
-                gone.entry(oid).or_insert(if matches!(o.status, Status::Refused(_)) { "orphan" } else { "removed" });
+                gone.entry(oid)
+                    .or_insert(if matches!(o.status, Status::Refused(_)) {
+                        "orphan"
+                    } else {
+                        "removed"
+                    });
                 continue;
             };
             if pieces.is_empty() {
@@ -1129,7 +1395,10 @@ fn combined(
                 nxt.push(x);
             }
         }
-        cur = Doc { blocks: new, entries: nxt };
+        cur = Doc {
+            blocks: new,
+            entries: nxt,
+        };
         steps.push(format!("{} ({})", ed.name, ed.what));
     }
     let mut live: HashMap<u64, Vec<&Entry>> = HashMap::new();
@@ -1139,18 +1408,36 @@ fn combined(
     let mut expected = HashMap::new();
     for e in &d0.entries {
         let o = if gone.get(&e.id) == Some(&"lenient") {
-            Outcome { status: Status::Removed("lenient".into()), lenient: true }
+            Outcome {
+                status: Status::Removed("lenient".into()),
+                lenient: true,
+            }
         } else if let Some(parts) = live.get(&e.id) {
             let pieces = if parts.len() > 1 {
-                parts.iter().map(|x| (x.path.clone(), x.start.unwrap(), x.end.unwrap())).collect()
+                parts
+                    .iter()
+                    .map(|x| (x.path.clone(), x.start.unwrap(), x.end.unwrap()))
+                    .collect()
             } else {
                 vec![]
             };
-            Outcome { status: Status::Placed { entry: parts[0].clone(), pieces }, lenient: false }
+            Outcome {
+                status: Status::Placed {
+                    entry: parts[0].clone(),
+                    pieces,
+                },
+                lenient: false,
+            }
         } else if gone.get(&e.id) == Some(&"orphan") {
-            Outcome { status: Status::Refused("oracle".into()), lenient: false }
+            Outcome {
+                status: Status::Refused("oracle".into()),
+                lenient: false,
+            }
         } else {
-            Outcome { status: Status::Removed("oracle".into()), lenient: false }
+            Outcome {
+                status: Status::Removed("oracle".into()),
+                lenient: false,
+            }
         };
         expected.insert(e.id, o);
     }
@@ -1168,7 +1455,9 @@ struct Observed {
 
 fn obs_key(e: &Entry) -> Key {
     match e.kind {
-        Kind::Marker | Kind::Rmarker | Kind::Keep => (e.kind, e.fp.clone(), e.path.clone(), e.start, None),
+        Kind::Marker | Kind::Rmarker | Kind::Keep => {
+            (e.kind, e.fp.clone(), e.path.clone(), e.start, None)
+        }
         Kind::Run if e.start == e.end => (e.kind, e.fp.clone(), e.path.clone(), e.start, None),
         Kind::Wrap => (e.kind, e.fp.clone(), e.path.clone(), e.start, e.end),
         _ => (e.kind, e.fp.clone(), e.path.clone(), None, None),
@@ -1177,11 +1466,17 @@ fn obs_key(e: &Entry) -> Key {
 
 impl Observed {
     fn new(entries: &[Entry]) -> Observed {
-        let mut o = Observed { cov: HashMap::new(), multi: HashMap::new() };
+        let mut o = Observed {
+            cov: HashMap::new(),
+            multi: HashMap::new(),
+        };
         for e in entries {
             if e.kind == Kind::Run && e.end > e.start {
                 for c in e.start.unwrap()..e.end.unwrap() {
-                    o.cov.entry(e.path.clone()).or_default().insert(c, e.fp.clone());
+                    o.cov
+                        .entry(e.path.clone())
+                        .or_default()
+                        .insert(c, e.fp.clone());
                 }
             } else {
                 *o.multi.entry(obs_key(e)).or_default() += 1;
@@ -1199,9 +1494,9 @@ impl Observed {
             vec![]
         };
         if !pieces.is_empty() {
-            return pieces
-                .iter()
-                .all(|(p, s, en)| (*s..*en).all(|c| self.cov.get(p).and_then(|m| m.get(&c)) == Some(&e.fp)));
+            return pieces.iter().all(|(p, s, en)| {
+                (*s..*en).all(|c| self.cov.get(p).and_then(|m| m.get(&c)) == Some(&e.fp))
+            });
         }
         // A marker moved before a block lands there, or, in a format whose
         // markers live in paragraphs (hwpx), at the start of that block's paragraph.
@@ -1222,7 +1517,9 @@ impl Observed {
         if e.kind == Kind::Run && e.end > e.start {
             return self.cov.values().any(|m| m.values().any(|f| *f == e.fp));
         }
-        self.multi.iter().any(|(k, v)| k.0 == e.kind && k.1 == e.fp && *v > 0)
+        self.multi
+            .iter()
+            .any(|(k, v)| k.0 == e.kind && k.1 == e.fp && *v > 0)
     }
 }
 
@@ -1318,19 +1615,27 @@ fn score(
                 *t.lost_by_kind.entry(format!("{:?}", e.kind)).or_default() += 1;
                 if t.examples.len() < 4 {
                     let why = match (&x.status, &g.status) {
-                        (Status::Placed { entry, .. }, Status::Placed { entry: ge, .. }) => format!(
-                            "expected {:?}[{:?},{:?}] got {:?}[{:?},{:?}]{}",
-                            entry.path,
-                            entry.start,
-                            entry.end,
-                            ge.path,
-                            ge.start,
-                            ge.end,
-                            if obs.has_fp(entry) { "" } else { " (missing)" }
-                        ),
-                        (a, b) => format!("expected {a:?} got {b:?}").chars().take(160).collect(),
+                        (Status::Placed { entry, .. }, Status::Placed { entry: ge, .. }) => {
+                            format!(
+                                "expected {:?}[{:?},{:?}] got {:?}[{:?},{:?}]{}",
+                                entry.path,
+                                entry.start,
+                                entry.end,
+                                ge.path,
+                                ge.start,
+                                ge.end,
+                                if obs.has_fp(entry) { "" } else { " (missing)" }
+                            )
+                        }
+                        (a, b) => format!("expected {a:?} got {b:?}")
+                            .chars()
+                            .take(160)
+                            .collect(),
                     };
-                    t.examples.push(format!("{:?} @{:?}[{:?},{:?}]: {why}", e.kind, e.path, e.start, e.end));
+                    t.examples.push(format!(
+                        "{:?} @{:?}[{:?},{:?}]: {why}",
+                        e.kind, e.path, e.start, e.end
+                    ));
                 }
             }
         }
@@ -1371,11 +1676,17 @@ fn new_text_boxes(s: &str) -> String {
     while let Some(k) = rest.find("<shape id=\"") {
         out.push_str(&rest[..k + 6]);
         rest = &rest[k + 6..];
-        let tail = rest.find(" name=\"TextBox ").filter(|&n| !rest[..n].contains('>')).and_then(|n| {
-            let after = &rest[n + 15..];
-            let digits = after.find('"')?;
-            after[..digits].chars().all(|c| c.is_ascii_digit()).then_some(n + 15 + digits + 1)
-        });
+        let tail = rest
+            .find(" name=\"TextBox ")
+            .filter(|&n| !rest[..n].contains('>'))
+            .and_then(|n| {
+                let after = &rest[n + 15..];
+                let digits = after.find('"')?;
+                after[..digits]
+                    .chars()
+                    .all(|c| c.is_ascii_digit())
+                    .then_some(n + 15 + digits + 1)
+            });
         if let Some(t) = tail {
             rest = &rest[t..];
         }
@@ -1383,7 +1694,10 @@ fn new_text_boxes(s: &str) -> String {
     out + rest
 }
 
-pub const RAW: ImportOptions = ImportOptions { neutralise: false, template: None };
+pub const RAW: ImportOptions = ImportOptions {
+    neutralise: false,
+    template: None,
+};
 
 fn export_and_check(
     cx: &Cx,
@@ -1401,13 +1715,25 @@ fn export_and_check(
     let rem = cx.rem;
     let mut next = rem.next_id;
     let entries = place::placed_entries(&d.entries, got, &mut next);
-    let mut r2 = Remainder { entries, next_id: next, styles: styles.clone(), ..rem.clone() };
+    let mut r2 = Remainder {
+        entries,
+        next_id: next,
+        styles: styles.clone(),
+        ..rem.clone()
+    };
     // What the write returns: the text, completed as the store completes it.
     let mut blocks = new_blocks.to_vec();
     cx.fmt.complete(&mut blocks, &mut r2);
     let same = blocks == new_blocks && r2.styles == *styles;
-    let returned = if same { new_text.to_string() } else { cx.fmt.text_of(&blocks, &r2) };
-    let (pkg, well_formed) = cx.fmt.export_blocks(&blocks, &r2).unwrap_or_else(|e| panic!("{name} {out_name}: {e}"));
+    let returned = if same {
+        new_text.to_string()
+    } else {
+        cx.fmt.text_of(&blocks, &r2)
+    };
+    let (pkg, well_formed) = cx
+        .fmt
+        .export_blocks(&blocks, &r2)
+        .unwrap_or_else(|e| panic!("{name} {out_name}: {e}"));
     out.save(name, out_name, &pkg);
     let (rb, rr, _, _) = cx.fmt.split(&pkg, &RAW).unwrap();
     let re_text = cx.fmt.text_of(&rb, &rr);
@@ -1428,7 +1754,9 @@ pub struct Out {
 
 impl Out {
     pub fn save(&self, name: &str, what: &str, pkg: &[u8]) {
-        let dir = self.dir.join(name.trim_end_matches(&format!(".{}", self.ext)));
+        let dir = self
+            .dir
+            .join(name.trim_end_matches(&format!(".{}", self.ext)));
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join(format!("{what}.{}", self.ext)), pkg).unwrap();
     }
@@ -1436,7 +1764,13 @@ impl Out {
 
 /// The exact text span of an edit: from its unit span when it has one,
 /// else the minimal differing region.
-fn text_span(fmt: &dyn Format, old_text: &str, new_text: &str, rem: &Remainder, ed: &Edit) -> (usize, usize, String) {
+fn text_span(
+    fmt: &dyn Format,
+    old_text: &str,
+    new_text: &str,
+    rem: &Remainder,
+    ed: &Edit,
+) -> (usize, usize, String) {
     if let Some(span) = &ed.span {
         return span.clone();
     }
@@ -1449,9 +1783,17 @@ fn text_span(fmt: &dyn Format, old_text: &str, new_text: &str, rem: &Remainder, 
         let (_, mut maps) = fmt.model().resolve(old_text, rem, CAPS).unwrap();
         let pm = match maps.swap_remove(path[0]).kind {
             hanji_core::model::SrcKind::Para(pm) => pm,
-            hanji_core::model::SrcKind::Table(cells) => cells[path[1]][path[2]].clone().unwrap()[path[3]].clone(),
+            hanji_core::model::SrcKind::Table(cells) => {
+                cells[path[1]][path[2]].clone().unwrap()[path[3]].clone()
+            }
         };
-        let at = |k: usize| if k < pm.units.len() { pm.units[k] } else { pm.mark };
+        let at = |k: usize| {
+            if k < pm.units.len() {
+                pm.units[k]
+            } else {
+                pm.mark
+            }
+        };
         let (a, b) = (at(*s), at(*e));
         let delta = new_text.len() as isize - old_text.len() as isize;
         let nb = (b as isize + delta) as usize;
@@ -1494,17 +1836,33 @@ pub fn edit_span(old_text: &str, new_text: &str) -> (usize, usize, String) {
 
 /// The smallest span of `old_text` whose replacement gives `new_text`: `(start, end, replacement)`.
 pub fn differing_span(old_text: &str, new_text: &str) -> (usize, usize, String) {
-    let pre = old_text.bytes().zip(new_text.bytes()).take_while(|(x, y)| x == y).count();
+    let pre = old_text
+        .bytes()
+        .zip(new_text.bytes())
+        .take_while(|(x, y)| x == y)
+        .count();
     let mut pre = pre;
     while !old_text.is_char_boundary(pre) || !new_text.is_char_boundary(pre) {
         pre -= 1;
     }
     let max_suf = old_text.len().min(new_text.len()) - pre;
-    let mut suf = old_text.bytes().rev().zip(new_text.bytes().rev()).take_while(|(x, y)| x == y).count().min(max_suf);
-    while !old_text.is_char_boundary(old_text.len() - suf) || !new_text.is_char_boundary(new_text.len() - suf) {
+    let mut suf = old_text
+        .bytes()
+        .rev()
+        .zip(new_text.bytes().rev())
+        .take_while(|(x, y)| x == y)
+        .count()
+        .min(max_suf);
+    while !old_text.is_char_boundary(old_text.len() - suf)
+        || !new_text.is_char_boundary(new_text.len() - suf)
+    {
         suf -= 1;
     }
-    (pre, old_text.len() - suf, new_text[pre..new_text.len() - suf].to_string())
+    (
+        pre,
+        old_text.len() - suf,
+        new_text[pre..new_text.len() - suf].to_string(),
+    )
 }
 
 /// One scripted edit of a revision: E1–E9 and the combined one (E10).
@@ -1604,11 +1962,19 @@ pub fn run_corpus_with(
 ) -> Summary {
     let report = std::env::var("HANJI_REPORT").is_ok();
     let mut totals = Totals::default();
-    let mut sum = Summary { files: files.len(), ..Default::default() };
+    let mut sum = Summary {
+        files: files.len(),
+        ..Default::default()
+    };
     for (name, bytes) in files {
-        let (blocks, rem, _, stats) = fmt.split(bytes, &RAW).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let (blocks, rem, _, stats) = fmt
+            .split(bytes, &RAW)
+            .unwrap_or_else(|e| panic!("{name}: {e}"));
         let cx = Cx { fmt, rem: &rem };
-        let d = Doc { blocks, entries: rem.entries.clone() };
+        let d = Doc {
+            blocks,
+            entries: rem.entries.clone(),
+        };
         let text = fmt.text_of(&d.blocks, &rem);
         // The model text round-trips through the format crate.
         assert_eq!(
@@ -1623,21 +1989,44 @@ pub fn run_corpus_with(
             "{name}: GetPut moved entries: {:?}",
             re.report
         );
-        let exported = fmt.engine().export(&text, &re.remainder).unwrap_or_else(|e| panic!("{name}: {e}"));
+        let exported = fmt
+            .engine()
+            .export(&text, &re.remainder)
+            .unwrap_or_else(|e| panic!("{name}: {e}"));
         out.save(name, "getput", &exported);
         out.save(name, "ORIGINAL", bytes);
         let (same, others) = getput_equal(fmt, bytes, &exported);
         if same && others {
             sum.getput_ok += 1;
         } else {
-            sum.failures.push(format!("{name}: GetPut split parts equal={same}, other parts byte-equal={others}"));
+            sum.failures.push(format!(
+                "{name}: GetPut split parts equal={same}, other parts byte-equal={others}"
+            ));
         }
         // Edits.
-        let jobs = edit_jobs(fmt, &d, &cx, &text, edits, all, report.then_some(name.as_str()));
-        for Job { name: ename, what, new_text, expected, touched, span } in jobs {
+        let jobs = edit_jobs(
+            fmt,
+            &d,
+            &cx,
+            &text,
+            edits,
+            all,
+            report.then_some(name.as_str()),
+        );
+        for Job {
+            name: ename,
+            what,
+            new_text,
+            expected,
+            touched,
+            span,
+        } in jobs
+        {
             let short = ename.split_whitespace().next().unwrap().to_string();
-            let mut designs: Vec<(&'static str, hanji_core::Reanchored)> =
-                vec![("C", hanji_core::reanchor_rewrite_in(fmt.model(), &rem, &text, &new_text, CAPS).unwrap())];
+            let mut designs: Vec<(&'static str, hanji_core::Reanchored)> = vec![(
+                "C",
+                hanji_core::reanchor_rewrite_in(fmt.model(), &rem, &text, &new_text, CAPS).unwrap(),
+            )];
             if let Some((s, e, ref new)) = span {
                 let r = hanji_core::reanchor_span_in(fmt.model(), &rem, &text, s, e, new, CAPS)
                     .unwrap_or_else(|e| panic!("{name} {ename}: {e}"));
@@ -1663,10 +2052,12 @@ pub fn run_corpus_with(
                     &format!("{short}-{design}"),
                 );
                 if !run.putget_ids {
-                    sum.failures.push(format!("{name} {ename} {design}: PutGet fails"));
+                    sum.failures
+                        .push(format!("{name} {ename} {design}: PutGet fails"));
                 }
                 if !run.well_formed {
-                    sum.failures.push(format!("{name} {ename} {design}: not well-formed"));
+                    sum.failures
+                        .push(format!("{name} {ename} {design}: not well-formed"));
                 }
                 let rs = totals.runs.entry(design).or_default();
                 rs.0 += 1;
@@ -1680,14 +2071,26 @@ pub fn run_corpus_with(
                     );
                 }
                 totals.by_design.entry(design).or_default().add(&run.tally);
-                totals.per_edit.entry((short.clone(), design)).or_default().add(&run.tally);
+                totals
+                    .per_edit
+                    .entry((short.clone(), design))
+                    .or_default()
+                    .add(&run.tally);
             }
         }
         if report {
-            println!("{name}: blocks {} entries {} {stats}", d.blocks.len(), d.entries.len());
+            println!(
+                "{name}: blocks {} entries {} {stats}",
+                d.blocks.len(),
+                d.entries.len()
+            );
         }
     }
-    println!("GetPut: {}/{} (split parts canonically equal, other parts byte-equal)", sum.getput_ok, files.len());
+    println!(
+        "GetPut: {}/{} (split parts canonically equal, other parts byte-equal)",
+        sum.getput_ok,
+        files.len()
+    );
     for (design, (n, pg, pgi, wf)) in &totals.runs {
         println!("[{design}] runs {n}: PutGet exact {pg}/{n}, with placeholder ids normalised {pgi}/{n}, well-formed {wf}/{n}");
     }
@@ -1701,7 +2104,10 @@ pub fn run_corpus_with(
         sum.touched.insert(design, t.touched);
     }
     for ((ed, design), t) in &totals.per_edit {
-        println!("  {ed:4} [{design:5}] touched {} / {} / {}", t.touched[0], t.touched[1], t.touched[2]);
+        println!(
+            "  {ed:4} [{design:5}] touched {} / {} / {}",
+            t.touched[0], t.touched[1], t.touched[2]
+        );
     }
     sum.runs = totals.runs;
     sum
@@ -1726,16 +2132,25 @@ pub fn neutralised_import_keeps_getput_for_the_rest(fmt: &dyn Format, files: &[(
 }
 
 /// The remainder round-trips through JSON, and exports the same bytes.
-pub fn a_serialized_remainder_exports_the_same_package(fmt: &dyn Format, files: &[(String, Vec<u8>)]) {
+pub fn a_serialized_remainder_exports_the_same_package(
+    fmt: &dyn Format,
+    files: &[(String, Vec<u8>)],
+) {
     let e = fmt.engine();
     for (name, bytes) in files {
         let imp = e.import(bytes, &RAW).unwrap();
         let json = imp.remainder.to_json();
         let back = Remainder::from_json(&json).unwrap_or_else(|e| panic!("{name}: {e}"));
-        assert_eq!(back, imp.remainder, "{name}: the remainder does not round-trip through JSON");
+        assert_eq!(
+            back, imp.remainder,
+            "{name}: the remainder does not round-trip through JSON"
+        );
         let a = e.export(&imp.text, &imp.remainder).unwrap();
         let b = e.export(&imp.text, &back).unwrap();
-        assert_eq!(a, b, "{name}: export from the deserialized remainder differs");
+        assert_eq!(
+            a, b,
+            "{name}: export from the deserialized remainder differs"
+        );
         // GetPut from the deserialized remainder.
         assert_eq!(getput_equal(fmt, bytes, &b), (true, true), "{name}");
     }

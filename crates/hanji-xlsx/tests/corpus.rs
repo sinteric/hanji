@@ -10,7 +10,10 @@ mod common;
 use common::*;
 
 fn raw() -> ImportOptions {
-    ImportOptions { neutralise: false, template: None }
+    ImportOptions {
+        neutralise: false,
+        template: None,
+    }
 }
 
 #[test]
@@ -34,7 +37,11 @@ fn corpus_getput() {
                     continue;
                 }
             };
-            let original = if opts.neutralise { neutralised_original(bytes) } else { bytes.clone() };
+            let original = if opts.neutralise {
+                neutralised_original(bytes)
+            } else {
+                bytes.clone()
+            };
             if let Err(e) = getput(&original, &out) {
                 failures.push(format!("{name} (neutralise {}): {e}", opts.neutralise));
             }
@@ -73,16 +80,26 @@ fn a_serialized_remainder_exports_the_same_package() {
 #[test]
 fn exports_are_well_formed() {
     for (name, bytes) in corpus() {
-        let imp = XlsxEngine.import(&bytes, &ImportOptions::default()).unwrap();
+        let imp = XlsxEngine
+            .import(&bytes, &ImportOptions::default())
+            .unwrap();
         let out = XlsxEngine.export(&imp.text, &imp.remainder).unwrap();
         for p in package::read(&out).unwrap() {
             if p.name.ends_with(".xml") || p.name.ends_with(".rels") {
-                assert!(xml::parse(&p.data).is_ok(), "{name}: {} is not well-formed", p.name);
+                assert!(
+                    xml::parse(&p.data).is_ok(),
+                    "{name}: {} is not well-formed",
+                    p.name
+                );
             }
         }
         // A second import finds nothing more to neutralise, and the same text.
         let again = XlsxEngine.import(&out, &ImportOptions::default()).unwrap();
-        assert!(again.report.neutralised.is_empty(), "{name}: {:?}", again.report.neutralised);
+        assert!(
+            again.report.neutralised.is_empty(),
+            "{name}: {:?}",
+            again.report.neutralised
+        );
         assert_eq!(again.text, imp.text, "{name}");
     }
 }
@@ -91,14 +108,23 @@ fn exports_are_well_formed() {
 /// Excel's cached values), in the original as in the export.
 #[cfg(not(target_os = "wasi"))]
 const LIBREOFFICE_DIFFERS: &[(&str, &str)] = &[
-    ("ExcelPivotTableSample.xlsx", "LibreOffice rebuilds pivot tables with its own labels"),
+    (
+        "ExcelPivotTableSample.xlsx",
+        "LibreOffice rebuilds pivot tables with its own labels",
+    ),
     (
         "GeneralFormatTests.xlsx",
         "General shows 10 digits in Excel (its cached TEXT() results agree), 11 in LibreOffice",
     ),
-    ("StructuredReferences.xlsx", "LibreOffice cannot compute these structured references"),
+    (
+        "StructuredReferences.xlsx",
+        "LibreOffice cannot compute these structured references",
+    ),
     ("xlookup.xlsx", "this LibreOffice has no XLOOKUP"),
-    ("rx_dynamic_array01.xlsx", "the writer cached 0; LibreOffice recalculates"),
+    (
+        "rx_dynamic_array01.xlsx",
+        "the writer cached 0; LibreOffice recalculates",
+    ),
 ];
 
 /// With HANJI_SOFFICE=1: LibreOffice converts every original and every
@@ -114,10 +140,14 @@ fn libreoffice_reads_every_export() {
     let (mut files, mut same, mut total, mut kept, mut shown) = (0, 0, 0, 0, 0);
     let (mut failures, mut changed) = (vec![], vec![]);
     for (name, bytes) in corpus() {
-        let imp = XlsxEngine.import(&bytes, &ImportOptions::default()).unwrap();
+        let imp = XlsxEngine
+            .import(&bytes, &ImportOptions::default())
+            .unwrap();
         let (rem, _) = XlsxEngine::recalculate(&imp.remainder).unwrap();
         let out = XlsxEngine.export(&imp.text, &rem).unwrap();
-        let dir = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("xlsx-corpus-soffice").join(&name);
+        let dir = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+            .join("xlsx-corpus-soffice")
+            .join(&name);
         let before = soffice_csv(&bytes, &dir.join("original"));
         let after = soffice_csv(&out, &dir.join("export"));
         match (before, after) {
@@ -125,9 +155,15 @@ fn libreoffice_reads_every_export() {
                 let (mut n, mut moved) = (0, vec![]);
                 for ((sb, rb), (sa, ra)) in b.iter().zip(&a) {
                     for r in 0..rb.len().max(ra.len()) {
-                        let (xb, xa) = (rb.get(r).cloned().unwrap_or_default(), ra.get(r).cloned().unwrap_or_default());
+                        let (xb, xa) = (
+                            rb.get(r).cloned().unwrap_or_default(),
+                            ra.get(r).cloned().unwrap_or_default(),
+                        );
                         for c in 0..xb.len().max(xa.len()) {
-                            let (vb, va) = (xb.get(c).map_or("", String::as_str), xa.get(c).map_or("", String::as_str));
+                            let (vb, va) = (
+                                xb.get(c).map_or("", String::as_str),
+                                xa.get(c).map_or("", String::as_str),
+                            );
                             n += usize::from(!vb.is_empty() || !va.is_empty());
                             if vb != va {
                                 moved.push(format!(
@@ -151,7 +187,9 @@ fn libreoffice_reads_every_export() {
                     changed.push(format!("{name}: {}", moved.join("; ")));
                 }
             }
-            _ => failures.push(format!("{name}: LibreOffice could not convert the original or the export")),
+            _ => failures.push(format!(
+                "{name}: LibreOffice could not convert the original or the export"
+            )),
         }
         match soffice_agrees(&rem, &out, &dir.join("windows")) {
             Some((s, t, diffs)) => {
@@ -159,12 +197,20 @@ fn libreoffice_reads_every_export() {
                 same += s;
                 total += t;
                 if s != t && !LIBREOFFICE_DIFFERS.iter().any(|(f, _)| *f == name) {
-                    failures.push(format!("{name}: LibreOffice shows {} cells otherwise: {}", t - s, diffs.join("; ")));
+                    failures.push(format!(
+                        "{name}: LibreOffice shows {} cells otherwise: {}",
+                        t - s,
+                        diffs.join("; ")
+                    ));
                 }
                 if report() {
                     println!(
                         "{name}: {s}/{t} cells as LibreOffice shows them{}",
-                        if diffs.is_empty() { String::new() } else { format!("; {}", diffs.join("; ")) }
+                        if diffs.is_empty() {
+                            String::new()
+                        } else {
+                            format!("; {}", diffs.join("; "))
+                        }
                     );
                 }
             }
@@ -172,6 +218,10 @@ fn libreoffice_reads_every_export() {
         }
     }
     println!("LibreOffice: {files} exports converted; {kept}/{shown} cells show as in the original; {same}/{total} cells as the windows show them");
-    failures.extend(changed.iter().map(|c| format!("LibreOffice shows the export otherwise than the original: {c}")));
+    failures.extend(
+        changed
+            .iter()
+            .map(|c| format!("LibreOffice shows the export otherwise than the original: {c}")),
+    );
     assert!(failures.is_empty(), "{}", failures.join("\n"));
 }

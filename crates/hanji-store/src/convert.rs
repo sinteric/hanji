@@ -31,8 +31,8 @@ use hanji_core::{ImportOptions, Kind, Remainder};
 use hanji_docx::format::Theme;
 use hanji_format::vocab::{Border, Color, Fill};
 use hanji_format::{
-    self as fm, Atom, Block, BlockMapKind, Cell, CellPara, Inline, Key, Para, ParaMap, ParaStyle, Parsed, Props, Span,
-    StyleLine, Unit, Value,
+    self as fm, Atom, Block, BlockMapKind, Cell, CellPara, Inline, Key, Para, ParaMap, ParaStyle,
+    Parsed, Props, Span, StyleLine, Unit, Value,
 };
 use serde::Serialize;
 
@@ -165,12 +165,29 @@ impl fmt::Display for Conversion {
             write!(f, "converted {from} → {to}. Not carried across:")?;
         }
         if !self.placeholders.is_empty() {
-            let kinds: Vec<String> = self.placeholder_kinds.iter().map(|(k, n)| format!("{k} ×{n}")).collect();
-            write!(f, "\n- placeholders dropped, {} ({}):", self.placeholders.len(), kinds.join(", "))?;
+            let kinds: Vec<String> = self
+                .placeholder_kinds
+                .iter()
+                .map(|(k, n)| format!("{k} ×{n}"))
+                .collect();
+            write!(
+                f,
+                "\n- placeholders dropped, {} ({}):",
+                self.placeholders.len(),
+                kinds.join(", ")
+            )?;
             for kind in self.placeholder_kinds.keys() {
-                let of_kind: Vec<&Placeholder> = self.placeholders.iter().filter(|p| &p.kind == kind).collect();
+                let of_kind: Vec<&Placeholder> = self
+                    .placeholders
+                    .iter()
+                    .filter(|p| &p.kind == kind)
+                    .collect();
                 for p in of_kind.iter().take(3) {
-                    write!(f, "\n    {} {} ({}): {}", p.kind, p.id, p.location, p.summary)?;
+                    write!(
+                        f,
+                        "\n    {} {} ({}): {}",
+                        p.kind, p.id, p.location, p.summary
+                    )?;
                 }
                 if of_kind.len() > 3 {
                     write!(f, "\n    … {} more {kind}", of_kind.len() - 3)?;
@@ -180,29 +197,58 @@ impl fmt::Display for Conversion {
         if !self.properties.is_empty() {
             write!(f, "\n- properties {to} cannot write, dropped:")?;
             for p in &self.properties {
-                write!(f, "\n    {} ×{} ({}): {}", p.property, p.count, p.at.join(", "), p.reason)?;
+                write!(
+                    f,
+                    "\n    {} ×{} ({}): {}",
+                    p.property,
+                    p.count,
+                    p.at.join(", "),
+                    p.reason
+                )?;
             }
         }
-        let replaced: Vec<&StyleNote> =
-            self.styles.iter().filter(|s| s.fate == StyleFate::Replaced && !s.detail.is_empty()).collect();
+        let replaced: Vec<&StyleNote> = self
+            .styles
+            .iter()
+            .filter(|s| s.fate == StyleFate::Replaced && !s.detail.is_empty())
+            .collect();
         if !replaced.is_empty() {
-            write!(f, "\n- styles {to} has under its own definition (its values differ):")?;
+            write!(
+                f,
+                "\n- styles {to} has under its own definition (its values differ):"
+            )?;
             for s in replaced {
                 let target = s.target.as_deref().unwrap_or(&s.name);
                 write!(f, "\n    {} → {target}: {}", s.name, s.detail)?;
             }
         }
-        let created: Vec<&str> =
-            self.styles.iter().filter(|s| s.fate == StyleFate::Created).map(|s| s.name.as_str()).collect();
+        let created: Vec<&str> = self
+            .styles
+            .iter()
+            .filter(|s| s.fate == StyleFate::Created)
+            .map(|s| s.name.as_str())
+            .collect();
         if !created.is_empty() {
             write!(f, "\n- styles written as new ones: {}", created.join(", "))?;
         }
         if !self.resolved_colours.is_empty() {
             let n: usize = self.resolved_colours.iter().map(|r| r.count).sum();
-            let shown: Vec<String> =
-                self.resolved_colours.iter().take(5).map(|r| format!("{} → {}", r.from, r.to)).collect();
-            let more = if self.resolved_colours.len() > 5 { ", …" } else { "" };
-            write!(f, "\n- theme colours written as #RRGGBB, {n} places ({}{more})", shown.join(", "))?;
+            let shown: Vec<String> = self
+                .resolved_colours
+                .iter()
+                .take(5)
+                .map(|r| format!("{} → {}", r.from, r.to))
+                .collect();
+            let more = if self.resolved_colours.len() > 5 {
+                ", …"
+            } else {
+                ""
+            };
+            write!(
+                f,
+                "\n- theme colours written as #RRGGBB, {n} places ({}{more})",
+                shown.join(", ")
+            )?;
         }
         if !self.not_carried.is_empty() {
             write!(f, "\n- what the file held beyond the text, left behind:")?;
@@ -274,8 +320,11 @@ impl<'a> Convert<'a> {
             } else {
                 Mapped::Target(t.clone())
             }
-        } else if let Some(h) =
-            self.src.styles.heading_level(name).and_then(|k| self.dst.styles.headings[usize::from(k) - 1].clone())
+        } else if let Some(h) = self
+            .src
+            .styles
+            .heading_level(name)
+            .and_then(|k| self.dst.styles.headings[usize::from(k) - 1].clone())
         {
             Mapped::Target(h)
         } else if self.src.styles.default_item.as_deref() == Some(name) {
@@ -314,10 +363,20 @@ impl<'a> Convert<'a> {
     fn differing(&self, name: &str, target: &str) -> String {
         let (a, b) = (self.src.styles.values(name), self.dst.styles.values(target));
         let own: Option<Vec<Key>> = (name != self.src_default)
-            .then(|| self.parsed.doc.styles.iter().find(|l| l.name == name).map(|l| l.props.keys().collect()))
+            .then(|| {
+                self.parsed
+                    .doc
+                    .styles
+                    .iter()
+                    .find(|l| l.name == name)
+                    .map(|l| l.props.keys().collect())
+            })
             .flatten();
         let mut out = vec![];
-        for k in Key::ALL.into_iter().filter(|k| own.as_ref().is_none_or(|o| o.contains(k))) {
+        for k in Key::ALL
+            .into_iter()
+            .filter(|k| own.as_ref().is_none_or(|o| o.contains(k)))
+        {
             let (x, y) = (a.get(k), b.get(k));
             if x != y {
                 let show = |v: Option<&Value>| v.map_or("unset".to_string(), |v| v.to_string());
@@ -335,7 +394,13 @@ impl<'a> Convert<'a> {
         let names: Vec<String> = lines
             .iter()
             .map(|l| l.name.clone())
-            .chain(self.src.styles.default_item.clone().filter(|_| self.has_items))
+            .chain(
+                self.src
+                    .styles
+                    .default_item
+                    .clone()
+                    .filter(|_| self.has_items),
+            )
             .collect();
         for name in names {
             if seen.contains(&name) {
@@ -349,7 +414,12 @@ impl<'a> Convert<'a> {
             };
             let detail = self.differing(&name, &target);
             if !detail.is_empty() {
-                notes.push(StyleNote { name, fate, target: Some(target), detail });
+                notes.push(StyleNote {
+                    name,
+                    fate,
+                    target: Some(target),
+                    detail,
+                });
             }
         }
         self.out.styles.extend(notes);
@@ -362,7 +432,15 @@ impl<'a> Convert<'a> {
         let slot = match self.properties.iter().position(|(k, _)| *k == key) {
             Some(i) => i,
             None => {
-                self.properties.push((key, Property { property, reason, count: 0, at: vec![] }));
+                self.properties.push((
+                    key,
+                    Property {
+                        property,
+                        reason,
+                        count: 0,
+                        at: vec![],
+                    },
+                ));
                 self.properties.len() - 1
             }
         };
@@ -379,10 +457,25 @@ impl<'a> Convert<'a> {
         let theme = self.theme.as_ref()?;
         let said = |from: &Color, to: &Color| (from.to_string(), to.to_string());
         match v {
-            Value::Color(c) => theme.resolve(c).map(|r| (Value::Color(r.clone()), said(c, &r))),
-            Value::Fill(Fill::Color(c)) => theme.resolve(c).map(|r| (Value::Fill(Fill::Color(r.clone())), said(c, &r))),
-            Value::Border(Border::Line { width, style, color }) => theme.resolve(color).map(|r| {
-                (Value::Border(Border::Line { width: *width, style: style.clone(), color: r.clone() }), said(color, &r))
+            Value::Color(c) => theme
+                .resolve(c)
+                .map(|r| (Value::Color(r.clone()), said(c, &r))),
+            Value::Fill(Fill::Color(c)) => theme
+                .resolve(c)
+                .map(|r| (Value::Fill(Fill::Color(r.clone())), said(c, &r))),
+            Value::Border(Border::Line {
+                width,
+                style,
+                color,
+            }) => theme.resolve(color).map(|r| {
+                (
+                    Value::Border(Border::Line {
+                        width: *width,
+                        style: style.clone(),
+                        color: r.clone(),
+                    }),
+                    said(color, &r),
+                )
             }),
             _ => None,
         }
@@ -429,7 +522,11 @@ impl<'a> Convert<'a> {
                 _ => {
                     let place = self.line(off(k));
                     let props = self.props(&u.props, &place);
-                    units.push(Unit { atom: u.atom.clone(), marks: u.marks, props });
+                    units.push(Unit {
+                        atom: u.atom.clone(),
+                        marks: u.marks,
+                        props,
+                    });
                 }
             }
         }
@@ -439,14 +536,22 @@ impl<'a> Convert<'a> {
             .iter()
             .filter_map(|s| {
                 let (start, end) = (index[s.start], index[s.end.min(content.units.len())]);
-                (start < end).then(|| Span { start, end, kind: s.kind.clone() })
+                (start < end).then(|| Span {
+                    start,
+                    end,
+                    kind: s.kind.clone(),
+                })
             })
             .collect();
         Inline { units, spans }
     }
 
     fn placeholder(&mut self, keep: &fm::Keep, location: String) {
-        *self.out.placeholder_kinds.entry(keep.kind.clone()).or_default() += 1;
+        *self
+            .out
+            .placeholder_kinds
+            .entry(keep.kind.clone())
+            .or_default() += 1;
         self.out.placeholders.push(Placeholder {
             id: keep.id.clone(),
             kind: keep.kind.clone(),
@@ -472,7 +577,9 @@ impl<'a> Convert<'a> {
                 let place = self.line(at);
                 let style = match &p.style {
                     ParaStyle::Plain => ParaStyle::Plain,
-                    ParaStyle::Heading(k) if self.dst.styles.headings[usize::from(*k) - 1].is_some() => {
+                    ParaStyle::Heading(k)
+                        if self.dst.styles.headings[usize::from(*k) - 1].is_some() =>
+                    {
                         ParaStyle::Heading(*k)
                     }
                     ParaStyle::Heading(k) => {
@@ -487,7 +594,11 @@ impl<'a> Convert<'a> {
                 };
                 let content = self.inline(&p.content, pm, at);
                 let props = self.props(&p.props, &place);
-                out.push(Block::Para(Para { style, content, props }));
+                out.push(Block::Para(Para {
+                    style,
+                    content,
+                    props,
+                }));
             }
             Block::List(items) => {
                 let maps = match &map.kind {
@@ -561,7 +672,10 @@ impl<'a> Convert<'a> {
                     Cell::Up => Cell::Up,
                     Cell::Left => Cell::Left,
                     Cell::Text(paras) => {
-                        let pms = cells.and_then(|m| m.get(r)).and_then(|row| row.get(c)).and_then(|x| x.as_ref());
+                        let pms = cells
+                            .and_then(|m| m.get(r))
+                            .and_then(|row| row.get(c))
+                            .and_then(|x| x.as_ref());
                         let mut out = Vec::with_capacity(paras.len());
                         for (k, p) in paras.iter().enumerate() {
                             let pm = pms.and_then(|ps| ps.get(k));
@@ -594,15 +708,27 @@ impl<'a> Convert<'a> {
                     .collect()
             })
             .collect();
-        fm::Table { style, rows, boxes, place: place_of_table }
+        fm::Table {
+            style,
+            rows,
+            boxes,
+            place: place_of_table,
+        }
     }
 }
 
 /// The text of `rem`'s revision `text`, written for `to`: the converted
 /// text (valid for the target's blank package) and what it left behind.
-pub fn prepare(text: &str, rem: &Remainder, from: Format, to: Format) -> Result<(String, Conversion)> {
+pub fn prepare(
+    text: &str,
+    rem: &Remainder,
+    from: Format,
+    to: Format,
+) -> Result<(String, Conversion)> {
     let parsed = fm::parse_with(text, &names(rem)).map_err(|d| Error::invalid(&d))?;
-    let imp = to.engine().import(&blank::package(to), &ImportOptions::default())?;
+    let imp = to
+        .engine()
+        .import(&blank::package(to), &ImportOptions::default())?;
     let dst_doc = fm::parse(&imp.text).map_err(|d| Error::invalid(&d))?;
     let dst_default = imp.remainder.styles.default_paragraph.clone();
     let mut c = Convert {
@@ -613,10 +739,20 @@ pub fn prepare(text: &str, rem: &Remainder, from: Format, to: Format) -> Result<
         dst: &imp.remainder,
         parsed: &parsed,
         theme: (from == Format::Docx).then(|| Theme::read(&rem.parts)),
-        has_items: parsed.doc.blocks.iter().any(|b| matches!(b, Block::List(_))),
+        has_items: parsed
+            .doc
+            .blocks
+            .iter()
+            .any(|b| matches!(b, Block::List(_))),
         src_default: rem.styles.default_paragraph.clone(),
         dst_default,
-        dst_names: imp.remainder.styles.paragraph.iter().map(|s| (s.name.to_lowercase(), s.name.clone())).collect(),
+        dst_names: imp
+            .remainder
+            .styles
+            .paragraph
+            .iter()
+            .map(|s| (s.name.to_lowercase(), s.name.clone()))
+            .collect(),
         mapped: HashMap::new(),
         created: vec![],
         out: Conversion::new(from, to),
@@ -627,7 +763,10 @@ pub fn prepare(text: &str, rem: &Remainder, from: Format, to: Format) -> Result<
     doc.front.format = to.name().to_string();
     if let Some(t) = doc.front.template.take() {
         c.out.not_carried.push(NotCarried {
-            what: format!("template \"{t}\" (the converted file starts from {}'s blank package)", to.name()),
+            what: format!(
+                "template \"{t}\" (the converted file starts from {}'s blank package)",
+                to.name()
+            ),
             count: 1,
             parts: vec![],
         });
@@ -644,8 +783,16 @@ pub fn prepare(text: &str, rem: &Remainder, from: Format, to: Format) -> Result<
         let line = parsed.doc.styles.iter().find(|l| l.name == name);
         let props = line.map_or_else(Props::new, |l| l.props.clone());
         let props = c.props(&props, &format!("style \"{name}\""));
-        styles.push(StyleLine { name: name.clone(), props });
-        c.out.styles.push(StyleNote { name, fate: StyleFate::Created, target: None, detail: String::new() });
+        styles.push(StyleLine {
+            name: name.clone(),
+            props,
+        });
+        c.out.styles.push(StyleNote {
+            name,
+            fate: StyleFate::Created,
+            target: None,
+            detail: String::new(),
+        });
     }
     doc.styles = styles;
     for (_, p) in std::mem::take(&mut c.properties) {
@@ -654,13 +801,20 @@ pub fn prepare(text: &str, rem: &Remainder, from: Format, to: Format) -> Result<
     for ((from, to), count) in std::mem::take(&mut c.resolved) {
         c.out.resolved_colours.push(Resolved { from, to, count });
     }
-    c.out.not_carried.extend(not_carried(rem, from, c.has_items));
+    c.out
+        .not_carried
+        .extend(not_carried(rem, from, c.has_items));
     let out = c.out;
     Ok((fm::serialize(&doc), out))
 }
 
 /// The source revision as the package of format `to`, and the report.
-pub fn export(text: &str, rem: &Remainder, from: Format, to: Format) -> Result<(Vec<u8>, Conversion)> {
+pub fn export(
+    text: &str,
+    rem: &Remainder,
+    from: Format,
+    to: Format,
+) -> Result<(Vec<u8>, Conversion)> {
     let (candidate, conversion) = prepare(text, rem, from, to)?;
     let mut ws = Workspace::new(MemStorage::new());
     let opened = ws.create(DocType::Document, Some(to), None)?;
@@ -668,10 +822,14 @@ pub fn export(text: &str, rem: &Remainder, from: Format, to: Format) -> Result<(
         e.message = format!("the text cannot be written as {}: {}", to.name(), e.message);
         e
     };
-    ws.write(&opened.doc_id, opened.revision, &candidate).map_err(failed)?;
+    ws.write(&opened.doc_id, opened.revision, &candidate)
+        .map_err(failed)?;
     let doc = ws.doc(&opened.doc_id)?;
     let (written, rem) = ws.revision(&doc, doc.head)?;
-    let bytes = to.engine().export(&written, &rem).map_err(|e| failed(e.into()))?;
+    let bytes = to
+        .engine()
+        .export(&written, &rem)
+        .map_err(|e| failed(e.into()))?;
     Ok((bytes, conversion))
 }
 
@@ -680,7 +838,11 @@ pub fn refuse_across(from: Format, to: Format) -> Result<()> {
     if from.doc_type() == to.doc_type() {
         return Ok(());
     }
-    let same: Vec<&str> = Format::ALL.iter().filter(|f| f.doc_type() == from.doc_type()).map(|f| f.name()).collect();
+    let same: Vec<&str> = Format::ALL
+        .iter()
+        .filter(|f| f.doc_type() == from.doc_type())
+        .map(|f| f.name())
+        .collect();
     Err(Error::new(
         Code::Unsupported,
         format!(
@@ -739,20 +901,32 @@ fn not_carried(rem: &Remainder, from: Format, has_items: bool) -> Vec<NotCarried
             .shell
             .first()
             .and_then(|s| serde_json::from_str::<hanji_hwpx::PackageShell>(s).ok())
-            .map_or(0, |s| s.sections.iter().filter(|x| x.start_run.is_some()).count());
+            .map_or(0, |s| {
+                s.sections.iter().filter(|x| x.start_run.is_some()).count()
+            });
         if sections > 0 {
             counts.insert(SECTIONS, sections);
         }
     }
-    let mut out: Vec<NotCarried> =
-        counts.into_iter().map(|(what, count)| NotCarried { what: what.to_string(), count, parts: vec![] }).collect();
+    let mut out: Vec<NotCarried> = counts
+        .into_iter()
+        .map(|(what, count)| NotCarried {
+            what: what.to_string(),
+            count,
+            parts: vec![],
+        })
+        .collect();
     let mut parts: BTreeMap<&'static str, Vec<String>> = BTreeMap::new();
     for p in &rem.parts {
         if let Some(what) = part_content(&p.name, from, has_items) {
             parts.entry(what).or_default().push(p.name.clone());
         }
     }
-    out.extend(parts.into_iter().map(|(what, parts)| NotCarried { what: what.to_string(), count: parts.len(), parts }));
+    out.extend(parts.into_iter().map(|(what, parts)| NotCarried {
+        what: what.to_string(),
+        count: parts.len(),
+        parts,
+    }));
     out
 }
 
@@ -764,7 +938,13 @@ fn part_content(name: &str, from: Format, has_items: bool) -> Option<&'static st
         Format::Docx => {
             if any(&["word/header", "word/footer"]) {
                 Some("headers and footers")
-            } else if any(&["word/media/", "word/embeddings/", "word/charts/", "word/diagrams/", "word/drawings/"]) {
+            } else if any(&[
+                "word/media/",
+                "word/embeddings/",
+                "word/charts/",
+                "word/diagrams/",
+                "word/drawings/",
+            ]) {
                 Some("pictures, charts and embedded objects")
             } else if name.starts_with("docProps/") {
                 Some("document properties (author, dates, statistics)")

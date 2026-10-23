@@ -4,7 +4,9 @@
 
 use std::collections::{BTreeSet, HashMap};
 
-use hanji_core::{Block, Entry, KeepIds, Kind, ListDefs, ListItem, Meta, Para, StyleDef, StyleSet, Table};
+use hanji_core::{
+    Block, Entry, KeepIds, Kind, ListDefs, ListItem, Meta, Para, StyleDef, StyleSet, Table,
+};
 use hanji_format::styled::{self, StyleTable};
 use hanji_format::{Atom, Cell, CellPara, Inline, Keep, Key, Marks, Props, Unit};
 use hanji_package::clip;
@@ -93,7 +95,10 @@ struct Mark(usize, u64, u64);
 impl<'a> Importer<'a> {
     pub fn new(header: &'a Header) -> Self {
         let styles = header.style_set();
-        let table = StyleTable { default: Some(styles.default_paragraph.clone()), lines: styles.lines() };
+        let table = StyleTable {
+            default: Some(styles.default_paragraph.clone()),
+            lines: styles.lines(),
+        };
         Importer {
             scope: Scope::new(),
             header,
@@ -118,8 +123,13 @@ impl<'a> Importer<'a> {
 
     pub fn finish(mut self, blocks: Vec<Block>) -> Split {
         // Each tracked paragraph also records how many paragraphs its change has.
-        let is_tracked =
-            |e: &Entry| e.kind == Kind::Bkeep && e.meta.keep.as_ref().is_some_and(|k| k.kind == "tracked-change");
+        let is_tracked = |e: &Entry| {
+            e.kind == Kind::Bkeep
+                && e.meta
+                    .keep
+                    .as_ref()
+                    .is_some_and(|k| k.kind == "tracked-change")
+        };
         let mut sizes: std::collections::HashMap<String, usize> = Default::default();
         for e in self.entries.iter().filter(|e| is_tracked(e)) {
             *sizes.entry(e.meta.aux[0].clone()).or_default() += 1;
@@ -132,10 +142,24 @@ impl<'a> Importer<'a> {
             .tracked_ids
             .iter()
             .map(|id| {
-                (id.clone(), self.header.tracked.get(id).cloned().unwrap_or_else(|| format!("tracked change {id}")))
+                (
+                    id.clone(),
+                    self.header
+                        .tracked
+                        .get(id)
+                        .cloned()
+                        .unwrap_or_else(|| format!("tracked change {id}")),
+                )
             })
             .collect();
-        Split { blocks, entries: self.entries, styles: self.styles, next_id: self.next_id, stats: self.stats, tracked }
+        Split {
+            blocks,
+            entries: self.entries,
+            styles: self.styles,
+            next_id: self.next_id,
+            stats: self.stats,
+            tracked,
+        }
     }
 
     fn checkpoint(&self) -> Mark {
@@ -185,7 +209,17 @@ impl<'a> Importer<'a> {
         let id = self.next_id;
         self.next_id += 1;
         let seq = self.seq();
-        self.entries.push(Entry { id, kind, xml, fp, path: path.to_vec(), start, end, seq, meta });
+        self.entries.push(Entry {
+            id,
+            kind,
+            xml,
+            fp,
+            path: path.to_vec(),
+            start,
+            end,
+            seq,
+            meta,
+        });
         self.entries.len() - 1
     }
 
@@ -200,9 +234,25 @@ impl<'a> Importer<'a> {
     ) -> Keep {
         let fpv = self.fp(&[Some(el)]);
         let id = self.keep_ids.next(&fpv);
-        let keep = Keep { id, kind: kind_name.to_string(), summary: self.summary(el) };
-        let meta = Meta { keep: Some(keep.clone()), run, ..Default::default() };
-        self.entry(kind, vec![el.to_xml()], fpv, path, pos, pos.map(|p| p + 1), meta);
+        let keep = Keep {
+            id,
+            kind: kind_name.to_string(),
+            summary: self.summary(el),
+        };
+        let meta = Meta {
+            keep: Some(keep.clone()),
+            run,
+            ..Default::default()
+        };
+        self.entry(
+            kind,
+            vec![el.to_xml()],
+            fpv,
+            path,
+            pos,
+            pos.map(|p| p + 1),
+            meta,
+        );
         keep
     }
 
@@ -212,14 +262,18 @@ impl<'a> Importer<'a> {
             let mut found = None;
             e.walk(&mut |x| {
                 if found.is_none() && x.is("hp:shapeComment") {
-                    found = Some(clip(&x.text_of(&["hp:shapeComment"]), 40)).filter(|s| !s.is_empty());
+                    found =
+                        Some(clip(&x.text_of(&["hp:shapeComment"]), 40)).filter(|s| !s.is_empty());
                 }
             });
             found
         };
         let s = match el.local() {
             "tbl" => {
-                let (r, c) = (el.get("rowCnt").unwrap_or_default(), el.get("colCnt").unwrap_or_default());
+                let (r, c) = (
+                    el.get("rowCnt").unwrap_or_default(),
+                    el.get("colCnt").unwrap_or_default(),
+                );
                 format!("table {r}×{c}: {}", text(el, 40))
             }
             "pic" => described(el).unwrap_or_else(|| "picture".into()),
@@ -271,7 +325,11 @@ impl<'a> Importer<'a> {
         self.scope = hanji_package::xml::scope_of(sec);
         if k > 0 {
             // The section starts before its first block, wherever that goes.
-            let meta = Meta { tag: "hwpx:section".into(), aux: vec![k.to_string()], ..Default::default() };
+            let meta = Meta {
+                tag: "hwpx:section".into(),
+                aux: vec![k.to_string()],
+                ..Default::default()
+            };
             let f = format!("section {k}|{}", self.fp(&[Some(&sec.shell())]));
             self.entry(Kind::Bmarker, vec![], f, &[blocks.len()], None, None, meta);
         }
@@ -306,7 +364,10 @@ impl<'a> Importer<'a> {
 
     fn top_para(&mut self, p: &Element, blocks: &mut Vec<Block>) -> Result<(), String> {
         if p.get("pageBreak").as_deref() == Some("1") {
-            let content = Inline { units: vec![Unit::new(Atom::PageBreak, Marks::NONE)], spans: vec![] };
+            let content = Inline {
+                units: vec![Unit::new(Atom::PageBreak, Marks::NONE)],
+                spans: vec![],
+            };
             blocks.push(Block::Para(Para {
                 props: Default::default(),
                 style: self.styles.default_paragraph.clone(),
@@ -366,7 +427,13 @@ impl<'a> Importer<'a> {
         if !has_tracked_change(p) {
             // A paragraph that lies inside a change holds none of its marks.
             let keep = e.meta.keep.as_mut().unwrap();
-            keep.summary = clip(&format!("inside a tracked change: {}", clip(&p.text_of(&["hp:t"]), 40)), 80);
+            keep.summary = clip(
+                &format!(
+                    "inside a tracked change: {}",
+                    clip(&p.text_of(&["hp:t"]), 40)
+                ),
+                80,
+            );
         }
         Block::Keep(k.id)
     }
@@ -384,10 +451,13 @@ impl<'a> Importer<'a> {
                         match c {
                             Node::El(t) if t.is("hp:tbl") => tbls.push(t),
                             // Spaces after a table lay the line out; they stay in the paragraph.
-                            Node::El(t) if t.is("hp:t") && t.attrs.is_empty() && spaces_only(t) => {}
+                            Node::El(t) if t.is("hp:t") && t.attrs.is_empty() && spaces_only(t) => {
+                            }
                             Node::El(c)
                                 if c.is("hp:ctrl")
-                                    && ctrl_kind(c).is_some_and(|k| MARKER_CTRLS.contains(&k.name.as_str())) => {}
+                                    && ctrl_kind(c).is_some_and(|k| {
+                                        MARKER_CTRLS.contains(&k.name.as_str())
+                                    }) => {}
                             n if is_blank(n) => {}
                             _ => return Ok(None),
                         }
@@ -425,13 +495,19 @@ impl<'a> Importer<'a> {
                 // text) and the layout cache (export may drop it).
                 let mut shown = anchor.clone();
                 shown.remove_attr("pageBreak");
-                shown.children.retain(|n| !matches!(n, Node::El(e) if e.is("hp:linesegarray")));
+                shown
+                    .children
+                    .retain(|n| !matches!(n, Node::El(e) if e.is("hp:linesegarray")));
                 let f = self.fp(&[Some(&shown)]);
                 ("hwpx:anchor", vec![anchor.to_xml()], f)
             } else {
                 ("hwpx:join", vec![], "hwpx:join".into())
             };
-            let meta = Meta { tag: tag.into(), aux: vec![group.to_string(), k.to_string()], ..Default::default() };
+            let meta = Meta {
+                tag: tag.into(),
+                aux: vec![group.to_string(), k.to_string()],
+                ..Default::default()
+            };
             self.entry(Kind::Tbl, xml, f, &[at], None, None, meta);
         }
         self.next_group += 1;
@@ -446,25 +522,42 @@ impl<'a> Importer<'a> {
         let mut fshell = shell.clone();
         fshell.remove_attr("rowCnt");
         fshell.remove_attr("colCnt");
-        let f = self.fp(&std::iter::once(Some(&fshell)).chain(head.iter().map(|e| Some(*e))).collect::<Vec<_>>());
-        let xml = std::iter::once(shell.to_xml()).chain(head.iter().map(|e| e.to_xml())).collect();
+        let f = self.fp(&std::iter::once(Some(&fshell))
+            .chain(head.iter().map(|e| Some(*e)))
+            .collect::<Vec<_>>());
+        let xml = std::iter::once(shell.to_xml())
+            .chain(head.iter().map(|e| e.to_xml()))
+            .collect();
         let (rows_n, cols_n) = dims(tbl);
-        let meta = Meta { aux: vec![rows_n.to_string(), cols_n.to_string()], ..Default::default() };
+        let meta = Meta {
+            aux: vec![rows_n.to_string(), cols_n.to_string()],
+            ..Default::default()
+        };
         self.entry(Kind::Tbl, xml, f, &[bi], None, None, meta);
         let mut rows: Vec<Vec<Option<Cell>>> = vec![vec![None; cols_n]; rows_n];
         let mut boxes: Vec<Vec<Props>> = vec![vec![Props::new(); cols_n]; rows_n];
         for (ri, tr) in tbl.elements().filter(|e| e.is("hp:tr")).enumerate() {
             let trs = tr.shell();
             let f = self.fp(&[Some(&trs)]);
-            self.entry(Kind::Tr, vec![trs.to_xml()], f, &[bi, ri], None, None, Meta::default());
+            self.entry(
+                Kind::Tr,
+                vec![trs.to_xml()],
+                f,
+                &[bi, ri],
+                None,
+                None,
+                Meta::default(),
+            );
             for tc in tr.elements().filter(|e| e.is("hp:tc")) {
                 let (c, r, cs, rs) = cell_place(tc).expect("checked by table_reason");
                 let sub = tc.child("hp:subList").expect("checked by table_reason");
                 let rest: Vec<&Element> = tc.elements().filter(|e| !e.is("hp:subList")).collect();
                 let sub_shell = sub.shell();
                 let tcs = tc.shell();
-                let xml =
-                    [tcs.to_xml(), sub_shell.to_xml()].into_iter().chain(rest.iter().map(|e| e.to_xml())).collect();
+                let xml = [tcs.to_xml(), sub_shell.to_xml()]
+                    .into_iter()
+                    .chain(rest.iter().map(|e| e.to_xml()))
+                    .collect();
                 // The fingerprint leaves out what the text shows: the cell's box.
                 let mut tcs_rest = tcs.clone();
                 tcs_rest.remove_attr("borderFillIDRef");
@@ -472,7 +565,11 @@ impl<'a> Importer<'a> {
                 sub_rest.remove_attr("vertAlign");
                 let kept: Vec<Option<&Element>> = [Some(&tcs_rest), Some(&sub_rest)]
                     .into_iter()
-                    .chain(rest.iter().filter(|e| !e.is("hp:cellAddr") && !e.is("hp:cellSpan")).map(|e| Some(*e)))
+                    .chain(
+                        rest.iter()
+                            .filter(|e| !e.is("hp:cellAddr") && !e.is("hp:cellSpan"))
+                            .map(|e| Some(*e)),
+                    )
                     .collect();
                 let f = self.fp(&kept);
                 self.entry(Kind::Tc, xml, f, &[bi, r, c], None, None, Meta::default());
@@ -481,7 +578,11 @@ impl<'a> Importer<'a> {
                     let k = paras.len();
                     let para = self.para(p, &[bi, r, c, k])?;
                     let style = (para.style != self.styles.default_paragraph).then_some(para.style);
-                    paras.push(CellPara { props: para.props, style, content: para.content });
+                    paras.push(CellPara {
+                        props: para.props,
+                        style,
+                        content: para.content,
+                    });
                 }
                 rows[r][c] = Some(Cell::Text(paras));
                 boxes[r][c] = self.header.cell_box(tc, sub).diff(&styled::box_default());
@@ -494,12 +595,19 @@ impl<'a> Importer<'a> {
                 }
             }
         }
-        let rows: Vec<Vec<Cell>> =
-            rows.into_iter().map(|r| r.into_iter().map(|c| c.expect("covered")).collect()).collect();
+        let rows: Vec<Vec<Cell>> = rows
+            .into_iter()
+            .map(|r| r.into_iter().map(|c| c.expect("covered")).collect())
+            .collect();
         if boxes.iter().flatten().all(Props::is_empty) {
             boxes.clear();
         }
-        Ok(Some(Table { boxes, style: None, rows, place: Default::default() }))
+        Ok(Some(Table {
+            boxes,
+            style: None,
+            rows,
+            place: Default::default(),
+        }))
     }
 
     // ------------------------------------------------------------ paragraphs
@@ -508,9 +616,13 @@ impl<'a> Importer<'a> {
         let n = |k: &str| p.get(k).and_then(|v| v.parse::<u32>().ok());
         let sid = n("styleIDRef").unwrap_or(0);
         let style = self.header.style_or_missing(sid);
-        if self.header.style(sid).is_none() && self.styles.paragraph_name(&sid.to_string()).is_none() {
+        if self.header.style(sid).is_none()
+            && self.styles.paragraph_name(&sid.to_string()).is_none()
+        {
             // A style id missing from header.xml: the text names it by its id.
-            self.styles.paragraph.push(StyleDef::new(sid.to_string(), sid.to_string()));
+            self.styles
+                .paragraph
+                .push(StyleDef::new(sid.to_string(), sid.to_string()));
         }
         let ppr = n("paraPrIDRef").unwrap_or(style.para_pr);
         let shell = p.shell();
@@ -537,17 +649,32 @@ impl<'a> Importer<'a> {
         } else {
             format!("{}|{}", canon(&rest, &self.scope), hidden(ppr))
         };
-        let xml = std::iter::once(shell.to_xml()).chain(lines.map(|x| x.to_xml())).collect();
+        let xml = std::iter::once(shell.to_xml())
+            .chain(lines.map(|x| x.to_xml()))
+            .collect();
         let aux = match item {
             Some((_, num, lvl)) => vec![num.to_string(), lvl.to_string()],
             None => vec![String::new(), String::new()],
         };
-        let meta = Meta { style: Some(sid.to_string()), item: item.map(|i| i.0), aux, ..Default::default() };
+        let meta = Meta {
+            style: Some(sid.to_string()),
+            item: item.map(|i| i.0),
+            aux,
+            ..Default::default()
+        };
         let pidx = self.entry(Kind::Ppr, xml, f, path, None, None, meta);
         // What the paragraph sets beyond its style (§5.2).
-        let name = self.styles.paragraph_name(&sid.to_string()).unwrap_or(&style.name).to_string();
+        let name = self
+            .styles
+            .paragraph_name(&sid.to_string())
+            .unwrap_or(&style.name)
+            .to_string();
         let base = self.style_values(&name);
-        let props = self.header.para_values(ppr).only(&styled::PARA_OWN).diff(&base);
+        let props = self
+            .header
+            .para_values(ppr)
+            .only(&styled::PARA_OWN)
+            .diff(&base);
         self.text_base = base.only(&Key::TEXT);
         self.buf.clear();
         self.unit_cp.clear();
@@ -557,25 +684,44 @@ impl<'a> Importer<'a> {
                 Node::El(e) if e.is("hp:linesegarray") => {}
                 Node::El(e) => {
                     let pos = self.buf.len();
-                    let keep = self.keep_entry(Kind::Keep, e, path, Some(pos), None, &keep_kind(&e.name));
+                    let keep =
+                        self.keep_entry(Kind::Keep, e, path, Some(pos), None, &keep_kind(&e.name));
                     self.buf.push(Unit::new(Atom::Keep(keep), Marks::NONE));
                     self.unit_cp.push(u32::MAX);
                 }
                 n if is_blank(n) => {}
-                _ => return Err("text or a comment directly inside <hp:p> is not supported yet".into()),
+                _ => {
+                    return Err(
+                        "text or a comment directly inside <hp:p> is not supported yet".into(),
+                    )
+                }
             }
         }
-        let mut content = Inline { units: std::mem::take(&mut self.buf), spans: vec![] };
+        let mut content = Inline {
+            units: std::mem::take(&mut self.buf),
+            spans: vec![],
+        };
         content.normalize();
         // The layout cache, and where it sits among the paragraph's children.
-        let lines_at = p.elements().position(|e| e.is("hp:linesegarray")).unwrap_or(0);
+        let lines_at = p
+            .elements()
+            .position(|e| e.is("hp:linesegarray"))
+            .unwrap_or(0);
         let key = layout_key(sid, ppr, &content);
-        self.entries[pidx].meta.aux.extend([key, lines_at.to_string(), char_key(&self.unit_cp)]);
+        self.entries[pidx]
+            .meta
+            .aux
+            .extend([key, lines_at.to_string(), char_key(&self.unit_cp)]);
         // A paragraph without text shows none of it, and keeps it (§5.2).
         self.entries[pidx].meta.unshown = !styled::shows(&content) && !props.is_empty();
         self.stats.list_items += item.is_some() as usize;
         let item = item.map(|i| i.0);
-        Ok(Para { style: name, content, item, props })
+        Ok(Para {
+            style: name,
+            content,
+            item,
+            props,
+        })
     }
 
     /// The list item a paragraph shape makes: the item, its list and level.
@@ -591,11 +737,27 @@ impl<'a> Importer<'a> {
             }
             if !stack.is_empty() || *margin == num {
                 stack.push(lvl);
-                return Some((ListItem { ordered, level: stack.len() - 1, first: false }, num, lvl));
+                return Some((
+                    ListItem {
+                        ordered,
+                        level: stack.len() - 1,
+                        first: false,
+                    },
+                    num,
+                    lvl,
+                ));
             }
         }
         self.list = Some((num, vec![lvl]));
-        Some((ListItem { ordered, level: 0, first: true }, num, lvl))
+        Some((
+            ListItem {
+                ordered,
+                level: 0,
+                first: true,
+            },
+            num,
+            lvl,
+        ))
     }
 
     fn push(&mut self, atom: Atom, marks: Marks) {
@@ -603,17 +765,29 @@ impl<'a> Importer<'a> {
     }
 
     fn run(&mut self, r: &Element, path: &[usize], style: &Style) -> Result<(), String> {
-        let cp = r.get("charPrIDRef").and_then(|v| v.parse::<u32>().ok()).unwrap_or(style.char_pr);
+        let cp = r
+            .get("charPrIDRef")
+            .and_then(|v| v.parse::<u32>().ok())
+            .unwrap_or(style.char_pr);
         let marks = Marks(self.header.flags(cp).0 & !self.header.flags(style.char_pr).0);
-        let text_props = self.header.char_values(cp).only(&Key::TEXT).diff(&self.text_base);
+        let text_props = self
+            .header
+            .char_values(cp)
+            .only(&Key::TEXT)
+            .diff(&self.text_base);
         let shell = r.shell();
         let mut rest = shell.clone();
         rest.remove_attr("charPrIDRef");
-        let trivial = rest.attrs.is_empty() && self.header.char_rest(cp) == self.header.char_rest(style.char_pr);
+        let trivial = rest.attrs.is_empty()
+            && self.header.char_rest(cp) == self.header.char_rest(style.char_pr);
         let f = if trivial {
             String::new()
         } else {
-            format!("{}|{}", canon(&rest, &self.scope), self.header.char_rest(cp))
+            format!(
+                "{}|{}",
+                canon(&rest, &self.scope),
+                self.header.char_rest(cp)
+            )
         };
         let start = self.buf.len();
         let run_xml = shell.to_xml();
@@ -624,7 +798,10 @@ impl<'a> Importer<'a> {
             path,
             Some(start),
             None,
-            Meta { marks, ..Default::default() },
+            Meta {
+                marks,
+                ..Default::default()
+            },
         );
         let run_id = self.entries[idx].id;
         let mut tabs = vec![];
@@ -633,17 +810,37 @@ impl<'a> Importer<'a> {
             let c = match n {
                 Node::El(c) => c,
                 n if is_blank(n) => continue,
-                _ => return Err("text or a comment directly inside <hp:run> is not supported yet".into()),
+                _ => {
+                    return Err(
+                        "text or a comment directly inside <hp:run> is not supported yet".into(),
+                    )
+                }
             };
             let is_t = c.is("hp:t") && t_modellable(c);
             if is_t {
                 // A new `hp:t` where the export would not start one by itself.
                 if prev_t || !c.attrs.is_empty() || c.children.is_empty() {
                     let ts = c.shell();
-                    let f = if c.attrs.is_empty() { String::new() } else { self.fp(&[Some(&ts)]) };
-                    let meta = Meta { run: Some(run_id), tag: "hp:t".into(), ..Default::default() };
+                    let f = if c.attrs.is_empty() {
+                        String::new()
+                    } else {
+                        self.fp(&[Some(&ts)])
+                    };
+                    let meta = Meta {
+                        run: Some(run_id),
+                        tag: "hp:t".into(),
+                        ..Default::default()
+                    };
                     let at = self.buf.len();
-                    self.entry(Kind::Rmarker, vec![ts.to_xml()], f, path, Some(at), Some(at), meta);
+                    self.entry(
+                        Kind::Rmarker,
+                        vec![ts.to_xml()],
+                        f,
+                        path,
+                        Some(at),
+                        Some(at),
+                        meta,
+                    );
                 }
                 for n in &c.children {
                     match n {
@@ -668,14 +865,25 @@ impl<'a> Importer<'a> {
                                     ..Default::default()
                                 };
                                 let (at, f) = (self.buf.len(), self.fp(&[Some(x)]));
-                                self.entry(Kind::Rmarker, vec![x.to_xml()], f, path, Some(at), Some(at), meta);
+                                self.entry(
+                                    Kind::Rmarker,
+                                    vec![x.to_xml()],
+                                    f,
+                                    path,
+                                    Some(at),
+                                    Some(at),
+                                    meta,
+                                );
                             }
                         },
                         _ => unreachable!("t_modellable"),
                     }
                 }
-            } else if let Some(k) =
-                c.is("hp:ctrl").then(|| ctrl_kind(c)).flatten().filter(|k| MARKER_CTRLS.contains(&k.name.as_str()))
+            } else if let Some(k) = c
+                .is("hp:ctrl")
+                .then(|| ctrl_kind(c))
+                .flatten()
+                .filter(|k| MARKER_CTRLS.contains(&k.name.as_str()))
             {
                 let meta = Meta {
                     run: Some(run_id),
@@ -685,7 +893,15 @@ impl<'a> Importer<'a> {
                     ..Default::default()
                 };
                 let (at, f) = (self.buf.len(), self.fp(&[Some(c)]));
-                self.entry(Kind::Marker, vec![c.to_xml(), run_xml.clone()], f, path, Some(at), Some(at), meta);
+                self.entry(
+                    Kind::Marker,
+                    vec![c.to_xml(), run_xml.clone()],
+                    f,
+                    path,
+                    Some(at),
+                    Some(at),
+                    meta,
+                );
             } else {
                 let kind = match c.name.as_str() {
                     "hp:ctrl" => ctrl_kind(c).map_or("control".into(), |k| keep_kind(&k.name)),
@@ -693,7 +909,8 @@ impl<'a> Importer<'a> {
                 };
                 if c.is("hp:tbl") {
                     self.stats.tables_kept += 1;
-                    let why = table_reason(c).unwrap_or_else(|| "shares its paragraph with text or objects".into());
+                    let why = table_reason(c)
+                        .unwrap_or_else(|| "shares its paragraph with text or objects".into());
                     self.stats.kept_reasons.push(why);
                 }
                 let pos = self.buf.len();
@@ -721,12 +938,18 @@ impl<'a> Importer<'a> {
 fn check_namespaces(p: &Element) -> Result<(), String> {
     let mut bad = None;
     p.walk(&mut |e| {
-        if bad.is_none() && e.attrs.iter().any(|a| hanji_package::xml::ns_prefix(&a.0).is_some()) {
+        if bad.is_none()
+            && e.attrs
+                .iter()
+                .any(|a| hanji_package::xml::ns_prefix(&a.0).is_some())
+        {
             bad = Some(e.name.clone());
         }
     });
     match bad {
-        Some(n) => Err(format!("a namespace declaration on <{n}> inside a section is not supported yet")),
+        Some(n) => Err(format!(
+            "a namespace declaration on <{n}> inside a section is not supported yet"
+        )),
         None => Ok(()),
     }
 }
@@ -736,13 +959,19 @@ fn check_namespaces(p: &Element) -> Result<(), String> {
 /// run that goes on with other content, and the paragraph without it.
 fn split_section_start(p: &Element) -> Option<(Element, bool, Element)> {
     let k = p.children.iter().position(|n| matches!(n, Node::El(_)))?;
-    let Node::El(run) = &p.children[k] else { return None };
+    let Node::El(run) = &p.children[k] else {
+        return None;
+    };
     if !run.is("hp:run") {
         return None;
     }
-    let settings = |n: &Node| matches!(n, Node::El(e) if e.is("hp:secPr") || e.is("hp:ctrl")) || is_blank(n);
+    let settings =
+        |n: &Node| matches!(n, Node::El(e) if e.is("hp:secPr") || e.is("hp:ctrl")) || is_blank(n);
     let n = run.children.iter().take_while(|n| settings(n)).count();
-    if !run.children[..n].iter().any(|n| matches!(n, Node::El(e) if e.is("hp:secPr"))) {
+    if !run.children[..n]
+        .iter()
+        .any(|n| matches!(n, Node::El(e) if e.is("hp:secPr")))
+    {
         return None;
     }
     let rest_empty = run.children[n..]
@@ -766,9 +995,13 @@ fn split_section_start(p: &Element) -> Option<(Element, bool, Element)> {
 /// tabs, fixed and non-breaking spaces, and zero-width marks.
 fn t_modellable(t: &Element) -> bool {
     t.children.iter().all(|n| match n {
-        Node::Text(s) => unescape(s).chars().all(|c| c as u32 >= 0x20 && char_element(c).is_none()),
+        Node::Text(s) => unescape(s)
+            .chars()
+            .all(|c| c as u32 >= 0x20 && char_element(c).is_none()),
         Node::El(x) if x.is("hp:lineBreak") => x.attrs.is_empty() && x.children.is_empty(),
-        Node::El(x) if t_char(&x.name).is_some() => x.children.is_empty() && (x.is("hp:tab") || x.attrs.is_empty()),
+        Node::El(x) if t_char(&x.name).is_some() => {
+            x.children.is_empty() && (x.is("hp:tab") || x.attrs.is_empty())
+        }
         Node::El(x) => T_MARKERS.contains(&x.name.as_str()) && x.children.is_empty(),
         _ => false,
     })
@@ -776,7 +1009,9 @@ fn t_modellable(t: &Element) -> bool {
 
 /// An `hp:t` of spaces, or empty.
 fn spaces_only(t: &Element) -> bool {
-    t.children.iter().all(|n| matches!(n, Node::Text(s) if unescape(s).chars().all(|c| c == ' ')))
+    t.children
+        .iter()
+        .all(|n| matches!(n, Node::Text(s) if unescape(s).chars().all(|c| c == ' ')))
 }
 
 /// `rowCnt` × `colCnt` of a table.
@@ -808,7 +1043,9 @@ pub fn table_reason(tbl: &Element) -> Option<String> {
     for n in &tbl.children {
         match n {
             Node::El(e) if e.is("hp:tr") => past_rows = true,
-            Node::El(e) if past_rows => return Some(format!("table-level {} after a row", e.local())),
+            Node::El(e) if past_rows => {
+                return Some(format!("table-level {} after a row", e.local()))
+            }
             Node::El(_) => {}
             n if is_blank(n) => {}
             _ => return Some("text or comment in a table".into()),
@@ -823,7 +1060,9 @@ pub fn table_reason(tbl: &Element) -> Option<String> {
         for n in &tr.children {
             match n {
                 Node::El(tc) if tc.is("hp:tc") => {
-                    let Some((c, r, cs, rs)) = cell_place(tc) else { return Some("cell without an address".into()) };
+                    let Some((c, r, cs, rs)) = cell_place(tc) else {
+                        return Some("cell without an address".into());
+                    };
                     if r != ri {
                         return Some("cell address outside its row".into());
                     }
@@ -837,11 +1076,16 @@ pub fn table_reason(tbl: &Element) -> Option<String> {
                             }
                         }
                     }
-                    let subs: Vec<&Element> = tc.elements().filter(|e| e.is("hp:subList")).collect();
+                    let subs: Vec<&Element> =
+                        tc.elements().filter(|e| e.is("hp:subList")).collect();
                     if subs.len() != 1 {
                         return Some("cell without one subList".into());
                     }
-                    if subs[0].children.iter().any(|n| !matches!(n, Node::El(p) if p.is("hp:p")) && !is_blank(n)) {
+                    if subs[0]
+                        .children
+                        .iter()
+                        .any(|n| !matches!(n, Node::El(p) if p.is("hp:p")) && !is_blank(n))
+                    {
                         return Some("cell holds something other than paragraphs".into());
                     }
                     if subs[0].elements().next().is_none() {
@@ -873,9 +1117,15 @@ pub fn char_key(unit_cp: &[u32]) -> String {
 /// for: its style, paragraph shape, text and marks. Export drops the cache
 /// when any of them, or its character shapes ([`char_key`]), changed.
 pub fn layout_key(style: u32, para_pr: u32, content: &Inline) -> String {
-    let units = content.units.iter().flat_map(|u| [hanji_core::model::key(&u.atom) as u64, u.marks.0 as u64]);
+    let units = content
+        .units
+        .iter()
+        .flat_map(|u| [hanji_core::model::key(&u.atom) as u64, u.marks.0 as u64]);
     let values = [style as u64, para_pr as u64].into_iter().chain(units);
-    format!("{:016x}", hanji_core::remainder::fnv1a(values.flat_map(u64::to_le_bytes)))
+    format!(
+        "{:016x}",
+        hanji_core::remainder::fnv1a(values.flat_map(u64::to_le_bytes))
+    )
 }
 
 #[cfg(test)]
@@ -888,20 +1138,33 @@ mod tests {
         let p = fragment("<hp:p><hp:run charPrIDRef=\"0\"><hp:secPr/><hp:ctrl><hp:colPr/></hp:ctrl></hp:run><hp:run charPrIDRef=\"1\"><hp:t>a</hp:t></hp:run></hp:p>");
         let (run, merged, rest) = split_section_start(&p).unwrap();
         assert!(run.child("hp:secPr").is_some() && !merged);
-        assert_eq!(rest.to_xml(), "<hp:p><hp:run charPrIDRef=\"1\"><hp:t>a</hp:t></hp:run></hp:p>");
+        assert_eq!(
+            rest.to_xml(),
+            "<hp:p><hp:run charPrIDRef=\"1\"><hp:t>a</hp:t></hp:run></hp:p>"
+        );
         let p = fragment("<hp:p><hp:run><hp:secPr/><hp:ctrl><hp:colPr/></hp:ctrl><hp:tbl/><hp:t/></hp:run></hp:p>");
         let (run, merged, rest) = split_section_start(&p).unwrap();
-        assert_eq!(run.to_xml(), "<hp:run><hp:secPr/><hp:ctrl><hp:colPr/></hp:ctrl></hp:run>");
+        assert_eq!(
+            run.to_xml(),
+            "<hp:run><hp:secPr/><hp:ctrl><hp:colPr/></hp:ctrl></hp:run>"
+        );
         assert!(merged);
-        assert_eq!(rest.to_xml(), "<hp:p><hp:run><hp:tbl/><hp:t/></hp:run></hp:p>");
+        assert_eq!(
+            rest.to_xml(),
+            "<hp:p><hp:run><hp:tbl/><hp:t/></hp:run></hp:p>"
+        );
         let p = fragment("<hp:p><hp:run><hp:t>a</hp:t><hp:secPr/></hp:run></hp:p>");
         assert!(split_section_start(&p).is_none());
     }
 
     #[test]
     fn t_with_colliding_characters_is_not_modellable() {
-        assert!(t_modellable(&fragment("<hp:t>a<hp:tab width=\"4000\"/>b<hp:lineBreak/><hp:nbSpace/></hp:t>")));
+        assert!(t_modellable(&fragment(
+            "<hp:t>a<hp:tab width=\"4000\"/>b<hp:lineBreak/><hp:nbSpace/></hp:t>"
+        )));
         assert!(!t_modellable(&fragment("<hp:t>a\u{a0}b</hp:t>")));
-        assert!(!t_modellable(&fragment("<hp:t>a<hp:insertBegin Id=\"1\"/></hp:t>")));
+        assert!(!t_modellable(&fragment(
+            "<hp:t>a<hp:insertBegin Id=\"1\"/></hp:t>"
+        )));
     }
 }

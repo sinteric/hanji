@@ -41,7 +41,10 @@ pub struct SheetSpec {
 }
 
 fn esc(s: &str) -> String {
-    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+    s.replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
 }
 
 fn serial(d: &str) -> f64 {
@@ -83,16 +86,24 @@ pub fn build(sheets: &[SheetSpec]) -> Vec<u8> {
             for (ci, c) in t.cols.iter().enumerate() {
                 let k = intern(&c.name, &mut sst);
                 refs += 1;
-                rows.entry(t.row).or_default().push((t.col + ci as u32, format!(" t=\"s\"><v>{k}</v>")));
+                rows.entry(t.row)
+                    .or_default()
+                    .push((t.col + ci as u32, format!(" t=\"s\"><v>{k}</v>")));
             }
             for (ri, r) in t.rows.iter().enumerate() {
                 let rr = t.row + 1 + ri as u32;
                 for (ci, c) in t.cols.iter().enumerate() {
                     let s = style(&c.format, &mut formats);
-                    let sa = if s == 0 { String::new() } else { format!(" s=\"{s}\"") };
+                    let sa = if s == 0 {
+                        String::new()
+                    } else {
+                        format!(" s=\"{s}\"")
+                    };
                     let col = t.col + ci as u32;
                     if let Some(f) = &c.formula {
-                        rows.entry(rr).or_default().push((col, format!("{sa}><f>{}</f>", esc(f))));
+                        rows.entry(rr)
+                            .or_default()
+                            .push((col, format!("{sa}><f>{}</f>", esc(f))));
                         continue;
                     }
                     let body = match r.get(ci).unwrap_or(&V::Empty) {
@@ -108,12 +119,20 @@ pub fn build(sheets: &[SheetSpec]) -> Vec<u8> {
                     rows.entry(rr).or_default().push((col, body));
                 }
             }
-            let (c1, r1) = (t.col + t.cols.len() as u32 - 1, t.row + (t.rows.len() as u32).max(1));
+            let (c1, r1) = (
+                t.col + t.cols.len() as u32 - 1,
+                t.row + (t.rows.len() as u32).max(1),
+            );
             if first {
                 max = (t.col, t.row, c1, r1);
                 first = false;
             } else {
-                max = (max.0.min(t.col), max.1.min(t.row), max.2.max(c1), max.3.max(r1));
+                max = (
+                    max.0.min(t.col),
+                    max.1.min(t.row),
+                    max.2.max(c1),
+                    max.3.max(r1),
+                );
             }
             table_id += 1;
             let range = format!("{}{}:{}{r1}", col_letters(t.col), t.row, col_letters(c1));
@@ -143,24 +162,38 @@ pub fn build(sheets: &[SheetSpec]) -> Vec<u8> {
             data.push_str("</row>");
         }
         let mine: Vec<&(usize, String, String)> = tables_xml.iter().filter(|t| t.0 == si).collect();
-        let parts_xml: String = (1..=mine.len()).map(|k| format!("<tablePart r:id=\"rId{k}\"/>")).collect();
+        let parts_xml: String = (1..=mine.len())
+            .map(|k| format!("<tablePart r:id=\"rId{k}\"/>"))
+            .collect();
         let dim = if first {
             "A1".to_string()
         } else {
-            format!("{}{}:{}{}", col_letters(max.0), max.1, col_letters(max.2), max.3)
+            format!(
+                "{}{}:{}{}",
+                col_letters(max.0),
+                max.1,
+                col_letters(max.2),
+                max.3
+            )
         };
         let sheet = format!(
             "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><dimension ref=\"{dim}\"/><sheetViews><sheetView workbookViewId=\"0\"/></sheetViews><sheetFormatPr defaultRowHeight=\"15\"/><sheetData>{data}</sheetData><pageMargins left=\"0.7\" right=\"0.7\" top=\"0.75\" bottom=\"0.75\" header=\"0.3\" footer=\"0.3\"/>{}</worksheet>",
             if mine.is_empty() { String::new() } else { format!("<tableParts count=\"{}\">{parts_xml}</tableParts>", mine.len()) }
         );
-        parts.push((format!("xl/worksheets/sheet{}.xml", si + 1), sheet.into_bytes()));
+        parts.push((
+            format!("xl/worksheets/sheet{}.xml", si + 1),
+            sheet.into_bytes(),
+        ));
         if !mine.is_empty() {
             let rels: String = mine
                 .iter()
                 .enumerate()
                 .map(|(k, t)| format!("<Relationship Id=\"rId{}\" Type=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships/table\" Target=\"../tables/{}\"/>", k + 1, t.1.rsplit('/').next().unwrap()))
                 .collect();
-            parts.push((format!("xl/worksheets/_rels/sheet{}.xml.rels", si + 1), rels_doc(&rels)));
+            parts.push((
+                format!("xl/worksheets/_rels/sheet{}.xml.rels", si + 1),
+                rels_doc(&rels),
+            ));
         }
     }
     for (_, name, xml) in &tables_xml {
@@ -177,8 +210,10 @@ pub fn build(sheets: &[SheetSpec]) -> Vec<u8> {
         .filter(|(_, f)| numfmt::builtin_id(f).is_none())
         .map(|(k, f)| (164 + k, f.clone()))
         .collect();
-    let num_fmts: String =
-        custom.iter().map(|(id, f)| format!("<numFmt numFmtId=\"{id}\" formatCode=\"{}\"/>", esc(f))).collect();
+    let num_fmts: String = custom
+        .iter()
+        .map(|(id, f)| format!("<numFmt numFmtId=\"{id}\" formatCode=\"{}\"/>", esc(f)))
+        .collect();
     let xfs: String = formats
         .iter()
         .enumerate()
@@ -197,7 +232,14 @@ pub fn build(sheets: &[SheetSpec]) -> Vec<u8> {
     let sheets_xml: String = sheets
         .iter()
         .enumerate()
-        .map(|(k, s)| format!("<sheet name=\"{}\" sheetId=\"{}\" r:id=\"rId{}\"/>", esc(&s.name), k + 1, k + 1))
+        .map(|(k, s)| {
+            format!(
+                "<sheet name=\"{}\" sheetId=\"{}\" r:id=\"rId{}\"/>",
+                esc(&s.name),
+                k + 1,
+                k + 1
+            )
+        })
         .collect();
     let workbook = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\" standalone=\"yes\"?>\n<workbook xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\" xmlns:r=\"http://schemas.openxmlformats.org/officeDocument/2006/relationships\"><bookViews><workbookView/></bookViews><sheets>{sheets_xml}</sheets><calcPr calcId=\"191029\"/></workbook>"
@@ -227,7 +269,13 @@ pub fn build(sheets: &[SheetSpec]) -> Vec<u8> {
     all.extend(parts);
     let parts: Vec<Part> = all
         .into_iter()
-        .map(|(name, data)| Part { name, data, dos_time: 0x5821 << 16, external_attr: 0, deflate: true })
+        .map(|(name, data)| Part {
+            name,
+            data,
+            dos_time: 0x5821 << 16,
+            external_attr: 0,
+            deflate: true,
+        })
         .collect();
     package::write(&parts).unwrap()
 }
@@ -260,8 +308,12 @@ pub fn round4_seed(book: &serde_json::Value) -> Vec<SheetSpec> {
                     }
                 })
                 .collect();
-            let types: Vec<String> =
-                t["columns"].as_array().unwrap().iter().map(|c| c["type"].as_str().unwrap().to_string()).collect();
+            let types: Vec<String> = t["columns"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|c| c["type"].as_str().unwrap().to_string())
+                .collect();
             let rows = t["rows"]
                 .as_array()
                 .unwrap()
@@ -275,16 +327,27 @@ pub fn round4_seed(book: &serde_json::Value) -> Vec<SheetSpec> {
                         .map(|(k, v)| match v {
                             serde_json::Value::Null => V::Empty,
                             serde_json::Value::Number(n) => V::Num(n.as_f64().unwrap()),
-                            serde_json::Value::String(s) if types[k] == "date" => V::Date(s.clone()),
+                            serde_json::Value::String(s) if types[k] == "date" => {
+                                V::Date(s.clone())
+                            }
                             serde_json::Value::String(s) => V::Text(s.clone()),
                             other => panic!("{other}"),
                         })
                         .collect()
                 })
                 .collect();
-            tables.push(TableSpec { name, col: anchor.col, row: anchor.row, cols, rows });
+            tables.push(TableSpec {
+                name,
+                col: anchor.col,
+                row: anchor.row,
+                cols,
+                rows,
+            });
         }
-        out.push(SheetSpec { name: s["name"].as_str().unwrap().to_string(), tables });
+        out.push(SheetSpec {
+            name: s["name"].as_str().unwrap().to_string(),
+            tables,
+        });
     }
     out
 }

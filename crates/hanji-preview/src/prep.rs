@@ -48,18 +48,24 @@ pub fn prepare(package: &[u8]) -> Result<Vec<u8>, String> {
 }
 
 fn is_xml_in(name: &str, dir: &str) -> bool {
-    name.strip_prefix(dir).is_some_and(|rest| !rest.contains('/') && rest.ends_with(".xml"))
+    name.strip_prefix(dir)
+        .is_some_and(|rest| !rest.contains('/') && rest.ends_with(".xml"))
 }
 
 fn prepare_part(p: &Part) -> Result<Option<Vec<u8>>, String> {
     let theme = is_xml_in(&p.name, "ppt/theme/");
-    let drawn = ["ppt/slides/", "ppt/slideLayouts/", "ppt/slideMasters/"].iter().any(|d| is_xml_in(&p.name, d));
+    let drawn = ["ppt/slides/", "ppt/slideLayouts/", "ppt/slideMasters/"]
+        .iter()
+        .any(|d| is_xml_in(&p.name, d));
     if !theme && !drawn {
         return Ok(None);
     }
     let mut doc = xml::parse(&p.data).map_err(|e| format!("{}: {e}", p.name))?;
-    let changed =
-        if theme { fill_theme_ea(&mut doc.root) } else { split_runs(&mut doc.root) | drop_timing(&mut doc.root) };
+    let changed = if theme {
+        fill_theme_ea(&mut doc.root)
+    } else {
+        split_runs(&mut doc.root) | drop_timing(&mut doc.root)
+    };
     Ok(changed.then(|| xml::write_doc(&doc)))
 }
 
@@ -72,9 +78,17 @@ pub fn fill_theme_ea(theme: &mut Element) -> bool {
         if !e.is("a:fontScheme") {
             return;
         }
-        for (group, hang) in [("a:majorFont", &fonts.major_hang), ("a:minorFont", &fonts.minor_hang)] {
-            let (Some(hang), Some(g)) = (hang, e.child_mut(group)) else { continue };
-            if let Some(ea) = g.child_mut("a:ea").filter(|ea| ea.get("typeface").unwrap_or_default().is_empty()) {
+        for (group, hang) in [
+            ("a:majorFont", &fonts.major_hang),
+            ("a:minorFont", &fonts.minor_hang),
+        ] {
+            let (Some(hang), Some(g)) = (hang, e.child_mut(group)) else {
+                continue;
+            };
+            if let Some(ea) = g
+                .child_mut("a:ea")
+                .filter(|ea| ea.get("typeface").unwrap_or_default().is_empty())
+            {
                 ea.set("typeface", hang);
                 changed = true;
             }
@@ -93,7 +107,11 @@ pub fn drop_timing(root: &mut Element) -> bool {
 pub fn split_runs(root: &mut Element) -> bool {
     let mut changed = false;
     root.walk_mut(&mut |e| {
-        if !e.children.iter().any(|n| matches!(n, Node::El(r) if r.is("a:r"))) {
+        if !e
+            .children
+            .iter()
+            .any(|n| matches!(n, Node::El(r) if r.is("a:r")))
+        {
             return;
         }
         let mut out = Vec::with_capacity(e.children.len());
@@ -118,7 +136,16 @@ pub fn split_runs(root: &mut Element) -> bool {
 fn split_run(r: &Element) -> Option<Vec<Element>> {
     let t = r.child("a:t")?;
     let text = xml::unescape(
-        &t.children.iter().map(|n| if let Node::Text(s) = n { s.as_str() } else { "" }).collect::<String>(),
+        &t.children
+            .iter()
+            .map(|n| {
+                if let Node::Text(s) = n {
+                    s.as_str()
+                } else {
+                    ""
+                }
+            })
+            .collect::<String>(),
     );
     let pieces = script_pieces(&text);
     if pieces.len() < 2 {
@@ -148,7 +175,11 @@ pub fn script_pieces(text: &str) -> Vec<&str> {
     let mut pieces = vec![];
     let (mut start, mut current) = (0, None);
     for (i, c) in text.char_indices() {
-        let ea = if c == ' ' { current.unwrap_or(false) } else { is_east_asian(c) };
+        let ea = if c == ' ' {
+            current.unwrap_or(false)
+        } else {
+            is_east_asian(c)
+        };
         match current {
             Some(k) if k != ea => {
                 pieces.push(&text[start..i]);
@@ -196,8 +227,14 @@ mod tests {
         );
         assert!(fill_theme_ea(&mut t));
         let s = t.to_xml();
-        assert!(s.contains(r#"<a:ea typeface="맑은 고딕"/><a:cs typeface=""/>"#), "{s}");
-        assert!(s.contains(r#"<a:ea typeface="굴림"/>"#), "an author's East Asian font stays: {s}");
+        assert!(
+            s.contains(r#"<a:ea typeface="맑은 고딕"/><a:cs typeface=""/>"#),
+            "{s}"
+        );
+        assert!(
+            s.contains(r#"<a:ea typeface="굴림"/>"#),
+            "an author's East Asian font stays: {s}"
+        );
         assert!(!fill_theme_ea(&mut t));
     }
 
@@ -218,7 +255,11 @@ mod tests {
         assert_eq!(parts.len(), before.len());
         for p in &parts {
             if p.name.starts_with("ppt/slides/slide") {
-                assert!(!String::from_utf8_lossy(&p.data).contains("<p:timing"), "{}", p.name);
+                assert!(
+                    !String::from_utf8_lossy(&p.data).contains("<p:timing"),
+                    "{}",
+                    p.name
+                );
             }
         }
     }

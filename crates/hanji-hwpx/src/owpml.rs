@@ -7,7 +7,10 @@ pub const CONTENT_PART: &str = "Contents/content.hpf";
 
 /// The section number of `Contents/section{N}.xml`.
 pub fn section_number(part: &str) -> Option<u32> {
-    part.strip_prefix("Contents/section")?.strip_suffix(".xml")?.parse().ok()
+    part.strip_prefix("Contents/section")?
+        .strip_suffix(".xml")?
+        .parse()
+        .ok()
 }
 
 /// `hp:ctrl` children that take no room in the text: kept as markers in
@@ -33,7 +36,12 @@ pub const MARKER_CTRLS: &[&str] = &[
 pub const T_MARKERS: &[&str] = &["hp:markpenBegin", "hp:markpenEnd", "hp:titleMark"];
 
 /// Tracked-change marks (`TrackChangeTag`), inside `hp:t`.
-pub const TRACK_MARKS: &[&str] = &["hp:insertBegin", "hp:insertEnd", "hp:deleteBegin", "hp:deleteEnd"];
+pub const TRACK_MARKS: &[&str] = &[
+    "hp:insertBegin",
+    "hp:insertEnd",
+    "hp:deleteBegin",
+    "hp:deleteEnd",
+];
 
 /// Characters an `hp:t` child element stands for.
 pub fn t_char(name: &str) -> Option<char> {
@@ -62,11 +70,13 @@ pub fn keep_kind(name: &str) -> String {
     let local = name.rsplit(':').next().unwrap_or(name);
     match local {
         "tbl" => "table",
-        "pic" | "rect" | "ellipse" | "arc" | "polygon" | "curve" | "connectLine" | "line" | "container" | "textart"
-        | "chart" => "drawing",
+        "pic" | "rect" | "ellipse" | "arc" | "polygon" | "curve" | "connectLine" | "line"
+        | "container" | "textart" | "chart" => "drawing",
         "equation" => "math",
         "ole" => "object",
-        "btn" | "checkBtn" | "radioBtn" | "comboBox" | "listBox" | "edit" | "scrollBar" => "form-control",
+        "btn" | "checkBtn" | "radioBtn" | "comboBox" | "listBox" | "edit" | "scrollBar" => {
+            "form-control"
+        }
         "footNote" => "footnote",
         "endNote" => "endnote",
         "autoNum" => "number",
@@ -128,7 +138,10 @@ pub fn tracked_ids(e: &Element, f: &mut dyn FnMut(String)) {
 /// Whether an element holds a tracked-change mark or a tracked shape change.
 pub fn has_tracked_change(e: &Element) -> bool {
     let mut found = false;
-    e.walk(&mut |x| found |= TRACK_MARKS.contains(&x.name.as_str()) || TC_ATTRS.iter().any(|a| x.attr(a).is_some()));
+    e.walk(&mut |x| {
+        found |=
+            TRACK_MARKS.contains(&x.name.as_str()) || TC_ATTRS.iter().any(|a| x.attr(a).is_some())
+    });
     found
 }
 
@@ -152,9 +165,15 @@ pub fn char_count(p: &Element) -> usize {
                     n += match k {
                         Node::Text(t) => u16s(&hanji_package::xml::unescape(t)),
                         Node::CData(t) => u16s(t),
-                        Node::El(e) if e.is("hp:lineBreak") || t_char(&e.name).is_some_and(|c| c != '\t') => 1,
                         Node::El(e)
-                            if T_MARKERS.contains(&e.name.as_str()) || TRACK_MARKS.contains(&e.name.as_str()) =>
+                            if e.is("hp:lineBreak")
+                                || t_char(&e.name).is_some_and(|c| c != '\t') =>
+                        {
+                            1
+                        }
+                        Node::El(e)
+                            if T_MARKERS.contains(&e.name.as_str())
+                                || TRACK_MARKS.contains(&e.name.as_str()) =>
                         {
                             0
                         }
@@ -179,8 +198,13 @@ pub fn char_count(p: &Element) -> usize {
 pub fn stale_layout(p: &Element) -> Option<String> {
     let lines = p.child("hp:linesegarray")?;
     let len = char_count(p);
-    let past = lines.elements().filter_map(|l| l.get("textpos")?.parse::<usize>().ok()).find(|&t| t > len + 1)?;
-    Some(format!("a line starts at {past}, past the paragraph's end ({len} characters and its end mark)"))
+    let past = lines
+        .elements()
+        .filter_map(|l| l.get("textpos")?.parse::<usize>().ok())
+        .find(|&t| t > len + 1)?;
+    Some(format!(
+        "a line starts at {past}, past the paragraph's end ({len} characters and its end mark)"
+    ))
 }
 
 /// Every paragraph under `e` (itself included, cells and text boxes too)
@@ -211,5 +235,6 @@ pub fn drop_stale_layouts(e: &mut Element) {
 /// Drops a paragraph's own layout cache (`hp:linesegarray`), which Hancom
 /// recomputes when it opens the file.
 pub fn drop_layout(p: &mut Element) {
-    p.children.retain(|n| !matches!(n, Node::El(e) if e.is("hp:linesegarray")));
+    p.children
+        .retain(|n| !matches!(n, Node::El(e) if e.is("hp:linesegarray")));
 }

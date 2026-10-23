@@ -30,8 +30,10 @@ impl Rel {
 }
 
 /// Extensions of macro-enabled Office packages.
-const MACRO_PACKAGES: &[&str] =
-    &[".docm", ".dotm", ".xlsm", ".xltm", ".xlam", ".xlsb", ".pptm", ".potm", ".ppsm", ".ppam", ".sldm"];
+const MACRO_PACKAGES: &[&str] = &[
+    ".docm", ".dotm", ".xlsm", ".xltm", ".xlam", ".xlsb", ".pptm", ".potm", ".ppsm", ".ppam",
+    ".sldm",
+];
 
 /// An embedded package that can carry macros (§8): a macro-enabled
 /// extension, or a zip holding a VBA project.
@@ -39,8 +41,11 @@ pub fn is_macro_package(p: &Part) -> bool {
     let lower = p.name.to_ascii_lowercase();
     MACRO_PACKAGES.iter().any(|x| lower.ends_with(x))
         || (p.data.starts_with(b"PK")
-            && package::read(&p.data)
-                .is_ok_and(|inner| inner.iter().any(|q| q.name.to_ascii_lowercase().ends_with("vbaproject.bin"))))
+            && package::read(&p.data).is_ok_and(|inner| {
+                inner
+                    .iter()
+                    .any(|q| q.name.to_ascii_lowercase().ends_with("vbaproject.bin"))
+            }))
 }
 
 /// `ppt/slides/slide1.xml` → `ppt/slides/_rels/slide1.xml.rels`.
@@ -89,7 +94,9 @@ pub fn relative_target(source: &str, part: &str) -> String {
 
 /// The relationships of `rels` data (a `.rels` part).
 pub fn parse_rels(data: &[u8]) -> Vec<Rel> {
-    let Ok(d) = xml::parse(data) else { return vec![] };
+    let Ok(d) = xml::parse(data) else {
+        return vec![];
+    };
     d.root
         .elements()
         .filter(|e| e.local() == "Relationship")
@@ -104,20 +111,27 @@ pub fn parse_rels(data: &[u8]) -> Vec<Rel> {
 
 /// The relationships of `part` in `parts`.
 pub fn rels_of(parts: &[Part], part: &str) -> Vec<Rel> {
-    package::get(parts, &rels_part(part)).map(parse_rels).unwrap_or_default()
+    package::get(parts, &rels_part(part))
+        .map(parse_rels)
+        .unwrap_or_default()
 }
 
 /// The internal part `part`'s relationship `id` points at.
 pub fn target_of(parts: &[Part], part: &str, id: &str) -> Option<String> {
-    rels_of(parts, part).into_iter().find(|r| r.id == id && !r.external).map(|r| resolve_target(part, &r.target))
+    rels_of(parts, part)
+        .into_iter()
+        .find(|r| r.id == id && !r.external)
+        .map(|r| resolve_target(part, &r.target))
 }
 
 /// A `.rels` part holding `rels`.
 pub fn write_rels(rels: &[Rel]) -> Vec<u8> {
     let mut root = Element::new("Relationships").with_attr("xmlns", RELS_NS);
     for r in rels {
-        let mut e =
-            Element::new("Relationship").with_attr("Id", &r.id).with_attr("Type", &r.ty).with_attr("Target", &r.target);
+        let mut e = Element::new("Relationship")
+            .with_attr("Id", &r.id)
+            .with_attr("Type", &r.ty)
+            .with_attr("Target", &r.target);
         if r.external {
             e = e.with_attr("TargetMode", "External");
         }
@@ -133,7 +147,10 @@ pub fn write_rels(rels: &[Rel]) -> Vec<u8> {
 
 /// A relationship id not in `rels` (`rId1`, `rId2`, …).
 pub fn free_rel_id(rels: &[Rel]) -> String {
-    (1..).map(|k| format!("rId{k}")).find(|id| !rels.iter().any(|r| &r.id == id)).unwrap()
+    (1..)
+        .map(|k| format!("rId{k}"))
+        .find(|id| !rels.iter().any(|r| &r.id == id))
+        .unwrap()
 }
 
 /// Every internal part reachable from the package root through relationships.
@@ -142,7 +159,9 @@ pub fn reachable(parts: &[Part]) -> BTreeSet<String> {
     let mut todo = vec![String::new()];
     while let Some(p) = todo.pop() {
         let rels = if p.is_empty() {
-            package::get(parts, "_rels/.rels").map(parse_rels).unwrap_or_default()
+            package::get(parts, "_rels/.rels")
+                .map(parse_rels)
+                .unwrap_or_default()
         } else {
             rels_of(parts, &p)
         };
@@ -159,7 +178,11 @@ pub fn reachable(parts: &[Part]) -> BTreeSet<String> {
 /// `[Content_Types].xml` with the overrides of `gone` removed and an
 /// override `(part, content type)` added for each of `added`; `None` when
 /// nothing changes.
-pub fn content_types(parts: &[Part], gone: &BTreeSet<String>, added: &[(String, String)]) -> Option<Vec<u8>> {
+pub fn content_types(
+    parts: &[Part],
+    gone: &BTreeSet<String>,
+    added: &[(String, String)],
+) -> Option<Vec<u8>> {
     let data = package::get(parts, CT_PART)?;
     let mut d = xml::parse(data).ok()?;
     let n = d.root.children.len();
@@ -169,12 +192,17 @@ pub fn content_types(parts: &[Part], gone: &BTreeSet<String>, added: &[(String, 
     let mut changed = d.root.children.len() != n;
     for (part, ct) in added {
         let name = format!("/{part}");
-        if d.root.elements().any(|e| e.local() == "Override" && e.get("PartName").as_deref() == Some(name.as_str())) {
+        if d.root
+            .elements()
+            .any(|e| e.local() == "Override" && e.get("PartName").as_deref() == Some(name.as_str()))
+        {
             continue;
         }
-        d.root
-            .children
-            .push(Node::El(Element::new("Override").with_attr("PartName", &name).with_attr("ContentType", ct)));
+        d.root.children.push(Node::El(
+            Element::new("Override")
+                .with_attr("PartName", &name)
+                .with_attr("ContentType", ct),
+        ));
         changed = true;
     }
     changed.then(|| xml::write_doc(&d))
@@ -190,23 +218,46 @@ mod tests {
             resolve_target("ppt/slides/slide1.xml", "../slideLayouts/slideLayout2.xml"),
             "ppt/slideLayouts/slideLayout2.xml"
         );
-        assert_eq!(resolve_target("ppt/presentation.xml", "slides/slide1.xml"), "ppt/slides/slide1.xml");
-        assert_eq!(resolve_target("", "ppt/presentation.xml"), "ppt/presentation.xml");
-        assert_eq!(resolve_target("ppt/slides/slide1.xml", "/ppt/media/a.png"), "ppt/media/a.png");
+        assert_eq!(
+            resolve_target("ppt/presentation.xml", "slides/slide1.xml"),
+            "ppt/slides/slide1.xml"
+        );
+        assert_eq!(
+            resolve_target("", "ppt/presentation.xml"),
+            "ppt/presentation.xml"
+        );
+        assert_eq!(
+            resolve_target("ppt/slides/slide1.xml", "/ppt/media/a.png"),
+            "ppt/media/a.png"
+        );
         assert_eq!(
             relative_target("ppt/slides/slide1.xml", "ppt/slideLayouts/slideLayout2.xml"),
             "../slideLayouts/slideLayout2.xml"
         );
-        assert_eq!(relative_target("ppt/presentation.xml", "ppt/slides/slide9.xml"), "slides/slide9.xml");
-        assert_eq!(rels_part("ppt/slides/slide1.xml"), "ppt/slides/_rels/slide1.xml.rels");
-        assert_eq!(source_of_rels("ppt/slides/_rels/slide1.xml.rels").as_deref(), Some("ppt/slides/slide1.xml"));
+        assert_eq!(
+            relative_target("ppt/presentation.xml", "ppt/slides/slide9.xml"),
+            "slides/slide9.xml"
+        );
+        assert_eq!(
+            rels_part("ppt/slides/slide1.xml"),
+            "ppt/slides/_rels/slide1.xml.rels"
+        );
+        assert_eq!(
+            source_of_rels("ppt/slides/_rels/slide1.xml.rels").as_deref(),
+            Some("ppt/slides/slide1.xml")
+        );
         assert_eq!(source_of_rels("_rels/.rels").as_deref(), Some(""));
     }
 
     #[test]
     fn rels_round_trip() {
         let rels = vec![
-            Rel { id: "rId1".into(), ty: "http://x/slideLayout".into(), target: "../a.xml".into(), external: false },
+            Rel {
+                id: "rId1".into(),
+                ty: "http://x/slideLayout".into(),
+                target: "../a.xml".into(),
+                external: false,
+            },
             Rel {
                 id: "rId3".into(),
                 ty: "http://x/hyperlink".into(),

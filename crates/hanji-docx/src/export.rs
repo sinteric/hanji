@@ -38,9 +38,20 @@ pub struct Fmt {
 
 impl Fmt {
     pub fn new(styles: &StyleSet, theme: Theme) -> Fmt {
-        let table = StyleTable { default: Some(styles.default_paragraph.clone()), lines: styles.lines() };
-        let values = styles.paragraph.iter().map(|d| (d.name.clone(), table.values(Some(&d.name)))).collect();
-        Fmt { theme, values, default: table.default_values() }
+        let table = StyleTable {
+            default: Some(styles.default_paragraph.clone()),
+            lines: styles.lines(),
+        };
+        let values = styles
+            .paragraph
+            .iter()
+            .map(|d| (d.name.clone(), table.values(Some(&d.name))))
+            .collect();
+        Fmt {
+            theme,
+            values,
+            default: table.default_values(),
+        }
     }
 
     fn of(&self, style: &str) -> &Props {
@@ -105,9 +116,15 @@ impl<'a> Exporter<'a> {
         match style {
             Some(s) if !s.is_empty() => s.to_string(),
             _ => {
-                let id = self.at(path, Kind::Ppr).first().and_then(|e| e.meta.style.clone());
+                let id = self
+                    .at(path, Kind::Ppr)
+                    .first()
+                    .and_then(|e| e.meta.style.clone());
                 let id = id.unwrap_or_else(|| self.styles.default_paragraph_id().to_string());
-                self.styles.paragraph_name(&id).unwrap_or(&self.styles.default_paragraph).to_string()
+                self.styles
+                    .paragraph_name(&id)
+                    .unwrap_or(&self.styles.default_paragraph)
+                    .to_string()
             }
         }
     }
@@ -120,11 +137,17 @@ impl<'a> Exporter<'a> {
     }
 
     fn at(&self, path: &[usize], kind: Kind) -> Vec<&'a Entry> {
-        self.by.get(&(path.to_vec(), kind)).cloned().unwrap_or_default()
+        self.by
+            .get(&(path.to_vec(), kind))
+            .cloned()
+            .unwrap_or_default()
     }
 
     fn keep_entry(&self, id: &str) -> Result<&'a Entry, String> {
-        self.keep.get(id).copied().ok_or_else(|| format!("placeholder {id} has no remainder entry"))
+        self.keep
+            .get(id)
+            .copied()
+            .ok_or_else(|| format!("placeholder {id} has no remainder entry"))
     }
 
     /// The body's children.
@@ -138,7 +161,8 @@ impl<'a> Exporter<'a> {
                 Block::Para(p) => {
                     // A list item keeps the paragraph style the remainder has,
                     // unless the text shows styles.
-                    let style = (p.item.is_none() || !p.style.is_empty()).then_some(p.style.as_str());
+                    let style =
+                        (p.item.is_none() || !p.style.is_empty()).then_some(p.style.as_str());
                     let props = self.stated(&p.content, &[bi]).then_some(&p.props);
                     let mut pel = self.para(&p.content, style, &[bi], props)?;
                     if let Some(plan) = self.lists.get(&bi) {
@@ -170,16 +194,31 @@ impl<'a> Exporter<'a> {
 
     /// `w:p` with its properties. `style: None` (a table cell) keeps the
     /// style the remainder has.
-    fn ppr(&self, style: Option<&str>, path: &[usize], props: Option<&Props>) -> Result<Element, String> {
+    fn ppr(
+        &self,
+        style: Option<&str>,
+        path: &[usize],
+        props: Option<&Props>,
+    ) -> Result<Element, String> {
         let mut pel = self.ppr_style(style, path)?;
-        let (Some(f), Some(want)) = (&self.fmt, props) else { return Ok(pel) };
+        let (Some(f), Some(want)) = (&self.fmt, props) else {
+            return Ok(pel);
+        };
         // A paragraph that had no text keeps what it had until the text says.
-        if want.is_empty() && self.at(path, Kind::Ppr).first().is_some_and(|e| e.meta.unshown) {
+        if want.is_empty()
+            && self
+                .at(path, Kind::Ppr)
+                .first()
+                .is_some_and(|e| e.meta.unshown)
+        {
             return Ok(pel);
         }
         let base = f.of(&self.style_at(style, path)).clone();
         let size = base.get(Key::Size).and_then(|v| v.length()).unwrap_or(1000);
-        let stored = pel.child("w:pPr").map(|x| format::ppr_props(x, size)).unwrap_or_default();
+        let stored = pel
+            .child("w:pPr")
+            .map(|x| format::ppr_props(x, size))
+            .unwrap_or_default();
         let shown = stored.only(&styled::PARA_OWN).diff(&base);
         if shown == *want {
             return Ok(pel);
@@ -198,9 +237,12 @@ impl<'a> Exporter<'a> {
     fn ppr_style(&self, style: Option<&str>, path: &[usize]) -> Result<Element, String> {
         let pp = self.at(path, Kind::Ppr);
         let want_id = match style {
-            Some(s) => {
-                Some(self.styles.paragraph_id(s).ok_or_else(|| format!("unknown paragraph style {s:?}"))?.to_string())
-            }
+            Some(s) => Some(
+                self.styles
+                    .paragraph_id(s)
+                    .ok_or_else(|| format!("unknown paragraph style {s:?}"))?
+                    .to_string(),
+            ),
             None => None,
         };
         let default_id = self.styles.default_paragraph_id().to_string();
@@ -212,7 +254,8 @@ impl<'a> Exporter<'a> {
                     let mut x = ppr.take().unwrap_or_else(|| el("w:pPr"));
                     remove_child(&mut x, "w:pStyle");
                     if want != default_id {
-                        x.children.insert(0, node(el("w:pStyle").with_attr("w:val", &want)));
+                        x.children
+                            .insert(0, node(el("w:pStyle").with_attr("w:val", &want)));
                     }
                     ppr = Some(x);
                 }
@@ -244,7 +287,8 @@ impl<'a> Exporter<'a> {
             // it (where the text shows formatting, it names the item's style).
             let new = self.at(&[bi], Kind::Ppr).is_empty() && !self.styles.formatting;
             if let (Some(s), true) = (&self.numbering.list_paragraph, new) {
-                ppr.children.push(node(el("w:pStyle").with_attr("w:val", s)));
+                ppr.children
+                    .push(node(el("w:pStyle").with_attr("w:val", s)));
             }
             pel.children.insert(0, node(ppr));
         }
@@ -253,9 +297,11 @@ impl<'a> Exporter<'a> {
         let num_pr = |num: u32, ilvl: Option<u32>| {
             let mut np = el("w:numPr");
             if let Some(l) = ilvl {
-                np.children.push(node(el("w:ilvl").with_attr("w:val", &l.to_string())));
+                np.children
+                    .push(node(el("w:ilvl").with_attr("w:val", &l.to_string())));
             }
-            np.children.push(node(el("w:numId").with_attr("w:val", &num.to_string())));
+            np.children
+                .push(node(el("w:numId").with_attr("w:val", &num.to_string())));
             np
         };
         match plan {
@@ -275,7 +321,13 @@ impl<'a> Exporter<'a> {
         }
     }
 
-    fn para(&self, p: &Inline, style: Option<&str>, path: &[usize], props: Option<&Props>) -> Result<Element, String> {
+    fn para(
+        &self,
+        p: &Inline,
+        style: Option<&str>,
+        path: &[usize],
+        props: Option<&Props>,
+    ) -> Result<Element, String> {
         let mut pel = self.ppr(style, path, props)?;
         let n = p.units.len();
         let runs = self.at(path, Kind::Run);
@@ -294,7 +346,9 @@ impl<'a> Exporter<'a> {
         // at a mark's edge, a page break) keeps what its run had.
         let revs = self.track.and_then(|t| t.units.get(path));
         if revs.is_some_and(|r| r.len() != n) {
-            return Err(format!("the tracked model of paragraph {path:?} does not match its text"));
+            return Err(format!(
+                "the tracked model of paragraph {path:?} does not match its text"
+            ));
         }
         let eff = match revs {
             Some(r) => r.iter().map(|u| u.eff).collect(),
@@ -311,7 +365,8 @@ impl<'a> Exporter<'a> {
         }
         let markers = self.at(path, Kind::Marker);
         let wraps = self.at(path, Kind::Wrap);
-        let mut bounds: std::collections::HashSet<usize> = markers.iter().map(|m| m.start.unwrap()).collect();
+        let mut bounds: std::collections::HashSet<usize> =
+            markers.iter().map(|m| m.start.unwrap()).collect();
         bounds.extend(zruns.iter().map(|z| z.start.unwrap()));
         for w in &wraps {
             bounds.insert(w.start.unwrap());
@@ -321,15 +376,31 @@ impl<'a> Exporter<'a> {
         // space, an atom) takes what the rest of its run takes when that
         // agrees (it keeps what its run had when the run has nothing else);
         // a new one takes its neighbours' when they agree.
-        let text_base = self.fmt.as_ref().map(|f| f.of(&self.style_at(style, path)).only(&Key::TEXT));
+        let text_base = self
+            .fmt
+            .as_ref()
+            .map(|f| f.of(&self.style_at(style, path)).only(&Key::TEXT));
         let stored = |o: &Entry| -> Props {
-            let (Some(f), Some(b)) = (&self.fmt, &text_base) else { return Props::new() };
-            o.xml.get(1).map(|x| format::rpr_props(&fragment(x), &f.theme).only(&Key::TEXT).diff(b)).unwrap_or_default()
+            let (Some(f), Some(b)) = (&self.fmt, &text_base) else {
+                return Props::new();
+            };
+            o.xml
+                .get(1)
+                .map(|x| {
+                    format::rpr_props(&fragment(x), &f.theme)
+                        .only(&Key::TEXT)
+                        .diff(b)
+                })
+                .unwrap_or_default()
         };
         let want: Vec<Props> = match &text_base {
             None => vec![Props::new(); n],
             Some(_) => {
-                let takes: Vec<Option<&Props>> = p.units.iter().map(|u| u.takes_props().then_some(&u.props)).collect();
+                let takes: Vec<Option<&Props>> = p
+                    .units
+                    .iter()
+                    .map(|u| u.takes_props().then_some(&u.props))
+                    .collect();
                 let mut mates: HashMap<u64, Option<Option<&Props>>> = HashMap::new();
                 for c in 0..n {
                     if let (Some(pr), Some(o)) = (takes[c], owner[c]) {
@@ -359,7 +430,14 @@ impl<'a> Exporter<'a> {
                     .collect()
             }
         };
-        let key = |c: usize| (owner[c].map(|o| o.id), eff[c], revs.map(|r| (r[c].st, &r[c].old_rpr)), &want[c]);
+        let key = |c: usize| {
+            (
+                owner[c].map(|o| o.id),
+                eff[c],
+                revs.map(|r| (r[c].st, &r[c].old_rpr)),
+                &want[c],
+            )
+        };
         let mut segs: Vec<(usize, usize, Option<&Entry>)> = vec![];
         let mut c = 0;
         while c < n {
@@ -385,10 +463,19 @@ impl<'a> Exporter<'a> {
                 .or_else(|| segs.iter().position(|g| g.0 <= s && s < g.1))
                 .or_else(|| (segs.last().is_some_and(|g| g.1 == s)).then(|| segs.len() - 1))
                 .map(Target::Seg)
-                .or_else(|| zruns.iter().find(|z| Some(z.id) == m.meta.run).map(|z| Target::Zrun(z.id)));
+                .or_else(|| {
+                    zruns
+                        .iter()
+                        .find(|z| Some(z.id) == m.meta.run)
+                        .map(|z| Target::Zrun(z.id))
+                });
             match t {
                 Some(t) => rm_at.entry(t).or_default().push(m),
-                None => return Err(format!("a run-internal marker at {path:?}:{s} has no run to live in")),
+                None => {
+                    return Err(format!(
+                        "a run-internal marker at {path:?}:{s} has no run to live in"
+                    ))
+                }
             }
         }
         #[derive(Clone, Copy)]
@@ -432,7 +519,12 @@ impl<'a> Exporter<'a> {
                     }
                     stack.last_mut().unwrap().1.children.push(node(e));
                 }
-                It::Marker(m) => stack.last_mut().unwrap().1.children.push(node(fragment(&m.xml[0]))),
+                It::Marker(m) => stack
+                    .last_mut()
+                    .unwrap()
+                    .1
+                    .children
+                    .push(node(fragment(&m.xml[0]))),
                 It::Pkeep(k) => {
                     for x in &k.xml {
                         stack.last_mut().unwrap().1.children.push(node(fragment(x)));
@@ -452,8 +544,15 @@ impl<'a> Exporter<'a> {
                     stack.last_mut().unwrap().1.children.push(node(r));
                 }
                 It::Seg(si) => {
-                    let mut r =
-                        self.run_el(p, &eff, segs[si], rm_at.get(&Target::Seg(si)).map(Vec::as_slice).unwrap_or(&[]))?;
+                    let mut r = self.run_el(
+                        p,
+                        &eff,
+                        segs[si],
+                        rm_at
+                            .get(&Target::Seg(si))
+                            .map(Vec::as_slice)
+                            .unwrap_or(&[]),
+                    )?;
                     if let Some(f) = &self.fmt {
                         let (a, _, own) = segs[si];
                         let shown = own.map(stored).unwrap_or_default();
@@ -514,7 +613,10 @@ impl<'a> Exporter<'a> {
                 return;
             }
             let (mut t, orig) = match t_attrs.get(*tcount).or(t_attrs.last()) {
-                Some(x) => (x.shell(), (*tcount < t_attrs.len()).then(|| x.text_of(&["w:t"]))),
+                Some(x) => (
+                    x.shell(),
+                    (*tcount < t_attrs.len()).then(|| x.text_of(&["w:t"])),
+                ),
                 None => (el("w:t"), None),
             };
             // A w:t keeps its attributes as they were; changed text that needs it gets preserve.
@@ -544,7 +646,8 @@ impl<'a> Exporter<'a> {
                 }
                 Atom::PageBreak => {
                     flush(&mut buf, &mut r, &mut tcount);
-                    r.children.push(node(el("w:br").with_attr("w:type", "page")));
+                    r.children
+                        .push(node(el("w:br").with_attr("w:type", "page")));
                 }
                 Atom::Keep(k) => {
                     flush(&mut buf, &mut r, &mut tcount);
@@ -553,7 +656,9 @@ impl<'a> Exporter<'a> {
                     }
                 }
                 Atom::NoteRef(_) | Atom::Math(_) => {
-                    return Err("footnotes and math are not supported by the docx engine yet".into())
+                    return Err(
+                        "footnotes and math are not supported by the docx engine yet".into(),
+                    )
                 }
             }
         }
@@ -571,7 +676,11 @@ impl<'a> Exporter<'a> {
         let mut tbl = match te.first() {
             Some(e) => {
                 let mut tbl = assemble(&e.xml);
-                let old = e.meta.style.as_deref().and_then(|id| self.styles.table_style_name(id));
+                let old = e
+                    .meta
+                    .style
+                    .as_deref()
+                    .and_then(|id| self.styles.table_style_name(id));
                 if old != t.style {
                     self.set_table_style(&mut tbl, t.style.as_deref())?;
                 }
@@ -580,11 +689,16 @@ impl<'a> Exporter<'a> {
             None => {
                 let mut tbl = el("w:tbl");
                 let mut pr = el("w:tblPr");
-                pr.children.push(node(el("w:tblW").with_attr("w:w", "0").with_attr("w:type", "auto")));
+                pr.children.push(node(
+                    el("w:tblW")
+                        .with_attr("w:w", "0")
+                        .with_attr("w:type", "auto"),
+                ));
                 tbl.children.push(node(pr));
                 let mut grid = el("w:tblGrid");
                 for _ in &t.rows[0] {
-                    grid.children.push(node(el("w:gridCol").with_attr("w:w", "2000")));
+                    grid.children
+                        .push(node(el("w:gridCol").with_attr("w:w", "2000")));
                 }
                 tbl.children.push(node(grid));
                 self.set_table_style(&mut tbl, t.style.as_deref())?;
@@ -594,7 +708,10 @@ impl<'a> Exporter<'a> {
         self.set_table_place(&mut tbl, &t.place);
         for (ri, row) in t.rows.iter().enumerate() {
             self.bmarkers(&mut tbl, &[bi, ri]);
-            let mut tr = self.at(&[bi, ri], Kind::Tr).first().map_or_else(|| el("w:tr"), |e| assemble(&e.xml));
+            let mut tr = self
+                .at(&[bi, ri], Kind::Tr)
+                .first()
+                .map_or_else(|| el("w:tr"), |e| assemble(&e.xml));
             let mut ci = 0;
             while ci < row.len() {
                 let cell = &row[ci];
@@ -614,8 +731,17 @@ impl<'a> Exporter<'a> {
                 let below_up = t.rows.get(ri + 1).and_then(|r| r.get(ci)) == Some(&Cell::Up);
                 let mut tcpr = merge_props(tcpr, span, *cell == Cell::Up, below_up);
                 if let (Some(f), Cell::Text(_)) = (&self.fmt, cell) {
-                    let shown = tcpr.as_ref().map(format::tcpr_props).unwrap_or_default().diff(&styled::box_default());
-                    let want = t.boxes.get(ri).and_then(|r| r.get(ci)).cloned().unwrap_or_default();
+                    let shown = tcpr
+                        .as_ref()
+                        .map(format::tcpr_props)
+                        .unwrap_or_default()
+                        .diff(&styled::box_default());
+                    let want = t
+                        .boxes
+                        .get(ri)
+                        .and_then(|r| r.get(ci))
+                        .cloned()
+                        .unwrap_or_default();
                     if shown != want {
                         let mut x = tcpr.take().unwrap_or_else(|| el("w:tcPr"));
                         format::apply(&mut x, &shown, &want, format::set_tcpr, &f.theme)?;
@@ -629,9 +755,13 @@ impl<'a> Exporter<'a> {
                     Cell::Text(ps) => {
                         for (k, p) in ps.iter().enumerate() {
                             self.bmarkers(&mut tc, &[bi, ri, ci, k]);
-                            let style = p.style.as_deref().unwrap_or(&self.styles.default_paragraph);
-                            let props = self.stated(&p.content, &[bi, ri, ci, k]).then_some(&p.props);
-                            let mut pel = self.para(&p.content, Some(style), &[bi, ri, ci, k], props)?;
+                            let style =
+                                p.style.as_deref().unwrap_or(&self.styles.default_paragraph);
+                            let props = self
+                                .stated(&p.content, &[bi, ri, ci, k])
+                                .then_some(&p.props);
+                            let mut pel =
+                                self.para(&p.content, Some(style), &[bi, ri, ci, k], props)?;
                             if let Some(t) = self.track {
                                 t.mark(&mut pel, &[bi, ri, ci, k])?;
                             }
@@ -650,7 +780,12 @@ impl<'a> Exporter<'a> {
                             .unwrap_or(1);
                         for k in 0..n {
                             self.bmarkers(&mut tc, &[bi, ri, ci, k]);
-                            tc.children.push(node(self.para(&Inline::default(), None, &[bi, ri, ci, k], None)?));
+                            tc.children.push(node(self.para(
+                                &Inline::default(),
+                                None,
+                                &[bi, ri, ci, k],
+                                None,
+                            )?));
                         }
                         n
                     }
@@ -682,7 +817,10 @@ impl<'a> Exporter<'a> {
     /// differs from what the stored `w:tblPr` shows; an unchanged one keeps
     /// its XML.
     fn set_table_place(&self, tbl: &mut Element, want: &TablePlace) {
-        let shown = tbl.child("w:tblPr").map(format::tblpr_place).unwrap_or_default();
+        let shown = tbl
+            .child("w:tblPr")
+            .map(format::tblpr_place)
+            .unwrap_or_default();
         if shown == *want {
             return;
         }
@@ -696,7 +834,12 @@ impl<'a> Exporter<'a> {
     /// style, written out so that every application draws it.
     fn set_table_style(&self, tbl: &mut Element, style: Option<&str>) -> Result<(), String> {
         let id = match style.or(self.styles.default_table.as_deref()) {
-            Some(s) => Some(self.styles.table_id(s).ok_or_else(|| format!("unknown table style {s:?}"))?.to_string()),
+            Some(s) => Some(
+                self.styles
+                    .table_id(s)
+                    .ok_or_else(|| format!("unknown table style {s:?}"))?
+                    .to_string(),
+            ),
             None => None,
         };
         if tbl.child("w:tblPr").is_none() {
@@ -705,7 +848,8 @@ impl<'a> Exporter<'a> {
         let pr = tbl.child_mut("w:tblPr").unwrap();
         remove_child(pr, "w:tblStyle");
         if let Some(id) = id {
-            pr.children.insert(0, node(el("w:tblStyle").with_attr("w:val", &id)));
+            pr.children
+                .insert(0, node(el("w:tblStyle").with_attr("w:val", &id)));
         }
         Ok(())
     }
@@ -758,7 +902,13 @@ fn set_underline(rpr: &mut Element, want: bool) {
 fn merge_props(tcpr: Option<Element>, span: usize, covered: bool, top: bool) -> Option<Element> {
     let cur_span = grid_span(tcpr.as_ref());
     let has_vm = tcpr.as_ref().is_some_and(|t| t.child("w:vMerge").is_some());
-    let cur_v = has_vm.then(|| if v_merged(tcpr.as_ref()) { "continue" } else { "restart" });
+    let cur_v = has_vm.then(|| {
+        if v_merged(tcpr.as_ref()) {
+            "continue"
+        } else {
+            "restart"
+        }
+    });
     let want_v = if covered {
         Some("continue")
     } else if top {
@@ -773,14 +923,22 @@ fn merge_props(tcpr: Option<Element>, span: usize, covered: bool, top: bool) -> 
     if cur_span != span {
         remove_child(&mut x, "w:gridSpan");
         if span > 1 {
-            insert_ordered(&mut x, el("w:gridSpan").with_attr("w:val", &span.to_string()), TCPR_ORDER);
+            insert_ordered(
+                &mut x,
+                el("w:gridSpan").with_attr("w:val", &span.to_string()),
+                TCPR_ORDER,
+            );
         }
     }
     if cur_v != want_v {
         remove_child(&mut x, "w:vMerge");
         match want_v {
             Some("continue") => insert_ordered(&mut x, el("w:vMerge"), TCPR_ORDER),
-            Some(_) => insert_ordered(&mut x, el("w:vMerge").with_attr("w:val", "restart"), TCPR_ORDER),
+            Some(_) => insert_ordered(
+                &mut x,
+                el("w:vMerge").with_attr("w:val", "restart"),
+                TCPR_ORDER,
+            ),
             None => {}
         }
     }

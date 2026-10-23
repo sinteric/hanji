@@ -113,7 +113,11 @@ mod fs {
                 for ent in rd {
                     let ent = ent.map_err(|e| err("cannot list", &dir, e))?;
                     let name = ent.file_name().to_string_lossy().into_owned();
-                    let key = if rel.is_empty() { name } else { format!("{rel}/{name}") };
+                    let key = if rel.is_empty() {
+                        name
+                    } else {
+                        format!("{rel}/{name}")
+                    };
                     if ent.path().is_dir() {
                         stack.push((ent.path(), key));
                     } else if key.starts_with(prefix) && !key.ends_with(".tmp") {
@@ -137,8 +141,14 @@ mod tests {
         s.put("docs/a/r1.txt", b"t").unwrap();
         s.put("docs/b/doc.json", b"2").unwrap();
         s.put("docs/a/doc.json", b"3").unwrap();
-        assert_eq!(s.get("docs/a/doc.json").unwrap().as_deref(), Some(&b"3"[..]));
-        assert_eq!(s.keys("docs/a/").unwrap(), ["docs/a/doc.json", "docs/a/r1.txt"]);
+        assert_eq!(
+            s.get("docs/a/doc.json").unwrap().as_deref(),
+            Some(&b"3"[..])
+        );
+        assert_eq!(
+            s.keys("docs/a/").unwrap(),
+            ["docs/a/doc.json", "docs/a/r1.txt"]
+        );
         assert_eq!(s.keys("docs/").unwrap().len(), 3);
     }
 

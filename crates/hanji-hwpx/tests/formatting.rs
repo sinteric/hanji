@@ -4,11 +4,19 @@
 //! edits and new styles in `header.xml`, and what the vocabulary or hwpx
 //! cannot hold, refused with the reason.
 
-use hanji_core::{edit, rewrite, Capabilities, Engine, EngineError, ImportOptions, Refusal, Remainder};
+use hanji_core::{
+    edit, rewrite, Capabilities, Engine, EngineError, ImportOptions, Refusal, Remainder,
+};
 use hanji_hwpx::{package, xml, HwpxEngine};
 
-const CAPS: Capabilities =
-    Capabilities { links: false, fields: false, footnotes: false, math: false, formatting: true, table_place: false };
+const CAPS: Capabilities = Capabilities {
+    links: false,
+    fields: false,
+    footnotes: false,
+    math: false,
+    formatting: true,
+    table_place: false,
+};
 
 fn corpus(name: &str) -> Vec<u8> {
     let path = format!("{}/corpus/{name}", env!("CARGO_MANIFEST_DIR"));
@@ -16,20 +24,33 @@ fn corpus(name: &str) -> Vec<u8> {
 }
 
 fn part(pkg: &[u8], name: &str) -> String {
-    String::from_utf8(package::get(&package::read(pkg).unwrap(), name).unwrap().to_vec()).unwrap()
+    String::from_utf8(
+        package::get(&package::read(pkg).unwrap(), name)
+            .unwrap()
+            .to_vec(),
+    )
+    .unwrap()
 }
 
 /// The element `<tag…>…</tag>` (or `<tag…/>`) that holds `text` in `xml`.
 fn around(xml: &str, tag: &str, text: &str) -> String {
-    let at = xml.find(text).unwrap_or_else(|| panic!("{text:?} not in the part"));
+    let at = xml
+        .find(text)
+        .unwrap_or_else(|| panic!("{text:?} not in the part"));
     let open = [format!("<{tag}>"), format!("<{tag} ")]
         .iter()
-        .filter_map(|o| xml[..at + text.len()].rfind(o.as_str()).filter(|k| *k <= at))
+        .filter_map(|o| {
+            xml[..at + text.len()]
+                .rfind(o.as_str())
+                .filter(|k| *k <= at)
+        })
         .max()
         .unwrap_or_else(|| panic!("no <{tag}> before {text:?}"));
     let close = format!("</{tag}>");
-    let end =
-        xml[at..].find(&close).map_or_else(|| xml[open..].find("/>").unwrap() + open + 2, |k| k + at + close.len());
+    let end = xml[at..].find(&close).map_or_else(
+        || xml[open..].find("/>").unwrap() + open + 2,
+        |k| k + at + close.len(),
+    );
     xml[open..end].to_string()
 }
 
@@ -49,7 +70,12 @@ fn consistent(header: &str) {
     root.walk(&mut |e| {
         if let Some(n) = e.get("itemCnt").or_else(|| e.get("fontCnt")) {
             let items: Vec<String> = e.elements().filter_map(|x| x.get("id")).collect();
-            assert_eq!(n.parse::<usize>().unwrap(), e.elements().count(), "{}", e.name);
+            assert_eq!(
+                n.parse::<usize>().unwrap(),
+                e.elements().count(),
+                "{}",
+                e.name
+            );
             let mut ids = items.clone();
             ids.sort();
             ids.dedup();
@@ -64,7 +90,11 @@ fn edits(text: &str, rem: &Remainder, list: &[(&str, &str)]) -> hanji_core::Rean
     let mut last = None;
     for (old, new) in list {
         let e = edit(&r, &t, old, new, CAPS).unwrap_or_else(|e| panic!("{old:?} → {new:?}: {e}"));
-        assert!(e.report.refused.is_empty() && e.report.removed.is_empty(), "{old:?}: {:?}", e.report);
+        assert!(
+            e.report.refused.is_empty() && e.report.removed.is_empty(),
+            "{old:?}: {:?}",
+            e.report
+        );
         (t, r) = (e.text.clone(), e.remainder.clone());
         last = Some(e);
     }
@@ -86,7 +116,10 @@ fn a_file_s_styles_and_direct_formatting_read_back_unchanged() {
     assert!(t.contains("  - 산업용 샘플을 찍어내던 것에서 발전해 시계, 신발, 휴대전화 케이스, 자동차 부속품까지 출력 {style=\"개요 3\" line-spacing=170%}\n"), "{t}");
     // GetPut: header.xml is not written, the section is the same XML.
     let out = HwpxEngine.export(t, &imp.remainder).unwrap();
-    assert_eq!(part(&out, "Contents/header.xml"), part(&pkg, "Contents/header.xml"));
+    assert_eq!(
+        part(&out, "Contents/header.xml"),
+        part(&pkg, "Contents/header.xml")
+    );
     let canon = |p: &[u8]| xml::canon_part(part(p, "Contents/section0.xml").as_bytes()).unwrap();
     assert_eq!(canon(&out), canon(&pkg));
 }
@@ -127,27 +160,55 @@ fn formatting_edits_add_shapes_cloned_from_the_element_s() {
     let mut rem = r.remainder.clone();
     HwpxEngine::complete(&mut blocks, &mut rem);
     let text = HwpxEngine::text_of(&blocks, &rem, None);
-    assert!(text.contains("<style name=\"Callout\" fill=#FFF2CC border-left=\"1.98pt solid #C00000\"/>"), "{text}");
+    assert!(
+        text.contains(
+            "<style name=\"Callout\" fill=#FFF2CC border-left=\"1.98pt solid #C00000\"/>"
+        ),
+        "{text}"
+    );
     let out = HwpxEngine.export(&text, &rem).unwrap();
     // PutGet: the export reads back as the returned text.
-    let back = HwpxEngine.import(&out, &ImportOptions::default()).unwrap().text;
+    let back = HwpxEngine
+        .import(&out, &ImportOptions::default())
+        .unwrap()
+        .text;
     if back != text {
         let (a, b): (Vec<&str>, Vec<&str>) = (back.lines().collect(), text.lines().collect());
         for (k, (x, y)) in a.iter().zip(&b).enumerate() {
-            assert_eq!(x, y, "PutGet\n{}", a[k.saturating_sub(3)..(k + 3).min(a.len())].join("\n"));
+            assert_eq!(
+                x,
+                y,
+                "PutGet\n{}",
+                a[k.saturating_sub(3)..(k + 3).min(a.len())].join("\n")
+            );
         }
     }
     assert_eq!(back, text);
-    let (h0, h1) = (part(&pkg, "Contents/header.xml"), part(&out, "Contents/header.xml"));
-    let (s0, s1) = (part(&pkg, "Contents/section0.xml"), part(&out, "Contents/section0.xml"));
+    let (h0, h1) = (
+        part(&pkg, "Contents/header.xml"),
+        part(&out, "Contents/header.xml"),
+    );
+    let (s0, s1) = (
+        part(&pkg, "Contents/section0.xml"),
+        part(&out, "Contents/section0.xml"),
+    );
     consistent(&h1);
     // A paragraph no edit touched keeps its XML, layout cache and all.
-    assert_eq!(around(&s1, "hp:p", "시제품 제작 시간과"), around(&s0, "hp:p", "시제품 제작 시간과"));
+    assert_eq!(
+        around(&s1, "hp:p", "시제품 제작 시간과"),
+        around(&s0, "hp:p", "시제품 제작 시간과")
+    );
     // The banner cell points at a new border fill, a copy of its own with the fill changed.
-    let (tc0, tc1) = (around(&s0, "hp:tc", "기술의 미래와 전망"), around(&s1, "hp:tc", "기술의 미래와 전망"));
+    let (tc0, tc1) = (
+        around(&s0, "hp:tc", "기술의 미래와 전망"),
+        around(&s1, "hp:tc", "기술의 미래와 전망"),
+    );
     let (b0, b1) = (attr(&tc0, "borderFillIDRef"), attr(&tc1, "borderFillIDRef"));
     assert_ne!(b0, b1);
-    let (f0, f1) = (shape(&h0, "hh:borderFill", &b0), shape(&h1, "hh:borderFill", &b1));
+    let (f0, f1) = (
+        shape(&h0, "hh:borderFill", &b0),
+        shape(&h1, "hh:borderFill", &b1),
+    );
     assert_eq!(
         f1.replace(&format!("id=\"{b1}\""), &format!("id=\"{b0}\"")),
         f0.replace("faceColor=\"#FFF0C3\"", "faceColor=\"#DDEBF7\"")
@@ -155,31 +216,53 @@ fn formatting_edits_add_shapes_cloned_from_the_element_s() {
     // Its run: a copy of its character shape with colour and font changed; the font is added.
     let run = |s: &str| attr(&around(s, "hp:run", "기술의 미래와 전망"), "charPrIDRef");
     let c1 = shape(&h1, "hh:charPr", &run(&s1));
-    assert!(c1.contains("textColor=\"#1F4E79\"") && c1.contains("height=\"2000\""), "{c1}");
+    assert!(
+        c1.contains("textColor=\"#1F4E79\"") && c1.contains("height=\"2000\""),
+        "{c1}"
+    );
     assert!(around(&h1, "hh:fontface", "lang=\"HANGUL\"").contains("face=\"맑은 고딕\""));
     let hangul = around(&h1, "hh:fontface", "lang=\"HANGUL\"");
     assert_eq!(
         attr(&hangul, "fontCnt"),
-        (attr(&around(&h0, "hh:fontface", "lang=\"HANGUL\""), "fontCnt").parse::<u32>().unwrap() + 1).to_string()
+        (attr(&around(&h0, "hh:fontface", "lang=\"HANGUL\""), "fontCnt")
+            .parse::<u32>()
+            .unwrap()
+            + 1)
+        .to_string()
     );
     // The indent: the HwpUnitChar branch holds 10pt, the default branch twice it.
     let p1 = around(&s1, "hp:p", "자동차 부속품까지 출력");
     let pp = shape(&h1, "hh:paraPr", &attr(&p1, "paraPrIDRef"));
     let case = around(&pp, "hp:case", "<hh:margin>");
     assert!(case.contains("<hc:intent value=\"1000\""), "{pp}");
-    assert!(around(&pp, "hp:default", "<hp:default>").contains("<hc:intent value=\"2000\""), "{pp}");
+    assert!(
+        around(&pp, "hp:default", "<hp:default>").contains("<hc:intent value=\"2000\""),
+        "{pp}"
+    );
     // Its layout cache is dropped (Hancom lays it out again); the rest of the paragraph stays.
     assert!(!p1.contains("linesegarray"), "{p1}");
     // The style line: 개요 4 points at a navy character shape, and so does each of its paragraphs.
     let style = around(&h1, "hh:style", "name=\"개요 4\"");
     let navy = attr(&style, "charPrIDRef");
-    assert!(shape(&h1, "hh:charPr", &navy).contains("textColor=\"#1F3864\""), "{style}");
+    assert!(
+        shape(&h1, "hh:charPr", &navy).contains("textColor=\"#1F3864\""),
+        "{style}"
+    );
     let p4 = around(&s1, "hp:p", "3D 프린터로 만들 수 있는 물건은");
-    assert!(shape(&h1, "hh:charPr", &attr(&around(&p4, "hp:run", "3D 프린터로"), "charPrIDRef")).contains("#1F3864"));
+    assert!(shape(
+        &h1,
+        "hh:charPr",
+        &attr(&around(&p4, "hp:run", "3D 프린터로"), "charPrIDRef")
+    )
+    .contains("#1F3864"));
     // The new style: an hh:style with its own paragraph and character shapes, the item in it.
     let callout = around(&h1, "hh:style", "name=\"Callout\"");
     let bf = attr(
-        &around(&shape(&h1, "hh:paraPr", &attr(&callout, "paraPrIDRef")), "hh:border", "borderFillIDRef"),
+        &around(
+            &shape(&h1, "hh:paraPr", &attr(&callout, "paraPrIDRef")),
+            "hh:border",
+            "borderFillIDRef",
+        ),
         "borderFillIDRef",
     );
     let fill = shape(&h1, "hh:borderFill", &bf);
@@ -188,7 +271,10 @@ fn formatting_edits_add_shapes_cloned_from_the_element_s() {
             && fill.contains("<hh:leftBorder type=\"SOLID\" width=\"0.7 mm\" color=\"#C00000\"/>"),
         "{fill}"
     );
-    assert_eq!(attr(&around(&s1, "hp:p", "전문인력 양성"), "styleIDRef"), attr(&callout, "id"));
+    assert_eq!(
+        attr(&around(&s1, "hp:p", "전문인력 양성"), "styleIDRef"),
+        attr(&callout, "id")
+    );
     // A shape two paragraphs ask for is added once: both items had the same one.
     let p2 = around(&s1, "hp:p", "관련 산업에도 도입");
     assert_eq!(attr(&p2, "paraPrIDRef"), attr(&p1, "paraPrIDRef"));
@@ -204,7 +290,8 @@ fn what_the_vocabulary_or_hwpx_cannot_hold_is_refused() {
         other => panic!("{new}: {:?}", other.map(|r| r.text)),
     };
     let refused = |old: &str, new: &str| {
-        let r = rewrite(rem, t, &t.replacen(old, new, 1), CAPS).unwrap_or_else(|e| panic!("{new}: {e}"));
+        let r = rewrite(rem, t, &t.replacen(old, new, 1), CAPS)
+            .unwrap_or_else(|e| panic!("{new}: {e}"));
         match HwpxEngine.export(&r.text, &r.remainder) {
             Err(EngineError::Refused(m)) => m,
             other => panic!("{new}: {:?}", other.map(|_| ())),
@@ -219,17 +306,27 @@ fn what_the_vocabulary_or_hwpx_cannot_hold_is_refused() {
     let m = refused("{fill=#FFF0C3 border-top", "{fill=gradient border-top");
     assert!(m.contains("gradient"), "{m}");
     // A mark is a mark: `bold=no` is not a property of running text.
-    let m = invalid("{align=center font=나눔고딕 size=20pt} |", "{align=center font=나눔고딕 size=20pt bold=no} |");
+    let m = invalid(
+        "{align=center font=나눔고딕 size=20pt} |",
+        "{align=center font=나눔고딕 size=20pt bold=no} |",
+    );
     assert!(m.contains("bold"), "{m}");
     // A new style needs a name no style has; the line of a style the text
     // does not use (본문) was not shown, so it is not changed at once.
-    let line = "<style name=\"개요 4\" indent-left=30pt space-before=3pt font=휴먼명조 size=14pt/>\n";
+    let line =
+        "<style name=\"개요 4\" indent-left=30pt space-before=3pt font=휴먼명조 size=14pt/>\n";
     let m = invalid(line, &format!("{line}<style name=\"본문\" size=9pt/>\n"));
-    assert!(m.contains("\"본문\" is already a style of this file"), "{m}");
+    assert!(
+        m.contains("\"본문\" is already a style of this file"),
+        "{m}"
+    );
     // hwpx has no table styles.
     let m = invalid("| {fill=#FFF0C3", "{style=\"Grid\"}\n| {fill=#FFF0C3");
     assert!(m.contains("table style"), "{m}");
     // Nor a table's own position (docx's table-align, table-indent).
     let m = invalid("| {fill=#FFF0C3", "{table-align=center}\n| {fill=#FFF0C3");
-    assert!(m.contains("table's own position") && m.contains("cannot be written to this file format"), "{m}");
+    assert!(
+        m.contains("table's own position") && m.contains("cannot be written to this file format"),
+        "{m}"
+    );
 }

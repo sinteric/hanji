@@ -21,7 +21,9 @@ fn peak_mb() -> u64 {
     std::fs::read_to_string("/proc/self/status")
         .ok()
         .and_then(|s| {
-            s.lines().find(|l| l.starts_with("VmHWM:")).and_then(|l| l.split_whitespace().nth(1)?.parse::<u64>().ok())
+            s.lines()
+                .find(|l| l.starts_with("VmHWM:"))
+                .and_then(|l| l.split_whitespace().nth(1)?.parse::<u64>().ok())
         })
         .map_or(0, |kb| kb / 1024)
 }
@@ -54,11 +56,18 @@ fn workbook() -> Vec<u8> {
             col("품목", "General", None),
             col("매출", "#,##0", None),
             col("원가", "#,##0", None),
-            col("이익", "#,##0", Some("Big[[#This Row],[매출]]-Big[[#This Row],[원가]]")),
+            col(
+                "이익",
+                "#,##0",
+                Some("Big[[#This Row],[매출]]-Big[[#This Row],[원가]]"),
+            ),
         ],
         rows,
     };
-    build(&[SheetSpec { name: "Data".into(), tables: vec![t] }])
+    build(&[SheetSpec {
+        name: "Data".into(),
+        tables: vec![t],
+    }])
 }
 
 #[test]
@@ -66,25 +75,40 @@ fn a_hundred_thousand_rows() {
     let pkg = workbook();
     let base = peak_mb();
     let mut times = vec![];
-    let mut lap = |what: &'static str, t: Instant| times.push((what, t.elapsed().as_millis(), peak_mb()));
+    let mut lap =
+        |what: &'static str, t: Instant| times.push((what, t.elapsed().as_millis(), peak_mb()));
 
     let t = Instant::now();
     let imp = XlsxEngine.import(&pkg, &ImportOptions::default()).unwrap();
     lap("import", t);
     let lines = imp.text.lines().count();
     assert!(lines < 40, "the structure text has {lines} lines");
-    assert!(imp.text.contains("<table name=\"Big\" range=\"A1:F100001\">"), "{}", imp.text);
+    assert!(
+        imp.text
+            .contains("<table name=\"Big\" range=\"A1:F100001\">"),
+        "{}",
+        imp.text
+    );
 
     // The generator writes no cached values (as openpyxl): compute all 100,000.
     let t = Instant::now();
     let (rem, rc) = XlsxEngine::recalculate(&imp.remainder).unwrap();
     lap("recalculate 100,000 formulas", t);
     assert_eq!((rc.written, rc.left.len()), (ROWS, 0));
-    let imp = hanji_core::Imported { remainder: rem, ..imp };
+    let imp = hanji_core::Imported {
+        remainder: rem,
+        ..imp
+    };
 
     let t = Instant::now();
-    let w = XlsxEngine::window(&imp.remainder, &WindowOf::Table { name: "Big".into(), rows: Some((50_002, 50_101)) })
-        .unwrap();
+    let w = XlsxEngine::window(
+        &imp.remainder,
+        &WindowOf::Table {
+            name: "Big".into(),
+            rows: Some((50_002, 50_101)),
+        },
+    )
+    .unwrap();
     lap("window of 100 rows", t);
     assert_eq!(w.lines().count(), 104, "{w}");
     assert!(
@@ -99,13 +123,35 @@ fn a_hundred_thousand_rows() {
     let t = Instant::now();
     let a = XlsxEngine::apply(&imp.text, &imp.remainder, ops).unwrap();
     lap("set, append and delete rows", t);
-    assert!(a.text.contains("<table name=\"Big\" range=\"A1:F99992\">"), "{}", a.text);
-    let w = XlsxEngine::window(&a.remainder, &WindowOf::Table { name: "Big".into(), rows: Some((99_991, 99_992)) })
-        .unwrap();
-    assert!(w.contains("| 99992 | 2026-12-31 | 강남 | new | 1,000 | 400 | 600 |"), "{w}");
-    let w = XlsxEngine::window(&a.remainder, &WindowOf::Table { name: "Big".into(), rows: Some((49_992, 49_992)) })
-        .unwrap();
-    assert!(w.contains("| 49992 | 2026-09-21 | 강남 | item 150 | 123,400 | 3,000,000 | -2,876,600 |"), "{w}");
+    assert!(
+        a.text.contains("<table name=\"Big\" range=\"A1:F99992\">"),
+        "{}",
+        a.text
+    );
+    let w = XlsxEngine::window(
+        &a.remainder,
+        &WindowOf::Table {
+            name: "Big".into(),
+            rows: Some((99_991, 99_992)),
+        },
+    )
+    .unwrap();
+    assert!(
+        w.contains("| 99992 | 2026-12-31 | 강남 | new | 1,000 | 400 | 600 |"),
+        "{w}"
+    );
+    let w = XlsxEngine::window(
+        &a.remainder,
+        &WindowOf::Table {
+            name: "Big".into(),
+            rows: Some((49_992, 49_992)),
+        },
+    )
+    .unwrap();
+    assert!(
+        w.contains("| 49992 | 2026-09-21 | 강남 | item 150 | 123,400 | 3,000,000 | -2,876,600 |"),
+        "{w}"
+    );
 
     let t = Instant::now();
     let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();

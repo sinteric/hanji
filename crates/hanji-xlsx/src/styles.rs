@@ -23,21 +23,30 @@ pub struct Styles {
 }
 
 fn prefix_of(root: &Element) -> String {
-    root.name.strip_suffix("styleSheet").unwrap_or("").to_string()
+    root.name
+        .strip_suffix("styleSheet")
+        .unwrap_or("")
+        .to_string()
 }
 
 impl Styles {
     pub fn load(part: Option<&str>, data: Option<&[u8]>) -> Result<Styles, String> {
-        let (Some(part), Some(data)) = (part, data) else { return Ok(Styles::default()) };
+        let (Some(part), Some(data)) = (part, data) else {
+            return Ok(Styles::default());
+        };
         let doc = xml::parse(data).map_err(|e| format!("{part}: {e}"))?;
-        let mut s = Styles { part: Some(part.into()), ..Default::default() };
+        let mut s = Styles {
+            part: Some(part.into()),
+            ..Default::default()
+        };
         for e in doc.root.elements() {
             match e.local() {
                 "numFmts" => {
                     for f in e.elements().filter(|f| f.local() == "numFmt") {
-                        if let (Some(id), Some(code)) =
-                            (f.get("numFmtId").and_then(|v| v.parse().ok()), f.get("formatCode"))
-                        {
+                        if let (Some(id), Some(code)) = (
+                            f.get("numFmtId").and_then(|v| v.parse().ok()),
+                            f.get("formatCode"),
+                        ) {
                             s.fmts.insert(id, code);
                         }
                     }
@@ -51,8 +60,10 @@ impl Styles {
                 }
                 "dxfs" => {
                     for (k, d) in e.elements().filter(|x| x.local() == "dxf").enumerate() {
-                        if let Some(code) =
-                            d.elements().find(|x| x.local() == "numFmt").and_then(|f| f.get("formatCode"))
+                        if let Some(code) = d
+                            .elements()
+                            .find(|x| x.local() == "numFmt")
+                            .and_then(|f| f.get("formatCode"))
                         {
                             s.dxf_fmt.insert(k as u32, code);
                         }
@@ -81,7 +92,10 @@ impl Styles {
 
     /// Every number format code the workbook can name: built-ins and its own.
     pub fn all_codes(&self) -> Vec<String> {
-        let mut v: Vec<String> = (0..=49).filter_map(numfmt::builtin).map(str::to_string).collect();
+        let mut v: Vec<String> = (0..=49)
+            .filter_map(numfmt::builtin)
+            .map(str::to_string)
+            .collect();
         for c in self.fmts.values() {
             if !v.contains(c) {
                 v.push(c.clone());
@@ -101,12 +115,20 @@ impl Styles {
         let id = self.fmts.keys().copied().max().unwrap_or(163).max(163) + 1;
         let doc = self.doc.as_mut().ok_or("the workbook has no styles part")?;
         let p = prefix_of(&doc.root);
-        let f =
-            Element::new(&format!("{p}numFmt")).with_attr("numFmtId", &id.to_string()).with_attr("formatCode", code);
+        let f = Element::new(&format!("{p}numFmt"))
+            .with_attr("numFmtId", &id.to_string())
+            .with_attr("formatCode", code);
         if !doc.root.elements().any(|e| e.local() == "numFmts") {
-            doc.root.children.insert(0, Node::El(Element::new(&format!("{p}numFmts")).with_attr("count", "0")));
+            doc.root.children.insert(
+                0,
+                Node::El(Element::new(&format!("{p}numFmts")).with_attr("count", "0")),
+            );
         }
-        let list = doc.root.elements_mut().find(|e| e.local() == "numFmts").unwrap();
+        let list = doc
+            .root
+            .elements_mut()
+            .find(|e| e.local() == "numFmts")
+            .unwrap();
         list.children.push(Node::El(f));
         let n = list.elements().count();
         list.set("count", &n.to_string());
@@ -123,9 +145,17 @@ impl Styles {
         }
         let id = self.format_id(code)?;
         let doc = self.doc.as_mut().ok_or("the workbook has no styles part")?;
-        let xfs = doc.root.elements_mut().find(|e| e.local() == "cellXfs").ok_or("styles.xml has no cellXfs")?;
+        let xfs = doc
+            .root
+            .elements_mut()
+            .find(|e| e.local() == "cellXfs")
+            .ok_or("styles.xml has no cellXfs")?;
         let list: Vec<Element> = xfs.elements().cloned().collect();
-        let base = list.get(s as usize).or(list.first()).cloned().ok_or("styles.xml has no cell style")?;
+        let base = list
+            .get(s as usize)
+            .or(list.first())
+            .cloned()
+            .ok_or("styles.xml has no cell style")?;
         let mut want = base.clone();
         want.set("numFmtId", &id.to_string());
         want.set("applyNumberFormat", "1");
@@ -143,7 +173,12 @@ impl Styles {
 
     /// A dxf holding number format `code` (for a table column's data format).
     pub fn dxf_with_format(&mut self, code: &str) -> Result<u32, String> {
-        if let Some(k) = self.dxf_fmt.iter().find(|(_, c)| *c == code).map(|(k, _)| *k) {
+        if let Some(k) = self
+            .dxf_fmt
+            .iter()
+            .find(|(_, c)| *c == code)
+            .map(|(k, _)| *k)
+        {
             return Ok(k);
         }
         let id = self.format_id(code)?;
@@ -163,12 +198,22 @@ impl Styles {
             "extLst",
         ];
         if !doc.root.elements().any(|e| e.local() == "dxfs") {
-            xml::insert_ordered(&mut doc.root, Element::new(&format!("{p}dxfs")).with_attr("count", "0"), &order);
+            xml::insert_ordered(
+                &mut doc.root,
+                Element::new(&format!("{p}dxfs")).with_attr("count", "0"),
+                &order,
+            );
         }
-        let dxfs = doc.root.elements_mut().find(|e| e.local() == "dxfs").unwrap();
+        let dxfs = doc
+            .root
+            .elements_mut()
+            .find(|e| e.local() == "dxfs")
+            .unwrap();
         let mut dxf = Element::new(&format!("{p}dxf"));
         dxf.children.push(Node::El(
-            Element::new(&format!("{p}numFmt")).with_attr("numFmtId", &id.to_string()).with_attr("formatCode", code),
+            Element::new(&format!("{p}numFmt"))
+                .with_attr("numFmtId", &id.to_string())
+                .with_attr("formatCode", code),
         ));
         dxfs.children.push(Node::El(dxf));
         let n = dxfs.elements().count();
@@ -179,6 +224,7 @@ impl Styles {
     }
 
     pub fn write(&self) -> Option<Vec<u8>> {
-        self.changed.then(|| xml::write_doc(self.doc.as_ref().unwrap()))
+        self.changed
+            .then(|| xml::write_doc(self.doc.as_ref().unwrap()))
     }
 }

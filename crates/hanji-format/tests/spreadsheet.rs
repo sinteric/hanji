@@ -1,6 +1,8 @@
 //! The Spreadsheet structure (DESIGN.md §5.4).
 
-use hanji_format::sheet::{parse_spreadsheet, serialize_spreadsheet, window_text, SheetItem, WindowOf};
+use hanji_format::sheet::{
+    parse_spreadsheet, serialize_spreadsheet, window_text, SheetItem, WindowOf,
+};
 use hanji_format::{diag, Names};
 
 #[test]
@@ -11,24 +13,50 @@ fn the_design_md_example_parses() {
     let a = body.find("```\n").unwrap() + 4;
     let b = a + body[a..].find("```\n").unwrap();
     // The block is indented under its list item.
-    let text: String =
-        body[a..b].trim_end_matches(' ').lines().map(|l| format!("{}\n", l.strip_prefix("  ").unwrap_or(l))).collect();
-    let s = parse_spreadsheet(&text, &Names::default()).unwrap_or_else(|e| panic!("{}", diag::render(&e)));
-    assert_eq!(serialize_spreadsheet(&s), text, "the example is in canonical form");
+    let text: String = body[a..b]
+        .trim_end_matches(' ')
+        .lines()
+        .map(|l| format!("{}\n", l.strip_prefix("  ").unwrap_or(l)))
+        .collect();
+    let s = parse_spreadsheet(&text, &Names::default())
+        .unwrap_or_else(|e| panic!("{}", diag::render(&e)));
+    assert_eq!(
+        serialize_spreadsheet(&s),
+        text,
+        "the example is in canonical form"
+    );
     let sheet = &s.sheets[0];
-    assert_eq!((sheet.name.as_str(), sheet.range.as_deref()), ("매출", Some("A1:G1201")));
+    assert_eq!(
+        (sheet.name.as_str(), sheet.range.as_deref()),
+        ("매출", Some("A1:G1201"))
+    );
     let items: Vec<String> = sheet
         .items
         .iter()
         .map(|i| match i {
             SheetItem::Table(t) => {
-                format!("table {} {}", t.name, t.columns.iter().map(|c| c.ty.as_str()).collect::<Vec<_>>().join(","))
+                format!(
+                    "table {} {}",
+                    t.name,
+                    t.columns
+                        .iter()
+                        .map(|c| c.ty.as_str())
+                        .collect::<Vec<_>>()
+                        .join(",")
+                )
             }
             SheetItem::Chart(c) => format!("chart {}", c.ty),
             SheetItem::Keep(k) => format!("keep {}", k.kind),
         })
         .collect();
-    assert_eq!(items, ["table Sales date,number,number,number", "chart bar", "keep data-validation"]);
+    assert_eq!(
+        items,
+        [
+            "table Sales date,number,number,number",
+            "chart bar",
+            "keep data-validation"
+        ]
+    );
 }
 
 #[test]
@@ -53,7 +81,10 @@ fn the_design_md_windows_are_what_the_window_writes() {
     }
     let s = |v: &[&str]| v.iter().map(|x| x.to_string()).collect::<Vec<_>>();
     let table = window_text(
-        &WindowOf::Table { name: "Sales".into(), rows: Some((2, 3)) },
+        &WindowOf::Table {
+            name: "Sales".into(),
+            rows: Some((2, 3)),
+        },
         &s(&["월", "매출", "원가", "이익"]),
         &[
             (2, s(&["2026-01", "12,000,000", "8,400,000", "3,600,000"])),
@@ -61,7 +92,10 @@ fn the_design_md_windows_are_what_the_window_writes() {
         ],
     );
     let range = window_text(
-        &WindowOf::Range { sheet: "매출".into(), range: "F1:G2".into() },
+        &WindowOf::Range {
+            sheet: "매출".into(),
+            range: "F1:G2".into(),
+        },
         &s(&["F", "G"]),
         &[(1, s(&["목표", "150,000,000"])), (2, s(&["", ""]))],
     );

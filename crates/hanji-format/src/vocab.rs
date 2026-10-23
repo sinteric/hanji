@@ -22,13 +22,35 @@
 use std::fmt;
 
 /// Paragraph keys, in canonical order.
-pub const PARA_KEYS: &[&str] =
-    &["align", "indent-left", "indent-right", "first-line", "space-before", "space-after", "line-spacing"];
+pub const PARA_KEYS: &[&str] = &[
+    "align",
+    "indent-left",
+    "indent-right",
+    "first-line",
+    "space-before",
+    "space-after",
+    "line-spacing",
+];
 /// Text keys, in canonical order.
-pub const TEXT_KEYS: &[&str] = &["font", "size", "color", "bold", "italic", "underline", "strike"];
+pub const TEXT_KEYS: &[&str] = &[
+    "font",
+    "size",
+    "color",
+    "bold",
+    "italic",
+    "underline",
+    "strike",
+];
 /// Box keys (a cell, a shape, a paragraph's shading), in canonical order.
-pub const BOX_KEYS: &[&str] =
-    &["fill", "border", "border-top", "border-right", "border-bottom", "border-left", "valign"];
+pub const BOX_KEYS: &[&str] = &[
+    "fill",
+    "border",
+    "border-top",
+    "border-right",
+    "border-bottom",
+    "border-left",
+    "valign",
+];
 /// Spreadsheet-only keys.
 pub const XLSX_KEYS: &[&str] = &["indent"];
 /// Flags: bare is on, `=no` is off.
@@ -36,7 +58,12 @@ pub const FLAGS: &[&str] = &["bold", "italic", "underline", "strike"];
 
 /// Every key, in the order canonical form writes them.
 pub fn order() -> impl Iterator<Item = &'static str> {
-    BOX_KEYS.iter().chain(PARA_KEYS).chain(TEXT_KEYS).chain(XLSX_KEYS).copied()
+    BOX_KEYS
+        .iter()
+        .chain(PARA_KEYS)
+        .chain(TEXT_KEYS)
+        .chain(XLSX_KEYS)
+        .copied()
 }
 
 /// A key's place in canonical order (`None`: not a key of the vocabulary).
@@ -68,11 +95,9 @@ pub fn parse_length(v: &str, negative: bool) -> Result<i64, String> {
         && u.matches('.').count() <= 1
         && !u.starts_with('.')
         && !u.ends_with('.');
-    let x: f64 = n
-        .parse()
-        .ok()
-        .filter(|_| ok)
-        .ok_or_else(|| format!("{v:?} is not a length; a length is in points, such as 12pt or 0.5pt"))?;
+    let x: f64 = n.parse().ok().filter(|_| ok).ok_or_else(|| {
+        format!("{v:?} is not a length; a length is in points, such as 12pt or 0.5pt")
+    })?;
     if x < 0.0 && !negative {
         return Err(format!("{v:?}: this length is 0pt or more"));
     }
@@ -87,8 +112,8 @@ pub fn parse_length(v: &str, negative: bool) -> Result<i64, String> {
 /// Theme colours a colour may name (DrawingML's scheme colours; docx and
 /// xlsx theme colours are named the same way), kept as names.
 pub const THEME_COLORS: &[&str] = &[
-    "tx1", "bg1", "tx2", "bg2", "accent1", "accent2", "accent3", "accent4", "accent5", "accent6", "hlink", "folHlink",
-    "dk1", "lt1", "dk2", "lt2",
+    "tx1", "bg1", "tx2", "bg2", "accent1", "accent2", "accent3", "accent4", "accent5", "accent6",
+    "hlink", "folHlink", "dk1", "lt1", "dk2", "lt2",
 ];
 
 /// What a colour may be written as, for messages.
@@ -125,11 +150,19 @@ pub struct Color {
 
 impl Color {
     pub fn rgb(r: u8, g: u8, b: u8) -> Color {
-        Color { base: ColorBase::Rgb([r, g, b]), tint: Tint::None, alpha: None }
+        Color {
+            base: ColorBase::Rgb([r, g, b]),
+            tint: Tint::None,
+            alpha: None,
+        }
     }
 
     pub fn theme(name: &str) -> Color {
-        Color { base: ColorBase::Theme(name.to_string()), tint: Tint::None, alpha: None }
+        Color {
+            base: ColorBase::Theme(name.to_string()),
+            tint: Tint::None,
+            alpha: None,
+        }
     }
 
     /// Whether a text may write this colour anew (not a `*` one).
@@ -164,10 +197,16 @@ impl Color {
                 return Err(err());
             }
             if body.contains(['+', '-']) {
-                return Err(format!("{v:?}: lighter and darker (+NN%, -NN%) apply to theme colours, not to #RRGGBB"));
+                return Err(format!(
+                    "{v:?}: lighter and darker (+NN%, -NN%) apply to theme colours, not to #RRGGBB"
+                ));
             }
             let b = |k: usize| u8::from_str_radix(&hex[k..k + 2], 16).unwrap();
-            return Ok(Color { base: ColorBase::Rgb([b(0), b(2), b(4)]), tint, alpha });
+            return Ok(Color {
+                base: ColorBase::Rgb([b(0), b(2), b(4)]),
+                tint,
+                alpha,
+            });
         }
         let name_end = body.find(['+', '-', '*']).unwrap_or(body.len());
         let (name, rest) = body.split_at(name_end);
@@ -185,7 +224,9 @@ impl Color {
                     .and_then(|n| n.parse().ok())
                     .ok_or_else(err)?;
                 if !(1..=99).contains(&n) {
-                    return Err(format!("{v:?}: a theme colour is lighter or darker by 1% to 99%"));
+                    return Err(format!(
+                        "{v:?}: a theme colour is lighter or darker by 1% to 99%"
+                    ));
                 }
                 if sign == "+" {
                     Tint::Lighter(n)
@@ -194,7 +235,11 @@ impl Color {
                 }
             }
         };
-        Ok(Color { base: ColorBase::Theme(name.to_string()), tint, alpha })
+        Ok(Color {
+            base: ColorBase::Theme(name.to_string()),
+            tint,
+            alpha,
+        })
     }
 }
 
@@ -237,10 +282,9 @@ impl Fill {
             "gradient" => Fill::Gradient,
             "pattern" => Fill::Pattern,
             "picture" => Fill::Picture,
-            c => Fill::Color(
-                Color::parse(c)
-                    .map_err(|_| format!("{v:?} is not a fill; a fill is none or a colour: {COLOR_FORM}"))?,
-            ),
+            c => Fill::Color(Color::parse(c).map_err(|_| {
+                format!("{v:?} is not a fill; a fill is none or a colour: {COLOR_FORM}")
+            })?),
         })
     }
 
@@ -269,7 +313,14 @@ impl fmt::Display for Fill {
 // ---------------------------------------------------------------- borders
 
 /// Border styles: the writable ones first, then those only shown.
-pub const BORDER_STYLES: &[&str] = &["solid", "dashed", "dotted", "double", "dash-dot", "dash-dot-dot"];
+pub const BORDER_STYLES: &[&str] = &[
+    "solid",
+    "dashed",
+    "dotted",
+    "double",
+    "dash-dot",
+    "dash-dot-dot",
+];
 pub const SHOWN_BORDER_STYLES: &[&str] = &["triple", "thin-thick", "thick-thin", "wave", "3d"];
 
 /// A border (an outline, a cell side): none, or a line.
@@ -293,22 +344,32 @@ impl Border {
         }
         let form = "a border is none, or \"<width>pt <style> <colour>\" such as \"0.5pt solid #000000\", its style solid, dashed, dotted, double, dash-dot or dash-dot-dot";
         let parts: Vec<&str> = s.split_whitespace().collect();
-        let [w, st, c] = parts.as_slice() else { return Err(format!("{v:?} is not a border; {form}")) };
+        let [w, st, c] = parts.as_slice() else {
+            return Err(format!("{v:?} is not a border; {form}"));
+        };
         let width = parse_length(w, false).map_err(|m| format!("{m}; {form}"))?;
         if width == 0 {
-            return Err(format!("{v:?}: a border's width is above 0pt; write none for no border"));
+            return Err(format!(
+                "{v:?}: a border's width is above 0pt; write none for no border"
+            ));
         }
         if !BORDER_STYLES.contains(st) && !SHOWN_BORDER_STYLES.contains(st) {
             return Err(format!("{v:?}: {st:?} is not a border style; {form}"));
         }
-        Ok(Border::Line { width, style: st.to_string(), color: Color::parse(c)? })
+        Ok(Border::Line {
+            width,
+            style: st.to_string(),
+            color: Color::parse(c)?,
+        })
     }
 
     /// Whether a text may write this border anew.
     pub fn is_writable(&self) -> bool {
         match self {
             Border::None => true,
-            Border::Line { style, color, .. } => BORDER_STYLES.contains(&style.as_str()) && color.is_writable(),
+            Border::Line { style, color, .. } => {
+                BORDER_STYLES.contains(&style.as_str()) && color.is_writable()
+            }
         }
     }
 }
@@ -317,7 +378,11 @@ impl fmt::Display for Border {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Border::None => write!(f, "none"),
-            Border::Line { width, style, color } => write!(f, "{} {style} {color}", length_text(*width)),
+            Border::Line {
+                width,
+                style,
+                color,
+            } => write!(f, "{} {style} {color}", length_text(*width)),
         }
     }
 }
@@ -356,16 +421,23 @@ impl LineSpacing {
         let form =
             "line spacing is a percent (160%), a length for exact spacing (14pt), \"at-least 14pt\" or \"gap 4pt\"";
         if let Some(p) = s.strip_suffix('%') {
-            let n = parse_length(p, false).map_err(|_| format!("{v:?} is not a line spacing; {form}"))?;
+            let n = parse_length(p, false)
+                .map_err(|_| format!("{v:?} is not a line spacing; {form}"))?;
             return Ok(LineSpacing::Percent(n));
         }
         if let Some(l) = s.strip_prefix("at-least") {
-            return Ok(LineSpacing::AtLeast(parse_length(l, false).map_err(|m| format!("{m}; {form}"))?));
+            return Ok(LineSpacing::AtLeast(
+                parse_length(l, false).map_err(|m| format!("{m}; {form}"))?,
+            ));
         }
         if let Some(l) = s.strip_prefix("gap") {
-            return Ok(LineSpacing::Gap(parse_length(l, false).map_err(|m| format!("{m}; {form}"))?));
+            return Ok(LineSpacing::Gap(
+                parse_length(l, false).map_err(|m| format!("{m}; {form}"))?,
+            ));
         }
-        Ok(LineSpacing::Exact(parse_length(s, false).map_err(|m| format!("{m}; {form}"))?))
+        Ok(LineSpacing::Exact(
+            parse_length(s, false).map_err(|m| format!("{m}; {form}"))?,
+        ))
     }
 }
 
@@ -385,7 +457,9 @@ pub fn parse_flag(key: &str, v: Option<&str>) -> Result<bool, String> {
     match v {
         None | Some("yes") => Ok(true),
         Some("no") => Ok(false),
-        Some(other) => Err(format!("{key}={other}: write {key} alone to turn it on, or {key}=no to turn it off")),
+        Some(other) => Err(format!(
+            "{key}={other}: write {key} alone to turn it on, or {key}=no to turn it off"
+        )),
     }
 }
 
@@ -394,12 +468,19 @@ pub fn parse_flag(key: &str, v: Option<&str>) -> Result<bool, String> {
 /// A value as an attribute writes it: bare, or quoted when it is empty or
 /// holds a space, a brace, a quote, `<`, `>` or `:`.
 pub fn quote(v: &str) -> String {
-    let bare =
-        !v.is_empty() && !v.chars().any(|c| c.is_whitespace() || matches!(c, '{' | '}' | '"' | '\'' | '>' | ':' | '<'));
+    let bare = !v.is_empty()
+        && !v
+            .chars()
+            .any(|c| c.is_whitespace() || matches!(c, '{' | '}' | '"' | '\'' | '>' | ':' | '<'));
     if bare {
         v.to_string()
     } else {
-        format!("\"{}\"", v.replace('&', "&amp;").replace('"', "&quot;").replace('<', "&lt;"))
+        format!(
+            "\"{}\"",
+            v.replace('&', "&amp;")
+                .replace('"', "&quot;")
+                .replace('<', "&lt;")
+        )
     }
 }
 
@@ -427,7 +508,10 @@ pub fn attrs(src: &str) -> Result<Vec<Attr>, (usize, String)> {
         }
         if cs.get(k) != Some(&'=') {
             if k < cs.len() && !cs[k].is_whitespace() {
-                return Err((k + 1, format!("after {key}, write = and its value, such as {key}=value")));
+                return Err((
+                    k + 1,
+                    format!("after {key}, write = and its value, such as {key}=value"),
+                ));
             }
             out.push((key, None, start + 1));
             continue;
@@ -454,7 +538,10 @@ pub fn attrs(src: &str) -> Result<Vec<Attr>, (usize, String)> {
                 cs[vs..k].iter().collect::<String>()
             }
         };
-        let value = value.replace("&quot;", "\"").replace("&lt;", "<").replace("&amp;", "&");
+        let value = value
+            .replace("&quot;", "\"")
+            .replace("&lt;", "<")
+            .replace("&amp;", "&");
         out.push((key, Some(value), start + 1));
     }
     Ok(out)
@@ -474,7 +561,9 @@ mod tests {
     use super::*;
 
     fn color(v: &str) -> String {
-        Color::parse(v).unwrap_or_else(|e| panic!("{e}")).to_string()
+        Color::parse(v)
+            .unwrap_or_else(|e| panic!("{e}"))
+            .to_string()
     }
 
     #[test]
@@ -490,11 +579,23 @@ mod tests {
         assert_eq!(color("folHlink"), "folHlink");
         assert!(!Color::parse("accent1*").unwrap().is_writable());
         assert!(Color::parse("accent1+40%").unwrap().is_writable());
-        for bad in ["red", "#FFF", "accent7", "text1", "accent1+0%", "accent1+100%", "#FF0000+20%", "accent1/120%", ""]
-        {
+        for bad in [
+            "red",
+            "#FFF",
+            "accent7",
+            "text1",
+            "accent1+0%",
+            "accent1+100%",
+            "#FF0000+20%",
+            "accent1/120%",
+            "",
+        ] {
             assert!(Color::parse(bad).is_err(), "{bad}");
         }
-        assert_eq!(Color::parse("#1F4E79").unwrap(), Color::rgb(0x1F, 0x4E, 0x79));
+        assert_eq!(
+            Color::parse("#1F4E79").unwrap(),
+            Color::rgb(0x1f, 0x4e, 0x79)
+        );
         assert_eq!(Color::parse("accent2").unwrap(), Color::theme("accent2"));
     }
 
@@ -511,14 +612,23 @@ mod tests {
         assert_eq!(length_text(150), "1.5pt");
         let b = Border::parse("2.83pt solid #7f7f7f").unwrap();
         assert_eq!(b.to_string(), "2.83pt solid #7F7F7F");
-        assert_eq!(Border::parse("2pt solid accent1*").unwrap().to_string(), "2pt solid accent1*");
+        assert_eq!(
+            Border::parse("2pt solid accent1*").unwrap().to_string(),
+            "2pt solid accent1*"
+        );
         assert!(!Border::parse("2pt solid accent1*").unwrap().is_writable());
         assert!(!Border::parse("1pt triple #000000").unwrap().is_writable());
         assert_eq!(Border::parse("none"), Ok(Border::None));
-        assert!(Border::parse("0pt solid #000000").is_err() && Border::parse("1pt groove #000000").is_err());
+        assert!(
+            Border::parse("0pt solid #000000").is_err()
+                && Border::parse("1pt groove #000000").is_err()
+        );
         assert_eq!(Fill::parse("gradient").unwrap().to_string(), "gradient");
         assert!(!Fill::parse("pattern").unwrap().is_writable());
-        assert_eq!(Fill::parse("accent1+80%").unwrap().to_string(), "accent1+80%");
+        assert_eq!(
+            Fill::parse("accent1+80%").unwrap().to_string(),
+            "accent1+80%"
+        );
         for (v, c) in [
             ("160%", "160%"),
             ("90%", "90%"),
@@ -535,8 +645,10 @@ mod tests {
 
     #[test]
     fn attribute_lists_read_bare_and_quoted_values() {
-        let a = attrs(r#"fill=#FFF0C3 border-bottom="2.83pt solid #7F7F7F" bold font="맑은 고딕""#).unwrap();
-        let v: Vec<(&str, Option<&str>)> = a.iter().map(|x| (x.0.as_str(), x.1.as_deref())).collect();
+        let a = attrs(r#"fill=#FFF0C3 border-bottom="2.83pt solid #7F7F7F" bold font="맑은 고딕""#)
+            .unwrap();
+        let v: Vec<(&str, Option<&str>)> =
+            a.iter().map(|x| (x.0.as_str(), x.1.as_deref())).collect();
         assert_eq!(
             v,
             [
@@ -551,7 +663,11 @@ mod tests {
         assert_eq!(quote("맑은 고딕"), "\"맑은 고딕\"");
         assert_eq!(quote("#101B3A/55%"), "#101B3A/55%");
         assert_eq!(rank("fill"), Some(0));
-        assert!(rank("align") < rank("font") && rank("font") < rank("size") && rank("size") < rank("color"));
+        assert!(
+            rank("align") < rank("font")
+                && rank("font") < rank("size")
+                && rank("size") < rank("color")
+        );
         assert!(css_refusal().contains("fill, border"));
     }
 }

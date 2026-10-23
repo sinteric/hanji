@@ -25,3 +25,6 @@ hanji-package.workspace = true
 hanji-core.workspace = true
 rdocx.workspace = true
 rpptx.workspace = true
+
+[lints]
+workspace = true

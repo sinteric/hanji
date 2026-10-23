@@ -12,12 +12,23 @@ mod common;
 use common::*;
 
 fn open(name: &str) -> hanji_core::Imported {
-    let bytes = corpus().into_iter().find(|(n, _)| n == name).unwrap_or_else(|| panic!("{name}")).1;
-    XlsxEngine.import(&bytes, &ImportOptions::default()).unwrap()
+    let bytes = corpus()
+        .into_iter()
+        .find(|(n, _)| n == name)
+        .unwrap_or_else(|| panic!("{name}"))
+        .1;
+    XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap()
 }
 
 fn part(pkg: &[u8], name: &str) -> String {
-    String::from_utf8(package::get(&package::read(pkg).unwrap(), name).unwrap().to_vec()).unwrap()
+    String::from_utf8(
+        package::get(&package::read(pkg).unwrap(), name)
+            .unwrap()
+            .to_vec(),
+    )
+    .unwrap()
 }
 
 /// The elements of list `list` (`fonts`, `cellXfs`) in styles.xml.
@@ -45,15 +56,23 @@ fn a_workbook_shows_its_formatting_as_range_lines() {
     // Theme colours by name, Excel's widths, one line per rectangle.
     assert!(t.contains("<format range=\"E4\" fill=bg2-10% border-top=\"2.25pt solid bg1\" border-left=\"2.25pt solid bg1\"/>\n<format range=\"F4:G4\" fill=bg2-10% border-top=\"2.25pt solid bg1\"/>"), "{t}");
     // A named cell style is shown with the cells in it.
-    assert!(t.contains("<format range=\"B4\" style=\"Heading 2\" "), "{t}");
+    assert!(
+        t.contains("<format range=\"B4\" style=\"Heading 2\" "),
+        "{t}"
+    );
     // The lines are read-only: an edit of one is refused with the operation to use.
-    let edited =
-        t.replace("fill=bg2-10% border-top=\"2.25pt solid bg1\"/>", "fill=#FF0000 border-top=\"2.25pt solid bg1\"/>");
+    let edited = t.replace(
+        "fill=bg2-10% border-top=\"2.25pt solid bg1\"/>",
+        "fill=#FF0000 border-top=\"2.25pt solid bg1\"/>",
+    );
     let m = match XlsxEngine::apply(&edited, &imp.remainder, "[]") {
         Err(EngineError::Refused(m)) => m,
         other => panic!("{:?}", other.map(|a| a.text)),
     };
-    assert!(m.contains("read-only") && m.contains("\"op\": \"format\""), "{m}");
+    assert!(
+        m.contains("read-only") && m.contains("\"op\": \"format\""),
+        "{m}"
+    );
 }
 
 fn corpus_bytes(name: &str) -> Vec<u8> {
@@ -63,11 +82,18 @@ fn corpus_bytes(name: &str) -> Vec<u8> {
 #[test]
 fn a_format_operation_changes_only_its_range_and_its_keys() {
     let bytes = corpus_bytes("simple-monthly-budget.xlsx");
-    let imp = XlsxEngine.import(&bytes, &ImportOptions::default()).unwrap();
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
     let ops = r##"[{"op": "format", "range": "Simple Monthly Budget!B5:C7", "set": {"fill": "accent2+80%", "bold": true}},
                   {"op": "format", "range": "Simple Monthly Budget!E12:F14", "set": {"outline": "2pt solid #1F3864"}}]"##;
     let a = XlsxEngine::apply(&imp.text, &imp.remainder, ops).unwrap_or_else(|e| panic!("{e}"));
-    assert!(a.text.contains("<format range=\"B5:C7\" fill=accent2+80% bold/>"), "{}", a.text);
+    assert!(
+        a.text
+            .contains("<format range=\"B5:C7\" fill=accent2+80% bold/>"),
+        "{}",
+        a.text
+    );
     // The outline snaps to Excel's thick border and goes round the range's edges.
     assert!(
         a.text.contains(
@@ -76,9 +102,19 @@ fn a_format_operation_changes_only_its_range_and_its_keys() {
         "{}",
         a.text
     );
-    assert!(a.text.contains("<format range=\"E13\" border-left=\"2.25pt solid #1F3864\"/>"), "{}", a.text);
+    assert!(
+        a.text
+            .contains("<format range=\"E13\" border-left=\"2.25pt solid #1F3864\"/>"),
+        "{}",
+        a.text
+    );
     // The other lines are as they were.
-    let lines = |t: &str| t.lines().filter(|l| l.starts_with("<format")).map(String::from).collect::<Vec<_>>();
+    let lines = |t: &str| {
+        t.lines()
+            .filter(|l| l.starts_with("<format"))
+            .map(String::from)
+            .collect::<Vec<_>>()
+    };
     let (old, new) = (lines(&imp.text), lines(&a.text));
     let gone: Vec<&String> = old.iter().filter(|l| !new.contains(l)).collect();
     assert!(gone.is_empty(), "{gone:?}");
@@ -92,7 +128,10 @@ fn a_format_operation_changes_only_its_range_and_its_keys() {
         let (a, b) = (items(&s0, list), items(&s1, list));
         assert_eq!(&b[..a.len()], &a[..], "{list}");
     }
-    assert!(s1.contains("<fgColor theme=\"5\" tint=\"0.8\"/>"), "accent2 is theme 5: {s1}");
+    assert!(
+        s1.contains("<fgColor theme=\"5\" tint=\"0.8\"/>"),
+        "accent2 is theme 5: {s1}"
+    );
     // The same operation again adds nothing.
     let again = XlsxEngine::apply(&a.text, &a.remainder, ops).unwrap();
     let out2 = XlsxEngine.export(&again.text, &again.remainder).unwrap();
@@ -116,9 +155,15 @@ fn what_a_workbook_cannot_hold_is_refused() {
         let m = refused(&imp, &op(set));
         assert!(m.contains(why), "{set}: {m}");
     }
-    let m = refused(&imp, r##"[{"op": "format", "range": "없음!A1", "set": {"bold": true}}]"##);
+    let m = refused(
+        &imp,
+        r##"[{"op": "format", "range": "없음!A1", "set": {"bold": true}}]"##,
+    );
     assert!(m.contains("there is no sheet"), "{m}");
-    let m = refused(&imp, r##"[{"op": "format", "range": "매출!A1:Z10000", "set": {"bold": true}}]"##);
+    let m = refused(
+        &imp,
+        r##"[{"op": "format", "range": "매출!A1:Z10000", "set": {"bold": true}}]"##,
+    );
     assert!(m.contains("at most 100000"), "{m}");
 }
 
@@ -128,12 +173,15 @@ fn what_a_workbook_cannot_hold_is_refused() {
 fn format_operations_put_get_on_the_corpus() {
     let mut failures = vec![];
     for (name, bytes) in corpus() {
-        let imp = XlsxEngine.import(&bytes, &ImportOptions::default()).unwrap();
-        let Some(sheet) = hanji_format::parse_spreadsheet(&imp.text, &XlsxEngine::names(&imp.remainder))
-            .unwrap()
-            .sheets
-            .into_iter()
-            .find(|s| s.range.is_some())
+        let imp = XlsxEngine
+            .import(&bytes, &ImportOptions::default())
+            .unwrap();
+        let Some(sheet) =
+            hanji_format::parse_spreadsheet(&imp.text, &XlsxEngine::names(&imp.remainder))
+                .unwrap()
+                .sheets
+                .into_iter()
+                .find(|s| s.range.is_some())
         else {
             continue;
         };

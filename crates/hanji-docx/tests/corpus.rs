@@ -10,12 +10,23 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use hanji_core::{Block, Engine, EngineError, Entry, ImportOptions, ImportReport, Kind, Remainder};
-use hanji_docx::{export_document, package, write_package, xml, DocxEngine, ExportOptions, History, Reviewer};
+use hanji_docx::{
+    export_document, package, write_package, xml, DocxEngine, ExportOptions, History, Reviewer,
+};
 use hanji_testkit::{Cx, Doc, Format, Job, Out, CAPS, RAW};
 
 struct Docx;
 
-const VISIBLE_RPR: &[&str] = &["color", "sz", "highlight", "u", "shd", "strike", "caps", "vertAlign"];
+const VISIBLE_RPR: &[&str] = &[
+    "color",
+    "sz",
+    "highlight",
+    "u",
+    "shd",
+    "strike",
+    "caps",
+    "vertAlign",
+];
 
 impl Format for Docx {
     fn engine(&self) -> &dyn Engine {
@@ -30,12 +41,24 @@ impl Format for Docx {
         opts: &ImportOptions,
     ) -> Result<(Vec<Block>, Remainder, ImportReport, String), EngineError> {
         let (b, r, rep, s) = DocxEngine::split(pkg, opts)?;
-        Ok((b, r, rep, format!("tables {}/{} kept {:?}", s.tables_modelled, s.tables_kept, s.kept_reasons)))
+        Ok((
+            b,
+            r,
+            rep,
+            format!(
+                "tables {}/{} kept {:?}",
+                s.tables_modelled, s.tables_kept, s.kept_reasons
+            ),
+        ))
     }
     fn text_of(&self, blocks: &[Block], rem: &Remainder) -> String {
         DocxEngine::text_of(blocks, rem, None)
     }
-    fn export_blocks(&self, blocks: &[Block], rem: &Remainder) -> Result<(Vec<u8>, bool), EngineError> {
+    fn export_blocks(
+        &self,
+        blocks: &[Block],
+        rem: &Remainder,
+    ) -> Result<(Vec<u8>, bool), EngineError> {
         let doc = export_document(blocks, rem)?;
         let well_formed = xml::parse(&doc.document).is_ok();
         Ok((write_package(rem, doc)?, well_formed))
@@ -46,13 +69,26 @@ impl Format for Docx {
     fn visible_run(&self, e: &Entry) -> bool {
         e.kind == Kind::Run
             && e.xml.len() >= 2
-            && xml::fragment(&e.xml[1]).elements().any(|c| VISIBLE_RPR.contains(&c.local()))
+            && xml::fragment(&e.xml[1])
+                .elements()
+                .any(|c| VISIBLE_RPR.contains(&c.local()))
     }
     fn holds_section(&self, entries: &[&Entry], _: usize) -> bool {
-        entries.iter().any(|e| e.kind == Kind::Ppr && e.xml.len() > 1 && e.xml[1].contains("sectPr"))
+        entries
+            .iter()
+            .any(|e| e.kind == Kind::Ppr && e.xml.len() > 1 && e.xml[1].contains("sectPr"))
     }
     fn preferred_styles(&self) -> &'static [&'static str] {
-        &["Quote", "Intense Quote", "List Paragraph", "Body Text", "Subtitle", "Title", "Note", "Quotations"]
+        &[
+            "Quote",
+            "Intense Quote",
+            "List Paragraph",
+            "Body Text",
+            "Subtitle",
+            "Title",
+            "Note",
+            "Quotations",
+        ]
     }
     fn is_drawing(&self, xml: &str) -> bool {
         xml.contains("drawing") || xml.contains("pict")
@@ -63,7 +99,12 @@ impl Format for Docx {
 }
 
 fn corpus() -> Vec<(String, Vec<u8>)> {
-    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).parent().unwrap().parent().unwrap().to_path_buf();
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .parent()
+        .unwrap()
+        .to_path_buf();
     hanji_testkit::corpus(&root.join("prototype/remainder/corpus"), "docx")
 }
 
@@ -75,8 +116,12 @@ fn out_dir() -> PathBuf {
 fn corpus_getput_putget_remainder() {
     let files = corpus();
     // E1–E9 and the formatting edits F1–F4 (§5.2), then all in one (E10).
-    let out = Out { dir: out_dir(), ext: "docx" };
-    let sum = hanji_testkit::run_corpus_with(&Docx, &files, &out, &hanji_testkit::FORMATTED_EDITS, "E10");
+    let out = Out {
+        dir: out_dir(),
+        ext: "docx",
+    };
+    let sum =
+        hanji_testkit::run_corpus_with(&Docx, &files, &out, &hanji_testkit::FORMATTED_EDITS, "E10");
     #[cfg(not(target_os = "wasi"))]
     if std::env::var("HANJI_SOFFICE").is_ok() {
         soffice();
@@ -119,7 +164,10 @@ fn convert_dir(dir: &std::path::Path, profile: &str) -> Option<BTreeMap<String, 
     let pdf = dir.join("pdf");
     let _ = std::fs::create_dir_all(&pdf);
     // A profile of its own, so two tests can convert at once.
-    let profile = format!("-env:UserInstallation=file://{}", std::env::temp_dir().join(profile).display());
+    let profile = format!(
+        "-env:UserInstallation=file://{}",
+        std::env::temp_dir().join(profile).display()
+    );
     Command::new("soffice")
         .arg(profile)
         .args(["--headless", "--convert-to", "pdf", "--outdir"])
@@ -127,13 +175,27 @@ fn convert_dir(dir: &std::path::Path, profile: &str) -> Option<BTreeMap<String, 
         .args(&files)
         .output()
         .ok()?;
-    let stem = |f: &PathBuf| f.file_name().unwrap().to_string_lossy().trim_end_matches(".docx").to_string();
-    Some(files.iter().map(|f| (stem(f), pdf_pages(&pdf.join(format!("{}.pdf", stem(f)))))).collect())
+    let stem = |f: &PathBuf| {
+        f.file_name()
+            .unwrap()
+            .to_string_lossy()
+            .trim_end_matches(".docx")
+            .to_string()
+    };
+    Some(
+        files
+            .iter()
+            .map(|f| (stem(f), pdf_pages(&pdf.join(format!("{}.pdf", stem(f))))))
+            .collect(),
+    )
 }
 
 #[cfg(not(target_os = "wasi"))]
 fn soffice_version() -> Option<String> {
-    let v = std::process::Command::new("soffice").arg("--version").output().ok()?;
+    let v = std::process::Command::new("soffice")
+        .arg("--version")
+        .output()
+        .ok()?;
     Some(String::from_utf8_lossy(&v.stdout).trim().to_string())
 }
 
@@ -146,7 +208,9 @@ fn soffice() {
     let (mut ok, mut total, mut differ) = (0, 0, vec![]);
     for dir in std::fs::read_dir(out_dir()).unwrap() {
         let dir = dir.unwrap().path();
-        let Some(pages) = convert_dir(&dir, "hanji-lo-corpus") else { continue };
+        let Some(pages) = convert_dir(&dir, "hanji-lo-corpus") else {
+            continue;
+        };
         let original = pages.get("ORIGINAL").copied().flatten();
         for (f, n) in pages.iter().filter(|f| f.0 != "ORIGINAL") {
             total += 1;
@@ -154,7 +218,10 @@ fn soffice() {
                 Some(n) => {
                     ok += 1;
                     if f == "getput" && Some(*n) != original {
-                        differ.push(format!("{}: {n} pages, original {original:?}", dir.display()));
+                        differ.push(format!(
+                            "{}: {n} pages, original {original:?}",
+                            dir.display()
+                        ));
                     }
                 }
                 None => println!("soffice: failed {}/{f}", dir.display()),
@@ -179,7 +246,9 @@ fn soffice_tracked() {
     let mut differ = vec![];
     for dir in std::fs::read_dir(tracked_dir()).unwrap() {
         let dir = dir.unwrap().path();
-        let Some(pages) = convert_dir(&dir, "hanji-lo-tracked") else { continue };
+        let Some(pages) = convert_dir(&dir, "hanji-lo-tracked") else {
+            continue;
+        };
         let getput = pages.get("getput").copied().flatten();
         for (f, p) in &pages {
             if f.contains('.') || f == "getput" {
@@ -193,14 +262,18 @@ fn soffice_tracked() {
             };
             n[1] += 1;
             let direct = get("direct");
-            let same = |a: Option<usize>, b: Option<usize>, what: &str, differ: &mut Vec<String>| {
-                if a.is_some() && a == b {
-                    1
-                } else {
-                    differ.push(format!("{}/{f}: {what} {a:?} pages, want {b:?}", dir.display()));
-                    0
-                }
-            };
+            let same =
+                |a: Option<usize>, b: Option<usize>, what: &str, differ: &mut Vec<String>| {
+                    if a.is_some() && a == b {
+                        1
+                    } else {
+                        differ.push(format!(
+                            "{}/{f}: {what} {a:?} pages, want {b:?}",
+                            dir.display()
+                        ));
+                        0
+                    }
+                };
             n[2] += same(Some(p), direct, "tracked", &mut differ);
             n[3] += same(get("accepted"), direct, "accepted", &mut differ);
             n[4] += same(get("rejected"), getput, "rejected", &mut differ);
@@ -232,7 +305,12 @@ fn tracked_dir() -> PathBuf {
 const AUTHOR: &str = "hanji (model edit)";
 
 fn reviewer() -> ExportOptions {
-    ExportOptions { tracked_changes: Some(Reviewer { author: AUTHOR.into(), date: "2026-09-29T00:00:00Z".into() }) }
+    ExportOptions {
+        tracked_changes: Some(Reviewer {
+            author: AUTHOR.into(),
+            date: "2026-09-29T00:00:00Z".into(),
+        }),
+    }
 }
 
 fn text_of_package(pkg: &[u8]) -> Result<String, String> {
@@ -251,7 +329,10 @@ fn text_of_package(pkg: &[u8]) -> Result<String, String> {
 fn corpus_tracked_changes() {
     let files = corpus();
     let report = std::env::var("HANJI_REPORT").is_ok();
-    let out = Out { dir: tracked_dir(), ext: "docx" };
+    let out = Out {
+        dir: tracked_dir(),
+        ext: "docx",
+    };
     let _ = std::fs::remove_dir_all(tracked_dir());
     let mut failures = vec![];
     // design → (runs, exported, accept ok, reject ok, well-formed)
@@ -260,31 +341,59 @@ fn corpus_tracked_changes() {
     let mut per_edit: BTreeMap<(String, &str), (usize, usize)> = BTreeMap::new();
     for (name, bytes) in &files {
         let (blocks, rem, _, _) = Docx.split(bytes, &RAW).unwrap();
-        let cx = Cx { fmt: &Docx, rem: &rem };
-        let d = Doc { blocks, entries: rem.entries.clone() };
+        let cx = Cx {
+            fmt: &Docx,
+            rem: &rem,
+        };
+        let d = Doc {
+            blocks,
+            entries: rem.entries.clone(),
+        };
         let text = Docx.text_of(&d.blocks, &rem);
         // No edit: the tracked export is the direct one, byte for byte.
         let h0 = History::new(&text, &rem).unwrap();
         let direct = DocxEngine.export(&text, &rem).unwrap();
-        let tracked0 = DocxEngine.export_with(&text, &rem, &reviewer(), Some(&h0)).unwrap();
+        let tracked0 = DocxEngine
+            .export_with(&text, &rem, &reviewer(), Some(&h0))
+            .unwrap();
         if tracked0 != direct {
-            failures.push(format!("{name}: a tracked export with no edit differs from the direct export"));
+            failures.push(format!(
+                "{name}: a tracked export with no edit differs from the direct export"
+            ));
         }
         out.save(name, "getput", &direct);
-        let jobs = hanji_testkit::edit_jobs(&Docx, &d, &cx, &text, &hanji_testkit::EDITS, "E10", None);
-        for Job { name: ename, new_text, span, .. } in jobs {
+        let jobs =
+            hanji_testkit::edit_jobs(&Docx, &d, &cx, &text, &hanji_testkit::EDITS, "E10", None);
+        for Job {
+            name: ename,
+            new_text,
+            span,
+            ..
+        } in jobs
+        {
             let short = ename.split_whitespace().next().unwrap().to_string();
-            let mut designs = vec![("C", vec![hanji_core::reanchor_rewrite(&rem, &text, &new_text, CAPS).unwrap()])];
+            let mut designs = vec![(
+                "C",
+                vec![hanji_core::reanchor_rewrite(&rem, &text, &new_text, CAPS).unwrap()],
+            )];
             if let Some((s, e, new)) = &span {
-                designs.push(("exact", vec![hanji_core::reanchor_span(&rem, &text, *s, *e, new, CAPS).unwrap()]));
+                designs.push((
+                    "exact",
+                    vec![hanji_core::reanchor_span(&rem, &text, *s, *e, new, CAPS).unwrap()],
+                ));
             }
             if short == "E10" {
                 // The same edits one at a time, each an exact span where it is local.
                 let steps = edit_chain(&text, &rem, true);
-                if steps.last().is_some_and(|r| Docx.text_of(&r.new, &r.remainder) == new_text) {
+                if steps
+                    .last()
+                    .is_some_and(|r| Docx.text_of(&r.new, &r.remainder) == new_text)
+                {
                     designs.push(("steps", steps));
                 } else {
-                    failures.push(format!("{name}: the edits one at a time do not give E10's text"));
+                    failures.push(format!(
+                        "{name}: the edits one at a time do not give E10's text"
+                    ));
                 }
                 // And without the move (E4), which a tracked export refuses when it moves a placeholder.
                 designs.push(("steps-no-E4", edit_chain(&text, &rem, false)));
@@ -295,15 +404,17 @@ fn corpus_tracked_changes() {
                 let t = totals.entry(design).or_default();
                 t[0] += 1;
                 // Option off: the same bytes as export.
-                let off = DocxEngine.export_with(&r.text, &r.remainder, &ExportOptions::default(), None);
+                let off =
+                    DocxEngine.export_with(&r.text, &r.remainder, &ExportOptions::default(), None);
                 if off.ok() != DocxEngine.export(&r.text, &r.remainder).ok() {
-                    failures.push(format!("{name} {tag}: export with the option off differs from export"));
+                    failures.push(format!(
+                        "{name} {tag}: export with the option off differs from export"
+                    ));
                 }
                 let mut h = History::new(&text, &rem).unwrap();
-                let pkg = steps
-                    .iter()
-                    .try_for_each(|r| h.push(r))
-                    .and_then(|_| DocxEngine.export_with(&r.text, &r.remainder, &reviewer(), Some(&h)));
+                let pkg = steps.iter().try_for_each(|r| h.push(r)).and_then(|_| {
+                    DocxEngine.export_with(&r.text, &r.remainder, &reviewer(), Some(&h))
+                });
                 let pkg = match pkg {
                     Ok(p) => p,
                     Err(e) => {
@@ -311,7 +422,9 @@ fn corpus_tracked_changes() {
                         if report {
                             println!("  {name} {tag}: {why}");
                         }
-                        *refusals.entry(format!("[{design}] {}", refusal_kind(&why))).or_default() += 1;
+                        *refusals
+                            .entry(format!("[{design}] {}", refusal_kind(&why)))
+                            .or_default() += 1;
                         continue;
                     }
                 };
@@ -332,7 +445,10 @@ fn corpus_tracked_changes() {
                     failures.push(format!("{name} {tag}: not well-formed"));
                 }
                 let edited = Docx.text_of(&r.new, &r.remainder);
-                for (accept, want, k, what) in [(true, &edited, 2, "accepted"), (false, &text, 3, "rejected")] {
+                for (accept, want, k, what) in [
+                    (true, &edited, 2, "accepted"),
+                    (false, &text, 3, "rejected"),
+                ] {
                     let got = review::resolve(&pkg, AUTHOR, accept).and_then(|p| {
                         out.save(name, &format!("{tag}.{what}"), &p);
                         let left = review::count(&p, AUTHOR);
@@ -343,7 +459,10 @@ fn corpus_tracked_changes() {
                     });
                     match got {
                         Ok(g) if &g == want => t[k] += 1,
-                        Ok(g) => failures.push(format!("{name} {tag}: {what} text differs\n{}", first_diff(want, &g))),
+                        Ok(g) => failures.push(format!(
+                            "{name} {tag}: {what} text differs\n{}",
+                            first_diff(want, &g)
+                        )),
                         Err(e) => failures.push(format!("{name} {tag}: {what}: {e}")),
                     }
                 }
@@ -389,7 +508,10 @@ fn refusal_kind(why: &str) -> String {
     match why.find("placeholder k") {
         Some(k) => {
             let rest = &why[k..];
-            let kind = rest.split_once('(').and_then(|x| x.1.split_once(':')).map_or("", |x| x.0);
+            let kind = rest
+                .split_once('(')
+                .and_then(|x| x.1.split_once(':'))
+                .map_or("", |x| x.0);
             format!("{}placeholder ({kind})", &why[..k])
         }
         None => why.split(':').next().unwrap_or(why).to_string(),
@@ -407,8 +529,19 @@ fn edit_chain(text: &str, rem: &Remainder, with_move: bool) -> Vec<hanji_core::R
             continue;
         }
         let blocks = hanji_testkit::written(&Docx, &text, &rem);
-        let d = Doc { blocks, entries: rem.entries.clone() };
-        let Some(ed) = f(&d, &Cx { fmt: &Docx, rem: &rem }) else { continue };
+        let d = Doc {
+            blocks,
+            entries: rem.entries.clone(),
+        };
+        let Some(ed) = f(
+            &d,
+            &Cx {
+                fmt: &Docx,
+                rem: &rem,
+            },
+        ) else {
+            continue;
+        };
         let new_text = Docx.text_of(&ed.blocks, &rem);
         let r = if ed.local {
             let (a, b, repl) = hanji_testkit::edit_span(&text, &new_text);

@@ -43,7 +43,10 @@ fn is_effects(e: &Element) -> bool {
 /// The effects of `el`'s own `p:spPr`, if it sets them (an empty list is
 /// none, set).
 pub fn own(el: &Element) -> Option<EffectsXml> {
-    el.child("p:spPr")?.elements().find(|e| is_effects(e)).map(Element::to_xml)
+    el.child("p:spPr")?
+        .elements()
+        .find(|e| is_effects(e))
+        .map(Element::to_xml)
 }
 
 /// The effects `el`'s `p:style` gives: its `a:effectRef` style from the theme.
@@ -54,17 +57,28 @@ pub fn from_style(el: &Element, theme: &ThemeFills) -> Option<EffectsXml> {
         return None;
     }
     let style = fragment(theme.effects.get(idx - 1)?);
-    let xml = style.elements().find(|e| is_effects(e)).map_or_else(|| "<a:effectLst/>".into(), Element::to_xml);
+    let xml = style
+        .elements()
+        .find(|e| is_effects(e))
+        .map_or_else(|| "<a:effectLst/>".into(), Element::to_xml);
     Some(xml)
 }
 
 /// What `el` inherits: its style's effects, else `parent`'s.
-pub fn inherited(el: &Element, parent: Option<&EffectsXml>, theme: &ThemeFills) -> Option<EffectsXml> {
+pub fn inherited(
+    el: &Element,
+    parent: Option<&EffectsXml>,
+    theme: &ThemeFills,
+) -> Option<EffectsXml> {
     from_style(el, theme).or_else(|| parent.cloned())
 }
 
 /// The effects `el` draws.
-pub fn effective(el: &Element, parent: Option<&EffectsXml>, theme: &ThemeFills) -> Option<EffectsXml> {
+pub fn effective(
+    el: &Element,
+    parent: Option<&EffectsXml>,
+    theme: &ThemeFills,
+) -> Option<EffectsXml> {
     own(el).or_else(|| inherited(el, parent, theme))
 }
 
@@ -98,7 +112,8 @@ pub fn shown(xml: Option<&EffectsXml>) -> Option<String> {
 pub fn without_effects(el: &Element) -> Element {
     let mut e = el.clone();
     if let Some(sp) = e.child_mut("p:spPr") {
-        sp.children.retain(|n| !matches!(n, Node::El(c) if is_effects(c)));
+        sp.children
+            .retain(|n| !matches!(n, Node::El(c) if is_effects(c)));
     }
     e
 }
@@ -112,8 +127,11 @@ fn set_own(el: &mut Element, xml: Option<&str>) {
             .map_or(0, |k| k + 1);
         el.children.insert(at, Node::El(Element::new("p:spPr")));
     }
-    let Some(sp) = el.child_mut("p:spPr") else { return };
-    sp.children.retain(|n| !matches!(n, Node::El(c) if is_effects(c)));
+    let Some(sp) = el.child_mut("p:spPr") else {
+        return;
+    };
+    sp.children
+        .retain(|n| !matches!(n, Node::El(c) if is_effects(c)));
     if let Some(x) = xml {
         insert_ordered(sp, fragment(x), SPPR_ORDER);
     }
@@ -160,14 +178,25 @@ mod tests {
             ..Default::default()
         };
         let sp = fragment("<p:sp><p:nvSpPr/><p:spPr><a:prstGeom prst=\"rect\"/><a:ln/></p:spPr><p:style><a:effectRef idx=\"2\"/></p:style></p:sp>");
-        assert_eq!(shown(effective(&sp, None, &theme).as_ref()).as_deref(), Some("shadow glow"));
+        assert_eq!(
+            shown(effective(&sp, None, &theme).as_ref()).as_deref(),
+            Some("shadow glow")
+        );
         // None over the style's: an empty list after the outline.
         let mut e = sp.clone();
         write(&mut e, None, None, &theme).unwrap();
-        assert!(e.to_xml().contains("<a:ln/><a:effectLst/></p:spPr>"), "{}", e.to_xml());
+        assert!(
+            e.to_xml().contains("<a:ln/><a:effectLst/></p:spPr>"),
+            "{}",
+            e.to_xml()
+        );
         // The preset shadow, then back to the style's: its own goes.
         write(&mut e, Some("shadow"), None, &theme).unwrap();
-        assert!(e.to_xml().contains(&format!("<a:ln/>{SHADOW}</p:spPr>")), "{}", e.to_xml());
+        assert!(
+            e.to_xml().contains(&format!("<a:ln/>{SHADOW}</p:spPr>")),
+            "{}",
+            e.to_xml()
+        );
         write(&mut e, Some("shadow glow"), None, &theme).unwrap();
         assert_eq!(e, sp);
         assert!(write(&mut e, Some("glow"), None, &theme).is_err());

@@ -17,12 +17,16 @@ fn ours(e: &Element, author: &str) -> bool {
 }
 
 fn has_mark(p: &Element, name: &str, author: &str) -> bool {
-    p.child("w:pPr").and_then(|x| x.child("w:rPr")).and_then(|r| r.child(name)).is_some_and(|m| ours(m, author))
+    p.child("w:pPr")
+        .and_then(|x| x.child("w:rPr"))
+        .and_then(|r| r.child(name))
+        .is_some_and(|m| ours(m, author))
 }
 
 fn drop_mark(p: &mut Element, name: &str, author: &str) {
     if let Some(r) = p.child_mut("w:pPr").and_then(|x| x.child_mut("w:rPr")) {
-        r.children.retain(|n| !matches!(n, Node::El(e) if e.is(name) && ours(e, author)));
+        r.children
+            .retain(|n| !matches!(n, Node::El(e) if e.is(name) && ours(e, author)));
     }
     if let Some(ppr) = p.child_mut("w:pPr") {
         ppr.children
@@ -36,18 +40,28 @@ fn props(e: &mut Element, author: &str, accept: bool) {
         if !e.is(holder) {
             continue;
         }
-        let at = e.children.iter().position(|n| matches!(n, Node::El(c) if c.is(change) && ours(c, author)));
+        let at = e
+            .children
+            .iter()
+            .position(|n| matches!(n, Node::El(c) if c.is(change) && ours(c, author)));
         let Some(at) = at else { continue };
-        let Node::El(c) = e.children.remove(at) else { unreachable!() };
+        let Node::El(c) = e.children.remove(at) else {
+            unreachable!()
+        };
         if accept {
             continue;
         }
-        let old = c.child(holder).cloned().unwrap_or_else(|| Element::new(holder));
+        let old = c
+            .child(holder)
+            .cloned()
+            .unwrap_or_else(|| Element::new(holder));
         // A paragraph's stored properties leave out its mark's run properties and section.
         let keep: Vec<Node> = e
             .children
             .drain(..)
-            .filter(|n| holder == "w:pPr" && matches!(n, Node::El(x) if x.is("w:rPr") || x.is("w:sectPr")))
+            .filter(|n| {
+                holder == "w:pPr" && matches!(n, Node::El(x) if x.is("w:rPr") || x.is("w:sectPr"))
+            })
             .collect();
         e.children = old.children;
         for n in keep {
@@ -66,7 +80,10 @@ fn runs(e: &mut Element, author: &str, accept: bool) {
             out.push(n);
             continue;
         };
-        let (ins, del) = (c.is("w:ins") && ours(&c, author), c.is("w:del") && ours(&c, author));
+        let (ins, del) = (
+            c.is("w:ins") && ours(&c, author),
+            c.is("w:del") && ours(&c, author),
+        );
         if (ins && !accept) || (del && accept) {
             continue;
         }
@@ -105,9 +122,14 @@ fn container(e: &mut Element, author: &str, accept: bool) -> Result<(), String> 
         }
     }
     // Tables whose rows all went.
-    e.children.retain(|n| !matches!(n, Node::El(t) if t.is("w:tbl") && t.child("w:tr").is_none()));
+    e.children
+        .retain(|n| !matches!(n, Node::El(t) if t.is("w:tbl") && t.child("w:tr").is_none()));
     // Paragraph marks: a removed one joins its paragraph to the next.
-    let (gone, stays) = if accept { ("w:del", "w:ins") } else { ("w:ins", "w:del") };
+    let (gone, stays) = if accept {
+        ("w:del", "w:ins")
+    } else {
+        ("w:ins", "w:del")
+    };
     let mut k = 0;
     while k < e.children.len() {
         let Node::El(p) = &e.children[k] else {
@@ -119,7 +141,9 @@ fn container(e: &mut Element, author: &str, accept: bool) -> Result<(), String> 
             continue;
         }
         if !has_mark(p, gone, author) {
-            let Node::El(p) = &mut e.children[k] else { unreachable!() };
+            let Node::El(p) = &mut e.children[k] else {
+                unreachable!()
+            };
             drop_mark(p, stays, author);
             k += 1;
             continue;
@@ -128,26 +152,49 @@ fn container(e: &mut Element, author: &str, accept: bool) -> Result<(), String> 
         let block = |n: &Node| matches!(n, Node::El(x) if matches!(x.local(), "p" | "tbl" | "sdt" | "sectPr" | "customXml" | "altChunk"));
         let next = (k + 1..e.children.len()).find(|&j| block(&e.children[j]));
         let Some(j) = next.filter(|&j| matches!(&e.children[j], Node::El(n) if n.is("w:p"))) else {
-            return Err(format!("a removed paragraph mark has no paragraph after it (in <{}>)", e.name));
+            return Err(format!(
+                "a removed paragraph mark has no paragraph after it (in <{}>)",
+                e.name
+            ));
         };
-        let Node::El(p) = e.children.remove(k) else { unreachable!() };
-        let content: Vec<Node> =
-            p.children.into_iter().filter(|n| !matches!(n, Node::El(x) if x.is("w:pPr"))).collect();
-        let Node::El(q) = &mut e.children[j - 1] else { unreachable!() };
-        let at = q.children.iter().position(|n| matches!(n, Node::El(x) if x.is("w:pPr"))).map_or(0, |a| a + 1);
+        let Node::El(p) = e.children.remove(k) else {
+            unreachable!()
+        };
+        let content: Vec<Node> = p
+            .children
+            .into_iter()
+            .filter(|n| !matches!(n, Node::El(x) if x.is("w:pPr")))
+            .collect();
+        let Node::El(q) = &mut e.children[j - 1] else {
+            unreachable!()
+        };
+        let at = q
+            .children
+            .iter()
+            .position(|n| matches!(n, Node::El(x) if x.is("w:pPr")))
+            .map_or(0, |a| a + 1);
         q.children.splice(at..at, content);
     }
     Ok(())
 }
 
 fn table(t: &mut Element, author: &str, accept: bool) -> Result<(), String> {
-    let (gone, stays) = if accept { ("w:del", "w:ins") } else { ("w:ins", "w:del") };
-    let marked =
-        |tr: &Element, name: &str| tr.child("w:trPr").and_then(|x| x.child(name)).is_some_and(|m| ours(m, author));
-    t.children.retain(|n| !matches!(n, Node::El(tr) if tr.is("w:tr") && marked(tr, gone)));
+    let (gone, stays) = if accept {
+        ("w:del", "w:ins")
+    } else {
+        ("w:ins", "w:del")
+    };
+    let marked = |tr: &Element, name: &str| {
+        tr.child("w:trPr")
+            .and_then(|x| x.child(name))
+            .is_some_and(|m| ours(m, author))
+    };
+    t.children
+        .retain(|n| !matches!(n, Node::El(tr) if tr.is("w:tr") && marked(tr, gone)));
     for tr in t.elements_mut().filter(|x| x.is("w:tr")) {
         if let Some(pr) = tr.child_mut("w:trPr") {
-            pr.children.retain(|n| !matches!(n, Node::El(m) if m.is(stays) && ours(m, author)));
+            pr.children
+                .retain(|n| !matches!(n, Node::El(m) if m.is(stays) && ours(m, author)));
         }
         tr.children
             .retain(|n| !matches!(n, Node::El(x) if x.is("w:trPr") && x.children.is_empty() && x.attrs.is_empty()));
@@ -161,7 +208,10 @@ fn table(t: &mut Element, author: &str, accept: bool) -> Result<(), String> {
 /// The package with every change by `author` accepted (or rejected).
 pub fn resolve(pkg: &[u8], author: &str, accept: bool) -> Result<Vec<u8>, String> {
     let mut parts = package::read(pkg)?;
-    let doc = parts.iter_mut().find(|p| p.name == "word/document.xml").ok_or("no document part")?;
+    let doc = parts
+        .iter_mut()
+        .find(|p| p.name == "word/document.xml")
+        .ok_or("no document part")?;
     let mut d = xml::parse(&doc.data).map_err(|e| e.to_string())?;
     let body = d.root.child_mut("w:body").ok_or("no body")?;
     container(body, author, accept)?;
@@ -174,6 +224,7 @@ pub fn count(pkg: &[u8], author: &str) -> usize {
     let parts = package::read(pkg).unwrap();
     let d = xml::parse(package::get(&parts, "word/document.xml").unwrap()).unwrap();
     let mut n = 0;
-    d.root.walk(&mut |e| n += (e.get("w:author").as_deref() == Some(author)) as usize);
+    d.root
+        .walk(&mut |e| n += (e.get("w:author").as_deref() == Some(author)) as usize);
     n
 }

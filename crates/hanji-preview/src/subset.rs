@@ -12,30 +12,51 @@ use allsorts::tag;
 /// `font`'s face `index` with only the glyphs `chars` map to (and `.notdef`).
 pub fn subset(font: &[u8], index: u32, chars: &BTreeSet<char>) -> Result<Vec<u8>, String> {
     let face = ttf_parser::Face::parse(font, index).map_err(|e| format!("not a font: {e}"))?;
-    let mut glyphs: Vec<u16> =
-        chars.iter().filter_map(|&c| face.glyph_index(c)).map(|g| g.0).filter(|&g| g != 0).collect();
+    let mut glyphs: Vec<u16> = chars
+        .iter()
+        .filter_map(|&c| face.glyph_index(c))
+        .map(|g| g.0)
+        .filter(|&g| g != 0)
+        .collect();
     glyphs.sort_unstable();
     glyphs.dedup();
     glyphs.insert(0, 0);
-    let data = ReadScope::new(font).read::<FontData<'_>>().map_err(|e| format!("not a font: {e}"))?;
-    let provider = data.table_provider(index as usize).map_err(|e| format!("not a font: {e}"))?;
+    let data = ReadScope::new(font)
+        .read::<FontData<'_>>()
+        .map_err(|e| format!("not a font: {e}"))?;
+    let provider = data
+        .table_provider(index as usize)
+        .map_err(|e| format!("not a font: {e}"))?;
     // Some valid Apple fonts have no OS/2 table. Keep it and the TrueType
     // hinting programs when present, without requiring optional tables.
     let mut tables = vec![tag::OS_2, tag::CVT, tag::FPGM, tag::PREP];
     tables.retain(|t| allsorts::tables::FontTableProvider::has_table(&provider, *t));
     let profile = SubsetProfile::Custom(
-        [tag::CMAP, tag::HEAD, tag::HHEA, tag::HMTX, tag::MAXP, tag::NAME, tag::POST]
-            .into_iter()
-            .chain(tables)
-            .collect(),
+        [
+            tag::CMAP,
+            tag::HEAD,
+            tag::HHEA,
+            tag::HMTX,
+            tag::MAXP,
+            tag::NAME,
+            tag::POST,
+        ]
+        .into_iter()
+        .chain(tables)
+        .collect(),
     );
-    cut(&provider, &glyphs, &profile, CmapTarget::Unicode).map_err(|e| format!("cannot subset the font: {e}"))
+    cut(&provider, &glyphs, &profile, CmapTarget::Unicode)
+        .map_err(|e| format!("cannot subset the font: {e}"))
 }
 
 /// The `@font-face` rule for a subset font named `hanji-font-{id}`.
 pub fn font_face(id: u32, data: &[u8], bold: bool, italic: bool) -> String {
     use base64::Engine as _;
-    let (mime, format) = if data.starts_with(b"OTTO") { ("font/otf", "opentype") } else { ("font/ttf", "truetype") };
+    let (mime, format) = if data.starts_with(b"OTTO") {
+        ("font/otf", "opentype")
+    } else {
+        ("font/ttf", "truetype")
+    };
     format!(
         "@font-face{{font-family:'hanji-font-{id}';src:url('data:{mime};base64,{}') format('{format}');font-weight:{};font-style:{}}}",
         base64::engine::general_purpose::STANDARD.encode(data),
@@ -60,13 +81,22 @@ mod tests {
             .flatten()
             .copied()
             .collect();
-        assert_eq!(records.len(), (n - 1) * 16, "the fixture contains the table");
+        assert_eq!(
+            records.len(),
+            (n - 1) * 16,
+            "the fixture contains the table"
+        );
         out[12..12 + records.len()].copy_from_slice(&records);
         out[12 + records.len()..12 + n * 16].fill(0);
         let n = (n - 1) as u16;
         let selector = 15 - n.leading_zeros() as u16;
         let search_range = (1u16 << selector) * 16;
-        for (at, value) in [(4, n), (6, search_range), (8, selector), (10, n * 16 - search_range)] {
+        for (at, value) in [
+            (4, n),
+            (6, search_range),
+            (8, selector),
+            (10, n * 16 - search_range),
+        ] {
             out[at..at + 2].copy_from_slice(&value.to_be_bytes());
         }
         out
@@ -76,14 +106,21 @@ mod tests {
     fn a_font_without_optional_os2_keeps_its_glyphs_and_cmap() {
         let original = oxml_layout::bundled_fonts::bundled_font_data()[0].1;
         let font = without_table(original, b"OS/2");
-        assert!(ttf_parser::Face::parse(&font, 0).unwrap().tables().os2.is_none());
+        assert!(ttf_parser::Face::parse(&font, 0)
+            .unwrap()
+            .tables()
+            .os2
+            .is_none());
         let chars: BTreeSet<char> = "Hello, 2026".chars().collect();
         let out = subset(&font, 0, &chars).unwrap();
         let face = ttf_parser::Face::parse(&out, 0).unwrap();
         assert!(face.tables().os2.is_none());
         assert!(face.tables().cmap.is_some());
         for c in chars {
-            assert!(face.glyph_index(c).is_some(), "{c:?} survives subsetting without OS/2");
+            assert!(
+                face.glyph_index(c).is_some(),
+                "{c:?} survives subsetting without OS/2"
+            );
         }
         assert!(face.glyph_index('Z').is_none());
     }
@@ -101,7 +138,12 @@ mod tests {
         let carlito = oxml_layout::bundled_fonts::bundled_font_data()[0].1;
         let chars: BTreeSet<char> = "Hello, 2026".chars().collect();
         let out = subset(carlito, 0, &chars).unwrap();
-        assert!(out.len() * 10 < carlito.len(), "{} of {}", out.len(), carlito.len());
+        assert!(
+            out.len() * 10 < carlito.len(),
+            "{} of {}",
+            out.len(),
+            carlito.len()
+        );
         let f = ttf_parser::Face::parse(&out, 0).unwrap();
         for c in chars {
             assert!(f.glyph_index(c).is_some(), "{c:?} is in the cmap");

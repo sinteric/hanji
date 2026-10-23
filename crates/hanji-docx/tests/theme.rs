@@ -10,7 +10,13 @@ use hanji_format::vocab::{Color, ColorBase, Tint};
 const THEME: &str = r#"<a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:themeElements><a:clrScheme name="Office"><a:dk1><a:sysClr val="windowText" lastClr="000000"/></a:dk1><a:lt1><a:sysClr val="window" lastClr="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="44546A"/></a:dk2><a:lt2><a:srgbClr val="E7E6E6"/></a:lt2><a:accent1><a:srgbClr val="4472C4"/></a:accent1><a:accent2><a:srgbClr val="ED7D31"/></a:accent2><a:hlink><a:srgbClr val="0563C1"/></a:hlink><a:folHlink><a:srgbClr val="954F72"/></a:folHlink></a:clrScheme></a:themeElements></a:theme>"#;
 
 fn part(name: &str, xml: &str) -> Part {
-    Part { name: name.into(), data: xml.as_bytes().to_vec(), dos_time: 0, external_attr: 0, deflate: true }
+    Part {
+        name: name.into(),
+        data: xml.as_bytes().to_vec(),
+        dos_time: 0,
+        external_attr: 0,
+        deflate: true,
+    }
 }
 
 fn theme(settings: Option<&str>) -> Theme {
@@ -20,7 +26,11 @@ fn theme(settings: Option<&str>) -> Theme {
 }
 
 fn color(name: &str, tint: Tint) -> Color {
-    Color { base: ColorBase::Theme(name.into()), tint, alpha: None }
+    Color {
+        base: ColorBase::Theme(name.into()),
+        tint,
+        alpha: None,
+    }
 }
 
 /// The resolved colour as `RRGGBB`.
@@ -92,14 +102,22 @@ fn lighter_and_darker_are_offices_own_values() {
 #[test]
 fn opacity_is_kept_and_what_a_theme_cannot_say_is_not_resolved() {
     let t = theme(None);
-    let faded = Color { alpha: Some(50), ..color("accent1", Tint::None) };
+    let faded = Color {
+        alpha: Some(50),
+        ..color("accent1", Tint::None)
+    };
     let r = t.resolve(&faded).unwrap();
-    assert_eq!((r.base, r.alpha), (ColorBase::Rgb([0x44, 0x72, 0xC4]), Some(50)));
+    assert_eq!(
+        (r.base, r.alpha),
+        (ColorBase::Rgb([0x44, 0x72, 0xc4]), Some(50))
+    );
     // Not a theme colour, not in this theme, another transform, or no theme at all.
     assert!(t.resolve(&Color::rgb(1, 2, 3)).is_none());
     assert!(t.resolve(&color("accent5", Tint::None)).is_none());
     assert!(t.resolve(&color("accent1", Tint::Other)).is_none());
-    assert!(Theme::read(&[]).resolve(&color("accent1", Tint::None)).is_none());
+    assert!(Theme::read(&[])
+        .resolve(&color("accent1", Tint::None))
+        .is_none());
 }
 
 #[test]

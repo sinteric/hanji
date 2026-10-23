@@ -30,8 +30,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
+      # The pinned nightly rustfmt; scripts/fmt.py names it (STYLE.md).
       - name: Rust formatting
-        run: cargo fmt --all --check
+        run: python3 scripts/fmt.py --check
       - name: Static Rust checks
         run: cargo clippy --locked --workspace --all-targets -- -D warnings
       # The preview's Korean tests draw with a Hangul font (crates/hanji-preview/tests/render.rs).

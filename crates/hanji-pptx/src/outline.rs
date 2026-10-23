@@ -72,7 +72,10 @@ impl Ln {
     pub fn of(ln: &Element) -> Ln {
         Ln {
             w: ln.get("w").and_then(|v| v.trim().parse().ok()),
-            fill: ln.elements().find(|e| FILLS.contains(&e.name.as_str())).map(Element::to_xml),
+            fill: ln
+                .elements()
+                .find(|e| FILLS.contains(&e.name.as_str()))
+                .map(Element::to_xml),
             dash: ln
                 .child("a:prstDash")
                 .and_then(|d| d.get("val"))
@@ -119,11 +122,19 @@ impl Ln {
         // 0.75 pt when nothing sets it, as PowerPoint draws it.
         let w = self.w.unwrap_or(9525);
         let width = ((w as f64) / EMU_PER_CENTI_PT as f64).round().max(1.0) as i64;
-        Some(Border::Line { width, style: style.into(), color: Color::parse(&color).ok()? }.to_string())
+        Some(
+            Border::Line {
+                width,
+                style: style.into(),
+                color: Color::parse(&color).ok()?,
+            }
+            .to_string(),
+        )
     }
 
     fn arrow(v: &Option<String>) -> Option<String> {
-        v.clone().filter(|t| t != "none" && look::ARROWS.contains(&t.as_str()))
+        v.clone()
+            .filter(|t| t != "none" && look::ARROWS.contains(&t.as_str()))
     }
 
     /// The look this outline gives: its border, and for a line its arrowheads.
@@ -143,7 +154,10 @@ pub fn from_style(el: &Element, theme: &ThemeFills) -> Option<Ln> {
     let r = el.child("p:style")?.child("a:lnRef")?;
     let idx: usize = r.get("idx")?.trim().parse().ok()?;
     if idx == 0 {
-        return Some(Ln { fill: Some("<a:noFill/>".into()), ..Default::default() });
+        return Some(Ln {
+            fill: Some("<a:noFill/>".into()),
+            ..Default::default()
+        });
     }
     let mut ln = fragment(theme.lines.get(idx - 1)?);
     if let Some(c) = r.elements().next() {
@@ -173,7 +187,8 @@ pub fn effective(el: &Element, parent: Option<&Ln>, theme: &ThemeFills) -> Ln {
 pub fn without_outline(el: &Element) -> Element {
     let mut e = el.clone();
     if let Some(sp) = e.child_mut("p:spPr") {
-        sp.children.retain(|n| !matches!(n, Node::El(c) if c.is("a:ln")));
+        sp.children
+            .retain(|n| !matches!(n, Node::El(c) if c.is("a:ln")));
     }
     e
 }
@@ -181,7 +196,11 @@ pub fn without_outline(el: &Element) -> Element {
 /// The parts of a canonical border: width (hundredths of a point), style, colour.
 fn parts(b: &str) -> Option<(i64, String, String)> {
     match Border::parse(b).ok()? {
-        Border::Line { width, style, color } => Some((width, style, color.to_string())),
+        Border::Line {
+            width,
+            style,
+            color,
+        } => Some((width, style, color.to_string())),
         Border::None => None,
     }
 }
@@ -201,7 +220,13 @@ fn dash_of(style: &str) -> &'static str {
 /// style, colour, an arrowhead) is set in `el`'s own `a:ln`, the others
 /// kept; no border is `a:noFill`. A style or colour the text cannot write
 /// (`triple`, `accent1*`) is refused.
-pub fn write(el: &mut Element, want: &Look, parent: Option<&Ln>, theme: &ThemeFills, line: bool) -> Result<(), String> {
+pub fn write(
+    el: &mut Element,
+    want: &Look,
+    parent: Option<&Ln>,
+    theme: &ThemeFills,
+    line: bool,
+) -> Result<(), String> {
     let now = effective(el, parent, theme);
     let had = now.look(line);
     if had.border == want.border && had.start == want.start && had.end == want.end {
@@ -209,9 +234,14 @@ pub fn write(el: &mut Element, want: &Look, parent: Option<&Ln>, theme: &ThemeFi
     }
     // Taken back to what the style or layout gives: the element's own outline goes.
     let base = inherited(el, parent, theme).look(line);
-    if own(el).is_some() && base.border == want.border && base.start == want.start && base.end == want.end {
+    if own(el).is_some()
+        && base.border == want.border
+        && base.start == want.start
+        && base.end == want.end
+    {
         if let Some(sp) = el.child_mut("p:spPr") {
-            sp.children.retain(|n| !matches!(n, Node::El(c) if c.is("a:ln")));
+            sp.children
+                .retain(|n| !matches!(n, Node::El(c) if c.is("a:ln")));
         }
         return Ok(());
     }
@@ -233,7 +263,8 @@ pub fn write(el: &mut Element, want: &Look, parent: Option<&Ln>, theme: &ThemeFi
             (None, _) => set_fill(ln, "<a:noFill/>"),
             (Some(w), old) => {
                 let (width, style, color) = parts(w).ok_or("a border that cannot be read")?;
-                let (ow, os, oc) = old.map_or((None, None, None), |(a, b, c)| (Some(a), Some(b), Some(c)));
+                let (ow, os, oc) =
+                    old.map_or((None, None, None), |(a, b, c)| (Some(a), Some(b), Some(c)));
                 if ow != Some(width) {
                     ln.set("w", &(width * EMU_PER_CENTI_PT).to_string());
                 }
@@ -247,20 +278,29 @@ pub fn write(el: &mut Element, want: &Look, parent: Option<&Ln>, theme: &ThemeFi
                     if look::is_kept_border(w) {
                         return Err(format!("border={w}: the style {style} is shown for a line the file draws so, and cannot be written; write solid, dashed, dotted, double, dash-dot or dash-dot-dot"));
                     }
-                    ln.children.retain(|n| !matches!(n, Node::El(c) if c.is("a:prstDash") || c.is("a:custDash")));
+                    ln.children.retain(
+                        |n| !matches!(n, Node::El(c) if c.is("a:prstDash") || c.is("a:custDash")),
+                    );
                     if style == "double" {
                         ln.set("cmpd", "dbl");
                     } else {
                         if now.cmpd.as_deref().is_some_and(|c| c != "sng") {
                             ln.set("cmpd", "sng");
                         }
-                        insert_ordered(ln, Element::new("a:prstDash").with_attr("val", dash_of(&style)), LN_ORDER);
+                        insert_ordered(
+                            ln,
+                            Element::new("a:prstDash").with_attr("val", dash_of(&style)),
+                            LN_ORDER,
+                        );
                     }
                 }
             }
         }
     }
-    for (name, want, had) in [("a:headEnd", &want.start, &had.start), ("a:tailEnd", &want.end, &had.end)] {
+    for (name, want, had) in [
+        ("a:headEnd", &want.start, &had.start),
+        ("a:tailEnd", &want.end, &had.end),
+    ] {
         if want == had {
             continue;
         }
@@ -274,7 +314,8 @@ pub fn write(el: &mut Element, want: &Look, parent: Option<&Ln>, theme: &ThemeFi
 }
 
 fn set_fill(ln: &mut Element, xml: &str) {
-    ln.children.retain(|n| !matches!(n, Node::El(c) if FILLS.contains(&c.name.as_str())));
+    ln.children
+        .retain(|n| !matches!(n, Node::El(c) if FILLS.contains(&c.name.as_str())));
     insert_ordered(ln, fragment(xml), LN_ORDER);
 }
 
@@ -293,20 +334,37 @@ mod tests {
         assert_eq!(l.border().as_deref(), Some("2pt solid accent1*"));
         // A width alone: the colour the style gives is kept.
         let mut e = sp.clone();
-        let want = Look { border: Some("3pt solid accent1*".into()), ..Default::default() };
+        let want = Look {
+            border: Some("3pt solid accent1*".into()),
+            ..Default::default()
+        };
         write(&mut e, &want, None, &theme, false).unwrap();
-        assert!(e.to_xml().contains("<a:prstGeom prst=\"rect\"/><a:ln w=\"38100\"/>"), "{}", e.to_xml());
+        assert!(
+            e.to_xml()
+                .contains("<a:prstGeom prst=\"rect\"/><a:ln w=\"38100\"/>"),
+            "{}",
+            e.to_xml()
+        );
         // A kept colour cannot be written anew; a dashed red one can.
-        let want = Look { border: Some("3pt solid accent2*".into()), ..Default::default() };
+        let want = Look {
+            border: Some("3pt solid accent2*".into()),
+            ..Default::default()
+        };
         assert!(write(&mut e.clone(), &want, None, &theme, false).is_err());
-        let want = Look { border: Some("3pt dashed #FF0000".into()), ..Default::default() };
+        let want = Look {
+            border: Some("3pt dashed #FF0000".into()),
+            ..Default::default()
+        };
         write(&mut e, &want, None, &theme, false).unwrap();
         assert!(e.to_xml().contains("<a:ln w=\"38100\"><a:solidFill><a:srgbClr val=\"FF0000\"/></a:solidFill><a:prstDash val=\"dash\"/></a:ln>"), "{}", e.to_xml());
         // None, and a line's arrowheads.
         write(&mut e, &Look::default(), None, &theme, false).unwrap();
         assert_eq!(effective(&e, None, &theme).border(), None);
         let mut c = fragment("<p:cxnSp><p:nvCxnSpPr/><p:spPr><a:ln w=\"12700\"><a:solidFill><a:schemeClr val=\"tx1\"/></a:solidFill><a:tailEnd type=\"triangle\" w=\"lg\"/></a:ln></p:spPr></p:cxnSp>");
-        assert_eq!(effective(&c, None, &theme).look(true).end.as_deref(), Some("triangle"));
+        assert_eq!(
+            effective(&c, None, &theme).look(true).end.as_deref(),
+            Some("triangle")
+        );
         let want = Look {
             border: Some("1pt solid tx1".into()),
             start: Some("oval".into()),
@@ -315,7 +373,8 @@ mod tests {
         };
         write(&mut c, &want, None, &theme, true).unwrap();
         assert!(
-            c.to_xml().contains("<a:headEnd type=\"oval\"/><a:tailEnd type=\"arrow\" w=\"lg\"/>"),
+            c.to_xml()
+                .contains("<a:headEnd type=\"oval\"/><a:tailEnd type=\"arrow\" w=\"lg\"/>"),
             "{}",
             c.to_xml()
         );

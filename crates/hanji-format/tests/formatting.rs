@@ -33,29 +33,47 @@ fn canonical_formatting_reads_back_as_written() {
     assert_eq!(canonical(&doc(body)), doc(body));
     let d = parse(&doc(body)).unwrap();
     assert_eq!(d.styles.len(), 2);
-    assert_eq!(d.styles[1].props.write(), "space-before=12pt size=16pt color=accent1 bold");
+    assert_eq!(
+        d.styles[1].props.write(),
+        "space-before=12pt size=16pt color=accent1 bold"
+    );
 }
 
 #[test]
 fn shared_values_are_lifted() {
     // Every run of a paragraph has it: the paragraph's.
-    assert_eq!(canonical(&doc("[전부 빨강]{color=#FF0000}\n")), doc("전부 빨강 {color=#FF0000}\n"));
+    assert_eq!(
+        canonical(&doc("[전부 빨강]{color=#FF0000}\n")),
+        doc("전부 빨강 {color=#FF0000}\n")
+    );
     // More than half of a table's cells: the table line's; a row's: the row's.
     let cells = "| {fill=#EEEEEE} a | {fill=#EEEEEE} b |\n|---|---|\n| {fill=#EEEEEE} c | d |\n";
-    assert_eq!(canonical(&doc(cells)), doc("{fill=#EEEEEE}\n| a | b |\n|---|---|\n| c | {fill=none} d |\n"));
+    assert_eq!(
+        canonical(&doc(cells)),
+        doc("{fill=#EEEEEE}\n| a | b |\n|---|---|\n| c | {fill=none} d |\n")
+    );
     let row = "| {fill=#EEEEEE} a | {fill=#EEEEEE} b |\n|---|---|\n| c | d |\n| e | f |\n";
-    assert_eq!(canonical(&doc(row)), doc("| a | b | {fill=#EEEEEE}\n|---|---|\n| c | d |\n| e | f |\n"));
+    assert_eq!(
+        canonical(&doc(row)),
+        doc("| a | b | {fill=#EEEEEE}\n|---|---|\n| c | d |\n| e | f |\n")
+    );
 }
 
 #[test]
 fn braces_in_text_are_escaped() {
     assert_eq!(canonical(&doc("집합 \\{a, b\\}\n")), doc("집합 \\{a, b}\n"));
-    assert_eq!(canonical(&doc("[괄호 \\[1\\]]{size=9pt} 뒤\n")), doc("[괄호 \\[1\\]]{size=9pt} 뒤\n"));
+    assert_eq!(
+        canonical(&doc("[괄호 \\[1\\]]{size=9pt} 뒤\n")),
+        doc("[괄호 \\[1\\]]{size=9pt} 뒤\n")
+    );
 }
 
 #[test]
 fn what_the_syntax_cannot_say_is_refused() {
-    assert!(error("굵게 아님 {bold=no}\n").contains("bold"), "a mark is written as a mark");
+    assert!(
+        error("굵게 아님 {bold=no}\n").contains("bold"),
+        "a mark is written as a mark"
+    );
     assert!(error("문단 {valign=middle}\n").contains("valign is a cell's"));
     let e = error("<br/> {first-line=10pt}\n");
     assert!(e.contains("without text"), "{e}");
