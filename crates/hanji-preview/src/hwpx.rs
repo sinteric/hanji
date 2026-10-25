@@ -561,6 +561,55 @@ impl Preview {
         self.pages.get(index).map(|p| p.info)
     }
 
+    /// Every face's full bytes by face number, as `hanji-font-N` names them.
+    pub(crate) fn face_bytes(&self) -> Vec<(usize, Arc<[u8]>)> {
+        self.faces
+            .iter()
+            .enumerate()
+            .map(|(id, face)| (id, face.data.clone()))
+            .collect()
+    }
+
+    /// Page `index` parsed by usvg with each face's full bytes, so glyph ids
+    /// are the faces' own and one face numbers its glyphs alike on every page.
+    /// The second value maps usvg's font ids to face numbers and units per em.
+    pub(crate) fn usvg_page(
+        &self,
+        index: usize,
+    ) -> Option<Result<(resvg::usvg::Tree, crate::page_svg::Faces), String>> {
+        let page = self.pages.get(index)?;
+        let mut options = resvg::usvg::Options::default();
+        let mut names = BTreeMap::new();
+        let mut faces = std::collections::HashMap::new();
+        for &id in page.chars.keys() {
+            let loaded =
+                options
+                    .fontdb_mut()
+                    .load_font_source(resvg::usvg::fontdb::Source::Binary(Arc::new(
+                        self.faces[id].data.clone(),
+                    )));
+            let units = ttf_parser::Face::parse(&self.faces[id].data, 0)
+                .map_or(1000, |face| face.units_per_em());
+            if let Some(&loaded) = loaded.first() {
+                names.insert(format!("hanji-font-{id}"), loaded);
+                faces.insert(loaded, (id, units));
+            }
+        }
+        options.font_resolver = resvg::usvg::FontResolver {
+            select_font: Box::new(move |font, _| {
+                font.families()
+                    .iter()
+                    .find_map(|f| names.get(f.to_string().trim_matches('"')).copied())
+            }),
+            select_fallback: Box::new(|_, _, _| None),
+        };
+        Some(
+            resvg::usvg::Tree::from_str(&page.svg.to_xml(), &options)
+                .map(|tree| (tree, faces))
+                .map_err(|e| format!("usvg: {e}")),
+        )
+    }
+
     fn css(&self, subsets: &BTreeMap<usize, Arc<[u8]>>, prefix: &str) -> String {
         subsets
             .iter()

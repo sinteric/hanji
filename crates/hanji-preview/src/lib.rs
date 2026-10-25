@@ -21,6 +21,9 @@ pub mod fonts;
 #[cfg(feature = "hwpx")]
 pub mod hwpx;
 mod images;
+pub mod page;
+#[cfg(feature = "hwpx")]
+mod page_svg;
 pub mod prep;
 pub mod quality;
 pub mod sfnt;
@@ -766,6 +769,55 @@ pub fn render_pptx_with_resolver_and_limits(
     finish_preview_with_limits(layout_preview(input, stock, resolver)?, limits)
 }
 
+/// A PPTX layout for [`page::Layout`]: [`render_pptx_with_fonts_and_limits`]'s
+/// fonts and layout, prepared for the display list instead of SVG.
+pub(crate) fn layout_pptx(
+    package: &[u8],
+    opts: &FontOptions,
+    limits: ImageLimits,
+) -> Result<Preview, String> {
+    limits.validate()?;
+    let p = {
+        let (input, stock) = resolve_pptx(package)?;
+        let fonts = Fonts::from_bytes(&opts.fonts, &input.fonts, opts.aliases.clone())?;
+        layout_preview(input, stock, &fonts)?
+    };
+    finish_layout(p, limits)
+}
+
+/// Counts and diagnoses a layout for [`page::Layout`]. No font is subset:
+/// a display list carries glyph outlines, not fonts.
+pub(crate) fn finish_layout(mut p: Preview, limits: ImageLimits) -> Result<Preview, String> {
+    p.image_limits = limits;
+    p.count();
+    p.image_plan = images::ImagePlan::inspect(&p.layout, p.image_limits)?;
+    let mut seen = BTreeSet::new();
+    append_unique(
+        &mut p.diagnostics,
+        &mut seen,
+        svg::layout_diagnostics(&p.layout),
+    );
+    for k in 0..p.page_count() {
+        let diagnostics = page::page_diagnostics(&p.layout, &p.image_plan, k)
+            .ok_or_else(|| format!("cannot lay out page {}: the layout page is absent", k + 1))?;
+        append_unique(&mut p.diagnostics, &mut seen, diagnostics);
+    }
+    p.summarize_diagnostics();
+    Ok(p)
+}
+
+fn append_unique(
+    out: &mut Vec<Diagnostic>,
+    seen: &mut BTreeSet<(String, String)>,
+    ds: Vec<Diagnostic>,
+) {
+    for d in ds {
+        if seen.insert((d.path.clone(), d.message.clone())) {
+            out.push(d);
+        }
+    }
+}
+
 fn finish_preview_with_limits(mut p: Preview, limits: ImageLimits) -> Result<Preview, String> {
     p.image_limits = limits;
     finish_preview(p)
@@ -1229,17 +1281,6 @@ impl Preview {
         mut cache_remaining: usize,
     ) -> Result<(), String> {
         self.image_plan = images::ImagePlan::inspect(&self.layout, self.image_limits)?;
-        fn append_unique(
-            out: &mut Vec<Diagnostic>,
-            seen: &mut BTreeSet<(String, String)>,
-            ds: Vec<Diagnostic>,
-        ) {
-            for d in ds {
-                if seen.insert((d.path.clone(), d.message.clone())) {
-                    out.push(d);
-                }
-            }
-        }
         let mut seen = BTreeSet::new();
         let mut cache = SubsetCache::new();
         let mut all: BTreeMap<FontId, BTreeSet<char>> = BTreeMap::new();
@@ -1273,6 +1314,12 @@ impl Preview {
                 })?;
             append_unique(&mut self.diagnostics, &mut seen, diagnostics);
         }
+        self.summarize_diagnostics();
+        Ok(())
+    }
+
+    /// One warning per distinct diagnostic message, with its count.
+    fn summarize_diagnostics(&mut self) {
         let mut summaries: BTreeMap<&str, (usize, &str)> = BTreeMap::new();
         for d in &self.diagnostics {
             let message = warning_text_for_diagnostic(&d.message);
@@ -1286,7 +1333,6 @@ impl Preview {
                 format!("{message} ({count} occurrences; first at {path})")
             });
         }
-        Ok(())
     }
 
     /// Only successful preflight entries are present. Inputs stay immutable, so

@@ -27,7 +27,22 @@ pub fn render_with_fonts_and_limits(
         .map_err(|e| format!("rdocx cannot open the document: {e}"))?;
     let embedded = embedded_fonts(&document);
     let fonts = Fonts::from_bytes(&options.fonts, &embedded, options.aliases.clone())?;
-    render(&document, bytes, &fonts, limits)
+    finish_preview_with_limits(build(&document, bytes, &fonts)?, limits)
+}
+
+/// The DOCX layout for [`crate::page::Layout`]: the same fonts and layout as
+/// [`render_with_fonts_and_limits`], prepared for the display list.
+pub(crate) fn layout(
+    bytes: &[u8],
+    options: &FontOptions,
+    limits: ImageLimits,
+) -> Result<Preview, String> {
+    limits.validate()?;
+    let document = rdocx::Document::from_bytes(bytes)
+        .map_err(|e| format!("rdocx cannot open the document: {e}"))?;
+    let embedded = embedded_fonts(&document);
+    let fonts = Fonts::from_bytes(&options.fonts, &embedded, options.aliases.clone())?;
+    crate::finish_layout(build(&document, bytes, &fonts)?, limits)
 }
 
 /// DOCX preview using the optional native font-directory/system adapter.
@@ -48,7 +63,7 @@ pub fn render_native_with_limits(
         .map_err(|e| format!("rdocx cannot open the document: {e}"))?;
     let embedded = embedded_fonts(&document);
     let fonts = Fonts::load(&options.font_dirs, &embedded, options.system_fonts);
-    render(&document, bytes, &fonts, limits)
+    finish_preview_with_limits(build(&document, bytes, &fonts)?, limits)
 }
 
 fn embedded_fonts(document: &rdocx::Document) -> Vec<FontFile> {
@@ -219,11 +234,10 @@ fn prefer_script(left: Script, right: Script) -> Script {
     }
 }
 
-fn render(
+fn build(
     document: &rdocx::Document,
     bytes: &[u8],
     resolver: &dyn FontResolver,
-    limits: ImageLimits,
 ) -> Result<Preview, String> {
     let mut files = Vec::new();
     let mut infos = Vec::new();
@@ -374,21 +388,18 @@ fn render(
     {
         warnings.push(crate::NO_KOREAN_FONT.into());
     }
-    finish_preview_with_limits(
-        Preview {
-            layout,
-            image_limits: ImageLimits::default(),
-            image_plan: crate::images::ImagePlan::default(),
-            faces,
-            chars: vec![],
-            page_subsets: vec![],
-            document_subsets: vec![],
-            fonts: FontsReport::default(),
-            warnings,
-            diagnostics: vec![],
-        },
-        limits,
-    )
+    Ok(Preview {
+        layout,
+        image_limits: ImageLimits::default(),
+        image_plan: crate::images::ImagePlan::default(),
+        faces,
+        chars: vec![],
+        page_subsets: vec![],
+        document_subsets: vec![],
+        fonts: FontsReport::default(),
+        warnings,
+        diagnostics: vec![],
+    })
 }
 
 #[cfg(test)]
