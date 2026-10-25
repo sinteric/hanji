@@ -1,5 +1,7 @@
-//! The display list (`hanji_preview::page`): what it draws matches the SVG
-//! preview of the same layout, glyph for glyph.
+//! The display list (`hanji_preview::page`): what it draws matches the PNG
+//! preview of the same layout, glyph for glyph. What this cannot see: a loss
+//! the PNG preview shares, and anything this file's rasterizer does not draw
+//! (shadows, grid paints).
 
 use hanji_core::engine::{Engine, ImportOptions};
 use hanji_preview::page::{
@@ -13,6 +15,8 @@ const ENGLISH: &[u8] =
     include_bytes!("../../../prototype/preview/baseline/08-docx-new-report-en.docx");
 const KOREAN: &[u8] =
     include_bytes!("../../../prototype/preview/baseline/01-docx-untouched-korean-report.docx");
+const HWPX: &[u8] =
+    include_bytes!("../../../prototype/preview/baseline/25-hwpx-untouched-hcar-001.hwpx");
 
 #[test]
 fn every_page_starts_white_and_its_glyphs_have_outlines() {
@@ -84,19 +88,38 @@ fn a_revision_is_laid_out_through_its_export() {
 }
 
 #[test]
-fn hwpx_is_refused_until_its_layer_tree_is_lowered() {
-    let error = page::layout_with_fonts(DocumentKind::Hwpx, b"", &FontOptions::default())
-        .err()
-        .unwrap();
-    assert!(error.contains("HWPX"), "{error}");
+fn hwpx_glyphs_come_from_hanjis_faces() {
+    let layout =
+        page::layout_with_fonts(DocumentKind::Hwpx, HWPX, &FontOptions::default()).unwrap();
+    let mut glyphs = 0;
+    let mut drawn = 0;
+    for k in 0..layout.page_count() {
+        let page = layout.page(k).unwrap();
+        let info = layout.page_info(k).unwrap();
+        assert!((page.width - info.width).abs() < 0.01, "page {k} width");
+        assert!((page.height - info.height).abs() < 0.01, "page {k} height");
+        for item in &page.items {
+            if let Item::Glyphs(run) = item {
+                for g in &run.glyphs {
+                    glyphs += 1;
+                    drawn += usize::from(layout.outline(run.face, g.id).is_some());
+                }
+            }
+        }
+    }
+    assert!(
+        glyphs > 0 && drawn * 10 >= glyphs * 8,
+        "{drawn} of {glyphs}"
+    );
 }
 
 /// Mean absolute channel difference (0–255) between the display list drawn
 /// here and the SVG preview's PNG, over the pixels either one inks (not
 /// white), page by page: white margins would hide a missing line of text.
 fn compare(name: &str, kind: DocumentKind, bytes: &[u8], pages: usize, limit: f64) {
-    let layout = page::layout_with_fonts(kind, bytes, &FontOptions::default()).unwrap();
-    let preview = render_document_with_fonts(kind, bytes, &FontOptions::default()).unwrap();
+    let fonts = fonts();
+    let layout = page::layout_with_fonts(kind, bytes, &fonts).unwrap();
+    let preview = render_document_with_fonts(kind, bytes, &fonts).unwrap();
     assert_eq!(layout.page_count(), preview.page_count());
     for k in 0..layout.page_count().min(pages) {
         let PageData::Png(png) = preview
@@ -107,7 +130,13 @@ fn compare(name: &str, kind: DocumentKind, bytes: &[u8], pages: usize, limit: f6
             panic!("PNG")
         };
         let svg = tiny_skia::Pixmap::decode_png(&png).unwrap();
-        let ours = draw(&layout, k, svg.width(), svg.height());
+        let ours = draw(
+            &layout,
+            k,
+            svg.width(),
+            svg.height(),
+            kind == DocumentKind::Hwpx,
+        );
         let (mut total, mut inked) = (0_u64, 0_u64);
         for (a, b) in svg.data().chunks(4).zip(ours.data().chunks(4)) {
             if a.iter().chain(b).all(|v| *v == 255) {
@@ -134,6 +163,23 @@ fn compare(name: &str, kind: DocumentKind, bytes: &[u8], pages: usize, limit: f6
     }
 }
 
+/// The bundled faces have no Hangul, so Korean text draws as boxes unless
+/// `HANJI_PAGE_FONTS` names a directory of font files to add.
+fn fonts() -> FontOptions {
+    let mut fonts = FontOptions::default();
+    let Ok(dir) = std::env::var("HANJI_PAGE_FONTS") else {
+        return fonts;
+    };
+    for entry in std::fs::read_dir(dir).unwrap() {
+        let data = std::fs::read(entry.unwrap().path()).unwrap();
+        fonts.fonts.push(hanji_preview::FontData {
+            data: data.into(),
+            face_index: 0,
+        });
+    }
+    fonts
+}
+
 #[test]
 fn slides_draw_like_the_svg_preview() {
     compare("shapes", DocumentKind::Pptx, SHAPES, usize::MAX, 1.0);
@@ -145,10 +191,16 @@ fn document_pages_draw_like_the_svg_preview() {
     compare("korean", DocumentKind::Docx, KOREAN, usize::MAX, 2.0);
 }
 
-/// Every PPTX and DOCX of the preview baseline, first four pages. Slower; run
-/// with `--ignored` when the lowering changes. The bound is loose because the
-/// two outputs differ on purpose, and the measured differences (2026-10-25,
-/// up to 7.6 on 13-pptx page 2) were each one of these: this file's
+#[test]
+fn hwpx_pages_draw_like_the_png_preview() {
+    compare("hwpx", DocumentKind::Hwpx, HWPX, usize::MAX, 2.0);
+}
+
+/// Every PPTX, DOCX and HWPX of the preview baseline, first four pages.
+/// Slower; run with `--ignored` when the lowering changes. The bound is loose
+/// because the two outputs differ on purpose, and the measured differences
+/// (2026-10-25, up to 7.6 on 13-pptx page 2; HWPX at most 1.5) were each one
+/// of these: this file's
 /// rasterizer draws no shadows; the SVG redraws a run whose glyphs are not one
 /// per character from its text, losing ligatures the engine shaped (Lato's
 /// "ti"), where the list draws the shaped glyphs; and usvg draws no synthetic
@@ -169,6 +221,7 @@ fn the_baseline_draws_like_the_svg_preview() {
         let kind = match path.extension().and_then(|e| e.to_str()) {
             Some("pptx") => DocumentKind::Pptx,
             Some("docx") => DocumentKind::Docx,
+            Some("hwpx") => DocumentKind::Hwpx,
             _ => continue,
         };
         eprintln!("{}", path.display());
@@ -181,28 +234,41 @@ fn the_baseline_draws_like_the_svg_preview() {
 // preview: solid and gradient paints, glyphs, PNG images, groups with clips
 // and opacity. Shadows and grid paints are not drawn.
 
-fn draw(layout: &Layout, index: usize, width: u32, height: u32) -> tiny_skia::Pixmap {
+fn draw(layout: &Layout, index: usize, width: u32, height: u32, exact: bool) -> tiny_skia::Pixmap {
     let page = layout.page(index).unwrap();
-    let scale = width as f32 / page.width as f32;
+    // The engines' PNG stretches the page to its rounded pixel size; HWPX's
+    // (resvg) rounds the canvas but draws at 96 dpi exactly.
+    let (sx, sy) = if exact {
+        (96.0 / 72.0, 96.0 / 72.0)
+    } else {
+        (
+            width as f32 / page.width as f32,
+            height as f32 / page.height as f32,
+        )
+    };
+    // White under the page, as the PNG is: a rounded-up canvas edge is
+    // outside the page's own white.
+    let mut canvas = tiny_skia::Pixmap::new(width, height).unwrap();
+    canvas.fill(tiny_skia::Color::WHITE);
     let mut layers = vec![Layer {
-        pixmap: tiny_skia::Pixmap::new(width, height).unwrap(),
-        transform: tiny_skia::Transform::from_scale(scale, height as f32 / page.height as f32),
+        pixmap: Some(canvas),
+        transform: tiny_skia::Transform::from_scale(sx, sy),
         mask: None,
         opacity: 1.0,
     }];
     for item in &page.items {
-        let top = layers.last_mut().unwrap();
+        let top = layers.last().unwrap();
         let (transform, mask) = (top.transform, top.mask.clone());
+        let mask = mask.as_deref();
+        let target = layers
+            .iter_mut()
+            .rev()
+            .find_map(|l| l.pixmap.as_mut())
+            .unwrap();
         match item {
             Item::Fill { path, paint } => {
                 if let (Some(p), Some(paint)) = (skia_path(path), skia_paint(paint)) {
-                    top.pixmap.fill_path(
-                        &p,
-                        &paint,
-                        fill_rule(path.fill_rule),
-                        transform,
-                        mask.as_ref(),
-                    );
+                    target.fill_path(&p, &paint, fill_rule(path.fill_rule), transform, mask);
                 }
             }
             Item::Stroke { path, stroke } => {
@@ -227,8 +293,7 @@ fn draw(layout: &Layout, index: usize, width: u32, height: u32) -> tiny_skia::Pi
                             0.0,
                         );
                     }
-                    top.pixmap
-                        .stroke_path(&p, &paint, &s, transform, mask.as_ref());
+                    target.stroke_path(&p, &paint, &s, transform, mask);
                 }
             }
             Item::Glyphs(run) => {
@@ -263,13 +328,17 @@ fn draw(layout: &Layout, index: usize, width: u32, height: u32) -> tiny_skia::Pi
                     } else {
                         t = t.pre_translate(g.x as f32, g.y as f32);
                     }
-                    let t = t.pre_scale(run.size as f32, run.size as f32);
-                    top.pixmap.fill_path(
+                    let m = run.matrix;
+                    let em = tiny_skia::Transform::from_scale(run.size as f32, run.size as f32)
+                        .pre_concat(tiny_skia::Transform::from_row(
+                            m.a as f32, m.b as f32, m.c as f32, m.d as f32, 0.0, 0.0,
+                        ));
+                    target.fill_path(
                         &outline,
                         &paint,
                         tiny_skia::FillRule::Winding,
-                        t,
-                        mask.as_ref(),
+                        t.pre_concat(em),
+                        mask,
                     );
                     if run.embolden {
                         let s = tiny_skia::Stroke {
@@ -278,12 +347,8 @@ fn draw(layout: &Layout, index: usize, width: u32, height: u32) -> tiny_skia::Pi
                             line_join: tiny_skia::LineJoin::Round,
                             ..Default::default()
                         };
-                        if let Some(o) = outline.transform(tiny_skia::Transform::from_scale(
-                            run.size as f32,
-                            run.size as f32,
-                        )) {
-                            let t = t.pre_scale(1.0 / run.size as f32, 1.0 / run.size as f32);
-                            top.pixmap.stroke_path(&o, &paint, &s, t, mask.as_ref());
+                        if let Some(o) = outline.transform(em) {
+                            target.stroke_path(&o, &paint, &s, t, mask);
                         }
                     }
                 }
@@ -312,27 +377,31 @@ fn draw(layout: &Layout, index: usize, width: u32, height: u32) -> tiny_skia::Pi
                 let r =
                     tiny_skia::Rect::from_xywh(0.0, 0.0, img.width() as f32, img.height() as f32)
                         .unwrap();
-                top.pixmap.fill_rect(r, &paint, t, mask.as_ref());
+                target.fill_rect(r, &paint, t, mask);
             }
             Item::PushGroup(group) => {
-                let g = group.transform;
-                let transform = transform.pre_concat(tiny_skia::Transform::from_row(
-                    g.a as f32, g.b as f32, g.c as f32, g.d as f32, g.e as f32, g.f as f32,
-                ));
-                let mut mask = mask;
+                let transform = transform.pre_concat(skia_transform(group.transform));
+                let mut mask = layers.last().unwrap().mask.clone();
                 if let Some(clip) = group.clip.as_ref().and_then(skia_path) {
                     let rule = fill_rule(group.clip.as_ref().unwrap().fill_rule);
-                    match &mut mask {
-                        Some(m) => m.intersect_path(&clip, rule, true, transform),
+                    let m = match mask {
+                        Some(m) => {
+                            let mut m = (*m).clone();
+                            m.intersect_path(&clip, rule, true, transform);
+                            m
+                        }
                         None => {
                             let mut m = tiny_skia::Mask::new(width, height).unwrap();
                             m.fill_path(&clip, rule, true, transform);
-                            mask = Some(m);
+                            m
                         }
-                    }
+                    };
+                    mask = Some(std::rc::Rc::new(m));
                 }
+                // Only a group that fades needs a layer of its own.
                 layers.push(Layer {
-                    pixmap: tiny_skia::Pixmap::new(width, height).unwrap(),
+                    pixmap: (group.opacity < 1.0)
+                        .then(|| tiny_skia::Pixmap::new(width, height).unwrap()),
                     transform,
                     mask,
                     opacity: group.opacity as f32,
@@ -340,13 +409,20 @@ fn draw(layout: &Layout, index: usize, width: u32, height: u32) -> tiny_skia::Pi
             }
             Item::PopGroup => {
                 let layer = layers.pop().unwrap();
-                let below = layers.last_mut().unwrap();
-                below.pixmap.draw_pixmap(
+                let (Some(pixmap), opacity) = (layer.pixmap, layer.opacity) else {
+                    continue;
+                };
+                let below = layers
+                    .iter_mut()
+                    .rev()
+                    .find_map(|l| l.pixmap.as_mut())
+                    .unwrap();
+                below.draw_pixmap(
                     0,
                     0,
-                    layer.pixmap.as_ref(),
+                    pixmap.as_ref(),
                     &tiny_skia::PixmapPaint {
-                        opacity: layer.opacity,
+                        opacity,
                         ..Default::default()
                     },
                     tiny_skia::Transform::identity(),
@@ -355,7 +431,7 @@ fn draw(layout: &Layout, index: usize, width: u32, height: u32) -> tiny_skia::Pi
             }
         }
     }
-    layers.pop().unwrap().pixmap
+    layers.pop().unwrap().pixmap.unwrap()
 }
 
 /// PNG directly; JPEG through resvg, stretched to a square that the image's
@@ -380,10 +456,12 @@ fn decode(image: &page::Image) -> Option<tiny_skia::Pixmap> {
     Some(pixmap)
 }
 
+/// A group's state; `pixmap` is its own only when it fades, and otherwise
+/// it draws into the nearest layer below that has one.
 struct Layer {
-    pixmap: tiny_skia::Pixmap,
+    pixmap: Option<tiny_skia::Pixmap>,
     transform: tiny_skia::Transform,
-    mask: Option<tiny_skia::Mask>,
+    mask: Option<std::rc::Rc<tiny_skia::Mask>>,
     opacity: f32,
 }
 
@@ -417,6 +495,12 @@ fn skia_path(path: &Path) -> Option<tiny_skia::Path> {
     b.finish()
 }
 
+fn skia_transform(t: page::Transform) -> tiny_skia::Transform {
+    tiny_skia::Transform::from_row(
+        t.a as f32, t.b as f32, t.c as f32, t.d as f32, t.e as f32, t.f as f32,
+    )
+}
+
 fn skia_color(c: page::Color) -> tiny_skia::Color {
     tiny_skia::Color::from_rgba(c.r as f32, c.g as f32, c.b as f32, c.a as f32).unwrap()
 }
@@ -438,6 +522,7 @@ fn skia_paint(paint: &Paint) -> Option<tiny_skia::Paint<'static>> {
             start,
             end,
             stops: s,
+            transform,
             ..
         } => {
             out.shader = tiny_skia::LinearGradient::new(
@@ -445,7 +530,7 @@ fn skia_paint(paint: &Paint) -> Option<tiny_skia::Paint<'static>> {
                 tiny_skia::Point::from_xy(end.x as f32, end.y as f32),
                 stops(s),
                 tiny_skia::SpreadMode::Pad,
-                tiny_skia::Transform::identity(),
+                skia_transform(*transform),
             )?
         }
         Paint::Radial {
@@ -453,6 +538,7 @@ fn skia_paint(paint: &Paint) -> Option<tiny_skia::Paint<'static>> {
             radius,
             focal,
             stops: s,
+            transform,
             ..
         } => {
             out.shader = tiny_skia::RadialGradient::new(
@@ -462,7 +548,7 @@ fn skia_paint(paint: &Paint) -> Option<tiny_skia::Paint<'static>> {
                 *radius as f32,
                 stops(s),
                 tiny_skia::SpreadMode::Pad,
-                tiny_skia::Transform::identity(),
+                skia_transform(*transform),
             )?
         }
         Paint::Grid { colors, .. } => out.set_color(skia_color(*colors.first()?)),

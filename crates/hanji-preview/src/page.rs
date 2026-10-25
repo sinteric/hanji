@@ -14,13 +14,16 @@
 //! What a page cannot carry: a link (a viewer of a preview follows none), a
 //! tile paint (the layout carries no bytes for it), and an image that is
 //! neither PNG nor JPEG after GIF normalisation. Each is left out with a
-//! diagnostic, as the SVG output does. HWPX is not laid out here yet: rhwp's
-//! page layer tree is the planned source.
+//! diagnostic, as the SVG output does.
+//!
+//! PPTX and DOCX pages are their engine's layout. An HWPX page is rhwp's SVG
+//! page read by usvg, as the PNG preview draws it (`page_svg.rs` says what
+//! that leaves out).
 
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use oxml_layout::{FontId, LayoutResult, PositionedElement};
+use oxml_layout::{LayoutResult, PositionedElement};
 
 use crate::{images, Diagnostic, DocumentKind, FontOptions, FontsReport, PageInfo, Preview};
 
@@ -63,6 +66,17 @@ pub struct Transform {
     pub f: f64,
 }
 
+impl Transform {
+    pub const IDENTITY: Transform = Transform {
+        a: 1.0,
+        b: 0.0,
+        c: 0.0,
+        d: 1.0,
+        e: 0.0,
+        f: 0.0,
+    };
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FillRule {
     NonZero,
@@ -90,8 +104,8 @@ pub struct GradientStop {
     pub color: Color,
 }
 
-/// How a fill or a stroke is painted. Gradient coordinates are in the space
-/// of the path they paint.
+/// How a fill or a stroke is painted. A gradient's coordinates are in its
+/// own space, which `transform` maps into the space of the path it paints.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Paint {
     Solid(Color),
@@ -102,13 +116,17 @@ pub enum Paint {
         end: Point,
         stops: Vec<GradientStop>,
         extend: (bool, bool),
+        transform: Transform,
     },
+    /// The gradient runs from a point circle at `focal` to the circle of
+    /// `radius` around `center`.
     Radial {
         center: Point,
         radius: f64,
         focal: Point,
         stops: Vec<GradientStop>,
         extend: (bool, bool),
+        transform: Transform,
     },
     /// A grid of `columns` × `rows` colour cells, row by row, filling
     /// `bounds` and repeated beyond it (a path gradient's approximation).
@@ -162,6 +180,10 @@ pub struct Glyphs {
     pub color: Color,
     /// The baseline origin of the run, which `slant` shears about.
     pub origin: Point,
+    /// A linear map applied to each outline (in em) before it is scaled by
+    /// `size` and placed: identity for upright glyphs, and for HWPX a
+    /// character's width ratio (장평) or a rotation. Its `e` and `f` are zero.
+    pub matrix: Transform,
     pub glyphs: Vec<Glyph>,
     /// The run's text in logical order, for search and selection. It need not
     /// have one character per glyph.
@@ -236,9 +258,22 @@ pub struct Page {
 
 /// One document laid out, held until dropped. Pages are made on demand.
 pub struct Layout {
-    preview: Preview,
-    kind: DocumentKind,
-    faces: HashMap<FontId, Face>,
+    source: Source,
+    faces: HashMap<FaceId, Face>,
+}
+
+enum Source {
+    Engine {
+        preview: Box<Preview>,
+        kind: DocumentKind,
+    },
+    /// rhwp's pages as SVG; `diagnostics` adds each page's lowering to the
+    /// preview's own.
+    #[cfg(feature = "hwpx")]
+    Hwpx {
+        preview: Box<crate::hwpx::Preview>,
+        diagnostics: Vec<Diagnostic>,
+    },
 }
 
 struct Face {
@@ -247,7 +282,11 @@ struct Face {
     variations: Vec<([u8; 4], f32)>,
 }
 
-/// Lay out a PPTX or DOCX package with caller fonts, package fonts and the
+/// CSS pixels, the unit of rhwp's SVG, to points.
+#[cfg(feature = "hwpx")]
+const POINTS_PER_PX: f64 = 0.75;
+
+/// Lay out a document package with caller fonts, package fonts and the
 /// bundled fallbacks, as [`crate::render_document_with_fonts`] does. No host
 /// fonts are searched.
 pub fn layout_with_fonts(
@@ -258,7 +297,8 @@ pub fn layout_with_fonts(
     layout_with_fonts_and_limits(kind, package, fonts, images::ImageLimits::default())
 }
 
-/// [`layout_with_fonts`] with explicit embedded-image budgets.
+/// [`layout_with_fonts`] with explicit embedded-image budgets. HWPX images
+/// are rhwp's and take no budget here.
 pub fn layout_with_fonts_and_limits(
     kind: DocumentKind,
     package: &[u8],
@@ -268,11 +308,14 @@ pub fn layout_with_fonts_and_limits(
     let preview = match kind {
         DocumentKind::Pptx => crate::layout_pptx(package, fonts, limits)?,
         DocumentKind::Docx => crate::docx::layout(package, fonts, limits)?,
+        #[cfg(feature = "hwpx")]
+        DocumentKind::Hwpx => return Layout::hwpx(crate::hwpx::render_with_fonts(package, fonts)?),
+        #[cfg(not(feature = "hwpx"))]
         DocumentKind::Hwpx => {
-            return Err("HWPX is not laid out as a display list yet; use its SVG preview".into())
+            return Err("HWPX layout requires the hanji-preview hwpx feature".into())
         }
     };
-    Ok(Layout::new(preview, kind))
+    Ok(Layout::engine(preview, kind))
 }
 
 /// Lay out one revision: `engine` exports `text` and `remainder` to their home
@@ -295,14 +338,14 @@ pub fn layout_revision(
 }
 
 impl Layout {
-    fn new(preview: Preview, kind: DocumentKind) -> Self {
+    fn engine(preview: Preview, kind: DocumentKind) -> Self {
         let faces = preview
             .layout
             .fonts
             .iter()
             .map(|f| {
                 (
-                    f.id,
+                    FaceId(f.id.0),
                     Face {
                         data: f.data.clone(),
                         index: f.face_index,
@@ -312,35 +355,116 @@ impl Layout {
             })
             .collect();
         Self {
-            preview,
-            kind,
+            source: Source::Engine {
+                preview: Box::new(preview),
+                kind,
+            },
             faces,
         }
     }
 
+    /// Lowers every page once, dry, so [`Layout::diagnostics`] holds what the
+    /// pages leave out before any page is asked for.
+    #[cfg(feature = "hwpx")]
+    fn hwpx(preview: crate::hwpx::Preview) -> Result<Self, String> {
+        let faces = preview
+            .face_bytes()
+            .into_iter()
+            .map(|(number, data)| {
+                (
+                    FaceId(number as u32),
+                    Face {
+                        data,
+                        index: 0,
+                        variations: Vec::new(),
+                    },
+                )
+            })
+            .collect();
+        let mut diagnostics = preview.diagnostics.clone();
+        for index in 0..preview.page_count() {
+            let Some(page) = preview.usvg_page(index) else {
+                continue;
+            };
+            let (tree, svg_faces) = page?;
+            let mut lowering = crate::page_svg::SvgLowering::new(&svg_faces, index, false);
+            lowering.tree(&tree, Transform::IDENTITY);
+            diagnostics.extend(lowering.diagnostics);
+        }
+        Ok(Self {
+            source: Source::Hwpx {
+                preview: Box::new(preview),
+                diagnostics,
+            },
+            faces,
+        })
+    }
+
     pub fn page_count(&self) -> usize {
-        self.preview.page_count()
+        match &self.source {
+            Source::Engine { preview, .. } => preview.page_count(),
+            #[cfg(feature = "hwpx")]
+            Source::Hwpx { preview, .. } => preview.page_count(),
+        }
     }
 
     pub fn page_info(&self, index: usize) -> Option<PageInfo> {
-        self.preview.page_info(index)
+        match &self.source {
+            Source::Engine { preview, .. } => preview.page_info(index),
+            #[cfg(feature = "hwpx")]
+            Source::Hwpx { preview, .. } => preview.page_info(index),
+        }
     }
 
     /// Page `index` (0-based) as items. Its diagnostics are already in
     /// [`Layout::diagnostics`], made when the layout was.
     pub fn page(&self, index: usize) -> Result<Page, String> {
-        let mut lowering =
-            Lowering::new(&self.preview.layout, &self.preview.image_plan, index, true);
-        lowering
-            .page()
-            .ok_or_else(|| format!("page index {index} is out of range"))
+        let out_of_range = || format!("page index {index} is out of range");
+        match &self.source {
+            Source::Engine { preview, .. } => {
+                Lowering::new(&preview.layout, &preview.image_plan, index, true)
+                    .page()
+                    .ok_or_else(out_of_range)
+            }
+            #[cfg(feature = "hwpx")]
+            Source::Hwpx { preview, .. } => {
+                let (tree, faces) = preview.usvg_page(index).ok_or_else(out_of_range)??;
+                let (width, height) = (
+                    f64::from(tree.size().width()) * POINTS_PER_PX,
+                    f64::from(tree.size().height()) * POINTS_PER_PX,
+                );
+                let mut lowering = crate::page_svg::SvgLowering::new(&faces, index, true);
+                lowering.items.push(Item::Fill {
+                    path: rect_path(Rect {
+                        x: 0.0,
+                        y: 0.0,
+                        width,
+                        height,
+                    }),
+                    paint: Paint::Solid(WHITE),
+                });
+                lowering.tree(
+                    &tree,
+                    Transform {
+                        a: POINTS_PER_PX,
+                        d: POINTS_PER_PX,
+                        ..Transform::IDENTITY
+                    },
+                );
+                Ok(Page {
+                    width,
+                    height,
+                    items: lowering.items,
+                })
+            }
+        }
     }
 
     /// Glyph `glyph` of `face` as a path in em: 1.0 is the run's size, y down,
     /// origin at the glyph's baseline origin. `None` for a face the layout
     /// does not have, or a glyph with no outline (a space).
     pub fn outline(&self, face: FaceId, glyph: u16) -> Option<Path> {
-        let face = self.faces.get(&FontId(face.0))?;
+        let face = self.faces.get(&face)?;
         let mut parsed = ttf_parser::Face::parse(&face.data, face.index).ok()?;
         for (tag, value) in &face.variations {
             parsed.set_variation(ttf_parser::Tag::from_bytes(tag), *value);
@@ -358,23 +482,54 @@ impl Layout {
     }
 
     pub fn fonts(&self) -> &FontsReport {
-        &self.preview.fonts
+        match &self.source {
+            Source::Engine { preview, .. } => &preview.fonts,
+            #[cfg(feature = "hwpx")]
+            Source::Hwpx { preview, .. } => &preview.fonts,
+        }
     }
 
     pub fn warnings(&self) -> &[String] {
-        &self.preview.warnings
+        match &self.source {
+            Source::Engine { preview, .. } => &preview.warnings,
+            #[cfg(feature = "hwpx")]
+            Source::Hwpx { preview, .. } => &preview.warnings,
+        }
     }
 
     /// The layout's own diagnostics and every page's, with zero-based
     /// `pages[i]` paths, as [`crate::Preview::diagnostics`] has them.
     pub fn diagnostics(&self) -> &[Diagnostic] {
-        &self.preview.diagnostics
+        match &self.source {
+            Source::Engine { preview, .. } => &preview.diagnostics,
+            #[cfg(feature = "hwpx")]
+            Source::Hwpx { diagnostics, .. } => diagnostics,
+        }
     }
 
     pub fn quality(&self) -> crate::quality::QualityReport {
-        self.preview.quality(self.kind)
+        match &self.source {
+            Source::Engine { preview, kind } => preview.quality(*kind),
+            #[cfg(feature = "hwpx")]
+            Source::Hwpx {
+                preview,
+                diagnostics,
+            } => crate::quality::QualityReport::inspect(
+                crate::quality::PreviewSource::Hwpx,
+                diagnostics,
+                &preview.fonts,
+                &preview.warnings,
+            ),
+        }
     }
 }
+
+const WHITE: Color = Color {
+    r: 1.0,
+    g: 1.0,
+    b: 1.0,
+    a: 1.0,
+};
 
 /// Page `index`'s diagnostics for the display list, without copying images.
 pub(crate) fn page_diagnostics(
@@ -473,12 +628,7 @@ impl<'a> Lowering<'a> {
         };
         self.items.push(Item::Fill {
             path: rect_path(bounds),
-            paint: Paint::Solid(Color {
-                r: 1.0,
-                g: 1.0,
-                b: 1.0,
-                a: 1.0,
-            }),
+            paint: Paint::Solid(WHITE),
         });
         if let Some(background) = &frame.background {
             let path = format!("pages[{}].background", self.index);
@@ -667,6 +817,7 @@ impl<'a> Lowering<'a> {
             size: run.font_size,
             color: color_of(run.color),
             origin: point(run.origin),
+            matrix: Transform::IDENTITY,
             glyphs,
             text: run.text.clone(),
             embolden: synthetic_bold,
@@ -734,6 +885,7 @@ impl<'a> Lowering<'a> {
                 end: point(*end),
                 stops: stops(s),
                 extend: *extend,
+                transform: Transform::IDENTITY,
             },
             oxml_layout::Paint::Radial {
                 center,
@@ -747,6 +899,7 @@ impl<'a> Lowering<'a> {
                 focal: point(*focal),
                 stops: stops(s),
                 extend: *extend,
+                transform: Transform::IDENTITY,
             },
             oxml_layout::Paint::Grid {
                 bounds,

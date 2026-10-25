@@ -22,6 +22,8 @@ pub mod fonts;
 pub mod hwpx;
 mod images;
 pub mod page;
+#[cfg(feature = "hwpx")]
+mod page_svg;
 pub mod prep;
 pub mod quality;
 pub mod sfnt;

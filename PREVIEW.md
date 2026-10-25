@@ -36,11 +36,11 @@ library jobs. Existing PPTX entry points remain available.
 
 `page::layout_with_fonts(kind, package_bytes, &FontOptions)` and
 `page::layout_revision(engine, text, remainder, &FontOptions)` return an owned
-`page::Layout` for PPTX and DOCX: `page(i)` answers a page as display-list
-items (placed glyph ids, paths, PNG/JPEG images, groups), `outline(face,
-glyph)` a glyph's path in em, and the same `fonts`, `warnings` and
-`diagnostics` as a preview job. No font is subset for it. HWPX is refused
-there for now. DESIGN.md §7 "Pages as a display list" says what it leaves out.
+`page::Layout` for PPTX, DOCX and HWPX (HWPX needs the `hwpx` feature):
+`page(i)` answers a page as display-list items (placed glyph ids, paths,
+PNG/JPEG images, groups), `outline(face, glyph)` a glyph's path in em, and the
+same `fonts`, `warnings` and `diagnostics` as a preview job. No font is subset
+for it. DESIGN.md §7 "Pages as a display list" says what it leaves out.
 
 The default features are `host-fonts` and `hwpx`. Use
 `default-features = false` for PPTX/DOCX/XLSX jobs with caller font bytes and

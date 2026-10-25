@@ -1373,15 +1373,22 @@ without parsing a font. `layout_revision` takes a revision's text and
 remainder and exports inside; `layout_with_fonts` takes the package export
 wrote. Either way preview and export are the same bytes (§2 rule 4), and no
 engine type crosses the API, so an engine stays replaceable. PPTX and DOCX
-lower `oxml_layout::LayoutResult`; HWPX is refused until rhwp's page layer
-tree (the tree its SVG is drawn from) is lowered too. What a page leaves out,
-with a diagnostic as the SVG does: links, tile paints, images neither PNG nor
-JPEG. Measured 2026-10-25 against the SVG preview's PNG on the baseline's
-PPTX and DOCX (first four pages, `tests/page.rs`): a mean channel difference
-of 0–1.4 over inked pixels on pages without shadows; the larger ones are the
-SVG's own losses (it redraws a run that is not one glyph per character from
-text, dropping the engine's ligatures, and draws no synthetic bold or italic)
-and the test rasterizer's (no shadows).
+lower `oxml_layout::LayoutResult`. HWPX lowers rhwp's SVG page as usvg reads
+it, with the faces hanji chose (`page_svg.rs`), not rhwp's page layer tree:
+the SVG is where hanji puts its own font selection (`hanji-font-N`), so the
+list draws the same picture as the HWPX PNG preview, and the layer tree would
+need that selection rebuilt. Its glyph runs carry a linear map for 장평 and
+rotation. What a page leaves out, with a diagnostic as the SVG does: links,
+tile paints, images neither PNG nor JPEG; for HWPX also masks, filters,
+pattern paints and non-pad gradient spreads (drawn padded). Measured
+2026-10-25 against each format's PNG preview on the baseline (first four
+pages, `tests/page.rs`, Nanum fonts added): HWPX a mean channel difference of
+0–0.13 over inked pixels but one page (1.5); PPTX and DOCX 0–1.4 on pages
+without shadows, the larger ones being the SVG's own losses (it redraws a run
+that is not one glyph per character from text, dropping the engine's
+ligatures, and draws no synthetic bold or italic) and the test rasterizer's
+(no shadows). The comparison sees only what both outputs draw: a loss shared
+by the engine's layout and its PNG is invisible to it.
 
 Found by [prototype/tracked-changes/SPIKE.md](prototype/tracked-changes/SPIKE.md):
 rhwp 0.8.6 drops hwpx track-change marks on save without a loss report, and a
