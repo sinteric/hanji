@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Lay out PPTX and DOCX pages as a display list (`hanji_preview::page`):
+  glyph ids with their outlines, paths, images and groups, in hanji's own
+  types, from a package or from a revision's text and remainder. For viewers
+  that draw pages themselves instead of showing SVG or PNG. HWPX follows.
 - Read a DOCX field's cached result as text when it is text in one paragraph
   (page numbers, caption `SEQ` numbers, cross-references, `HYPERLINK` fields)
   instead of a `<keep kind="field"/>` placeholder. Editing it replaces the

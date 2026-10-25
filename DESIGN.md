@@ -1363,6 +1363,26 @@ dropped; and every face rpptx lays out with gets a 1.2 em line
 (PowerPoint's single line; rpptx uses ascent + descent + gap). Layout on the
 8 baseline decks: 0.944 (rpptx in the spike: 0.791).
 
+**Pages as a display list** (decided with the owner 2026-10-25, for
+Sinteric's viewer, which draws hanji documents the way it draws PDFs: from a
+render tree): `hanji_preview::page` lays a revision out and answers each page
+as hanji's own items: glyph ids placed in a face, filled and stroked paths,
+PNG/JPEG images, and groups that transform, clip, fade or shadow. Glyph
+outlines come from the layout, so a caller draws the glyphs the engine shaped
+without parsing a font. `layout_revision` takes a revision's text and
+remainder and exports inside; `layout_with_fonts` takes the package export
+wrote. Either way preview and export are the same bytes (§2 rule 4), and no
+engine type crosses the API, so an engine stays replaceable. PPTX and DOCX
+lower `oxml_layout::LayoutResult`; HWPX is refused until rhwp's page layer
+tree (the tree its SVG is drawn from) is lowered too. What a page leaves out,
+with a diagnostic as the SVG does: links, tile paints, images neither PNG nor
+JPEG. Measured 2026-10-25 against the SVG preview's PNG on the baseline's
+PPTX and DOCX (first four pages, `tests/page.rs`): a mean channel difference
+of 0–1.4 over inked pixels on pages without shadows; the larger ones are the
+SVG's own losses (it redraws a run that is not one glyph per character from
+text, dropping the engine's ligatures, and draws no synthetic bold or italic)
+and the test rasterizer's (no shadows).
+
 Found by [prototype/tracked-changes/SPIKE.md](prototype/tracked-changes/SPIKE.md):
 rhwp 0.8.6 drops hwpx track-change marks on save without a loss report, and a
 plain rdocx 0.14 open/save of one corpus file wrote a `styles.xml` that is not
