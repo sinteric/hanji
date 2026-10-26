@@ -1,12 +1,13 @@
 //! Edits to the structure text (§5.4: the structure is text the model may
 //! edit): a column's type, format or formula, a new column at the end of a
-//! table, a new table, a new sheet at the end, a deleted placeholder. They
-//! become range operations, so the text and the operations share one
-//! validator and one implementation. Any other change is refused with the
-//! form it should take.
+//! table, a new table, a new sheet at the end, merged ranges, a deleted
+//! placeholder. Table, sheet and column edits become range operations, so
+//! the text and the operations share one validator and one implementation.
+//! Merged ranges are applied from the `<merge range/>` lines. Any other
+//! change is refused with the form it should take.
 
 use hanji_format::ops::{ColumnSpec, RangeOp};
-use hanji_format::sheet::{SheetItem, Spreadsheet, TableDecl};
+use hanji_format::sheet::{MergeDecl, SheetItem, Spreadsheet, TableDecl};
 
 /// Whether two structures are the same (front matter aside).
 pub fn same(a: &Spreadsheet, b: &Spreadsheet) -> bool {
@@ -36,6 +37,17 @@ fn tables(items: &[SheetItem]) -> Vec<&TableDecl> {
             } else {
                 None
             }
+        })
+        .collect()
+}
+
+/// The `<merge range/>` lines of a sheet, in the order written.
+pub fn merge_ranges(items: &[SheetItem]) -> Vec<&MergeDecl> {
+    items
+        .iter()
+        .filter_map(|i| match i {
+            SheetItem::Merge(m) => Some(m),
+            _ => None,
         })
         .collect()
 }

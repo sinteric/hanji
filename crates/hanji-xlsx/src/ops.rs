@@ -14,12 +14,14 @@
 use std::collections::HashMap;
 
 use hanji_core::cells::{col_letters, parse_sqref, CellRange, CellRef, RowShift, MAX_ROW};
-use hanji_core::{notice, EngineError, Kind, Notice, Remainder};
+use hanji_core::{notice, EngineError, Entry, Kind, Meta, Notice, Remainder};
 use hanji_format::formula;
 use hanji_format::ops::{
     check_ops, date_of, parse_ops, render_errors, ColumnSpec, Formats, RangeOp, Row, SortKey, Value,
 };
-use hanji_format::sheet::{format_kind, parse_spreadsheet, serialize_spreadsheet, FormatKind};
+use hanji_format::sheet::{
+    format_kind, parse_spreadsheet, serialize_spreadsheet, FormatKind, SheetItem,
+};
 use hanji_package::xml::{self, Element, Node};
 
 use crate::book::{Book, SheetInfo, SheetKind, TableCol, TableInfo, CT_SHEET, MAIN_NS, R_NS};
@@ -148,6 +150,7 @@ pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, Eng
             )
         })
         .collect();
+    let mut next_id = rem.next_id;
     let mut cx = Ctx {
         changed: Changed::default(),
         notices: vec![],
@@ -175,12 +178,20 @@ pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, Eng
     }
     let n_text = text_ops.len();
     for (k, op) in all.iter().enumerate() {
+        if k == n_text {
+            apply_merges(&mut book, &parsed, &mut next_id)
+                .map_err(|m| refused(format!("the structure text: {m}")))?;
+        }
         let which = if k < n_text {
             "the structure text".to_string()
         } else {
             format!("operation {} ({})", k - n_text + 1, op.name())
         };
         apply_op(&mut book, op, &mut cx).map_err(|m| refused(format!("{which}: {m}")))?;
+    }
+    if n_text == all.len() {
+        apply_merges(&mut book, &parsed, &mut next_id)
+            .map_err(|m| refused(format!("the structure text: {m}")))?;
     }
     let recalc = calc::recompute(&mut book, &cx.changed).map_err(refused)?;
     shift::refresh_pivots(&mut book, &cx.changed, &mut cx.notices);
@@ -213,12 +224,140 @@ pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, Eng
     let text = serialize_spreadsheet(
         &model::structure(&mut book, template).map_err(EngineError::Package)?,
     );
-    let remainder = remainder_of(book, rem.next_id);
+    let remainder = remainder_of(book, next_id);
     Ok(Applied {
         text,
         remainder,
         report,
     })
+}
+
+/// Apply the `<merge range/>` lines of `parsed` to each sheet. A sheet that
+/// still has a merged-cells placeholder is left alone (the placeholder owns
+/// the ranges; deleting it is `drop_keep`).
+fn apply_merges(
+    book: &mut Book,
+    parsed: &hanji_format::sheet::Spreadsheet,
+    next_id: &mut u64,
+) -> Result<(), String> {
+    for (i, ns) in parsed.sheets.iter().enumerate() {
+        if ns
+            .items
+            .iter()
+            .any(|it| matches!(it, SheetItem::Keep(k) if k.kind == "merged-cells"))
+        {
+            continue;
+        }
+        let wanted: Vec<String> = structure::merge_ranges(&ns.items)
+            .into_iter()
+            .map(|m| m.range.clone())
+            .collect();
+        let have: Vec<String> = book
+            .entries
+            .iter()
+            .filter(|e| {
+                e.kind == Kind::Range && e.path.first() == Some(&i) && e.meta.tag == "mergeCell"
+            })
+            .filter_map(|e| {
+                e.meta
+                    .range
+                    .as_deref()
+                    .and_then(CellRange::parse)
+                    .map(|r| r.to_string())
+            })
+            .collect();
+        if have == wanted {
+            continue;
+        }
+        set_sheet_merges(book, i, &wanted, next_id)?;
+    }
+    Ok(())
+}
+
+fn set_sheet_merges(
+    book: &mut Book,
+    i: usize,
+    wanted: &[String],
+    next_id: &mut u64,
+) -> Result<(), String> {
+    book.load_store(i)?;
+    let prefix = book.store(i).prefix.clone();
+    let scope = xml::scope_of(&book.store(i).skel.root);
+    let mut old: Vec<Entry> = vec![];
+    book.entries.retain(|e| {
+        if e.kind == Kind::Range && e.path.first() == Some(&i) && e.meta.tag == "mergeCell" {
+            old.push(e.clone());
+            false
+        } else {
+            true
+        }
+    });
+    let mut unused = vec![true; old.len()];
+    let mut placed: Vec<Option<Entry>> = vec![None; wanted.len()];
+    for (wi, w) in wanted.iter().enumerate() {
+        let Some(k) = old.iter().enumerate().find(|(k, e)| {
+            unused[*k]
+                && e.meta
+                    .range
+                    .as_deref()
+                    .and_then(CellRange::parse)
+                    .is_some_and(|r| r.to_string() == *w)
+        }) else {
+            continue;
+        };
+        unused[k.0] = false;
+        placed[wi] = Some(k.1.clone());
+    }
+    let leftover: Vec<Entry> = old
+        .into_iter()
+        .enumerate()
+        .filter(|(k, _)| unused[*k])
+        .map(|(_, e)| e)
+        .collect();
+    let mut leftover = leftover.into_iter();
+    let mut seq = book
+        .entries
+        .iter()
+        .filter(|e| e.path.first() == Some(&i))
+        .map(|e| e.seq)
+        .max()
+        .unwrap_or(0);
+    let mut out = vec![];
+    for (w, slot) in wanted.iter().zip(placed) {
+        if let Some(e) = slot {
+            out.push(e);
+            continue;
+        }
+        if let Some(mut e) = leftover.next() {
+            e.meta.range = Some(w.clone());
+            let mut x = xml::fragment(&e.xml[0]);
+            x.set("ref", w);
+            e.xml[0] = x.to_xml();
+            e.fp = xml::canon(&x, &scope);
+            out.push(e);
+            continue;
+        }
+        seq += 1;
+        let el = Element::new(&format!("{prefix}mergeCell")).with_attr("ref", w);
+        out.push(Entry {
+            id: *next_id,
+            kind: Kind::Range,
+            xml: vec![el.to_xml()],
+            fp: xml::canon(&el, &scope),
+            path: vec![i],
+            start: None,
+            end: None,
+            seq,
+            meta: Meta {
+                tag: "mergeCell".into(),
+                range: Some(w.clone()),
+                ..Default::default()
+            },
+        });
+        *next_id += 1;
+    }
+    book.entries.extend(out);
+    Ok(())
 }
 
 /// Remove what a deleted placeholder stood for (§2 rule 8: an explicit act).

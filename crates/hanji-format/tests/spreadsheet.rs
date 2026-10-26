@@ -45,6 +45,7 @@ fn the_design_md_example_parses() {
                         .join(",")
                 )
             }
+            SheetItem::Merge(m) => format!("merge {}", m.range),
             SheetItem::Chart(c) => format!("chart {}", c.ty),
             SheetItem::Keep(k) => format!("keep {}", k.kind),
         })
@@ -54,6 +55,7 @@ fn the_design_md_example_parses() {
         [
             "table Sales date,number,number,number",
             "chart bar",
+            "merge A1:G1",
             "keep data-validation"
         ]
     );

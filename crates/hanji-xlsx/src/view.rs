@@ -153,7 +153,8 @@ pub fn full_view(book: &mut Book, rows: u32) -> Result<String, String> {
             out.extend(sh.formats.iter().map(|f| f.line()));
         }
         let mut any_table = false;
-        for item in &sh.items {
+        let mut items = sh.items.iter().peekable();
+        while let Some(item) = items.next() {
             out.push(String::new());
             match item {
                 hanji_format::sheet::SheetItem::Table(t) => {
@@ -178,6 +179,14 @@ pub fn full_view(book: &mut Book, rows: u32) -> Result<String, String> {
                         .trim_end()
                         .to_string(),
                     );
+                }
+                hanji_format::sheet::SheetItem::Merge(m) => {
+                    out.push(hanji_format::sheet::merge_line(m));
+                    while let Some(hanji_format::sheet::SheetItem::Merge(_)) = items.peek() {
+                        if let Some(hanji_format::sheet::SheetItem::Merge(m)) = items.next() {
+                            out.push(hanji_format::sheet::merge_line(m));
+                        }
+                    }
                 }
                 hanji_format::sheet::SheetItem::Keep(k) => out.push(format!(
                     "<keep id=\"{}\" kind=\"{}\" summary=\"{}\"/>",

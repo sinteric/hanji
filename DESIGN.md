@@ -893,6 +893,8 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
 
   <chart type="bar" data="Sales[월],Sales[이익]" title="월별 이익"/>
 
+  <merge range="A1:G1"/>
+
   <keep id="k1" kind="data-validation" summary="B2:B1201"/>
   </sheet>
   ```
@@ -944,10 +946,15 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
 
   `range` on `<sheet>` is the used range, tables included. A column's type
   is `text`, `number`, `date` or `mixed` (cells of more than one kind, or
-  empty cells in General format). Merges, validations, conditional formats,
-  notes, pictures and pivot tables are `<keep/>` placeholders (rule 8). A
-  syntax for validations is still open; until then they are
-  placeholders, and a value that breaks one is refused.
+  empty cells in General format). Merged cells are `<merge range="A1:G1"/>`
+  lines: the model may keep, add, remove or change them. A merge is a
+  rectangle of two or more cells; overlapping or out-of-grid ranges are
+  refused. A sheet with more merged ranges than the text will hold (1,024)
+  keeps them as a `<keep/>` placeholder, because listing tens of thousands
+  of ranges would grow the structure with the grid (rule 11). Validations,
+  conditional formats, notes, pictures and pivot tables are `<keep/>`
+  placeholders (rule 8). A syntax for validations is still open; until then
+  they are placeholders, and a value that breaks one is refused.
 
 - **Cell data** is read through a row window of one table or range: a pipe
   table whose first column is the read-only sheet row number, then one cell

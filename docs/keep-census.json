@@ -33,8 +33,8 @@
   "total": {
     "files": 102,
     "failed": 0,
-    "with_keeps": 64,
-    "keeps": 374
+    "with_keeps": 62,
+    "keeps": 357
   },
   "formats": [
     {
@@ -62,8 +62,8 @@
       "format": "xlsx",
       "files": 46,
       "failed": 0,
-      "with_keeps": 23,
-      "keeps": 64
+      "with_keeps": 21,
+      "keeps": 47
     }
   ],
   "kinds": [
@@ -90,12 +90,6 @@
       "kind": "comment",
       "keeps": 18,
       "files": 5
-    },
-    {
-      "format": "xlsx",
-      "kind": "merged-cells",
-      "keeps": 18,
-      "files": 7
     },
     {
       "format": "docx",
@@ -286,6 +280,12 @@
     {
       "format": "xlsx",
       "kind": "group",
+      "keeps": 1,
+      "files": 1
+    },
+    {
+      "format": "xlsx",
+      "kind": "merged-cells",
       "keeps": 1,
       "files": 1
     }
@@ -787,10 +787,9 @@
     {
       "path": "crates/hanji-xlsx/corpus/DataValidations-49244.xlsx",
       "format": "xlsx",
-      "keeps": 2,
+      "keeps": 1,
       "kinds": {
-        "data-validation": 1,
-        "merged-cells": 1
+        "data-validation": 1
       }
     },
     {
@@ -865,10 +864,8 @@
     {
       "path": "crates/hanji-xlsx/corpus/Tables.xlsx",
       "format": "xlsx",
-      "keeps": 12,
-      "kinds": {
-        "merged-cells": 12
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/WithChart.xlsx",
@@ -921,26 +918,24 @@
     {
       "path": "crates/hanji-xlsx/corpus/korean-sales-lo.xlsx",
       "format": "xlsx",
-      "keeps": 6,
+      "keeps": 5,
       "kinds": {
         "chart": 1,
         "conditional-format": 1,
         "data-validation": 1,
         "hyperlinks": 1,
-        "merged-cells": 1,
         "notes": 1
       }
     },
     {
       "path": "crates/hanji-xlsx/corpus/korean-sales.xlsx",
       "format": "xlsx",
-      "keeps": 6,
+      "keeps": 5,
       "kinds": {
         "chart": 1,
         "conditional-format": 1,
         "data-validation": 1,
         "hyperlinks": 1,
-        "merged-cells": 1,
         "notes": 1
       }
     },
@@ -1031,10 +1026,8 @@
     {
       "path": "crates/hanji-xlsx/corpus/rx_merge_range01.xlsx",
       "format": "xlsx",
-      "keeps": 1,
-      "kinds": {
-        "merged-cells": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/rx_rich_string01.xlsx",
@@ -1081,11 +1074,10 @@
     {
       "path": "crates/hanji-xlsx/corpus/simple-monthly-budget.xlsx",
       "format": "xlsx",
-      "keeps": 4,
+      "keeps": 3,
       "kinds": {
         "chart": 1,
         "conditional-format": 1,
-        "merged-cells": 1,
         "shape": 1
       }
     },
