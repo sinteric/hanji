@@ -1,6 +1,7 @@
 //! The xlsx engine (SpreadsheetML, DESIGN.md §5.4). A workbook splits in two:
 //! its structure is text (sheets, tables with their columns' types, number
-//! formats and formulas, and placeholders for what the text does not model),
+//! formats and formulas, merged ranges as `<merge range/>` lines, and
+//! placeholders for what the text does not model),
 //! and its cells are read through row windows and written by range
 //! operations. The cell grid stays in the remainder, in its home encoding
 //! (each worksheet's rows, the shared strings), because a 100k-row sheet is

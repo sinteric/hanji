@@ -20,7 +20,7 @@ schema: 1
 Canonical form: one paragraph per line (no hard wraps), a blank line between blocks, no table padding, `1.` for every numbered item. hanji stores text in this form; read again after an edit that reports `canonicalized`.
 Inline: **bold**, *italic*, ~~strike~~, <u>underline</u>, <br/> (a line break inside a paragraph).
 docx, hwpx, pptx and xlsx texts show their formatting (below).
-<keep id="k3" kind="drawing" summary="…"/> stands for something the text does not model (a picture, chart, footnote, comment, merged cells, …). Leave it as it is; you may move it or delete its line, never create or change one.
+<keep id="k3" kind="drawing" summary="…"/> stands for something the text does not model (a picture, chart, footnote, comment, …). Leave it as it is; you may move it or delete its line, never create or change one.
 In docx, a field's shown result (a page number, a caption number, a cross-reference) is that text: editing it replaces the cached result and keeps the instruction; Word may compute it again when it updates fields. Form fields and fields with no shown result stay placeholders.
 
 Document (docx, hwpx)
@@ -95,8 +95,10 @@ The text is the workbook's structure; cells are not in it.
 </table>
 
 <chart type="bar" data="Sales[월],Sales[이익]" title="월별 이익"/>
+
+<merge range="A1:G1"/>
 </sheet>
-A sheet's `range` is its used range. A column's type is text, number, date or mixed. Editing the structure text can add sheets (at the end), tables and columns (at the end), and change a column's type, format or formula; it cannot rename, reorder or delete sheets, tables or columns, or change a `range` (those follow the cells).
+A sheet's `range` is its used range. A column's type is text, number, date or mixed. Editing the structure text can add sheets (at the end), tables and columns (at the end), change a column's type, format or formula, and add, remove or change merged ranges (`<merge range="A1:B2"/>`, one line per range; overlapping or out-of-grid ranges are refused). A sheet with more than 1024 merged ranges keeps them as a placeholder. It cannot rename, reorder or delete sheets, tables or columns, or change a `range` (those follow the cells).
 Cells are read as a row window: a table and its sheet rows (rows "2:101"), or a sheet and a range ("A1:F50"). The window's first column is the sheet row number (read-only); values are as displayed.
 Cells are written by range operations, a JSON list applied in order, all or nothing: set {range, values}, append_rows {table, rows}, insert_rows {table, before, rows}, delete_rows {table, rows: "6:7"}, fill_formula {table, column, formula}, set_type {table, column, type, format?}, add_column {table, column: {name, type, format?, formula?}}, sort {table, keys: [{column, order: "asc"|"desc"}]}, add_table {sheet, name, anchor, columns, rows?}, add_sheet {name}.
 [{"op": "set", "range": "매출!B73", "values": [[18420000]]},

@@ -283,7 +283,9 @@ These are not supported yet:
 - hwpx: a table's own position (`table-align`, `table-indent`), which docx
   writes.
 - xlsx: cell styles beyond formats, new charts, renaming or deleting sheets,
-  tables and columns, column insert and delete.
+  tables and columns, column insert and delete. Merged cells are
+  `<merge range="A1:B2"/>` lines except on a sheet with more than 1024 of
+  them, which stay a placeholder.
 - Native-application fidelity for all DOCX/HWPX features, and XLSX print
   layout and advanced visuals. DOCX/HWPX previews are experimental. XLSX
   previews are bounded read-only worksheet windows with explicit cached

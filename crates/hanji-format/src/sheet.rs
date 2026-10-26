@@ -1,10 +1,10 @@
 //! The Spreadsheet grammar (DESIGN.md §5.4): the workbook's structure as text
 //! — `<sheet>` blocks holding `<table>` blocks (one pipe-table line per
-//! column: name, type, number format, formula), `<chart/>` lines and
-//! placeholders — and the row window through which cell data is read (a
-//! pipe table whose first column is the read-only sheet row number, values
-//! as displayed; §6 round 4, read view A). Cell data is written by range
-//! operations (`ops.rs`), never as text.
+//! column: name, type, number format, formula), `<merge range/>` lines,
+//! `<chart/>` lines and placeholders — and the row window through which cell
+//! data is read (a pipe table whose first column is the read-only sheet row
+//! number, values as displayed; §6 round 4, read view A). Cell data is
+//! written by range operations (`ops.rs`), never as text.
 
 use crate::ast::{FrontMatter, Keep};
 use crate::cellfmt::{self, CellFormat, FormatLine};
@@ -21,6 +21,15 @@ pub const COLUMN_TYPES: &[&str] = &["text", "number", "date", "mixed"];
 pub const CHART_TYPES: &[&str] = &[
     "bar", "column", "line", "pie", "area", "scatter", "doughnut", "radar",
 ];
+
+/// At most this many `<merge range/>` lines on one sheet. A sheet with more
+/// (tens of thousands of merged ranges) keeps them as a placeholder: the
+/// structure text does not grow with the grid (§2 rule 11).
+pub const MAX_MERGE_LINES: usize = 1024;
+
+/// Excel's last row and column (A1's `XFD1048576`).
+const MAX_ROW: u32 = 1_048_576;
+const MAX_COL: u32 = 16_384;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Spreadsheet {
@@ -44,8 +53,16 @@ pub struct SheetDecl {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum SheetItem {
     Table(TableDecl),
+    Merge(MergeDecl),
     Chart(ChartDecl),
     Keep(Keep),
+}
+
+/// One merged range on a sheet (`<merge range="A1:F1"/>`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct MergeDecl {
+    /// Canonical A1 range (`A1:F1`), two or more cells.
+    pub range: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -244,6 +261,7 @@ fn hanji_cell_like(u: &str) -> bool {
 
 const SHEET_FORM: &str = "<sheet name=\"…\"> … </sheet>";
 const TABLE_FORM: &str = "<table name=\"…\" range=\"A1:F20\">, the lines | column | type | format | formula | and |---|---|---|---|, one line | name | type | format | formula | per column, and </table>";
+const MERGE_FORM: &str = "<merge range=\"A1:B2\"/>";
 const CHART_FORM: &str = "<chart type=\"bar\" data=\"Table[Column],Table[Column]\" title=\"…\"/>";
 const KEEP_FORM: &str = "<keep id=\"…\" kind=\"…\" summary=\"…\"/>";
 
@@ -333,6 +351,21 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
             i = next;
             continue;
         }
+        if t.starts_with("<merge") {
+            let prev: Vec<String> = sheet
+                .items
+                .iter()
+                .filter_map(|it| match it {
+                    SheetItem::Merge(m) => Some(m.range.clone()),
+                    _ => None,
+                })
+                .collect();
+            if let Some(m) = merge_tag(&mut p, i, &prev) {
+                sheet.items.push(SheetItem::Merge(m));
+            }
+            i += 1;
+            continue;
+        }
         if t.starts_with("<chart") {
             if let Some(c) = chart_tag(&mut p, i) {
                 sheet.items.push(SheetItem::Chart(c));
@@ -353,7 +386,7 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
         } else if t.starts_with('|') {
             p.err(i, col, format!("a pipe table here belongs inside a table block: {TABLE_FORM}. Cell data is written by range operations."));
         } else {
-            p.err(i, col, format!("a sheet holds only table blocks ({TABLE_FORM}), chart lines ({CHART_FORM}), placeholders ({KEEP_FORM}) and the format lines of its cells."));
+            p.err(i, col, format!("a sheet holds only table blocks ({TABLE_FORM}), merge lines ({MERGE_FORM}), chart lines ({CHART_FORM}), placeholders ({KEEP_FORM}) and the format lines of its cells."));
         }
         i += 1;
     }
@@ -691,6 +724,146 @@ fn quoted_list(v: &[&str]) -> String {
     quoted(&v.iter().map(|s| s.to_string()).collect::<Vec<_>>())
 }
 
+fn merge_tag(p: &mut Parser<'_>, i: usize, prev: &[String]) -> Option<MergeDecl> {
+    let attrs = tag_attrs(p, i, "merge", MERGE_FORM, &["range"])?;
+    let Some(raw) = get(&attrs, "range") else {
+        p.err(i, 1, format!("<merge> has a range: {MERGE_FORM}."));
+        return None;
+    };
+    if prev.len() >= MAX_MERGE_LINES {
+        p.err(
+            i,
+            1,
+            format!(
+                "this sheet already has {MAX_MERGE_LINES} merged ranges; at most {MAX_MERGE_LINES} are written as {MERGE_FORM} lines (a sheet with more keeps them as a placeholder)."
+            ),
+        );
+        return None;
+    }
+    let range = match parse_merge_range(raw) {
+        Ok(r) => r,
+        Err(m) => {
+            p.err(i, 1, m);
+            return None;
+        }
+    };
+    let Some(rect) = merge_rect(&range) else {
+        p.err(
+            i,
+            1,
+            format!("range=\"{raw}\" is not an A1 range of two or more cells such as A1:B2."),
+        );
+        return None;
+    };
+    for old in prev {
+        if let Some(o) = merge_rect(old) {
+            if rect.overlaps(&o) {
+                p.err(
+                    i,
+                    1,
+                    format!(
+                        "range=\"{range}\" overlaps {old}; merged ranges on a sheet do not overlap."
+                    ),
+                );
+                return None;
+            }
+        }
+    }
+    Some(MergeDecl { range })
+}
+
+/// Canonical A1 form of a merge (`B2:A1` → `A1:B2`). Two or more cells,
+/// inside Excel's grid.
+fn parse_merge_range(s: &str) -> Result<String, String> {
+    let form = "an A1 range of two or more cells such as A1:B2 (Excel's last cell is XFD1048576)";
+    let Some((a, b)) = s.split_once(':') else {
+        return Err(format!("range=\"{s}\" is one cell; a merge is {form}."));
+    };
+    let (Some(p), Some(q)) = (parse_a1(a), parse_a1(b)) else {
+        return Err(format!("range=\"{s}\" is not {form}."));
+    };
+    let first_col = p.0.min(q.0);
+    let last_col = p.0.max(q.0);
+    let first_row = p.1.min(q.1);
+    let last_row = p.1.max(q.1);
+    if first_col == last_col && first_row == last_row {
+        return Err(format!("range=\"{s}\" is one cell; a merge is {form}."));
+    }
+    Ok(format!(
+        "{}{}:{}{}",
+        col_letters(first_col),
+        first_row,
+        col_letters(last_col),
+        last_row
+    ))
+}
+
+fn parse_a1(s: &str) -> Option<(u32, u32)> {
+    let s = s.trim();
+    let s = s.strip_prefix('$').unwrap_or(s);
+    let k = s.find(|c: char| !c.is_ascii_alphabetic())?;
+    let (letters, rest) = s.split_at(k);
+    let rest = rest.strip_prefix('$').unwrap_or(rest);
+    if rest.is_empty() || !rest.bytes().all(|b| b.is_ascii_digit()) || rest.starts_with('0') {
+        return None;
+    }
+    let row: u32 = rest.parse().ok()?;
+    (1..=MAX_ROW)
+        .contains(&row)
+        .then_some((col_index(letters)?, row))
+}
+
+fn col_index(letters: &str) -> Option<u32> {
+    if letters.is_empty() || letters.len() > 3 {
+        return None;
+    }
+    let mut n: u32 = 0;
+    for b in letters.bytes() {
+        if !b.is_ascii_alphabetic() {
+            return None;
+        }
+        n = n * 26 + u32::from(b.to_ascii_uppercase() - b'A' + 1);
+    }
+    (1..=MAX_COL).contains(&n).then_some(n - 1)
+}
+
+fn col_letters(col: u32) -> String {
+    let mut s = Vec::new();
+    let mut n = col + 1;
+    while n > 0 {
+        let r = (n - 1) % 26;
+        s.push(b'A' + r as u8);
+        n = (n - 1) / 26;
+    }
+    s.reverse();
+    String::from_utf8(s).unwrap()
+}
+
+struct MergeRect {
+    c0: u32,
+    r0: u32,
+    c1: u32,
+    r1: u32,
+}
+
+impl MergeRect {
+    fn overlaps(&self, o: &MergeRect) -> bool {
+        self.c0 <= o.c1 && o.c0 <= self.c1 && self.r0 <= o.r1 && o.r0 <= self.r1
+    }
+}
+
+fn merge_rect(s: &str) -> Option<MergeRect> {
+    let (a, b) = s.split_once(':')?;
+    let p = parse_a1(a)?;
+    let q = parse_a1(b)?;
+    Some(MergeRect {
+        c0: p.0.min(q.0),
+        r0: p.1.min(q.1),
+        c1: p.0.max(q.0),
+        r1: p.1.max(q.1),
+    })
+}
+
 fn chart_tag(p: &mut Parser<'_>, i: usize) -> Option<ChartDecl> {
     let attrs = tag_attrs(p, i, "chart", CHART_FORM, &["type", "data", "title"])?;
     let (Some(ty), Some(data)) = (get(&attrs, "type"), get(&attrs, "data")) else {
@@ -833,17 +1006,38 @@ pub fn serialize_spreadsheet(s: &Spreadsheet) -> String {
             out.push(String::new());
             out.extend(sh.formats.iter().map(FormatLine::line));
         }
-        for item in &sh.items {
+        let mut i = 0;
+        while i < sh.items.len() {
             out.push(String::new());
-            match item {
-                SheetItem::Table(t) => out.extend(table_lines(t)),
-                SheetItem::Chart(c) => out.push(chart_line(c)),
-                SheetItem::Keep(k) => out.push(format!(
-                    "<keep id=\"{}\" kind=\"{}\" summary=\"{}\"/>",
-                    attr(&k.id),
-                    attr(&k.kind),
-                    attr(&k.summary)
-                )),
+            match &sh.items[i] {
+                SheetItem::Merge(_) => {
+                    while i < sh.items.len() {
+                        match &sh.items[i] {
+                            SheetItem::Merge(m) => {
+                                out.push(merge_line(m));
+                                i += 1;
+                            }
+                            _ => break,
+                        }
+                    }
+                }
+                SheetItem::Table(t) => {
+                    out.extend(table_lines(t));
+                    i += 1;
+                }
+                SheetItem::Chart(c) => {
+                    out.push(chart_line(c));
+                    i += 1;
+                }
+                SheetItem::Keep(k) => {
+                    out.push(format!(
+                        "<keep id=\"{}\" kind=\"{}\" summary=\"{}\"/>",
+                        attr(&k.id),
+                        attr(&k.kind),
+                        attr(&k.summary)
+                    ));
+                    i += 1;
+                }
             }
         }
         out.push("</sheet>".into());
@@ -893,6 +1087,10 @@ pub fn chart_line(c: &ChartDecl) -> String {
         s.push_str(&format!(" title=\"{}\"", attr(t)));
     }
     s + "/>"
+}
+
+pub fn merge_line(m: &MergeDecl) -> String {
+    format!("<merge range=\"{}\"/>", attr(&m.range))
 }
 
 /// What a row window shows: a table's rows, or a range of a sheet.
@@ -947,7 +1145,7 @@ pub fn window_text(of: &WindowOf, header: &[String], rows: &[(u32, Vec<String>)]
 mod tests {
     use super::*;
 
-    const TEXT: &str = "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"매출\" range=\"A1:E1201\">\n\n<table name=\"Sales\" range=\"A1:E1201\">\n| column | type | format | formula |\n|---|---|---|---|\n| 월 | date | yyyy-mm |  |\n| 매출 | number | #,##0 |  |\n| 이익 | number | #,##0 | =[@매출]-[@원가] |\n</table>\n\n<chart type=\"bar\" data=\"Sales[월],Sales[이익]\" title=\"월별 이익\"/>\n\n<keep id=\"k1\" kind=\"merged-cells\" summary=\"G1:H1\"/>\n</sheet>\n";
+    const TEXT: &str = "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"매출\" range=\"A1:E1201\">\n\n<table name=\"Sales\" range=\"A1:E1201\">\n| column | type | format | formula |\n|---|---|---|---|\n| 월 | date | yyyy-mm |  |\n| 매출 | number | #,##0 |  |\n| 이익 | number | #,##0 | =[@매출]-[@원가] |\n</table>\n\n<chart type=\"bar\" data=\"Sales[월],Sales[이익]\" title=\"월별 이익\"/>\n\n<merge range=\"G1:H1\"/>\n\n<keep id=\"k1\" kind=\"data-validation\" summary=\"B2:B1201\"/>\n</sheet>\n";
 
     #[test]
     fn round_trip() {
@@ -964,8 +1162,8 @@ mod tests {
     fn errs(text: &str) -> Vec<String> {
         let k1 = Keep {
             id: "k1".into(),
-            kind: "merged-cells".into(),
-            summary: "G1:H1".into(),
+            kind: "data-validation".into(),
+            summary: "B2:B1201".into(),
         };
         parse_spreadsheet(
             text,
@@ -997,7 +1195,7 @@ mod tests {
             e[0].contains("placeholder id=\"k2\" is not in this file"),
             "{e:?}"
         );
-        let e = errs(&TEXT.replace("G1:H1", "G1:H2"));
+        let e = errs(&TEXT.replace("B2:B1201", "B2:B2"));
         assert!(e[0].contains("was altered"), "{e:?}");
         let e = errs(&TEXT.replace("name=\"Sales\"", "name=\"A1\""));
         assert!(e[0].contains("reads as a cell address"), "{e:?}");
@@ -1049,5 +1247,63 @@ mod tests {
         );
         assert_eq!(w, "<data table=\"Sales\">\n| row | 월 | 매출 |\n|---|---|---|\n| 2 | 2026-01 | 12,000,000 |\n| 3 |  |  |\n</data>\n");
         assert_eq!(split_pipe_row("| a\\|b | c |").unwrap(), ["a|b", "c"]);
+    }
+
+    #[test]
+    fn merge_lines_round_trip() {
+        let s = parse_spreadsheet(TEXT, &Names::default()).unwrap();
+        assert_eq!(
+            s.sheets[0]
+                .items
+                .iter()
+                .filter_map(|i| match i {
+                    SheetItem::Merge(m) => Some(m.range.as_str()),
+                    _ => None,
+                })
+                .collect::<Vec<_>>(),
+            ["G1:H1"]
+        );
+        let two = TEXT.replace(
+            "<merge range=\"G1:H1\"/>",
+            "<merge range=\"G1:H1\"/>\n<merge range=\"A2:C2\"/>",
+        );
+        let s = parse_spreadsheet(&two, &Names::default()).unwrap();
+        let canon = serialize_spreadsheet(&s);
+        assert_eq!(canon, two);
+        assert_eq!(parse_spreadsheet(&canon, &Names::default()).unwrap(), s);
+        // Either corner first prints top-left:bottom-right.
+        let flipped = TEXT.replace("G1:H1", "H1:G1");
+        let s = parse_spreadsheet(&flipped, &Names::default()).unwrap();
+        assert_eq!(serialize_spreadsheet(&s), TEXT);
+    }
+
+    #[test]
+    fn merge_errors() {
+        let overlap = TEXT.replace(
+            "<merge range=\"G1:H1\"/>",
+            "<merge range=\"G1:H1\"/>\n<merge range=\"H1:I2\"/>",
+        );
+        let e = errs(&overlap);
+        assert!(
+            e[0].contains("overlaps G1:H1") && e[0].contains("do not overlap"),
+            "{e:?}"
+        );
+        let twice = TEXT.replace(
+            "<merge range=\"G1:H1\"/>",
+            "<merge range=\"G1:H1\"/>\n<merge range=\"G1:H1\"/>",
+        );
+        let e = errs(&twice);
+        assert!(e[0].contains("overlaps"), "{e:?}");
+        let e = errs(&TEXT.replace("G1:H1", "A1"));
+        assert!(e[0].contains("one cell"), "{e:?}");
+        let e = errs(&TEXT.replace("G1:H1", "A1048577:B1048577"));
+        assert!(
+            e[0].contains("A1048577:B1048577") && e[0].contains("XFD1048576"),
+            "{e:?}"
+        );
+        let e = errs(&TEXT.replace("G1:H1", "XFE1:XFE2"));
+        assert!(e[0].contains("XFE1:XFE2"), "{e:?}");
+        let e = errs(&TEXT.replace("G1:H1", "not-a-range"));
+        assert!(e[0].contains("not-a-range"), "{e:?}");
     }
 }

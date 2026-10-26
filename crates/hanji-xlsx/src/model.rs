@@ -9,7 +9,8 @@ use hanji_core::cells::{parse_sqref, CellRange, CellRef};
 use hanji_core::{Entry, KeepIds, Kind, Meta};
 use hanji_format::cellfmt::{self, CellFormat, FormatLine};
 use hanji_format::sheet::{
-    format_kind, ColumnDecl, FormatKind, SheetDecl, SheetItem, Spreadsheet, TableDecl,
+    format_kind, ColumnDecl, FormatKind, MergeDecl, SheetDecl, SheetItem, Spreadsheet, TableDecl,
+    MAX_MERGE_LINES,
 };
 use hanji_format::{formula, FrontMatter, Keep};
 use hanji_package::clip;
@@ -188,6 +189,9 @@ pub fn keeps(book: &Book) -> Vec<(usize, Keep)> {
             ));
         };
         for &(_, child, _) in RANGE_ELEMENTS {
+            if child == "mergeCell" && modelled_merges(book, i).is_some() {
+                continue;
+            }
             let ranges: Vec<&str> = book
                 .entries
                 .iter()
@@ -221,6 +225,36 @@ pub fn keeps(book: &Book) -> Vec<(usize, Keep)> {
         }
     }
     out
+}
+
+/// This sheet's merged ranges as `<merge range/>` lines, or `None` when they
+/// stay a placeholder: more than [`MAX_MERGE_LINES`], a single-cell "merge",
+/// an unparsable ref, or overlapping ranges (the parser would refuse the
+/// unedited text).
+fn modelled_merges(book: &Book, i: usize) -> Option<Vec<String>> {
+    let mut rs: Vec<CellRange> = vec![];
+    for e in &book.entries {
+        if e.kind != Kind::Range || e.path.first() != Some(&i) || e.meta.tag != "mergeCell" {
+            continue;
+        }
+        let r = CellRange::parse(e.meta.range.as_deref()?)?;
+        if r.first == r.last {
+            return None;
+        }
+        rs.push(r);
+    }
+    if rs.is_empty() {
+        return Some(vec![]);
+    }
+    if rs.len() > MAX_MERGE_LINES {
+        return None;
+    }
+    for (a, x) in rs.iter().enumerate() {
+        if rs[a + 1..].iter().any(|y| x.intersects(y)) {
+            return None;
+        }
+    }
+    Some(rs.into_iter().map(|r| r.to_string()).collect())
 }
 
 fn list_summary(ranges: &[&str]) -> String {
@@ -344,6 +378,12 @@ pub fn structure(book: &mut Book, template: Option<&str>) -> Result<Spreadsheet,
             });
             for t in book.tables.iter().filter(|t| t.sheet == i) {
                 items.push(SheetItem::Table(table_decl(book, t)));
+            }
+            if let Some(ms) = modelled_merges(book, i) {
+                items.extend(
+                    ms.into_iter()
+                        .map(|range| SheetItem::Merge(MergeDecl { range })),
+                );
             }
         }
         items.extend(
