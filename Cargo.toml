@@ -22,12 +22,12 @@ hanji-package = { path = "crates/hanji-package" }
 hanji-testkit = { path = "crates/hanji-testkit" }
 
 # One immutable renderer source keeps PPTX and DOCX layout types compatible.
-# S95.11 (sinteric/rdocx main 562aefb): S95 Word authoring APIs and stricter Word/PowerPoint validation on top of S94 (zip 9.0.3).
-rdocx = { git = "https://github.com/sinteric/rdocx", rev = "562aefb4e403f9c5672227c025b670a80ffc838f", default-features = false }
-rpptx = { git = "https://github.com/sinteric/rdocx", rev = "562aefb4e403f9c5672227c025b670a80ffc838f", default-features = false }
-rpptx-render = { git = "https://github.com/sinteric/rdocx", rev = "562aefb4e403f9c5672227c025b670a80ffc838f", default-features = false }
-rpptx-layout = { git = "https://github.com/sinteric/rdocx", rev = "562aefb4e403f9c5672227c025b670a80ffc838f", default-features = false }
-oxml-layout = { git = "https://github.com/sinteric/rdocx", rev = "562aefb4e403f9c5672227c025b670a80ffc838f", default-features = false }
+# S95.2/S95.3 (sinteric/rdocx main 45ac63f): Word content-control shells and typed payloads, custom XML data binding, template grammar, numbering navigation, PowerPoint authoring/table-row paint, bounded edit scans, and stricter validation on top of S95.11.
+rdocx = { git = "https://github.com/sinteric/rdocx", rev = "45ac63f51e23ff8c82f276a51ddd48ca6e5eb085", default-features = false }
+rpptx = { git = "https://github.com/sinteric/rdocx", rev = "45ac63f51e23ff8c82f276a51ddd48ca6e5eb085", default-features = false }
+rpptx-render = { git = "https://github.com/sinteric/rdocx", rev = "45ac63f51e23ff8c82f276a51ddd48ca6e5eb085", default-features = false }
+rpptx-layout = { git = "https://github.com/sinteric/rdocx", rev = "45ac63f51e23ff8c82f276a51ddd48ca6e5eb085", default-features = false }
+oxml-layout = { git = "https://github.com/sinteric/rdocx", rev = "45ac63f51e23ff8c82f276a51ddd48ca6e5eb085", default-features = false }
 # sinteric/rhwp main (0.8.7 plus Hanji fork contracts and zip 9.0.4).
 rhwp = { git = "https://github.com/sinteric/rhwp", rev = "d2fdbebf32e5182bb7f2e365ed9642bf7f5a9924", default-features = false }
 

@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `45ac63f`
+  (S95.2 and S95.3 / rdocx 0.16.3, rpptx and oxml-layout 0.14.3: Word
+  content-control shells and typed payloads, custom XML data binding, template
+  grammar, numbering navigation, PowerPoint authoring and table-row paint,
+  bounded edit scans, stricter validation).
 - Lay out PPTX, DOCX and HWPX pages as a display list (`hanji_preview::page`):
   glyph ids with their outlines, paths, images and groups, in hanji's own
   types, from a package or from a revision's text and remainder. For viewers
