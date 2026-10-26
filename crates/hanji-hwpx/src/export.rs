@@ -260,6 +260,7 @@ impl<'a> Exporter<'a> {
                     1
                 }
                 Block::Head(_) => return Err("a Document has no slides, slots or shapes".into()),
+                _ => return Err("a Document has no slides, slots or shapes".into()),
             };
             bi += step;
         }
@@ -545,6 +546,7 @@ impl<'a> Exporter<'a> {
                 }
                 Some(ListPlan::Strip) => ppr = self.header.para_pr_with(ppr, None)?,
                 Some(ListPlan::Keep) | None => {}
+                _ => {}
             }
         }
         // What the paragraph sets (§5.2): its style's values and its own. A
@@ -911,6 +913,7 @@ impl<'a> Exporter<'a> {
                 Atom::NoteRef(_) | Atom::Math(_) => {
                     return Err("footnotes and math are not supported by the hwpx engine yet".into())
                 }
+                &_ => return Err("footnotes and math are not supported by the hwpx engine yet".into()),
             }
         }
         close(&mut t, r);

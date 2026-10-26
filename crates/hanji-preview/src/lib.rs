@@ -54,14 +54,30 @@ use fonts::{Fonts, Metrics, Script, Source};
 /// Caller fonts and alias policy. Assets remain inside the PPTX package.
 /// The default uses only document-embedded and bundled fonts, with no host discovery.
 #[derive(Clone, Debug, Default)]
+#[non_exhaustive]
 pub struct FontOptions {
     pub fonts: Vec<FontData>,
     pub aliases: Option<fonts::Aliases>,
 }
 
+impl FontOptions {
+    pub fn from_fonts(fonts: Vec<FontData>) -> FontOptions {
+        FontOptions {
+            fonts,
+            aliases: None,
+        }
+    }
+
+    pub fn with_aliases(mut self, aliases: fonts::Aliases) -> FontOptions {
+        self.aliases = Some(aliases);
+        self
+    }
+}
+
 /// Where the preview finds fonts.
 #[derive(Clone, Debug)]
 #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
+#[non_exhaustive]
 pub struct Options {
     /// Font files and directories, searched first (`--font-dir`, `HANJI_FONT_DIR`).
     pub font_dirs: Vec<PathBuf>,
@@ -81,6 +97,23 @@ impl Default for Options {
 
 #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 impl Options {
+    /// Document-embedded and bundled fonts only: no extra directories, no
+    /// system fonts.
+    pub fn bundled_only() -> Options {
+        Options {
+            font_dirs: vec![],
+            system_fonts: false,
+        }
+    }
+
+    /// Extra font directories, without system fonts.
+    pub fn font_dirs_only(font_dirs: Vec<PathBuf>) -> Options {
+        Options {
+            font_dirs,
+            system_fonts: false,
+        }
+    }
+
     /// `font_dirs` (`--font-dir`), then `HANJI_FONT_DIR`, then system fonts.
     pub fn with_font_dirs(mut font_dirs: Vec<PathBuf>) -> Options {
         font_dirs.extend(fonts::env_font_dirs());
@@ -367,6 +400,7 @@ pub struct Preview {
 
 /// One page's dimensions, in points (72 points per inch).
 #[derive(Clone, Copy, Debug, PartialEq, Serialize)]
+#[non_exhaustive]
 pub struct PageInfo {
     pub index: usize,
     pub width: f64,
@@ -375,6 +409,7 @@ pub struct PageInfo {
 
 /// A page job's requested encoding. Raster DPI must be finite and positive.
 #[derive(Clone, Copy, Debug)]
+#[non_exhaustive]
 pub enum PageFormat {
     Svg,
     Png { dpi: f64 },
@@ -405,12 +440,14 @@ fn png_dimensions(width: f64, height: f64, dpi: f64) -> Result<(u32, u32), Strin
 
 /// Owned output buffers; adapters decide how to transfer/display them.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum PageData {
     Svg(String),
     Png(Vec<u8>),
 }
 
 #[derive(Debug)]
+#[non_exhaustive]
 pub struct RenderedPage {
     pub page: PageInfo,
     pub data: PageData,
@@ -427,6 +464,7 @@ pub enum DocumentKind {
 }
 
 /// The common page-job interface over the two existing renderer outputs.
+#[non_exhaustive]
 pub enum DocumentPreview {
     Layout(Box<Preview>),
     #[cfg(feature = "hwpx")]
@@ -523,6 +561,7 @@ const SUBSET_CACHE_BYTES: usize = 16 * 1024 * 1024;
 
 /// `fonts` in the preview result (DESIGN.md §7.1).
 #[derive(Clone, Debug, Default, Serialize)]
+#[non_exhaustive]
 pub struct FontsReport {
     pub substituted: Vec<Substituted>,
     pub drawn_as_requested: Vec<AsRequested>,
@@ -537,6 +576,7 @@ fn is_zero(n: &usize) -> bool {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct Substituted {
     pub requested: String,
     pub script: Script,
@@ -550,6 +590,7 @@ pub struct Substituted {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct AsRequested {
     pub requested: String,
     pub script: Script,
@@ -558,11 +599,26 @@ pub struct AsRequested {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct MissingGlyph {
     /// `U+AC00`.
     pub char: String,
     pub requested: String,
     pub pages: Vec<usize>,
+}
+
+impl MissingGlyph {
+    pub fn new(
+        char: impl Into<String>,
+        requested: impl Into<String>,
+        pages: Vec<usize>,
+    ) -> MissingGlyph {
+        MissingGlyph {
+            char: char.into(),
+            requested: requested.into(),
+            pages,
+        }
+    }
 }
 
 const MISSING_LISTED: usize = 100;

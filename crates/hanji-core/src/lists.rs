@@ -12,6 +12,7 @@ use crate::remainder::{Entry, Kind};
 
 /// What a top-level paragraph's numbering becomes.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ListPlan {
     /// A list item as imported: its numbering stays as it is.
     Keep,

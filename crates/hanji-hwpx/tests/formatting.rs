@@ -9,14 +9,7 @@ use hanji_core::{
 };
 use hanji_hwpx::{package, xml, HwpxEngine};
 
-const CAPS: Capabilities = Capabilities {
-    links: false,
-    fields: false,
-    footnotes: false,
-    math: false,
-    formatting: true,
-    table_place: false,
-};
+const CAPS: Capabilities = Capabilities::FORMATTING;
 
 fn corpus(name: &str) -> Vec<u8> {
     let path = format!("{}/corpus/{name}", env!("CARGO_MANIFEST_DIR"));

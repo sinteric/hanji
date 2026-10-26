@@ -46,6 +46,7 @@ const PLACES: usize = 8;
 
 /// A placeholder the target file does not have: it is not in the converted text.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub struct Placeholder {
     pub id: String,
     pub kind: String,
@@ -56,6 +57,7 @@ pub struct Placeholder {
 
 /// A property the target could not write, as the text had it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub struct Property {
     /// `key=value`, or what the text had (`table style "Grid Table 4"`).
     pub property: String,
@@ -68,6 +70,7 @@ pub struct Property {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum StyleFate {
     /// The target has the style (by name, or as its default or heading) and
     /// keeps its own definition.
@@ -77,6 +80,7 @@ pub enum StyleFate {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub struct StyleNote {
     /// The source's style.
     pub name: String,
@@ -92,6 +96,7 @@ pub struct StyleNote {
 
 /// A theme colour written as the `#RRGGBB` the source theme gives it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub struct Resolved {
     pub from: String,
     pub to: String,
@@ -100,6 +105,7 @@ pub struct Resolved {
 
 /// Something the remainder held that the text does not show, by what it is.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub struct NotCarried {
     pub what: String,
     pub count: usize,
@@ -111,6 +117,7 @@ pub struct NotCarried {
 /// What an export in the other format did not carry across (§2 rule 1: it
 /// never drops silently).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub struct Conversion {
     pub from: Format,
     pub to: Format,
@@ -591,6 +598,14 @@ impl<'a> Convert<'a> {
                         ParaStyle::Plain
                     }
                     ParaStyle::Named(n) => self.named(n).map_or(ParaStyle::Plain, ParaStyle::Named),
+                    &_ => {
+                        self.dropped(
+                            "paragraph style".into(),
+                            format!("{} cannot convert this paragraph style yet", self.to.name()),
+                            place.clone(),
+                        );
+                        ParaStyle::Plain
+                    }
                 };
                 let content = self.inline(&p.content, pm, at);
                 let props = self.props(&p.props, &place);
@@ -624,6 +639,13 @@ impl<'a> Convert<'a> {
                 out.push(Block::List(new));
             }
             Block::Table(t) => out.push(Block::Table(self.table(t, map))),
+            &_ => {
+                self.dropped(
+                    "block".into(),
+                    format!("{} cannot convert this block yet", self.to.name()),
+                    self.line(at),
+                );
+            }
         }
     }
 
@@ -689,6 +711,14 @@ impl<'a> Convert<'a> {
                             });
                         }
                         Cell::Text(out)
+                    }
+                    &_ => {
+                        self.dropped(
+                            "cell".into(),
+                            format!("{} cannot convert this cell yet", self.to.name()),
+                            self.line(cell_at(r, c)),
+                        );
+                        Cell::Text(vec![])
                     }
                 });
             }
@@ -895,6 +925,7 @@ fn not_carried(rem: &Remainder, from: Format, has_items: bool) -> Vec<NotCarried
                 _ => "other zero-width markers",
             },
             Kind::Slide | Kind::Shape | Kind::Range => continue,
+            _ => "other remainder entries",
         };
         *counts.entry(what).or_default() += 1;
     }

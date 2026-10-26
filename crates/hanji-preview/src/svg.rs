@@ -20,6 +20,7 @@ use oxml_layout::{
 
 /// One stable diagnostic produced while lowering a page to SVG.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[non_exhaustive]
 pub struct SvgDiagnostic {
     /// Location in the layout result that required a fallback or was omitted.
     pub path: String,
@@ -27,8 +28,18 @@ pub struct SvgDiagnostic {
     pub message: String,
 }
 
+impl SvgDiagnostic {
+    pub fn new(path: impl Into<String>, message: impl Into<String>) -> SvgDiagnostic {
+        SvgDiagnostic {
+            path: path.into(),
+            message: message.into(),
+        }
+    }
+}
+
 /// One self-contained SVG page and its ordered diagnostics.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct SvgRenderResult {
     /// Complete UTF-8 SVG document.
     pub svg: String,

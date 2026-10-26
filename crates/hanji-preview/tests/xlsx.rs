@@ -258,10 +258,7 @@ fn an_overflow_font_without_marker_glyphs_uses_an_unambiguous_vector_fallback() 
         .unwrap()
         .glyph_index('#')
         .is_none());
-    let fonts = FontOptions {
-        fonts: vec![hanji_preview::FontData::new(data)],
-        ..Default::default()
-    };
+    let fonts = FontOptions::from_fonts(vec![hanji_preview::FontData::new(data)]);
     let sheet = r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><cols><col min="1" max="1" width="2"/></cols><sheetData><row r="1"><c r="A1"><v>123456789</v></c></row></sheetData></worksheet>"#;
     let mut b = open_xlsx(
         &fixture::build(sheet, "", fixture::STYLES, &[]),
@@ -447,46 +444,21 @@ fn nonempty_text_omitted_from_a_narrow_visible_cell_is_diagnosed() {
 #[test]
 fn resource_budgets_refuse_instead_of_truncating_or_allocating_large_rasters() {
     let bytes = fixture::build(fixture::GRID, "", fixture::STYLES, &[]);
-    assert!(error(open_xlsx(
-        &bytes,
-        XlsxOptions {
-            max_unpacked_bytes: 100,
-            ..Default::default()
-        }
-    ))
-    .contains("expands"));
-    assert!(error(open_xlsx(
-        &bytes,
-        XlsxOptions {
-            max_window_rows: 0,
-            ..Default::default()
-        }
-    ))
-    .contains("positive"));
-    assert!(error(open_xlsx(
-        &bytes,
-        XlsxOptions {
-            max_font_family_bytes: 2,
-            ..Default::default()
-        }
-    ))
-    .contains("metadata budget"));
-    assert!(error(open_xlsx(
-        &bytes,
-        XlsxOptions {
-            max_number_format_bytes: 2,
-            ..Default::default()
-        }
-    ))
-    .contains("metadata budget"));
-    let mut b = open_xlsx(
-        &bytes,
-        XlsxOptions {
-            max_window_text_bytes: 4,
-            ..Default::default()
-        },
-    )
-    .unwrap();
+    let mut unpacked = XlsxOptions::default();
+    unpacked.max_unpacked_bytes = 100;
+    assert!(error(open_xlsx(&bytes, unpacked)).contains("expands"));
+    let mut rows = XlsxOptions::default();
+    rows.max_window_rows = 0;
+    assert!(error(open_xlsx(&bytes, rows)).contains("positive"));
+    let mut family = XlsxOptions::default();
+    family.max_font_family_bytes = 2;
+    assert!(error(open_xlsx(&bytes, family)).contains("metadata budget"));
+    let mut number = XlsxOptions::default();
+    number.max_number_format_bytes = 2;
+    assert!(error(open_xlsx(&bytes, number)).contains("metadata budget"));
+    let mut text = XlsxOptions::default();
+    text.max_window_text_bytes = 4;
+    let mut b = open_xlsx(&bytes, text).unwrap();
     assert!(
         error(b.render_window_with_fonts(0, "A1:B2", &FontOptions::default()))
             .contains("text budget")
@@ -612,15 +584,12 @@ fn supplied_korean_font_renders_multilingual_cells_without_missing_glyphs() {
         return;
     };
     let data = std::fs::read(std::path::PathBuf::from(dir).join("Arial Unicode.ttf")).unwrap();
-    let opts = FontOptions {
-        fonts: vec![hanji_preview::FontData::new(data)],
-        aliases: Some(
-            hanji_preview::fonts::Aliases::parse(
-                "[[family]]\nnames = [\"Calibri\"]\nsubstitute = [\"Arial Unicode MS\"]\n",
-            )
-            .unwrap(),
-        ),
-    };
+    let opts = FontOptions::from_fonts(vec![hanji_preview::FontData::new(data)]).with_aliases(
+        hanji_preview::fonts::Aliases::parse(
+            "[[family]]\nnames = [\"Calibri\"]\nsubstitute = [\"Arial Unicode MS\"]\n",
+        )
+        .unwrap(),
+    );
     let mut b = book("");
     let w = b.render_window_with_fonts(0, "A1:B1", &opts).unwrap();
     assert_eq!(w.fonts().missing_glyphs_total, 0);
@@ -720,15 +689,17 @@ fn unsupported_font_advance_policy_does_not_claim_applied_metrics() {
             _: bool,
             _: bool,
         ) -> Option<hanji_preview::ResolvedFont> {
-            Some(hanji_preview::ResolvedFont {
-                family: "Carlito".into(),
-                source: hanji_preview::fonts::Source::Supplied,
-                metrics: hanji_preview::fonts::Metrics::Table,
-                ea_advance: Some(1.0),
-                font: hanji_preview::FontData::new(
-                    oxml_layout::bundled_fonts::bundled_font_data()[0].1,
-                ),
-            })
+            Some(
+                hanji_preview::ResolvedFont::new(
+                    "Carlito",
+                    hanji_preview::fonts::Source::Supplied,
+                    hanji_preview::fonts::Metrics::Table,
+                    hanji_preview::FontData::new(
+                        oxml_layout::bundled_fonts::bundled_font_data()[0].1,
+                    ),
+                )
+                .with_ea_advance(Some(1.0)),
+            )
         }
     }
     let mut workbook = book("");
@@ -826,6 +797,7 @@ fn worksheet_theme_and_tint_colors_match_explicit_rgb_in_all_outputs() {
         {
             PageData::Svg(s) => s.into_bytes(),
             PageData::Png(png) => png,
+            _ => unreachable!("svg or png"),
         };
         assert_eq!(bytes(&a), bytes(&b));
         assert_eq!(bytes(&a), bytes(&a));

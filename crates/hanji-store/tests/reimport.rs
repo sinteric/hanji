@@ -34,11 +34,7 @@ impl SharedStorage {
     }
 }
 
-const ACK: ExportOptions = ExportOptions {
-    acknowledge_surfaced: true,
-    tracked_changes: false,
-    format: None,
-};
+const ACK: ExportOptions = ExportOptions::ACKNOWLEDGE_SURFACED;
 
 fn person_edits(bytes: &[u8], part: &str, from: &str, to: &str) -> Vec<u8> {
     let mut parts: Vec<Part> = package::read(bytes).unwrap();
@@ -63,10 +59,7 @@ fn docx_refuses_a_stale_export_after_a_committed_edit_without_changing_the_store
         .edit(
             &o.doc_id,
             1,
-            &[TextEdit {
-                old: "| ^^ | 종로 | 95 |".into(),
-                new: "| ^^ | 종로 | 97 |".into(),
-            }],
+            &[TextEdit::new("| ^^ | 종로 | 95 |", "| ^^ | 종로 | 97 |")],
         )
         .unwrap();
     let before = storage.snapshot();
@@ -143,11 +136,7 @@ fn xlsx_refuses_a_stale_export_even_when_only_cells_changed() {
         .reimport_bytes_at_revision(&o.doc_id, c.revision, "sales.xlsx", &polished)
         .unwrap();
     assert_eq!((r.parent, r.revision), (2, 3));
-    let w = Window {
-        table: Some("Sales".into()),
-        rows: Some("4:4".into()),
-        ..Default::default()
-    };
+    let w = Window::table_rows("Sales", "4:4");
     assert!(ws
         .read(&o.doc_id, None, &w)
         .unwrap()

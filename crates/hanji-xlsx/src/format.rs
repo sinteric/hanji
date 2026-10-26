@@ -501,6 +501,7 @@ pub fn snap(b: &Border) -> Result<Option<(&'static str, &Color)>, String> {
                 .ok_or_else(|| format!("{b}: a workbook has no {style} border; write solid, dashed, dotted, double, dash-dot or dash-dot-dot"))?;
             Ok(Some((best.0, color)))
         }
+        _ => Ok(None),
     }
 }
 

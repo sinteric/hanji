@@ -2,6 +2,7 @@
 
 /// What a cell holds (a formula cell: its computed value).
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum CellValue {
     Empty,
     Number(f64),

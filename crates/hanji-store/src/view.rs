@@ -19,6 +19,7 @@ pub const DEFAULT_ROWS: u32 = 50;
 /// `slides`; `table` (with `rows`) or `sheet` with `range` for cells.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
+#[non_exhaustive]
 pub struct Window {
     /// Line range, 1-based and inclusive: `"120:180"`, or `"120"`.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -48,10 +49,45 @@ impl Window {
     pub fn is_cells(&self) -> bool {
         self.table.is_some() || self.rows.is_some() || self.sheet.is_some() || self.range.is_some()
     }
+
+    /// Line range, 1-based and inclusive: `"120:180"`, or `"120"`.
+    pub fn lines(spec: impl Into<String>) -> Window {
+        Window {
+            lines: Some(spec.into()),
+            ..Default::default()
+        }
+    }
+
+    /// A Document's section: the text of its heading, up to the next heading
+    /// of the same or a higher level.
+    pub fn section(heading: impl Into<String>) -> Window {
+        Window {
+            section: Some(heading.into()),
+            ..Default::default()
+        }
+    }
+
+    /// A Presentation's slides, 1-based and inclusive: `"3:5"`, or `"3"`.
+    pub fn slides(spec: impl Into<String>) -> Window {
+        Window {
+            slides: Some(spec.into()),
+            ..Default::default()
+        }
+    }
+
+    /// A Spreadsheet table and the sheet rows of it to show.
+    pub fn table_rows(table: impl Into<String>, rows: impl Into<String>) -> Window {
+        Window {
+            table: Some(table.into()),
+            rows: Some(rows.into()),
+            ..Default::default()
+        }
+    }
 }
 
 /// A heading, slide, sheet or table line, for finding a part to read.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub struct OutlineEntry {
     pub line: usize,
     pub text: String,

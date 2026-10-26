@@ -23,6 +23,7 @@ pub struct BlockMap {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum BlockMapKind {
     Para(ParaMap),
     /// Per row and column, one map per cell paragraph; `None` for a `||` cell.

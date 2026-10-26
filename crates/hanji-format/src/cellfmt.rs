@@ -323,6 +323,7 @@ pub fn default_line(f: &CellFormat) -> String {
 
 /// What a `<format …/>` line holds: the default, or a range line.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Parsed {
     Default(CellFormat),
     Range(FormatLine),

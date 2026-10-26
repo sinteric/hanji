@@ -8,14 +8,7 @@ use hanji_docx::{package, DocxEngine};
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
-const CAPS: Capabilities = Capabilities {
-    links: false,
-    fields: false,
-    footnotes: false,
-    math: false,
-    formatting: true,
-    table_place: true,
-};
+const CAPS: Capabilities = Capabilities::DOCUMENT;
 
 fn part(name: &str, data: &str) -> Part {
     Part {

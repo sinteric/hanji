@@ -8,14 +8,7 @@ use hanji_core::{edit, reanchor_rewrite, Capabilities, Engine, EngineError, Impo
 use hanji_docx::{package, DocxEngine, ExportOptions, History, Reviewer};
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
-const CAPS: Capabilities = Capabilities {
-    links: false,
-    fields: false,
-    footnotes: false,
-    math: false,
-    formatting: true,
-    table_place: true,
-};
+const CAPS: Capabilities = Capabilities::DOCUMENT;
 const AUTHOR: &str = "hanji";
 
 const STYLES: &str = r#"<?xml version="1.0" encoding="UTF-8"?><w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style><w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/></w:style><w:style w:type="paragraph" w:styleId="Note"><w:name w:val="Note"/></w:style><w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/></w:style></w:styles>"#;
@@ -50,12 +43,7 @@ fn p(text: &str) -> String {
 }
 
 fn tracked() -> ExportOptions {
-    ExportOptions {
-        tracked_changes: Some(Reviewer {
-            author: AUTHOR.into(),
-            date: "2026-09-29T00:00:00Z".into(),
-        }),
-    }
+    ExportOptions::tracked(Reviewer::new(AUTHOR, "2026-09-29T00:00:00Z"))
 }
 
 fn doc_xml(pkg: &[u8]) -> String {

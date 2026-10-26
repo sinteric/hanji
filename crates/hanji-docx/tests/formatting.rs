@@ -9,14 +9,7 @@ use hanji_core::{
 use hanji_docx::DocxEngine;
 use hanji_package::package;
 
-const CAPS: Capabilities = Capabilities {
-    links: false,
-    fields: false,
-    footnotes: false,
-    math: false,
-    formatting: true,
-    table_place: true,
-};
+const CAPS: Capabilities = Capabilities::DOCUMENT;
 
 fn corpus(name: &str) -> Vec<u8> {
     let path = format!(

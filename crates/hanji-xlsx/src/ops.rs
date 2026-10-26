@@ -48,6 +48,7 @@ pub const ROUND4_FORMATS: &[&str] = &[
 
 /// What happened to one range entry.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct EntryOutcome {
     pub id: u64,
     /// `mergeCell`, `conditionalFormatting`, `dataValidation`, `hyperlink`.
@@ -59,6 +60,7 @@ pub struct EntryOutcome {
 }
 
 #[derive(Clone, Debug, Default)]
+#[non_exhaustive]
 pub struct OpReport {
     /// Operations applied (structure edits in the text first).
     pub applied: usize,
@@ -496,6 +498,7 @@ fn apply_op(book: &mut Book, op: &RangeOp, cx: &mut Ctx) -> Result<(), String> {
             set,
             outline,
         } => op_format(book, range, set, outline.as_ref()),
+        _ => Err("this range operation is not implemented".into()),
     }
 }
 
@@ -620,6 +623,7 @@ fn to_write(book: &Book, v: &Value, ty: Option<&str>, fmt: &str, at: &str) -> Re
         (Some("mixed") | None, Value::Number(n)) => W::Num(*n),
         (Some("mixed") | None, Value::Bool(b)) => W::Bool(*b),
         (Some(t), v) => return Err(format!("{at}: {v} does not fit a {t} column")),
+        _ => return Err(format!("{at}: {v} cannot be written")),
     })
 }
 
@@ -883,6 +887,7 @@ fn check_validation(
             Value::Number(n) => numfmt::general(*n),
             Value::Bool(b) => (if *b { "TRUE" } else { "FALSE" }).into(),
             Value::Null => String::new(),
+            _ => String::new(),
         };
         let bounds = || {
             (

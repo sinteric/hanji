@@ -56,6 +56,7 @@ pub const GUIDE: &str = include_str!("guide.md");
 /// What made a revision.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum RevOp {
     Open,
     New,
@@ -66,6 +67,7 @@ pub enum RevOp {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct Revision {
     pub id: u32,
     pub parent: Option<u32>,
@@ -76,6 +78,7 @@ pub struct Revision {
 /// A document: its home format, template and revisions. The text and
 /// remainder of each revision are stored beside it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct DocRecord {
     pub id: String,
     pub doc_type: DocType,
@@ -91,13 +94,24 @@ pub struct DocRecord {
 
 /// One exact-span edit: the one occurrence of `old` becomes `new`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct TextEdit {
     pub old: String,
     pub new: String,
 }
 
+impl TextEdit {
+    pub fn new(old: impl Into<String>, new: impl Into<String>) -> TextEdit {
+        TextEdit {
+            old: old.into(),
+            new: new.into(),
+        }
+    }
+}
+
 /// §8 on import: what was neutralised, and what to surface before export.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub struct ImportReport {
     pub neutralised: Vec<Item>,
     pub surfaced: Vec<Item>,
@@ -113,6 +127,7 @@ impl From<&hanji_core::ImportReport> for ImportReport {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct Opened {
     pub doc_id: String,
     pub revision: u32,
@@ -125,6 +140,7 @@ pub struct Opened {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct Read {
     pub doc_id: String,
     pub revision: u32,
@@ -153,6 +169,7 @@ pub struct Read {
 
 /// A range entry of a Spreadsheet that moved or went.
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct Moved {
     pub tag: String,
     pub sheet: String,
@@ -161,6 +178,7 @@ pub struct Moved {
 }
 
 #[derive(Clone, Debug, Default, Serialize)]
+#[non_exhaustive]
 pub struct Recalc {
     pub dirty: usize,
     pub written: usize,
@@ -170,6 +188,7 @@ pub struct Recalc {
 
 /// A new revision (or none, when the text did not change).
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct Changed {
     pub doc_id: String,
     pub revision: u32,
@@ -202,6 +221,7 @@ pub struct Changed {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct Validated {
     pub valid: bool,
     pub doc_type: DocType,
@@ -213,6 +233,7 @@ pub struct Validated {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default)]
+#[non_exhaustive]
 pub struct ExportOptions {
     /// Export although the §8 surface list is not empty (after a person saw it).
     pub acknowledge_surfaced: bool,
@@ -224,7 +245,39 @@ pub struct ExportOptions {
     pub format: Option<Format>,
 }
 
+impl ExportOptions {
+    /// Export even when the §8 surface list is not empty.
+    pub const ACKNOWLEDGE_SURFACED: ExportOptions = ExportOptions {
+        acknowledge_surfaced: true,
+        tracked_changes: false,
+        format: None,
+    };
+
+    pub fn new(
+        acknowledge_surfaced: bool,
+        tracked_changes: bool,
+        format: Option<Format>,
+    ) -> ExportOptions {
+        ExportOptions {
+            acknowledge_surfaced,
+            tracked_changes,
+            format,
+        }
+    }
+
+    pub fn with_format(mut self, format: Format) -> ExportOptions {
+        self.format = Some(format);
+        self
+    }
+
+    pub fn with_tracked_changes(mut self) -> ExportOptions {
+        self.tracked_changes = true;
+        self
+    }
+}
+
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct Exported {
     pub doc_id: String,
     pub revision: u32,
@@ -242,6 +295,7 @@ pub struct Exported {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct Reimported {
     pub doc_id: String,
     pub revision: u32,
@@ -255,6 +309,7 @@ pub struct Reimported {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct History {
     pub doc_id: String,
     pub doc_type: DocType,
@@ -264,6 +319,7 @@ pub struct History {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct Diff {
     pub doc_id: String,
     pub from: u32,
@@ -272,6 +328,7 @@ pub struct Diff {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct DocSummary {
     pub doc_id: String,
     pub doc_type: DocType,
@@ -613,10 +670,7 @@ impl<S: Storage> Workspace<S> {
         source: Option<String>,
         op: RevOp,
     ) -> Result<Opened> {
-        let opts = ImportOptions {
-            template: template.clone(),
-            ..Default::default()
-        };
+        let opts = ImportOptions::default().with_template(template.clone());
         let imp = format.engine().import(bytes, &opts)?;
         let id = self.fresh_id(id_from)?;
         let mut doc = DocRecord {
@@ -1049,13 +1103,8 @@ impl<S: Storage> Workspace<S> {
         for r in &path[1..] {
             h.push_text(&self.text(doc, *r)?)?;
         }
-        let reviewer = hanji_docx::Reviewer {
-            author: "hanji (model edit)".into(),
-            date: TRACKED_DATE.into(),
-        };
-        let opts = hanji_docx::ExportOptions {
-            tracked_changes: Some(reviewer),
-        };
+        let reviewer = hanji_docx::Reviewer::new("hanji (model edit)", TRACKED_DATE);
+        let opts = hanji_docx::ExportOptions::tracked(reviewer);
         Ok(hanji_docx::DocxEngine.export_with(h.text(), h.remainder(), &opts, Some(&h))?)
     }
 
@@ -1112,10 +1161,7 @@ impl<S: Storage> Workspace<S> {
                 f.name()
             )));
         }
-        let opts = ImportOptions {
-            template: doc.template.clone(),
-            ..Default::default()
-        };
+        let opts = ImportOptions::default().with_template(doc.template.clone());
         let imp = doc.format.engine().import(bytes, &opts)?;
         let parent = doc.head;
         let (text, rem) = self.revision(&doc, parent)?;

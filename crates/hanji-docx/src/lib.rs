@@ -273,21 +273,13 @@ impl Engine for DocxEngine {
     }
 
     fn capabilities(&self) -> Capabilities {
-        Capabilities {
-            formatting: true,
-            table_place: true,
-            ..Default::default()
-        }
+        Capabilities::DOCUMENT
     }
 
     fn import(&self, package: &[u8], opts: &ImportOptions) -> Result<Imported, EngineError> {
         let (blocks, remainder, report, _) = Self::split(package, opts)?;
         let text = Self::text_of(&blocks, &remainder, opts.template.as_deref());
-        Ok(Imported {
-            text,
-            remainder,
-            report,
-        })
+        Ok(Imported::new(text, remainder, report))
     }
 
     fn export(&self, text: &str, rem: &Remainder) -> Result<Vec<u8>, EngineError> {
@@ -308,6 +300,7 @@ impl Engine for DocxEngine {
 /// What export writes: `word/document.xml`, `word/numbering.xml` when a
 /// new list needed its own numbering, and `word/styles.xml` when the style
 /// section changed a style or made one.
+#[non_exhaustive]
 pub struct Exported {
     pub document: Vec<u8>,
     pub numbering: Option<Vec<u8>>,

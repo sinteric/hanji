@@ -49,6 +49,7 @@ pub const MAX_NEW_ROWS: usize = 50;
 /// (empty). A date is text `YYYY-MM-DD` (`YYYY-MM` for the first of the
 /// month), read as a date only in a date column.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum Value {
     Null,
     Bool(bool),
@@ -85,6 +86,7 @@ pub struct SortKey {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum RangeOp {
     Set {
         range: String,

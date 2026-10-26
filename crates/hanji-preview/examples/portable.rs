@@ -16,12 +16,9 @@ fn main() -> Result<(), String> {
             ea_advance: None,
         },
     )?;
-    let options = FontOptions {
-        fonts: vec![FontData::new(font)],
-        aliases: Some(fonts::Aliases::parse(
-            "[[family]]\nnames = [\"Calibri\"]\nmetric = [\"Caller Sans\"]\n",
-        )?),
-    };
+    let options = FontOptions::from_fonts(vec![FontData::new(font)]).with_aliases(
+        fonts::Aliases::parse("[[family]]\nnames = [\"Calibri\"]\nmetric = [\"Caller Sans\"]\n")?,
+    );
     let preview = hanji_preview::render_pptx_with_fonts(bytes, &options)?;
     assert_eq!(preview.slide_count(), 6);
     assert_eq!(preview.fonts.missing_glyphs_total, 0);

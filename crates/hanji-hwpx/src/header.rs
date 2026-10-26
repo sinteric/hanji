@@ -29,6 +29,7 @@ pub struct Style {
 
 /// A paragraph heading (`hh:heading`): outline level, numbered or bulleted list.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Heading {
     Outline(u32),
     Number { id: u32, level: u32 },

@@ -4,6 +4,7 @@
 use hanji_format::{self as fmt, Atom, Cell, Diagnostic, Inline, Props};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Block {
     Para(Para),
     Table(Table),
@@ -34,6 +35,7 @@ pub struct Head {
 
 /// A head's geometry: a box, a line's ends, or a group with its objects.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Place {
     Box(fmt::Geom),
     Line(fmt::Ends),
@@ -237,6 +239,7 @@ impl StyleSet {
 
 /// What an engine can export; the rest of the format is refused with a reason.
 #[derive(Clone, Copy, Debug, Default)]
+#[non_exhaustive]
 pub struct Capabilities {
     pub links: bool,
     pub fields: bool,
@@ -246,6 +249,31 @@ pub struct Capabilities {
     pub formatting: bool,
     /// A table's own position: `table-align`, `table-indent` (§5.2).
     pub table_place: bool,
+}
+
+impl Capabilities {
+    /// No extra export features (presentations and spreadsheets).
+    pub const NONE: Capabilities = Capabilities {
+        links: false,
+        fields: false,
+        footnotes: false,
+        math: false,
+        formatting: false,
+        table_place: false,
+    };
+
+    /// Direct formatting only (HWPX).
+    pub const FORMATTING: Capabilities = Capabilities {
+        formatting: true,
+        ..Capabilities::NONE
+    };
+
+    /// Direct formatting and table position (DOCX, remainder tests).
+    pub const DOCUMENT: Capabilities = Capabilities {
+        formatting: true,
+        table_place: true,
+        ..Capabilities::NONE
+    };
 }
 
 /// An empty paragraph's content.
@@ -274,6 +302,7 @@ pub struct BlockSrc {
 /// A block's paragraph map: for a paragraph (a head: its mark only), or per
 /// table cell.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SrcKind {
     Para(fmt::ParaMap),
     Table(Vec<Vec<Option<Vec<fmt::ParaMap>>>>),
@@ -309,6 +338,7 @@ pub(crate) fn push_block_map(out: &mut Vec<BlockSrc>, m: &fmt::BlockMap) {
             end: m.end,
             kind: SrcKind::Table(t.clone()),
         }),
+        _ => {}
     }
 }
 
@@ -330,13 +360,7 @@ pub fn resolve(
     for (b, m) in parsed.doc.blocks.iter().zip(&parsed.map.blocks) {
         line += text[counted..m.start].matches('\n').count();
         counted = m.start;
-        let mut err = |msg: String| {
-            errs.push(Diagnostic {
-                line,
-                col: 1,
-                message: msg,
-            })
-        };
+        let mut err = |msg: String| errs.push(Diagnostic::new(line, 1, msg));
         let para = |style: String, content: Inline| Block::Para(Para::new(style, content, None));
         match b {
             fmt::Block::Para(p) => {
@@ -354,6 +378,7 @@ pub fn resolve(
                         }
                     },
                     fmt::ParaStyle::Named(s) => s.clone(),
+                    _ => styles.default_paragraph.clone(),
                 };
                 check_inline(&p.content, caps, is_block_keep, &mut err);
                 check_props(&p.props, &p.content, caps, &mut err);
@@ -441,14 +466,13 @@ pub fn resolve(
                     }));
                 }
             }
-            fmt::Block::FootnoteDef(f) => {
-                if !caps.footnotes {
-                    err(format!(
-                        "footnotes cannot be written to this file format yet; remove [^{}] and its definition.",
-                        f.label
-                    ));
-                }
+            fmt::Block::FootnoteDef(f) if !caps.footnotes => {
+                err(format!(
+                    "footnotes cannot be written to this file format yet; remove [^{}] and its definition.",
+                    f.label
+                ));
             }
+            _ => {}
         }
     }
     if errs.is_empty() {
@@ -491,13 +515,7 @@ fn check_styles(
             .position(|l| l.trim_start().starts_with("<style") && l.contains(&needle))
             .map_or(1, |k| k + 1)
     };
-    let mut err = |name: &str, message: String| {
-        errs.push(Diagnostic {
-            line: at(name),
-            col: 1,
-            message,
-        })
-    };
+    let mut err = |name: &str, message: String| errs.push(Diagnostic::new(at(name), 1, message));
     if !caps.formatting {
         err(&lines[0].name, NO_FORMATTING.into());
         return;
@@ -784,6 +802,7 @@ pub fn paras(blocks: &[Block]) -> Vec<(Path, Option<&Inline>)> {
                             ),
                             Cell::Up => out.push((vec![j, r, c, 0], Some(&EMPTY))),
                             Cell::Left => {}
+                            _ => {}
                         }
                     }
                 }
@@ -821,6 +840,7 @@ pub fn key(a: &Atom) -> u32 {
         Atom::NoteRef(l) => h(2, l),
         Atom::Math(m) => h(3, m),
         Atom::PageBreak => h(4, ""),
+        _ => h(255, ""),
     }
 }
 

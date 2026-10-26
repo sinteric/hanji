@@ -306,13 +306,7 @@ fn shared_external_references_adjust_relatively_without_evaluating_them() {
     // neutralises external links; this read-only comparison does no fetching.
     let imported = |bytes: &[u8]| {
         XlsxEngine
-            .import(
-                bytes,
-                &ImportOptions {
-                    neutralise: false,
-                    ..Default::default()
-                },
-            )
+            .import(bytes, &ImportOptions::RAW)
             .unwrap()
             .remainder
     };

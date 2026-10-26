@@ -845,10 +845,7 @@ mod tests {
             },
         )
         .unwrap();
-        let options = FontOptions {
-            fonts: vec![crate::FontData::new(sparse)],
-            ..Default::default()
-        };
+        let options = FontOptions::from_fonts(vec![crate::FontData::new(sparse)]);
         let fonts = Fonts::from_bytes(&options.fonts, &[], None).unwrap();
         let tree = xml::parse(br#"<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="5" y="20" font-family="Sparse Test">A</text><text x="5" y="40" font-family="Sparse Test">123</text></svg>"#).unwrap();
         let preview = finish(vec![tree], vec![], &fonts).unwrap();

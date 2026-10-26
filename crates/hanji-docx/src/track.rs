@@ -43,17 +43,36 @@ use crate::{write_package, DocShell, DocxEngine, Exported};
 /// Who the revisions are by: `w:author` and `w:date` (ISO 8601, e.g.
 /// `2026-09-29T00:00:00Z`).
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Reviewer {
     pub author: String,
     pub date: String,
 }
 
+impl Reviewer {
+    pub fn new(author: impl Into<String>, date: impl Into<String>) -> Reviewer {
+        Reviewer {
+            author: author.into(),
+            date: date.into(),
+        }
+    }
+}
+
 /// Export options for docx.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ExportOptions {
     /// Write the edits since import as tracked changes by this reviewer.
     /// Off (`None`) by default: the edits are direct changes.
     pub tracked_changes: Option<Reviewer>,
+}
+
+impl ExportOptions {
+    pub fn tracked(reviewer: Reviewer) -> ExportOptions {
+        ExportOptions {
+            tracked_changes: Some(reviewer),
+        }
+    }
 }
 
 /// The imported revision and the edits made since: what a tracked export
@@ -1298,6 +1317,7 @@ impl<'a> Merge<'a> {
                         Cell::Up
                     }
                     Cell::Left => Cell::Left,
+                    _ => Cell::Left,
                 });
             }
             rows.push(out);

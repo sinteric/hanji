@@ -85,6 +85,7 @@ fn design_example_is_canonical() {
             SlideItem::Line(_) => "line",
             SlideItem::Group(_) => "group",
             SlideItem::Picture(_) => "picture",
+            &_ => unreachable!(),
         })
         .collect();
     assert_eq!(names, ["title", "body", "notes"]);
@@ -505,6 +506,7 @@ fn objects_are_keep_lines_among_the_slots() {
             SlideItem::Object(o) => o.keep.id.clone(),
             SlideItem::Shape(_) => "shape".into(),
             SlideItem::Line(_) | SlideItem::Group(_) | SlideItem::Picture(_) => unreachable!(),
+            &_ => unreachable!(),
         })
         .collect();
     // k5 ends the title slot; k1, a slot's object, is the body's text.
@@ -551,6 +553,7 @@ fn the_design_md_example_parses() {
             SlideItem::Line(l) => format!("line {}", l.id),
             SlideItem::Group(g) => format!("group {}", g.id),
             SlideItem::Picture(p) => format!("picture {}", p.id),
+            &_ => unreachable!(),
         })
         .collect();
     assert_eq!(

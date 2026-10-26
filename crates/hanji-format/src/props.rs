@@ -12,6 +12,7 @@ use crate::vocab::{self, Border, Color, Fill, LineSpacing};
 
 /// A property of the vocabulary, in the order canonical form writes them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum Key {
     Fill,
     BorderTop,
@@ -188,6 +189,7 @@ impl fmt::Display for Key {
 
 /// A property's value.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum Value {
     /// Hundredths of a point.
     Len(i64),
@@ -381,6 +383,7 @@ impl<'de> serde::Deserialize<'de> for Props {
 /// One entry of a written list: a property (with its value parsed), or one
 /// of the names the caller takes itself (`style`, `name`).
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Item {
     Prop(Key, Value),
     Other(String, Option<String>),

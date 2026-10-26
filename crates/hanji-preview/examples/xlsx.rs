@@ -19,15 +19,10 @@ pub fn windows_json() -> String {
         },
     )
     .unwrap();
-    let opts = FontOptions {
-        fonts: vec![FontData::new(data)],
-        aliases: Some(
-            fonts::Aliases::parse(
-                "[[family]]\nnames = [\"Calibri\"]\nmetric = [\"Caller Sans\"]\n",
-            )
+    let opts = FontOptions::from_fonts(vec![FontData::new(data)]).with_aliases(
+        fonts::Aliases::parse("[[family]]\nnames = [\"Calibri\"]\nmetric = [\"Caller Sans\"]\n")
             .unwrap(),
-        ),
-    };
+    );
     let bytes = fixture::build(
         fixture::GRID,
         r#"<calcPr fullCalcOnLoad="1"/>"#,

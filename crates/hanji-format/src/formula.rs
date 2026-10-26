@@ -17,6 +17,7 @@ pub struct Token {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum Tok {
     Space,
     /// `"text"`, `""` escaping a quote.
@@ -854,6 +855,7 @@ pub fn to_file_form(formula: &str, table: &str) -> String {
 
 /// Why a formula a model writes is refused (§5.4, §8), if it is.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FormulaProblem {
     NotAFormula,
     /// An A1 reference (`D2`, `$D$2`, `D2:D9`, `매출!D2`).

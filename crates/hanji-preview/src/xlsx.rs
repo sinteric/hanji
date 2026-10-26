@@ -26,6 +26,7 @@ use styles::Style;
 /// Configurable workload budgets, independent of Excel's address limits.
 /// Exceeding one is an explicit error; no cells/results are silently truncated.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct XlsxOptions {
     pub max_unpacked_bytes: u64,
     pub max_window_rows: u32,
@@ -53,6 +54,7 @@ impl Default for XlsxOptions {
     }
 }
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct SheetInfo {
     pub index: usize,
     pub name: String,
@@ -61,6 +63,7 @@ pub struct SheetInfo {
 }
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
 pub enum FormulaResult {
     NotFormula,
     CachedUnverified,
@@ -68,6 +71,7 @@ pub enum FormulaResult {
     Missing,
 }
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct CellInfo {
     pub address: String,
     pub display: String,

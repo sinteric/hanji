@@ -93,6 +93,7 @@ pub enum PathCommand {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Path {
     pub commands: Vec<PathCommand>,
     pub fill_rule: FillRule,
@@ -107,6 +108,7 @@ pub struct GradientStop {
 /// How a fill or a stroke is painted. A gradient's coordinates are in its
 /// own space, which `transform` maps into the space of the path it paints.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum Paint {
     Solid(Color),
     /// `extend` says whether the end colours continue past the start and the
@@ -153,6 +155,7 @@ pub enum LineJoin {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Stroke {
     pub paint: Paint,
     pub width: f64,
@@ -164,6 +167,7 @@ pub struct Stroke {
 
 /// A glyph placed on the page: `x`, `y` is its baseline origin.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Glyph {
     pub id: u16,
     pub x: f64,
@@ -172,6 +176,7 @@ pub struct Glyph {
 
 /// A run of glyphs in one face, size and colour.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Glyphs {
     pub face: FaceId,
     /// The em size in points: an outline from [`Layout::outline`] is scaled
@@ -202,6 +207,7 @@ pub const EMBOLDEN_EM: f64 = 1.0 / 24.0;
 pub const SLANT: f64 = 0.212_556_56;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Codec {
     Png,
     Jpeg,
@@ -209,6 +215,7 @@ pub enum Codec {
 
 /// Encoded image bytes, drawn stretched to fill their rectangle.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Image {
     pub codec: Codec,
     pub bytes: Arc<[u8]>,
@@ -218,6 +225,7 @@ pub struct Image {
 /// standard deviation `blur / 2`, offset by `dx`, `dy` and filled with
 /// `color`, all in the group's own space, drawn under the content.
 #[derive(Clone, Copy, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Shadow {
     pub dx: f64,
     pub dy: f64,
@@ -228,6 +236,7 @@ pub struct Shadow {
 /// What a group does to the items until its [`Item::PopGroup`]. The clip is
 /// in the group's own space, after `transform`.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Group {
     pub transform: Transform,
     pub clip: Option<Path>,
@@ -238,6 +247,7 @@ pub struct Group {
 /// One drawing step. Coordinates are in the space of the innermost open
 /// group, and page space outside every group.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum Item {
     Glyphs(Glyphs),
     Fill { path: Path, paint: Paint },
@@ -250,6 +260,7 @@ pub enum Item {
 /// One page: its size in points and its items in drawing order. The first
 /// item paints the page white.
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct Page {
     pub width: f64,
     pub height: f64,

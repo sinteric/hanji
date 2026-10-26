@@ -49,6 +49,7 @@ pub struct XlsxEngine;
 /// The result of range operations: the new revision's text and remainder,
 /// and what happened to everything the remainder anchors.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct Applied {
     pub text: String,
     pub remainder: Remainder,
@@ -185,11 +186,7 @@ impl Engine for XlsxEngine {
     fn import(&self, package: &[u8], opts: &ImportOptions) -> Result<Imported, EngineError> {
         let (remainder, report) = Self::split(package, opts)?;
         let text = Self::text_of(&remainder, opts.template.as_deref())?;
-        Ok(Imported {
-            text,
-            remainder,
-            report,
-        })
+        Ok(Imported::new(text, remainder, report))
     }
 
     fn export(&self, text: &str, rem: &Remainder) -> Result<Vec<u8>, EngineError> {

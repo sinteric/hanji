@@ -23,6 +23,7 @@ const SPPR_ORDER: &[&str] = &[
 /// An object's geometry: a preset with its adjustment guides (name,
 /// formula), or custom geometry.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[non_exhaustive]
 pub enum Geo {
     Preset {
         prst: String,

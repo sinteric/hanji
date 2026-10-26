@@ -448,15 +448,14 @@ fn run(cli: Cli) -> Result<Out> {
             rev,
             window: w,
         } => {
-            let win = Window {
-                lines: w.lines,
-                section: w.section,
-                slides: w.slides,
-                table: w.table,
-                rows: w.rows,
-                sheet: w.sheet,
-                range: w.range,
-            };
+            let mut win = Window::default();
+            win.lines = w.lines;
+            win.section = w.section;
+            win.slides = w.slides;
+            win.table = w.table;
+            win.rows = w.rows;
+            win.sheet = w.sheet;
+            win.range = w.range;
             let r = ws.read(&doc, rev, &win)?;
             let mut note = format!(
                 "{} · revision {}{} · lines {}–{} of {}\n",
@@ -499,11 +498,10 @@ fn run(cli: Cli) -> Result<Out> {
             edits,
         } => {
             let list = match (old, new, old_file, new_file, edits) {
-                (Some(old), Some(new), ..) => vec![TextEdit { old, new }],
-                (_, _, Some(o), Some(n), _) => vec![TextEdit {
-                    old: read_input(&o)?,
-                    new: read_input(&n)?,
-                }],
+                (Some(old), Some(new), ..) => vec![TextEdit::new(old, new)],
+                (_, _, Some(o), Some(n), _) => {
+                    vec![TextEdit::new(read_input(&o)?, read_input(&n)?)]
+                }
                 (.., Some(f)) => serde_json::from_str(&read_input(&f)?).map_err(|e| {
                     Error::bad(format!(
                         "the edits are not a JSON list of {{\"old\": …, \"new\": …}}: {e}"
@@ -557,11 +555,7 @@ fn run(cli: Cli) -> Result<Out> {
                 &doc,
                 rev,
                 &path,
-                &ExportOptions {
-                    acknowledge_surfaced,
-                    tracked_changes,
-                    format,
-                },
+                &ExportOptions::new(acknowledge_surfaced, tracked_changes, format),
             )?;
             let mut t = format!(
                 "wrote {} ({} bytes) from revision {} of {}; digest {}\n",
@@ -598,11 +592,7 @@ fn run(cli: Cli) -> Result<Out> {
             out,
             format,
             font_dirs,
-            XlsxSelection {
-                sheet,
-                sheet_index,
-                range,
-            },
+            XlsxSelection::new(sheet, sheet_index, range),
         )?,
         Cmd::Reimport {
             doc,

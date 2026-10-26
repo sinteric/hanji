@@ -3,12 +3,23 @@ use std::fmt;
 /// A validator error written for the model: where, what was expected, and
 /// the allowed names when a list applies.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Diagnostic {
     /// 1-based line.
     pub line: usize,
     /// 1-based column, in characters.
     pub col: usize,
     pub message: String,
+}
+
+impl Diagnostic {
+    pub fn new(line: usize, col: usize, message: impl Into<String>) -> Diagnostic {
+        Diagnostic {
+            line,
+            col,
+            message: message.into(),
+        }
+    }
 }
 
 impl fmt::Display for Diagnostic {

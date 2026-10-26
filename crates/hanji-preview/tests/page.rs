@@ -62,15 +62,7 @@ fn every_page_starts_white_and_its_glyphs_have_outlines() {
 #[test]
 fn a_revision_is_laid_out_through_its_export() {
     let engine = hanji_pptx::PptxEngine;
-    let imported = engine
-        .import(
-            SHAPES,
-            &ImportOptions {
-                neutralise: true,
-                template: None,
-            },
-        )
-        .unwrap();
+    let imported = engine.import(SHAPES, &ImportOptions::default()).unwrap();
     let layout = page::layout_revision(
         &engine,
         &imported.text,
@@ -172,10 +164,7 @@ fn fonts() -> FontOptions {
     };
     for entry in std::fs::read_dir(dir).unwrap() {
         let data = std::fs::read(entry.unwrap().path()).unwrap();
-        fonts.fonts.push(hanji_preview::FontData {
-            data: data.into(),
-            face_index: 0,
-        });
+        fonts.fonts.push(hanji_preview::FontData::new(data));
     }
     fonts
 }
@@ -429,6 +418,7 @@ fn draw(layout: &Layout, index: usize, width: u32, height: u32, exact: bool) -> 
                     None,
                 );
             }
+            _ => {}
         }
     }
     layers.pop().unwrap().pixmap.unwrap()
@@ -552,6 +542,7 @@ fn skia_paint(paint: &Paint) -> Option<tiny_skia::Paint<'static>> {
             )?
         }
         Paint::Grid { colors, .. } => out.set_color(skia_color(*colors.first()?)),
+        _ => return None,
     }
     Some(out)
 }

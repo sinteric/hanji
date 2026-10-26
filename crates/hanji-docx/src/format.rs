@@ -774,6 +774,7 @@ fn set_side(
             }
             set_color(&mut e, color, theme, &LINE_COLOR)?;
         }
+        _ => {}
     }
     remove_child(box_el, name);
     insert_ordered(box_el, e, order);
@@ -899,6 +900,7 @@ pub fn set_ppr(ppr: &mut Element, k: Key, v: Option<&Value>, theme: &Theme) -> R
                         LineSpacing::Exact(l) => (((*l as f64) / 5.0).round() as i64, "exact"),
                         LineSpacing::AtLeast(l) => (((*l as f64) / 5.0).round() as i64, "atLeast"),
                         LineSpacing::Gap(_) => unreachable!("checked writable"),
+                        &_ => unreachable!("checked writable"),
                     };
                     sp.set("w:line", &line.to_string());
                     sp.set("w:lineRule", rule);

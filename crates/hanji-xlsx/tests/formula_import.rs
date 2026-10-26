@@ -10,10 +10,7 @@ use common::fixture::{build, Col, SheetSpec, TableSpec, V};
 use common::*;
 
 fn raw() -> ImportOptions {
-    ImportOptions {
-        neutralise: false,
-        template: None,
-    }
+    ImportOptions::RAW
 }
 
 /// A one-table workbook, its parts edited by `edit` (name, text → text).

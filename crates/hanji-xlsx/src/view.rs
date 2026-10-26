@@ -133,6 +133,7 @@ pub fn window(book: &mut Book, of: &WindowOf) -> Result<String, String> {
                 &rows,
             ))
         }
+        _ => Err("this window is not a table or a range".into()),
     }
 }
 
@@ -197,6 +198,7 @@ pub fn full_view(book: &mut Book, rows: u32) -> Result<String, String> {
                 hanji_format::sheet::SheetItem::Chart(c) => {
                     out.push(hanji_format::sheet::chart_line(c))
                 }
+                _ => {}
             }
         }
         if !any_table {

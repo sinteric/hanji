@@ -18,15 +18,10 @@ fn supplied() -> FontOptions {
         },
     )
     .unwrap();
-    FontOptions {
-        fonts: vec![FontData::new(data)],
-        aliases: Some(
-            fonts::Aliases::parse(
-                "[[family]]\nnames = [\"Calibri\"]\nmetric = [\"Caller Sans\"]\n",
-            )
+    FontOptions::from_fonts(vec![FontData::new(data)]).with_aliases(
+        fonts::Aliases::parse("[[family]]\nnames = [\"Calibri\"]\nmetric = [\"Caller Sans\"]\n")
             .unwrap(),
-        ),
-    }
+    )
 }
 
 #[test]
@@ -51,10 +46,7 @@ fn supplied_bytes_and_aliases_draw_the_requested_face() {
 
 #[test]
 fn invalid_supplied_bytes_or_face_index_are_configuration_errors() {
-    let bad = FontOptions {
-        fonts: vec![FontData::new(b"invalid font".as_slice())],
-        ..Default::default()
-    };
+    let bad = FontOptions::from_fonts(vec![FontData::new(b"invalid font".as_slice())]);
     assert!(hanji_preview::render_pptx_with_fonts(SHAPES, &bad)
         .err()
         .unwrap()
@@ -177,13 +169,7 @@ fn per_style_resolved_faces_drive_reports_and_html_substitution_marks() {
                     fonts::Metrics::Substitute,
                 ),
             };
-            Some(ResolvedFont {
-                family,
-                source,
-                metrics,
-                ea_advance: None,
-                font: font.clone(),
-            })
+            Some(ResolvedFont::new(family, source, metrics, font.clone()))
         }
     }
     let variant = |bold, italic| {
@@ -276,15 +262,12 @@ fn per_style_resolved_faces_drive_reports_and_html_substitution_marks() {
     }
     // A resolver may offer only a regular physical face for styled requests.
     // FontManager's synthetic style flags must not erase that face's metadata.
-    let regular_only = FontOptions {
-        fonts: vec![policy.regular.clone()],
-        aliases: Some(
-            fonts::Aliases::parse(
-                "[[family]]\nnames = [\"Style Requested\"]\nmetric = [\"Style Test\"]\n",
-            )
-            .unwrap(),
-        ),
-    };
+    let regular_only = FontOptions::from_fonts(vec![policy.regular.clone()]).with_aliases(
+        fonts::Aliases::parse(
+            "[[family]]\nnames = [\"Style Requested\"]\nmetric = [\"Style Test\"]\n",
+        )
+        .unwrap(),
+    );
     let p = hanji_preview::render_pptx_with_fonts(&bytes, &regular_only).unwrap();
     assert_eq!(
         p.fonts
@@ -311,14 +294,7 @@ fn per_style_resolved_faces_drive_reports_and_html_substitution_marks() {
 #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 fn the_native_adapter_and_byte_path_have_equivalent_outputs_without_host_fonts() {
     let bytes = hanji_preview::render_pptx_with_fonts(SHAPES, &FontOptions::default()).unwrap();
-    let host = hanji_preview::render_pptx(
-        SHAPES,
-        &hanji_preview::Options {
-            font_dirs: vec![],
-            system_fonts: false,
-        },
-    )
-    .unwrap();
+    let host = hanji_preview::render_pptx(SHAPES, &hanji_preview::Options::bundled_only()).unwrap();
     assert_eq!(bytes.diagnostics, host.diagnostics);
     assert_eq!(bytes.warnings, host.warnings);
     for k in 0..bytes.slide_count() {
