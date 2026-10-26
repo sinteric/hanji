@@ -160,6 +160,7 @@ pub fn write_sqref(ranges: &[CellRange]) -> String {
 
 /// Rows of a span of columns (`cols`, inclusive, 0-based) moving on one sheet.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum RowShift {
     /// `n` new rows at sheet row `at`; the rows from `at` down move down by `n`.
     Insert { cols: (u32, u32), at: u32, n: u32 },
@@ -173,6 +174,7 @@ pub enum RowShift {
 
 /// Where a range goes under a [`RowShift`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Moved {
     /// Not touched.
     Same,

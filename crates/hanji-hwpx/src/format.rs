@@ -440,6 +440,7 @@ pub fn set_para(pp: &mut Element, k: Key, v: &Value) -> Result<(), String> {
             LineSpacing::Exact(l) => ("FIXED", l * scale),
             LineSpacing::AtLeast(l) => ("AT_LEAST", l * scale),
             LineSpacing::Gap(l) => ("BETWEEN_LINES", l * scale),
+            &_ => return Err(format!("{k} cannot be written to a paragraph shape")),
         };
         match child_local_mut(place, "lineSpacing") {
             Some(l) => {
@@ -516,6 +517,7 @@ pub fn set_side(bf: &mut Element, k: Key, b: &Border) -> Result<(), String> {
             e.set("width", &format!("{} mm", snap_width(*width)));
             e.set("color", &rgb(color)?);
         }
+        _ => {}
     }
     Ok(())
 }

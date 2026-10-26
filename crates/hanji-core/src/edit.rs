@@ -12,6 +12,7 @@ use crate::remainder::{Kind, Remainder};
 
 /// What happened to the remainder: counts, and every entry that did not land.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Report {
     pub placed: usize,
     /// Removed together with its text or block.
@@ -21,6 +22,7 @@ pub struct Report {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Refusal {
     /// The new text is not valid for this file.
     Invalid(Vec<Diagnostic>),
@@ -149,6 +151,7 @@ pub fn reanchor(
 
 /// A re-anchored revision.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct Reanchored {
     pub text: String,
     pub old: Vec<Block>,

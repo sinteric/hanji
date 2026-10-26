@@ -75,22 +75,13 @@ fn public_jobs_apply_page_image_aggregation() {
             .replace(parent_close, &format!("{second}{parent_close}"))
             .into_bytes();
         let bytes = package::write(&parts).unwrap();
-        let limits = ImageLimits {
-            max_image_decoded_bytes: 4,
-            max_page_decoded_bytes: 8,
-            max_document_decoded_bytes: 8,
-        };
+        let limits = ImageLimits::new(4, 8, 8);
         let p = render(kind, &bytes, limits);
         assert_eq!(p.page_count(), 1, "{kind:?}");
         assert_eq!(p.slide_svg(0).matches("<image").count(), 2, "{kind:?}");
-        let p = render(
-            kind,
-            &bytes,
-            ImageLimits {
-                max_page_decoded_bytes: 4,
-                ..limits
-            },
-        );
+        let mut page = limits;
+        page.max_page_decoded_bytes = 4;
+        let p = render(kind, &bytes, page);
         assert_eq!(p.slide_svg(0).matches("<image").count(), 1, "{kind:?}");
         assert!(p
             .diagnostics
@@ -186,23 +177,13 @@ fn public_jobs_refuse_large_headers_before_output_decode() {
 #[test]
 fn public_jobs_expose_image_budget_configuration() {
     for kind in [DocumentKind::Pptx, DocumentKind::Docx] {
-        let limits = ImageLimits {
-            max_image_decoded_bytes: 3,
-            max_page_decoded_bytes: 4,
-            max_document_decoded_bytes: 4,
-        };
+        let limits = ImageLimits::new(3, 4, 4);
         let p = preview(kind, PNG, false, limits);
         assert_eq!(p.image_limits(), limits);
         assert!(!p.html("three byte budget").contains("<image"));
-        let p = preview(
-            kind,
-            PNG,
-            false,
-            ImageLimits {
-                max_image_decoded_bytes: 4,
-                ..limits
-            },
-        );
+        let mut four = limits;
+        four.max_image_decoded_bytes = 4;
+        let p = preview(kind, PNG, false, four);
         assert!(p.html("four byte budget").contains("<image"));
     }
 }

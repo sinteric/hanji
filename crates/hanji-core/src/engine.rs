@@ -6,6 +6,7 @@ use hanji_format::Diagnostic;
 
 /// Something neutralised or to be surfaced (§8).
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct Notice {
     /// e.g. `external-template`, `dde-field`, `ole-object`, `macros`, `hidden-text`, `comment`.
     pub kind: String,
@@ -29,6 +30,7 @@ pub fn notice(
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ImportReport {
     /// Active or remote content removed on import; it is not preserved.
     pub neutralised: Vec<Notice>,
@@ -38,13 +40,25 @@ pub struct ImportReport {
 }
 
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct Imported {
     pub text: String,
     pub remainder: Remainder,
     pub report: ImportReport,
 }
 
+impl Imported {
+    pub fn new(text: String, remainder: Remainder, report: ImportReport) -> Imported {
+        Imported {
+            text,
+            remainder,
+            report,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum EngineError {
     /// The package cannot be read (not a zip, missing part, malformed XML, …).
     Package(String),
@@ -69,11 +83,26 @@ impl std::fmt::Display for EngineError {
 impl std::error::Error for EngineError {}
 
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct ImportOptions {
     /// §8: neutralise active and remote content. Only tests turn it off.
     pub neutralise: bool,
     /// `template:` written into the front matter.
     pub template: Option<String>,
+}
+
+impl ImportOptions {
+    /// Import without §8 neutralisation. Tests use this to keep macros and
+    /// other active content that a normal open would strip.
+    pub const RAW: ImportOptions = ImportOptions {
+        neutralise: false,
+        template: None,
+    };
+
+    pub fn with_template(mut self, template: Option<String>) -> ImportOptions {
+        self.template = template;
+        self
+    }
 }
 
 impl Default for ImportOptions {
@@ -88,6 +117,7 @@ impl Default for ImportOptions {
 /// A rendered preview (a stub: the pptx preview is the native `hanji-preview`
 /// crate, since it reads font files).
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct Rendered {
     pub pages: Vec<Vec<u8>>,
     pub media_type: &'static str,

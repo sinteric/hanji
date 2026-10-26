@@ -10,10 +10,7 @@ mod common;
 use common::*;
 
 fn raw() -> ImportOptions {
-    ImportOptions {
-        neutralise: false,
-        template: None,
-    }
+    ImportOptions::RAW
 }
 
 #[test]

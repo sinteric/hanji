@@ -57,10 +57,7 @@ fn worksheet_face_cache_checks_later_cells_and_embeds_their_actual_characters() 
     let styles = fixture::STYLES.replace("Calibri", "Sparse Test");
     let bytes = fixture::build(sheet, "", &styles, &[]);
     let mut book = hanji_preview::xlsx::open_xlsx(&bytes, Default::default()).unwrap();
-    let options = FontOptions {
-        fonts: vec![FontData::new(sparse())],
-        ..Default::default()
-    };
+    let options = FontOptions::from_fonts(vec![FontData::new(sparse())]);
     let window = book.render_window_with_fonts(0, "A1:A3", &options).unwrap();
     assert_eq!(window.fonts().missing_glyphs_total, 0);
     assert_eq!(
@@ -119,10 +116,7 @@ fn joiner_controls_keep_the_authored_face_and_source_text() {
             "the fixture has no standalone joiner glyph"
         );
     }
-    let options = FontOptions {
-        fonts: vec![FontData::new(data)],
-        ..Default::default()
-    };
+    let options = FontOptions::from_fonts(vec![FontData::new(data)]);
     let fonts = Fonts::from_bytes(&options.fonts, &[], None).unwrap();
     let render = |text: &str| {
         let sheet = format!(
@@ -269,13 +263,12 @@ fn last_resort_cmap_entries_do_not_count_as_character_coverage_even_for_old_cust
     struct Legacy(FontData);
     impl FontResolver for Legacy {
         fn resolve_font(&self, _: &str, _: Script, _: bool, _: bool) -> Option<ResolvedFont> {
-            Some(ResolvedFont {
-                family: "Generic Metadata Double".into(),
-                source: Source::Supplied,
-                metrics: Metrics::Original,
-                ea_advance: None,
-                font: self.0.clone(),
-            })
+            Some(ResolvedFont::new(
+                "Generic Metadata Double",
+                Source::Supplied,
+                Metrics::Original,
+                self.0.clone(),
+            ))
         }
     }
     let bytes = fixture::build(
@@ -311,10 +304,7 @@ fn docx_passes_available_supplemental_faces_to_the_engine_without_replacing_lati
         .find(|(n, _)| *n == "Noto Sans Arabic")
         .unwrap()
         .1;
-    let options = FontOptions {
-        fonts: vec![FontData::new(named(arabic, "Noto Sans Arabic"))],
-        ..Default::default()
-    };
+    let options = FontOptions::from_fonts(vec![FontData::new(named(arabic, "Noto Sans Arabic"))]);
     let preview = hanji_preview::docx::render_with_fonts(&bytes, &options).unwrap();
     assert_eq!(preview.fonts.missing_glyphs_total, 0);
     assert!(preview

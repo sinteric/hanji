@@ -120,6 +120,7 @@ pub enum Severity {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
 pub enum Consequence {
     Approximation,
     UnsupportedOmission,
@@ -135,6 +136,7 @@ pub enum Consequence {
 /// Indices are zero-based, including font-report page indices translated here.
 /// Absent indices mean the source diagnostic did not establish that location.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub struct DiagnosticLocation {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub page_index: Option<usize>,
@@ -149,6 +151,7 @@ pub struct DiagnosticLocation {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub struct QualityDiagnostic {
     pub code: DiagnosticCode,
     pub severity: Severity,
@@ -162,6 +165,7 @@ pub struct QualityDiagnostic {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
 pub enum QualityStatus {
     NoKnownIssues,
     Degraded,
@@ -169,6 +173,7 @@ pub enum QualityStatus {
 }
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum RenderingStatus {
     Ready,
     Rendered,
@@ -176,6 +181,7 @@ pub enum RenderingStatus {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct DiagnosticCoverage {
     /// Always false in v1: no detector proves every document feature/fidelity.
     pub complete: bool,
@@ -184,6 +190,7 @@ pub struct DiagnosticCoverage {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct QualityReport {
     pub version: u32,
     pub source: PreviewSource,
@@ -203,6 +210,7 @@ pub enum Strictness {
 }
 
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct QualityRefusal {
     pub code: &'static str,
     pub quality: QualityReport,

@@ -180,6 +180,7 @@ impl<'a> Exporter<'a> {
                     }
                 }
                 Block::Head(_) => return Err("a Document has no slides, slots or shapes".into()),
+                _ => {}
             }
         }
         let mut tail = self.tail.clone();
@@ -318,6 +319,7 @@ impl<'a> Exporter<'a> {
                 }
             }
             ListPlan::Keep => {}
+            _ => {}
         }
     }
 
@@ -674,6 +676,7 @@ impl<'a> Exporter<'a> {
                         "footnotes and math are not supported by the docx engine yet".into(),
                     )
                 }
+                &_ => {}
             }
         }
         flush(&mut buf, &mut r, &mut tcount);

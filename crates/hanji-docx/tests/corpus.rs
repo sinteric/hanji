@@ -307,12 +307,7 @@ fn tracked_dir() -> PathBuf {
 const AUTHOR: &str = "hanji (model edit)";
 
 fn reviewer() -> ExportOptions {
-    ExportOptions {
-        tracked_changes: Some(Reviewer {
-            author: AUTHOR.into(),
-            date: "2026-09-29T00:00:00Z".into(),
-        }),
-    }
+    ExportOptions::tracked(Reviewer::new(AUTHOR, "2026-09-29T00:00:00Z"))
 }
 
 fn text_of_package(pkg: &[u8]) -> Result<String, String> {

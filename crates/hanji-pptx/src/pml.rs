@@ -61,6 +61,7 @@ pub fn is_body_type(ty: &str) -> bool {
 
 /// Which master text style a placeholder's text inherits.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum TextClass {
     Title,
     Body,
@@ -103,6 +104,7 @@ pub fn c_nv_pr_mut(shape: &mut Element) -> Option<&mut Element> {
 
 /// A bullet setting of one paragraph level.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[non_exhaustive]
 pub enum Bu {
     /// Not set here: inherited.
     #[default]

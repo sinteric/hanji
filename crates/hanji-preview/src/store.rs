@@ -17,6 +17,7 @@ use crate::{
 /// What the preview writes.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum Output {
     /// One self-contained viewer file.
     #[default]
@@ -42,6 +43,7 @@ impl Output {
 pub const PNG_DPI: f64 = 96.0;
 
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct Previewed {
     pub doc_id: String,
     pub revision: u32,
@@ -66,6 +68,7 @@ pub struct Previewed {
 /// Native adapter selection. Worksheet indexes here are 1-based, as in the CLI;
 /// the portable workbook API and serialized `SheetInfo.index` remain 0-based.
 #[derive(Clone, Debug, Default)]
+#[non_exhaustive]
 pub struct XlsxSelection {
     pub sheet: Option<String>,
     pub sheet_index: Option<usize>,
@@ -73,6 +76,18 @@ pub struct XlsxSelection {
 }
 
 impl XlsxSelection {
+    pub fn new(
+        sheet: Option<String>,
+        sheet_index: Option<usize>,
+        range: Option<String>,
+    ) -> XlsxSelection {
+        XlsxSelection {
+            sheet,
+            sheet_index,
+            range,
+        }
+    }
+
     pub fn is_requested(&self) -> bool {
         self.sheet.is_some() || self.sheet_index.is_some() || self.range.is_some()
     }
@@ -80,6 +95,7 @@ impl XlsxSelection {
 
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum XlsxSource {
     File,
     Revision,
@@ -87,6 +103,7 @@ pub enum XlsxSource {
 
 /// One bounded worksheet window, with the same reports as the portable API.
 #[derive(Clone, Debug, Serialize)]
+#[non_exhaustive]
 pub struct XlsxPreviewed {
     pub doc_id: String,
     pub revision: u32,
@@ -249,14 +266,7 @@ pub fn render_xlsx<S: Storage>(
     if ws.doc(id)?.format != Format::Xlsx {
         return Err(Error::bad("worksheet selection requires an xlsx document"));
     }
-    let (e, bytes) = ws.export_bytes(
-        id,
-        revision,
-        &ExportOptions {
-            acknowledge_surfaced: true,
-            ..Default::default()
-        },
-    )?;
+    let (e, bytes) = ws.export_bytes(id, revision, &ExportOptions::ACKNOWLEDGE_SURFACED)?;
     render_xlsx_bytes(
         &bytes,
         e.doc_id,
@@ -351,14 +361,7 @@ pub fn render<S: Storage>(
         ));
     }
     // The preview stays on this machine: content to surface does not stop it.
-    let (e, bytes) = ws.export_bytes(
-        id,
-        revision,
-        &ExportOptions {
-            acknowledge_surfaced: true,
-            ..Default::default()
-        },
-    )?;
+    let (e, bytes) = ws.export_bytes(id, revision, &ExportOptions::ACKNOWLEDGE_SURFACED)?;
     let p = match doc.format {
         Format::Pptx => render_pptx(&bytes, opts),
         Format::Docx => docx::render_native(&bytes, opts),
@@ -394,14 +397,7 @@ pub fn render_document<S: Storage>(
 ) -> Result<(Previewed, DocumentPreview)> {
     #[cfg(feature = "hwpx")]
     if ws.doc(id)?.format == Format::Hwpx {
-        let (e, bytes) = ws.export_bytes(
-            id,
-            revision,
-            &ExportOptions {
-                acknowledge_surfaced: true,
-                ..Default::default()
-            },
-        )?;
+        let (e, bytes) = ws.export_bytes(id, revision, &ExportOptions::ACKNOWLEDGE_SURFACED)?;
         let preview = crate::hwpx::render_native(&bytes, opts)
             .map_err(|m| Error::new(Code::Package, format!("cannot preview {id}: {m}")))?;
         let out = Previewed {

@@ -75,6 +75,7 @@ pub fn shift_formula(f: &str, own: &str, target: &str, sh: &RowShift) -> Option<
                 changed = true;
                 Some(write_ref(prefix, r, to))
             }
+            _ => None,
         }
     });
     changed.then_some(out)
@@ -502,6 +503,7 @@ pub fn apply(
                 Moved::Same | Moved::Split => kept.push(*r),
                 Moved::To(to) => kept.push(to),
                 Moved::Gone => {}
+                _ => {}
             }
         }
         if kept.is_empty() {
@@ -564,6 +566,7 @@ pub fn apply(
                                 Moved::Same | Moved::Split => Some(*r),
                                 Moved::To(to) => Some(to),
                                 Moved::Gone => None,
+                                _ => None,
                             })
                             .collect();
                         if !moved.is_empty() && moved != rs {
@@ -598,6 +601,7 @@ fn move_cells(book: &mut Book, i: usize, sh: &RowShift) -> Result<(), String> {
     let lag = match *sh {
         RowShift::Delete { first, last, .. } => last - first + 1,
         RowShift::Insert { .. } => 0,
+        _ => 0,
     };
     let mut removed_strings = 0i64;
     let st = book.store_mut(i)?;

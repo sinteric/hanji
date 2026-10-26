@@ -15,6 +15,7 @@ use serde::{Deserialize, Serialize};
 /// Where a face came from (the report's `source`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(rename_all = "kebab-case")]
+#[non_exhaustive]
 pub enum Source {
     Supplied,
     FontDir,
@@ -27,6 +28,7 @@ pub enum Source {
 /// typeface for East Asian text and its Latin one otherwise.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum Script {
     Latin,
     Hangul,
@@ -69,6 +71,7 @@ pub fn is_hangul(c: char) -> bool {
 
 /// How the drawn face's metrics relate to the requested face's (the report's `metrics`).
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[non_exhaustive]
 pub enum Metrics {
     /// The requested face itself.
     Original,
@@ -189,6 +192,7 @@ pub struct Drawn {
 
 /// A caller-owned font file or selected face of a font collection.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct FontData {
     pub data: Arc<[u8]>,
     /// Zero-based face index; use zero for a single-face font.
@@ -206,12 +210,35 @@ impl FontData {
 
 /// The face selected by a resolver for one request and style.
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub struct ResolvedFont {
     pub family: String,
     pub source: Source,
     pub metrics: Metrics,
     pub ea_advance: Option<f64>,
     pub font: FontData,
+}
+
+impl ResolvedFont {
+    pub fn new(
+        family: impl Into<String>,
+        source: Source,
+        metrics: Metrics,
+        font: FontData,
+    ) -> ResolvedFont {
+        ResolvedFont {
+            family: family.into(),
+            source,
+            metrics,
+            ea_advance: None,
+            font,
+        }
+    }
+
+    pub fn with_ea_advance(mut self, ea_advance: Option<f64>) -> ResolvedFont {
+        self.ea_advance = ea_advance;
+        self
+    }
 }
 
 /// Font selection inside a document job. Implementations return bytes, never paths.

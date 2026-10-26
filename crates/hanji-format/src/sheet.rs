@@ -51,6 +51,7 @@ pub struct SheetDecl {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SheetItem {
     Table(TableDecl),
     Merge(MergeDecl),
@@ -124,6 +125,7 @@ impl Spreadsheet {
 
 /// What a number format code displays.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum FormatKind {
     General,
     Text,
@@ -1095,6 +1097,7 @@ pub fn merge_line(m: &MergeDecl) -> String {
 
 /// What a row window shows: a table's rows, or a range of a sheet.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum WindowOf {
     /// `rows`: the sheet rows shown when not every data row is (`2:101`).
     Table {

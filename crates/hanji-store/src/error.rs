@@ -11,6 +11,7 @@ use serde::Serialize;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
+#[non_exhaustive]
 pub enum Code {
     /// No such document, revision or file.
     NotFound,
@@ -42,6 +43,7 @@ pub enum Code {
 
 /// A remainder entry an edit would lose.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub struct Loss {
     pub kind: String,
     pub reason: String,
@@ -58,6 +60,7 @@ impl Loss {
 
 /// A §8 item: neutralised on import, or to surface before export.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub struct Item {
     pub kind: String,
     pub location: String,
@@ -80,6 +83,7 @@ pub fn items(ns: &[Notice]) -> Vec<Item> {
 
 /// A validator error: 1-based line and column (in characters).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub struct Diag {
     pub line: usize,
     pub col: usize,
@@ -98,6 +102,7 @@ pub fn diags(ds: &[Diagnostic]) -> Vec<Diag> {
 
 /// Lines of a revision the edit and a person's edits both change.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub struct Conflict {
     /// 1-based, inclusive, in the revision the edit was made against.
     pub first_line: usize,
@@ -105,6 +110,7 @@ pub struct Conflict {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub struct Error {
     pub code: Code,
     pub message: String,
@@ -114,6 +120,7 @@ pub struct Error {
 
 /// What an error points at, beyond its message.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
 pub struct Detail {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub diagnostics: Vec<Diag>,
@@ -205,6 +212,7 @@ impl From<EngineError> for Error {
             EngineError::Unsupported(m) => {
                 Error::new(Code::Unsupported, format!("not supported: {m}"))
             }
+            other => Error::new(Code::Unsupported, format!("not supported: {other}")),
         }
     }
 }
@@ -226,6 +234,7 @@ impl From<Refusal> for Error {
                     .collect();
                 e
             }
+            other => Error::new(Code::Refused, other.to_string()),
         }
     }
 }

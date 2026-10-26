@@ -198,10 +198,7 @@ fn declared_symbol_numbering_retains_the_private_code_and_actual_legacy_glyph() 
     let bytes = document("02", "Symbol", true);
     let preview = hanji_preview::docx::render_with_fonts(
         &bytes,
-        &FontOptions {
-            fonts: vec![FontData::new(font.clone())],
-            ..Default::default()
-        },
+        &FontOptions::from_fonts(vec![FontData::new(font.clone())]),
     )
     .unwrap();
     assert_eq!(preview.page_count(), 1);
@@ -247,10 +244,7 @@ fn absent_or_disagreeing_legacy_mapping_does_not_preserve_the_private_code() {
     ] {
         let preview = hanji_preview::docx::render_with_fonts(
             &document("02", "Symbol", true),
-            &FontOptions {
-                fonts: vec![FontData::new(font)],
-                ..Default::default()
-            },
+            &FontOptions::from_fonts(vec![FontData::new(font)]),
         )
         .unwrap();
         let PageData::Svg(svg) = preview.render_page(0, PageFormat::Svg).unwrap().data else {
@@ -281,10 +275,7 @@ fn a_family_name_or_unrelated_private_text_is_insufficient_to_activate_the_bridg
     ] {
         let preview = hanji_preview::docx::render_with_fonts(
             &document(charset, family, numbered),
-            &FontOptions {
-                fonts: vec![FontData::new(encoding_fixture('\u{2022}'))],
-                ..Default::default()
-            },
+            &FontOptions::from_fonts(vec![FontData::new(encoding_fixture('\u{2022}'))]),
         )
         .unwrap();
         let PageData::Svg(svg) = preview.render_page(0, PageFormat::Svg).unwrap().data else {

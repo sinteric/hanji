@@ -116,13 +116,7 @@ impl TextModel for PptxModel {
         rem: &Remainder,
         caps: Capabilities,
     ) -> Result<(Vec<Block>, Vec<BlockSrc>), Vec<Diagnostic>> {
-        let shell = DeckShell::of(rem).map_err(|m| {
-            vec![Diagnostic {
-                line: 1,
-                col: 1,
-                message: m,
-            }]
-        })?;
+        let shell = DeckShell::of(rem).map_err(|m| vec![Diagnostic::new(1, 1, m)])?;
         check_size(text, shell.deck.size)?;
         let (mut blocks, maps) =
             hanji_core::presentation::model_of(text, &shell.names(rem), caps, &|id| {
@@ -336,6 +330,7 @@ fn shown_group(mut g: fmt::GroupItem) -> fmt::GroupItem {
                 p.crop = p.crop.map(|c| c.shown());
             }
             fmt::SlideItem::Slot(_) => {}
+            _ => {}
         }
     }
     g
@@ -363,18 +358,18 @@ fn check_size(text: &str, size: Option<(i64, i64)>) -> Result<(), Vec<Diagnostic
         .join(" ");
     match want {
         Some(w) if w == got => Ok(()),
-        Some(w) => Err(vec![Diagnostic {
-            line: k + 1,
-            col: 1,
-            message: format!(
+        Some(w) => Err(vec![Diagnostic::new(
+            k + 1,
+            1,
+            format!(
                 "size is the deck's slide size, size: {w}, and it cannot be changed here; keep the line as it is."
             ),
-        }]),
-        None => Err(vec![Diagnostic {
-            line: k + 1,
-            col: 1,
-            message: "this deck states no slide size, so the front matter has no size: line; delete it.".into(),
-        }]),
+        )]),
+        None => Err(vec![Diagnostic::new(
+            k + 1,
+            1,
+            "this deck states no slide size, so the front matter has no size: line; delete it.",
+        )]),
     }
 }
 
@@ -570,11 +565,7 @@ impl Engine for PptxEngine {
     fn import(&self, package: &[u8], opts: &ImportOptions) -> Result<Imported, EngineError> {
         let (blocks, remainder, report, _) = Self::split(package, opts)?;
         let text = Self::text_of(&blocks, &remainder, opts.template.as_deref());
-        Ok(Imported {
-            text,
-            remainder,
-            report,
-        })
+        Ok(Imported::new(text, remainder, report))
     }
 
     fn export(&self, text: &str, rem: &Remainder) -> Result<Vec<u8>, EngineError> {

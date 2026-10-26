@@ -9,14 +9,7 @@ use hanji_core::{
 use hanji_package::{opc, package};
 use hanji_pptx::{PptxEngine, PptxModel};
 
-const CAPS: Capabilities = Capabilities {
-    links: false,
-    fields: false,
-    footnotes: false,
-    math: false,
-    formatting: false,
-    table_place: false,
-};
+const CAPS: Capabilities = Capabilities::NONE;
 
 fn deck(name: &str) -> Vec<u8> {
     let path = format!("{}/corpus/{name}", env!("CARGO_MANIFEST_DIR"));
@@ -152,10 +145,7 @@ fn every_object_shows_its_box_and_getput_keeps_every_xfrm() {
         }
         let pkg = std::fs::read(&path).unwrap();
         let before = package::read(&pkg).unwrap();
-        let raw = ImportOptions {
-            neutralise: false,
-            template: None,
-        };
+        let raw = ImportOptions::RAW;
         let imp = PptxEngine
             .import(&pkg, &raw)
             .unwrap_or_else(|e| panic!("{path:?}: {e}"));

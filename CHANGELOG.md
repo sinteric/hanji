@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.6.0 — 2026-10-26
+
+**Breaking changes**
+
+- Public library types that may grow now carry `#[non_exhaustive]` (Google
+  Rust Style Guide; deferred from #122). Matches on those enums need a `_`
+  arm (`&_` when matching a reference). Struct literals and functional
+  record update (`Foo { x, ..Default::default() }`) from outside the
+  defining crate no longer compile: use a constructor, or `Default` and
+  then assign fields. Closed ontologies (`Format`, `DocType`, two-state
+  enums, SVG path/stroke enums, `ColorBase` / `Tint`, `Tag`,
+  `PreviewSource`, `DocumentKind`) are unmarked.
+
+- Show XLSX merged cells as editable `<merge range="A1:B2"/>` lines instead of
+  a `<keep kind="merged-cells"/>` placeholder. Each rectangle can be kept,
+  added, removed or retargeted. Sheets with more than 1024 merges, or with
+  overlapping or single-cell merges, stay placeholders. Corpus keeps: 374 →
+  357 (`xlsx` merged-cells 18 → 1).
 - Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `45ac63f`
   (S95.2 and S95.3 / rdocx 0.16.3, rpptx and oxml-layout 0.14.3: Word
   content-control shells and typed payloads, custom XML data binding, template
@@ -19,6 +37,13 @@
   inside it, are refused. Legacy form fields, fields with no or a blank
   result, and fields spanning paragraphs stay placeholders. Corpus keeps:
   387 → 374 (DOCX `field` 85 → 72; `field-part` 12 unchanged).
+- Count the `<keep/>` placeholders of every corpus file, with a committed
+  baseline and a test that fails when it is stale. Since that baseline the
+  count has gone 387 → 357.
+- Adopt the Google Rust Style Guide as hanji's base, reformat the tree with
+  the guide's rustfmt options, and check formatting in CI. `#[non_exhaustive]`
+  on public library types, deferred from that adoption, is applied in this
+  release (see Breaking changes).
 - Show `###########` for XLSX date and time formats on serials past
   9999-12-31, as Excel does, instead of panicking on huge values (`1e300` as
   `yyyy-mm-dd`), and stop long `ss.000…` runs from showing float noise or the

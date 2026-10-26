@@ -28,10 +28,10 @@ fn empty_diagnostics_never_assert_complete_detection_or_native_fidelity() {
 
 #[test]
 fn known_omission_has_stable_code_source_object_page_and_opt_in_refusal() {
-    let legacy = Diagnostic {
-        path: "pages[2].elements[4].children[1]".into(),
-        message: "image bytes are neither PNG nor JPEG and were omitted".into(),
-    };
+    let legacy = Diagnostic::new(
+        "pages[2].elements[4].children[1]",
+        "image bytes are neither PNG nor JPEG and were omitted",
+    );
     let original = serde_json::to_value(&legacy).unwrap();
     let report = QualityReport::inspect(
         PreviewSource::Pptx,
@@ -64,12 +64,10 @@ fn known_omission_has_stable_code_source_object_page_and_opt_in_refusal() {
 
 #[test]
 fn chart_legend_omitted_is_a_classified_warning_not_a_critical_loss() {
-    let legacy = Diagnostic {
-        path: "layout.diagnostics[0]".into(),
-        message:
-            "chart-legend-omitted reason=entries-exceed-height width_pt=200 height_pt=140 entries=10 source=slide:rId2"
-                .into(),
-    };
+    let legacy = Diagnostic::new(
+        "layout.diagnostics[0]",
+        "chart-legend-omitted reason=entries-exceed-height width_pt=200 height_pt=140 entries=10 source=slide:rId2",
+    );
     let notice = rdocx::ChartLegendOmitted::from_diagnostic_message(&legacy.message).unwrap();
     assert_eq!(notice.reason.as_str(), "entries-exceed-height");
     assert_eq!(notice.entry_count, 10);
@@ -101,14 +99,11 @@ fn chart_legend_omitted_is_a_classified_warning_not_a_critical_loss() {
 #[test]
 fn opaque_upstream_and_future_diagnostics_never_become_critical_by_keyword_guess() {
     let legacy = [
-        Diagnostic {
-            path: "layout.diagnostics[4]".into(),
-            message: "critical image omission; numeric clipping; failed font".into(),
-        },
-        Diagnostic {
-            path: "future.feature".into(),
-            message: "critical unsupported omission".into(),
-        },
+        Diagnostic::new(
+            "layout.diagnostics[4]",
+            "critical image omission; numeric clipping; failed font",
+        ),
+        Diagnostic::new("future.feature", "critical unsupported omission"),
     ];
     let report = QualityReport::inspect(PreviewSource::Docx, &legacy, &FontsReport::default(), &[]);
     assert_eq!(report.diagnostics[0].code, DiagnosticCode::LayoutReport);
@@ -131,14 +126,11 @@ fn opaque_upstream_and_future_diagnostics_never_become_critical_by_keyword_guess
 #[test]
 fn hancom_aggregate_counters_have_page_locations_without_invented_table_or_cell_objects() {
     let legacy = [
-        Diagnostic {
-            path: "pages[2].tables".into(),
-            message: "rhwp reports 3 overflowing cell lines; table content may be clipped".into(),
-        },
-        Diagnostic {
-            path: "pages[2].tables".into(),
-            message: "rhwp reports 2 table overlaps".into(),
-        },
+        Diagnostic::new(
+            "pages[2].tables",
+            "rhwp reports 3 overflowing cell lines; table content may be clipped",
+        ),
+        Diagnostic::new("pages[2].tables", "rhwp reports 2 table overlaps"),
     ];
     let report = QualityReport::inspect(PreviewSource::Hwpx, &legacy, &FontsReport::default(), &[]);
     assert_eq!(report.diagnostics[0].code, DiagnosticCode::TableOverflow);
@@ -153,15 +145,13 @@ fn hancom_aggregate_counters_have_page_locations_without_invented_table_or_cell_
 
 #[test]
 fn font_loss_does_not_depend_on_warning_strings_and_preserves_page_provenance() {
-    let fonts = FontsReport {
-        missing_glyphs: vec![MissingGlyph {
-            char: "U+274F".into(),
-            requested: "missing symbol font".into(),
-            pages: vec![1, 3],
-        }],
-        missing_glyphs_total: 101,
-        ..Default::default()
-    };
+    let mut fonts = FontsReport::default();
+    fonts.missing_glyphs = vec![MissingGlyph::new(
+        "U+274F",
+        "missing symbol font",
+        vec![1, 3],
+    )];
+    fonts.missing_glyphs_total = 101;
     let report = QualityReport::inspect(PreviewSource::Hwpx, &[], &fonts, &[]);
     assert_eq!(report.status, QualityStatus::Degraded);
     assert_eq!(report.diagnostics[0].code, DiagnosticCode::MissingGlyphs);
@@ -181,14 +171,14 @@ fn font_loss_does_not_depend_on_warning_strings_and_preserves_page_provenance() 
 #[test]
 fn worksheet_missing_cache_is_distinct_from_overflow_and_zero() {
     let legacy = [
-        Diagnostic {
-            path: "sheets[3].cells[B12].formula".into(),
-            message: "formula has no cached result; shown as #UNEVALUATED; no evaluation was performed".into(),
-        },
-        Diagnostic {
-            path: "sheets[3].cells[C12].formula".into(),
-            message: "stored formula result shown; cache freshness is unverified; no evaluation was performed".into(),
-        },
+        Diagnostic::new(
+            "sheets[3].cells[B12].formula",
+            "formula has no cached result; shown as #UNEVALUATED; no evaluation was performed",
+        ),
+        Diagnostic::new(
+            "sheets[3].cells[C12].formula",
+            "stored formula result shown; cache freshness is unverified; no evaluation was performed",
+        ),
     ];
     let report = QualityReport::inspect(PreviewSource::Xlsx, &legacy, &FontsReport::default(), &[]);
     let missing = &report.diagnostics[0];

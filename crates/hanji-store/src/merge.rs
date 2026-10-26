@@ -108,6 +108,7 @@ pub struct Hunk {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Merged {
     /// Our changes as replacements in `theirs`, in text order; empty when
     /// `theirs` already holds them.

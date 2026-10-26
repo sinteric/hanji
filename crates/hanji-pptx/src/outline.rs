@@ -202,6 +202,7 @@ fn parts(b: &str) -> Option<(i64, String, String)> {
             color,
         } => Some((width, style, color.to_string())),
         Border::None => None,
+        _ => None,
     }
 }
 

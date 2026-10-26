@@ -6,14 +6,7 @@ use hanji_core::{Capabilities, Engine, EngineError, ImportOptions, Imported, Par
 use hanji_package::{opc, package};
 use hanji_pptx::{PptxEngine, PptxModel};
 
-const CAPS: Capabilities = Capabilities {
-    links: false,
-    fields: false,
-    footnotes: false,
-    math: false,
-    formatting: false,
-    table_place: false,
-};
+const CAPS: Capabilities = Capabilities::NONE;
 
 fn deck(name: &str) -> Vec<u8> {
     let path = format!("{}/corpus/{name}", env!("CARGO_MANIFEST_DIR"));
@@ -720,11 +713,7 @@ fn a_rewrite_that_deletes_a_slide_and_adds_one_is_refused_not_guessed() {
     // The same change as exact edits goes through.
     let (text, rem) = span_edit(&imp, a, b + 5, "");
     let n = text.len();
-    let imp2 = Imported {
-        text,
-        remainder: rem,
-        report: imp.report.clone(),
-    };
+    let imp2 = Imported::new(text, rem, imp.report.clone());
     let (text, rem) = span_edit(
         &imp2,
         n,

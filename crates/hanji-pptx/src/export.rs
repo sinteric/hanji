@@ -398,6 +398,7 @@ impl<'a> Exporter<'a> {
                 }
                 // A slide head is no item; an object always has its entry (keep_slot).
                 HeadKind::Slide { .. } | HeadKind::Object => unreachable!(),
+                _ => unreachable!(),
             }
         }
         // Text, placeholder binding and names.
@@ -1820,6 +1821,7 @@ fn item_label(it: &ItemG) -> String {
         HeadKind::Picture { id, name } => format!("<picture id=\"{id}\" name=\"{name}\">"),
         HeadKind::Object => "an object's <keep/>".into(),
         HeadKind::Slide { .. } => "the slide".into(),
+        _ => "an item".into(),
     }
 }
 
@@ -1894,6 +1896,7 @@ pub fn sig(items: &[SlideItem]) -> Vec<String> {
                 )
             }
             SlideItem::Slot(_) => "::slot::".into(),
+            _ => String::new(),
         })
         .collect()
 }
@@ -1907,6 +1910,7 @@ fn member_box(it: &SlideItem) -> Option<Geom> {
         SlideItem::Group(g) => g.geom,
         SlideItem::Picture(p) => p.geom,
         SlideItem::Slot(_) => None,
+        _ => None,
     }
 }
 

@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[non_exhaustive]
 pub enum Kind {
     /// Inline object shown as `<keep/>`. Anchor: its placeholder.
     Keep,

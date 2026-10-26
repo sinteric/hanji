@@ -45,6 +45,7 @@ impl Iterator for Tail {
 }
 
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub enum RowSlot {
     Raw(RawRow),
     Parsed(Row),

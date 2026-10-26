@@ -17,14 +17,7 @@ use hanji_core::{
 use hanji_format::{Atom, Cell, Inline, Marks, Unit};
 use hanji_package::{package, xml};
 
-pub const CAPS: Capabilities = Capabilities {
-    links: false,
-    fields: false,
-    footnotes: false,
-    math: false,
-    formatting: true,
-    table_place: true,
-};
+pub const CAPS: Capabilities = Capabilities::DOCUMENT;
 
 /// What the harness needs from an engine.
 pub trait Format {
@@ -150,6 +143,7 @@ fn paras(blocks: &[Block]) -> Vec<(Path, &Inline)> {
                 }
             }
             Block::Keep(_) | Block::Head(_) => {}
+            _ => {}
         }
     }
     out
@@ -310,6 +304,7 @@ pub fn quote(d: &Doc, i: usize) -> String {
         Block::Table(_) => return format!("block {i} (a table)"),
         Block::Keep(_) => return format!("block {i} (an object)"),
         Block::Head(h) => h.label.clone(),
+        _ => return format!("block {i}"),
     };
     let text = text.split_whitespace().collect::<Vec<_>>().join(" ");
     if text.is_empty() {
@@ -1694,10 +1689,7 @@ fn new_text_boxes(s: &str) -> String {
     out + rest
 }
 
-pub const RAW: ImportOptions = ImportOptions {
-    neutralise: false,
-    template: None,
-};
+pub const RAW: ImportOptions = ImportOptions::RAW;
 
 fn export_and_check(
     cx: &Cx,
@@ -1786,6 +1778,7 @@ fn text_span(
             hanji_core::model::SrcKind::Table(cells) => {
                 cells[path[1]][path[2]].clone().unwrap()[path[3]].clone()
             }
+            _ => panic!("not a paragraph map"),
         };
         let at = |k: usize| {
             if k < pm.units.len() {

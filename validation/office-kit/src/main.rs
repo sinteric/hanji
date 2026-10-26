@@ -295,9 +295,7 @@ fn step(fmt: &dyn Format, rem: &Remainder, text: &str, new_text: &str, ed: &Edit
 
 fn docx(kit: &mut Kit) {
     let word = opened_in("Word");
-    let tracked = ExportOptions {
-        tracked_changes: Some(Reviewer { author: AUTHOR.into(), date: "2026-09-29T00:00:00Z".into() }),
-    };
+    let tracked = ExportOptions::tracked(Reviewer::new(AUTHOR, "2026-09-29T00:00:00Z"));
     for (name, licence) in DOCX {
         let bytes = read(DOCX_DIR, name);
         let opts = ImportOptions::default();

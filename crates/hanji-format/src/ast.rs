@@ -77,6 +77,7 @@ pub struct Slide {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum SlideItem {
     /// `::name box="…"::` and the lines after it: paragraphs, list items,
     /// empty paragraphs and placeholders.
@@ -420,6 +421,7 @@ impl Presentation {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Block {
     Para(Para),
     Table(Table),
@@ -468,6 +470,7 @@ pub struct Para {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum ParaStyle {
     /// A plain line: the file's default paragraph style.
     Plain,
@@ -533,6 +536,7 @@ impl Table {
 pub static NO_PROPS: Props = Props(std::collections::BTreeMap::new());
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Cell {
     /// One or more paragraphs (§5.2: `<p/>` starts another).
     Text(Vec<CellPara>),
@@ -602,6 +606,7 @@ impl Unit {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum Atom {
     Char(char),
     /// `<br/>`.
@@ -638,6 +643,7 @@ pub struct Span {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
 pub enum SpanKind {
     Link(String),
     Field(String),

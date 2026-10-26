@@ -12,6 +12,7 @@ use crate::remainder::{Entry, Kind};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[allow(clippy::large_enum_variant)] // short-lived; one per entry
+#[non_exhaustive]
 pub enum Status {
     /// Placed; a run may land in several pieces `(path, start, end)`.
     Placed {
@@ -63,6 +64,7 @@ fn cell_keys(cell: &Cell, out: &mut Vec<u32>) {
         }
         Cell::Up => out.extend([0x5e, 0x5e]),
         Cell::Left => out.extend([0x7c, 0x7c]),
+        _ => {}
     }
 }
 

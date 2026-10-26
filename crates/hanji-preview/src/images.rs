@@ -9,6 +9,7 @@ use resvg::usvg;
 /// and the output page raster. Each image occurrence is charged in layout order.
 /// Repeated media are charged again; no assumption about browser cache reuse is made.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ImageLimits {
     /// Maximum width × height × 4 bytes for one image occurrence.
     pub max_image_decoded_bytes: u64,
@@ -32,6 +33,18 @@ impl Default for ImageLimits {
 }
 
 impl ImageLimits {
+    pub fn new(
+        max_image_decoded_bytes: u64,
+        max_page_decoded_bytes: u64,
+        max_document_decoded_bytes: u64,
+    ) -> ImageLimits {
+        ImageLimits {
+            max_image_decoded_bytes,
+            max_page_decoded_bytes,
+            max_document_decoded_bytes,
+        }
+    }
+
     pub(crate) fn validate(self) -> Result<(), String> {
         if self.max_image_decoded_bytes == 0
             || self.max_page_decoded_bytes == 0

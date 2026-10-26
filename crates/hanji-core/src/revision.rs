@@ -14,6 +14,7 @@ use crate::place::{Alignment, Stream};
 
 /// A position in a Document's model.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum Pos {
     /// Unit `.1` of the paragraph at `.0` (`[block]`, or `[block, row, col, paragraph]` in a table).
     Unit(Path, usize),
@@ -60,6 +61,7 @@ pub fn same_shape(a: &[Vec<Cell>], b: &[Vec<Cell>]) -> bool {
         Cell::Text(_) => 0,
         Cell::Up => 1,
         Cell::Left => 2,
+        _ => 3,
     };
     a.len() == b.len()
         && a.iter()

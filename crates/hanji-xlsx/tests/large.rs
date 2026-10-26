@@ -95,10 +95,7 @@ fn a_hundred_thousand_rows() {
     let (rem, rc) = XlsxEngine::recalculate(&imp.remainder).unwrap();
     lap("recalculate 100,000 formulas", t);
     assert_eq!((rc.written, rc.left.len()), (ROWS, 0));
-    let imp = hanji_core::Imported {
-        remainder: rem,
-        ..imp
-    };
+    let imp = hanji_core::Imported::new(imp.text, rem, imp.report);
 
     let t = Instant::now();
     let w = XlsxEngine::window(

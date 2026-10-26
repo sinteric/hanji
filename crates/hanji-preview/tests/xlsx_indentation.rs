@@ -345,20 +345,16 @@ fn inactive_alignment_and_zero_indent_preserve_output_and_resource_budgets() {
         .iter()
         .any(|d| d.message.contains("indentation")));
     let sample = fixture::build(fixture::GRID, "", fixture::STYLES, &[]);
-    let options = XlsxOptions {
-        max_window_text_bytes: 1,
-        ..XlsxOptions::default()
-    };
+    let mut options = XlsxOptions::default();
+    options.max_window_text_bytes = 1;
     let mut b = open_xlsx(&sample, options).unwrap();
     assert!(b
         .render_window_with_fonts(0, "A1:B1", &FontOptions::default())
         .err()
         .unwrap()
         .contains("text budget"));
-    let options = XlsxOptions {
-        max_png_pixels: 1,
-        ..XlsxOptions::default()
-    };
+    let mut options = XlsxOptions::default();
+    options.max_png_pixels = 1;
     let mut b = open_xlsx(&bytes, options).unwrap();
     let w = b
         .render_window_with_fonts(0, "A1", &FontOptions::default())
@@ -427,10 +423,8 @@ fn unresolved_normal_style_metrics_are_reported_and_normal_metadata_is_budgeted(
         .diagnostics()
         .iter()
         .any(|d| d.message.contains("Normal style font is unresolved")));
-    let options = XlsxOptions {
-        max_font_family_bytes: 10,
-        ..XlsxOptions::default()
-    };
+    let mut options = XlsxOptions::default();
+    options.max_font_family_bytes = 10;
     assert!(
         open_xlsx(&fixture::build(fixture::GRID, "", &overlong, &[]), options)
             .err()

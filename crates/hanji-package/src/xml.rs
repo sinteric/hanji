@@ -10,6 +10,7 @@ use quick_xml::events::Event;
 use quick_xml::Reader;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum Node {
     El(Element),
     /// Raw (escaped) character data.

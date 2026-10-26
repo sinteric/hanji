@@ -48,6 +48,7 @@ fn the_design_md_example_parses() {
             SheetItem::Merge(m) => format!("merge {}", m.range),
             SheetItem::Chart(c) => format!("chart {}", c.ty),
             SheetItem::Keep(k) => format!("keep {}", k.kind),
+            &_ => unreachable!(),
         })
         .collect();
     assert_eq!(

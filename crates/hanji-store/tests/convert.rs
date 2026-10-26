@@ -47,11 +47,7 @@ fn full_text(ws: &Workspace<MemStorage>, id: &str) -> String {
 }
 
 fn to(format: Format) -> ExportOptions {
-    ExportOptions {
-        acknowledge_surfaced: true,
-        format: Some(format),
-        ..Default::default()
-    }
+    ExportOptions::ACKNOWLEDGE_SURFACED.with_format(format)
 }
 
 /// The words of a text, whatever the markup: its front matter, style
@@ -244,10 +240,7 @@ fn nothing_hidden_leaves_in_a_converted_file_and_the_report_says_what_was_left()
             .code,
         Code::SurfacedNotAcknowledged
     );
-    let opts = ExportOptions {
-        format: Some(Format::Hwpx),
-        ..Default::default()
-    };
+    let opts = ExportOptions::default().with_format(Format::Hwpx);
     let (out, _) = ws
         .export_bytes(&o.doc_id, None, &opts)
         .unwrap_or_else(|e| panic!("{e}"));
@@ -573,10 +566,7 @@ fn another_type_is_refused_and_so_is_tracking_across_formats() {
         .unwrap_err();
     assert_eq!(e.code, Code::Unsupported);
     // Tracked changes are the edits since the file was opened, written into it.
-    let opts = ExportOptions {
-        tracked_changes: true,
-        ..to(Format::Hwpx)
-    };
+    let opts = to(Format::Hwpx).with_tracked_changes();
     let e = ws.export_bytes(&doc.doc_id, None, &opts).unwrap_err();
     assert_eq!(e.code, Code::BadRequest);
     assert!(
@@ -613,14 +603,7 @@ fn naming_the_home_format_is_an_ordinary_export() {
     let mut ws = ws();
     let o = open(&mut ws, "prototype/remainder/corpus/korean-report.docx");
     let (plain_out, a) = ws
-        .export_bytes(
-            &o.doc_id,
-            None,
-            &ExportOptions {
-                acknowledge_surfaced: true,
-                ..Default::default()
-            },
-        )
+        .export_bytes(&o.doc_id, None, &ExportOptions::ACKNOWLEDGE_SURFACED)
         .unwrap();
     let (named, b) = ws.export_bytes(&o.doc_id, None, &to(Format::Docx)).unwrap();
     assert!(named.conversion.is_none() && plain_out.conversion.is_none());

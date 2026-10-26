@@ -38,6 +38,7 @@ pub fn picture_key(id: &str) -> String {
 
 /// What a head stands for.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum HeadKind<'a> {
     Slide {
         layout: &'a str,
@@ -251,6 +252,7 @@ pub fn resolve(
                     blocks.push(picture_head(pic));
                     vec![]
                 }
+                _ => vec![],
             };
             maps.push(head_src(&im.head));
             if body.is_empty() {

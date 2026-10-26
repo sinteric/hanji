@@ -32,10 +32,7 @@ fn opened(name: &str) -> (Workspace<MemStorage>, String) {
 }
 
 fn no_fonts() -> Options {
-    Options {
-        font_dirs: vec![],
-        system_fonts: false,
-    }
+    Options::bundled_only()
 }
 
 /// A font file that draws Hangul, for the Korean tests.
@@ -191,10 +188,7 @@ fn the_korean_deck_without_a_korean_font_warns_and_reports_what_is_missing() {
 fn the_korean_deck_with_a_korean_font_draws_every_character() {
     let Some(font) = korean_font() else { return };
     let (ws, id) = opened("korean-deck.pptx");
-    let opts = Options {
-        font_dirs: vec![font],
-        system_fonts: false,
-    };
+    let opts = Options::font_dirs_only(vec![font]);
     let (_, p) = store::render(&ws, &id, None, &opts).unwrap();
     // A Korean slide with its subset fonts stays small (a whole CJK face is 16 MB or more).
     check_pages(&p, 7, 300 << 10);
@@ -255,10 +249,9 @@ fn the_shapes_deck_renders_every_slide() {
 fn the_korean_font_can_be_supplied_as_bytes_without_host_discovery() {
     let Some(font) = korean_font() else { return };
     let package = std::fs::read(corpus("korean-deck.pptx")).unwrap();
-    let options = hanji_preview::FontOptions {
-        fonts: vec![hanji_preview::FontData::new(std::fs::read(font).unwrap())],
-        ..Default::default()
-    };
+    let options = hanji_preview::FontOptions::from_fonts(vec![hanji_preview::FontData::new(
+        std::fs::read(font).unwrap(),
+    )]);
     let p = hanji_preview::render_pptx_with_fonts(&package, &options).unwrap();
     check_pages(&p, 7, 300 << 10);
     assert_eq!(p.fonts.missing_glyphs_total, 0);
@@ -274,10 +267,9 @@ fn the_korean_font_can_be_supplied_as_bytes_without_host_discovery() {
 fn chart_korean_and_mixed_legends_use_the_embedded_font_advances() {
     use hanji_package::{package, xml};
     let Some(font) = korean_font() else { return };
-    let options = hanji_preview::FontOptions {
-        fonts: vec![hanji_preview::FontData::new(std::fs::read(&font).unwrap())],
-        ..Default::default()
-    };
+    let options = hanji_preview::FontOptions::from_fonts(vec![hanji_preview::FontData::new(
+        std::fs::read(&font).unwrap(),
+    )]);
     let mut db = fontdb::Database::new();
     db.load_font_file(font).unwrap();
     let family = db
@@ -501,10 +493,7 @@ fn a_revision_is_previewed_from_its_export_not_the_original() {
     ws.edit(
         &id,
         1,
-        &[TextEdit {
-            old: "3분기 영업 보고".into(),
-            new: "4분기 영업 보고".into(),
-        }],
+        &[TextEdit::new("3분기 영업 보고", "4분기 영업 보고")],
     )
     .unwrap();
     let text = |rev| {

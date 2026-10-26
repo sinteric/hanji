@@ -324,6 +324,7 @@ pub fn table_decl(book: &Book, t: &TableInfo) -> TableDecl {
                 FormatKind::Date => "date",
                 FormatKind::Number => "number",
                 FormatKind::General => "mixed",
+                _ => "mixed",
             },
             (_, 0, 0) => "text",
             (0, _, 0) if kind == FormatKind::Date => "date",

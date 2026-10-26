@@ -32,6 +32,7 @@ pub const CT_MAIN: &str =
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum SheetKind {
     Work,
     Chart,
@@ -59,6 +60,7 @@ pub struct TableCol {
 
 /// What a cell holds: [`Book::kind`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ValueKind {
     Empty,
     Text,

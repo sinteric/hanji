@@ -267,6 +267,7 @@ impl fmt::Display for Color {
 /// A fill: none, a colour, or a gradient, pattern or picture (shown, kept
 /// while left as written, never written anew).
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum Fill {
     None,
     Color(Color),
@@ -325,6 +326,7 @@ pub const SHOWN_BORDER_STYLES: &[&str] = &["triple", "thin-thick", "thick-thin",
 
 /// A border (an outline, a cell side): none, or a line.
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum Border {
     None,
     Line {
@@ -406,6 +408,7 @@ pub fn parse_choice(key: &str, v: &str, allowed: &[&str]) -> Result<String, Stri
 /// Line spacing: proportional, exact, at least, or a gap between lines
 /// (hwpx's 여백만 지정).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[non_exhaustive]
 pub enum LineSpacing {
     /// Hundredths of a percent (16000 is 160%).
     Percent(i64),

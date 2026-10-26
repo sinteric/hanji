@@ -32,17 +32,10 @@ fn text(ws: &Workspace<MemStorage>, id: &str) -> (u32, String) {
 }
 
 fn one(old: &str, new: &str) -> Vec<TextEdit> {
-    vec![TextEdit {
-        old: old.into(),
-        new: new.into(),
-    }]
+    vec![TextEdit::new(old, new)]
 }
 
-const ACK: ExportOptions = ExportOptions {
-    acknowledge_surfaced: true,
-    tracked_changes: false,
-    format: None,
-};
+const ACK: ExportOptions = ExportOptions::ACKNOWLEDGE_SURFACED;
 
 /// Export the current revision, open the bytes as a new document, and check
 /// PutGet: the reopened text is the revision's text. Returns the bytes.
@@ -103,14 +96,11 @@ fn docx_open_read_edit_export_reopen() {
             &o.doc_id,
             2,
             &[
-                TextEdit {
-                    old: "4분기에는".into(),
-                    new: "4분기부터".into(),
-                },
-                TextEdit {
-                    old: "4분기부터 [부산]{color=#C00000}과 ".into(),
-                    new: "4분기부터 [부산]{color=#C00000}·".into(),
-                },
+                TextEdit::new("4분기에는", "4분기부터"),
+                TextEdit::new(
+                    "4분기부터 [부산]{color=#C00000}과 ",
+                    "4분기부터 [부산]{color=#C00000}·",
+                ),
             ],
         )
         .unwrap();
@@ -205,11 +195,7 @@ fn xlsx_open_read_ops_edit_export_reopen() {
         )
         .unwrap();
     assert_eq!((c.revision, c.applied), (2, Some(1)));
-    let w = Window {
-        table: Some("Sales".into()),
-        rows: Some("4:5".into()),
-        ..Default::default()
-    };
+    let w = Window::table_rows("Sales", "4:5");
     let r = ws.read(&o.doc_id, None, &w).unwrap();
     assert!(
         r.data
@@ -495,14 +481,8 @@ fn an_ambiguous_or_missing_old_is_refused_with_its_count() {
             &o.doc_id,
             1,
             &[
-                TextEdit {
-                    old: "4분기에는".into(),
-                    new: "4분기부터".into(),
-                },
-                TextEdit {
-                    old: "수도권".into(),
-                    new: "x".into(),
-                },
+                TextEdit::new("4분기에는", "4분기부터"),
+                TextEdit::new("수도권", "x"),
             ],
         )
         .unwrap_err();
@@ -581,10 +561,7 @@ fn export_shows_what_it_would_surface_and_needs_an_acknowledgement() {
     let (out, _) = ws.export_bytes(&o.doc_id, None, &ACK).unwrap();
     assert_eq!(out.surfaced, e.detail.surfaced);
     // Tracked changes (§10.2): with no edit since the file was opened, the same bytes.
-    let tracked = ExportOptions {
-        tracked_changes: true,
-        ..ACK
-    };
+    let tracked = ACK.with_tracked_changes();
     let (_, a) = ws.export_bytes(&o.doc_id, None, &ACK).unwrap();
     let (_, b) = ws.export_bytes(&o.doc_id, None, &tracked).unwrap();
     assert_eq!(a, b);
@@ -719,14 +696,7 @@ fn a_large_document_is_read_a_part_at_a_time() {
         r.text.len()
     );
     let stored = ws
-        .read(
-            &o.doc_id,
-            None,
-            &Window {
-                lines: Some("1:100000".into()),
-                ..Default::default()
-            },
-        )
+        .read(&o.doc_id, None, &Window::lines("1:100000"))
         .unwrap();
     assert_eq!(r.total_lines, stored.total_lines);
     assert_eq!(r.outline.len(), 30);
@@ -736,16 +706,7 @@ fn a_large_document_is_read_a_part_at_a_time() {
         .as_deref()
         .unwrap()
         .starts_with(&format!("lines {}:", r.last_line + 1)));
-    let s = ws
-        .read(
-            &o.doc_id,
-            None,
-            &Window {
-                section: Some("제7장".into()),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    let s = ws.read(&o.doc_id, None, &Window::section("제7장")).unwrap();
     assert!(
         s.text.starts_with("# 제7장\n")
             && s.text
@@ -760,22 +721,12 @@ fn a_large_document_is_read_a_part_at_a_time() {
         .read(
             &o.doc_id,
             None,
-            &Window {
-                lines: Some(format!("{}:{}", s.first_line, s.first_line + 3)),
-                ..Default::default()
-            },
+            &Window::lines(format!("{}:{}", s.first_line, s.first_line + 3)),
         )
         .unwrap();
     assert_eq!(l.text.lines().count(), 4);
     let e = ws
-        .read(
-            &o.doc_id,
-            None,
-            &Window {
-                section: Some("제99장".into()),
-                ..Default::default()
-            },
-        )
+        .read(&o.doc_id, None, &Window::section("제99장"))
         .unwrap_err();
     assert!(e.message.contains("# 제1장 (line 9)"), "{}", e.message);
 }
@@ -784,16 +735,7 @@ fn a_large_document_is_read_a_part_at_a_time() {
 fn a_deck_is_read_by_slides() {
     let mut ws = ws();
     let o = open(&mut ws, "crates/hanji-pptx/corpus/korean-deck.pptx");
-    let r = ws
-        .read(
-            &o.doc_id,
-            None,
-            &Window {
-                slides: Some("2:3".into()),
-                ..Default::default()
-            },
-        )
-        .unwrap();
+    let r = ws.read(&o.doc_id, None, &Window::slides("2:3")).unwrap();
     assert!(r.partial && r.text.starts_with(
         "layout: Title and Content\n::title box=\"36 22 648 90\" font=\"맑은 고딕\" size=44pt color=tx1::\n핵심 지표\n"
     ));
@@ -802,16 +744,7 @@ fn a_deck_is_read_by_slides() {
         r.outline[3].text,
         "slide 4: layout: Title Only · 분기별 매출"
     );
-    let e = ws
-        .read(
-            &o.doc_id,
-            None,
-            &Window {
-                section: Some("x".into()),
-                ..Default::default()
-            },
-        )
-        .unwrap_err();
+    let e = ws.read(&o.doc_id, None, &Window::section("x")).unwrap_err();
     assert_eq!(e.code, Code::BadRequest);
 }
 

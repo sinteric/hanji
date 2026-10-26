@@ -35,6 +35,7 @@ pub struct HwpxEngine;
 
 /// One section part around its paragraphs, stored once.
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct SectionShell {
     pub part: String,
     pub prolog: String,
@@ -53,6 +54,7 @@ pub struct SectionShell {
 /// What export needs besides the entries: the sections, and the tracked
 /// changes the sections refer to (id, what it is).
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct PackageShell {
     pub sections: Vec<SectionShell>,
     pub tracked: Vec<(String, String)>,
@@ -165,20 +167,13 @@ impl Engine for HwpxEngine {
     }
 
     fn capabilities(&self) -> Capabilities {
-        Capabilities {
-            formatting: true,
-            ..Default::default()
-        }
+        Capabilities::FORMATTING
     }
 
     fn import(&self, package: &[u8], opts: &ImportOptions) -> Result<Imported, EngineError> {
         let (blocks, remainder, report, _) = Self::split(package, opts)?;
         let text = Self::text_of(&blocks, &remainder, opts.template.as_deref());
-        Ok(Imported {
-            text,
-            remainder,
-            report,
-        })
+        Ok(Imported::new(text, remainder, report))
     }
 
     fn export(&self, text: &str, rem: &Remainder) -> Result<Vec<u8>, EngineError> {
@@ -417,6 +412,7 @@ impl HwpxEngine {
 }
 
 /// What export writes: the section parts, and `header.xml` when it gained shapes.
+#[non_exhaustive]
 pub struct Exported {
     pub sections: Vec<(String, Vec<u8>)>,
     pub header: Option<Vec<u8>>,
