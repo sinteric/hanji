@@ -265,7 +265,28 @@ fields), inline `<keep/>`.
   way. A comment stays a `<keep/>` when its body is not this text (a
   reply, a table or image in the balloon, a mixed run that also holds
   text). Tracked-change export refuses a change to the balloon or a
-  deletion of the comment.
+  deletion of the comment. A shown comment inside a shown content
+  control is the same balloon; the control wrap and the comment wrap
+  both stay.
+- **Content controls (docx `w:sdt`):** a rich-text or plain-text control,
+  a combo box or drop-down whose displayed value is text, a citation, a
+  bibliography, or a `docPartObj` (a heading TOC, a bibliography gallery)
+  is read as its inner paragraphs and runs, as a field's result is; the
+  `w:sdt` / `w:sdtContent` shells and `w:sdtPr` / `w:sdtEndPr` stay in the
+  remainder as a `Wrap` (`tag` `w:sdt` for a run-level control, `w:sdt/block`
+  for one that wraps paragraphs or a table). Editing the text keeps the
+  control properties. Deleting all of an inline control's text, or the
+  first or last paragraph of a block control, removes the control and is
+  reported. Joining a paragraph onto a block control's first or last
+  paragraph expands the control to the whole joined paragraph: a block
+  `w:sdt` wraps whole blocks, not a character range. A control stays a `<keep kind="content-control"/>` when its
+  state is not the displayed text: a date (`w:date` holds `fullDate` in
+  `sdtPr`), a checkbox or picture, a repeating section, a data-bound
+  control (`w:dataBinding`: editing the text would desync custom XML),
+  or one still showing placeholder text (`w:showingPlcHdr`). A parent
+  that contains any of those nested is kept whole. A row- or cell-level
+  control that the table model cannot hold stays inside a table
+  placeholder.
 - **Line break:** `<br/>` is a line break inside one paragraph (docx `w:br`,
   the HWP line break). It is valid in paragraphs, headings, list items and
   table cells, and it never starts a paragraph: a line holding only `<br/>`

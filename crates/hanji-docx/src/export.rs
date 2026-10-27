@@ -19,6 +19,8 @@ pub struct Exporter<'a> {
     by: HashMap<(Vec<usize>, Kind), Vec<&'a Entry>>,
     /// Field wraps that close in a different paragraph: end path → wrap.
     close_at: HashMap<Path, Vec<&'a Entry>>,
+    /// Block content controls (`w:sdt` around paragraphs/tables).
+    block_sdts: Vec<&'a Entry>,
     keep: HashMap<&'a str, &'a Entry>,
     tail: Vec<&'a Entry>,
     numbering: &'a Numbering,
@@ -69,6 +71,37 @@ fn node(e: Element) -> Node {
     Node::El(e)
 }
 
+fn sdt_content_mut(sdt: &mut Element) -> &mut Element {
+    if sdt.child("w:sdtContent").is_none() {
+        sdt.children.push(node(el("w:sdtContent")));
+    }
+    sdt.child_mut("w:sdtContent").unwrap()
+}
+
+/// Runs and markers gathered as children of `w:sdt` go into `sdtContent`.
+fn nest_sdt_content(sdt: &mut Element) {
+    let mut extra = vec![];
+    sdt.children.retain(|n| match n {
+        Node::El(e) if e.is("w:sdtPr") || e.is("w:sdtEndPr") || e.is("w:sdtContent") => true,
+        _ => {
+            extra.push(n.clone());
+            false
+        }
+    });
+    if extra.is_empty() {
+        return;
+    }
+    sdt_content_mut(sdt).children.extend(extra);
+}
+
+fn push_body_node(stack: &mut [(u64, Element)], out: &mut Vec<Node>, n: Node) {
+    if let Some((_, sdt)) = stack.last_mut() {
+        sdt_content_mut(sdt).children.push(n);
+    } else {
+        out.push(n);
+    }
+}
+
 impl<'a> Exporter<'a> {
     pub fn new(
         styles: &'a StyleSet,
@@ -80,6 +113,7 @@ impl<'a> Exporter<'a> {
             styles,
             by: HashMap::new(),
             close_at: HashMap::new(),
+            block_sdts: vec![],
             keep: HashMap::new(),
             tail: vec![],
             numbering,
@@ -93,6 +127,7 @@ impl<'a> Exporter<'a> {
                 Kind::Keep | Kind::Bkeep => {
                     ex.keep.insert(e.meta.keep.as_ref().unwrap().id.as_str(), e);
                 }
+                _ if is_block_sdt(e) => ex.block_sdts.push(e),
                 _ => {
                     if let Some(p) = &e.meta.end_path {
                         ex.close_at.entry(p.clone()).or_default().push(e);
@@ -160,11 +195,64 @@ impl<'a> Exporter<'a> {
 
     /// The body's children.
     pub fn body(&self, blocks: &[Block]) -> Result<Vec<Node>, String> {
+        let n = blocks.len();
+        let mut opens: HashMap<usize, Vec<&Entry>> = HashMap::new();
+        let mut closes: HashMap<usize, Vec<&Entry>> = HashMap::new();
+        for e in &self.block_sdts {
+            let a = e
+                .path
+                .first()
+                .copied()
+                .unwrap_or(0)
+                .min(n.saturating_sub(1));
+            let b = e
+                .meta
+                .end_path
+                .as_ref()
+                .and_then(|p| p.first().copied())
+                .unwrap_or(a)
+                .min(n.saturating_sub(1));
+            if n == 0 {
+                continue;
+            }
+            opens.entry(a).or_default().push(e);
+            closes.entry(b).or_default().push(e);
+        }
+        for v in opens.values_mut() {
+            v.sort_by_key(|e| {
+                let a = e.path.first().copied().unwrap_or(0);
+                let b = e
+                    .meta
+                    .end_path
+                    .as_ref()
+                    .and_then(|p| p.first().copied())
+                    .unwrap_or(a);
+                (std::cmp::Reverse(b.saturating_sub(a)), e.seq)
+            });
+        }
+        for v in closes.values_mut() {
+            v.sort_by_key(|e| {
+                let a = e.path.first().copied().unwrap_or(0);
+                let b = e
+                    .meta
+                    .end_path
+                    .as_ref()
+                    .and_then(|p| p.first().copied())
+                    .unwrap_or(a);
+                (b.saturating_sub(a), e.meta.seq_close)
+            });
+        }
+        let mut stack: Vec<(u64, Element)> = vec![];
         let mut out = vec![];
         for (bi, b) in blocks.iter().enumerate() {
             let mut holder = el("x");
             self.bmarkers(&mut holder, &[bi]);
-            out.extend(holder.children);
+            for n in holder.children {
+                push_body_node(&mut stack, &mut out, n);
+            }
+            for w in opens.get(&bi).into_iter().flatten() {
+                stack.push((w.id, fragment(&w.xml[0])));
+            }
             match b {
                 Block::Para(p) => {
                     // A list item keeps the paragraph style the remainder has,
@@ -179,17 +267,32 @@ impl<'a> Exporter<'a> {
                     if let Some(t) = self.track {
                         t.mark(&mut pel, &[bi])?;
                     }
-                    out.push(node(pel));
+                    push_body_node(&mut stack, &mut out, node(pel));
                 }
-                Block::Table(t) => out.push(node(self.table(t, bi)?)),
+                Block::Table(t) => {
+                    push_body_node(&mut stack, &mut out, node(self.table(t, bi)?));
+                }
                 Block::Keep(id) => {
                     for x in &self.keep_entry(id)?.xml {
-                        out.push(node(fragment(x)));
+                        push_body_node(&mut stack, &mut out, node(fragment(x)));
                     }
                 }
                 Block::Head(_) => return Err("a Document has no slides, slots or shapes".into()),
                 _ => {}
             }
+            for w in closes.get(&bi).into_iter().flatten() {
+                if stack.last().is_none_or(|s| s.0 != w.id) {
+                    return Err("a content control closes before it opens".into());
+                }
+                let (_, mut sdt) = stack.pop().unwrap();
+                for x in &w.meta.aux {
+                    sdt_content_mut(&mut sdt).children.push(node(fragment(x)));
+                }
+                push_body_node(&mut stack, &mut out, node(sdt));
+            }
+        }
+        if !stack.is_empty() {
+            return Err("a content control is not closed".into());
         }
         let mut tail = self.tail.clone();
         tail.sort_by_key(|e| e.seq);
@@ -571,6 +674,9 @@ impl<'a> Exporter<'a> {
                             .extend(w.meta.aux.iter().map(|x| node(fragment(x))));
                         parent.append(&mut e.children);
                     } else {
+                        if is_inline_sdt(w) {
+                            nest_sdt_content(&mut e);
+                        }
                         parent.push(node(e));
                     }
                 }

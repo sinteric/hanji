@@ -7,7 +7,7 @@ use std::collections::{HashMap, HashSet};
 use hanji_format::{Atom, Cell, Inline};
 
 use crate::diff::{self, Op, Tag};
-use crate::model::{keys, paras, Block, Path};
+use crate::model::{content_at, keys, paras, Block, Path};
 use crate::remainder::{Entry, Kind};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -1403,14 +1403,30 @@ impl<'a> Placer<'a> {
                 hits.first().cloned()
             };
         }
-        let np = self.para_map.get(old_path)?;
+        // A join removes the second paragraph as a block; the global
+        // stream still has it and maps it into the surviving paragraph.
+        // Try that before `para_map`, which has no entry for a merged-away
+        // path.
         if let Some(g) = &self.al.global {
             if let Some(&b) = g.old.base.get(old_path) {
                 return g.new.locate(map_pos(&g.ops, b + pos, right));
             }
         }
-        let p = self.map_offset(old_path, np, pos, right);
-        Some((np.clone(), p))
+        if let Some(np) = self.para_map.get(old_path) {
+            let p = self.map_offset(old_path, np, pos, right);
+            return Some((np.clone(), p));
+        }
+        // A block content control can open or close on a table: that path
+        // is not a paragraph, so `para_map` and the global stream omit it.
+        if old_path.len() == 1 {
+            let i = old_path[0];
+            if !matches!(self.old.get(i), Some(Block::Para(_))) {
+                if let Some(j) = self.al.bmap.get(i).copied().flatten() {
+                    return Some((vec![j], pos));
+                }
+            }
+        }
+        None
     }
 
     fn place_spanning(&mut self, e: &Entry) {
@@ -1435,21 +1451,32 @@ impl<'a> Placer<'a> {
                 x.path = fp.clone();
                 x.start = Some(a);
                 if fp == lp {
-                    x.meta.end_path = None;
                     if en > start && b <= a {
                         self.set(e, Status::Removed("all of its text was deleted".into()));
                         return;
                     }
                     x.end = Some(b.max(a));
+                    // A block content control stays a block wrap even when
+                    // its first and last paragraphs are the same one.
+                    if e.meta.tag == "w:sdt/block" {
+                        x.meta.end_path = Some(lp);
+                    } else {
+                        x.meta.end_path = None;
+                    }
                 } else if lp < fp {
                     self.set(
                         e,
-                        Status::Refused("the field's begin and end are no longer in order".into()),
+                        Status::Refused(
+                            "the wrapper's begin and end are no longer in order".into(),
+                        ),
                     );
                     return;
                 } else {
                     x.meta.end_path = Some(lp);
                     x.end = Some(b);
+                }
+                if e.meta.tag == "w:sdt/block" {
+                    self.snap_block_sdt(&mut x);
                 }
                 self.set(
                     e,
@@ -1459,6 +1486,20 @@ impl<'a> Placer<'a> {
                     },
                 );
             }
+        }
+    }
+
+    /// A block `w:sdt` wraps whole body blocks, not a character range.
+    /// After a join (or a split) at a boundary, start/end become the first
+    /// paragraph's start and the last paragraph's length so export — which
+    /// emits the `sdt` around those blocks — and re-import agree.
+    fn snap_block_sdt(&self, x: &mut Entry) {
+        if content_at(self.new, &x.path).is_some() {
+            x.start = Some(0);
+        }
+        let end_path = x.meta.end_path.clone().unwrap_or_else(|| x.path.clone());
+        if let Some(inl) = content_at(self.new, &end_path) {
+            x.end = Some(inl.units.len());
         }
     }
 

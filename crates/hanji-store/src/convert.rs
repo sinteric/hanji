@@ -942,6 +942,9 @@ fn not_carried(rem: &Remainder, from: Format, has_items: bool) -> Vec<NotCarried
                 "fldChar" | "fldSimple" => {
                     "fields (the result's text stays, the instruction does not)"
                 }
+                "sdt" | "sdt/block" => {
+                    "content controls (the text stays, the control properties do not)"
+                }
                 // A layout hint Word writes for the page it last rendered.
                 "lastRenderedPageBreak" => continue,
                 "" => "wrapped text (hyperlinks, smart tags) and block markers",

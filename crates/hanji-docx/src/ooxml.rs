@@ -34,6 +34,18 @@ pub(crate) fn is_comment(e: &Entry) -> bool {
     e.kind == Kind::Wrap && e.meta.tag == "w:commentReference"
 }
 
+/// An inline content control (`w:sdt` around runs): a wrapper whose
+/// children go in `sdtContent`.
+pub(crate) fn is_inline_sdt(e: &Entry) -> bool {
+    e.kind == Kind::Wrap && e.meta.tag == "w:sdt"
+}
+
+/// A block content control (`w:sdt` around paragraphs/tables): a wrapper
+/// whose children are body blocks inside `sdtContent`.
+pub(crate) fn is_block_sdt(e: &Entry) -> bool {
+    e.kind == Kind::Wrap && e.meta.tag == "w:sdt/block"
+}
+
 /// Zero-width inline elements.
 pub const MARKERS: &[&str] = &[
     "w:bookmarkStart",
