@@ -34,7 +34,7 @@
     "files": 102,
     "failed": 0,
     "with_keeps": 62,
-    "keeps": 319
+    "keeps": 315
   },
   "formats": [
     {
@@ -42,7 +42,7 @@
       "files": 13,
       "failed": 0,
       "with_keeps": 13,
-      "keeps": 174
+      "keeps": 170
     },
     {
       "format": "hwpx",
@@ -213,12 +213,6 @@
     },
     {
       "format": "docx",
-      "kind": "field-part",
-      "keeps": 4,
-      "files": 1
-    },
-    {
-      "format": "docx",
       "kind": "table",
       "keeps": 4,
       "files": 3
@@ -385,12 +379,11 @@
     {
       "path": "prototype/remainder/corpus/tdf154481.docx",
       "format": "docx",
-      "keeps": 8,
+      "keeps": 4,
       "kinds": {
         "break": 1,
         "drawing": 1,
-        "field": 2,
-        "field-part": 4
+        "field": 2
       }
     },
     {

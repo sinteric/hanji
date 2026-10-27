@@ -1466,6 +1466,16 @@ fn span_roles(paras: &[&Element]) -> HashMap<usize, ParaSpan> {
     m
 }
 
+/// A sibling that can sit in a complex field's `begin`..`end`: a run, a
+/// bookmark, a hyperlink (or other wrapper), or a simple field. A TOC
+/// entry is often a `w:hyperlink` wrapping a nested `PAGEREF`.
+fn field_sibling(k: &Element) -> bool {
+    k.is("w:r")
+        || MARKERS.contains(&k.name.as_str())
+        || WRAPPERS.contains(&k.name.as_str())
+        || k.is("w:fldSimple")
+}
+
 /// Complex fields whose begin..end lie among these siblings: start → end.
 fn field_groups(kids: &[&Element]) -> HashMap<usize, usize> {
     let mut groups = HashMap::new();
@@ -1491,12 +1501,7 @@ fn field_groups(kids: &[&Element]) -> HashMap<usize, usize> {
                 }
                 j += 1;
             }
-            if depth == 0
-                && j < kids.len()
-                && kids[i..=j]
-                    .iter()
-                    .all(|x| x.is("w:r") || MARKERS.contains(&x.name.as_str()))
-            {
+            if depth == 0 && j < kids.len() && kids[i..=j].iter().copied().all(field_sibling) {
                 groups.insert(i, j);
                 i = j + 1;
                 continue;
@@ -1511,12 +1516,13 @@ fn field_groups(kids: &[&Element]) -> HashMap<usize, usize> {
 /// [`field_groups`]) when its cached result can show as text: the index of
 /// the run it ends. A legacy form field (`w:ffData`) is shown the same way
 /// when that result is not blank: `ffData` and the instruction stay in the
-/// wrap. Otherwise the field stays a placeholder: no result or a blank one
+/// wrap. Nested single-paragraph fields and hyperlinks in the result (a
+/// one-entry TOC's `PAGEREF`) are walked as they are in a spanning field.
+/// Otherwise the field stays a placeholder: no result or a blank one
 /// (an index entry; an empty FORMTEXT whose value is padding spaces that
-/// would hide the field; a FORMCHECKBOX, which has no `separate`), a result
-/// holding another field, or parts that share a run with the result.
-/// Bookmarks Word puts between the field's parts are allowed (they stay in
-/// the wrap).
+/// would hide the field; a FORMCHECKBOX, which has no `separate`), or
+/// parts that share a run with the result. Bookmarks Word puts between
+/// the field's parts are allowed (they stay in the wrap).
 fn shown_field(kids: &[&Element], begin: usize, end: usize) -> Option<usize> {
     let fld =
         |e: &Element, t: &str| e.is("w:fldChar") && e.get("w:fldCharType").as_deref() == Some(t);
@@ -1556,10 +1562,7 @@ fn shown_field(kids: &[&Element], begin: usize, end: usize) -> Option<usize> {
         return None;
     }
     let result = &kids[sep + 1..end];
-    if result
-        .iter()
-        .any(|k| !k.descendants("w:fldChar").is_empty() || !k.descendants("w:fldSimple").is_empty())
-    {
+    if !result.iter().copied().all(field_sibling) {
         return None;
     }
     let text: String = result.iter().map(|k| k.text_of(&["w:t"])).collect();

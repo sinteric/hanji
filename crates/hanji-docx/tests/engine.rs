@@ -1763,18 +1763,15 @@ fn a_field_result_split_across_paragraphs_is_refused() {
 #[test]
 fn fields_without_a_text_result_stay_placeholders() {
     // Empty FORMTEXT (padding spaces), a checkbox (no result), a blank XE,
-    // a nested field, and parts sharing a run: still keeps.
+    // and parts sharing a run: still keeps. A nested field with a shown
+    // result is a wrap, not a keep (see
+    // `a_nested_field_in_a_single_paragraph_result_is_text`).
     let empty_form = form_text("Text1", "     ");
-    let nested = format!(
-        "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText> IF 1 = 1 </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>{}<w:r><w:fldChar w:fldCharType=\"end\"/></w:r>",
-        field("PAGE", "3")
-    );
     let shared = "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText> PAGE </w:instrText><w:fldChar w:fldCharType=\"separate\"/><w:t>4</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r>";
     let body = [
         empty_form,
         form_checkbox("Check1"),
         field("XE \"index\"", " "),
-        nested,
         shared.to_string(),
     ]
     .iter()
@@ -1785,10 +1782,29 @@ fn fields_without_a_text_result_stay_placeholders() {
         .unwrap();
     assert_eq!(
         imp.text.matches("kind=\"field\"").count(),
-        5,
+        4,
         "{}",
         imp.text
     );
+}
+
+#[test]
+fn a_nested_field_in_a_single_paragraph_result_is_text() {
+    let nested = format!(
+        "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText> IF 1 = 1 </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>{}<w:r><w:fldChar w:fldCharType=\"end\"/></w:r>",
+        field("PAGE", "3")
+    );
+    let source = docx(
+        &format!("<w:p><w:r><w:t>a</w:t></w:r>{nested}</w:p>"),
+        vec![],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("a3"), "{}", imp.text);
+    assert!(!imp.text.contains("<keep"), "{}", imp.text);
+    let unchanged = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&source), canon_doc(&unchanged));
 }
 
 #[test]
@@ -1855,6 +1871,32 @@ fn editing_a_form_text_field_replaces_the_result_and_keeps_ffdata() {
 fn spanning(instr: &str, first: &str, last: &str) -> String {
     format!(
         "<w:p><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText xml:space=\"preserve\"> {instr} </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>{first}</w:p><w:p>{last}<w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p>"
+    )
+}
+
+/// A TOC entry: a hyperlink wrapping heading text, a tab, and a PAGEREF.
+fn toc_entry(anchor: &str, heading: &str, page: &str) -> String {
+    format!(
+        "<w:hyperlink w:anchor=\"{anchor}\">{}{}{}</w:hyperlink>",
+        t(heading),
+        tab(),
+        field(&format!("PAGEREF {anchor} \\h"), page)
+    )
+}
+
+/// A one-paragraph TOC whose result is a hyperlink + PAGEREF (Word's
+/// heading-TOC shape when there is only one entry).
+fn single_para_toc(instr: &str, entry: &str) -> String {
+    format!(
+        "<w:p><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText xml:space=\"preserve\"> {instr} </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>{entry}<w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p>"
+    )
+}
+
+/// A PAGEREF with no `separate` and no cached page number (a leftover
+/// nested field inside a blank TOC).
+fn pageref_no_result(anchor: &str) -> String {
+    format!(
+        "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText>PAGEREF {anchor} \\h</w:instrText></w:r><w:r><w:rPr/></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r>"
     )
 }
 
@@ -2879,6 +2921,170 @@ fn a_toc_inside_a_content_control_is_ordinary_paragraphs() {
     assert!(imp.text.contains("Heading1\t3"), "{}", imp.text);
     assert!(imp.text.contains("Heading2\t9"), "{}", imp.text);
     assert!(!imp.text.contains("content-control"), "{}", imp.text);
+    let unchanged = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&source), canon_doc(&unchanged));
+}
+
+#[test]
+fn a_single_paragraph_toc_with_a_hyperlink_result_is_text() {
+    let source = docx(
+        &single_para_toc(r#"TOC \h"#, &toc_entry("_Toc1", "Heading1", "3")),
+        vec![],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("Heading1\t3"), "{}", imp.text);
+    assert!(!imp.text.contains("<keep"), "{}", imp.text);
+    assert!(!imp.text.contains("field-part"), "{}", imp.text);
+    let unchanged = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&source), canon_doc(&unchanged));
+}
+
+#[test]
+fn editing_a_single_paragraph_toc_keeps_the_instruction_and_hyperlink() {
+    let source = docx(
+        &single_para_toc(r#"TOC \h"#, &toc_entry("_Toc1", "Heading1", "3")),
+        vec![],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    let r = edit(&imp.remainder, &imp.text, "Heading1", "Intro", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains("TOC \\h"), "{xml}");
+    assert!(xml.contains("w:hyperlink"), "{xml}");
+    assert!(xml.contains("PAGEREF _Toc1"), "{xml}");
+    assert!(xml.contains(">Intro<"), "{xml}");
+}
+
+#[test]
+fn a_single_paragraph_toc_inside_a_content_control_is_text() {
+    let source = docx(
+        &sdt(
+            &format!(
+                "{}<w:docPartObj><w:docPartGallery w:val=\"Table of Contents\"/><w:docPartUnique/></w:docPartObj>",
+                sdt_id("8")
+            ),
+            &format!(
+                "{}{}",
+                p("Contents"),
+                single_para_toc(r#"TOC \h"#, &toc_entry("_Toc1", "Heading1", "3")),
+            ),
+        ),
+        vec![],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("Contents"), "{}", imp.text);
+    assert!(imp.text.contains("Heading1\t3"), "{}", imp.text);
+    assert!(!imp.text.contains("content-control"), "{}", imp.text);
+    assert!(!imp.text.contains("field-part"), "{}", imp.text);
+    let unchanged = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&source), canon_doc(&unchanged));
+}
+
+#[test]
+fn a_blank_single_paragraph_toc_with_a_hyperlink_is_one_field_keep() {
+    // tdf154481: a leftover one-paragraph TOC whose result is only a
+    // hyperlink wrapping a PAGEREF with no cached page number. Grouped as
+    // one field keep, not four field-part keeps.
+    let inner = format!(
+        "<w:hyperlink w:anchor=\"_Toc1\">{}</w:hyperlink>",
+        pageref_no_result("_Toc1")
+    );
+    let source = docx(&single_para_toc(r#"TOC \h"#, &inner), vec![]);
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert_eq!(
+        imp.text.matches("kind=\"field\"").count(),
+        1,
+        "{}",
+        imp.text
+    );
+    assert!(!imp.text.contains("field-part"), "{}", imp.text);
+    let unchanged = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&source), canon_doc(&unchanged));
+}
+
+#[test]
+fn a_heading_toc_sdt_nests_a_spanning_field_and_a_blank_leftover() {
+    // tdf154481: a heading-TOC `docPartObj` holds a multi-paragraph TOC
+    // (shown) and a leftover one-paragraph TOC with an empty hyperlink
+    // (one field keep). The sdt wrap and the field wrap nest.
+    let leftover = format!(
+        "<w:hyperlink w:anchor=\"_Toc2\">{}</w:hyperlink>",
+        pageref_no_result("_Toc2")
+    );
+    let source = docx(
+        &sdt(
+            &format!(
+                "{}<w:docPartObj><w:docPartGallery w:val=\"Table of Contents\"/><w:docPartUnique/></w:docPartObj>",
+                sdt_id("9")
+            ),
+            &format!(
+                "{}{}{}",
+                p("Contents"),
+                spanning(
+                    r#"TOC \h"#,
+                    &toc_entry("_Toc1", "Heading1", "3"),
+                    &toc_entry("_Toc1b", "Heading2", "9"),
+                ),
+                single_para_toc(r#"TOC \h"#, &leftover),
+            ),
+        ),
+        vec![],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("Contents"), "{}", imp.text);
+    assert!(imp.text.contains("Heading1\t3"), "{}", imp.text);
+    assert!(imp.text.contains("Heading2\t9"), "{}", imp.text);
+    assert!(!imp.text.contains("content-control"), "{}", imp.text);
+    assert!(!imp.text.contains("field-part"), "{}", imp.text);
+    assert_eq!(
+        imp.text.matches("kind=\"field\"").count(),
+        1,
+        "{}",
+        imp.text
+    );
+    let sdt = imp
+        .remainder
+        .entries
+        .iter()
+        .find(|e| e.kind == Kind::Wrap && e.meta.tag == "w:sdt/block")
+        .expect("block content control");
+    let toc = imp
+        .remainder
+        .entries
+        .iter()
+        .find(|e| e.kind == Kind::Wrap && e.meta.tag == "w:fldChar" && e.meta.end_path.is_some())
+        .expect("spanning TOC");
+    assert!(
+        toc.path[0] >= sdt.path[0]
+            && toc.meta.end_path.as_ref().unwrap()[0] <= sdt.meta.end_path.as_ref().unwrap()[0],
+        "field wrap should sit inside the sdt wrap: sdt={:?}..{:?} toc={:?}..{:?}",
+        sdt.path,
+        sdt.meta.end_path,
+        toc.path,
+        toc.meta.end_path
+    );
     let unchanged = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
     assert_eq!(canon_doc(&source), canon_doc(&unchanged));
 }

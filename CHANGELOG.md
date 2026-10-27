@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Show a single-paragraph DOCX field whose cached result holds a
+  hyperlink (or another wrapper) and nested fields — a one-entry TOC's
+  `PAGEREF` — as the same `Wrap` as #124/#130, including inside a shown
+  content control. `begin`…`end` grouping no longer requires every sibling
+  to be a run, so a blank leftover TOC that is only an empty hyperlink
+  becomes one `<keep kind="field"/>` instead of four `field-part` keeps.
+  Empty form fields, checkboxes, blank XE/TA, and parts that share a run
+  with the result stay placeholders. An inline page break mixed with text
+  (`w:br type=page` in a TOC heading) stays `<keep kind="break"/>`:
+  `<pagebreak/>` is a paragraph. Corpus keeps: 319 → 315 (docx
+  `field-part` 4 → 0; `field` 73 and `break` 2 unchanged).
 - Show a DOCX content control (`w:sdt`) whose displayed value is text as
   ordinary paragraphs and runs instead of a `<keep kind="content-control"/>`
   placeholder: rich and plain text, a combo box or drop-down, a citation,
