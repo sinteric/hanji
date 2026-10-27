@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Show a DOCX complex field whose cached result spans paragraphs (TOC,
+  INDEX, TOA, and similar) as ordinary editable paragraphs instead of
+  `<keep kind="field-part"/>` placeholders. The instruction stays as one
+  `Wrap` remainder entry: `begin`…`separate` on the first paragraph and
+  `end` on the last (`end_path`). Editing result text is allowed; adding
+  or removing a paragraph strictly inside the range is written back when
+  it can be placed faithfully; deleting the first or last paragraph
+  removes the field and is reported; splitting a boundary paragraph
+  keeps begin and end with the pieces that still hold them; reordering
+  the ends is refused, as are tracked changes inside the range.
+  Nested single-paragraph fields in the result (a TOC entry's `PAGEREF`)
+  keep the existing wrap. Blank, unmatched, or shared-run spanning fields
+  stay placeholders. Corpus keeps: 357 → 345 (docx `field-part` 12 → 0).
 - Show a DOCX legacy form field's cached result as text when it is not
   blank (`FORMTEXT` / `FORMDROPDOWN` with `w:ffData`), the same way
   ordinary fields already are: editing it replaces the result and keeps

@@ -39,11 +39,11 @@ date.
 
 | format | files | failed | with keeps | keeps |
 | ------ | ----: | -----: | ---------: | ----: |
-| docx   |    13 |      0 |         13 |   212 |
+| docx   |    13 |      0 |         13 |   200 |
 | hwpx   |    16 |      0 |         12 |    54 |
 | pptx   |    27 |      0 |         16 |    44 |
 | xlsx   |    46 |      0 |         21 |    47 |
-| all    |   102 |      0 |         62 |   357 |
+| all    |   102 |      0 |         62 |   345 |
 
 ## By kind, most first
 
@@ -58,7 +58,6 @@ date.
 | pptx   | table              |    15 |    10 |
 | docx   | tracked-delete     |    14 |     3 |
 | hwpx   | table              |    13 |     6 |
-| docx   | field-part         |    12 |     1 |
 | pptx   | field              |    11 |     4 |
 | hwpx   | footnote           |    10 |     2 |
 | docx   | object             |     8 |     2 |
@@ -102,7 +101,7 @@ date.
 | `prototype/remainder/corpus/sample-docx.docx`                        | docx   |     5 | drawing 3, tracked-delete 1, tracked-insert 1 |
 | `prototype/remainder/corpus/tdf124637_sectionMargin.docx`            | docx   |     3 | break 1, content-control 1, footnote 1 |
 | `prototype/remainder/corpus/tdf154481.docx`                          | docx   |    15 | comment 12, content-control 1, drawing 1, field 1 |
-| `prototype/remainder/corpus/testWORD_2006ml.docx`                    | docx   |    51 | comment 1, content-control 9, drawing 5, endnote 1, field 2, field-part 12, footnote 1, math 1, object 3, table 1, tracked-delete 11, tracked-insert 2, tracked-move 2 |
+| `prototype/remainder/corpus/testWORD_2006ml.docx`                    | docx   |    39 | comment 1, content-control 9, drawing 5, endnote 1, field 2, footnote 1, math 1, object 3, table 1, tracked-delete 11, tracked-insert 2, tracked-move 2 |
 | `prototype/remainder/corpus/testWORD_various.docx`                   | docx   |     2 | drawing 1, footnote 1 |
 | `crates/hanji-hwpx/corpus/basic-table-01.hwpx`                       | hwpx   |     0 | |
 | `crates/hanji-hwpx/corpus/eq-002.hwpx`                               | hwpx   |    17 | math 16, number 1 |

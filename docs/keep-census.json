@@ -34,7 +34,7 @@
     "files": 102,
     "failed": 0,
     "with_keeps": 62,
-    "keeps": 357
+    "keeps": 345
   },
   "formats": [
     {
@@ -42,7 +42,7 @@
       "files": 13,
       "failed": 0,
       "with_keeps": 13,
-      "keeps": 212
+      "keeps": 200
     },
     {
       "format": "hwpx",
@@ -120,12 +120,6 @@
       "kind": "table",
       "keeps": 13,
       "files": 6
-    },
-    {
-      "format": "docx",
-      "kind": "field-part",
-      "keeps": 12,
-      "files": 1
     },
     {
       "format": "pptx",
@@ -407,14 +401,13 @@
     {
       "path": "prototype/remainder/corpus/testWORD_2006ml.docx",
       "format": "docx",
-      "keeps": 51,
+      "keeps": 39,
       "kinds": {
         "comment": 1,
         "content-control": 9,
         "drawing": 5,
         "endnote": 1,
         "field": 2,
-        "field-part": 12,
         "footnote": 1,
         "math": 1,
         "object": 3,

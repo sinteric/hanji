@@ -36,7 +36,7 @@ use hanji_format::{Atom, Cell, CellPara, Inline, Marks, Props, Unit};
 
 use crate::export::{with_marks, Exporter};
 use crate::numbering::Numbering;
-use crate::ooxml::{insert_ordered, is_shown_field, remove_child, PPR_ORDER};
+use crate::ooxml::{insert_ordered, is_shown_field, is_spanning_field, remove_child, PPR_ORDER};
 use crate::xml::{self, fragment, Element, Node, Scope};
 use crate::{write_package, DocShell, DocxEngine, Exported};
 
@@ -1392,6 +1392,9 @@ impl<'a> Merge<'a> {
             .find(|o| o.id == e.id)
             .ok_or_else(changed)?;
         let (s, en) = (old.start.unwrap_or(0), old.end.unwrap_or(0));
+        if let Some(end_old) = &old.meta.end_path {
+            return self.check_spanning_field(old, x, s, en, end_old);
+        }
         if en <= s {
             return Err(changed());
         }
@@ -1402,6 +1405,67 @@ impl<'a> Merge<'a> {
         };
         let same = p == q && p == x.path && x.start == Some(a) && x.end == Some(b + 1);
         if !same || !(a..=b).all(|k| self.units[&p][k].st == St::Eq) {
+            return Err(changed());
+        }
+        Ok(())
+    }
+
+    fn check_spanning_field(
+        &self,
+        old: &Entry,
+        x: &Entry,
+        s: usize,
+        en: usize,
+        end_old: &Path,
+    ) -> Result<(), String> {
+        let changed = || {
+            "the edit changes the result of a field, which cannot be tracked; update the field in Office instead"
+                .to_string()
+        };
+        let eq = |path: &Path, lo: usize, hi: usize| -> bool {
+            (lo..hi).all(|u| {
+                self.old_pos(path, u)
+                    .and_then(|(p, k)| self.units.get(&p).and_then(|v| v.get(k)))
+                    .is_some_and(|r| r.st == St::Eq)
+            })
+        };
+        let pref =
+            |p: &Path| -> Vec<usize> { p.get(..p.len().saturating_sub(1)).unwrap_or(&[]).to_vec() };
+        if pref(&old.path) != pref(end_old) {
+            return Err(changed());
+        }
+        let n0 = self.old.len(&old.path);
+        if s < n0 && !eq(&old.path, s, n0) {
+            return Err(changed());
+        }
+        let n1 = self.old.len(end_old);
+        if en > 0 && !eq(end_old, 0, en.min(n1)) {
+            return Err(changed());
+        }
+        let i0 = *old.path.last().unwrap_or(&0);
+        let i1 = *end_old.last().unwrap_or(&0);
+        for pe in &self.old.rem.entries {
+            if pe.kind != Kind::Ppr || pref(&pe.path) != pref(&old.path) {
+                continue;
+            }
+            let Some(&i) = pe.path.last() else { continue };
+            if i <= i0 || i >= i1 {
+                continue;
+            }
+            let n = self.old.len(&pe.path);
+            if !eq(&pe.path, 0, n) {
+                return Err(changed());
+            }
+            if let Some(mp) = self.old_mark.get(&pe.path) {
+                if self.marks.get(mp).is_none_or(|m| m.st != St::Eq) {
+                    return Err(changed());
+                }
+            }
+        }
+        let x_last = x.meta.end_path.as_ref().unwrap_or(&x.path);
+        let xi0 = *x.path.last().unwrap_or(&0);
+        let xi1 = *x_last.last().unwrap_or(&0);
+        if pref(&x.path) != pref(x_last) || xi1.saturating_sub(xi0) != i1.saturating_sub(i0) {
             return Err(changed());
         }
         Ok(())
@@ -1486,6 +1550,15 @@ impl<'a> Merge<'a> {
                         out.push(y);
                     }
                     continue;
+                }
+                Kind::Wrap if is_spanning_field(e) => {
+                    let (s, en) = (e.start.unwrap(), e.end.unwrap());
+                    let end_path = e.meta.end_path.as_ref().unwrap();
+                    let (p, a) = at(self.new_pos(&e.path, s))?;
+                    let (q, b) = at(self.new_pos(end_path, en))?;
+                    (x.path, x.start, x.end) = (p.clone(), Some(a), Some(b));
+                    x.meta.end_path = (p != q).then_some(q);
+                    self.check_field(e, &x)?;
                 }
                 Kind::Wrap => {
                     let (s, en) = (e.start.unwrap(), e.end.unwrap());

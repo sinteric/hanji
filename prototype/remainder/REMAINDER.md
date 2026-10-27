@@ -245,7 +245,8 @@ Findings about the format and the storage, independent of the design:
 - **Complex fields that span paragraphs** (a TOC) cannot be one placeholder;
   the prototype falls back to one placeholder per field part (12 of them), so
   the model sees three cryptic `<keep/>`s per field. A field-range entry kind
-  is needed.
+  is needed. **Done in the engine:** those results are ordinary paragraphs,
+  with `begin`/`end` as one spanning `Wrap` (`DESIGN.md` §5.1).
 - **Serializer bug to avoid.** The prototype writes `**fox **`, with the space
   inside the closing marker. That is not CommonMark emphasis. A real
   serializer must move boundary spaces outside the markers.

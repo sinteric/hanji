@@ -224,18 +224,29 @@ content controls, HWP form fields), inline `<keep/>`.
   runs from `begin` to `separate`, and the `end` run; or the `w:fldSimple`
   element). Editing the text replaces the cached result and keeps the
   instruction, so Word may compute it again when it updates fields.
-  Deleting all of it removes the field, and the report says so; a result
-  split across paragraphs is refused, and so is any tracked change inside
-  a field (§10.2). A legacy form field (`FORMTEXT` / `FORMDROPDOWN` with
-  `w:ffData`) whose cached result is not blank is the same: the result is
-  text, and `ffData`, the instruction and the form bookmark stay in the
-  wrap. A field stays a `<keep/>` when its result is not text to edit: a
-  form checkbox (`FORMCHECKBOX`: `w:ffData` holds checked/unchecked, and
-  there is no cached result), no result or a blank one (an index entry; an
-  empty `FORMTEXT` whose value is padding spaces that would hide the
-  field), a field in the result, parts sharing a run with the result, or a
-  field spanning paragraphs (a table of contents, whose result is already
-  text and whose parts stay as `field-part` keeps).
+  Deleting all of it removes the field, and the report says so; a
+  single-paragraph result split across paragraphs is refused, and so is any
+  tracked change inside a field (§10.2). A legacy form field (`FORMTEXT` /
+  `FORMDROPDOWN` with `w:ffData`) whose cached result is not blank is the
+  same: the result is text, and `ffData`, the instruction and the form
+  bookmark stay in the wrap. A field whose `begin` and `end` sit in
+  different paragraphs (a table of contents, INDEX, TOA) is the same wrap:
+  the result paragraphs are ordinary paragraphs (nested `PAGEREF` /
+  `HYPERLINK` fields in a TOC entry use the single-paragraph rule), and
+  the begin (first paragraph) and end (last paragraph) stay in the
+  remainder (`end_path` is the last paragraph). Editing text inside those
+  paragraphs is allowed; adding or removing a paragraph strictly between
+  the first and last is written back when placement can do so faithfully,
+  otherwise refused. Deleting the first or last paragraph of the range
+  removes the whole field and is reported; splitting a boundary paragraph
+  keeps begin and end with the pieces that still hold them (the new
+  paragraph is inside the field); moving content so the boundaries are no
+  longer in order is refused. A field stays a `<keep/>` when its result is not text to
+  edit: a form checkbox (`FORMCHECKBOX`: `w:ffData` holds
+  checked/unchecked, and there is no cached result), no result or a blank
+  one (an index entry; an empty `FORMTEXT` whose value is padding spaces
+  that would hide the field), a single-paragraph field in the result,
+  or parts sharing a run with the result.
 - **Line break:** `<br/>` is a line break inside one paragraph (docx `w:br`,
   the HWP line break). It is valid in paragraphs, headings, list items and
   table cells, and it never starts a paragraph: a line holding only `<br/>`

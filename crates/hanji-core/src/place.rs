@@ -701,6 +701,8 @@ pub struct Placer<'a> {
     handled: HashSet<u64>,
     by_path: HashMap<Path, Vec<&'a Entry>>,
     owners: HashMap<(Path, Path), Vec<Owned>>,
+    /// Old paragraph path → new, for wraps that span paragraphs.
+    para_map: HashMap<Path, Path>,
 }
 
 fn top_paras<'b>(blocks: &'b [Block], same: &HashSet<usize>) -> Vec<(Path, &'b Inline)> {
@@ -734,6 +736,7 @@ pub fn place(
         handled: HashSet::new(),
         by_path,
         owners: HashMap::new(),
+        para_map: HashMap::new(),
     };
     p.run();
     keep_marker_order(entries, &mut p.out);
@@ -896,6 +899,7 @@ impl<'a> Placer<'a> {
                 _ => self.deleted_block(i),
             }
         }
+        self.spanning_wraps();
         let al = self.al;
         for p in &al.lenient {
             for e in self.entries_at(p) {
@@ -988,6 +992,7 @@ impl<'a> Placer<'a> {
             for e in self.entries_at(&path) {
                 if matches!(e.kind, Kind::Keep | Kind::Bkeep)
                     || (e.kind == Kind::Bmarker && path.len() == 1)
+                    || e.spans_paragraphs()
                     || self.handled.contains(&e.id)
                 {
                     continue;
@@ -1153,6 +1158,7 @@ impl<'a> Placer<'a> {
                         });
                     for e in self.entries_at(&p) {
                         if matches!(e.kind, Kind::Keep | Kind::Bkeep | Kind::Bmarker)
+                            || e.spans_paragraphs()
                             || self.handled.contains(&e.id)
                         {
                             continue;
@@ -1170,12 +1176,14 @@ impl<'a> Placer<'a> {
     }
 
     fn para(&mut self, op: &Inline, path: Path, np: &Inline, npath: Path, skip: &[Kind]) {
+        self.para_map.insert(path.clone(), npath.clone());
         let ents: Vec<&Entry> = self
             .entries_at(&path)
             .into_iter()
             .filter(|e| {
                 !matches!(e.kind, Kind::Keep | Kind::Bkeep | Kind::Bmarker)
                     && !skip.contains(&e.kind)
+                    && !e.spans_paragraphs()
                     && !self.handled.contains(&e.id)
             })
             .collect();
@@ -1289,8 +1297,121 @@ impl<'a> Placer<'a> {
     fn offset_entries(&self, path: &Path) -> Vec<&'a Entry> {
         self.entries_at(path)
             .into_iter()
-            .filter(|e| e.kind.is_offset())
+            .filter(|e| e.kind.is_offset() && !e.spans_paragraphs())
             .collect()
+    }
+
+    /// A wrap whose begin and end sit in different paragraphs: map each
+    /// end with its own paragraph. Deleting the first or last paragraph
+    /// removes the field; a split of a boundary keeps begin/end with the
+    /// pieces that still hold them; a reorder is refused.
+    fn spanning_wraps(&mut self) {
+        let ids: Vec<u64> = self
+            .entries
+            .iter()
+            .filter(|e| e.spans_paragraphs() && !self.handled.contains(&e.id))
+            .map(|e| e.id)
+            .collect();
+        for id in ids {
+            let Some(e) = self.entries.iter().find(|x| x.id == id) else {
+                continue;
+            };
+            let e = e.clone();
+            self.place_spanning(&e);
+        }
+    }
+
+    /// Where a spanning wrap's begin or end sits after the edit. A split of
+    /// that paragraph follows the piece that still holds the offset; a
+    /// deleted paragraph is `None`.
+    fn map_span_end(&self, old_path: &Path, pos: usize, right: bool) -> Option<(Path, usize)> {
+        if let Some(segs) = self.al.cross.get(old_path) {
+            let hits: Vec<(Path, usize)> = segs
+                .iter()
+                .filter(|s| s.0 <= pos && pos <= s.1)
+                .map(|s| (s.2.clone(), pos - s.0 + s.3))
+                .collect();
+            return if right {
+                hits.last().cloned()
+            } else {
+                hits.first().cloned()
+            };
+        }
+        let np = self.para_map.get(old_path)?;
+        if let Some(g) = &self.al.global {
+            if let Some(&b) = g.old.base.get(old_path) {
+                return g.new.locate(map_pos(&g.ops, b + pos, right));
+            }
+        }
+        let p = self.map_offset(old_path, np, pos, right);
+        Some((np.clone(), p))
+    }
+
+    fn place_spanning(&mut self, e: &Entry) {
+        let Some(end_old) = e.meta.end_path.clone() else {
+            return;
+        };
+        let start = e.start.unwrap_or(0);
+        let en = e.end.unwrap_or(0);
+        match (
+            self.map_span_end(&e.path, start, true),
+            self.map_span_end(&end_old, en, false),
+        ) {
+            (None, None) => self.set(e, Status::Removed("all of its text was deleted".into())),
+            (None, Some(_)) => {
+                self.set(e, Status::Removed("its first paragraph was deleted".into()))
+            }
+            (Some(_), None) => {
+                self.set(e, Status::Removed("its last paragraph was deleted".into()))
+            }
+            (Some((fp, a)), Some((lp, b))) => {
+                let mut x = e.clone();
+                x.path = fp.clone();
+                x.start = Some(a);
+                if fp == lp {
+                    x.meta.end_path = None;
+                    if en > start && b <= a {
+                        self.set(e, Status::Removed("all of its text was deleted".into()));
+                        return;
+                    }
+                    x.end = Some(b.max(a));
+                } else if lp < fp {
+                    self.set(
+                        e,
+                        Status::Refused("the field's begin and end are no longer in order".into()),
+                    );
+                    return;
+                } else {
+                    x.meta.end_path = Some(lp);
+                    x.end = Some(b);
+                }
+                self.set(
+                    e,
+                    Status::Placed {
+                        entry: x,
+                        pieces: vec![],
+                    },
+                );
+            }
+        }
+    }
+
+    fn map_offset(&self, old_path: &Path, new_path: &Path, p: usize, right: bool) -> usize {
+        let ops = match self.al.para_ops.get(old_path) {
+            Some(o) => o.clone(),
+            None => match (inline_at(self.old, old_path), inline_at(self.new, new_path)) {
+                (Some(old), Some(new)) => {
+                    let (ok, nk) = (keys(old), keys(new));
+                    if ok == nk {
+                        diff::equal_ops(ok.len())
+                    } else {
+                        diff::opcodes(&ok, &nk)
+                    }
+                }
+                _ => return p,
+            },
+        };
+        map_pos(&ops, p, right)
     }
 
     /// Oracle: a true split/join map.
@@ -1467,6 +1588,13 @@ impl<'a> Placer<'a> {
             }
         }
     }
+}
+
+fn inline_at<'b>(blocks: &'b [Block], path: &Path) -> Option<&'b Inline> {
+    paras(blocks)
+        .into_iter()
+        .find(|(p, _)| p == path)
+        .and_then(|(_, i)| i)
 }
 
 /// `e` re-anchored at `path`.

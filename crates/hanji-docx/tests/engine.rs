@@ -1850,3 +1850,284 @@ fn editing_a_form_text_field_replaces_the_result_and_keeps_ffdata() {
         "{xml}"
     );
 }
+
+/// A field whose `begin` is in the first paragraph and `end` in the last.
+fn spanning(instr: &str, first: &str, last: &str) -> String {
+    format!(
+        "<w:p><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText xml:space=\"preserve\"> {instr} </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>{first}</w:p><w:p>{last}<w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p>"
+    )
+}
+
+fn t(s: &str) -> String {
+    format!("<w:r><w:t xml:space=\"preserve\">{s}</w:t></w:r>")
+}
+
+fn tab() -> &'static str {
+    "<w:r><w:tab/></w:r>"
+}
+
+fn spanning_docx() -> Vec<u8> {
+    docx(
+        &spanning(
+            r#"TOC \h"#,
+            &format!(
+                "{}{}{}",
+                t("Heading1"),
+                tab(),
+                field("PAGEREF _Toc1 \\h", "3")
+            ),
+            &format!(
+                "{}{}{}",
+                t("Heading2"),
+                tab(),
+                field("PAGEREF _Toc2 \\h", "9")
+            ),
+        ),
+        vec![],
+    )
+}
+
+#[test]
+fn a_spanning_field_result_is_paragraphs_and_exports_unchanged() {
+    let source = spanning_docx();
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("Heading1\t3"), "{}", imp.text);
+    assert!(imp.text.contains("Heading2\t9"), "{}", imp.text);
+    assert!(!imp.text.contains("<keep"), "{}", imp.text);
+    assert!(!imp.text.contains("field-part"), "{}", imp.text);
+    let unchanged = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&source), canon_doc(&unchanged));
+}
+
+#[test]
+fn editing_a_spanning_field_result_keeps_the_instruction() {
+    let imp = DocxEngine
+        .import(&spanning_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = edit(&imp.remainder, &imp.text, "Heading1", "Intro", CAPS).unwrap();
+    let r = edit(&r.remainder, &r.text, "Heading2", "Body", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains("TOC \\h"), "{xml}");
+    assert!(xml.contains(">Intro<"), "{xml}");
+    assert!(xml.contains("PAGEREF _Toc1"), "{xml}");
+    assert!(xml.contains("<w:fldChar w:fldCharType=\"end\"/>"), "{xml}");
+}
+
+#[test]
+fn adding_a_paragraph_inside_a_spanning_field_is_written_back() {
+    let imp = DocxEngine
+        .import(&spanning_docx(), &ImportOptions::default())
+        .unwrap();
+    let old = "Heading1\t3\n\nHeading2\t9";
+    let new = "Heading1\t3\n\nInserted\n\nHeading2\t9";
+    let r = rewrite(&imp.remainder, &imp.text, &imp.text.replace(old, new), CAPS).unwrap();
+    assert!(r.report.refused.is_empty(), "{:?}", r.report);
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains("TOC \\h"), "{xml}");
+    assert!(xml.contains(">Inserted<"), "{xml}");
+    let begin = xml.find("w:fldCharType=\"begin\"").unwrap();
+    let inserted = xml.find(">Inserted<").unwrap();
+    let end = xml.rfind("w:fldCharType=\"end\"").unwrap();
+    assert!(begin < inserted && inserted < end, "{xml}");
+}
+
+#[test]
+fn deleting_a_middle_paragraph_of_a_spanning_field_is_written_back() {
+    let body = format!(
+        "<w:p><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText xml:space=\"preserve\"> INDEX </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>{}</w:p><w:p>{}</w:p><w:p>{}<w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p>",
+        t("alpha, 1"),
+        t("beta, 2"),
+        t("gamma, 3"),
+    );
+    let source = docx(&body, vec![]);
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("alpha, 1"), "{}", imp.text);
+    assert!(imp.text.contains("beta, 2"), "{}", imp.text);
+    assert!(imp.text.contains("gamma, 3"), "{}", imp.text);
+    let r = rewrite(
+        &imp.remainder,
+        &imp.text,
+        &imp.text.replace("beta, 2\n\n", ""),
+        CAPS,
+    )
+    .unwrap();
+    assert!(r.report.refused.is_empty(), "{:?}", r.report);
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains("INDEX"), "{xml}");
+    assert!(!xml.contains("beta"), "{xml}");
+    assert!(
+        xml.contains("alpha, 1") && xml.contains("gamma, 3"),
+        "{xml}"
+    );
+}
+
+#[test]
+fn deleting_the_first_paragraph_of_a_spanning_field_removes_the_field() {
+    let imp = DocxEngine
+        .import(&spanning_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = rewrite(
+        &imp.remainder,
+        &imp.text,
+        &imp.text.replace("Heading1\t3\n\n", ""),
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.1 == Kind::Wrap && x.2.contains("first paragraph")),
+        "{:?}",
+        r.report
+    );
+    let xml = doc_xml(&DocxEngine.export(&r.text, &r.remainder).unwrap());
+    assert!(!xml.contains("TOC"), "{xml}");
+    assert!(xml.contains("Heading2"), "{xml}");
+}
+
+#[test]
+fn deleting_the_last_paragraph_of_a_spanning_field_removes_the_field() {
+    let imp = DocxEngine
+        .import(&spanning_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = rewrite(
+        &imp.remainder,
+        &imp.text,
+        &imp.text.replace("\n\nHeading2\t9", ""),
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.1 == Kind::Wrap && x.2.contains("last paragraph")),
+        "{:?}",
+        r.report
+    );
+    let xml = doc_xml(&DocxEngine.export(&r.text, &r.remainder).unwrap());
+    assert!(!xml.contains("TOC"), "{xml}");
+    assert!(xml.contains("Heading1"), "{xml}");
+}
+
+#[test]
+fn splitting_the_first_paragraph_of_a_spanning_field_is_written_back() {
+    let imp = DocxEngine
+        .import(&spanning_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = rewrite(
+        &imp.remainder,
+        &imp.text,
+        &imp.text.replace("Heading1", "Head\n\ning1"),
+        CAPS,
+    )
+    .unwrap();
+    assert!(r.report.refused.is_empty(), "{:?}", r.report);
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains("TOC \\h"), "{xml}");
+    let begin = xml.find("w:fldCharType=\"begin\"").unwrap();
+    let head = xml.find(">Head<").unwrap();
+    let ing = xml.find(">ing1<").unwrap();
+    let end = xml.rfind("w:fldCharType=\"end\"").unwrap();
+    assert!(begin < head && head < ing && ing < end, "{xml}");
+}
+
+#[test]
+fn splitting_the_last_paragraph_of_a_spanning_field_is_written_back() {
+    let imp = DocxEngine
+        .import(&spanning_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = rewrite(
+        &imp.remainder,
+        &imp.text,
+        &imp.text.replace("Heading2", "Head\n\ning2"),
+        CAPS,
+    )
+    .unwrap();
+    assert!(r.report.refused.is_empty(), "{:?}", r.report);
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains("TOC \\h"), "{xml}");
+    let begin = xml.find("w:fldCharType=\"begin\"").unwrap();
+    let head = xml.find(">Head<").unwrap();
+    let ing = xml.find(">ing2<").unwrap();
+    let end = xml.rfind("w:fldCharType=\"end\"").unwrap();
+    assert!(begin < head && head < ing && ing < end, "{xml}");
+}
+
+#[test]
+fn reordering_a_spanning_field_boundary_is_refused() {
+    let imp = DocxEngine
+        .import(&spanning_docx(), &ImportOptions::default())
+        .unwrap();
+    let new = imp
+        .text
+        .replace("Heading1\t3\n\nHeading2\t9", "Heading2\t9\n\nHeading1\t3");
+    match rewrite(&imp.remainder, &imp.text, &new, CAPS) {
+        Err(Refusal::Unplaceable(r)) => assert!(
+            r.refused
+                .iter()
+                .any(|x| x.1 == Kind::Wrap && x.2.contains("no longer in order")),
+            "{r:?}"
+        ),
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn a_blank_spanning_field_stays_a_placeholder() {
+    let body = "<w:p><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText> TOC </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r></w:p><w:p><w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p>";
+    let imp = DocxEngine
+        .import(&docx(body, vec![]), &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("kind=\"field-part\""), "{}", imp.text);
+}

@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use hanji_core::{Block, Entry, Kind, ListPlan, StyleSet};
+use hanji_core::{Block, Entry, Kind, ListPlan, Path, StyleSet};
 use hanji_format::styled::{self, StyleTable};
 use hanji_format::{Atom, Cell, Inline, Key, Marks, Props, TablePlace};
 
@@ -17,6 +17,8 @@ use crate::xml::{self, assemble, fragment, Element, Node};
 pub struct Exporter<'a> {
     styles: &'a StyleSet,
     by: HashMap<(Vec<usize>, Kind), Vec<&'a Entry>>,
+    /// Field wraps that close in a different paragraph: end path → wrap.
+    close_at: HashMap<Path, Vec<&'a Entry>>,
     keep: HashMap<&'a str, &'a Entry>,
     tail: Vec<&'a Entry>,
     numbering: &'a Numbering,
@@ -77,6 +79,7 @@ impl<'a> Exporter<'a> {
         let mut ex = Exporter {
             styles,
             by: HashMap::new(),
+            close_at: HashMap::new(),
             keep: HashMap::new(),
             tail: vec![],
             numbering,
@@ -90,7 +93,12 @@ impl<'a> Exporter<'a> {
                 Kind::Keep | Kind::Bkeep => {
                     ex.keep.insert(e.meta.keep.as_ref().unwrap().id.as_str(), e);
                 }
-                _ => ex.by.entry((e.path.clone(), e.kind)).or_default().push(e),
+                _ => {
+                    if let Some(p) = &e.meta.end_path {
+                        ex.close_at.entry(p.clone()).or_default().push(e);
+                    }
+                    ex.by.entry((e.path.clone(), e.kind)).or_default().push(e);
+                }
             }
         }
         ex
@@ -367,11 +375,17 @@ impl<'a> Exporter<'a> {
         }
         let markers = self.at(path, Kind::Marker);
         let wraps = self.at(path, Kind::Wrap);
+        let closing = self.close_at.get(path).cloned().unwrap_or_default();
         let mut bounds: std::collections::HashSet<usize> =
             markers.iter().map(|m| m.start.unwrap()).collect();
         bounds.extend(zruns.iter().map(|z| z.start.unwrap()));
         for w in &wraps {
             bounds.insert(w.start.unwrap());
+            if w.meta.end_path.is_none() {
+                bounds.insert(w.end.unwrap());
+            }
+        }
+        for w in &closing {
             bounds.insert(w.end.unwrap());
         }
         // Text properties as exported: a unit the text states none for (a
@@ -492,6 +506,11 @@ impl<'a> Exporter<'a> {
         let mut items: Vec<(usize, u8, u64, It)> = vec![];
         for w in &wraps {
             items.push((w.start.unwrap(), 0, w.seq, It::Open(w)));
+            if w.meta.end_path.is_none() {
+                items.push((w.end.unwrap(), 0, w.meta.seq_close, It::Close(w)));
+            }
+        }
+        for w in &closing {
             items.push((w.end.unwrap(), 0, w.meta.seq_close, It::Close(w)));
         }
         for m in &markers {
@@ -512,12 +531,24 @@ impl<'a> Exporter<'a> {
             match it {
                 // A complex field's parts are siblings of its result's runs:
                 // they are gathered in a holder that closing unwraps.
+                It::Open(w) if is_spanning_field(w) => {
+                    let parent = &mut stack.last_mut().unwrap().1.children;
+                    for x in &w.xml {
+                        parent.push(node(fragment(x)));
+                    }
+                }
                 It::Open(w) if is_field(w) => {
                     let mut holder = el("w:fldChar");
                     holder.children = w.xml.iter().map(|x| node(fragment(x))).collect();
                     stack.push((Some(w.id), holder));
                 }
                 It::Open(w) => stack.push((Some(w.id), fragment(&w.xml[0]))),
+                It::Close(w) if is_spanning_field(w) => {
+                    let parent = &mut stack.last_mut().unwrap().1.children;
+                    for x in &w.meta.aux {
+                        parent.push(node(fragment(x)));
+                    }
+                }
                 It::Close(w) => {
                     if !stack.iter().any(|s| s.0 == Some(w.id)) {
                         return Err("a wrapper closes before it opens".into());
