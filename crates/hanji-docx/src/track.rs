@@ -37,7 +37,8 @@ use hanji_format::{Atom, Cell, CellPara, Inline, Marks, Props, Unit};
 use crate::export::{with_marks, Exporter};
 use crate::numbering::Numbering;
 use crate::ooxml::{
-    insert_ordered, is_comment, is_shown_field, is_spanning_field, remove_child, PPR_ORDER,
+    insert_ordered, is_block_sdt, is_comment, is_shown_field, is_spanning_field, remove_child,
+    PPR_ORDER,
 };
 use crate::xml::{self, fragment, Element, Node, Scope};
 use crate::{write_package, DocShell, DocxEngine, Exported};
@@ -1569,6 +1570,17 @@ impl<'a> Merge<'a> {
                     x.meta.end_path = (p != q).then_some(q);
                     self.check_field(e, &x)?;
                 }
+                Kind::Wrap if is_block_sdt(e) => {
+                    let (s, en) = (e.start.unwrap_or(0), e.end.unwrap_or(0));
+                    let end_path = e.meta.end_path.as_ref().unwrap_or(&e.path);
+                    let (p, _) = at(self.new_pos(&e.path, s))?;
+                    let (q, _) = at(self.new_pos(end_path, en))?;
+                    let end = hanji_core::model::content_at(self.new.blocks, &q)
+                        .map(|i| i.units.len())
+                        .unwrap_or(0);
+                    (x.path, x.start, x.end) = (p.clone(), Some(0), Some(end));
+                    x.meta.end_path = Some(q);
+                }
                 Kind::Wrap => {
                     let (s, en) = (e.start.unwrap(), e.end.unwrap());
                     let (p, a) = at(self.new_pos(&e.path, s))?;
@@ -1680,6 +1692,7 @@ impl<'a> Merge<'a> {
                         "the edit deletes a comment: edits to comments cannot be tracked".into(),
                     );
                 }
+                Kind::Wrap if is_block_sdt(e) && !live.contains(&e.id) => continue,
                 Kind::Wrap if !live.contains(&e.id) => {
                     let (s, en) = (e.start.unwrap(), e.end.unwrap());
                     if en <= s {

@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- Show a DOCX content control (`w:sdt`) whose displayed value is text as
+  ordinary paragraphs and runs instead of a `<keep kind="content-control"/>`
+  placeholder: rich and plain text, a combo box or drop-down, a citation,
+  a bibliography, and a `docPartObj` (heading TOC, bibliography gallery).
+  The `w:sdt` / `w:sdtContent` shells and `w:sdtPr` / `w:sdtEndPr` stay as a
+  `Wrap`. Editing the text keeps the control properties; deleting all of
+  an inline control's text, or the first or last paragraph of a block
+  control, removes it and is reported. Joining a paragraph onto a block
+  control expands the control to the whole joined paragraph. Dates
+  (`fullDate` in `sdtPr`), checkboxes, pictures, repeating sections,
+  data-bound controls
+  (`w:dataBinding`), and controls still showing placeholder text
+  (`w:showingPlcHdr`) stay placeholders, as does a parent that contains
+  any of those nested. Row- and cell-level controls the table model
+  cannot hold stay inside a table placeholder. Comments inside a shown
+  control stay `<comment>` balloons. Corpus keeps: 327 → 319
+  (docx `content-control` 19 → 5; unwrapping a heading TOC `docPartObj`
+  also surfaces inner leftovers the parent keep had hidden: `field` 72 →
+  73, `field-part` 0 → 4, `break` 1 → 2).
 - Show a DOCX comment whose body is ordinary text as
   `<comment>…</comment>` at the balloon instead of a
   `<keep kind="comment"/>` placeholder. The commented range is ordinary

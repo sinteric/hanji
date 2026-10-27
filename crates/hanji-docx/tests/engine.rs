@@ -2,7 +2,7 @@
 //! §8 neutralisation and the surface-before-export list.
 
 use hanji_core::{
-    edit, rewrite, Capabilities, Engine, EngineError, ImportOptions, Kind, Part, Refusal,
+    edit, rewrite, Block, Capabilities, Engine, EngineError, ImportOptions, Kind, Part, Refusal,
 };
 use hanji_docx::{package, DocxEngine, ExportOptions, History, Reviewer};
 
@@ -2467,4 +2467,497 @@ fn a_comment_change_cannot_be_tracked() {
     h.push(&r).unwrap();
     let m = refused(DocxEngine.export_with(&r.text, &r.remainder, &opts, Some(&h)));
     assert!(m.contains("comment"), "{m}");
+}
+
+fn sdt(pr: &str, content: &str) -> String {
+    format!("<w:sdt><w:sdtPr>{pr}</w:sdtPr><w:sdtContent>{content}</w:sdtContent></w:sdt>")
+}
+
+fn sdt_id(id: &str) -> String {
+    format!("<w:id w:val=\"{id}\"/>")
+}
+
+fn inline_sdt_docx() -> Vec<u8> {
+    docx(
+        &format!(
+            "<w:p><w:r><w:t xml:space=\"preserve\">Name: </w:t></w:r>{}</w:p>",
+            sdt(
+                &format!("{}<w:alias w:val=\"Author\"/>", sdt_id("1")),
+                "<w:r><w:t>Ada</w:t></w:r>",
+            )
+        ),
+        vec![],
+    )
+}
+
+fn block_sdt_docx() -> Vec<u8> {
+    docx(
+        &format!(
+            "{}{}",
+            sdt(&sdt_id("2"), &format!("{}{}", p("Rich_text"), p("second")),),
+            p("after"),
+        ),
+        vec![],
+    )
+}
+
+#[test]
+fn an_inline_content_control_is_text_and_exports_unchanged() {
+    let source = inline_sdt_docx();
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("Name: Ada"), "{}", imp.text);
+    assert!(!imp.text.contains("<keep"), "{}", imp.text);
+    let unchanged = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&source), canon_doc(&unchanged));
+}
+
+#[test]
+fn editing_an_inline_content_control_keeps_sdtpr() {
+    let imp = DocxEngine
+        .import(&inline_sdt_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = edit(&imp.remainder, &imp.text, "Name: Ada", "Name: Bo", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains("<w:alias w:val=\"Author\"/>"), "{xml}");
+    assert!(xml.contains("<w:id w:val=\"1\"/>"), "{xml}");
+    assert!(xml.contains("<w:sdtContent>"), "{xml}");
+    assert!(xml.contains(">Bo<"), "{xml}");
+}
+
+#[test]
+fn deleting_an_inline_content_control_removes_it_and_says_so() {
+    let imp = DocxEngine
+        .import(&inline_sdt_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = edit(&imp.remainder, &imp.text, "Name: Ada", "Name: ", CAPS).unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.1 == Kind::Wrap && x.2.contains("all of its text")),
+        "{:?}",
+        r.report
+    );
+    let xml = doc_xml(&DocxEngine.export(&r.text, &r.remainder).unwrap());
+    assert!(!xml.contains("w:sdt"), "{xml}");
+    assert!(xml.contains("Name:"), "{xml}");
+}
+
+#[test]
+fn a_block_content_control_is_paragraphs_and_exports_unchanged() {
+    let source = block_sdt_docx();
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("Rich_text"), "{}", imp.text);
+    assert!(imp.text.contains("second"), "{}", imp.text);
+    assert!(imp.text.contains("after"), "{}", imp.text);
+    assert!(!imp.text.contains("<keep"), "{}", imp.text);
+    let unchanged = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&source), canon_doc(&unchanged));
+}
+
+#[test]
+fn editing_a_block_content_control_keeps_sdtpr() {
+    let imp = DocxEngine
+        .import(&block_sdt_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = edit(&imp.remainder, &imp.text, "Rich_text", "Changed", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains("<w:id w:val=\"2\"/>"), "{xml}");
+    assert!(xml.contains(">Changed<"), "{xml}");
+    assert!(xml.contains(">second<"), "{xml}");
+}
+
+#[test]
+fn deleting_the_first_paragraph_of_a_block_content_control_removes_it() {
+    let imp = DocxEngine
+        .import(&block_sdt_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = rewrite(
+        &imp.remainder,
+        &imp.text,
+        &imp.text.replace("Rich_text\n\n", ""),
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.1 == Kind::Wrap && x.2.contains("first paragraph")),
+        "{:?}",
+        r.report
+    );
+    let xml = doc_xml(&DocxEngine.export(&r.text, &r.remainder).unwrap());
+    assert!(!xml.contains("w:sdt"), "{xml}");
+    assert!(xml.contains("second"), "{xml}");
+}
+
+#[test]
+fn deleting_the_last_paragraph_of_a_block_content_control_removes_it() {
+    let imp = DocxEngine
+        .import(&block_sdt_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = rewrite(
+        &imp.remainder,
+        &imp.text,
+        &imp.text.replace("\n\nsecond", ""),
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.1 == Kind::Wrap && x.2.contains("last paragraph")),
+        "{:?}",
+        r.report
+    );
+    let xml = doc_xml(&DocxEngine.export(&r.text, &r.remainder).unwrap());
+    assert!(!xml.contains("w:sdt"), "{xml}");
+    assert!(xml.contains("Rich_text"), "{xml}");
+}
+
+#[test]
+fn a_combo_box_content_control_is_its_displayed_text() {
+    let source = docx(
+        &sdt(
+            &format!(
+                "{}<w:comboBox><w:listItem w:displayText=\"Watermelon\" w:value=\"Watermelon\"/></w:comboBox>",
+                sdt_id("3")
+            ),
+            &p("Watermelon"),
+        ),
+        vec![],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("Watermelon"), "{}", imp.text);
+    assert!(!imp.text.contains("<keep"), "{}", imp.text);
+    let r = edit(&imp.remainder, &imp.text, "Watermelon", "Cantaloupe", CAPS).unwrap();
+    let xml = doc_xml(&DocxEngine.export(&r.text, &r.remainder).unwrap());
+    assert!(xml.contains("w:comboBox"), "{xml}");
+    assert!(xml.contains(">Cantaloupe<"), "{xml}");
+}
+
+#[test]
+fn a_date_content_control_stays_a_placeholder() {
+    let source = docx(
+        &sdt(
+            &format!(
+                "{}<w:date w:fullDate=\"2013-04-16T00:00:00Z\"><w:dateFormat w:val=\"M/d/yyyy\"/></w:date>",
+                sdt_id("4")
+            ),
+            &p("4/16/2013"),
+        ),
+        vec![],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(
+        imp.text.contains("kind=\"content-control\""),
+        "{}",
+        imp.text
+    );
+    assert!(imp.text.contains("4/16/2013"), "{}", imp.text);
+}
+
+#[test]
+fn a_data_bound_content_control_stays_a_placeholder() {
+    let source = docx(
+        &format!(
+            "<w:p>{}</w:p>",
+            sdt(
+                &format!(
+                    "{}<w:dataBinding w:xpath=\"/ns0:coreProperties[1]/ns1:creator[1]\" w:storeItemID=\"{{6C3C8BC8-F283-45AE-878A-BAB7291924A1}}\"/><w:text/>",
+                    sdt_id("5")
+                ),
+                "<w:r><w:t>This is the Author</w:t></w:r>",
+            )
+        ),
+        vec![],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(
+        imp.text.contains("kind=\"content-control\""),
+        "{}",
+        imp.text
+    );
+}
+
+#[test]
+fn a_placeholder_content_control_stays_a_placeholder() {
+    let source = docx(
+        &sdt(
+            &format!(
+                "{}<w:showingPlcHdr/><w:comboBox><w:listItem w:displayText=\"Drop down1\" w:value=\"1\"/></w:comboBox>",
+                sdt_id("6")
+            ),
+            &p("Drop down1"),
+        ),
+        vec![],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(
+        imp.text.contains("kind=\"content-control\""),
+        "{}",
+        imp.text
+    );
+}
+
+#[test]
+fn joining_a_paragraph_onto_a_block_content_control_keeps_the_control() {
+    let source = docx(
+        &format!("{}{}", p("before"), sdt(&sdt_id("8"), &p("inside"))),
+        vec![],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("before"), "{}", imp.text);
+    assert!(imp.text.contains("inside"), "{}", imp.text);
+    let r = rewrite(
+        &imp.remainder,
+        &imp.text,
+        &imp.text.replace("before\n\ninside", "beforeinside"),
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report.refused.is_empty() && !r.report.removed.iter().any(|x| x.1 == Kind::Wrap),
+        "{:?}",
+        r.report
+    );
+    let wrap = r
+        .remainder
+        .entries
+        .iter()
+        .find(|e| e.meta.tag == "w:sdt/block")
+        .expect("block content control");
+    let Block::Para(p) = &r.new[wrap.path[0]] else {
+        panic!("wrap path is not a paragraph");
+    };
+    assert_eq!(wrap.start, Some(0));
+    assert_eq!(wrap.end, Some(p.content.units.len()));
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains("<w:id w:val=\"8\"/>"), "{xml}");
+    let inside = xml
+        .split("<w:sdtContent>")
+        .nth(1)
+        .and_then(|s| s.split("</w:sdtContent>").next())
+        .unwrap_or("");
+    assert!(
+        inside.contains("before") && inside.contains("inside"),
+        "{xml}"
+    );
+}
+
+#[test]
+fn joining_the_next_paragraph_onto_a_block_content_control_expands_it() {
+    let source = docx(
+        &format!("{}{}", sdt(&sdt_id("9"), &p("Rich_text")), p("Blahdeblah1")),
+        vec![],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    let r = rewrite(
+        &imp.remainder,
+        &imp.text,
+        &imp.text
+            .replace("Rich_text\n\nBlahdeblah1", "Rich_textBlahdeblah1"),
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report.refused.is_empty() && !r.report.removed.iter().any(|x| x.1 == Kind::Wrap),
+        "{:?}",
+        r.report
+    );
+    let wrap = r
+        .remainder
+        .entries
+        .iter()
+        .find(|e| e.meta.tag == "w:sdt/block")
+        .expect("block content control");
+    let Block::Para(p) = &r.new[wrap.path[0]] else {
+        panic!("wrap path is not a paragraph");
+    };
+    assert_eq!(wrap.start, Some(0));
+    assert_eq!(wrap.end, Some(p.content.units.len()));
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    let re = DocxEngine.import(&out, &ImportOptions::default()).unwrap();
+    assert_eq!(re.text, r.text);
+    let wrap2 = re
+        .remainder
+        .entries
+        .iter()
+        .find(|e| e.meta.tag == "w:sdt/block")
+        .expect("re-imported block content control");
+    assert_eq!(wrap2.path, wrap.path);
+    assert_eq!(wrap2.start, wrap.start);
+    assert_eq!(wrap2.end, wrap.end);
+    let xml = doc_xml(&out);
+    let inside = xml
+        .split("<w:sdtContent>")
+        .nth(1)
+        .and_then(|s| s.split("</w:sdtContent>").next())
+        .unwrap_or("");
+    assert!(
+        inside.contains("Rich_text") && inside.contains("Blahdeblah1"),
+        "{xml}"
+    );
+}
+
+#[test]
+fn a_toc_inside_a_content_control_is_ordinary_paragraphs() {
+    let source = docx(
+        &sdt(
+            &format!(
+                "{}<w:docPartObj><w:docPartGallery w:val=\"Table of Contents\"/><w:docPartUnique/></w:docPartObj>",
+                sdt_id("7")
+            ),
+            &format!(
+                "{}{}",
+                p("Contents"),
+                spanning(
+                    r#"TOC \h"#,
+                    &format!("{}{}{}", t("Heading1"), tab(), field("PAGEREF _Toc1 \\h", "3")),
+                    &format!("{}{}{}", t("Heading2"), tab(), field("PAGEREF _Toc2 \\h", "9")),
+                ),
+            ),
+        ),
+        vec![],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("Contents"), "{}", imp.text);
+    assert!(imp.text.contains("Heading1\t3"), "{}", imp.text);
+    assert!(imp.text.contains("Heading2\t9"), "{}", imp.text);
+    assert!(!imp.text.contains("content-control"), "{}", imp.text);
+    let unchanged = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&source), canon_doc(&unchanged));
+}
+
+#[test]
+fn a_comment_inside_an_inline_content_control_is_a_balloon() {
+    let source = docx(
+        &format!(
+            "<w:p><w:r><w:t xml:space=\"preserve\">Name: </w:t></w:r>{}</w:p>",
+            sdt(
+                &sdt_id("1"),
+                r#"<w:commentRangeStart w:id="0"/><w:r><w:t>Ada</w:t></w:r><w:commentRangeEnd w:id="0"/><w:r><w:rPr><w:rStyle w:val="CommentReference"/></w:rPr><w:commentReference w:id="0"/></w:r>"#,
+            ),
+        ),
+        vec![comments_part("0", "Park", "the author")],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(
+        imp.text.contains("Name: Ada<comment>the author</comment>"),
+        "{}",
+        imp.text
+    );
+    assert!(
+        !imp.text.contains("kind=\"content-control\""),
+        "{}",
+        imp.text
+    );
+    assert!(!imp.text.contains("kind=\"comment\""), "{}", imp.text);
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "<comment>the author</comment>",
+        "<comment>Ada Lovelace</comment>",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains("<w:id w:val=\"1\"/>"), "{xml}");
+    assert!(xml.contains("commentReference"), "{xml}");
+    assert!(xml.contains("commentRangeStart"), "{xml}");
+    let cxml = comments_xml(&out);
+    assert!(cxml.contains(">Ada Lovelace<"), "{cxml}");
+}
+
+#[test]
+fn a_comment_inside_a_block_content_control_is_a_balloon() {
+    let source = docx(
+        &sdt(&sdt_id("2"), &commented_p("inside", "0")),
+        vec![comments_part("0", "Park", "note")],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(
+        imp.text.contains("inside<comment>note</comment>"),
+        "{}",
+        imp.text
+    );
+    assert!(
+        !imp.text.contains("kind=\"content-control\""),
+        "{}",
+        imp.text
+    );
+    let unchanged = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&source), canon_doc(&unchanged));
+    assert_eq!(comments_xml(&source), comments_xml(&unchanged));
 }

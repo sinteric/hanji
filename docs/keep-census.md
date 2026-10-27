@@ -39,19 +39,18 @@ date.
 
 | format | files | failed | with keeps | keeps |
 | ------ | ----: | -----: | ---------: | ----: |
-| docx   |    13 |      0 |         13 |   182 |
+| docx   |    13 |      0 |         13 |   174 |
 | hwpx   |    16 |      0 |         12 |    54 |
 | pptx   |    27 |      0 |         16 |    44 |
 | xlsx   |    46 |      0 |         21 |    47 |
-| all    |   102 |      0 |         62 |   327 |
+| all    |   102 |      0 |         62 |   319 |
 
 ## By kind, most first
 
 | format | kind               | keeps | files |
 | ------ | ------------------ | ----: | ----: |
-| docx   | field              |    72 |     3 |
+| docx   | field              |    73 |     3 |
 | docx   | drawing            |    26 |    10 |
-| docx   | content-control    |    19 |     5 |
 | docx   | tracked-insert     |    17 |     4 |
 | hwpx   | math               |    16 |     1 |
 | pptx   | table              |    15 |    10 |
@@ -69,18 +68,20 @@ date.
 | xlsx   | picture            |     7 |     3 |
 | hwpx   | drawing            |     6 |     5 |
 | pptx   | diagram            |     6 |     3 |
+| docx   | content-control    |     5 |     2 |
 | hwpx   | form-control       |     5 |     1 |
 | pptx   | chart              |     5 |     5 |
 | xlsx   | conditional-format |     5 |     5 |
 | xlsx   | shape              |     5 |     3 |
+| docx   | field-part         |     4 |     1 |
 | docx   | table              |     4 |     3 |
 | xlsx   | data-validation    |     4 |     4 |
 | docx   | endnote            |     3 |     3 |
 | hwpx   | text               |     3 |     1 |
+| docx   | break              |     2 |     2 |
 | docx   | math               |     2 |     2 |
 | docx   | tracked-move       |     2 |     1 |
 | xlsx   | pivot-table        |     2 |     1 |
-| docx   | break              |     1 |     1 |
 | hwpx   | number             |     1 |     1 |
 | xlsx   | group              |     1 |     1 |
 | xlsx   | merged-cells       |     1 |     1 |
@@ -89,18 +90,18 @@ date.
 
 | file                                                                 | format | keeps | kinds |
 | -------------------------------------------------------------------- | ------ | ----: | ----- |
-| `prototype/remainder/corpus/Bug54849.docx`                           | docx   |    10 | content-control 7, endnote 1, footnote 1, table 1 |
+| `prototype/remainder/corpus/Bug54849.docx`                           | docx   |     4 | content-control 1, endnote 1, footnote 1, table 1 |
 | `prototype/remainder/corpus/WordWithAttachments.docx`                | docx   |     9 | drawing 4, object 5 |
 | `prototype/remainder/corpus/delins.docx`                             | docx   |    15 | tracked-delete 2, tracked-insert 13 |
 | `prototype/remainder/corpus/docx4j-tables.docx`                      | docx   |     3 | drawing 1, table 2 |
 | `prototype/remainder/corpus/fdo76098.docx`                           | docx   |     2 | drawing 2 |
 | `prototype/remainder/corpus/form_footnotes.docx`                     | docx   |    82 | drawing 5, field 69, footnote 1, symbol 7 |
 | `prototype/remainder/corpus/korean-report.docx`                      | docx   |     3 | drawing 1, footnote 1, tracked-insert 1 |
-| `prototype/remainder/corpus/loadAndSave.docx`                        | docx   |     7 | content-control 1, drawing 3, endnote 1, footnote 1, math 1 |
+| `prototype/remainder/corpus/loadAndSave.docx`                        | docx   |     6 | drawing 3, endnote 1, footnote 1, math 1 |
 | `prototype/remainder/corpus/sample-docx.docx`                        | docx   |     5 | drawing 3, tracked-delete 1, tracked-insert 1 |
-| `prototype/remainder/corpus/tdf124637_sectionMargin.docx`            | docx   |     3 | break 1, content-control 1, footnote 1 |
-| `prototype/remainder/corpus/tdf154481.docx`                          | docx   |     3 | content-control 1, drawing 1, field 1 |
-| `prototype/remainder/corpus/testWORD_2006ml.docx`                    | docx   |    38 | content-control 9, drawing 5, endnote 1, field 2, footnote 1, math 1, object 3, table 1, tracked-delete 11, tracked-insert 2, tracked-move 2 |
+| `prototype/remainder/corpus/tdf124637_sectionMargin.docx`            | docx   |     2 | break 1, footnote 1 |
+| `prototype/remainder/corpus/tdf154481.docx`                          | docx   |     8 | break 1, drawing 1, field 2, field-part 4 |
+| `prototype/remainder/corpus/testWORD_2006ml.docx`                    | docx   |    33 | content-control 4, drawing 5, endnote 1, field 2, footnote 1, math 1, object 3, table 1, tracked-delete 11, tracked-insert 2, tracked-move 2 |
 | `prototype/remainder/corpus/testWORD_various.docx`                   | docx   |     2 | drawing 1, footnote 1 |
 | `crates/hanji-hwpx/corpus/basic-table-01.hwpx`                       | hwpx   |     0 | |
 | `crates/hanji-hwpx/corpus/eq-002.hwpx`                               | hwpx   |    17 | math 16, number 1 |

@@ -292,51 +292,82 @@ impl<'a> Importer<'a> {
     pub fn body(mut self, body: &Element) -> Result<Split, String> {
         let mut blocks = vec![];
         let mut pending: Vec<&Element> = vec![];
-        let kids: Vec<&Node> = body.children.iter().filter(|n| !is_blank(n)).collect();
-        let p_els: Vec<&Element> = kids
+        let items = expand_items(&body.children)?;
+        let p_els: Vec<&Element> = items
             .iter()
-            .filter_map(|n| match n {
-                Node::El(e) if e.is("w:p") => Some(e),
+            .filter_map(|it| match it {
+                WalkItem::El(e) if e.is("w:p") => Some(*e),
                 _ => None,
             })
             .collect();
         let span_of = span_roles(&p_els);
         let mut p_i = 0usize;
-        let last_el = kids.iter().rposition(|n| matches!(n, Node::El(_)));
-        for (idx, n) in kids.iter().enumerate() {
-            let bi = blocks.len();
-            let el = match n {
-                Node::El(e) => e,
-                Node::Comment(_) | Node::Pi(_) => return Err(
-                    "an XML comment or processing instruction between blocks is not supported yet"
-                        .into(),
-                ),
-                _ => return Err("text directly inside <w:body>".into()),
-            };
-            if el.is("w:sectPr") && Some(idx) == last_el {
-                pending.push(el);
-                continue;
-            }
-            if MARKERS.contains(&el.name.as_str()) {
-                pending.push(el);
-                continue;
-            }
-            for m in std::mem::take(&mut pending) {
-                self.bmarker(m, &[bi]);
-            }
-            let b = match el.name.as_str() {
-                "w:p" => {
-                    let span = span_of.get(&p_i).copied();
-                    p_i += 1;
-                    Block::Para(self.para(el, &[bi], span)?)
+        let mut sdt_stack: Vec<OpenSdt<'_>> = vec![];
+        for (idx, item) in items.iter().enumerate() {
+            match item {
+                WalkItem::OpenSdt(sdt) => {
+                    sdt_stack.push(OpenSdt {
+                        el: sdt,
+                        first: None,
+                        leading: vec![],
+                    });
                 }
-                "w:tbl" => self.table(el, bi)?,
-                _ => self.block_keep(el, bi),
-            };
-            if !matches!(b, Block::Para(Para { item: Some(_), .. })) {
-                self.list = None;
+                WalkItem::CloseSdt => {
+                    let mut open = sdt_stack.pop().ok_or_else(|| {
+                        "a content control closes with no matching open".to_string()
+                    })?;
+                    let trailing = if open.first.is_some() {
+                        std::mem::take(&mut pending)
+                    } else {
+                        vec![]
+                    };
+                    self.finish_block_sdt(&mut blocks, &mut open, trailing);
+                }
+                WalkItem::El(el) => {
+                    let last_el = items[idx + 1..]
+                        .iter()
+                        .all(|it| !matches!(it, WalkItem::El(_)));
+                    if el.is("w:sectPr") && last_el {
+                        pending.push(el);
+                        continue;
+                    }
+                    if MARKERS.contains(&el.name.as_str()) {
+                        if let Some(top) = sdt_stack.last_mut() {
+                            if top.first.is_none() {
+                                top.leading.push(el);
+                                continue;
+                            }
+                        }
+                        pending.push(el);
+                        continue;
+                    }
+                    let bi = blocks.len();
+                    for open in &mut sdt_stack {
+                        if open.first.is_none() {
+                            open.first = Some(bi);
+                        }
+                    }
+                    for m in std::mem::take(&mut pending) {
+                        self.bmarker(m, &[bi]);
+                    }
+                    let b = match el.name.as_str() {
+                        "w:p" => {
+                            let span = span_of.get(&p_i).copied();
+                            p_i += 1;
+                            Block::Para(self.para(el, &[bi], span)?)
+                        }
+                        "w:tbl" => self.table(el, bi)?,
+                        _ => self.block_keep(el, bi),
+                    };
+                    if !matches!(b, Block::Para(Para { item: Some(_), .. })) {
+                        self.list = None;
+                    }
+                    blocks.push(b);
+                }
             }
-            blocks.push(b);
+        }
+        if !sdt_stack.is_empty() {
+            return Err("a content control is not closed".into());
         }
         for m in pending {
             let (x, f) = (self.frag(m), self.fp(&[Some(m)]));
@@ -349,6 +380,41 @@ impl<'a> Importer<'a> {
             next_id: self.next_id,
             stats: self.stats,
         })
+    }
+
+    /// Close a shown block content control: inner blocks are already in
+    /// `blocks`; the wrap holds `sdtPr` / `sdtEndPr` and any leading or
+    /// trailing markers that sat in `sdtContent` around them.
+    fn finish_block_sdt(
+        &mut self,
+        blocks: &mut Vec<Block>,
+        open: &mut OpenSdt<'_>,
+        trailing: Vec<&Element>,
+    ) {
+        let Some(first) = open.first else {
+            let bi = blocks.len();
+            blocks.push(self.block_keep(open.el, bi));
+            return;
+        };
+        let last = blocks.len() - 1;
+        let end = match &blocks[last] {
+            Block::Para(p) => p.content.units.len(),
+            _ => 0,
+        };
+        let shell = sdt_block_shell(open.el, &open.leading);
+        let pr = open.el.child("w:sdtPr");
+        let end_pr = open.el.child("w:sdtEndPr");
+        let f = self.fp(&[pr, end_pr, Some(&shell)]);
+        let meta = Meta {
+            tag: "w:sdt/block".into(),
+            aux: trailing.iter().map(|e| self.frag(e)).collect(),
+            end_path: Some(vec![last]),
+            ..Default::default()
+        };
+        let xml = vec![self.frag(&shell)];
+        let idx = self.entry(Kind::Wrap, xml, f, &[first], Some(0), Some(end), meta);
+        let close = self.seq();
+        self.entries[idx].meta.seq_close = close;
     }
 
     /// A zero-width element between blocks, rows, cells or cell paragraphs:
@@ -830,6 +896,28 @@ impl<'a> Importer<'a> {
             }
             if name == "w:r" {
                 self.run(k, path, pb)?;
+            } else if name == "w:sdt" && sdt_shown(k) && !sdt_content_is_block(k) {
+                let shell = sdt_inline_shell(k);
+                let pr = k.child("w:sdtPr");
+                let end_pr = k.child("w:sdtEndPr");
+                let (x, f) = (self.frag(&shell), self.fp(&[pr, end_pr, Some(&shell)]));
+                let at = self.pos();
+                let meta = Meta {
+                    tag: "w:sdt".into(),
+                    ..Default::default()
+                };
+                let idx = self.entry(Kind::Wrap, vec![x], f, path, Some(at), None, meta);
+                let saved = self.inherited.len();
+                self.inherit(k);
+                if let Some(c) = k.child("w:sdtContent") {
+                    self.walk(c, path, pb)?;
+                }
+                self.inherited.truncate(saved);
+                let end = self.pos();
+                let close = self.seq();
+                let e = &mut self.entries[idx];
+                e.end = Some(end);
+                e.meta.seq_close = close;
             } else if WRAPPERS.contains(&name) || (name == "w:fldSimple" && shown_simple_field(k)) {
                 let mut shell = k.shell();
                 shell.children = k
@@ -1528,4 +1616,148 @@ pub fn field_result(els: &[&Element]) -> String {
         });
     }
     out
+}
+
+/// An item of the body's expanded walk: shown block content controls are
+/// opened and closed around their `sdtContent` children, so inner
+/// paragraphs participate in spanning-field detection.
+enum WalkItem<'a> {
+    OpenSdt(&'a Element),
+    CloseSdt,
+    El(&'a Element),
+}
+
+struct OpenSdt<'a> {
+    el: &'a Element,
+    first: Option<usize>,
+    leading: Vec<&'a Element>,
+}
+
+/// A content control whose inner text the model can edit: rich or plain
+/// text, a combo/dropdown's displayed value, a citation, a bibliography,
+/// a `docPartObj` (TOC, cover page, …). Date, checkbox, picture, repeating
+/// section, data-bound (`w:dataBinding`) and placeholder (`showingPlcHdr`)
+/// controls stay `<keep/>`. A parent that contains any of those nested is
+/// kept whole, so unwrapping does not explode the keep count.
+fn sdt_shown(sdt: &Element) -> bool {
+    sdt_pr_shown(sdt) && nested_sdts_shown(sdt)
+}
+
+fn sdt_pr_shown(sdt: &Element) -> bool {
+    let Some(pr) = sdt.child("w:sdtPr") else {
+        return true;
+    };
+    if pr.child("w:dataBinding").is_some() || pr.child("w:showingPlcHdr").is_some() {
+        return false;
+    }
+    !pr.elements().any(|c| {
+        matches!(
+            c.local(),
+            "date"
+                | "checkbox"
+                | "picture"
+                | "repeatingSection"
+                | "repeatingSectionItem"
+                | "equation"
+                | "group"
+        )
+    })
+}
+
+fn nested_sdts_shown(sdt: &Element) -> bool {
+    let Some(content) = sdt.child("w:sdtContent") else {
+        return true;
+    };
+    let mut ok = true;
+    content.walk(&mut |e| {
+        if e.is("w:sdt") && !sdt_pr_shown(e) {
+            ok = false;
+        }
+    });
+    ok
+}
+
+fn sdt_content_is_block(sdt: &Element) -> bool {
+    sdt.child("w:sdtContent").is_some_and(|c| {
+        c.elements()
+            .any(|e| e.is("w:p") || e.is("w:tbl") || e.is("w:sdt"))
+    })
+}
+
+fn expand_items<'a>(
+    nodes: impl IntoIterator<Item = &'a Node>,
+) -> Result<Vec<WalkItem<'a>>, String> {
+    let mut out = vec![];
+    expand_nodes(nodes, &mut out)?;
+    Ok(out)
+}
+
+fn expand_nodes<'a>(
+    nodes: impl IntoIterator<Item = &'a Node>,
+    out: &mut Vec<WalkItem<'a>>,
+) -> Result<(), String> {
+    for n in nodes {
+        match n {
+            Node::El(e) if e.is("w:sdt") && sdt_shown(e) => expand_sdt(e, out)?,
+            Node::El(e) => out.push(WalkItem::El(e)),
+            n if is_blank(n) => {}
+            Node::Comment(_) | Node::Pi(_) => {
+                return Err(
+                    "an XML comment or processing instruction between blocks is not supported yet"
+                        .into(),
+                )
+            }
+            _ => return Err("text directly inside a block container".into()),
+        }
+    }
+    Ok(())
+}
+
+fn expand_sdt<'a>(sdt: &'a Element, out: &mut Vec<WalkItem<'a>>) -> Result<(), String> {
+    let Some(content) = sdt.child("w:sdtContent") else {
+        out.push(WalkItem::El(sdt));
+        return Ok(());
+    };
+    out.push(WalkItem::OpenSdt(sdt));
+    expand_nodes(&content.children, out)?;
+    out.push(WalkItem::CloseSdt);
+    Ok(())
+}
+
+/// The `w:sdt` shell: properties and an `sdtContent` holding only leading
+/// markers that sit before the first inner block.
+fn sdt_block_shell(sdt: &Element, leading: &[&Element]) -> Element {
+    let mut shell = sdt.shell();
+    let mut content = None;
+    for n in &sdt.children {
+        let Node::El(e) = n else { continue };
+        if e.is("w:sdtPr") || e.is("w:sdtEndPr") {
+            shell.children.push(Node::El(e.clone()));
+        } else if e.is("w:sdtContent") {
+            content = Some(e.shell());
+        }
+    }
+    let mut c = content.unwrap_or_else(|| Element::new("w:sdtContent"));
+    for m in leading {
+        c.children.push(Node::El((*m).clone()));
+    }
+    shell.children.push(Node::El(c));
+    shell
+}
+
+fn sdt_inline_shell(sdt: &Element) -> Element {
+    let mut shell = sdt.shell();
+    let mut content = None;
+    for n in &sdt.children {
+        let Node::El(e) = n else { continue };
+        if e.is("w:sdtPr") || e.is("w:sdtEndPr") {
+            shell.children.push(Node::El(e.clone()));
+        } else if e.is("w:sdtContent") {
+            content = Some(e.shell());
+        }
+    }
+    shell.children.push(Node::El(
+        content.unwrap_or_else(|| Element::new("w:sdtContent")),
+    ));
+    shell
 }

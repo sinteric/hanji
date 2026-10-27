@@ -56,7 +56,7 @@ One flat list of typed entries per document revision:
 | `ppr` | `w:p` attributes + `pPr` minus `pStyle`: spacing, numbering, **section breaks** (`sectPr`), paragraph-mark formatting | the paragraph |
 | `run` | **direct formatting**: one entry per `w:r`, holding its attributes and its `rPr` minus `b`/`i` (colour, size, fonts, `lang`, `rStyle`, rsids) | character range `[start, end)` in the paragraph |
 | `marker` / `rmarker` | zero-width elements: bookmark and comment-range starts/ends, permission ranges, proofing marks, `lastRenderedPageBreak` | a character position |
-| `wrap` | inline wrappers whose text the model edits: hyperlink, smartTag, customXml | character range |
+| `wrap` | wrappers whose text the model edits: hyperlink, smartTag, customXml, a field's cached result, a content control (`w:sdt` / `w:sdt/block`) | character range, or first…last paragraph when it spans |
 | `bmarker` | a zero-width element between blocks (a body-level bookmark) | before a block |
 | `tbl` / `tr` / `tc` | table, row and cell properties (merges are regenerated from `^^`/`||`) | table / row / cell |
 | `tail` | the body's final `sectPr` | the document |
@@ -247,6 +247,11 @@ Findings about the format and the storage, independent of the design:
   the model sees three cryptic `<keep/>`s per field. A field-range entry kind
   is needed. **Done in the engine:** those results are ordinary paragraphs,
   with `begin`/`end` as one spanning `Wrap` (`DESIGN.md` §5.1).
+- **Content controls** (`w:sdt`) were one placeholder each in the prototype.
+  **Done in the engine:** textual kinds (rich/plain text, combo/dropdown,
+  citation, bibliography, `docPartObj` TOC) are ordinary paragraphs/runs
+  with the `sdt` shell as a `Wrap`; date, data-bound, placeholder,
+  repeating-section and table-structure controls stay `<keep/>`.
 - **Serializer bug to avoid.** The prototype writes `**fox **`, with the space
   inside the closing marker. That is not CommonMark emphasis. A real
   serializer must move boundary spaces outside the markers.

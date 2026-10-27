@@ -22,10 +22,11 @@ pub enum Kind {
     Marker,
     /// Zero-width element inside a run. Anchor: a position (+ its run).
     Rmarker,
-    /// Inline wrapper whose text the model edits (hyperlink, smartTag, a
-    /// field's cached result). Anchor: `[start, end)` in `path`, or from
-    /// `path`/`start` to `meta.end_path`/`end` when the wrapper spans
-    /// paragraphs (a TOC field).
+    /// Inline or block wrapper whose text the model edits (hyperlink,
+    /// smartTag, a field's cached result, a content control). Anchor:
+    /// `[start, end)` in `path`, or from `path`/`start` to `meta.end_path`/
+    /// `end` when the wrapper spans paragraphs (a TOC field, a block
+    /// `w:sdt`).
     Wrap,
     /// Zero-width element between blocks, table rows, cells or cell
     /// paragraphs. Anchor: before the block, row, cell or paragraph at its
@@ -106,8 +107,10 @@ pub struct Meta {
     /// its properties stay as stored until the text states its own.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub unshown: bool,
-    /// When a wrapper's end is in a different paragraph (a TOC field's
-    /// `end` run): that paragraph's path. `end` is the offset there.
+    /// When a wrapper's end is recorded on a path (a TOC field's `end`
+    /// run, or a block `w:sdt`, which keeps this even when first and last
+    /// are the same paragraph): that paragraph's path. `end` is the offset
+    /// there.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub end_path: Option<Path>,
 }
@@ -134,7 +137,9 @@ impl Entry {
         self.fp.is_empty()
     }
 
-    /// A wrapper whose end is in a different paragraph (a TOC field).
+    /// A wrapper whose end is recorded on `end_path` (a TOC field, or a
+    /// block `w:sdt`, which keeps `end_path` even when first and last are
+    /// the same paragraph so export still emits a block control).
     pub fn spans_paragraphs(&self) -> bool {
         self.kind == Kind::Wrap && self.meta.end_path.is_some()
     }
