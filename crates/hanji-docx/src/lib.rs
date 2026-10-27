@@ -7,6 +7,7 @@
 //! fragments, bookmarks and wrappers are not available as the XML the
 //! remainder must store.
 
+pub mod comment;
 pub mod export;
 pub mod format;
 pub mod import;
@@ -197,6 +198,7 @@ impl DocxEngine {
             .and_then(|id| styles.paragraph_name(id))
             .map(str::to_string);
         let notes = notes(&parts);
+        let shown = comment::shown(&parts);
         let body_at = root
             .children
             .iter()
@@ -207,10 +209,17 @@ impl DocxEngine {
         let xml::Node::El(body) = &root.children[body_at] else {
             unreachable!()
         };
-        let mut split =
-            import::Importer::new(&scope, styles, default_table, &notes, &numbering, &fmt)
-                .body(body)
-                .map_err(|e| EngineError::Package(format!("{DOC_PART}: {e}")))?;
+        let mut split = import::Importer::new(
+            &scope,
+            styles,
+            default_table,
+            &notes,
+            &shown,
+            &numbering,
+            &fmt,
+        )
+        .body(body)
+        .map_err(|e| EngineError::Package(format!("{DOC_PART}: {e}")))?;
         hanji_core::model::mark_shown(&mut split.styles, &split.blocks);
         let shell = DocShell {
             prolog: doc.prolog.clone(),
@@ -293,6 +302,7 @@ impl Engine for DocxEngine {
             &mut rem,
             self.capabilities(),
         );
+        comment::apply(&mut rem.parts, &blocks, &rem.entries).map_err(EngineError::Refused)?;
         write_package(&rem, export_document(&blocks, &rem)?)
     }
 }

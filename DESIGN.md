@@ -214,8 +214,9 @@ package ─────────────────────► model
 
 **Shared inline core:** text, `**bold**`, `*italic*`, `~~strike~~`, `<u>`,
 links, footnote references `[^1]`, math `$…$` or `<math>…</math>` (→ OMML /
-HWP equation), line break `<br/>`, `<field name=…>value</field>` (Word
-content controls, HWP form fields), inline `<keep/>`.
+HWP equation), line break `<br/>`, `<comment>…</comment>` (a DOCX comment
+body), `<field name=…>value</field>` (Word content controls, HWP form
+fields), inline `<keep/>`.
 
 - **Fields (docx):** a field whose cached result is text in one paragraph (a
   page number, a caption's `SEQ`, a cross-reference, a `HYPERLINK` field) is
@@ -247,6 +248,24 @@ content controls, HWP form fields), inline `<keep/>`.
   one (an index entry; an empty `FORMTEXT` whose value is padding spaces
   that would hide the field), a single-paragraph field in the result,
   or parts sharing a run with the result.
+- **Comments (docx):** a comment whose body is ordinary text in one
+  paragraph (no table, drawing, tracked change or reply) is
+  `<comment>body</comment>` at the balloon (`w:commentReference`). The
+  commented range is ordinary editable text; `w:commentRangeStart` /
+  `w:commentRangeEnd` stay markers, so overlapping comments do not have
+  to nest. Author, date, initials, `annotationRef`, threading and
+  resolved state stay in `comments.xml` and the extended parts
+  (`commentsExtended`, `commentsIds`, `commentsExtensible`). Editing the
+  body rewrites the comment's `w:t` and keeps the rest of that part;
+  editing the anchored text keeps the anchors. Deleting the `<comment>`
+  marker removes the balloon, the range markers and that comment's
+  entries in the comment parts, and the report says so. Deleting the
+  anchored range and leaving the marker is a point comment (PutGet).
+  Replacing `<comment>` with ordinary text removes the comment the same
+  way. A comment stays a `<keep/>` when its body is not this text (a
+  reply, a table or image in the balloon, a mixed run that also holds
+  text). Tracked-change export refuses a change to the balloon or a
+  deletion of the comment.
 - **Line break:** `<br/>` is a line break inside one paragraph (docx `w:br`,
   the HWP line break). It is valid in paragraphs, headings, list items and
   table cells, and it never starts a paragraph: a line holding only `<br/>`
@@ -261,6 +280,10 @@ content controls, HWP form fields), inline `<keep/>`.
   otherwise. *Why:* it is the smallest rule that keeps `$5 and $10` as text.
   It needs no new escape, the tag joins the existing tag set, and the common
   `$x^2$` is unchanged.
+- **Comment:** `<comment>…</comment>` is a DOCX comment body's text, raw up
+  to `</comment>` on the same line (an empty one is `<comment/>`). The
+  highlighted range is ordinary text; the tag sits at the balloon. hwpx and
+  pptx refuse it.
 
 ### 5.2 Document
 
@@ -491,8 +514,9 @@ schema: 1
     miss a look-alike character, not formatting.
 - Headers, footers and section setup come from the template or the remainder
   at first; exposing their text is a later extension.
-- Tracked changes and comments (`<ins>`, `<del>`, `<comment>`) are read-only
-  projections at first.
+- Tracked changes (`<ins>`, `<del>`) are read-only projections at first.
+  A DOCX comment whose body is ordinary text is `<comment>…</comment>`
+  at the balloon; replies and rich balloons stay placeholders.
 
 ### 5.3 Presentation
 

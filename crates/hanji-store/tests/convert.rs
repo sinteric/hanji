@@ -50,8 +50,21 @@ fn to(format: Format) -> ExportOptions {
     ExportOptions::ACKNOWLEDGE_SURFACED.with_format(format)
 }
 
+/// Skip a raw-body tag (`<comment>…</comment>` or `<comment/>`) at the start
+/// of `rest`, including its body: conversion drops those atoms.
+fn skip_comment(rest: &str) -> Option<&str> {
+    if let Some(after) = rest.strip_prefix("<comment/>") {
+        return Some(after);
+    }
+    let after = rest.strip_prefix("<comment>")?;
+    after
+        .find("</comment>")
+        .map(|k| &after[k + "</comment>".len()..])
+}
+
 /// The words of a text, whatever the markup: its front matter, style
-/// section, tags (placeholders included), braces and punctuation left out.
+/// section, tags (placeholders and comment bodies included), braces and
+/// punctuation left out.
 fn plain(text: &str) -> String {
     let body = text.strip_prefix("---\n").map_or(text, |rest| {
         rest.split_once("\n---\n").map_or(rest, |x| x.1)
@@ -60,7 +73,9 @@ fn plain(text: &str) -> String {
     for line in body.lines().filter(|l| !l.starts_with("<style ")) {
         let mut rest = line;
         while !rest.is_empty() {
-            if rest.starts_with('<') {
+            if let Some(after) = skip_comment(rest) {
+                rest = after;
+            } else if rest.starts_with('<') {
                 let end = if rest.starts_with("<keep ") {
                     rest.find("/>").map(|k| k + 2)
                 } else {
@@ -81,12 +96,30 @@ fn plain(text: &str) -> String {
     out
 }
 
-/// The ids of the placeholders a text has, in order.
+/// The ids of the placeholders a text has, in order: `<keep/>` ids, then a
+/// synthetic `c{n}` for each `<comment>` conversion drops.
 fn keep_ids(text: &str) -> Vec<String> {
-    text.split("<keep id=\"")
+    let mut ids: Vec<String> = text
+        .split("<keep id=\"")
         .skip(1)
         .map(|s| s.split('"').next().unwrap().to_string())
-        .collect()
+        .collect();
+    let mut n = 0usize;
+    let mut rest = text;
+    while !rest.is_empty() {
+        if let Some(after) = skip_comment(rest) {
+            n += 1;
+            ids.push(format!("c{n}"));
+            rest = after;
+            continue;
+        }
+        match rest.find('<') {
+            Some(0) => rest = &rest[1..],
+            Some(i) => rest = &rest[i..],
+            None => break,
+        }
+    }
+    ids
 }
 
 /// A channel-wise distance of two `#RRGGBB` colours.

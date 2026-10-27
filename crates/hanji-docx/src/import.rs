@@ -41,6 +41,8 @@ pub struct Importer<'a> {
     next_seq: u64,
     keep_ids: KeepIds,
     notes: &'a HashMap<(String, String), String>,
+    /// Comment ids whose body the text shows, mapped to that body.
+    shown: &'a HashMap<String, String>,
     buf: Vec<Unit>,
     stats: Stats,
     /// Namespace declarations on ancestors below the root.
@@ -64,11 +66,13 @@ pub struct Importer<'a> {
 struct Mark(usize, u64, u64);
 
 impl<'a> Importer<'a> {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         scope: &'a Scope,
         styles: StyleSet,
         default_table: Option<String>,
         notes: &'a HashMap<(String, String), String>,
+        shown: &'a HashMap<String, String>,
         numbering: &'a Numbering,
         fmt: &'a format::Styles,
     ) -> Self {
@@ -81,6 +85,7 @@ impl<'a> Importer<'a> {
             next_seq: 1000,
             keep_ids: KeepIds::default(),
             notes,
+            shown,
             buf: vec![],
             stats: Stats::default(),
             inherited: vec![],
@@ -818,6 +823,11 @@ impl<'a> Importer<'a> {
                 continue;
             }
             let name = k.name.as_str();
+            if crate::comment::shown_run(k, self.shown).is_some() {
+                self.comment_ref(k, path)?;
+                i += 1;
+                continue;
+            }
             if name == "w:r" {
                 self.run(k, path, pb)?;
             } else if WRAPPERS.contains(&name) || (name == "w:fldSimple" && shown_simple_field(k)) {
@@ -866,6 +876,43 @@ impl<'a> Importer<'a> {
             }
             i += 1;
         }
+        Ok(())
+    }
+
+    /// A comment-only run whose body the text shows: a length-1 wrap over
+    /// a [`Atom::Comment`], holding the original run (DESIGN.md §5.1).
+    fn comment_ref(&mut self, r: &Element, path: &[usize]) -> Result<(), String> {
+        let cref = crate::comment::comment_only_run(r)
+            .ok_or_else(|| "a comment run has no w:commentReference".to_string())?;
+        let id = cref
+            .get("w:id")
+            .ok_or_else(|| "a commentReference has no w:id".to_string())?;
+        let body = self
+            .shown
+            .get(&id)
+            .cloned()
+            .ok_or_else(|| format!("comment {id} has no shown body"))?;
+        let f = self.fp(&[Some(r)]);
+        let meta = Meta {
+            tag: "w:commentReference".into(),
+            ..Default::default()
+        };
+        let at = self.pos();
+        let idx = self.entry(
+            Kind::Wrap,
+            vec![self.frag(r)],
+            f,
+            path,
+            Some(at),
+            None,
+            meta,
+        );
+        self.push(Atom::Comment(body), Marks::NONE);
+        let end = self.pos();
+        let close = self.seq();
+        let e = &mut self.entries[idx];
+        e.end = Some(end);
+        e.meta.seq_close = close;
         Ok(())
     }
 

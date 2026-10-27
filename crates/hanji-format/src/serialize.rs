@@ -560,6 +560,7 @@ fn dollar_escapes(inl: &Inline) -> Vec<bool> {
                     || span_starts.contains(&j)
             }
             Atom::Math(_) => true,
+            Atom::Comment(c) => c.contains('$'),
             Atom::Keep(k) => (k.id.clone() + &k.kind + &k.summary).contains('$'),
             _ => false,
         }) || span_dollar(i + 1)
@@ -707,6 +708,13 @@ fn unit(out: &mut Out, units: &[Unit], i: usize, in_link: bool) {
                 out.text(&format!("${m}$"))
             } else {
                 out.text(&format!("<math>{m}</math>"))
+            }
+        }
+        Atom::Comment(c) => {
+            if c.is_empty() {
+                out.text("<comment/>")
+            } else {
+                out.text(&format!("<comment>{c}</comment>"))
             }
         }
         Atom::PageBreak => out.text("<pagebreak/>"),

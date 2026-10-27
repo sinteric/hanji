@@ -249,6 +249,8 @@ pub struct Capabilities {
     pub formatting: bool,
     /// A table's own position: `table-align`, `table-indent` (§5.2).
     pub table_place: bool,
+    /// DOCX comment balloons as `<comment>…</comment>`.
+    pub comments: bool,
 }
 
 impl Capabilities {
@@ -260,6 +262,7 @@ impl Capabilities {
         math: false,
         formatting: false,
         table_place: false,
+        comments: false,
     };
 
     /// Direct formatting only (HWPX).
@@ -268,10 +271,11 @@ impl Capabilities {
         ..Capabilities::NONE
     };
 
-    /// Direct formatting and table position (DOCX, remainder tests).
+    /// Direct formatting, table position and comment balloons (DOCX).
     pub const DOCUMENT: Capabilities = Capabilities {
         formatting: true,
         table_place: true,
+        comments: true,
         ..Capabilities::NONE
     };
 }
@@ -629,6 +633,9 @@ fn check_inline(
             Atom::NoteRef(l) if !caps.footnotes => err(format!(
                 "footnote [^{l}] cannot be written to this file format yet."
             )),
+            Atom::Comment(_) if !caps.comments => {
+                err("<comment> cannot be written to this file format yet.".into())
+            }
             Atom::Keep(k) if is_block_keep(&k.id) == Some(true) => err(format!(
                 "placeholder id=\"{}\" stands for a whole block; keep it alone on its own line.",
                 k.id
@@ -840,6 +847,7 @@ pub fn key(a: &Atom) -> u32 {
         Atom::NoteRef(l) => h(2, l),
         Atom::Math(m) => h(3, m),
         Atom::PageBreak => h(4, ""),
+        Atom::Comment(c) => h(5, c),
         _ => h(255, ""),
     }
 }

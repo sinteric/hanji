@@ -189,7 +189,7 @@ fn fm_form(doc_type: &str) -> String {
 const P_FORM: &str =
     "<p/> and <p style=\"Name\"/> are single tags that start a paragraph: no </p>, and no attribute but style.";
 const INLINE_TAGS: &str =
-    "<u>…</u>, <br/>, <math>…</math>, <field name=\"…\">…</field>, <keep id=\"…\" kind=\"…\" summary=\"…\"/>, and <p/> in a table cell";
+    "<u>…</u>, <br/>, <math>…</math>, <comment>…</comment>, <field name=\"…\">…</field>, <keep id=\"…\" kind=\"…\" summary=\"…\"/>, and <p/> in a table cell";
 
 impl<'a> Parser<'a> {
     pub(crate) fn new(text: &'a str, names: &'a Names) -> Parser<'a> {
@@ -1581,7 +1581,7 @@ impl<'a> Parser<'a> {
                             if !tag.attrs.is_empty() {
                                 fail!(x, "<math> takes no attributes: <math>…</math>.");
                             }
-                            let Some((body_end, resume)) = math_tag_end(src, after) else {
+                            let Some((body_end, resume)) = tagged_end(src, after, "</math>") else {
                                 fail!(x, "<math> is not closed by </math> on the same line.");
                             };
                             if body_end == after {
@@ -1593,6 +1593,25 @@ impl<'a> Parser<'a> {
                             continue;
                         }
                         ("math", _) => fail!(x, "math is <math>…</math> (or $…$); </math> closes an open <math>."),
+                        ("comment", false) if tag.self_closing => {
+                            if !tag.attrs.is_empty() {
+                                fail!(x, "<comment> takes no attributes: <comment>…</comment>.");
+                            }
+                            st.push(off, Atom::Comment(String::new()));
+                        }
+                        ("comment", false) => {
+                            if !tag.attrs.is_empty() {
+                                fail!(x, "<comment> takes no attributes: <comment>…</comment>.");
+                            }
+                            let Some((body_end, resume)) = tagged_end(src, after, "</comment>") else {
+                                fail!(x, "<comment> is not closed by </comment> on the same line.");
+                            };
+                            let body: String = src[after..body_end].iter().map(|s| s.2).collect();
+                            st.push(off, Atom::Comment(body));
+                            x = resume;
+                            continue;
+                        }
+                        ("comment", true) => fail!(x, "</comment> without an opening <comment>."),
                         ("br", false) => {
                             if !tag.attrs.is_empty() {
                                 fail!(x, "<br/> takes no attributes.");
@@ -2224,10 +2243,10 @@ fn math_close(src: &[Src], from: usize) -> Option<usize> {
     None
 }
 
-/// The `</math>` closing a `<math>` whose body starts at `from`: (body end,
-/// index after `</math>`). The body is raw text.
-fn math_tag_end(src: &[Src], from: usize) -> Option<(usize, usize)> {
-    let close: Vec<char> = "</math>".chars().collect();
+/// Closing `close` (`</math>`, `</comment>`) of a raw-body tag: (body end,
+/// index after the closer). The body is unparsed text.
+fn tagged_end(src: &[Src], from: usize, close: &str) -> Option<(usize, usize)> {
+    let close: Vec<char> = close.chars().collect();
     (from..src.len())
         .find(|&y| {
             src.len() - y >= close.len()
@@ -2237,6 +2256,19 @@ fn math_tag_end(src: &[Src], from: usize) -> Option<(usize, usize)> {
                     .eq(close.iter().copied())
         })
         .map(|y| (y, y + close.len()))
+}
+
+/// `<math>…</math>` or `<comment>…</comment>` at `src[y]`: the index after it.
+fn skip_raw_atom(src: &[Src], y: usize) -> Option<usize> {
+    let (tag, after) = parse_tag(src, y)?;
+    if tag.closing || !matches!(tag.name.as_str(), "math" | "comment") {
+        return None;
+    }
+    if tag.self_closing {
+        return Some(after);
+    }
+    let close = format!("</{}>", tag.name);
+    tagged_end(src, after, &close).map(|m| m.1)
 }
 
 /// A cell paragraph tag starts here: math and link text end at it.
@@ -2288,9 +2320,8 @@ fn span_at(src: &[Src], x: usize) -> Option<(usize, usize)> {
                     .map(|b| (y, b))
             }
             '<' if p_tag_at(src, y) => return None,
-            '<' if parse_tag(src, y).is_some_and(|t| t.0.name == "math" && !t.0.closing) => {
-                let after = parse_tag(src, y).unwrap().1;
-                y = math_tag_end(src, after).map_or(after, |m| m.1);
+            '<' if skip_raw_atom(src, y).is_some() => {
+                y = skip_raw_atom(src, y).unwrap();
             }
             '<' => y = parse_tag(src, y).map_or(y + 1, |t| t.1),
             '$' => {
@@ -2371,9 +2402,8 @@ fn link_at(src: &[Src], x: usize) -> Option<(usize, String, usize)> {
             '[' => y = span_at(src, y)?.1 + 1,
             ']' => break,
             '<' if p_tag_at(src, y) => return None,
-            '<' if parse_tag(src, y).is_some_and(|t| t.0.name == "math" && !t.0.closing) => {
-                let after = parse_tag(src, y).unwrap().1;
-                y = math_tag_end(src, after).map_or(after, |m| m.1);
+            '<' if skip_raw_atom(src, y).is_some() => {
+                y = skip_raw_atom(src, y).unwrap();
             }
             '<' => y = parse_tag(src, y).map_or(y + 1, |t| t.1),
             '$' => {

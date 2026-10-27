@@ -29,6 +29,11 @@ pub(crate) fn is_spanning_field(e: &Entry) -> bool {
     is_field(e) && e.spans_paragraphs()
 }
 
+/// A comment balloon: a length-1 wrap whose XML is the `commentReference` run.
+pub(crate) fn is_comment(e: &Entry) -> bool {
+    e.kind == Kind::Wrap && e.meta.tag == "w:commentReference"
+}
+
 /// Zero-width inline elements.
 pub const MARKERS: &[&str] = &[
     "w:bookmarkStart",

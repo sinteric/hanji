@@ -1233,6 +1233,9 @@ impl<'a> Exporter<'a> {
                     }
                     pel.children.push(Node::El(br));
                 }
+                Atom::Comment(_) => {
+                    return Err("comments are not supported by the pptx engine yet".into())
+                }
                 _ => {}
             }
         }

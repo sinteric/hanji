@@ -525,6 +525,29 @@ impl<'a> Convert<'a> {
                     let location = self.line(off(k));
                     self.placeholder(keep, location);
                 }
+                Atom::Comment(body) => {
+                    let location = self.line(off(k));
+                    let n = self
+                        .out
+                        .placeholder_kinds
+                        .get("comment")
+                        .copied()
+                        .unwrap_or(0)
+                        + 1;
+                    let summary = if body.chars().count() > 40 {
+                        format!("comment: {}…", body.chars().take(40).collect::<String>())
+                    } else {
+                        format!("comment: {body}")
+                    };
+                    self.placeholder(
+                        &fm::Keep {
+                            id: format!("c{n}"),
+                            kind: "comment".into(),
+                            summary,
+                        },
+                        location,
+                    );
+                }
                 _ if u.props.is_empty() => units.push(u.clone()),
                 _ => {
                     let place = self.line(off(k));
