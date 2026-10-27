@@ -22,7 +22,10 @@ pub enum Kind {
     Marker,
     /// Zero-width element inside a run. Anchor: a position (+ its run).
     Rmarker,
-    /// Inline wrapper whose text the model edits (hyperlink, smartTag, …). Anchor: `[start, end)`.
+    /// Inline wrapper whose text the model edits (hyperlink, smartTag, a
+    /// field's cached result). Anchor: `[start, end)` in `path`, or from
+    /// `path`/`start` to `meta.end_path`/`end` when the wrapper spans
+    /// paragraphs (a TOC field).
     Wrap,
     /// Zero-width element between blocks, table rows, cells or cell
     /// paragraphs. Anchor: before the block, row, cell or paragraph at its
@@ -103,6 +106,10 @@ pub struct Meta {
     /// its properties stay as stored until the text states its own.
     #[serde(skip_serializing_if = "std::ops::Not::not")]
     pub unshown: bool,
+    /// When a wrapper's end is in a different paragraph (a TOC field's
+    /// `end` run): that paragraph's path. `end` is the offset there.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end_path: Option<Path>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -125,6 +132,11 @@ pub struct Entry {
 impl Entry {
     pub fn is_trivial(&self) -> bool {
         self.fp.is_empty()
+    }
+
+    /// A wrapper whose end is in a different paragraph (a TOC field).
+    pub fn spans_paragraphs(&self) -> bool {
+        self.kind == Kind::Wrap && self.meta.end_path.is_some()
     }
 }
 

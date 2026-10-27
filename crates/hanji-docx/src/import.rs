@@ -11,7 +11,7 @@ use crate::format;
 
 use crate::numbering::{num_pr, Numbering};
 use crate::ooxml::*;
-use crate::xml::{is_blank, Element, Node, Scope};
+use crate::xml::{fragment, is_blank, Element, Node, Scope};
 use hanji_package::clip;
 
 pub struct Split {
@@ -54,6 +54,9 @@ pub struct Importer<'a> {
     values: HashMap<String, Props>,
     /// The text properties of the paragraph being read's style.
     text_base: Props,
+    /// A spanning field wrap opened in an earlier paragraph, waiting for
+    /// its `end` run (DESIGN.md §5.1).
+    open_span: Option<usize>,
 }
 
 /// Import-time checkpoint, so a table that turns out not to be a pipe
@@ -86,6 +89,7 @@ impl<'a> Importer<'a> {
             fmt,
             values: HashMap::new(),
             text_base: Props::new(),
+            open_span: None,
         }
     }
 
@@ -110,6 +114,9 @@ impl<'a> Importer<'a> {
             }
         }
         (self.next_id, self.next_seq) = (m.1, m.2);
+        if self.open_span.is_some_and(|i| i >= m.0) {
+            self.open_span = None;
+        }
     }
 
     fn seq(&mut self) -> u64 {
@@ -281,6 +288,15 @@ impl<'a> Importer<'a> {
         let mut blocks = vec![];
         let mut pending: Vec<&Element> = vec![];
         let kids: Vec<&Node> = body.children.iter().filter(|n| !is_blank(n)).collect();
+        let p_els: Vec<&Element> = kids
+            .iter()
+            .filter_map(|n| match n {
+                Node::El(e) if e.is("w:p") => Some(e),
+                _ => None,
+            })
+            .collect();
+        let span_of = span_roles(&p_els);
+        let mut p_i = 0usize;
         let last_el = kids.iter().rposition(|n| matches!(n, Node::El(_)));
         for (idx, n) in kids.iter().enumerate() {
             let bi = blocks.len();
@@ -304,7 +320,11 @@ impl<'a> Importer<'a> {
                 self.bmarker(m, &[bi]);
             }
             let b = match el.name.as_str() {
-                "w:p" => Block::Para(self.para(el, &[bi])?),
+                "w:p" => {
+                    let span = span_of.get(&p_i).copied();
+                    p_i += 1;
+                    Block::Para(self.para(el, &[bi], span)?)
+                }
                 "w:tbl" => self.table(el, bi)?,
                 _ => self.block_keep(el, bi),
             };
@@ -545,10 +565,15 @@ impl<'a> Importer<'a> {
                 let f = self.fp(&[Some(&tcs), rest.as_ref()]);
                 self.entry(Kind::Tc, xml, f, &[bi, ri, gc], None, None, Meta::default());
                 let mut paras = vec![];
+                let cell_ps: Vec<&Element> = tc.elements().filter(|e| e.is("w:p")).collect();
+                let cell_span = span_roles(&cell_ps);
+                let mut p_i = 0usize;
                 for e in tc.elements().filter(|e| !e.is("w:tcPr")) {
                     let k = paras.len();
                     if e.is("w:p") {
-                        let para = self.para(e, &[bi, ri, gc, k])?;
+                        let span = cell_span.get(&p_i).copied();
+                        p_i += 1;
+                        let para = self.para(e, &[bi, ri, gc, k], span)?;
                         let style =
                             (para.style != self.styles.default_paragraph).then_some(para.style);
                         paras.push(CellPara {
@@ -595,7 +620,12 @@ impl<'a> Importer<'a> {
 
     // ------------------------------------------------------------ paragraphs
 
-    fn para(&mut self, p: &Element, path: &[usize]) -> Result<Para, String> {
+    fn para(
+        &mut self,
+        p: &Element,
+        path: &[usize],
+        span: Option<ParaSpan>,
+    ) -> Result<Para, String> {
         let saved = self.inherited.len();
         self.inherit(p);
         let ppr = p.child("w:pPr");
@@ -655,7 +685,7 @@ impl<'a> Importer<'a> {
         self.text_base = base.only(&Key::TEXT);
         self.buf.clear();
         let page_break_only = sid == default_id && is_page_break_para(p);
-        self.walk(p, path, page_break_only)?;
+        self.walk_para(p, path, page_break_only, span)?;
         self.inherited.truncate(saved);
         let mut content = Inline {
             units: std::mem::take(&mut self.buf),
@@ -735,19 +765,37 @@ impl<'a> Importer<'a> {
     }
 
     fn walk(&mut self, container: &Element, path: &[usize], pb: bool) -> Result<(), String> {
-        let mut kids: Vec<&Element> = vec![];
-        for n in &container.children {
-            match n {
-                Node::El(e) if e.is("w:pPr") || e.is("w:smartTagPr") || e.is("w:customXmlPr") => {}
-                Node::El(e) => kids.push(e),
-                n if is_blank(n) => {}
-                Node::Comment(_) | Node::Pi(_) => {
-                    return Err("an XML comment inside a paragraph is not supported yet".into())
+        self.walk_kids(&content_kids(container)?, path, pb)
+    }
+
+    /// A paragraph: its children, with a spanning field's begin and/or end
+    /// taken out of the walk and stored as the wrap.
+    fn walk_para(
+        &mut self,
+        p: &Element,
+        path: &[usize],
+        pb: bool,
+        span: Option<ParaSpan>,
+    ) -> Result<(), String> {
+        let kids = content_kids(p)?;
+        let mut i = 0;
+        if let Some(sp) = span {
+            if let (Some(end), Some((begin, _))) = (sp.close, sp.open) {
+                if begin < end {
+                    return self.walk_kids(&kids, path, pb);
                 }
-                _ => return Err(format!("text directly inside <{}>", container.name)),
+            }
+            if let Some(end) = sp.close {
+                self.walk_kids(&kids[i..end], path, pb)?;
+                i = self.close_spanning(&kids, end, path)? + 1;
+            }
+            if let Some((begin, sep)) = sp.open {
+                self.walk_kids(&kids[i..begin], path, pb)?;
+                self.open_spanning(&kids, begin, sep, path)?;
+                i = sep + 1;
             }
         }
-        self.walk_kids(&kids, path, pb)
+        self.walk_kids(&kids[i..], path, pb)
     }
 
     /// [`Importer::walk`] over a paragraph's or wrapper's children.
@@ -863,6 +911,67 @@ impl<'a> Importer<'a> {
         e.end = Some(end);
         e.meta.seq_close = close;
         Ok(())
+    }
+
+    /// Open a spanning field wrap at the result's start in this paragraph.
+    /// The matching [`Importer::close_spanning`] stores the `end` run.
+    fn open_spanning(
+        &mut self,
+        kids: &[&Element],
+        begin: usize,
+        sep: usize,
+        path: &[usize],
+    ) -> Result<(), String> {
+        if self.open_span.is_some() {
+            return Err("a field begins inside another field that spans paragraphs".into());
+        }
+        let open: Vec<&Element> = kids[begin..=sep].to_vec();
+        let f = self.fp(&open.iter().copied().map(Some).collect::<Vec<_>>());
+        let meta = Meta {
+            tag: "w:fldChar".into(),
+            ..Default::default()
+        };
+        let xml = open.iter().map(|e| self.frag(e)).collect();
+        let at = self.pos();
+        let idx = self.entry(Kind::Wrap, xml, f, path, Some(at), None, meta);
+        self.open_span = Some(idx);
+        Ok(())
+    }
+
+    fn close_spanning(
+        &mut self,
+        kids: &[&Element],
+        end: usize,
+        path: &[usize],
+    ) -> Result<usize, String> {
+        let idx = self
+            .open_span
+            .take()
+            .ok_or_else(|| "a field ends with no begin".to_string())?;
+        let close_at = field_close(kids, end, end);
+        let tail: Vec<&Element> = if close_at > end {
+            vec![kids[end], kids[close_at]]
+        } else {
+            vec![kids[end]]
+        };
+        let xml = self.entries[idx].xml.clone();
+        let opens: Vec<Element> = xml.iter().map(|x| fragment(x)).collect();
+        let parts: Vec<Option<&Element>> = opens
+            .iter()
+            .map(Some)
+            .chain(tail.iter().copied().map(Some))
+            .collect();
+        let f = self.fp(&parts);
+        let aux: Vec<String> = tail.iter().map(|el| self.frag(el)).collect();
+        let at = self.pos();
+        let seq_close = self.seq();
+        let e = &mut self.entries[idx];
+        e.end = Some(at);
+        e.fp = f;
+        e.meta.seq_close = seq_close;
+        e.meta.aux = aux;
+        e.meta.end_path = Some(path.to_vec());
+        Ok(close_at)
     }
 
     fn run(&mut self, r: &Element, path: &[usize], pb: bool) -> Result<(), String> {
@@ -1066,6 +1175,160 @@ fn para_is_blank(p: &Element) -> bool {
 /// Text a pipe table cell can hold as it is.
 fn cell_writable(i: &Inline) -> bool {
     !i.units.iter().any(|u| matches!(u.atom, Atom::PageBreak))
+}
+
+/// A spanning field's begin and/or end in one paragraph of the range.
+#[derive(Clone, Copy, Debug)]
+struct ParaSpan {
+    close: Option<usize>,
+    open: Option<(usize, usize)>,
+}
+
+fn content_kids(container: &Element) -> Result<Vec<&Element>, String> {
+    let mut kids = vec![];
+    for n in &container.children {
+        match n {
+            Node::El(e) if e.is("w:pPr") || e.is("w:smartTagPr") || e.is("w:customXmlPr") => {}
+            Node::El(e) => kids.push(e),
+            n if is_blank(n) => {}
+            Node::Comment(_) | Node::Pi(_) => {
+                return Err("an XML comment inside a paragraph is not supported yet".into())
+            }
+            _ => return Err(format!("text directly inside <{}>", container.name)),
+        }
+    }
+    Ok(kids)
+}
+
+fn fld_type(e: &Element, t: &str) -> bool {
+    e.is("w:fldChar") && e.get("w:fldCharType").as_deref() == Some(t)
+}
+
+fn run_content(r: &Element) -> Vec<&Element> {
+    r.elements().filter(|c| !c.is("w:rPr")).collect()
+}
+
+fn is_begin_run(k: &Element) -> bool {
+    k.is("w:r") && run_content(k).last().is_some_and(|c| fld_type(c, "begin"))
+}
+
+fn is_sep_run(k: &Element) -> bool {
+    k.is("w:r")
+        && run_content(k)
+            .last()
+            .is_some_and(|c| fld_type(c, "separate"))
+}
+
+fn is_end_run(k: &Element) -> bool {
+    let c = run_content(k);
+    k.is("w:r") && c.len() == 1 && fld_type(c[0], "end")
+}
+
+/// Complex fields whose `begin` and `end` sit in different paragraphs of
+/// `paras`, and whose cached result can show as text: begin and `separate`
+/// are sibling runs of the first paragraph, `end` is a sibling run of the
+/// last, and the result (including nested single-paragraph fields) is not
+/// blank. Nested fields in the result are walked as they are today.
+fn spanning_fields(paras: &[&Element]) -> Vec<(usize, usize, usize, usize, usize)> {
+    let mut out = vec![];
+    let mut depth = 0i32;
+    let mut open: Option<(usize, usize, Option<usize>)> = None;
+    for (pi, p) in paras.iter().enumerate() {
+        let Ok(kids) = content_kids(p) else {
+            continue;
+        };
+        for (ki, k) in kids.iter().enumerate() {
+            for f in k.descendants("w:fldChar") {
+                match f.get("w:fldCharType").as_deref() {
+                    Some("begin") => {
+                        if depth == 0 {
+                            open = Some((pi, ki, None));
+                        }
+                        depth += 1;
+                    }
+                    Some("separate") if depth == 1 => {
+                        if let Some(o) = &mut open {
+                            o.2 = Some(ki);
+                        }
+                    }
+                    Some("end") => {
+                        depth -= 1;
+                        if depth == 0 {
+                            if let Some((first, begin, Some(sep))) = open.take() {
+                                if first != pi && shown_spanning(paras, first, pi, begin, sep, ki) {
+                                    out.push((first, pi, begin, sep, ki));
+                                }
+                            }
+                        }
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+    out
+}
+
+fn shown_spanning(
+    paras: &[&Element],
+    first: usize,
+    last: usize,
+    begin: usize,
+    sep: usize,
+    end: usize,
+) -> bool {
+    let Ok(first_kids) = content_kids(paras[first]) else {
+        return false;
+    };
+    let Ok(last_kids) = content_kids(paras[last]) else {
+        return false;
+    };
+    if begin >= first_kids.len() || sep >= first_kids.len() || begin > sep || end >= last_kids.len()
+    {
+        return false;
+    }
+    if !is_begin_run(first_kids[begin])
+        || !is_sep_run(first_kids[sep])
+        || !is_end_run(last_kids[end])
+    {
+        return false;
+    }
+    if !first_kids[begin..=sep]
+        .iter()
+        .all(|k| k.is("w:r") || MARKERS.contains(&k.name.as_str()))
+    {
+        return false;
+    }
+    let mut text = String::new();
+    for k in &first_kids[sep + 1..] {
+        text.push_str(&k.text_of(&["w:t"]));
+    }
+    for p in &paras[first + 1..last] {
+        text.push_str(&p.text_of(&["w:t"]));
+    }
+    for k in &last_kids[..end] {
+        text.push_str(&k.text_of(&["w:t"]));
+    }
+    text.chars().any(|c| !c.is_whitespace())
+}
+
+fn span_roles(paras: &[&Element]) -> HashMap<usize, ParaSpan> {
+    let mut m = HashMap::new();
+    for (first, last, begin, sep, end) in spanning_fields(paras) {
+        m.entry(first)
+            .or_insert(ParaSpan {
+                close: None,
+                open: None,
+            })
+            .open = Some((begin, sep));
+        m.entry(last)
+            .or_insert(ParaSpan {
+                close: None,
+                open: None,
+            })
+            .close = Some(end);
+    }
+    m
 }
 
 /// Complex fields whose begin..end lie among these siblings: start → end.

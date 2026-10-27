@@ -24,6 +24,11 @@ pub(crate) fn is_shown_field(e: &Entry) -> bool {
     is_field(e) || (e.kind == Kind::Wrap && e.meta.tag == "w:fldSimple")
 }
 
+/// A shown complex field whose `begin` and `end` are in different paragraphs.
+pub(crate) fn is_spanning_field(e: &Entry) -> bool {
+    is_field(e) && e.spans_paragraphs()
+}
+
 /// Zero-width inline elements.
 pub const MARKERS: &[&str] = &[
     "w:bookmarkStart",

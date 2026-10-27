@@ -274,11 +274,11 @@ These are not supported yet:
 - Links, fields, footnotes and math in documents. They are read as
   placeholders, and the docx engine refuses new ones on export. In docx, a
   hyperlink's text and a field's shown result (a page number, a caption
-  number, a cross-reference) are text: editing it keeps the address or the
-  field instruction, and Word may compute an edited result again when it
-  updates fields. A filled legacy form field (`FORMTEXT`) is the same.
-  Empty form fields, checkboxes, and fields without a shown result stay
-  placeholders.
+  number, a cross-reference, a table of contents) are text: editing it
+  keeps the address or the field instruction, and Word may compute an
+  edited result again when it updates fields. A filled legacy form field
+  (`FORMTEXT`) is the same. Empty form fields, checkboxes, and fields
+  without a shown result stay placeholders.
 - Editing header, footer and section text.
 - Nested tables. They stay placeholders.
 - hwpx: a table's own position (`table-align`, `table-indent`), which docx

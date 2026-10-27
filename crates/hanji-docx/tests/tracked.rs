@@ -241,9 +241,9 @@ fn what_cannot_be_tracked_is_refused_with_the_reason() {
     assert!(m.contains("another author"), "{m}");
     // Text next to it is fine.
     run(other, &[(" two", " three")]).unwrap();
-    // A field's result.
+    // A spanning field's result (begin in one paragraph, end in the next).
     let field = r#"<w:p><w:r><w:t xml:space="preserve">page </w:t></w:r><w:r><w:fldChar w:fldCharType="begin"/></w:r><w:r><w:instrText> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType="separate"/></w:r></w:p><w:p><w:r><w:t>3</w:t></w:r><w:r><w:fldChar w:fldCharType="end"/></w:r></w:p>"#;
-    run(field, &[("page ", "")]).unwrap();
+    run(field, &[("page ", "Page ")]).unwrap();
     let m = refused(run(field, &[("3", "4")]));
     assert!(m.contains("field"), "{m}");
     // A rewrite that chooses among identical paragraphs.
