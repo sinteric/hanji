@@ -226,12 +226,16 @@ content controls, HWP form fields), inline `<keep/>`.
   instruction, so Word may compute it again when it updates fields.
   Deleting all of it removes the field, and the report says so; a result
   split across paragraphs is refused, and so is any tracked change inside
-  a field (§10.2). A field stays a `<keep/>` when its result is not text to
-  edit: a legacy form field (`w:ffData` holds its state; an empty text
-  field's value is spaces that would hide it), no result or a blank one
-  (an index entry), a field in the result, parts sharing a run with the
-  result, or a field spanning paragraphs (a table of contents, whose result
-  is already text and whose parts stay as `field-part` keeps).
+  a field (§10.2). A legacy form field (`FORMTEXT` / `FORMDROPDOWN` with
+  `w:ffData`) whose cached result is not blank is the same: the result is
+  text, and `ffData`, the instruction and the form bookmark stay in the
+  wrap. A field stays a `<keep/>` when its result is not text to edit: a
+  form checkbox (`FORMCHECKBOX`: `w:ffData` holds checked/unchecked, and
+  there is no cached result), no result or a blank one (an index entry; an
+  empty `FORMTEXT` whose value is padding spaces that would hide the
+  field), a field in the result, parts sharing a run with the result, or a
+  field spanning paragraphs (a table of contents, whose result is already
+  text and whose parts stay as `field-part` keeps).
 - **Line break:** `<br/>` is a line break inside one paragraph (docx `w:br`,
   the HWP line break). It is valid in paragraphs, headings, list items and
   table cells, and it never starts a paragraph: a line holding only `<br/>`

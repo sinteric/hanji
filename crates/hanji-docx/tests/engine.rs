@@ -1635,6 +1635,28 @@ fn field(instr: &str, result: &str) -> String {
     )
 }
 
+/// A legacy FORMTEXT field named `name` whose cached result is `result`,
+/// with Word's form-field bookmark around the parts.
+fn form_text(name: &str, result: &str) -> String {
+    format!(
+        "<w:r><w:fldChar w:fldCharType=\"begin\"><w:ffData><w:name w:val=\"{name}\"/><w:enabled/><w:calcOnExit w:val=\"0\"/><w:textInput/></w:ffData></w:fldChar></w:r><w:bookmarkStart w:id=\"0\" w:name=\"{name}\"/><w:r><w:instrText xml:space=\"preserve\"> FORMTEXT </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:rPr><w:noProof/></w:rPr><w:t>{result}</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r><w:bookmarkEnd w:id=\"0\"/>"
+    )
+}
+
+/// A legacy FORMCHECKBOX: `w:ffData` holds the state and there is no
+/// cached result (`begin` … instruction … `end`).
+fn form_checkbox(name: &str) -> String {
+    format!(
+        "<w:r><w:fldChar w:fldCharType=\"begin\"><w:ffData><w:name w:val=\"{name}\"/><w:enabled/><w:calcOnExit w:val=\"0\"/><w:checkBox><w:sizeAuto/><w:default w:val=\"0\"/></w:checkBox></w:ffData></w:fldChar></w:r><w:bookmarkStart w:id=\"1\" w:name=\"{name}\"/><w:r><w:instrText xml:space=\"preserve\"> FORMCHECKBOX </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r><w:bookmarkEnd w:id=\"1\"/>"
+    )
+}
+
+fn canon_doc(pkg: &[u8]) -> String {
+    use hanji_package::xml;
+    xml::canon_part(package::get(&package::read(pkg).unwrap(), "word/document.xml").unwrap())
+        .unwrap()
+}
+
 fn field_docx() -> Vec<u8> {
     let body = format!(
         "<w:p><w:r><w:t xml:space=\"preserve\">Table </w:t></w:r>{}<w:r><w:t xml:space=\"preserve\"> totals</w:t></w:r></w:p><w:p><w:r><w:t xml:space=\"preserve\">page </w:t></w:r><w:fldSimple w:instr=\" PAGE \"><w:r><w:t>7</w:t></w:r></w:fldSimple></w:p>",
@@ -1740,14 +1762,17 @@ fn a_field_result_split_across_paragraphs_is_refused() {
 
 #[test]
 fn fields_without_a_text_result_stay_placeholders() {
-    let form = "<w:r><w:fldChar w:fldCharType=\"begin\"><w:ffData><w:name w:val=\"Text1\"/><w:textInput/></w:ffData></w:fldChar></w:r><w:r><w:instrText> FORMTEXT </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>name</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r>";
+    // Empty FORMTEXT (padding spaces), a checkbox (no result), a blank XE,
+    // a nested field, and parts sharing a run: still keeps.
+    let empty_form = form_text("Text1", "     ");
     let nested = format!(
         "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText> IF 1 = 1 </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r>{}<w:r><w:fldChar w:fldCharType=\"end\"/></w:r>",
         field("PAGE", "3")
     );
     let shared = "<w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText> PAGE </w:instrText><w:fldChar w:fldCharType=\"separate\"/><w:t>4</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r>";
     let body = [
-        form.to_string(),
+        empty_form,
+        form_checkbox("Check1"),
         field("XE \"index\"", " "),
         nested,
         shared.to_string(),
@@ -1760,8 +1785,68 @@ fn fields_without_a_text_result_stay_placeholders() {
         .unwrap();
     assert_eq!(
         imp.text.matches("kind=\"field\"").count(),
-        4,
+        5,
         "{}",
         imp.text
+    );
+}
+
+#[test]
+fn a_form_text_field_result_is_text_and_exports_unchanged() {
+    let source = docx(
+        &format!(
+            "<w:p><w:r><w:t xml:space=\"preserve\">Name: </w:t></w:r>{}</w:p>",
+            form_text("Text1", "Ada")
+        ),
+        vec![],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("Name: Ada"), "{}", imp.text);
+    assert!(!imp.text.contains("<keep"), "{}", imp.text);
+    let unchanged = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&source), canon_doc(&unchanged));
+}
+
+#[test]
+fn editing_a_form_text_field_replaces_the_result_and_keeps_ffdata() {
+    let source = docx(
+        &format!(
+            "<w:p><w:r><w:t xml:space=\"preserve\">Name: </w:t></w:r>{}</w:p>",
+            form_text("Text1", "Ada")
+        ),
+        vec![],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    let r = edit(&imp.remainder, &imp.text, "Name: Ada", "Name: Bo", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains("FORMTEXT"), "{xml}");
+    assert!(xml.contains("<w:ffData><w:name w:val=\"Text1\"/>"), "{xml}");
+    assert!(
+        xml.contains("<w:bookmarkStart w:id=\"0\" w:name=\"Text1\"/>"),
+        "{xml}"
+    );
+    assert!(xml.contains("<w:bookmarkEnd w:id=\"0\"/>"), "{xml}");
+    assert!(
+        xml.contains(
+            "<w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:rPr><w:noProof/></w:rPr><w:t>Bo</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r><w:bookmarkEnd w:id=\"0\"/>"
+        ),
+        "{xml}"
     );
 }

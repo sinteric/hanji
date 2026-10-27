@@ -276,7 +276,8 @@ These are not supported yet:
   hyperlink's text and a field's shown result (a page number, a caption
   number, a cross-reference) are text: editing it keeps the address or the
   field instruction, and Word may compute an edited result again when it
-  updates fields. Form fields and fields without a shown result stay
+  updates fields. A filled legacy form field (`FORMTEXT`) is the same.
+  Empty form fields, checkboxes, and fields without a shown result stay
   placeholders.
 - Editing header, footer and section text.
 - Nested tables. They stay placeholders.
