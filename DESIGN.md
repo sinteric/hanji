@@ -242,12 +242,15 @@ fields), inline `<keep/>`.
   removes the whole field and is reported; splitting a boundary paragraph
   keeps begin and end with the pieces that still hold them (the new
   paragraph is inside the field); moving content so the boundaries are no
-  longer in order is refused. A field stays a `<keep/>` when its result is not text to
-  edit: a form checkbox (`FORMCHECKBOX`: `w:ffData` holds
+  longer in order is refused.   Nested single-paragraph fields in a result (a TOC entry's `PAGEREF`,
+  including when the outer field is one paragraph and the entry is a
+  hyperlink) use the same wrap. A field stays a `<keep/>` when its result
+  is not text to edit: a form checkbox (`FORMCHECKBOX`: `w:ffData` holds
   checked/unchecked, and there is no cached result), no result or a blank
   one (an index entry; an empty `FORMTEXT` whose value is padding spaces
-  that would hide the field), a single-paragraph field in the result,
-  or parts sharing a run with the result.
+  that would hide the field), or parts sharing a run with the result. A
+  blank field whose result is only a hyperlink wrapping an empty nested
+  field is one `<keep kind="field"/>`, not four `field-part` keeps.
 - **Comments (docx):** a comment whose body is ordinary text in one
   paragraph (no table, drawing, tracked change or reply) is
   `<comment>body</comment>` at the balloon (`w:commentReference`). The

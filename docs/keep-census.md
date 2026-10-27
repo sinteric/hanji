@@ -39,11 +39,11 @@ date.
 
 | format | files | failed | with keeps | keeps |
 | ------ | ----: | -----: | ---------: | ----: |
-| docx   |    13 |      0 |         13 |   174 |
+| docx   |    13 |      0 |         13 |   170 |
 | hwpx   |    16 |      0 |         12 |    54 |
 | pptx   |    27 |      0 |         16 |    44 |
 | xlsx   |    46 |      0 |         21 |    47 |
-| all    |   102 |      0 |         62 |   319 |
+| all    |   102 |      0 |         62 |   315 |
 
 ## By kind, most first
 
@@ -73,7 +73,6 @@ date.
 | pptx   | chart              |     5 |     5 |
 | xlsx   | conditional-format |     5 |     5 |
 | xlsx   | shape              |     5 |     3 |
-| docx   | field-part         |     4 |     1 |
 | docx   | table              |     4 |     3 |
 | xlsx   | data-validation    |     4 |     4 |
 | docx   | endnote            |     3 |     3 |
@@ -100,7 +99,7 @@ date.
 | `prototype/remainder/corpus/loadAndSave.docx`                        | docx   |     6 | drawing 3, endnote 1, footnote 1, math 1 |
 | `prototype/remainder/corpus/sample-docx.docx`                        | docx   |     5 | drawing 3, tracked-delete 1, tracked-insert 1 |
 | `prototype/remainder/corpus/tdf124637_sectionMargin.docx`            | docx   |     2 | break 1, footnote 1 |
-| `prototype/remainder/corpus/tdf154481.docx`                          | docx   |     8 | break 1, drawing 1, field 2, field-part 4 |
+| `prototype/remainder/corpus/tdf154481.docx`                          | docx   |     4 | break 1, drawing 1, field 2 |
 | `prototype/remainder/corpus/testWORD_2006ml.docx`                    | docx   |    33 | content-control 4, drawing 5, endnote 1, field 2, footnote 1, math 1, object 3, table 1, tracked-delete 11, tracked-insert 2, tracked-move 2 |
 | `prototype/remainder/corpus/testWORD_various.docx`                   | docx   |     2 | drawing 1, footnote 1 |
 | `crates/hanji-hwpx/corpus/basic-table-01.hwpx`                       | hwpx   |     0 | |
