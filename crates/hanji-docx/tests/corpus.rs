@@ -556,7 +556,10 @@ fn edit_chain(text: &str, rem: &Remainder, with_move: bool) -> Vec<hanji_core::R
 /// Field results read as text in the corpus files that have them, export
 /// unchanged, and take an edit to the cached result (DESIGN.md §5.1).
 /// (testWORD_2006ml's are covered by the harness's GetPut: its OLE object
-/// is neutralised on import, so its part is not compared here.)
+/// is neutralised on import, so its part is not compared here.
+/// form_footnotes.docx's 69 `field` keeps are empty FORMTEXT and
+/// FORMCHECKBOX: no non-whitespace result. A filled FORMTEXT is an engine
+/// test.)
 #[test]
 fn corpus_field_results_are_text() {
     let files = corpus();

@@ -758,8 +758,9 @@ impl<'a> Importer<'a> {
             let k = kids[i];
             if let Some(&end) = groups.get(&i) {
                 if let Some(sep) = shown_field(kids, i, end) {
-                    self.field(kids, (i, sep, end), path, pb)?;
-                    i = end + 1;
+                    let close = field_close(kids, i, end);
+                    self.field(kids, (i, sep, end), close, path, pb)?;
+                    i = close + 1;
                     continue;
                 }
                 let pos = self.pos();
@@ -823,21 +824,33 @@ impl<'a> Importer<'a> {
     /// A complex field whose cached result shows as text (DESIGN.md §5.1):
     /// a [`Kind::Wrap`] over the result, holding the runs from `begin` to
     /// `separate` (`xml`) and the `end` run (`meta.aux`), which export writes
-    /// around the result's runs as they were.
+    /// around the result's runs as they were. A matching `bookmarkEnd` after
+    /// `end` (Word's form-field bookmark) is stored with the `end` run so it
+    /// leaves with the field.
     fn field(
         &mut self,
         kids: &[&Element],
         (begin, sep, end): (usize, usize, usize),
+        close_at: usize,
         path: &[usize],
         pb: bool,
     ) -> Result<(), String> {
         let open: Vec<&Element> = kids[begin..=sep].to_vec();
-        let parts: Vec<Option<&Element>> =
-            open.iter().chain([&kids[end]]).map(|e| Some(*e)).collect();
+        let tail: Vec<&Element> = if close_at > end {
+            vec![kids[end], kids[close_at]]
+        } else {
+            vec![kids[end]]
+        };
+        let parts: Vec<Option<&Element>> = open
+            .iter()
+            .copied()
+            .chain(tail.iter().copied())
+            .map(Some)
+            .collect();
         let f = self.fp(&parts);
         let meta = Meta {
             tag: "w:fldChar".into(),
-            aux: vec![self.frag(kids[end])],
+            aux: tail.iter().map(|e| self.frag(e)).collect(),
             ..Default::default()
         };
         let xml = open.iter().map(|e| self.frag(e)).collect();
@@ -1098,11 +1111,14 @@ fn field_groups(kids: &[&Element]) -> HashMap<usize, usize> {
 
 /// The `separate` of the complex field `kids[begin..=end]` (a group of
 /// [`field_groups`]) when its cached result can show as text: the index of
-/// the run it ends. Otherwise the field stays a placeholder: a legacy form
-/// field (`w:ffData`: its value is form state, and a text field's empty
-/// value is spaces that would hide the field), a field without a result or
-/// whose result is blank (the text would not show it), a result holding
-/// another field, or parts that share a run with the result.
+/// the run it ends. A legacy form field (`w:ffData`) is shown the same way
+/// when that result is not blank: `ffData` and the instruction stay in the
+/// wrap. Otherwise the field stays a placeholder: no result or a blank one
+/// (an index entry; an empty FORMTEXT whose value is padding spaces that
+/// would hide the field; a FORMCHECKBOX, which has no `separate`), a result
+/// holding another field, or parts that share a run with the result.
+/// Bookmarks Word puts between the field's parts are allowed (they stay in
+/// the wrap).
 fn shown_field(kids: &[&Element], begin: usize, end: usize) -> Option<usize> {
     let fld =
         |e: &Element, t: &str| e.is("w:fldChar") && e.get("w:fldCharType").as_deref() == Some(t);
@@ -1112,6 +1128,9 @@ fn shown_field(kids: &[&Element], begin: usize, end: usize) -> Option<usize> {
     let mut depth = 0;
     let mut sep = None;
     for (j, k) in kids.iter().enumerate().take(end).skip(begin) {
+        if MARKERS.contains(&k.name.as_str()) {
+            continue;
+        }
         if !k.is("w:r") {
             return None;
         }
@@ -1121,9 +1140,6 @@ fn shown_field(kids: &[&Element], begin: usize, end: usize) -> Option<usize> {
                 Some("end") => depth -= 1,
                 Some("separate") if depth == 1 => sep = Some(j),
                 _ => {}
-            }
-            if f.child("w:ffData").is_some() {
-                return None;
             }
         }
         if sep.is_some() {
@@ -1150,6 +1166,29 @@ fn shown_field(kids: &[&Element], begin: usize, end: usize) -> Option<usize> {
     }
     let text: String = result.iter().map(|k| k.text_of(&["w:t"])).collect();
     text.chars().any(|c| !c.is_whitespace()).then_some(sep)
+}
+
+/// The index of a `w:bookmarkEnd` immediately after the field's `end` run
+/// when it pairs with a `w:bookmarkStart` among the field's parts (Word's
+/// form-field bookmark). Otherwise `end`.
+fn field_close(kids: &[&Element], begin: usize, end: usize) -> usize {
+    let Some(after) = kids.get(end + 1) else {
+        return end;
+    };
+    if !after.is("w:bookmarkEnd") {
+        return end;
+    }
+    let Some(id) = after.get("w:id") else {
+        return end;
+    };
+    let paired = kids[begin..=end]
+        .iter()
+        .any(|k| k.is("w:bookmarkStart") && k.get("w:id").as_deref() == Some(id.as_str()));
+    if paired {
+        end + 1
+    } else {
+        end
+    }
 }
 
 /// A `w:fldSimple` whose result shows as text: runs and markers only, with

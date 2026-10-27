@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Show a DOCX legacy form field's cached result as text when it is not
+  blank (`FORMTEXT` / `FORMDROPDOWN` with `w:ffData`), the same way
+  ordinary fields already are: editing it replaces the result and keeps
+  the instruction, `ffData` and the form bookmark. Empty `FORMTEXT`
+  (padding spaces) and `FORMCHECKBOX` (no cached result; state is in
+  `ffData`) stay `<keep kind="field"/>` placeholders. Corpus keeps
+  unchanged: 357 (docx `field` still 72 — the leftovers are empty form
+  fields, checkboxes, and blank XE/TA).
+
 ## 0.6.0 — 2026-10-26
 
 **Breaking changes**
