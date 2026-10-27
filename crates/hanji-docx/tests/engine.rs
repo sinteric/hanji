@@ -2903,7 +2903,11 @@ fn a_comment_inside_an_inline_content_control_is_a_balloon() {
         "{}",
         imp.text
     );
-    assert!(!imp.text.contains("kind=\"content-control\""), "{}", imp.text);
+    assert!(
+        !imp.text.contains("kind=\"content-control\""),
+        "{}",
+        imp.text
+    );
     assert!(!imp.text.contains("kind=\"comment\""), "{}", imp.text);
     let r = edit(
         &imp.remainder,
@@ -2937,10 +2941,7 @@ fn a_comment_inside_an_inline_content_control_is_a_balloon() {
 #[test]
 fn a_comment_inside_a_block_content_control_is_a_balloon() {
     let source = docx(
-        &sdt(
-            &sdt_id("2"),
-            &commented_p("inside", "0"),
-        ),
+        &sdt(&sdt_id("2"), &commented_p("inside", "0")),
         vec![comments_part("0", "Park", "note")],
     );
     let imp = DocxEngine
@@ -2951,11 +2952,12 @@ fn a_comment_inside_a_block_content_control_is_a_balloon() {
         "{}",
         imp.text
     );
-    assert!(!imp.text.contains("kind=\"content-control\""), "{}", imp.text);
+    assert!(
+        !imp.text.contains("kind=\"content-control\""),
+        "{}",
+        imp.text
+    );
     let unchanged = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
     assert_eq!(canon_doc(&source), canon_doc(&unchanged));
-    assert_eq!(
-        comments_xml(&source),
-        comments_xml(&unchanged)
-    );
+    assert_eq!(comments_xml(&source), comments_xml(&unchanged));
 }

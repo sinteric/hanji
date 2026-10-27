@@ -17,9 +17,10 @@
   (`w:showingPlcHdr`) stay placeholders, as does a parent that contains
   any of those nested. Row- and cell-level controls the table model
   cannot hold stay inside a table placeholder. Comments inside a shown
-  control stay `<comment>` balloons. Corpus keeps: 327 → TBD
+  control stay `<comment>` balloons. Corpus keeps: 327 → 319
   (docx `content-control` 19 → 5; unwrapping a heading TOC `docPartObj`
-  also surfaces inner leftovers the parent keep had hidden).
+  also surfaces inner leftovers the parent keep had hidden: `field` 72 →
+  73, `field-part` 0 → 4, `break` 1 → 2).
 - Show a DOCX comment whose body is ordinary text as
   `<comment>…</comment>` at the balloon instead of a
   `<keep kind="comment"/>` placeholder. The commented range is ordinary
