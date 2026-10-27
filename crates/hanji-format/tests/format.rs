@@ -286,6 +286,7 @@ fn random_inline(r: &mut Rng, notes: &mut Vec<String>, allow_spans: bool) -> Inl
                 notes.push(l.clone());
                 Atom::NoteRef(l)
             }
+            4 => Atom::Comment(["note", "re-check", "a $ b", ""][r.below(4)].into()),
             _ => Atom::Char(*r.pick(ALPHABET)),
         };
         units.push(Unit::new(atom, marks));
@@ -998,6 +999,39 @@ fn math_before_a_digit_uses_the_math_tag() {
     assert!(e[0].contains("<math> is not closed by </math>"), "{e:?}");
     let e = errors("<math></math>\n");
     assert!(e[0].contains("is empty"), "{e:?}");
+}
+
+#[test]
+fn comment_is_a_raw_body_tag() {
+    let t = doc("see <comment>check this</comment> here\n");
+    let d = parse(&t).unwrap();
+    let Block::Para(p) = &d.blocks[0] else {
+        panic!()
+    };
+    let bodies: Vec<&str> = p
+        .content
+        .units
+        .iter()
+        .filter_map(|u| {
+            if let Atom::Comment(c) = &u.atom {
+                Some(c.as_str())
+            } else {
+                None
+            }
+        })
+        .collect();
+    assert_eq!(bodies, ["check this"]);
+    assert_eq!(roundtrip(&t), t);
+    assert_eq!(roundtrip(&doc("<comment/>\n")), doc("<comment/>\n"));
+    assert_eq!(
+        roundtrip(&doc("<comment></comment>\n")),
+        doc("<comment/>\n")
+    );
+    let e = errors("<comment>x\n");
+    assert!(
+        e[0].contains("<comment> is not closed by </comment>"),
+        "{e:?}"
+    );
 }
 
 #[test]

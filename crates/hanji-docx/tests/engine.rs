@@ -4,7 +4,7 @@
 use hanji_core::{
     edit, rewrite, Capabilities, Engine, EngineError, ImportOptions, Kind, Part, Refusal,
 };
-use hanji_docx::{package, DocxEngine};
+use hanji_docx::{package, DocxEngine, ExportOptions, History, Reviewer};
 
 const W: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 const R: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
@@ -2130,4 +2130,341 @@ fn a_blank_spanning_field_stays_a_placeholder() {
         .import(&docx(body, vec![]), &ImportOptions::default())
         .unwrap();
     assert!(imp.text.contains("kind=\"field-part\""), "{}", imp.text);
+}
+
+fn comments_part(id: &str, author: &str, text: &str) -> Part {
+    part(
+        "word/comments.xml",
+        &format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><w:comments xmlns:w="{W}"><w:comment w:id="{id}" w:author="{author}" w:date="2026-01-01T00:00:00Z" w:initials="A"><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:comment></w:comments>"#
+        ),
+    )
+}
+
+fn commented_p(anchor: &str, id: &str) -> String {
+    format!(
+        r#"<w:p><w:commentRangeStart w:id="{id}"/><w:r><w:t xml:space="preserve">{anchor}</w:t></w:r><w:commentRangeEnd w:id="{id}"/><w:r><w:rPr><w:rStyle w:val="CommentReference"/></w:rPr><w:commentReference w:id="{id}"/></w:r></w:p>"#
+    )
+}
+
+fn comment_docx() -> Vec<u8> {
+    docx(
+        &commented_p("check this figure", "0"),
+        vec![comments_part("0", "Park", "re-check the figure")],
+    )
+}
+
+fn comments_xml(pkg: &[u8]) -> String {
+    String::from_utf8(
+        package::get(&package::read(pkg).unwrap(), "word/comments.xml")
+            .unwrap()
+            .to_vec(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_plain_comment_shows_as_comment_text() {
+    let imp = DocxEngine
+        .import(&comment_docx(), &ImportOptions::default())
+        .unwrap();
+    assert!(
+        imp.text
+            .contains("check this figure<comment>re-check the figure</comment>"),
+        "{}",
+        imp.text
+    );
+    assert!(!imp.text.contains("kind=\"comment\""), "{}", imp.text);
+}
+
+#[test]
+fn unedited_comment_keeps_comments_xml() {
+    use hanji_package::xml;
+    let source = comment_docx();
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    let before = package::read(&source).unwrap();
+    let after = package::read(&out).unwrap();
+    assert_eq!(
+        xml::canon_part(package::get(&before, "word/document.xml").unwrap()).unwrap(),
+        xml::canon_part(package::get(&after, "word/document.xml").unwrap()).unwrap()
+    );
+    assert_eq!(
+        package::get(&before, "word/comments.xml").unwrap(),
+        package::get(&after, "word/comments.xml").unwrap()
+    );
+}
+
+#[test]
+fn editing_comment_body_updates_comments_xml() {
+    let imp = DocxEngine
+        .import(&comment_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "<comment>re-check the figure</comment>",
+        "<comment>looks good</comment>",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = comments_xml(&out);
+    assert!(xml.contains(">looks good</w:t>"), "{xml}");
+    assert!(xml.contains("w:author=\"Park\""), "{xml}");
+    let doc = doc_xml(&out);
+    assert!(doc.contains("check this figure"), "{doc}");
+    assert!(doc.contains("commentReference"), "{doc}");
+}
+
+#[test]
+fn editing_anchored_text_keeps_the_comment() {
+    let imp = DocxEngine
+        .import(&comment_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "check this figure",
+        "check that figure",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let doc = doc_xml(&out);
+    assert!(doc.contains("check that figure"), "{doc}");
+    assert!(doc.contains("commentRangeStart"), "{doc}");
+    assert!(doc.contains("commentReference"), "{doc}");
+    assert!(
+        comments_xml(&out).contains("re-check the figure"),
+        "{}",
+        comments_xml(&out)
+    );
+}
+
+#[test]
+fn deleting_the_comment_marker_removes_the_comment() {
+    let imp = DocxEngine
+        .import(&comment_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "check this figure<comment>re-check the figure</comment>",
+        "check this figure",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report.removed.iter().any(|x| {
+            x.1 == Kind::Wrap
+                && (x.2.contains("the comment was deleted") || x.2.contains("all of its text"))
+        }),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    let doc = doc_xml(&out);
+    assert!(!doc.contains("commentReference"), "{doc}");
+    assert!(!doc.contains("commentRangeStart"), "{doc}");
+    let xml = comments_xml(&out);
+    assert!(!xml.contains("w:comment "), "{xml}");
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+}
+
+#[test]
+fn deleting_the_anchored_range_leaves_a_point_comment() {
+    let imp = DocxEngine
+        .import(&comment_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "check this figure<comment>re-check the figure</comment>",
+        "<comment>re-check the figure</comment>",
+        CAPS,
+    )
+    .unwrap();
+    assert!(r.report.refused.is_empty(), "{:?}", r.report);
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    let back = DocxEngine
+        .import(&out, &ImportOptions::default())
+        .unwrap()
+        .text;
+    assert_eq!(back, r.text);
+    let doc = doc_xml(&out);
+    assert!(doc.contains("commentReference"), "{doc}");
+    assert!(
+        comments_xml(&out).contains("re-check the figure"),
+        "{}",
+        comments_xml(&out)
+    );
+}
+
+#[test]
+fn a_comment_with_a_table_stays_a_placeholder() {
+    let comments = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><w:comments xmlns:w="{W}"><w:comment w:id="0" w:author="Park"><w:tbl><w:tr><w:tc><w:p><w:r><w:t>cell</w:t></w:r></w:p></w:tc></w:tr></w:tbl></w:comment></w:comments>"#
+    );
+    let imp = DocxEngine
+        .import(
+            &docx(
+                &commented_p("x", "0"),
+                vec![part("word/comments.xml", &comments)],
+            ),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    assert!(imp.text.contains("kind=\"comment\""), "{}", imp.text);
+    assert!(!imp.text.contains("<comment>"), "{}", imp.text);
+}
+
+#[test]
+fn a_reply_comment_stays_a_placeholder() {
+    let comments = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><w:comments xmlns:w="{W}" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w:comment w:id="0" w:author="Park"><w:p w14:paraId="AAAA1111"><w:r><w:t>parent</w:t></w:r></w:p></w:comment><w:comment w:id="1" w:author="Kim"><w:p w14:paraId="BBBB2222"><w:r><w:t>reply</w:t></w:r></w:p></w:comment></w:comments>"#
+    );
+    let ex = r#"<?xml version="1.0" encoding="UTF-8"?><w15:commentsEx xmlns:w15="http://schemas.microsoft.com/office/word/2012/wordml"><w15:commentEx w15:paraId="AAAA1111" w15:done="0"/><w15:commentEx w15:paraId="BBBB2222" w15:paraIdParent="AAAA1111" w15:done="0"/></w15:commentsEx>"#;
+    let body = format!(
+        "{}{}",
+        commented_p("parent range", "0"),
+        commented_p("reply range", "1")
+    );
+    let imp = DocxEngine
+        .import(
+            &docx(
+                &body,
+                vec![
+                    part("word/comments.xml", &comments),
+                    part("word/commentsExtended.xml", ex),
+                ],
+            ),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    assert!(
+        imp.text.contains("<comment>parent</comment>"),
+        "{}",
+        imp.text
+    );
+    assert!(imp.text.contains("kind=\"comment\""), "{}", imp.text);
+    assert!(
+        !imp.text.contains("<comment>reply</comment>"),
+        "{}",
+        imp.text
+    );
+}
+
+#[test]
+fn overlapping_comments_are_both_shown() {
+    let comments = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><w:comments xmlns:w="{W}"><w:comment w:id="0" w:author="A"><w:p><w:r><w:t>one</w:t></w:r></w:p></w:comment><w:comment w:id="1" w:author="B"><w:p><w:r><w:t>two</w:t></w:r></w:p></w:comment></w:comments>"#
+    );
+    let body = r#"<w:p><w:commentRangeStart w:id="0"/><w:r><w:t>ab</w:t></w:r><w:commentRangeStart w:id="1"/><w:r><w:t>cd</w:t></w:r><w:commentRangeEnd w:id="0"/><w:r><w:commentReference w:id="0"/></w:r><w:commentRangeEnd w:id="1"/><w:r><w:commentReference w:id="1"/></w:r></w:p>"#;
+    let imp = DocxEngine
+        .import(
+            &docx(body, vec![part("word/comments.xml", &comments)]),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    assert!(
+        imp.text.contains("<comment>one</comment>") && imp.text.contains("<comment>two</comment>"),
+        "{}",
+        imp.text
+    );
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        imp.text
+    );
+}
+
+#[test]
+fn a_mixed_comment_run_stays_a_placeholder() {
+    let comments = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><w:comments xmlns:w="{W}"><w:comment w:id="0" w:author="Park"><w:p><w:r><w:t>note</w:t></w:r></w:p></w:comment></w:comments>"#
+    );
+    let body = r#"<w:p><w:commentRangeStart w:id="0"/><w:r><w:t>hello</w:t><w:commentReference w:id="0"/></w:r><w:commentRangeEnd w:id="0"/></w:p>"#;
+    let imp = DocxEngine
+        .import(
+            &docx(body, vec![part("word/comments.xml", &comments)]),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    assert!(imp.text.contains("hello"), "{}", imp.text);
+    assert!(imp.text.contains("kind=\"comment\""), "{}", imp.text);
+    assert!(!imp.text.contains("<comment>"), "{}", imp.text);
+}
+
+#[test]
+fn a_comment_change_cannot_be_tracked() {
+    let refused = |r: Result<Vec<u8>, EngineError>| match r {
+        Err(EngineError::Refused(m)) => m,
+        other => panic!("{other:?}"),
+    };
+    let opts = ExportOptions::tracked(Reviewer::new("hanji", "2026-09-29T00:00:00Z"));
+    let source = comment_docx();
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    let mut h = History::new(&imp.text, &imp.remainder).unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "<comment>re-check the figure</comment>",
+        "<comment>looks good</comment>",
+        CAPS,
+    )
+    .unwrap();
+    h.push(&r).unwrap();
+    let m = refused(DocxEngine.export_with(&r.text, &r.remainder, &opts, Some(&h)));
+    assert!(m.contains("comment"), "{m}");
+
+    let mut h = History::new(&imp.text, &imp.remainder).unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "check this figure<comment>re-check the figure</comment>",
+        "check this figure",
+        CAPS,
+    )
+    .unwrap();
+    h.push(&r).unwrap();
+    let m = refused(DocxEngine.export_with(&r.text, &r.remainder, &opts, Some(&h)));
+    assert!(m.contains("comment"), "{m}");
 }

@@ -36,7 +36,9 @@ use hanji_format::{Atom, Cell, CellPara, Inline, Marks, Props, Unit};
 
 use crate::export::{with_marks, Exporter};
 use crate::numbering::Numbering;
-use crate::ooxml::{insert_ordered, is_shown_field, is_spanning_field, remove_child, PPR_ORDER};
+use crate::ooxml::{
+    insert_ordered, is_comment, is_shown_field, is_spanning_field, remove_child, PPR_ORDER,
+};
 use crate::xml::{self, fragment, Element, Node, Scope};
 use crate::{write_package, DocShell, DocxEngine, Exported};
 
@@ -252,8 +254,10 @@ fn export_tracked(
     }
     let body = ex.body(&m.blocks).map_err(EngineError::Refused)?;
     let document = shell.document(&body).into_bytes();
+    let mut rem = rem.clone();
+    crate::comment::apply(&mut rem.parts, &m.blocks, &entries).map_err(EngineError::Refused)?;
     write_package(
-        rem,
+        &rem,
         Exported {
             document,
             numbering: numbering.part(),
@@ -1067,6 +1071,11 @@ impl<'a> Merge<'a> {
                 if it.st != St::Eq {
                     self.check_keep(kp, it.st)?;
                 }
+            } else if matches!(&unit.atom, Atom::Comment(_)) && it.st != St::Eq {
+                return Err(
+                    "the edit changes a comment, which cannot be tracked; export without tracked changes"
+                        .into(),
+                );
             } else if it.st != St::Eq && self.depth > 0 {
                 return Err("the edit changes the result of a field, which cannot be tracked; update the field in \
                             Office instead"
@@ -1579,6 +1588,24 @@ impl<'a> Merge<'a> {
                     if is_shown_field(e) {
                         self.check_field(e, &x)?;
                     }
+                    if is_comment(e) {
+                        let old = self
+                            .old
+                            .rem
+                            .entries
+                            .iter()
+                            .find(|o| o.id == e.id)
+                            .ok_or_else(|| {
+                                "the edit changes a comment, which cannot be tracked; export without tracked changes"
+                                    .to_string()
+                            })?;
+                        if old.path != x.path || old.start != x.start || old.end != x.end {
+                            return Err(
+                                "the edit moves a comment, which cannot be tracked; export without tracked changes"
+                                    .into(),
+                            );
+                        }
+                    }
                 }
                 _ => {
                     let (p, s) = at(self.new_pos(&e.path, e.start.unwrap_or(0)))?;
@@ -1646,6 +1673,11 @@ impl<'a> Merge<'a> {
                 Kind::Wrap if is_shown_field(e) && !live.contains(&e.id) => {
                     return Err(
                         "the edit deletes a field: edits to fields cannot be tracked".into(),
+                    );
+                }
+                Kind::Wrap if is_comment(e) && !live.contains(&e.id) => {
+                    return Err(
+                        "the edit deletes a comment: edits to comments cannot be tracked".into(),
                     );
                 }
                 Kind::Wrap if !live.contains(&e.id) => {

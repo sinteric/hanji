@@ -3,7 +3,7 @@
 hanji reads Word, PowerPoint, Excel and Hancom files (docx, pptx, xlsx,
 hwpx) as a Markdown-like text, and writes your edits to that text back into
 the original file. Anything the text does not show (formatting, pictures,
-charts, comments, field instructions) is kept in the file. It is built for coding agents,
+charts, comment metadata, field instructions) is kept in the file. It is built for coding agents,
 and it also works as a command-line tool.
 
 Two lens laws hold for every file:
@@ -81,7 +81,7 @@ $ hanji export korean-report out.hwpx --format hwpx --acknowledge-surfaced
 wrote out.hwpx (7821 bytes) from revision 2 of korean-report; digest fnv1a64:…
 converted docx → hwpx. Not carried across:
 - placeholders dropped, 4 (comment ×1, drawing ×1, footnote ×1, tracked-insert ×1):
-    comment ku25a (line 18): comment: 지방 수치 재확인 필요
+    comment c1 (line 18): comment: 지방 수치 재확인 필요
     …
 - properties hwpx cannot write, dropped:
     table-align=left table-indent=0pt ×1 (line 26): hwpx has no table position (table-align, table-indent): the table sits where hwpx puts it

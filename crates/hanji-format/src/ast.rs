@@ -617,6 +617,8 @@ pub enum Atom {
     NoteRef(String),
     /// `$…$`, kept opaque.
     Math(String),
+    /// `<comment>…</comment>`: a DOCX comment body's text (DESIGN.md §5.1).
+    Comment(String),
     /// Only as the whole content of a resolved page-break paragraph; the
     /// text form is the block line `<pagebreak/>`.
     PageBreak,

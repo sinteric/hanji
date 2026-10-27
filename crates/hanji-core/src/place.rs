@@ -4,7 +4,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use hanji_format::{Cell, Inline};
+use hanji_format::{Atom, Cell, Inline};
 
 use crate::diff::{self, Op, Tag};
 use crate::model::{keys, paras, Block, Path};
@@ -900,6 +900,7 @@ impl<'a> Placer<'a> {
             }
         }
         self.spanning_wraps();
+        self.comment_anchors();
         let al = self.al;
         for p in &al.lenient {
             for e in self.entries_at(p) {
@@ -1294,6 +1295,71 @@ impl<'a> Placer<'a> {
         self.set(e, Status::Placed { entry: x, pieces });
     }
 
+    /// A comment balloon wrap must still cover exactly one `<comment>` atom;
+    /// range markers of a deleted comment go with it.
+    fn comment_anchors(&mut self) {
+        let ids: Vec<u64> = self
+            .entries
+            .iter()
+            .filter(|e| e.kind == Kind::Wrap && e.meta.tag == "w:commentReference")
+            .map(|e| e.id)
+            .collect();
+        for id in ids {
+            let Some(o) = self.out.get(&id) else {
+                continue;
+            };
+            let Status::Placed { entry, .. } = &o.status else {
+                continue;
+            };
+            if covers_comment(self.new, entry) {
+                continue;
+            }
+            self.out
+                .insert(id, Status::Removed("the comment was deleted".into()).into());
+        }
+        let mut live = HashSet::new();
+        for e in self.entries {
+            if !matches!(
+                self.out.get(&e.id).map(|o| &o.status),
+                Some(Status::Placed { .. })
+            ) {
+                continue;
+            }
+            if let Some(cid) = comment_id(e) {
+                live.insert(cid);
+            }
+        }
+        let markers: Vec<u64> = self
+            .entries
+            .iter()
+            .filter(|e| {
+                e.kind == Kind::Marker
+                    && matches!(
+                        e.meta.tag.as_str(),
+                        "w:commentRangeStart" | "w:commentRangeEnd"
+                    )
+            })
+            .map(|e| e.id)
+            .collect();
+        for id in markers {
+            let Some(e) = self.entries.iter().find(|x| x.id == id) else {
+                continue;
+            };
+            let cid = e.xml.first().and_then(|x| w_id(x));
+            if cid.is_some_and(|c| live.contains(&c)) {
+                continue;
+            }
+            if !matches!(
+                self.out.get(&id).map(|o| &o.status),
+                Some(Status::Placed { .. })
+            ) {
+                continue;
+            }
+            self.out
+                .insert(id, Status::Removed("the comment was deleted".into()).into());
+        }
+    }
+
     fn offset_entries(&self, path: &Path) -> Vec<&'a Entry> {
         self.entries_at(path)
             .into_iter()
@@ -1587,6 +1653,38 @@ impl<'a> Placer<'a> {
                 self.out.insert(e.id, o);
             }
         }
+    }
+}
+
+fn covers_comment(blocks: &[Block], e: &Entry) -> bool {
+    let Some(inl) = inline_at(blocks, &e.path) else {
+        return false;
+    };
+    let (s, en) = (e.start.unwrap_or(0), e.end.unwrap_or(0));
+    en == s + 1 && matches!(inl.units.get(s).map(|u| &u.atom), Some(Atom::Comment(_)))
+}
+
+fn w_id(xml: &str) -> Option<String> {
+    let key = "w:id=\"";
+    let i = xml.find(key)?;
+    let rest = &xml[i + key.len()..];
+    Some(rest[..rest.find('"')?].to_string())
+}
+
+fn comment_id(e: &Entry) -> Option<String> {
+    if e.meta.tag == "w:commentReference"
+        || e.meta.keep.as_ref().is_some_and(|k| k.kind == "comment")
+        || e.xml.iter().any(|x| x.contains("commentReference"))
+    {
+        e.xml.iter().find_map(|x| {
+            if x.contains("commentReference") {
+                w_id(x)
+            } else {
+                None
+            }
+        })
+    } else {
+        None
     }
 }
 

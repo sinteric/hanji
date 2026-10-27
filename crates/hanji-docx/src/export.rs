@@ -375,6 +375,11 @@ impl<'a> Exporter<'a> {
         }
         let markers = self.at(path, Kind::Marker);
         let wraps = self.at(path, Kind::Wrap);
+        for w in &wraps {
+            if is_comment(w) {
+                pkeep.insert(w.start.unwrap(), w);
+            }
+        }
         let closing = self.close_at.get(path).cloned().unwrap_or_default();
         let mut bounds: std::collections::HashSet<usize> =
             markers.iter().map(|m| m.start.unwrap()).collect();
@@ -505,6 +510,9 @@ impl<'a> Exporter<'a> {
         }
         let mut items: Vec<(usize, u8, u64, It)> = vec![];
         for w in &wraps {
+            if is_comment(w) {
+                continue;
+            }
             items.push((w.start.unwrap(), 0, w.seq, It::Open(w)));
             if w.meta.end_path.is_none() {
                 items.push((w.end.unwrap(), 0, w.meta.seq_close, It::Close(w)));
@@ -701,6 +709,9 @@ impl<'a> Exporter<'a> {
                     for x in &self.keep_entry(&k.id)?.xml {
                         r.children.push(node(fragment(x)));
                     }
+                }
+                Atom::Comment(_) => {
+                    return Err("a <comment> that was not in the file cannot be created".into())
                 }
                 Atom::NoteRef(_) | Atom::Math(_) => {
                     return Err(

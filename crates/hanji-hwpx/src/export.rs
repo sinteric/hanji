@@ -910,10 +910,18 @@ impl<'a> Exporter<'a> {
                             .into(),
                     )
                 }
-                Atom::NoteRef(_) | Atom::Math(_) => {
-                    return Err("footnotes and math are not supported by the hwpx engine yet".into())
+                Atom::NoteRef(_) | Atom::Math(_) | Atom::Comment(_) => {
+                    return Err(
+                        "comments, footnotes and math are not supported by the hwpx engine yet"
+                            .into(),
+                    )
                 }
-                &_ => return Err("footnotes and math are not supported by the hwpx engine yet".into()),
+                &_ => {
+                    return Err(
+                        "comments, footnotes and math are not supported by the hwpx engine yet"
+                            .into(),
+                    )
+                }
             }
         }
         close(&mut t, r);

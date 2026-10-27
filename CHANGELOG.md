@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Show a DOCX comment whose body is ordinary text as
+  `<comment>…</comment>` at the balloon instead of a
+  `<keep kind="comment"/>` placeholder. The commented range is ordinary
+  text (range start/end stay remainder markers); author, date, initials,
+  threading and resolved state stay in `comments.xml` and the extended
+  parts. Editing the body updates the comment part; editing the anchored
+  text keeps the anchors; deleting the `<comment>` marker removes the
+  comment and its extended-part entries and is reported; deleting the
+  anchored range leaves a point comment. Replies, rich balloons (tables,
+  images) and mixed runs stay placeholders. Tracked-change export refuses
+  a change to the balloon. Corpus keeps: 345 → 327 (docx `comment` 18 → 0).
 - Show a DOCX complex field whose cached result spans paragraphs (TOC,
   INDEX, TOA, and similar) as ordinary editable paragraphs instead of
   `<keep kind="field-part"/>` placeholders. The instruction stays as one

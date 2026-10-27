@@ -20,8 +20,9 @@ schema: 1
 Canonical form: one paragraph per line (no hard wraps), a blank line between blocks, no table padding, `1.` for every numbered item. hanji stores text in this form; read again after an edit that reports `canonicalized`.
 Inline: **bold**, *italic*, ~~strike~~, <u>underline</u>, <br/> (a line break inside a paragraph).
 docx, hwpx, pptx and xlsx texts show their formatting (below).
-<keep id="k3" kind="drawing" summary="…"/> stands for something the text does not model (a picture, chart, footnote, comment, …). Leave it as it is; you may move it or delete its line, never create or change one.
+<keep id="k3" kind="drawing" summary="…"/> stands for something the text does not model (a picture, chart, footnote, a rich comment, …). Leave it as it is; you may move it or delete its line, never create or change one.
 In docx, a field's shown result (a page number, a caption number, a cross-reference, a filled FORMTEXT, a table of contents) is that text: editing it replaces the cached result and keeps the instruction; Word may compute it again when it updates fields. Empty form fields, checkboxes, and fields with no shown result stay placeholders.
+In docx, a comment whose body is ordinary text is `<comment>body</comment>` at the balloon: edit the body to change the comment, edit the highlighted words as ordinary text, or delete the `<comment>` marker to remove the comment. Replies and comments that hold a table or image stay placeholders.
 
 Document (docx, hwpx)
 - `#` … `######`: the file's Heading 1–6.
