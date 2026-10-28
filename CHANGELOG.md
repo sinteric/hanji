@@ -2,9 +2,7 @@
 
 ## Unreleased
 
-## [0.7.0] - 2026-10-28
-
-### Added
+## 0.7.0 — 2026-10-28
 
 - Show DOCX run-level tracked insertions and deletions (`w:ins` / `w:del`)
   whose inner text is one line as `<ins>…</ins>` / `<del>…</del>` (empty:
@@ -92,9 +90,6 @@
   `ffData`) stay `<keep kind="field"/>` placeholders. Corpus keeps
   unchanged: 357 (docx `field` still 72 — the leftovers are empty form
   fields, checkboxes, and blank XE/TA).
-
-### Changed
-
 - Corpus `<keep/>` placeholders went 357 → 268 since 0.6.0
   (`docs/keep-census.md`).
 
