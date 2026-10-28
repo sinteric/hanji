@@ -33,16 +33,16 @@
   "total": {
     "files": 102,
     "failed": 0,
-    "with_keeps": 62,
-    "keeps": 315
+    "with_keeps": 61,
+    "keeps": 284
   },
   "formats": [
     {
       "format": "docx",
       "files": 13,
       "failed": 0,
-      "with_keeps": 13,
-      "keeps": 170
+      "with_keeps": 12,
+      "keeps": 139
     },
     {
       "format": "hwpx",
@@ -80,12 +80,6 @@
       "files": 10
     },
     {
-      "format": "docx",
-      "kind": "tracked-insert",
-      "keeps": 17,
-      "files": 4
-    },
-    {
       "format": "hwpx",
       "kind": "math",
       "keeps": 16,
@@ -96,12 +90,6 @@
       "kind": "table",
       "keeps": 15,
       "files": 10
-    },
-    {
-      "format": "docx",
-      "kind": "tracked-delete",
-      "keeps": 14,
-      "files": 3
     },
     {
       "format": "hwpx",
@@ -302,11 +290,8 @@
     {
       "path": "prototype/remainder/corpus/delins.docx",
       "format": "docx",
-      "keeps": 15,
-      "kinds": {
-        "tracked-delete": 2,
-        "tracked-insert": 13
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "prototype/remainder/corpus/docx4j-tables.docx",
@@ -339,11 +324,10 @@
     {
       "path": "prototype/remainder/corpus/korean-report.docx",
       "format": "docx",
-      "keeps": 3,
+      "keeps": 2,
       "kinds": {
         "drawing": 1,
-        "footnote": 1,
-        "tracked-insert": 1
+        "footnote": 1
       }
     },
     {
@@ -360,11 +344,9 @@
     {
       "path": "prototype/remainder/corpus/sample-docx.docx",
       "format": "docx",
-      "keeps": 5,
+      "keeps": 3,
       "kinds": {
-        "drawing": 3,
-        "tracked-delete": 1,
-        "tracked-insert": 1
+        "drawing": 3
       }
     },
     {
@@ -389,7 +371,7 @@
     {
       "path": "prototype/remainder/corpus/testWORD_2006ml.docx",
       "format": "docx",
-      "keeps": 33,
+      "keeps": 20,
       "kinds": {
         "content-control": 4,
         "drawing": 5,
@@ -399,8 +381,6 @@
         "math": 1,
         "object": 3,
         "table": 1,
-        "tracked-delete": 11,
-        "tracked-insert": 2,
         "tracked-move": 2
       }
     },

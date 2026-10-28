@@ -525,29 +525,9 @@ impl<'a> Convert<'a> {
                     let location = self.line(off(k));
                     self.placeholder(keep, location);
                 }
-                Atom::Comment(body) => {
-                    let location = self.line(off(k));
-                    let n = self
-                        .out
-                        .placeholder_kinds
-                        .get("comment")
-                        .copied()
-                        .unwrap_or(0)
-                        + 1;
-                    let summary = if body.chars().count() > 40 {
-                        format!("comment: {}…", body.chars().take(40).collect::<String>())
-                    } else {
-                        format!("comment: {body}")
-                    };
-                    self.placeholder(
-                        &fm::Keep {
-                            id: format!("c{n}"),
-                            kind: "comment".into(),
-                            summary,
-                        },
-                        location,
-                    );
-                }
+                Atom::Comment(body) => self.dropped_atom("comment", "c", "comment", body, off(k)),
+                Atom::Ins(body) => self.dropped_atom("tracked-insert", "i", "ins", body, off(k)),
+                Atom::Del(body) => self.dropped_atom("tracked-delete", "d", "del", body, off(k)),
                 _ if u.props.is_empty() => units.push(u.clone()),
                 _ => {
                     let place = self.line(off(k));
@@ -574,6 +554,24 @@ impl<'a> Convert<'a> {
             })
             .collect();
         Inline { units, spans }
+    }
+
+    fn dropped_atom(&mut self, kind: &str, prefix: &str, label: &str, body: &str, at: usize) {
+        let location = self.line(at);
+        let n = self.out.placeholder_kinds.get(kind).copied().unwrap_or(0) + 1;
+        let summary = if body.chars().count() > 40 {
+            format!("{label}: {}…", body.chars().take(40).collect::<String>())
+        } else {
+            format!("{label}: {body}")
+        };
+        self.placeholder(
+            &fm::Keep {
+                id: format!("{prefix}{n}"),
+                kind: kind.into(),
+                summary,
+            },
+            location,
+        );
     }
 
     fn placeholder(&mut self, keep: &fm::Keep, location: String) {
@@ -934,6 +932,7 @@ fn not_carried(rem: &Remainder, from: Format, has_items: bool) -> Vec<NotCarried
             Kind::Marker | Kind::Rmarker | Kind::Wrap | Kind::Bmarker => match tag {
                 "bookmarkStart" | "bookmarkEnd" => "bookmarks",
                 "commentRangeStart" | "commentRangeEnd" | "commentReference" => "comment ranges",
+                "ins" | "del" => continue, // listed as dropped `<ins>` / `<del>` placeholders
                 "moveFromRangeStart" | "moveFromRangeEnd" | "moveToRangeStart" | "moveToRangeEnd" => {
                     "tracked-move ranges"
                 }

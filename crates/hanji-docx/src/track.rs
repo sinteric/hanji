@@ -37,8 +37,8 @@ use hanji_format::{Atom, Cell, CellPara, Inline, Marks, Props, Unit};
 use crate::export::{with_marks, Exporter};
 use crate::numbering::Numbering;
 use crate::ooxml::{
-    insert_ordered, is_block_sdt, is_comment, is_shown_field, is_spanning_field, remove_child,
-    PPR_ORDER,
+    insert_ordered, is_block_sdt, is_comment, is_revision, is_shown_field, is_spanning_field,
+    remove_child, PPR_ORDER,
 };
 use crate::xml::{self, fragment, Element, Node, Scope};
 use crate::{write_package, DocShell, DocxEngine, Exported};
@@ -1077,6 +1077,11 @@ impl<'a> Merge<'a> {
                     "the edit changes a comment, which cannot be tracked; export without tracked changes"
                         .into(),
                 );
+            } else if matches!(&unit.atom, Atom::Ins(_) | Atom::Del(_)) && it.st != St::Eq {
+                return Err(
+                    "the edit changes a tracked insertion or deletion, which cannot be nested; export without tracked changes"
+                        .into(),
+                );
             } else if it.st != St::Eq && self.depth > 0 {
                 return Err("the edit changes the result of a field, which cannot be tracked; update the field in \
                             Office instead"
@@ -1618,6 +1623,24 @@ impl<'a> Merge<'a> {
                             );
                         }
                     }
+                    if is_revision(e) {
+                        let old = self
+                            .old
+                            .rem
+                            .entries
+                            .iter()
+                            .find(|o| o.id == e.id)
+                            .ok_or_else(|| {
+                                "the edit changes a tracked insertion or deletion, which cannot be nested; export without tracked changes"
+                                    .to_string()
+                            })?;
+                        if old.path != x.path || old.start != x.start || old.end != x.end {
+                            return Err(
+                                "the edit moves a tracked change, which cannot be nested; export without tracked changes"
+                                    .into(),
+                            );
+                        }
+                    }
                 }
                 _ => {
                     let (p, s) = at(self.new_pos(&e.path, e.start.unwrap_or(0)))?;
@@ -1690,6 +1713,11 @@ impl<'a> Merge<'a> {
                 Kind::Wrap if is_comment(e) && !live.contains(&e.id) => {
                     return Err(
                         "the edit deletes a comment: edits to comments cannot be tracked".into(),
+                    );
+                }
+                Kind::Wrap if is_revision(e) && !live.contains(&e.id) => {
+                    return Err(
+                        "the edit deletes a tracked change: edits to another author's revision cannot be tracked".into(),
                     );
                 }
                 Kind::Wrap if is_block_sdt(e) && !live.contains(&e.id) => continue,

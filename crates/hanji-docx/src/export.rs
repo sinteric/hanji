@@ -479,7 +479,7 @@ impl<'a> Exporter<'a> {
         let markers = self.at(path, Kind::Marker);
         let wraps = self.at(path, Kind::Wrap);
         for w in &wraps {
-            if is_comment(w) {
+            if is_comment(w) || is_revision(w) {
                 pkeep.insert(w.start.unwrap(), w);
             }
         }
@@ -613,7 +613,7 @@ impl<'a> Exporter<'a> {
         }
         let mut items: Vec<(usize, u8, u64, It)> = vec![];
         for w in &wraps {
-            if is_comment(w) {
+            if is_comment(w) || is_revision(w) {
                 continue;
             }
             items.push((w.start.unwrap(), 0, w.seq, It::Open(w)));
@@ -687,8 +687,22 @@ impl<'a> Exporter<'a> {
                     .children
                     .push(node(fragment(&m.xml[0]))),
                 It::Pkeep(k) => {
-                    for x in &k.xml {
-                        stack.last_mut().unwrap().1.children.push(node(fragment(x)));
+                    if is_revision(k) {
+                        let body = match p.units.get(k.start.unwrap()).map(|u| &u.atom) {
+                            Some(Atom::Ins(s) | Atom::Del(s)) => s.as_str(),
+                            _ => return Err("a tracked change is missing from the text".into()),
+                        };
+                        let x = crate::revision::with_body(&k.xml[0], body);
+                        stack
+                            .last_mut()
+                            .unwrap()
+                            .1
+                            .children
+                            .push(node(fragment(&x)));
+                    } else {
+                        for x in &k.xml {
+                            stack.last_mut().unwrap().1.children.push(node(fragment(x)));
+                        }
                     }
                 }
                 It::Zrun(z) => {
@@ -818,6 +832,11 @@ impl<'a> Exporter<'a> {
                 }
                 Atom::Comment(_) => {
                     return Err("a <comment> that was not in the file cannot be created".into())
+                }
+                Atom::Ins(_) | Atom::Del(_) => {
+                    return Err(
+                        "an <ins> or <del> that was not in the file cannot be created".into(),
+                    )
                 }
                 Atom::NoteRef(_) | Atom::Math(_) => {
                     return Err(

@@ -619,6 +619,10 @@ pub enum Atom {
     Math(String),
     /// `<comment>…</comment>`: a DOCX comment body's text (DESIGN.md §5.1).
     Comment(String),
+    /// `<ins>…</ins>`: a DOCX tracked insertion's text (DESIGN.md §5.1).
+    Ins(String),
+    /// `<del>…</del>`: a DOCX tracked deletion's text (DESIGN.md §5.1).
+    Del(String),
     /// Only as the whole content of a resolved page-break paragraph; the
     /// text form is the block line `<pagebreak/>`.
     PageBreak,

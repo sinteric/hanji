@@ -901,6 +901,7 @@ impl<'a> Placer<'a> {
         }
         self.spanning_wraps();
         self.comment_anchors();
+        self.revision_anchors();
         let al = self.al;
         for p in &al.lenient {
             for e in self.entries_at(p) {
@@ -1293,6 +1294,34 @@ impl<'a> Placer<'a> {
             pieces.clear();
         }
         self.set(e, Status::Placed { entry: x, pieces });
+    }
+
+    /// A tracked insertion or deletion wrap must still cover exactly one
+    /// `<ins>` or `<del>` atom of that kind.
+    fn revision_anchors(&mut self) {
+        let ids: Vec<u64> = self
+            .entries
+            .iter()
+            .filter(|e| e.kind == Kind::Wrap && matches!(e.meta.tag.as_str(), "w:ins" | "w:del"))
+            .map(|e| e.id)
+            .collect();
+        for id in ids {
+            let Some(o) = self.out.get(&id) else {
+                continue;
+            };
+            let Status::Placed { entry, .. } = &o.status else {
+                continue;
+            };
+            if covers_revision(self.new, entry) {
+                continue;
+            }
+            let what = if entry.meta.tag == "w:ins" {
+                "the tracked insertion was deleted"
+            } else {
+                "the tracked deletion was deleted"
+            };
+            self.out.insert(id, Status::Removed(what.into()).into());
+        }
     }
 
     /// A comment balloon wrap must still cover exactly one `<comment>` atom;
@@ -1703,6 +1732,20 @@ fn covers_comment(blocks: &[Block], e: &Entry) -> bool {
     };
     let (s, en) = (e.start.unwrap_or(0), e.end.unwrap_or(0));
     en == s + 1 && matches!(inl.units.get(s).map(|u| &u.atom), Some(Atom::Comment(_)))
+}
+
+fn covers_revision(blocks: &[Block], e: &Entry) -> bool {
+    let Some(inl) = inline_at(blocks, &e.path) else {
+        return false;
+    };
+    let (s, en) = (e.start.unwrap_or(0), e.end.unwrap_or(0));
+    if en != s + 1 {
+        return false;
+    }
+    matches!(
+        (e.meta.tag.as_str(), inl.units.get(s).map(|u| &u.atom)),
+        ("w:ins", Some(Atom::Ins(_))) | ("w:del", Some(Atom::Del(_)))
+    )
 }
 
 fn w_id(xml: &str) -> Option<String> {

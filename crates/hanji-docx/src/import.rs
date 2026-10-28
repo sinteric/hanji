@@ -894,6 +894,11 @@ impl<'a> Importer<'a> {
                 i += 1;
                 continue;
             }
+            if crate::revision::shown(k).is_some() {
+                self.revision(k, path)?;
+                i += 1;
+                continue;
+            }
             if name == "w:r" {
                 self.run(k, path, pb)?;
             } else if name == "w:sdt" && sdt_shown(k) && !sdt_content_is_block(k) {
@@ -964,6 +969,43 @@ impl<'a> Importer<'a> {
             }
             i += 1;
         }
+        Ok(())
+    }
+
+    /// An inline `w:ins` / `w:del` whose text the model shows: a length-1
+    /// wrap over [`Atom::Ins`] / [`Atom::Del`], holding the original element
+    /// (DESIGN.md §5.1).
+    fn revision(&mut self, el: &Element, path: &[usize]) -> Result<(), String> {
+        let (ins, body) = crate::revision::shown(el)
+            .ok_or_else(|| "a tracked change has no shown body".to_string())?;
+        let f = self.fp(&[Some(el)]);
+        let meta = Meta {
+            tag: if ins { "w:ins" } else { "w:del" }.into(),
+            ..Default::default()
+        };
+        let at = self.pos();
+        let idx = self.entry(
+            Kind::Wrap,
+            vec![self.frag(el)],
+            f,
+            path,
+            Some(at),
+            None,
+            meta,
+        );
+        self.push(
+            if ins {
+                Atom::Ins(body)
+            } else {
+                Atom::Del(body)
+            },
+            Marks::NONE,
+        );
+        let end = self.pos();
+        let close = self.seq();
+        let e = &mut self.entries[idx];
+        e.end = Some(end);
+        e.meta.seq_close = close;
         Ok(())
     }
 

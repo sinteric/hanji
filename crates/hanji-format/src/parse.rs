@@ -189,7 +189,7 @@ fn fm_form(doc_type: &str) -> String {
 const P_FORM: &str =
     "<p/> and <p style=\"Name\"/> are single tags that start a paragraph: no </p>, and no attribute but style.";
 const INLINE_TAGS: &str =
-    "<u>…</u>, <br/>, <math>…</math>, <comment>…</comment>, <field name=\"…\">…</field>, <keep id=\"…\" kind=\"…\" summary=\"…\"/>, and <p/> in a table cell";
+    "<u>…</u>, <br/>, <math>…</math>, <comment>…</comment>, <ins>…</ins>, <del>…</del>, <field name=\"…\">…</field>, <keep id=\"…\" kind=\"…\" summary=\"…\"/>, and <p/> in a table cell";
 
 impl<'a> Parser<'a> {
     pub(crate) fn new(text: &'a str, names: &'a Names) -> Parser<'a> {
@@ -1593,25 +1593,28 @@ impl<'a> Parser<'a> {
                             continue;
                         }
                         ("math", _) => fail!(x, "math is <math>…</math> (or $…$); </math> closes an open <math>."),
-                        ("comment", false) if tag.self_closing => {
+                        (name @ ("comment" | "ins" | "del"), false) if tag.self_closing => {
                             if !tag.attrs.is_empty() {
-                                fail!(x, "<comment> takes no attributes: <comment>…</comment>.");
+                                fail!(x, "<{name}> takes no attributes: <{name}>…</{name}>.");
                             }
-                            st.push(off, Atom::Comment(String::new()));
+                            st.push(off, raw_atom(name, String::new()));
                         }
-                        ("comment", false) => {
+                        (name @ ("comment" | "ins" | "del"), false) => {
                             if !tag.attrs.is_empty() {
-                                fail!(x, "<comment> takes no attributes: <comment>…</comment>.");
+                                fail!(x, "<{name}> takes no attributes: <{name}>…</{name}>.");
                             }
-                            let Some((body_end, resume)) = tagged_end(src, after, "</comment>") else {
-                                fail!(x, "<comment> is not closed by </comment> on the same line.");
+                            let close = format!("</{name}>");
+                            let Some((body_end, resume)) = tagged_end(src, after, &close) else {
+                                fail!(x, "<{name}> is not closed by </{name}> on the same line.");
                             };
                             let body: String = src[after..body_end].iter().map(|s| s.2).collect();
-                            st.push(off, Atom::Comment(body));
+                            st.push(off, raw_atom(name, body));
                             x = resume;
                             continue;
                         }
-                        ("comment", true) => fail!(x, "</comment> without an opening <comment>."),
+                        (name @ ("comment" | "ins" | "del"), true) => {
+                            fail!(x, "</{name}> without an opening <{name}>.")
+                        }
                         ("br", false) => {
                             if !tag.attrs.is_empty() {
                                 fail!(x, "<br/> takes no attributes.");
@@ -2243,6 +2246,15 @@ fn math_close(src: &[Src], from: usize) -> Option<usize> {
     None
 }
 
+/// `<comment>`, `<ins>` or `<del>` as its atom.
+fn raw_atom(name: &str, body: String) -> Atom {
+    match name {
+        "ins" => Atom::Ins(body),
+        "del" => Atom::Del(body),
+        _ => Atom::Comment(body),
+    }
+}
+
 /// Closing `close` (`</math>`, `</comment>`) of a raw-body tag: (body end,
 /// index after the closer). The body is unparsed text.
 fn tagged_end(src: &[Src], from: usize, close: &str) -> Option<(usize, usize)> {
@@ -2261,7 +2273,7 @@ fn tagged_end(src: &[Src], from: usize, close: &str) -> Option<(usize, usize)> {
 /// `<math>…</math>` or `<comment>…</comment>` at `src[y]`: the index after it.
 fn skip_raw_atom(src: &[Src], y: usize) -> Option<usize> {
     let (tag, after) = parse_tag(src, y)?;
-    if tag.closing || !matches!(tag.name.as_str(), "math" | "comment") {
+    if tag.closing || !matches!(tag.name.as_str(), "math" | "comment" | "ins" | "del") {
         return None;
     }
     if tag.self_closing {

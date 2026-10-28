@@ -50,16 +50,18 @@ fn to(format: Format) -> ExportOptions {
     ExportOptions::ACKNOWLEDGE_SURFACED.with_format(format)
 }
 
-/// Skip a raw-body tag (`<comment>…</comment>` or `<comment/>`) at the start
-/// of `rest`, including its body: conversion drops those atoms.
-fn skip_comment(rest: &str) -> Option<&str> {
-    if let Some(after) = rest.strip_prefix("<comment/>") {
+/// Skip a raw-body tag (`<comment>…</comment>` or `<comment/>`, and the
+/// same for `<ins>` / `<del>`) at the start of `rest`, including its body:
+/// conversion drops those atoms.
+fn skip_raw<'a>(rest: &'a str, name: &str) -> Option<&'a str> {
+    let empty = format!("<{name}/>");
+    if let Some(after) = rest.strip_prefix(&empty) {
         return Some(after);
     }
-    let after = rest.strip_prefix("<comment>")?;
-    after
-        .find("</comment>")
-        .map(|k| &after[k + "</comment>".len()..])
+    let open = format!("<{name}>");
+    let after = rest.strip_prefix(&open)?;
+    let close = format!("</{name}>");
+    after.find(&close).map(|k| &after[k + close.len()..])
 }
 
 /// The words of a text, whatever the markup: its front matter, style
@@ -73,7 +75,10 @@ fn plain(text: &str) -> String {
     for line in body.lines().filter(|l| !l.starts_with("<style ")) {
         let mut rest = line;
         while !rest.is_empty() {
-            if let Some(after) = skip_comment(rest) {
+            if let Some(after) = skip_raw(rest, "comment")
+                .or_else(|| skip_raw(rest, "ins"))
+                .or_else(|| skip_raw(rest, "del"))
+            {
                 rest = after;
             } else if rest.starts_with('<') {
                 let end = if rest.starts_with("<keep ") {
@@ -97,19 +102,34 @@ fn plain(text: &str) -> String {
 }
 
 /// The ids of the placeholders a text has, in order: `<keep/>` ids, then a
-/// synthetic `c{n}` for each `<comment>` conversion drops.
+/// synthetic `c{n}` / `i{n}` / `d{n}` for each `<comment>` / `<ins>` /
+/// `<del>` conversion drops.
 fn keep_ids(text: &str) -> Vec<String> {
     let mut ids: Vec<String> = text
         .split("<keep id=\"")
         .skip(1)
         .map(|s| s.split('"').next().unwrap().to_string())
         .collect();
-    let mut n = 0usize;
+    let mut comments = 0usize;
+    let mut inserts = 0usize;
+    let mut deletes = 0usize;
     let mut rest = text;
     while !rest.is_empty() {
-        if let Some(after) = skip_comment(rest) {
-            n += 1;
-            ids.push(format!("c{n}"));
+        if let Some(after) = skip_raw(rest, "comment") {
+            comments += 1;
+            ids.push(format!("c{comments}"));
+            rest = after;
+            continue;
+        }
+        if let Some(after) = skip_raw(rest, "ins") {
+            inserts += 1;
+            ids.push(format!("i{inserts}"));
+            rest = after;
+            continue;
+        }
+        if let Some(after) = skip_raw(rest, "del") {
+            deletes += 1;
+            ids.push(format!("d{deletes}"));
             rest = after;
             continue;
         }
@@ -239,15 +259,12 @@ fn the_report_names_each_placeholder_by_kind_with_its_line() {
         .iter()
         .find(|p| p.kind == "tracked-insert" && p.summary.contains("dog"))
         .unwrap();
-    assert!(ins.summary.contains("Allison, Timothy B."), "{ins:?}");
+    assert!(ins.summary.contains("dog"), "{ins:?}");
     let line: usize = ins.location.strip_prefix("line ").unwrap().parse().unwrap();
+    let src_line = source.lines().nth(line - 1).unwrap();
     assert!(
-        source
-            .lines()
-            .nth(line - 1)
-            .unwrap()
-            .contains(&format!("id=\"{}\"", ins.id)),
-        "{ins:?}"
+        src_line.contains("<ins>dog</ins>") || src_line.contains(&format!("id=\"{}\"", ins.id)),
+        "{ins:?} in {src_line}"
     );
     let footnote = c
         .placeholders

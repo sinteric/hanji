@@ -215,7 +215,8 @@ package ─────────────────────► model
 **Shared inline core:** text, `**bold**`, `*italic*`, `~~strike~~`, `<u>`,
 links, footnote references `[^1]`, math `$…$` or `<math>…</math>` (→ OMML /
 HWP equation), line break `<br/>`, `<comment>…</comment>` (a DOCX comment
-body), `<field name=…>value</field>` (Word content controls, HWP form
+body), `<ins>…</ins>` / `<del>…</del>` (a DOCX tracked insertion or
+deletion), `<field name=…>value</field>` (Word content controls, HWP form
 fields), inline `<keep/>`.
 
 - **Fields (docx):** a field whose cached result is text in one paragraph (a
@@ -271,6 +272,20 @@ fields), inline `<keep/>`.
   deletion of the comment. A shown comment inside a shown content
   control is the same balloon; the control wrap and the comment wrap
   both stay.
+- **Tracked changes (docx):** a run-level `w:ins` or `w:del` whose inner
+  text is one line (runs, proof errors, fields, run-property changes; no
+  nested revision, drawing, note or table) is `<ins>body</ins>` or
+  `<del>body</del>` at that span. Author, date, revision id and the
+  original run XML stay in the remainder as a `Wrap`. Editing the body
+  rewrites `w:t` / `w:delText` and keeps the rest; deleting the tag
+  removes the mark, and the report says so. Replacing the tag with
+  ordinary text drops the mark and leaves the words (PutGet). A
+  revision stays a `<keep/>` when it is a move (`w:moveFrom` /
+  `w:moveTo`: the pair shares an id the tags cannot hold), when it
+  wraps a paragraph or table, or when its inner content is not this
+  text. Tracked-change export refuses a change to another author's
+  revision. Paragraph-mark property revisions (`w:pPr/w:rPr/w:ins`)
+  stay in paragraph properties, as they did.
 - **Content controls (docx `w:sdt`):** a rich-text or plain-text control,
   a combo box or drop-down whose displayed value is text, a citation, a
   bibliography, or a `docPartObj` (a heading TOC, a bibliography gallery)
@@ -308,6 +323,13 @@ fields), inline `<keep/>`.
   to `</comment>` on the same line (an empty one is `<comment/>`). The
   highlighted range is ordinary text; the tag sits at the balloon. hwpx and
   pptx refuse it.
+- **Tracked changes:** `<ins>…</ins>` / `<del>…</del>` is a DOCX tracked
+  insertion or deletion's text, raw up to the closer on the same line (an
+  empty one is `<ins/>` / `<del/>`). Author, date and revision id stay in
+  the remainder. Editing the body keeps it a tracked change of that author.
+  Deleting the tag removes the revision mark. hwpx and pptx refuse it.
+  Moves (`w:moveFrom` / `w:moveTo`), revisions that wrap a paragraph or
+  table, and inner content these tags cannot hold stay `<keep/>`.
 
 ### 5.2 Document
 
@@ -538,9 +560,13 @@ schema: 1
     miss a look-alike character, not formatting.
 - Headers, footers and section setup come from the template or the remainder
   at first; exposing their text is a later extension.
-- Tracked changes (`<ins>`, `<del>`) are read-only projections at first.
-  A DOCX comment whose body is ordinary text is `<comment>…</comment>`
-  at the balloon; replies and rich balloons stay placeholders.
+- Tracked changes (`<ins>`, `<del>`): a DOCX run-level insertion or
+  deletion whose inner text is one line is that tag; author, date and id
+  stay in the remainder. Editing the body keeps the revision. Moves,
+  paragraph- or table-wrapping revisions, and inner content the tags
+  cannot hold stay placeholders. A DOCX comment whose body is ordinary
+  text is `<comment>…</comment>` at the balloon; replies and rich balloons
+  stay placeholders.
 
 ### 5.3 Presentation
 

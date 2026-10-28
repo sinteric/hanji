@@ -285,7 +285,11 @@ These are not supported yet:
   the file. Dates, repeating sections, data-bound controls, and
   placeholder text (`showingPlcHdr`) stay placeholders. A comment
   whose body is ordinary text is `<comment>…</comment>` at the balloon,
-  including when it sits inside a content control.
+  including when it sits inside a content control. A tracked insertion
+  or deletion whose text is one line is `<ins>…</ins>` / `<del>…</del>`:
+  editing the body keeps the revision (author and date stay in the
+  file); moves and revisions that wrap a paragraph or table stay
+  placeholders.
 - Editing header, footer and section text.
 - Nested tables. They stay placeholders.
 - hwpx: a table's own position (`table-align`, `table-indent`), which docx

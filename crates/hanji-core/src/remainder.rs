@@ -23,10 +23,10 @@ pub enum Kind {
     /// Zero-width element inside a run. Anchor: a position (+ its run).
     Rmarker,
     /// Inline or block wrapper whose text the model edits (hyperlink,
-    /// smartTag, a field's cached result, a content control). Anchor:
-    /// `[start, end)` in `path`, or from `path`/`start` to `meta.end_path`/
-    /// `end` when the wrapper spans paragraphs (a TOC field, a block
-    /// `w:sdt`).
+    /// smartTag, a field's cached result, a content control, a tracked
+    /// insertion or deletion). Anchor: `[start, end)` in `path`, or from
+    /// `path`/`start` to `meta.end_path`/`end` when the wrapper spans
+    /// paragraphs (a TOC field, a block `w:sdt`).
     Wrap,
     /// Zero-width element between blocks, table rows, cells or cell
     /// paragraphs. Anchor: before the block, row, cell or paragraph at its
