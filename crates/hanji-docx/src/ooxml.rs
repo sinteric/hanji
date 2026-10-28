@@ -34,6 +34,12 @@ pub(crate) fn is_comment(e: &Entry) -> bool {
     e.kind == Kind::Wrap && e.meta.tag == "w:commentReference"
 }
 
+/// A shown tracked insertion or deletion: a length-1 wrap whose XML is the
+/// original `w:ins` / `w:del`.
+pub(crate) fn is_revision(e: &Entry) -> bool {
+    e.kind == Kind::Wrap && matches!(e.meta.tag.as_str(), "w:ins" | "w:del")
+}
+
 /// An inline content control (`w:sdt` around runs): a wrapper whose
 /// children go in `sdtContent`.
 pub(crate) fn is_inline_sdt(e: &Entry) -> bool {

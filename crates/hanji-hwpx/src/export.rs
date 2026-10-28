@@ -910,9 +910,9 @@ impl<'a> Exporter<'a> {
                             .into(),
                     )
                 }
-                Atom::NoteRef(_) | Atom::Math(_) | Atom::Comment(_) => {
+                Atom::NoteRef(_) | Atom::Math(_) | Atom::Comment(_) | Atom::Ins(_) | Atom::Del(_) => {
                     return Err(
-                        "comments, footnotes and math are not supported by the hwpx engine yet"
+                        "comments, footnotes, math and tracked changes are not supported by the hwpx engine yet"
                             .into(),
                     )
                 }

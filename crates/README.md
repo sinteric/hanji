@@ -175,8 +175,10 @@ conversion runs natively only, and the rhwp check is a separate crate
 
 ## Deferred
 
-- §10.2: tracked changes are read as placeholders (`<ins>`, `<del>`, comments)
-  and written only by the docx export option. It refuses: deleting or moving
+- §10.2: tracked changes already in a file are `<ins>` / `<del>` when the
+  inner text is one line (author and date stay in the remainder); moves and
+  block-level revisions stay placeholders. Model edits are written as
+  tracked changes only by the docx export option. It refuses: deleting or moving
   a placeholder other than a picture, symbol or special character in a run
   (fields, other authors' tracked changes, note and comment references,
   content controls, kept tables), text inside a field's result, inserting or

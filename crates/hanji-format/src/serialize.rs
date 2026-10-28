@@ -560,7 +560,7 @@ fn dollar_escapes(inl: &Inline) -> Vec<bool> {
                     || span_starts.contains(&j)
             }
             Atom::Math(_) => true,
-            Atom::Comment(c) => c.contains('$'),
+            Atom::Comment(c) | Atom::Ins(c) | Atom::Del(c) => c.contains('$'),
             Atom::Keep(k) => (k.id.clone() + &k.kind + &k.summary).contains('$'),
             _ => false,
         }) || span_dollar(i + 1)
@@ -710,14 +710,18 @@ fn unit(out: &mut Out, units: &[Unit], i: usize, in_link: bool) {
                 out.text(&format!("<math>{m}</math>"))
             }
         }
-        Atom::Comment(c) => {
-            if c.is_empty() {
-                out.text("<comment/>")
-            } else {
-                out.text(&format!("<comment>{c}</comment>"))
-            }
-        }
+        Atom::Comment(c) => out.text(&raw_tag("comment", c)),
+        Atom::Ins(c) => out.text(&raw_tag("ins", c)),
+        Atom::Del(c) => out.text(&raw_tag("del", c)),
         Atom::PageBreak => out.text("<pagebreak/>"),
+    }
+}
+
+fn raw_tag(name: &str, body: &str) -> String {
+    if body.is_empty() {
+        format!("<{name}/>")
+    } else {
+        format!("<{name}>{body}</{name}>")
     }
 }
 

@@ -287,6 +287,8 @@ fn random_inline(r: &mut Rng, notes: &mut Vec<String>, allow_spans: bool) -> Inl
                 Atom::NoteRef(l)
             }
             4 => Atom::Comment(["note", "re-check", "a $ b", ""][r.below(4)].into()),
+            5 => Atom::Ins(["added", "8%", "a $ b", ""][r.below(4)].into()),
+            6 => Atom::Del(["gone", "frog", "a $ b", ""][r.below(4)].into()),
             _ => Atom::Char(*r.pick(ALPHABET)),
         };
         units.push(Unit::new(atom, marks));
@@ -1032,6 +1034,33 @@ fn comment_is_a_raw_body_tag() {
         e[0].contains("<comment> is not closed by </comment>"),
         "{e:?}"
     );
+}
+
+#[test]
+fn ins_and_del_are_raw_body_tags() {
+    let t = doc("see <ins>added</ins> and <del>gone</del> here\n");
+    let d = parse(&t).unwrap();
+    let Block::Para(p) = &d.blocks[0] else {
+        panic!()
+    };
+    let mut ins = vec![];
+    let mut del = vec![];
+    for u in &p.content.units {
+        match &u.atom {
+            Atom::Ins(c) => ins.push(c.as_str()),
+            Atom::Del(c) => del.push(c.as_str()),
+            _ => {}
+        }
+    }
+    assert_eq!(ins, ["added"]);
+    assert_eq!(del, ["gone"]);
+    assert_eq!(roundtrip(&t), t);
+    assert_eq!(roundtrip(&doc("<ins/>\n")), doc("<ins/>\n"));
+    assert_eq!(roundtrip(&doc("<del></del>\n")), doc("<del/>\n"));
+    let e = errors("<ins>x\n");
+    assert!(e[0].contains("<ins> is not closed by </ins>"), "{e:?}");
+    let e = errors("<del author=\"x\">y</del>\n");
+    assert!(e[0].contains("takes no attributes"), "{e:?}");
 }
 
 #[test]

@@ -251,6 +251,8 @@ pub struct Capabilities {
     pub table_place: bool,
     /// DOCX comment balloons as `<comment>…</comment>`.
     pub comments: bool,
+    /// DOCX tracked insertions and deletions as `<ins>`/`<del>`.
+    pub revisions: bool,
 }
 
 impl Capabilities {
@@ -263,6 +265,7 @@ impl Capabilities {
         formatting: false,
         table_place: false,
         comments: false,
+        revisions: false,
     };
 
     /// Direct formatting only (HWPX).
@@ -271,11 +274,12 @@ impl Capabilities {
         ..Capabilities::NONE
     };
 
-    /// Direct formatting, table position and comment balloons (DOCX).
+    /// Direct formatting, table position, comment balloons and tracked changes (DOCX).
     pub const DOCUMENT: Capabilities = Capabilities {
         formatting: true,
         table_place: true,
         comments: true,
+        revisions: true,
         ..Capabilities::NONE
     };
 }
@@ -636,6 +640,12 @@ fn check_inline(
             Atom::Comment(_) if !caps.comments => {
                 err("<comment> cannot be written to this file format yet.".into())
             }
+            Atom::Ins(_) if !caps.revisions => {
+                err("<ins> cannot be written to this file format yet.".into())
+            }
+            Atom::Del(_) if !caps.revisions => {
+                err("<del> cannot be written to this file format yet.".into())
+            }
             Atom::Keep(k) if is_block_keep(&k.id) == Some(true) => err(format!(
                 "placeholder id=\"{}\" stands for a whole block; keep it alone on its own line.",
                 k.id
@@ -848,6 +858,8 @@ pub fn key(a: &Atom) -> u32 {
         Atom::Math(m) => h(3, m),
         Atom::PageBreak => h(4, ""),
         Atom::Comment(c) => h(5, c),
+        Atom::Ins(c) => h(6, c),
+        Atom::Del(c) => h(7, c),
         _ => h(255, ""),
     }
 }

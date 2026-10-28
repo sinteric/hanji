@@ -2511,6 +2511,187 @@ fn a_comment_change_cannot_be_tracked() {
     assert!(m.contains("comment"), "{m}");
 }
 
+fn ins_p(text: &str) -> String {
+    format!(
+        r#"<w:p><w:r><w:t xml:space="preserve">see </w:t></w:r><w:ins w:id="7" w:author="Kim" w:date="2026-01-01T00:00:00Z"><w:r><w:t>{text}</w:t></w:r></w:ins><w:r><w:t xml:space="preserve"> here</w:t></w:r></w:p>"#
+    )
+}
+
+fn del_p(text: &str) -> String {
+    format!(
+        r#"<w:p><w:r><w:t xml:space="preserve">see </w:t></w:r><w:del w:id="8" w:author="Kim" w:date="2026-01-01T00:00:00Z"><w:r><w:delText>{text}</w:delText></w:r></w:del><w:r><w:t xml:space="preserve"> here</w:t></w:r></w:p>"#
+    )
+}
+
+fn move_p() -> String {
+    r#"<w:p><w:moveTo w:id="3" w:author="Kim" w:date="2026-01-01T00:00:00Z"><w:r><w:t>moved</w:t></w:r></w:moveTo></w:p>"#
+        .into()
+}
+
+#[test]
+fn a_plain_insertion_shows_as_ins_text() {
+    let imp = DocxEngine
+        .import(&docx(&ins_p("added"), vec![]), &ImportOptions::default())
+        .unwrap();
+    assert!(
+        imp.text.contains("see <ins>added</ins> here"),
+        "{}",
+        imp.text
+    );
+    assert!(
+        !imp.text.contains("kind=\"tracked-insert\""),
+        "{}",
+        imp.text
+    );
+}
+
+#[test]
+fn a_plain_deletion_shows_as_del_text() {
+    let imp = DocxEngine
+        .import(&docx(&del_p("gone"), vec![]), &ImportOptions::default())
+        .unwrap();
+    assert!(
+        imp.text.contains("see <del>gone</del> here"),
+        "{}",
+        imp.text
+    );
+    assert!(
+        !imp.text.contains("kind=\"tracked-delete\""),
+        "{}",
+        imp.text
+    );
+}
+
+#[test]
+fn a_move_stays_a_placeholder() {
+    let imp = DocxEngine
+        .import(&docx(&move_p(), vec![]), &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("kind=\"tracked-move\""), "{}", imp.text);
+    assert!(!imp.text.contains("<ins>"), "{}", imp.text);
+}
+
+#[test]
+fn unedited_revision_keeps_document_xml() {
+    use hanji_package::xml;
+    let source = docx(&format!("{}{}", ins_p("added"), del_p("gone")), vec![]);
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    let before = package::read(&source).unwrap();
+    let after = package::read(&out).unwrap();
+    assert_eq!(
+        xml::canon_part(package::get(&before, "word/document.xml").unwrap()).unwrap(),
+        xml::canon_part(package::get(&after, "word/document.xml").unwrap()).unwrap()
+    );
+}
+
+#[test]
+fn editing_insertion_text_keeps_author_and_date() {
+    let imp = DocxEngine
+        .import(&docx(&ins_p("added"), vec![]), &ImportOptions::default())
+        .unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "<ins>added</ins>",
+        "<ins>changed</ins>",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains(">changed</w:t>"), "{xml}");
+    assert!(xml.contains("w:author=\"Kim\""), "{xml}");
+    assert!(xml.contains("w:date=\"2026-01-01T00:00:00Z\""), "{xml}");
+    assert!(xml.contains("<w:ins "), "{xml}");
+}
+
+#[test]
+fn editing_deletion_text_keeps_author_and_date() {
+    let imp = DocxEngine
+        .import(&docx(&del_p("gone"), vec![]), &ImportOptions::default())
+        .unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "<del>gone</del>",
+        "<del>removed</del>",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains(">removed</w:delText>"), "{xml}");
+    assert!(xml.contains("w:author=\"Kim\""), "{xml}");
+    assert!(xml.contains("<w:del "), "{xml}");
+}
+
+#[test]
+fn deleting_the_ins_marker_removes_the_revision() {
+    let imp = DocxEngine
+        .import(&docx(&ins_p("added"), vec![]), &ImportOptions::default())
+        .unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "see <ins>added</ins> here",
+        "see  here",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report.removed.iter().any(|x| {
+            x.1 == Kind::Wrap
+                && (x.2.contains("the tracked insertion was deleted")
+                    || x.2.contains("all of its text"))
+        }),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    let xml = doc_xml(&out);
+    assert!(!xml.contains("<w:ins "), "{xml}");
+    assert!(!xml.contains("added"), "{xml}");
+}
+
+#[test]
+fn replacing_ins_with_ordinary_text_drops_the_revision_mark() {
+    let imp = DocxEngine
+        .import(&docx(&ins_p("added"), vec![]), &ImportOptions::default())
+        .unwrap();
+    let r = edit(&imp.remainder, &imp.text, "<ins>added</ins>", "added", CAPS).unwrap();
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    let xml = doc_xml(&out);
+    assert!(!xml.contains("<w:ins "), "{xml}");
+    assert!(xml.contains("added"), "{xml}");
+}
+
 fn sdt(pr: &str, content: &str) -> String {
     format!("<w:sdt><w:sdtPr>{pr}</w:sdtPr><w:sdtContent>{content}</w:sdtContent></w:sdt>")
 }

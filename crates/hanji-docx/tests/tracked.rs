@@ -231,14 +231,9 @@ fn what_cannot_be_tracked_is_refused_with_the_reason() {
     let other = r#"<w:p><w:r><w:t xml:space="preserve">one </w:t></w:r><w:ins w:id="7" w:author="kim" w:date="2026-01-01T00:00:00Z"><w:r><w:t>x</w:t></w:r></w:ins><w:r><w:t xml:space="preserve"> two</w:t></w:r></w:p>"#;
     let pkg = docx(other);
     let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
-    let keep = imp
-        .text
-        .lines()
-        .find(|l| l.contains("<keep"))
-        .unwrap()
-        .to_string();
-    let m = refused(run(other, &[(keep.as_str(), "one two")]));
-    assert!(m.contains("another author"), "{m}");
+    assert!(imp.text.contains("<ins>x</ins>"), "{}", imp.text);
+    let m = refused(run(other, &[("one <ins>x</ins> two", "one two")]));
+    assert!(m.contains("another author") || m.contains("tracked"), "{m}");
     // Text next to it is fine.
     run(other, &[(" two", " three")]).unwrap();
     // A spanning field's result (begin in one paragraph, end in the next).

@@ -13,6 +13,7 @@ pub mod format;
 pub mod import;
 pub mod numbering;
 pub mod ooxml;
+pub mod revision;
 pub mod safety;
 pub mod styles;
 pub mod track;
