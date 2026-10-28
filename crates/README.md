@@ -190,7 +190,9 @@ conversion runs natively only, and the rhwp check is a separate crate
   direct changes. Word itself has not opened these files yet (§9).
 - §10.5: header, footer and footnote text. Those parts are copied through, and
   `[^1]`, links, `<field>` and `$math$` parse but the docx engine refuses them
-  on export.
+  on export. hwpx writes `$…$` / `<math>…</math>` as a Hancom equation
+  (`hp:equation`): an existing object's script is that math, and a new
+  `$…$` creates one; Hancom's cached box (`hp:sz`) is left as stored.
 - §10.8 leftovers: `gridBefore`/`gridAfter`, nested tables and row-level
   content controls stay block placeholders (4 of the corpus's 29 tables, 40
   of the table survey's 506 docx tables). Zero-width markers between rows,
@@ -205,6 +207,11 @@ conversion runs natively only, and the rhwp check is a separate crate
 
 hwpx, in addition:
 
+- Equations (`hp:equation`) whose script is ordinary one-line text are
+  `$…$` / `<math>…</math>`; size, baseline, font and colour stay in the
+  remainder. An edited script keeps those attributes and Hancom's cached
+  box (`hp:sz`); Hancom lays the formula out again when it opens the file.
+  An empty script or one holding a newline or `</math>` stays a placeholder.
 - 누름틀 (click-here) and other fields: their begin and end controls are
   durable markers and the value is ordinary editable text; `<field name=…>`
   (§5.1) is not produced or accepted yet.

@@ -64,6 +64,32 @@ fn skip_raw<'a>(rest: &'a str, name: &str) -> Option<&'a str> {
     after.find(&close).map(|k| &after[k + close.len()..])
 }
 
+/// Skip `$…$` or `<math>…</math>` at the start of `rest` (the math grammar).
+fn skip_math(rest: &str) -> Option<&str> {
+    if let Some(after) = rest.strip_prefix("<math>") {
+        return after.find("</math>").map(|k| &after[k + "</math>".len()..]);
+    }
+    let rest = rest.strip_prefix('$')?;
+    let mut chars = rest.char_indices();
+    let (_, first) = chars.next()?;
+    if first.is_whitespace() {
+        return None;
+    }
+    let mut prev = first;
+    for (i, c) in chars {
+        if c == '$' && !prev.is_whitespace() {
+            let next = rest[i + 1..].chars().next();
+            if next.is_some_and(|d| d.is_ascii_digit()) {
+                prev = c;
+                continue;
+            }
+            return Some(&rest[i + 1..]);
+        }
+        prev = c;
+    }
+    None
+}
+
 /// The words of a text, whatever the markup: its front matter, style
 /// section, tags (placeholders and comment bodies included), braces and
 /// punctuation left out.
@@ -79,6 +105,8 @@ fn plain(text: &str) -> String {
                 .or_else(|| skip_raw(rest, "ins"))
                 .or_else(|| skip_raw(rest, "del"))
             {
+                rest = after;
+            } else if let Some(after) = skip_math(rest) {
                 rest = after;
             } else if rest.starts_with('<') {
                 let end = if rest.starts_with("<keep ") {
@@ -103,8 +131,9 @@ fn plain(text: &str) -> String {
 
 /// The ids of the placeholders a text has, in order: `<keep/>` ids, then a
 /// synthetic `c{n}` / `i{n}` / `d{n}` for each `<comment>` / `<ins>` /
-/// `<del>` conversion drops.
-fn keep_ids(text: &str) -> Vec<String> {
+/// `<del>` conversion drops, then `m{n}` for each `$…$` / `<math>` the
+/// target cannot write.
+fn keep_ids(text: &str, math: bool) -> Vec<String> {
     let mut ids: Vec<String> = text
         .split("<keep id=\"")
         .skip(1)
@@ -113,6 +142,7 @@ fn keep_ids(text: &str) -> Vec<String> {
     let mut comments = 0usize;
     let mut inserts = 0usize;
     let mut deletes = 0usize;
+    let mut n_math = 0usize;
     let mut rest = text;
     while !rest.is_empty() {
         if let Some(after) = skip_raw(rest, "comment") {
@@ -133,7 +163,19 @@ fn keep_ids(text: &str) -> Vec<String> {
             rest = after;
             continue;
         }
-        match rest.find('<') {
+        if let Some(after) = skip_math(rest) {
+            if math {
+                n_math += 1;
+                ids.push(format!("m{n_math}"));
+            }
+            rest = after;
+            continue;
+        }
+        let next = match (rest.find('<'), rest.find('$')) {
+            (Some(a), Some(b)) => Some(a.min(b)),
+            (a, b) => a.or(b),
+        };
+        match next {
             Some(0) => rest = &rest[1..],
             Some(i) => rest = &rest[i..],
             None => break,
@@ -195,7 +237,7 @@ fn every_document_of_the_corpus_crosses_both_ways_with_its_text() {
             "{path}: the text changed"
         );
         // Every placeholder is in the report, each once.
-        let mut ids = keep_ids(&source);
+        let mut ids = keep_ids(&source, other == Format::Docx);
         let mut named: Vec<String> = c.placeholders.iter().map(|p| p.id.clone()).collect();
         ids.sort();
         named.sort();

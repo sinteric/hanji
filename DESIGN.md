@@ -319,6 +319,19 @@ fields), inline `<keep/>`.
   otherwise. *Why:* it is the smallest rule that keeps `$5 and $10` as text.
   It needs no new escape, the tag joins the existing tag set, and the common
   `$x^2$` is unchanged.
+- **Equations (hwpx):** an `hp:equation` whose script is ordinary one-line
+  text (not empty, and not holding `</math>`) is that math: `$…$` or
+  `<math>…</math>`, the script the body. Size, baseline, font, colour and
+  the rest of the object stay in the remainder (`Wrap` `hp:equation`).
+  Editing the script writes it back to `hp:script` and keeps those
+  attributes; Hancom's cached box (`hp:sz`) stays as stored, so an edited
+  equation may display at its old size until Hancom lays the formula out
+  again. The paragraph's line layout (`hp:linesegarray`) is dropped when
+  the script changes, as for any other text edit. Deleting the math
+  removes the equation. A new `$…$` writes a new equation (a guessed box;
+  Hancom lays it out when it opens the file). An equation whose script
+  the math grammar cannot hold stays `<keep kind="math"/>`. docx math
+  (OMML) stays a placeholder; pptx refuses `$…$`.
 - **Comment:** `<comment>…</comment>` is a DOCX comment body's text, raw up
   to `</comment>` on the same line (an empty one is `<comment/>`). The
   highlighted range is ordinary text; the tag sits at the balloon. hwpx and

@@ -1,6 +1,6 @@
 //! OWPML (KS X 6101) names and small helpers shared by import and export.
 
-use hanji_package::xml::{Element, Node};
+use hanji_package::xml::{escape_text, Element, Node};
 
 pub const HEADER_PART: &str = "Contents/header.xml";
 pub const CONTENT_PART: &str = "Contents/content.hpf";
@@ -86,6 +86,92 @@ pub fn keep_kind(name: &str) -> String {
         other => other,
     }
     .to_string()
+}
+
+/// The equation script the text can show: ordinary one-line text, not empty
+/// and not holding `</math>` (which would close `<math>`).
+pub fn shown_script(el: &Element) -> Option<String> {
+    if !el.is("hp:equation") {
+        return None;
+    }
+    let body = el.text_of(&["hp:script"]);
+    if body.is_empty() || body.contains('\n') || body.contains('\r') || body.contains("</math>") {
+        return None;
+    }
+    Some(body)
+}
+
+/// Writes `script` into `hp:script`, adding the child when the object has
+/// none. Returns whether the stored text changed.
+pub fn set_script(el: &mut Element, script: &str) -> bool {
+    if el.text_of(&["hp:script"]) == script {
+        return false;
+    }
+    if let Some(s) = el.child_mut("hp:script") {
+        s.children = vec![Node::Text(escape_text(script))];
+        return true;
+    }
+    let mut s = Element::new("hp:script");
+    s.children.push(Node::Text(escape_text(script)));
+    el.children.push(Node::El(s));
+    true
+}
+
+/// A new `hp:equation` for a `$…$` that was not in the file: Hancom's
+/// in-line defaults, a guessed box (`hp:sz`) Hancom replaces when it
+/// lays the formula out.
+pub fn new_equation(id: u32, z_order: u32, script: &str) -> Element {
+    let mut eq = Element::new("hp:equation")
+        .with_attr("id", &id.to_string())
+        .with_attr("zOrder", &z_order.to_string())
+        .with_attr("numberingType", "EQUATION")
+        .with_attr("textWrap", "TOP_AND_BOTTOM")
+        .with_attr("textFlow", "BOTH_SIDES")
+        .with_attr("lock", "0")
+        .with_attr("dropcapstyle", "None")
+        .with_attr("version", "Equation Version 60")
+        .with_attr("baseLine", "85")
+        .with_attr("textColor", "#000000")
+        .with_attr("baseUnit", "1000")
+        .with_attr("lineMode", "CHAR")
+        .with_attr("font", "HYhwpEQ");
+    eq.children.extend([
+        Node::El(
+            Element::new("hp:sz")
+                .with_attr("width", "1000")
+                .with_attr("widthRelTo", "ABSOLUTE")
+                .with_attr("height", "1000")
+                .with_attr("heightRelTo", "ABSOLUTE")
+                .with_attr("protect", "0"),
+        ),
+        Node::El(
+            Element::new("hp:pos")
+                .with_attr("treatAsChar", "1")
+                .with_attr("affectLSpacing", "0")
+                .with_attr("flowWithText", "1")
+                .with_attr("allowOverlap", "0")
+                .with_attr("holdAnchorAndSO", "0")
+                .with_attr("vertRelTo", "PARA")
+                .with_attr("horzRelTo", "PARA")
+                .with_attr("vertAlign", "TOP")
+                .with_attr("horzAlign", "LEFT")
+                .with_attr("vertOffset", "0")
+                .with_attr("horzOffset", "0"),
+        ),
+        Node::El(
+            Element::new("hp:outMargin")
+                .with_attr("left", "56")
+                .with_attr("right", "56")
+                .with_attr("top", "0")
+                .with_attr("bottom", "0"),
+        ),
+        Node::El({
+            let mut s = Element::new("hp:script");
+            s.children.push(Node::Text(escape_text(script)));
+            s
+        }),
+    ]);
+    eq
 }
 
 /// Order of `hh:charPr` children (KS X 6101 `CharShapeType`), for inserting a flag.

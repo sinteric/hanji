@@ -528,6 +528,9 @@ impl<'a> Convert<'a> {
                 Atom::Comment(body) => self.dropped_atom("comment", "c", "comment", body, off(k)),
                 Atom::Ins(body) => self.dropped_atom("tracked-insert", "i", "ins", body, off(k)),
                 Atom::Del(body) => self.dropped_atom("tracked-delete", "d", "del", body, off(k)),
+                Atom::Math(body) if !self.caps.math => {
+                    self.dropped_atom("math", "m", "equation", body, off(k))
+                }
                 _ if u.props.is_empty() => units.push(u.clone()),
                 _ => {
                     let place = self.line(off(k));
@@ -944,6 +947,8 @@ fn not_carried(rem: &Remainder, from: Format, has_items: bool) -> Vec<NotCarried
                 "sdt" | "sdt/block" => {
                     "content controls (the text stays, the control properties do not)"
                 }
+                // Shown as math placeholders; size and placement do not cross.
+                "equation" => continue,
                 // A layout hint Word writes for the page it last rendered.
                 "lastRenderedPageBreak" => continue,
                 "" => "wrapped text (hyperlinks, smart tags) and block markers",
