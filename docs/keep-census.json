@@ -34,7 +34,7 @@
     "files": 102,
     "failed": 0,
     "with_keeps": 61,
-    "keeps": 284
+    "keeps": 268
   },
   "formats": [
     {
@@ -49,7 +49,7 @@
       "files": 16,
       "failed": 0,
       "with_keeps": 12,
-      "keeps": 54
+      "keeps": 38
     },
     {
       "format": "pptx",
@@ -78,12 +78,6 @@
       "kind": "drawing",
       "keeps": 26,
       "files": 10
-    },
-    {
-      "format": "hwpx",
-      "kind": "math",
-      "keeps": 16,
-      "files": 1
     },
     {
       "format": "pptx",
@@ -402,9 +396,8 @@
     {
       "path": "crates/hanji-hwpx/corpus/eq-002.hwpx",
       "format": "hwpx",
-      "keeps": 17,
+      "keeps": 1,
       "kinds": {
-        "math": 16,
         "number": 1
       }
     },

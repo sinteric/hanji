@@ -40,10 +40,10 @@ date.
 | format | files | failed | with keeps | keeps |
 | ------ | ----: | -----: | ---------: | ----: |
 | docx   |    13 |      0 |         12 |   139 |
-| hwpx   |    16 |      0 |         12 |    54 |
+| hwpx   |    16 |      0 |         12 |    38 |
 | pptx   |    27 |      0 |         16 |    44 |
 | xlsx   |    46 |      0 |         21 |    47 |
-| all    |   102 |      0 |         61 |   284 |
+| all    |   102 |      0 |         61 |   268 |
 
 ## By kind, most first
 
@@ -51,7 +51,6 @@ date.
 | ------ | ------------------ | ----: | ----: |
 | docx   | field              |    73 |     3 |
 | docx   | drawing            |    26 |    10 |
-| hwpx   | math               |    16 |     1 |
 | pptx   | table              |    15 |    10 |
 | hwpx   | table              |    13 |     6 |
 | pptx   | field              |    11 |     4 |
@@ -101,7 +100,7 @@ date.
 | `prototype/remainder/corpus/testWORD_2006ml.docx`                    | docx   |    20 | content-control 4, drawing 5, endnote 1, field 2, footnote 1, math 1, object 3, table 1, tracked-move 2 |
 | `prototype/remainder/corpus/testWORD_various.docx`                   | docx   |     2 | drawing 1, footnote 1 |
 | `crates/hanji-hwpx/corpus/basic-table-01.hwpx`                       | hwpx   |     0 | |
-| `crates/hanji-hwpx/corpus/eq-002.hwpx`                               | hwpx   |    17 | math 16, number 1 |
+| `crates/hanji-hwpx/corpus/eq-002.hwpx`                               | hwpx   |     1 | number 1 |
 | `crates/hanji-hwpx/corpus/fdi-2025q2.hwpx`                           | hwpx   |     3 | drawing 1, table 2 |
 | `crates/hanji-hwpx/corpus/field-multipara-clickhere.hwpx`            | hwpx   |     2 | table 2 |
 | `crates/hanji-hwpx/corpus/footnote-01.hwpx`                          | hwpx   |     9 | footnote 9 |
