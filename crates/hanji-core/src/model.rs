@@ -268,9 +268,10 @@ impl Capabilities {
         revisions: false,
     };
 
-    /// Direct formatting only (HWPX).
+    /// Direct formatting and Hancom equations (HWPX).
     pub const FORMATTING: Capabilities = Capabilities {
         formatting: true,
+        math: true,
         ..Capabilities::NONE
     };
 

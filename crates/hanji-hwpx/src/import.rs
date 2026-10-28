@@ -48,8 +48,9 @@ pub struct Stats {
 ///   paragraph style's). Its `hp:t` text is the paragraph's text.
 /// - `hp:ctrl` for columns, header, footer, page numbers, bookmarks and
 ///   field begin/end: a durable `Marker` in its run.
-/// - Objects in a run (tables in text, pictures, shapes, equations, form
-///   controls, footnotes): inline `Keep`.
+/// - Objects in a run (tables in text, pictures, shapes, form controls,
+///   footnotes): inline `Keep`. An `hp:equation` whose script the math
+///   grammar can hold is `$…$` / `<math>…</math>` with a `Wrap`.
 /// - A paragraph holding only tables (side by side or one): one table block
 ///   per table; the paragraph itself is a `Tbl` entry of the first.
 /// - A paragraph with a tracked change, or inside one: a block `Bkeep`.
@@ -902,6 +903,8 @@ impl<'a> Importer<'a> {
                     Some(at),
                     meta,
                 );
+            } else if c.is("hp:equation") {
+                self.equation(c, path, run_id, marks);
             } else {
                 let kind = match c.name.as_str() {
                     "hp:ctrl" => ctrl_kind(c).map_or("control".into(), |k| keep_kind(&k.name)),
@@ -930,6 +933,43 @@ impl<'a> Importer<'a> {
         e.end = Some(end);
         (e.meta.aux_at, e.meta.aux) = tabs.into_iter().unzip();
         Ok(())
+    }
+
+    /// An `hp:equation` whose script the math grammar can hold: a length-1
+    /// wrap over a [`Atom::Math`], holding the original object (DESIGN.md
+    /// §5.1). Size, baseline, font and the rest stay in the wrap.
+    fn equation(&mut self, e: &Element, path: &[usize], run_id: u64, marks: Marks) {
+        let Some(script) = shown_script(e) else {
+            let pos = self.buf.len();
+            let keep = self.keep_entry(Kind::Keep, e, path, Some(pos), Some(run_id), "math");
+            self.push(Atom::Keep(keep), marks);
+            return;
+        };
+        let mut fp_el = e.clone();
+        if let Some(s) = fp_el.child_mut("hp:script") {
+            s.children.clear();
+        }
+        let f = self.fp(&[Some(&fp_el)]);
+        let at = self.buf.len();
+        let idx = self.entry(
+            Kind::Wrap,
+            vec![e.to_xml()],
+            f,
+            path,
+            Some(at),
+            None,
+            Meta {
+                run: Some(run_id),
+                tag: "hp:equation".into(),
+                ..Default::default()
+            },
+        );
+        self.push(Atom::Math(script), marks);
+        let end = self.buf.len();
+        let close = self.seq();
+        let w = &mut self.entries[idx];
+        w.end = Some(end);
+        w.meta.seq_close = close;
     }
 }
 
@@ -1155,6 +1195,16 @@ mod tests {
         );
         let p = fragment("<hp:p><hp:run><hp:t>a</hp:t><hp:secPr/></hp:run></hp:p>");
         assert!(split_section_start(&p).is_none());
+    }
+
+    #[test]
+    fn shown_script_rejects_empty_and_math_close() {
+        let ok = fragment("<hp:equation><hp:script>x^2</hp:script></hp:equation>");
+        assert_eq!(shown_script(&ok).as_deref(), Some("x^2"));
+        let empty = fragment("<hp:equation><hp:script></hp:script></hp:equation>");
+        assert!(shown_script(&empty).is_none());
+        let close = fragment("<hp:equation><hp:script>a&lt;/math&gt;b</hp:script></hp:equation>");
+        assert!(shown_script(&close).is_none());
     }
 
     #[test]

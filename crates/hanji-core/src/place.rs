@@ -902,6 +902,7 @@ impl<'a> Placer<'a> {
         self.spanning_wraps();
         self.comment_anchors();
         self.revision_anchors();
+        self.equation_anchors();
         let al = self.al;
         for p in &al.lenient {
             for e in self.entries_at(p) {
@@ -1324,6 +1325,32 @@ impl<'a> Placer<'a> {
         }
     }
 
+    /// An `hp:equation` wrap must still cover exactly one `$…$` / `<math>`
+    /// atom; replacing it with ordinary text drops the object.
+    fn equation_anchors(&mut self) {
+        let ids: Vec<u64> = self
+            .entries
+            .iter()
+            .filter(|e| e.kind == Kind::Wrap && e.meta.tag == "hp:equation")
+            .map(|e| e.id)
+            .collect();
+        for id in ids {
+            let Some(o) = self.out.get(&id) else {
+                continue;
+            };
+            let Status::Placed { entry, .. } = &o.status else {
+                continue;
+            };
+            if covers_math(self.new, entry) {
+                continue;
+            }
+            self.out.insert(
+                id,
+                Status::Removed("the equation was deleted".into()).into(),
+            );
+        }
+    }
+
     /// A comment balloon wrap must still cover exactly one `<comment>` atom;
     /// range markers of a deleted comment go with it.
     fn comment_anchors(&mut self) {
@@ -1727,11 +1754,19 @@ impl<'a> Placer<'a> {
 }
 
 fn covers_comment(blocks: &[Block], e: &Entry) -> bool {
+    covers_atom(blocks, e, |a| matches!(a, Atom::Comment(_)))
+}
+
+fn covers_math(blocks: &[Block], e: &Entry) -> bool {
+    covers_atom(blocks, e, |a| matches!(a, Atom::Math(_)))
+}
+
+fn covers_atom(blocks: &[Block], e: &Entry, pred: impl Fn(&Atom) -> bool) -> bool {
     let Some(inl) = inline_at(blocks, &e.path) else {
         return false;
     };
     let (s, en) = (e.start.unwrap_or(0), e.end.unwrap_or(0));
-    en == s + 1 && matches!(inl.units.get(s).map(|u| &u.atom), Some(Atom::Comment(_)))
+    en == s + 1 && inl.units.get(s).is_some_and(|u| pred(&u.atom))
 }
 
 fn covers_revision(blocks: &[Block], e: &Entry) -> bool {

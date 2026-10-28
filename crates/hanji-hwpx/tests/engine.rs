@@ -1292,3 +1292,111 @@ fn older_remainders_without_tab_places_keep_their_tabs() {
         canon(&export(&imp.text, &imp.remainder))
     );
 }
+
+fn equation(id: u32, script: &str) -> String {
+    format!(
+        r##"<hp:equation id="{id}" zOrder="{id}" numberingType="EQUATION" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" version="Equation Version 60" baseLine="88" textColor="#000000" baseUnit="900" lineMode="CHAR" font="HYhwpEQ"><hp:sz width="2824" widthRelTo="ABSOLUTE" height="1050" heightRelTo="ABSOLUTE" protect="0"/><hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/><hp:outMargin left="56" right="56" top="0" bottom="0"/><hp:script>{script}</hp:script></hp:equation>"##
+    )
+}
+
+fn p_with(inner: &str) -> String {
+    format!(
+        r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="0">{inner}</hp:run><hp:linesegarray><hp:lineseg textpos="0"/></hp:linesegarray></hp:p>"#
+    )
+}
+
+#[test]
+fn an_equation_shows_as_math() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>값 </hp:t>{}<hp:t> 이다</hp:t>",
+        equation(7, "x^2")
+    ))]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("값 $x^2$ 이다"), "{}", imp.text);
+    assert!(!imp.text.contains("kind=\"math\""), "{}", imp.text);
+}
+
+#[test]
+fn unedited_equation_keeps_the_section() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>값 </hp:t>{}<hp:t> 이다</hp:t>",
+        equation(7, "x^2")
+    ))]);
+    let imp = import(&pkg);
+    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg));
+}
+
+#[test]
+fn editing_the_script_writes_it_back_and_keeps_attributes() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>값 </hp:t>{}<hp:t> 이다</hp:t>",
+        equation(7, "x^2")
+    ))]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "$x^2$", "$y^2$", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = export(&r.text, &r.remainder);
+    let sec = section(&out);
+    assert!(sec.contains("<hp:script>y^2</hp:script>"), "{sec}");
+    assert!(sec.contains(r#"id="7""#), "{sec}");
+    assert!(sec.contains(r#"baseLine="88""#), "{sec}");
+    assert!(sec.contains(r#"font="HYhwpEQ""#), "{sec}");
+    assert!(sec.contains(r##"textColor="#000000""##), "{sec}");
+    assert!(
+        sec.contains(r#"width="2824""#) && sec.contains(r#"height="1050""#),
+        "cached hp:sz stays: {sec}"
+    );
+    assert!(!sec.contains("<hp:linesegarray>"), "{sec}");
+    let back = import(&out);
+    assert!(back.text.contains("$y^2$"), "{}", back.text);
+}
+
+#[test]
+fn deleting_math_removes_the_equation() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>값 </hp:t>{}<hp:t> 이다</hp:t>",
+        equation(7, "x^2")
+    ))]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "값 $x^2$ 이다", "값 이다", CAPS).unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.2.contains("equation") || x.2.contains("all of its text")),
+        "{:?}",
+        r.report
+    );
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(!sec.contains("<hp:equation"), "{sec}");
+    assert!(sec.contains("값 이다") || sec.contains("값이다"), "{sec}");
+}
+
+#[test]
+fn a_new_math_writes_an_equation() {
+    let pkg = hwpx(&[p("본문")]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "본문", "본문 $a+b$", CAPS).unwrap();
+    let out = export(&r.text, &r.remainder);
+    let sec = section(&out);
+    assert!(sec.contains("<hp:equation"), "{sec}");
+    assert!(sec.contains("<hp:script>a+b</hp:script>"), "{sec}");
+    let back = import(&out);
+    assert!(back.text.contains("$a+b$"), "{}", back.text);
+}
+
+#[test]
+fn an_equation_whose_script_the_math_grammar_cannot_hold_stays_a_placeholder() {
+    let pkg = hwpx(&[p_with(&format!(
+        "{}{}",
+        equation(1, ""),
+        equation(2, "a&lt;/math&gt;b")
+    ))]);
+    let imp = import(&pkg);
+    assert_eq!(imp.text.matches("kind=\"math\"").count(), 2, "{}", imp.text);
+    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg));
+}

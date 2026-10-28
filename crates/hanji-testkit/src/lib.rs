@@ -19,6 +19,10 @@ use hanji_package::{package, xml};
 
 pub const CAPS: Capabilities = Capabilities::DOCUMENT;
 
+fn caps(fmt: &dyn Format) -> Capabilities {
+    fmt.engine().capabilities()
+}
+
 /// What the harness needs from an engine.
 pub trait Format {
     fn engine(&self) -> &dyn Engine;
@@ -252,7 +256,7 @@ pub fn ident(n: usize) -> Vec<Option<usize>> {
 /// Where each block of `d` is in its text: `(start, end)`.
 pub fn block_ranges(cx: &Cx, d: &Doc) -> Vec<(usize, usize)> {
     let text = cx.fmt.text_of(&d.blocks, cx.rem);
-    let (_, maps) = cx.fmt.model().resolve(&text, cx.rem, CAPS).unwrap();
+    let (_, maps) = cx.fmt.model().resolve(&text, cx.rem, caps(cx.fmt)).unwrap();
     maps.iter().map(|m| (m.start, m.end)).collect()
 }
 
@@ -1303,7 +1307,7 @@ fn f4_cell_fill(d: &Doc, cx: &Cx) -> Option<Edit> {
 /// The blocks of a text, as the engine's grammar reads it.
 pub fn written(fmt: &dyn Format, text: &str, rem: &Remainder) -> Vec<Block> {
     fmt.model()
-        .resolve(text, rem, CAPS)
+        .resolve(text, rem, caps(fmt))
         .unwrap_or_else(|e| panic!("{}\n{text}", hanji_format::diag::render(&e)))
         .0
 }
@@ -1772,7 +1776,7 @@ fn text_span(
         return differing_span(old_text, new_text);
     }
     if let Some((path, s, e)) = &ed.unit_span {
-        let (_, mut maps) = fmt.model().resolve(old_text, rem, CAPS).unwrap();
+        let (_, mut maps) = fmt.model().resolve(old_text, rem, caps(fmt)).unwrap();
         let pm = match maps.swap_remove(path[0]).kind {
             hanji_core::model::SrcKind::Para(pm) => pm,
             hanji_core::model::SrcKind::Table(cells) => {
@@ -1976,7 +1980,8 @@ pub fn run_corpus_with(
             "{name}: model text does not reparse to itself"
         );
         // GetPut through the whole path: text → parse → place → export.
-        let re = hanji_core::reanchor_rewrite_in(fmt.model(), &rem, &text, &text, CAPS).unwrap();
+        let re =
+            hanji_core::reanchor_rewrite_in(fmt.model(), &rem, &text, &text, caps(fmt)).unwrap();
         assert!(
             re.report.refused.is_empty() && re.report.removed.is_empty(),
             "{name}: GetPut moved entries: {:?}",
@@ -2018,11 +2023,13 @@ pub fn run_corpus_with(
             let short = ename.split_whitespace().next().unwrap().to_string();
             let mut designs: Vec<(&'static str, hanji_core::Reanchored)> = vec![(
                 "C",
-                hanji_core::reanchor_rewrite_in(fmt.model(), &rem, &text, &new_text, CAPS).unwrap(),
+                hanji_core::reanchor_rewrite_in(fmt.model(), &rem, &text, &new_text, caps(fmt))
+                    .unwrap(),
             )];
             if let Some((s, e, ref new)) = span {
-                let r = hanji_core::reanchor_span_in(fmt.model(), &rem, &text, s, e, new, CAPS)
-                    .unwrap_or_else(|e| panic!("{name} {ename}: {e}"));
+                let r =
+                    hanji_core::reanchor_span_in(fmt.model(), &rem, &text, s, e, new, caps(fmt))
+                        .unwrap_or_else(|e| panic!("{name} {ename}: {e}"));
                 assert_eq!(
                     fmt.text_of(&r.new, &r.remainder),
                     new_text,

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Show a Hancom equation (`hp:equation`) whose script is ordinary one-line
+  text as `$…$` / `<math>…</math>` instead of a `<keep kind="math"/>`
+  placeholder. Size, baseline, font, colour and the rest of the object stay
+  as a `Wrap`. Editing the script writes it back to `hp:script` and keeps
+  those attributes; Hancom's cached box (`hp:sz`) is left as stored, so an
+  edited equation may display at its old size until Hancom lays the formula
+  out again. Deleting the math removes the equation; a new `$…$` writes a
+  new one (a guessed box). An empty script, one holding a newline, or one
+  holding `</math>` stays a placeholder. docx OMML math is unchanged.
+  Corpus keeps: 284 → 268 (hwpx `math` 16 → 0). The `number` keep in
+  `eq-002.hwpx` (`hp:autoNum`) is left as-is.
 - Show a single-paragraph DOCX field whose cached result holds a
   hyperlink (or another wrapper) and nested fields — a one-entry TOC's
   `PAGEREF` — as the same `Wrap` as #124/#130, including inside a shown

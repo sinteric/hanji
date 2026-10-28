@@ -11,7 +11,7 @@ use hanji_package::xml::{assemble, escape_text, fragment, Element, Node};
 
 use crate::header::{list_heading, list_num, Header, Style};
 use crate::import::{char_key, dims, layout_key};
-use crate::owpml::char_element;
+use crate::owpml::{self, char_element};
 use crate::{PackageShell, SectionShell};
 
 pub struct Exporter<'a> {
@@ -29,6 +29,11 @@ pub struct Exporter<'a> {
     cell_template: Option<&'a Entry>,
     /// Formatting (§5.2), where the file shows it.
     fmt: Option<Fmt>,
+    /// Next `hp:equation` `id` / `zOrder` for a `$…$` that was not in the file.
+    eq_id: std::cell::Cell<u32>,
+    eq_z: std::cell::Cell<u32>,
+    /// An existing equation to copy size, font and placement from.
+    eq_template: Option<String>,
 }
 
 /// Each paragraph style's values as the text's style section says.
@@ -129,6 +134,9 @@ impl<'a> Exporter<'a> {
             table_template: None,
             cell_template: None,
             fmt: None,
+            eq_id: std::cell::Cell::new(0),
+            eq_z: std::cell::Cell::new(0),
+            eq_template: None,
         };
         for e in entries {
             match e.kind {
@@ -146,6 +154,20 @@ impl<'a> Exporter<'a> {
             }
             if e.kind == Kind::Tc && ex.cell_template.is_none() {
                 ex.cell_template = Some(e);
+            }
+            if e.kind == Kind::Wrap && e.meta.tag == "hp:equation" {
+                if ex.eq_template.is_none() {
+                    ex.eq_template = e.xml.first().cloned();
+                }
+                if let Some(x) = e.xml.first() {
+                    let el = fragment(x);
+                    if let Some(id) = el.get("id").and_then(|s| s.parse().ok()) {
+                        ex.eq_id.set(ex.eq_id.get().max(id));
+                    }
+                    if let Some(z) = el.get("zOrder").and_then(|s| s.parse().ok()) {
+                        ex.eq_z.set(ex.eq_z.get().max(z));
+                    }
+                }
             }
         }
         ex
@@ -610,6 +632,12 @@ impl<'a> Exporter<'a> {
                 }
             }
         }
+        let eqs: HashMap<usize, &Entry> = self
+            .at(path, Kind::Wrap)
+            .into_iter()
+            .filter(|e| e.meta.tag == "hp:equation")
+            .filter_map(|e| Some((e.start?, e)))
+            .collect();
         let bounds: std::collections::HashSet<usize> =
             zruns.iter().map(|z| z.start.unwrap()).collect();
         // Text properties as exported (§5.2): a unit the text states none for
@@ -748,6 +776,7 @@ impl<'a> Exporter<'a> {
                         ms,
                         None,
                         &mut tabs,
+                        &eqs,
                     )?;
                     out.push(node(r));
                 }
@@ -758,7 +787,7 @@ impl<'a> Exporter<'a> {
                         .find_map(|m| m.xml.get(1))
                         .map_or_else(|| empty_run(style.char_pr), |x| fragment(x));
                     r.children.clear();
-                    self.fill_run(&mut r, p, s, s, ms, None, &mut tabs)?;
+                    self.fill_run(&mut r, p, s, s, ms, None, &mut tabs, &eqs)?;
                     out.push(node(r));
                 }
                 It::Seg(si) => {
@@ -790,7 +819,7 @@ impl<'a> Exporter<'a> {
                     unit_cp[a..b].fill(cp);
                     self.set_char_pr(&mut r, cp, old_style, style);
                     let ms = at.get(&Target::Seg(si)).unwrap_or(&none);
-                    self.fill_run(&mut r, p, a, b, ms, own, &mut tabs)?;
+                    self.fill_run(&mut r, p, a, b, ms, own, &mut tabs, &eqs)?;
                     out.push(node(r));
                 }
             }
@@ -828,6 +857,7 @@ impl<'a> Exporter<'a> {
         zw: &[&Entry],
         own: Option<&Entry>,
         tabs: &mut HashMap<u64, usize>,
+        eqs: &HashMap<usize, &Entry>,
     ) -> Result<(), String> {
         let mut by_pos: BTreeMap<usize, Vec<&Entry>> = BTreeMap::new();
         for m in zw {
@@ -904,28 +934,54 @@ impl<'a> Exporter<'a> {
                         r.children.push(node(fragment(x)));
                     }
                 }
+                Atom::Math(script) => {
+                    close(&mut t, r);
+                    r.children.push(node(self.equation(script, eqs.get(&c).copied())));
+                }
                 Atom::PageBreak => {
                     return Err(
                         "a page break inside a paragraph cannot be written to hwpx; write <pagebreak/> on its own line"
                             .into(),
                     )
                 }
-                Atom::NoteRef(_) | Atom::Math(_) | Atom::Comment(_) | Atom::Ins(_) | Atom::Del(_) => {
+                Atom::NoteRef(_) | Atom::Comment(_) | Atom::Ins(_) | Atom::Del(_) => {
                     return Err(
-                        "comments, footnotes, math and tracked changes are not supported by the hwpx engine yet"
+                        "comments, footnotes and tracked changes are not supported by the hwpx engine yet"
                             .into(),
                     )
                 }
                 &_ => {
-                    return Err(
-                        "comments, footnotes and math are not supported by the hwpx engine yet"
-                            .into(),
-                    )
+                    return Err("comments and footnotes are not supported by the hwpx engine yet".into())
                 }
             }
         }
         close(&mut t, r);
         Ok(())
+    }
+
+    /// An existing equation with its (maybe edited) script, or a new one.
+    /// An edit keeps `hp:sz` as stored: Hancom's cached box, which it
+    /// replaces when it lays the formula out.
+    fn equation(&self, script: &str, wrap: Option<&Entry>) -> Element {
+        if let Some(e) = wrap {
+            let mut eq = fragment(&e.xml[0]);
+            owpml::set_script(&mut eq, script);
+            return eq;
+        }
+        let id = self.eq_id.get() + 1;
+        self.eq_id.set(id);
+        let z = self.eq_z.get() + 1;
+        self.eq_z.set(z);
+        match &self.eq_template {
+            Some(x) => {
+                let mut eq = fragment(x);
+                eq.set("id", &id.to_string());
+                eq.set("zOrder", &z.to_string());
+                owpml::set_script(&mut eq, script);
+                eq
+            }
+            None => owpml::new_equation(id, z, script),
+        }
     }
 
     // ------------------------------------------------------------ tables

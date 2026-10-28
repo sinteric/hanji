@@ -272,7 +272,12 @@ These are not supported yet:
   and its objects move only within its box. Pictures, charts and tables
   cannot be created.
 - Links, fields, footnotes and math in documents. They are read as
-  placeholders, and the docx engine refuses new ones on export. In docx, a
+  placeholders, and the docx engine refuses new ones on export. In hwpx, a
+  Hancom equation (`hp:equation`) whose script is ordinary text is `$…$`
+  or `<math>…</math>`: editing the script writes it back and keeps size,
+  baseline and font; Hancom's cached box stays until it lays the formula
+  out again. An empty script or one the math grammar cannot hold stays a
+  placeholder. In docx, a
   hyperlink's text and a field's shown result (a page number, a caption
   number, a cross-reference, a table of contents) are text: editing it
   keeps the address or the field instruction, and Word may compute an
