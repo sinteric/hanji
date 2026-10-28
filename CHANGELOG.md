@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+## [0.7.0] - 2026-10-28
+
+### Added
+
+- Show DOCX run-level tracked insertions and deletions (`w:ins` / `w:del`)
+  whose inner text is one line as `<ins>…</ins>` / `<del>…</del>` (empty:
+  `<ins/>` / `<del/>`) instead of `<keep kind="tracked-insert"/>` /
+  `<keep kind="tracked-delete"/>` placeholders. Author, date, revision id
+  and the original run XML stay as a `Wrap`. Editing the body rewrites
+  `w:t` / `w:delText` and keeps those attributes; deleting the tag removes
+  the mark and is reported; replacing it with ordinary text drops the mark
+  and keeps the words. A new `<ins>` / `<del>` is refused (cannot invent a
+  revision). Moves (`w:moveFrom` / `w:moveTo`), paragraph- or table-wrapping
+  revisions, nested content the tags cannot hold, and paragraph-mark
+  property revisions stay placeholders. hwpx and pptx refuse the tags.
+  Corpus keeps: 315 → 284 (docx `tracked-insert` 17 → 0, `tracked-delete`
+  14 → 0; `tracked-move` 2 unchanged).
 - Show a Hancom equation (`hp:equation`) whose script is ordinary one-line
   text as `$…$` / `<math>…</math>` instead of a `<keep kind="math"/>`
   placeholder. Size, baseline, font, colour and the rest of the object stay
@@ -75,6 +92,11 @@
   `ffData`) stay `<keep kind="field"/>` placeholders. Corpus keeps
   unchanged: 357 (docx `field` still 72 — the leftovers are empty form
   fields, checkboxes, and blank XE/TA).
+
+### Changed
+
+- Corpus `<keep/>` placeholders went 357 → 268 since 0.6.0
+  (`docs/keep-census.md`).
 
 ## 0.6.0 — 2026-10-26
 

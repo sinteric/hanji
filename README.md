@@ -260,7 +260,7 @@ The old binary formats (.doc, .ppt, .xls, .hwp) are not supported.
 
 ## Status and limitations
 
-Version 0.6.0 (release candidate). The format has `schema: 1` and may change before 1.0.
+Version 0.7.0 (release candidate). The format has `schema: 1` and may change before 1.0.
 
 These are not supported yet:
 
