@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `73894d2`
+  (S95.4 / rdocx 0.16.4, rpptx and oxml-layout 0.14.4: Word legacy/modern
+  form-field authoring, mail merge, relationship/style preservation, body
+  read/edit bounds, PowerPoint publisher bounds, CJK line measurement,
+  rendering changes, plus an upstream merge).
+
 ## 0.7.0 — 2026-10-28
 
 - Show DOCX run-level tracked insertions and deletions (`w:ins` / `w:del`)
