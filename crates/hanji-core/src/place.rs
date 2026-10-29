@@ -903,6 +903,7 @@ impl<'a> Placer<'a> {
         self.comment_anchors();
         self.revision_anchors();
         self.equation_anchors();
+        self.note_anchors();
         let al = self.al;
         for p in &al.lenient {
             for e in self.entries_at(p) {
@@ -1320,6 +1321,42 @@ impl<'a> Placer<'a> {
                 "the tracked insertion was deleted"
             } else {
                 "the tracked deletion was deleted"
+            };
+            self.out.insert(id, Status::Removed(what.into()).into());
+        }
+    }
+
+    /// A footnote or endnote wrap must still cover exactly one `[^label]`;
+    /// replacing it with ordinary text drops the note.
+    fn note_anchors(&mut self) {
+        let ids: Vec<u64> = self
+            .entries
+            .iter()
+            .filter(|e| {
+                e.kind == Kind::Wrap
+                    && matches!(
+                        e.meta.tag.as_str(),
+                        "w:footnoteReference" | "w:endnoteReference" | "hp:footNote" | "hp:endNote"
+                    )
+            })
+            .map(|e| e.id)
+            .collect();
+        for id in ids {
+            let Some(o) = self.out.get(&id) else {
+                continue;
+            };
+            let Status::Placed { entry, .. } = &o.status else {
+                continue;
+            };
+            if covers_note(self.new, entry) {
+                continue;
+            }
+            let what = if entry.meta.tag.ends_with("endnoteReference")
+                || entry.meta.tag.ends_with("endNote")
+            {
+                "the endnote was deleted"
+            } else {
+                "the footnote was deleted"
             };
             self.out.insert(id, Status::Removed(what.into()).into());
         }
@@ -1759,6 +1796,10 @@ fn covers_comment(blocks: &[Block], e: &Entry) -> bool {
 
 fn covers_math(blocks: &[Block], e: &Entry) -> bool {
     covers_atom(blocks, e, |a| matches!(a, Atom::Math(_)))
+}
+
+fn covers_note(blocks: &[Block], e: &Entry) -> bool {
+    covers_atom(blocks, e, |a| matches!(a, Atom::NoteRef(_)))
 }
 
 fn covers_atom(blocks: &[Block], e: &Entry, pred: impl Fn(&Atom) -> bool) -> bool {

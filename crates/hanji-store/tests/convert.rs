@@ -90,6 +90,41 @@ fn skip_math(rest: &str) -> Option<&str> {
     None
 }
 
+/// `[^label]: body` at the start of a line (a footnote definition).
+fn footnote_def(line: &str) -> bool {
+    let t = line.trim_start();
+    let Some(rest) = t.strip_prefix("[^") else {
+        return false;
+    };
+    let Some(close) = rest.find("]:") else {
+        return false;
+    };
+    let label = &rest[..close];
+    !label.is_empty()
+        && label
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+}
+
+/// Skip `[^label]` at the start of `rest`.
+fn skip_note_ref(rest: &str) -> Option<(&str, &str)> {
+    let rest = rest.strip_prefix("[^")?;
+    let close = rest.find(']')?;
+    let label = &rest[..close];
+    if label.is_empty()
+        || !label
+            .chars()
+            .all(|c| c.is_alphanumeric() || c == '-' || c == '_')
+    {
+        return None;
+    }
+    Some((&rest[close + 1..], label))
+}
+
+fn endnote_label(label: &str) -> bool {
+    matches!(label.strip_prefix('e'), Some(rest) if !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit()))
+}
+
 /// The words of a text, whatever the markup: its front matter, style
 /// section, tags (placeholders and comment bodies included), braces and
 /// punctuation left out.
@@ -99,12 +134,17 @@ fn plain(text: &str) -> String {
     });
     let mut out = String::new();
     for line in body.lines().filter(|l| !l.starts_with("<style ")) {
+        if footnote_def(line) {
+            continue;
+        }
         let mut rest = line;
         while !rest.is_empty() {
             if let Some(after) = skip_raw(rest, "comment")
                 .or_else(|| skip_raw(rest, "ins"))
                 .or_else(|| skip_raw(rest, "del"))
             {
+                rest = after;
+            } else if let Some((after, _)) = skip_note_ref(rest) {
                 rest = after;
             } else if let Some(after) = skip_math(rest) {
                 rest = after;
@@ -179,6 +219,30 @@ fn keep_ids(text: &str, math: bool) -> Vec<String> {
             Some(0) => rest = &rest[1..],
             Some(i) => rest = &rest[i..],
             None => break,
+        }
+    }
+    let mut footnotes = 0usize;
+    let mut endnotes = 0usize;
+    for line in text.lines() {
+        if footnote_def(line) {
+            continue;
+        }
+        let mut s = line;
+        while let Some(i) = s.find("[^") {
+            s = &s[i..];
+            match skip_note_ref(s) {
+                Some((after, label)) => {
+                    if endnote_label(label) {
+                        endnotes += 1;
+                        ids.push(format!("e{endnotes}"));
+                    } else {
+                        footnotes += 1;
+                        ids.push(format!("f{footnotes}"));
+                    }
+                    s = after;
+                }
+                None => s = &s[2..],
+            }
         }
     }
     ids

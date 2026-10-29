@@ -28,13 +28,13 @@ fn errors_with(body: &str, names: &Names) -> Vec<String> {
 
 #[test]
 fn design_example_is_canonical() {
-    let text = doc("# 3분기 영업 보고\n\n매출은 전년 대비 **12%** 증가했다.[^1]\n\n<div style=\"Note\">신규 고객 34곳 중 21곳이 수도권.</div>\n\n| 지역 | 지점 | 매출 |\n|---|---|---|\n| 서울 | 강남 | 120 |\n| ^^ | 종로 | 95 |\n| 합계 || 215 |\n\n{style=\"Grid Table 4\"}\n| 지역 | 매출 | 증감 |\n|---|---|---|\n| 수도권 | 1,204 | +15% |\n\n<field name=\"작성자\">홍길동</field>\n\n<keep id=\"k3\" kind=\"drawing\" summary=\"조직도, 상자 5개\"/>\n\n<pagebreak/>\n\n[^1]: 내부 집계 기준.\n");
+    let text = doc("# 3분기 영업 보고\n\n매출은 전년 대비 **12%** 증가했다.[^1]\n\n[^1]: 내부 집계 기준.\n\n<div style=\"Note\">신규 고객 34곳 중 21곳이 수도권.</div>\n\n| 지역 | 지점 | 매출 |\n|---|---|---|\n| 서울 | 강남 | 120 |\n| ^^ | 종로 | 95 |\n| 합계 || 215 |\n\n{style=\"Grid Table 4\"}\n| 지역 | 매출 | 증감 |\n|---|---|---|\n| 수도권 | 1,204 | +15% |\n\n<field name=\"작성자\">홍길동</field>\n\n<keep id=\"k3\" kind=\"drawing\" summary=\"조직도, 상자 5개\"/>\n\n<pagebreak/>\n");
     assert_eq!(roundtrip(&text), text);
     let d = parse(&text).unwrap();
-    assert!(matches!(&d.blocks[4], Block::Table(t) if t.style.as_deref() == Some("Grid Table 4")));
-    assert!(matches!(&d.blocks[6], Block::Keep(k) if k.id == "k3"));
-    assert!(matches!(&d.blocks[7], Block::PageBreak));
-    match &d.blocks[3] {
+    assert!(matches!(&d.blocks[5], Block::Table(t) if t.style.as_deref() == Some("Grid Table 4")));
+    assert!(matches!(&d.blocks[7], Block::Keep(k) if k.id == "k3"));
+    assert!(matches!(&d.blocks[8], Block::PageBreak));
+    match &d.blocks[4] {
         Block::Table(t) => {
             assert_eq!(t.rows[2][0], Cell::Up);
             assert_eq!(t.rows[3][2], Cell::text(Inline::plain("215")));
@@ -284,7 +284,11 @@ fn random_inline(r: &mut Rng, notes: &mut Vec<String>, allow_spans: bool) -> Inl
             3 => {
                 let l = format!("n{}", r.below(3));
                 notes.push(l.clone());
-                Atom::NoteRef(l)
+                Atom::NoteRef(Note {
+                    label: l,
+                    body: String::new(),
+                    kind: NoteKind::Footnote,
+                })
             }
             4 => Atom::Comment(["note", "re-check", "a $ b", ""][r.below(4)].into()),
             5 => Atom::Ins(["added", "8%", "a $ b", ""][r.below(4)].into()),
@@ -551,6 +555,10 @@ fn errors_have_line_column_and_form() {
     assert!(e[0].contains("alignment is direct formatting"), "{e:?}");
     let e = errors("x[^9]\n");
     assert!(e[0].contains("footnote [^9] has no definition"), "{e:?}");
+    assert!(
+        errors("x[^1]\n\n[^1]: one\n[^2]: unused\n").is_empty(),
+        "an unused definition is not an error"
+    );
     let e = errors("<div style=\"Note\">x\n");
     assert!(e[0].contains("<div> is not closed by </div>"), "{e:?}");
     let e = parse("# no front matter\n").unwrap_err();

@@ -479,7 +479,7 @@ impl<'a> Exporter<'a> {
         let markers = self.at(path, Kind::Marker);
         let wraps = self.at(path, Kind::Wrap);
         for w in &wraps {
-            if is_comment(w) || is_revision(w) {
+            if is_comment(w) || is_revision(w) || is_note(w) {
                 pkeep.insert(w.start.unwrap(), w);
             }
         }
@@ -613,7 +613,7 @@ impl<'a> Exporter<'a> {
         }
         let mut items: Vec<(usize, u8, u64, It)> = vec![];
         for w in &wraps {
-            if is_comment(w) || is_revision(w) {
+            if is_comment(w) || is_revision(w) || is_note(w) {
                 continue;
             }
             items.push((w.start.unwrap(), 0, w.seq, It::Open(w)));
@@ -838,11 +838,10 @@ impl<'a> Exporter<'a> {
                         "an <ins> or <del> that was not in the file cannot be created".into(),
                     )
                 }
-                Atom::NoteRef(_) | Atom::Math(_) => {
-                    return Err(
-                        "footnotes and math are not supported by the docx engine yet".into(),
-                    )
+                Atom::NoteRef(_) => {
+                    return Err("a footnote that was not in the file cannot be created".into())
                 }
+                Atom::Math(_) => return Err("math is not supported by the docx engine yet".into()),
                 &_ => {}
             }
         }

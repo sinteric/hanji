@@ -467,9 +467,9 @@ fn an_ambiguous_or_missing_old_is_refused_with_its_count() {
         .edit(&o.doc_id, 1, &one("수도권", "서울·경기"))
         .unwrap_err();
     assert_eq!((e.code, e.detail.matches), (Code::AmbiguousMatch, Some(2)));
-    assert_eq!(e.detail.lines, [14, 16]);
+    assert_eq!(e.detail.lines, [14, 18]);
     assert!(
-        e.message.contains("occurs 2 times (lines 14, 16)"),
+        e.message.contains("occurs 2 times (lines 14, 18)"),
         "{}",
         e.message
     );
@@ -504,7 +504,7 @@ fn validator_errors_have_line_column_and_the_allowed_names() {
         .unwrap_err();
     assert_eq!(e.code, Code::Invalid);
     let d = &e.detail.diagnostics[0];
-    assert_eq!((d.line, d.col), (16, 6), "{d:?}");
+    assert_eq!((d.line, d.col), (18, 6), "{d:?}");
     assert!(
         d.message.contains("\"Callout\"") && d.message.contains("\"Note\""),
         "{}",

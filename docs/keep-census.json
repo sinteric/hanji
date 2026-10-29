@@ -33,8 +33,8 @@
   "total": {
     "files": 102,
     "failed": 0,
-    "with_keeps": 61,
-    "keeps": 268
+    "with_keeps": 60,
+    "keeps": 250
   },
   "formats": [
     {
@@ -42,14 +42,14 @@
       "files": 13,
       "failed": 0,
       "with_keeps": 12,
-      "keeps": 139
+      "keeps": 131
     },
     {
       "format": "hwpx",
       "files": 16,
       "failed": 0,
-      "with_keeps": 12,
-      "keeps": 38
+      "with_keeps": 11,
+      "keeps": 28
     },
     {
       "format": "pptx",
@@ -98,12 +98,6 @@
       "files": 4
     },
     {
-      "format": "hwpx",
-      "kind": "footnote",
-      "keeps": 10,
-      "files": 2
-    },
-    {
       "format": "docx",
       "kind": "object",
       "keeps": 8,
@@ -114,12 +108,6 @@
       "kind": "chart",
       "keeps": 8,
       "files": 6
-    },
-    {
-      "format": "docx",
-      "kind": "footnote",
-      "keeps": 7,
-      "files": 7
     },
     {
       "format": "docx",
@@ -206,12 +194,6 @@
       "files": 4
     },
     {
-      "format": "docx",
-      "kind": "endnote",
-      "keeps": 3,
-      "files": 3
-    },
-    {
       "format": "hwpx",
       "kind": "text",
       "keeps": 3,
@@ -239,6 +221,18 @@
       "format": "xlsx",
       "kind": "pivot-table",
       "keeps": 2,
+      "files": 1
+    },
+    {
+      "format": "docx",
+      "kind": "endnote",
+      "keeps": 1,
+      "files": 1
+    },
+    {
+      "format": "docx",
+      "kind": "footnote",
+      "keeps": 1,
       "files": 1
     },
     {
@@ -307,31 +301,27 @@
     {
       "path": "prototype/remainder/corpus/form_footnotes.docx",
       "format": "docx",
-      "keeps": 82,
+      "keeps": 81,
       "kinds": {
         "drawing": 5,
         "field": 69,
-        "footnote": 1,
         "symbol": 7
       }
     },
     {
       "path": "prototype/remainder/corpus/korean-report.docx",
       "format": "docx",
-      "keeps": 2,
+      "keeps": 1,
       "kinds": {
-        "drawing": 1,
-        "footnote": 1
+        "drawing": 1
       }
     },
     {
       "path": "prototype/remainder/corpus/loadAndSave.docx",
       "format": "docx",
-      "keeps": 6,
+      "keeps": 4,
       "kinds": {
         "drawing": 3,
-        "endnote": 1,
-        "footnote": 1,
         "math": 1
       }
     },
@@ -346,10 +336,9 @@
     {
       "path": "prototype/remainder/corpus/tdf124637_sectionMargin.docx",
       "format": "docx",
-      "keeps": 2,
+      "keeps": 1,
       "kinds": {
-        "break": 1,
-        "footnote": 1
+        "break": 1
       }
     },
     {
@@ -365,13 +354,11 @@
     {
       "path": "prototype/remainder/corpus/testWORD_2006ml.docx",
       "format": "docx",
-      "keeps": 20,
+      "keeps": 18,
       "kinds": {
         "content-control": 4,
         "drawing": 5,
-        "endnote": 1,
         "field": 2,
-        "footnote": 1,
         "math": 1,
         "object": 3,
         "table": 1,
@@ -381,10 +368,9 @@
     {
       "path": "prototype/remainder/corpus/testWORD_various.docx",
       "format": "docx",
-      "keeps": 2,
+      "keeps": 1,
       "kinds": {
-        "drawing": 1,
-        "footnote": 1
+        "drawing": 1
       }
     },
     {
@@ -421,18 +407,15 @@
     {
       "path": "crates/hanji-hwpx/corpus/footnote-01.hwpx",
       "format": "hwpx",
-      "keeps": 9,
-      "kinds": {
-        "footnote": 9
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-hwpx/corpus/footnote-tbox-01.hwpx",
       "format": "hwpx",
-      "keeps": 2,
+      "keeps": 1,
       "kinds": {
-        "drawing": 1,
-        "footnote": 1
+        "drawing": 1
       }
     },
     {

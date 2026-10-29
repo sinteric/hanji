@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use hanji_core::{Block, Entry, Kind, ListPlan, StyleSet};
 use hanji_format::styled::{self, StyleTable};
-use hanji_format::{Atom, Cell, Inline, Key, Marks, Props, Value};
+use hanji_format::{Atom, Cell, Inline, Key, Marks, Note, Props, Value};
 use hanji_package::xml::{assemble, escape_text, fragment, Element, Node};
 
 use crate::header::{list_heading, list_num, Header, Style};
@@ -638,6 +638,12 @@ impl<'a> Exporter<'a> {
             .filter(|e| e.meta.tag == "hp:equation")
             .filter_map(|e| Some((e.start?, e)))
             .collect();
+        let notes: HashMap<usize, &Entry> = self
+            .at(path, Kind::Wrap)
+            .into_iter()
+            .filter(|e| matches!(e.meta.tag.as_str(), "hp:footNote" | "hp:endNote"))
+            .filter_map(|e| Some((e.start?, e)))
+            .collect();
         let bounds: std::collections::HashSet<usize> =
             zruns.iter().map(|z| z.start.unwrap()).collect();
         // Text properties as exported (§5.2): a unit the text states none for
@@ -777,6 +783,7 @@ impl<'a> Exporter<'a> {
                         None,
                         &mut tabs,
                         &eqs,
+                        &notes,
                     )?;
                     out.push(node(r));
                 }
@@ -787,7 +794,7 @@ impl<'a> Exporter<'a> {
                         .find_map(|m| m.xml.get(1))
                         .map_or_else(|| empty_run(style.char_pr), |x| fragment(x));
                     r.children.clear();
-                    self.fill_run(&mut r, p, s, s, ms, None, &mut tabs, &eqs)?;
+                    self.fill_run(&mut r, p, s, s, ms, None, &mut tabs, &eqs, &notes)?;
                     out.push(node(r));
                 }
                 It::Seg(si) => {
@@ -819,7 +826,7 @@ impl<'a> Exporter<'a> {
                     unit_cp[a..b].fill(cp);
                     self.set_char_pr(&mut r, cp, old_style, style);
                     let ms = at.get(&Target::Seg(si)).unwrap_or(&none);
-                    self.fill_run(&mut r, p, a, b, ms, own, &mut tabs, &eqs)?;
+                    self.fill_run(&mut r, p, a, b, ms, own, &mut tabs, &eqs, &notes)?;
                     out.push(node(r));
                 }
             }
@@ -858,6 +865,7 @@ impl<'a> Exporter<'a> {
         own: Option<&Entry>,
         tabs: &mut HashMap<u64, usize>,
         eqs: &HashMap<usize, &Entry>,
+        notes: &HashMap<usize, &Entry>,
     ) -> Result<(), String> {
         let mut by_pos: BTreeMap<usize, Vec<&Entry>> = BTreeMap::new();
         for m in zw {
@@ -938,25 +946,41 @@ impl<'a> Exporter<'a> {
                     close(&mut t, r);
                     r.children.push(node(self.equation(script, eqs.get(&c).copied())));
                 }
+                Atom::NoteRef(n) => {
+                    close(&mut t, r);
+                    r.children
+                        .push(node(self.note_ctrl(n, notes.get(&c).copied())?));
+                }
                 Atom::PageBreak => {
                     return Err(
                         "a page break inside a paragraph cannot be written to hwpx; write <pagebreak/> on its own line"
                             .into(),
                     )
                 }
-                Atom::NoteRef(_) | Atom::Comment(_) | Atom::Ins(_) | Atom::Del(_) => {
+                Atom::Comment(_) | Atom::Ins(_) | Atom::Del(_) => {
                     return Err(
-                        "comments, footnotes and tracked changes are not supported by the hwpx engine yet"
+                        "comments and tracked changes are not supported by the hwpx engine yet"
                             .into(),
                     )
                 }
                 &_ => {
-                    return Err("comments and footnotes are not supported by the hwpx engine yet".into())
+                    return Err("comments are not supported by the hwpx engine yet".into())
                 }
             }
         }
         close(&mut t, r);
         Ok(())
+    }
+
+    /// An existing footnote or endnote with its (maybe edited) body.
+    /// A `[^label]` that was not in the file cannot be created.
+    fn note_ctrl(&self, n: &Note, wrap: Option<&Entry>) -> Result<Element, String> {
+        let Some(e) = wrap else {
+            return Err("a footnote that was not in the file cannot be created".into());
+        };
+        let mut ctrl = fragment(&e.xml[0]);
+        owpml::set_note_body(&mut ctrl, &n.body);
+        Ok(ctrl)
     }
 
     /// An existing equation with its (maybe edited) script, or a new one.

@@ -1,5 +1,6 @@
 //! OWPML (KS X 6101) names and small helpers shared by import and export.
 
+use hanji_format::NoteKind;
 use hanji_package::xml::{escape_text, Element, Node};
 
 pub const HEADER_PART: &str = "Contents/header.xml";
@@ -86,6 +87,105 @@ pub fn keep_kind(name: &str) -> String {
         other => other,
     }
     .to_string()
+}
+
+/// Locals a shown footnote or endnote body may hold. A table, drawing or
+/// nested object stays a placeholder.
+const NOTE_SHOWN: &[&str] = &[
+    "footNote",
+    "endNote",
+    "subList",
+    "p",
+    "run",
+    "ctrl",
+    "autoNum",
+    "autoNumFormat",
+    "t",
+    "linesegarray",
+    "lineseg",
+];
+
+/// An `hp:ctrl` whose `hp:footNote` / `hp:endNote` body the text can show:
+/// one paragraph of ordinary text.
+pub fn shown_note(ctrl: &Element) -> Option<(NoteKind, String)> {
+    if !ctrl.is("hp:ctrl") {
+        return None;
+    }
+    let inner = ctrl_kind(ctrl)?;
+    let kind = if inner.is("hp:footNote") {
+        NoteKind::Footnote
+    } else if inner.is("hp:endNote") {
+        NoteKind::Endnote
+    } else {
+        return None;
+    };
+    let paras: Vec<&Element> = inner
+        .child("hp:subList")
+        .map(|s| s.elements().filter(|e| e.is("hp:p")).collect())
+        .unwrap_or_default();
+    if paras.len() != 1 {
+        return None;
+    }
+    let mut ok = true;
+    inner.walk(&mut |e| {
+        if !NOTE_SHOWN.contains(&e.local()) {
+            ok = false;
+        }
+    });
+    if !ok {
+        return None;
+    }
+    let body = inner.text_of(&["hp:t"]);
+    if body.contains('\n') || body.contains('\r') {
+        return None;
+    }
+    Some((kind, body))
+}
+
+/// Writes `body` into the first `hp:t` of a note control, clearing the rest.
+/// Adds a `hp:t` when the note has none. Returns whether the stored text changed.
+pub fn set_note_body(ctrl: &mut Element, body: &str) -> bool {
+    let Some(inner) = ctrl
+        .elements_mut()
+        .find(|e| e.local() == "footNote" || e.local() == "endNote")
+    else {
+        return false;
+    };
+    if inner.text_of(&["hp:t"]) == body {
+        return false;
+    }
+    let mut used = false;
+    set_note_t(inner, body, &mut used);
+    if !used {
+        let mut t = Element::new("hp:t");
+        t.children.push(Node::Text(escape_text(body)));
+        let mut r = Element::new("hp:run");
+        r.children.push(Node::El(t));
+        if let Some(p) = inner
+            .child_mut("hp:subList")
+            .and_then(|s| s.child_mut("hp:p"))
+        {
+            p.children.push(Node::El(r));
+        } else {
+            inner.children.push(Node::El(r));
+        }
+    }
+    true
+}
+
+fn set_note_t(e: &mut Element, body: &str, used: &mut bool) {
+    if e.local() == "t" {
+        if !*used {
+            e.children = vec![Node::Text(escape_text(body))];
+            *used = true;
+        } else {
+            e.children.clear();
+        }
+        return;
+    }
+    for c in e.elements_mut() {
+        set_note_t(c, body, used);
+    }
 }
 
 /// The equation script the text can show: ordinary one-line text, not empty

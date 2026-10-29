@@ -11,6 +11,7 @@ pub mod comment;
 pub mod export;
 pub mod format;
 pub mod import;
+pub mod note;
 pub mod numbering;
 pub mod ooxml;
 pub mod revision;
@@ -200,6 +201,7 @@ impl DocxEngine {
             .map(str::to_string);
         let notes = notes(&parts);
         let shown = comment::shown(&parts);
+        let shown_notes = note::shown(&parts);
         let body_at = root
             .children
             .iter()
@@ -216,6 +218,7 @@ impl DocxEngine {
             default_table,
             &notes,
             &shown,
+            &shown_notes,
             &numbering,
             &fmt,
         )
@@ -304,6 +307,7 @@ impl Engine for DocxEngine {
             self.capabilities(),
         );
         comment::apply(&mut rem.parts, &blocks, &rem.entries).map_err(EngineError::Refused)?;
+        note::apply(&mut rem.parts, &blocks, &rem.entries).map_err(EngineError::Refused)?;
         write_package(&rem, export_document(&blocks, &rem)?)
     }
 }

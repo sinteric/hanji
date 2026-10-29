@@ -272,6 +272,24 @@ fields), inline `<keep/>`.
   deletion of the comment. A shown comment inside a shown content
   control is the same balloon; the control wrap and the comment wrap
   both stay.
+- **Footnotes and endnotes (docx, hwpx):** a note whose body is ordinary
+  text in one paragraph (no table, drawing, content control or nested
+  object)   is `[^label]` at the reference and `[^label]: body` for the
+  definition (this grammar, already in §5.1). Canonical form writes the
+  definition after the block that first uses the label. Import numbers
+  footnotes `1`, `2`, … and endnotes `e1`, `e2`, … so the labels do not
+  collide.
+  Editing the definition rewrites the note's text and keeps the rest
+  (docx: `footnotes.xml` / `endnotes.xml`; hwpx: the `hp:footNote` /
+  `hp:endNote` control, including its number and suffix). Deleting the
+  `[^label]` removes the reference and that note's body, and the report
+  says so; an unused `[^label]:` line is dropped in canonical form, so
+  the definition need not be deleted by hand. A note that was not in the
+  file cannot be created. A note stays a `<keep/>` when its body is not
+  this text (several paragraphs, a table or image, a content control).
+  A footnote inside a drawing (hwpx text box) stays inside that
+  drawing's `<keep/>`. Tracked-change export refuses a change to, move
+  of, or deletion of the reference.
 - **Tracked changes (docx):** a run-level `w:ins` or `w:del` whose inner
   text is one line (runs, proof errors, fields, run-property changes; no
   nested revision, drawing, note or table) is `<ins>body</ins>` or
@@ -356,6 +374,8 @@ schema: 1
 # 3분기 영업 보고
 매출은 전년 대비 **12%** 증가했다.[^1]
 
+[^1]: 내부 집계 기준.
+
 <div style="Note">신규 고객 34곳 중 21곳이 수도권.</div>
 
 - 신규 고객 34곳
@@ -380,8 +400,6 @@ schema: 1
 <field name="작성자">홍길동</field>
 <keep id="k3" kind="drawing" summary="조직도, 상자 5개"/>
 <pagebreak/>
-
-[^1]: 내부 집계 기준.
 ```
 
 - `#`–`######` map to the file's own Heading 1–6; `style` names come from the

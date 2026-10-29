@@ -572,6 +572,47 @@ pub struct FootnoteDef {
     pub content: Inline,
 }
 
+/// A footnote or endnote: `[^label]` at the mark, `[^label]: body` for the
+/// definition (DESIGN.md §5.1). Endnotes are labelled `e1`, `e2`, … so they
+/// do not collide with footnotes.
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Note {
+    pub label: String,
+    /// The definition's text. Empty at parse; resolve fills it from the
+    /// matching `[^label]:` line; import fills it from the note part.
+    pub body: String,
+    pub kind: NoteKind,
+}
+
+/// Whether a [`Note`] is a footnote or an endnote. The text does not
+/// distinguish except by label (`e1` for an endnote); import sets this
+/// from the package, and export writes the wrap the remainder already has.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum NoteKind {
+    Footnote,
+    Endnote,
+}
+
+impl NoteKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            NoteKind::Footnote => "footnote",
+            NoteKind::Endnote => "endnote",
+        }
+    }
+
+    /// Endnote labels are `e` then digits (`e1`), so they do not collide
+    /// with footnotes numbered `1`, `2`, ….
+    pub fn from_label(label: &str) -> NoteKind {
+        match label.strip_prefix('e') {
+            Some(rest) if !rest.is_empty() && rest.chars().all(|c| c.is_ascii_digit()) => {
+                NoteKind::Endnote
+            }
+            _ => NoteKind::Footnote,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct Inline {
     pub units: Vec<Unit>,
@@ -613,8 +654,9 @@ pub enum Atom {
     Break,
     /// Inline `<keep/>`.
     Keep(Keep),
-    /// `[^label]`.
-    NoteRef(String),
+    /// `[^label]`; the definition's body is stored so canonical form can
+    /// emit `[^label]: body` (DESIGN.md §5.1).
+    NoteRef(Note),
     /// `$…$`, kept opaque.
     Math(String),
     /// `<comment>…</comment>`: a DOCX comment body's text (DESIGN.md §5.1).

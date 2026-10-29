@@ -701,7 +701,7 @@ fn unit(out: &mut Out, units: &[Unit], i: usize, in_link: bool) {
         },
         Atom::Break => out.text("<br/>"),
         Atom::Keep(k) => out.text(&keep_tag(k)),
-        Atom::NoteRef(l) => out.text(&format!("[^{l}]")),
+        Atom::NoteRef(n) => out.text(&format!("[^{}]", n.label)),
         Atom::Math(m) => {
             let next_digit = next_char.is_some_and(|c| c.is_ascii_digit());
             if dollar_math_ok(m) && !next_digit {
