@@ -49,9 +49,9 @@ do not discover host fonts. Native `Options` can load `--font-dir`,
 `HANJI_FONT_DIR` and installed fonts. Korean text needs an appropriate font;
 the output reports actual missing characters when one is unavailable.
 
-PPTX/DOCX share one immutable git source for rdocx 0.16.3 and the rpptx /
-oxml-layout 0.14.3 family. The pinned `45ac63f51e23ff8c82f276a51ddd48ca6e5eb085`
-(sinteric/rdocx main) merges upstream S95.2 and S95.3 on top of S95.11, S94
+PPTX/DOCX share one immutable git source for rdocx 0.16.4 and the rpptx /
+oxml-layout 0.14.4 family. The pinned `73894d216764a21801aff08c83ffc58f4fa3b11e`
+(sinteric/rdocx main) merges upstream S95.4 on top of S95.2, S95.3, S95.11, S94
 (zip 9.0.3), S93 and the chart-legend-omitted layout diagnostic
 (sinteric/rdocx#20).
 This is a renderer-family update, not an isolated syntax patch. HWPX uses rhwp 0.8.7 from sinteric/rhwp main
