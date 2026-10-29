@@ -1,7 +1,7 @@
 //! The resolved model: the text's blocks with style names resolved against
 //! the file's style set. Remainder anchors refer to paths in it.
 
-use hanji_format::{self as fmt, Atom, Cell, Diagnostic, Inline, Props};
+use hanji_format::{self as fmt, Atom, Cell, Diagnostic, FootnoteDef, Inline, Props};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -268,19 +268,22 @@ impl Capabilities {
         revisions: false,
     };
 
-    /// Direct formatting and Hancom equations (HWPX).
+    /// Direct formatting, Hancom equations and footnotes (HWPX).
     pub const FORMATTING: Capabilities = Capabilities {
         formatting: true,
         math: true,
+        footnotes: true,
         ..Capabilities::NONE
     };
 
-    /// Direct formatting, table position, comment balloons and tracked changes (DOCX).
+    /// Direct formatting, table position, comment balloons, tracked changes
+    /// and footnotes (DOCX).
     pub const DOCUMENT: Capabilities = Capabilities {
         formatting: true,
         table_place: true,
         comments: true,
         revisions: true,
+        footnotes: true,
         ..Capabilities::NONE
     };
 }
@@ -319,12 +322,19 @@ pub enum SrcKind {
 
 /// The source of each block [`resolve`] returns, in the same order:
 /// footnote definitions are not blocks of the model, and each list item is one.
+/// A `[^label]:` line that follows a block is part of that block's range, so
+/// deleting the reference is one exact span (the definition is not a distant
+/// edit at the end of the file).
 pub fn block_maps(parsed: &fmt::Parsed) -> Vec<BlockSrc> {
-    let mut out = vec![];
+    let mut out: Vec<BlockSrc> = vec![];
     for (b, m) in parsed.doc.blocks.iter().zip(&parsed.map.blocks) {
-        if !matches!(b, fmt::Block::FootnoteDef(_)) {
-            push_block_map(&mut out, m);
+        if matches!(b, fmt::Block::FootnoteDef(_)) {
+            if let Some(prev) = out.last_mut() {
+                prev.end = prev.end.max(m.end);
+            }
+            continue;
         }
+        push_block_map(&mut out, m);
     }
     out
 }
@@ -364,6 +374,28 @@ pub fn resolve(
     let mut out = vec![];
     let mut errs = vec![];
     check_styles(parsed, text, styles, caps, &mut errs);
+    let mut defs = std::collections::HashMap::new();
+    for (b, m) in parsed.doc.blocks.iter().zip(&parsed.map.blocks) {
+        let fmt::Block::FootnoteDef(f) = b else {
+            continue;
+        };
+        if !caps.footnotes {
+            continue;
+        }
+        match plain_note(&f.content) {
+            Some(body) => {
+                defs.insert(f.label.clone(), body);
+            }
+            None => {
+                let line = 1 + text[..m.start].matches('\n').count();
+                errs.push(Diagnostic::new(
+                    line,
+                    1,
+                    "a footnote's text is ordinary characters; write no marks, placeholders or tags.",
+                ));
+            }
+        }
+    }
     // Line of each block, counted incrementally (blocks are in text order).
     let (mut line, mut counted) = (1, 0);
     for (b, m) in parsed.doc.blocks.iter().zip(&parsed.map.blocks) {
@@ -389,11 +421,12 @@ pub fn resolve(
                     fmt::ParaStyle::Named(s) => s.clone(),
                     _ => styles.default_paragraph.clone(),
                 };
-                check_inline(&p.content, caps, is_block_keep, &mut err);
-                check_props(&p.props, &p.content, caps, &mut err);
+                let content = with_notes(p.content.clone(), &defs);
+                check_inline(&content, caps, is_block_keep, &mut err);
+                check_props(&p.props, &content, caps, &mut err);
                 out.push(Block::Para(Para {
                     style,
-                    content: p.content.clone(),
+                    content,
                     item: None,
                     props: p.props.clone(),
                 }));
@@ -421,6 +454,7 @@ pub fn resolve(
                 for c in rows.iter_mut().flatten() {
                     if let Cell::Text(ps) = c {
                         for p in ps {
+                            p.content = with_notes(p.content.clone(), &defs);
                             check_inline(&p.content, caps, is_block_keep, &mut err);
                             check_props(&p.props, &p.content, caps, &mut err);
                             if p.style.as_deref() == Some(styles.default_paragraph.as_str()) {
@@ -447,8 +481,9 @@ pub fn resolve(
             fmt::Block::List(items) => {
                 let mut margin = None;
                 for it in items {
-                    check_inline(&it.content, caps, is_block_keep, &mut err);
-                    check_props(&it.props, &it.content, caps, &mut err);
+                    let content = with_notes(it.content.clone(), &defs);
+                    check_inline(&content, caps, is_block_keep, &mut err);
+                    check_props(&it.props, &content, caps, &mut err);
                     if it.style.is_some() && !caps.formatting {
                         err(NO_FORMATTING.into());
                     }
@@ -469,7 +504,7 @@ pub fn resolve(
                     };
                     out.push(Block::Para(Para {
                         style,
-                        content: it.content.clone(),
+                        content,
                         item: Some(item),
                         props: it.props.clone(),
                     }));
@@ -635,8 +670,9 @@ fn check_inline(
             Atom::Math(_) if !caps.math => {
                 err("math cannot be written to this file format yet.".into())
             }
-            Atom::NoteRef(l) if !caps.footnotes => err(format!(
-                "footnote [^{l}] cannot be written to this file format yet."
+            Atom::NoteRef(n) if !caps.footnotes => err(format!(
+                "footnote [^{}] cannot be written to this file format yet.",
+                n.label
             )),
             Atom::Comment(_) if !caps.comments => {
                 err("<comment> cannot be written to this file format yet.".into())
@@ -723,6 +759,7 @@ pub fn unresolve(
         })
         .collect();
     let blocks = &blocks[..];
+    let mut seen = std::collections::HashSet::new();
     for b in blocks {
         if let Block::Para(Para {
             content,
@@ -741,10 +778,14 @@ pub fn unresolve(
             };
             match out.last_mut() {
                 Some(fmt::Block::List(items)) if !it.first => items.push(fi),
-                _ => out.push(fmt::Block::List(vec![fi])),
+                _ => {
+                    emit_note_defs(&mut out, &mut seen);
+                    out.push(fmt::Block::List(vec![fi]));
+                }
             }
             continue;
         }
+        emit_note_defs(&mut out, &mut seen);
         out.push(match b {
             // A Document has no heads.
             Block::Head(_) => continue,
@@ -775,6 +816,7 @@ pub fn unresolve(
             }
         });
     }
+    emit_note_defs(&mut out, &mut seen);
     // The style section: the default style, then every style the text
     // uses, in order of first use (a style no paragraph uses has no line;
     // the file keeps it).
@@ -797,6 +839,78 @@ pub fn unresolve(
     };
     d.normalize();
     d
+}
+
+/// `[^label]: body` for each new note reference in the last block.
+fn emit_note_defs(out: &mut Vec<fmt::Block>, seen: &mut std::collections::HashSet<String>) {
+    let extra = match out.last() {
+        Some(fmt::Block::Para(p)) => defs_from(std::iter::once(&p.content), seen),
+        Some(fmt::Block::List(items)) => defs_from(items.iter().map(|i| &i.content), seen),
+        Some(fmt::Block::Table(t)) => {
+            let mut inls = vec![];
+            for c in t.rows.iter().flatten() {
+                if let Cell::Text(ps) = c {
+                    for p in ps {
+                        inls.push(&p.content);
+                    }
+                }
+            }
+            defs_from(inls, seen)
+        }
+        _ => return,
+    };
+    out.extend(extra);
+}
+
+fn defs_from<'a>(
+    inls: impl IntoIterator<Item = &'a Inline>,
+    seen: &mut std::collections::HashSet<String>,
+) -> Vec<fmt::Block> {
+    let mut out = vec![];
+    for inl in inls {
+        for u in &inl.units {
+            let Atom::NoteRef(n) = &u.atom else { continue };
+            if seen.insert(n.label.clone()) {
+                out.push(fmt::Block::FootnoteDef(FootnoteDef {
+                    label: n.label.clone(),
+                    content: Inline::plain(&n.body),
+                }));
+            }
+        }
+    }
+    out
+}
+
+/// Copy each definition's body onto its `[^label]` so canonical form and
+/// export see the edited text. The label is what re-anchoring keys on.
+fn with_notes(mut content: Inline, defs: &std::collections::HashMap<String, String>) -> Inline {
+    for u in &mut content.units {
+        if let Atom::NoteRef(n) = &mut u.atom {
+            if let Some(body) = defs.get(&n.label) {
+                n.body = body.clone();
+            }
+        }
+    }
+    content
+}
+
+/// A footnote definition the text can round-trip: ordinary characters, no
+/// marks, placeholders, math or nested notes.
+fn plain_note(i: &Inline) -> Option<String> {
+    if !i.spans.is_empty() {
+        return None;
+    }
+    let mut s = String::new();
+    for u in &i.units {
+        if !u.marks.is_empty() || !u.props.is_empty() {
+            return None;
+        }
+        match u.atom {
+            Atom::Char(c) => s.push(c),
+            _ => return None,
+        }
+    }
+    Some(s)
 }
 
 /// Units of every paragraph position in document order: `(path, Some(content))`
@@ -855,7 +969,7 @@ pub fn key(a: &Atom) -> u32 {
         Atom::Char(c) => *c as u32,
         Atom::Break => '\n' as u32,
         Atom::Keep(k) => h(1, &k.id),
-        Atom::NoteRef(l) => h(2, l),
+        Atom::NoteRef(n) => h(2, &n.label),
         Atom::Math(m) => h(3, m),
         Atom::PageBreak => h(4, ""),
         Atom::Comment(c) => h(5, c),

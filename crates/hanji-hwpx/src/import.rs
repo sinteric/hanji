@@ -8,7 +8,7 @@ use hanji_core::{
     Block, Entry, KeepIds, Kind, ListDefs, ListItem, Meta, Para, StyleDef, StyleSet, Table,
 };
 use hanji_format::styled::{self, StyleTable};
-use hanji_format::{Atom, Cell, CellPara, Inline, Keep, Key, Marks, Props, Unit};
+use hanji_format::{Atom, Cell, CellPara, Inline, Keep, Key, Marks, Note, NoteKind, Props, Unit};
 use hanji_package::clip;
 use hanji_package::xml::{canon, fp, is_blank, unescape, Element, Node, Scope};
 
@@ -49,8 +49,11 @@ pub struct Stats {
 /// - `hp:ctrl` for columns, header, footer, page numbers, bookmarks and
 ///   field begin/end: a durable `Marker` in its run.
 /// - Objects in a run (tables in text, pictures, shapes, form controls,
-///   footnotes): inline `Keep`. An `hp:equation` whose script the math
-///   grammar can hold is `$…$` / `<math>…</math>` with a `Wrap`.
+///   footnotes whose body is not ordinary text): inline `Keep`. An
+///   `hp:equation` whose script the math grammar can hold is `$…$` /
+///   `<math>…</math>` with a `Wrap`. A footnote or endnote whose body is
+///   ordinary text in one paragraph is `[^label]` / `[^label]: body`
+///   with a `Wrap`.
 /// - A paragraph holding only tables (side by side or one): one table block
 ///   per table; the paragraph itself is a `Tbl` entry of the first.
 /// - A paragraph with a tracked change, or inside one: a block `Bkeep`.
@@ -83,6 +86,9 @@ pub struct Importer<'a> {
     /// The character shape of each unit of the open paragraph (`u32::MAX`
     /// outside a run), for its layout cache's key.
     unit_cp: Vec<u32>,
+    /// Next footnote / endnote label (`1`, `2`, … / `e1`, `e2`, …).
+    fn_n: u32,
+    en_n: u32,
 }
 
 /// A list item's indent: its level's, which a new item, or one the text
@@ -108,6 +114,8 @@ impl<'a> Importer<'a> {
             table,
             text_base: Props::new(),
             unit_cp: vec![],
+            fn_n: 0,
+            en_n: 0,
             entries: vec![],
             next_id: 1,
             next_seq: 1000,
@@ -903,6 +911,8 @@ impl<'a> Importer<'a> {
                     Some(at),
                     meta,
                 );
+            } else if c.is("hp:ctrl") && shown_note(c).is_some() {
+                self.note(c, path, run_id, marks);
             } else if c.is("hp:equation") {
                 self.equation(c, path, run_id, marks);
             } else {
@@ -965,6 +975,59 @@ impl<'a> Importer<'a> {
             },
         );
         self.push(Atom::Math(script), marks);
+        let end = self.buf.len();
+        let close = self.seq();
+        let w = &mut self.entries[idx];
+        w.end = Some(end);
+        w.meta.seq_close = close;
+    }
+
+    /// An `hp:ctrl` whose footnote or endnote body the text can show: a
+    /// length-1 wrap over a [`Atom::NoteRef`], holding the original control
+    /// (DESIGN.md §5.1). Number, suffix and layout stay in the wrap.
+    fn note(&mut self, c: &Element, path: &[usize], run_id: u64, marks: Marks) {
+        let Some((kind, body)) = shown_note(c) else {
+            let pos = self.buf.len();
+            let keep = self.keep_entry(Kind::Keep, c, path, Some(pos), Some(run_id), "footnote");
+            self.push(Atom::Keep(keep), marks);
+            return;
+        };
+        let label = match kind {
+            NoteKind::Footnote => {
+                self.fn_n += 1;
+                self.fn_n.to_string()
+            }
+            NoteKind::Endnote => {
+                self.en_n += 1;
+                format!("e{}", self.en_n)
+            }
+        };
+        let mut fp_el = c.clone();
+        fp_el.walk_mut(&mut |e| {
+            if e.local() == "t" {
+                e.children.clear();
+            }
+        });
+        let f = self.fp(&[Some(&fp_el)]);
+        let at = self.buf.len();
+        let tag = match kind {
+            NoteKind::Footnote => "hp:footNote",
+            NoteKind::Endnote => "hp:endNote",
+        };
+        let idx = self.entry(
+            Kind::Wrap,
+            vec![c.to_xml()],
+            f,
+            path,
+            Some(at),
+            None,
+            Meta {
+                run: Some(run_id),
+                tag: tag.into(),
+                ..Default::default()
+            },
+        );
+        self.push(Atom::NoteRef(Note { label, body, kind }), marks);
         let end = self.buf.len();
         let close = self.seq();
         let w = &mut self.entries[idx];

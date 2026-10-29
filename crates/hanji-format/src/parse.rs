@@ -1508,7 +1508,14 @@ impl<'a> Parser<'a> {
                             fail!(x, "a footnote reference is [^label], with a label of letters, digits, - or _; write \\[ for a literal [.");
                         }
                         self.refs.push((line, col_of(x), label.clone()));
-                        st.push(off, Atom::NoteRef(label));
+                        st.push(
+                            off,
+                            Atom::NoteRef(Note {
+                                kind: NoteKind::from_label(&label),
+                                body: String::new(),
+                                label,
+                            }),
+                        );
                         x = end + 1;
                         continue;
                     }
@@ -1942,9 +1949,9 @@ impl<'a> Parser<'a> {
                     *col,
                     format!("footnote [^{label}] is defined twice."),
                 ));
-            } else if !self.refs.iter().any(|r| &r.2 == label) {
-                errs.push((*line, *col, format!("footnote [^{label}] is defined but never referenced; reference it with [^{label}] or delete the definition.")));
             }
+            // An unused definition is dropped in canonical form: deleting a
+            // reference does not require also deleting its `[^label]:` line.
         }
         for (l, c, m) in errs {
             self.errors.push(Diagnostic {

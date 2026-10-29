@@ -815,7 +815,7 @@ fn refusals_are_exit_status_1_with_the_reason() {
         (e["code"].as_str(), e["matches"].as_u64()),
         (Some("ambiguous_match"), Some(2))
     );
-    assert_eq!(e["lines"], serde_json::json!([14, 16]));
+    assert_eq!(e["lines"], serde_json::json!([14, 18]));
     // Validator errors: line, column, allowed names.
     let e = env.err(&[
         "edit",
@@ -833,7 +833,7 @@ fn refusals_are_exit_status_1_with_the_reason() {
             e["diagnostics"][0]["line"].as_u64(),
             e["diagnostics"][0]["col"].as_u64()
         ),
-        (Some(16), Some(6))
+        (Some(18), Some(6))
     );
     assert!(e["diagnostics"][0]["message"]
         .as_str()

@@ -5,7 +5,9 @@
 use std::collections::HashMap;
 
 use hanji_core::{Block, Entry, KeepIds, Kind, ListItem, Meta, Para, StyleDef, StyleSet, Table};
-use hanji_format::{styled, Atom, Cell, CellPara, Inline, Keep, Key, Marks, Props, Unit};
+use hanji_format::{
+    styled, Atom, Cell, CellPara, Inline, Keep, Key, Marks, Note, NoteKind, Props, Unit,
+};
 
 use crate::format;
 
@@ -43,6 +45,11 @@ pub struct Importer<'a> {
     notes: &'a HashMap<(String, String), String>,
     /// Comment ids whose body the text shows, mapped to that body.
     shown: &'a HashMap<String, String>,
+    /// Footnote and endnote ids whose body the text shows, mapped to that body.
+    shown_notes: &'a HashMap<(String, String), String>,
+    /// Next footnote / endnote label (`1`, `2`, … / `e1`, `e2`, …).
+    fn_n: u32,
+    en_n: u32,
     buf: Vec<Unit>,
     stats: Stats,
     /// Namespace declarations on ancestors below the root.
@@ -73,6 +80,7 @@ impl<'a> Importer<'a> {
         default_table: Option<String>,
         notes: &'a HashMap<(String, String), String>,
         shown: &'a HashMap<String, String>,
+        shown_notes: &'a HashMap<(String, String), String>,
         numbering: &'a Numbering,
         fmt: &'a format::Styles,
     ) -> Self {
@@ -86,6 +94,9 @@ impl<'a> Importer<'a> {
             keep_ids: KeepIds::default(),
             notes,
             shown,
+            shown_notes,
+            fn_n: 0,
+            en_n: 0,
             buf: vec![],
             stats: Stats::default(),
             inherited: vec![],
@@ -894,6 +905,11 @@ impl<'a> Importer<'a> {
                 i += 1;
                 continue;
             }
+            if crate::note::shown_run(k, self.shown_notes).is_some() {
+                self.note_ref(k, path)?;
+                i += 1;
+                continue;
+            }
             if crate::revision::shown(k).is_some() {
                 self.revision(k, path)?;
                 i += 1;
@@ -1038,6 +1054,49 @@ impl<'a> Importer<'a> {
             meta,
         );
         self.push(Atom::Comment(body), Marks::NONE);
+        let end = self.pos();
+        let close = self.seq();
+        let e = &mut self.entries[idx];
+        e.end = Some(end);
+        e.meta.seq_close = close;
+        Ok(())
+    }
+
+    /// A note-only run whose body the text shows: a length-1 wrap over
+    /// a [`Atom::NoteRef`], holding the original run (DESIGN.md §5.1).
+    fn note_ref(&mut self, r: &Element, path: &[usize]) -> Result<(), String> {
+        let (_, kind, body) = crate::note::shown_run(r, self.shown_notes)
+            .ok_or_else(|| "a note run has no shown body".to_string())?;
+        let label = match kind {
+            NoteKind::Footnote => {
+                self.fn_n += 1;
+                self.fn_n.to_string()
+            }
+            NoteKind::Endnote => {
+                self.en_n += 1;
+                format!("e{}", self.en_n)
+            }
+        };
+        let f = self.fp(&[Some(r)]);
+        let tag = match kind {
+            NoteKind::Footnote => "w:footnoteReference",
+            NoteKind::Endnote => "w:endnoteReference",
+        };
+        let meta = Meta {
+            tag: tag.into(),
+            ..Default::default()
+        };
+        let at = self.pos();
+        let idx = self.entry(
+            Kind::Wrap,
+            vec![self.frag(r)],
+            f,
+            path,
+            Some(at),
+            None,
+            meta,
+        );
+        self.push(Atom::NoteRef(Note { label, body, kind }), Marks::NONE);
         let end = self.pos();
         let close = self.seq();
         let e = &mut self.entries[idx];

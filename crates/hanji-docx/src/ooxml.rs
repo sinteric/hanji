@@ -34,6 +34,16 @@ pub(crate) fn is_comment(e: &Entry) -> bool {
     e.kind == Kind::Wrap && e.meta.tag == "w:commentReference"
 }
 
+/// A shown footnote or endnote reference: a length-1 wrap whose XML is the
+/// `footnoteReference` / `endnoteReference` run.
+pub(crate) fn is_note(e: &Entry) -> bool {
+    e.kind == Kind::Wrap
+        && matches!(
+            e.meta.tag.as_str(),
+            "w:footnoteReference" | "w:endnoteReference"
+        )
+}
+
 /// A shown tracked insertion or deletion: a length-1 wrap whose XML is the
 /// original `w:ins` / `w:del`.
 pub(crate) fn is_revision(e: &Entry) -> bool {

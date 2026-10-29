@@ -3348,3 +3348,226 @@ fn a_comment_inside_a_block_content_control_is_a_balloon() {
     assert_eq!(canon_doc(&source), canon_doc(&unchanged));
     assert_eq!(comments_xml(&source), comments_xml(&unchanged));
 }
+
+fn footnotes_part(id: &str, text: &str) -> Part {
+    part(
+        "word/footnotes.xml",
+        &format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><w:footnotes xmlns:w="{W}"><w:footnote w:type="separator" w:id="0"><w:p><w:r><w:separator/></w:r></w:p></w:footnote><w:footnote w:type="continuationSeparator" w:id="1"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:footnote><w:footnote w:id="{id}"><w:p><w:r><w:footnoteRef/></w:r><w:r><w:t>{text}</w:t></w:r></w:p></w:footnote></w:footnotes>"#
+        ),
+    )
+}
+
+fn endnotes_part(id: &str, text: &str) -> Part {
+    part(
+        "word/endnotes.xml",
+        &format!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><w:endnotes xmlns:w="{W}"><w:endnote w:type="separator" w:id="0"><w:p><w:r><w:separator/></w:r></w:p></w:endnote><w:endnote w:type="continuationSeparator" w:id="1"><w:p><w:r><w:continuationSeparator/></w:r></w:p></w:endnote><w:endnote w:id="{id}"><w:p><w:r><w:endnoteRef/></w:r><w:r><w:t>{text}</w:t></w:r></w:p></w:endnote></w:endnotes>"#
+        ),
+    )
+}
+
+fn noted_p(anchor: &str, id: &str, endnote: bool) -> String {
+    let tag = if endnote {
+        "w:endnoteReference"
+    } else {
+        "w:footnoteReference"
+    };
+    let style = if endnote {
+        "EndnoteReference"
+    } else {
+        "FootnoteReference"
+    };
+    format!(
+        r#"<w:p><w:r><w:t xml:space="preserve">{anchor}</w:t></w:r><w:r><w:rPr><w:rStyle w:val="{style}"/></w:rPr><{tag} w:id="{id}"/></w:r></w:p>"#
+    )
+}
+
+fn footnote_docx() -> Vec<u8> {
+    docx(
+        &noted_p("see this figure", "2", false),
+        vec![footnotes_part("2", "re-check the figure")],
+    )
+}
+
+fn endnote_docx() -> Vec<u8> {
+    docx(
+        &noted_p("see the appendix", "2", true),
+        vec![endnotes_part("2", "full table in the appendix")],
+    )
+}
+
+fn notes_xml(pkg: &[u8], part_name: &str) -> String {
+    String::from_utf8(
+        package::get(&package::read(pkg).unwrap(), part_name)
+            .unwrap()
+            .to_vec(),
+    )
+    .unwrap()
+}
+
+#[test]
+fn a_plain_footnote_shows_as_a_reference_and_definition() {
+    let imp = DocxEngine
+        .import(&footnote_docx(), &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("see this figure[^1]"), "{}", imp.text);
+    assert!(
+        imp.text.contains("[^1]: re-check the figure"),
+        "{}",
+        imp.text
+    );
+    assert!(!imp.text.contains("kind=\"footnote\""), "{}", imp.text);
+}
+
+#[test]
+fn a_plain_endnote_uses_an_e_label() {
+    let imp = DocxEngine
+        .import(&endnote_docx(), &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("see the appendix[^e1]"), "{}", imp.text);
+    assert!(
+        imp.text.contains("[^e1]: full table in the appendix"),
+        "{}",
+        imp.text
+    );
+    assert!(!imp.text.contains("kind=\"endnote\""), "{}", imp.text);
+}
+
+#[test]
+fn unedited_footnote_keeps_footnotes_xml() {
+    use hanji_package::xml;
+    let source = footnote_docx();
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    let before = package::read(&source).unwrap();
+    let after = package::read(&out).unwrap();
+    assert_eq!(
+        xml::canon_part(package::get(&before, "word/document.xml").unwrap()).unwrap(),
+        xml::canon_part(package::get(&after, "word/document.xml").unwrap()).unwrap()
+    );
+    assert_eq!(
+        package::get(&before, "word/footnotes.xml").unwrap(),
+        package::get(&after, "word/footnotes.xml").unwrap()
+    );
+}
+
+#[test]
+fn editing_footnote_body_updates_footnotes_xml() {
+    let imp = DocxEngine
+        .import(&footnote_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "[^1]: re-check the figure",
+        "[^1]: looks good",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = notes_xml(&out, "word/footnotes.xml");
+    assert!(xml.contains(">looks good</w:t>"), "{xml}");
+    assert!(xml.contains("w:type=\"separator\""), "{xml}");
+    let doc = doc_xml(&out);
+    assert!(doc.contains("see this figure"), "{doc}");
+    assert!(doc.contains("footnoteReference"), "{doc}");
+}
+
+#[test]
+fn editing_endnote_body_updates_endnotes_xml() {
+    let imp = DocxEngine
+        .import(&endnote_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "[^e1]: full table in the appendix",
+        "[^e1]: see the appendix table",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = notes_xml(&out, "word/endnotes.xml");
+    assert!(xml.contains(">see the appendix table</w:t>"), "{xml}");
+    assert!(xml.contains("w:type=\"separator\""), "{xml}");
+    let doc = doc_xml(&out);
+    assert!(doc.contains("see the appendix"), "{doc}");
+    assert!(doc.contains("endnoteReference"), "{doc}");
+}
+
+#[test]
+fn deleting_the_footnote_reference_removes_the_note() {
+    let imp = DocxEngine
+        .import(&footnote_docx(), &ImportOptions::default())
+        .unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "see this figure[^1]",
+        "see this figure",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report.removed.iter().any(|x| {
+            x.1 == Kind::Wrap
+                && (x.2.contains("the footnote was deleted") || x.2.contains("all of its text"))
+        }),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    let doc = doc_xml(&out);
+    assert!(!doc.contains("footnoteReference"), "{doc}");
+    let xml = notes_xml(&out, "word/footnotes.xml");
+    assert!(!xml.contains("w:id=\"2\""), "{xml}");
+    assert!(xml.contains("w:type=\"separator\""), "{xml}");
+    assert!(!DocxEngine
+        .import(&out, &ImportOptions::default())
+        .unwrap()
+        .text
+        .contains("[^1]"));
+}
+
+#[test]
+fn a_footnote_whose_body_holds_a_content_control_stays_a_placeholder() {
+    let notes = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><w:footnotes xmlns:w="{W}"><w:footnote w:id="2"><w:p><w:r><w:footnoteRef/></w:r><w:sdt><w:sdtPr/><w:sdtContent><w:r><w:t>controlled</w:t></w:r></w:sdtContent></w:sdt></w:p></w:footnote></w:footnotes>"#
+    );
+    let source = docx(
+        &noted_p("see", "2", false),
+        vec![part("word/footnotes.xml", &notes)],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("kind=\"footnote\""), "{}", imp.text);
+    assert!(!imp.text.contains("[^1]"), "{}", imp.text);
+}

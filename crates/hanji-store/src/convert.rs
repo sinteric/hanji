@@ -31,8 +31,8 @@ use hanji_core::{ImportOptions, Kind, Remainder};
 use hanji_docx::format::Theme;
 use hanji_format::vocab::{Border, Color, Fill};
 use hanji_format::{
-    self as fm, Atom, Block, BlockMapKind, Cell, CellPara, Inline, Key, Para, ParaMap, ParaStyle,
-    Parsed, Props, Span, StyleLine, Unit, Value,
+    self as fm, Atom, Block, BlockMapKind, Cell, CellPara, Inline, Key, NoteKind, Para, ParaMap,
+    ParaStyle, Parsed, Props, Span, StyleLine, Unit, Value,
 };
 use serde::Serialize;
 
@@ -301,6 +301,8 @@ struct Convert<'a> {
     mapped: HashMap<String, Mapped>,
     /// Source styles the converted text uses and the target lacks, in order of first use.
     created: Vec<String>,
+    /// Note bodies by label, from `[^label]:` lines (a `[^label]` atom holds none).
+    notes: HashMap<String, String>,
     out: Conversion,
     properties: Vec<(String, Property)>,
     resolved: BTreeMap<(String, String), usize>,
@@ -528,6 +530,18 @@ impl<'a> Convert<'a> {
                 Atom::Comment(body) => self.dropped_atom("comment", "c", "comment", body, off(k)),
                 Atom::Ins(body) => self.dropped_atom("tracked-insert", "i", "ins", body, off(k)),
                 Atom::Del(body) => self.dropped_atom("tracked-delete", "d", "del", body, off(k)),
+                Atom::NoteRef(n) => {
+                    let (kind, prefix) = match n.kind {
+                        NoteKind::Endnote => ("endnote", "e"),
+                        NoteKind::Footnote => ("footnote", "f"),
+                    };
+                    let body = self
+                        .notes
+                        .get(&n.label)
+                        .cloned()
+                        .unwrap_or_else(|| n.body.clone());
+                    self.dropped_atom(kind, prefix, kind, &body, off(k));
+                }
                 Atom::Math(body) if !self.caps.math => {
                     self.dropped_atom("math", "m", "equation", body, off(k))
                 }
@@ -599,7 +613,7 @@ impl<'a> Convert<'a> {
                 self.placeholder(k, location);
             }
             Block::PageBreak => out.push(Block::PageBreak),
-            Block::FootnoteDef(d) => out.push(Block::FootnoteDef(d.clone())),
+            Block::FootnoteDef(_) => {}
             Block::Para(p) => {
                 let pm = match &map.kind {
                     BlockMapKind::Para(m) => Some(m),
@@ -809,6 +823,15 @@ pub fn prepare(
             .collect(),
         mapped: HashMap::new(),
         created: vec![],
+        notes: parsed
+            .doc
+            .blocks
+            .iter()
+            .filter_map(|b| match b {
+                Block::FootnoteDef(f) => Some((f.label.clone(), f.content.text())),
+                _ => None,
+            })
+            .collect(),
         out: Conversion::new(from, to),
         properties: vec![],
         resolved: BTreeMap::new(),
@@ -936,6 +959,9 @@ fn not_carried(rem: &Remainder, from: Format, has_items: bool) -> Vec<NotCarried
                 "bookmarkStart" | "bookmarkEnd" => "bookmarks",
                 "commentRangeStart" | "commentRangeEnd" | "commentReference" => "comment ranges",
                 "ins" | "del" => continue, // listed as dropped `<ins>` / `<del>` placeholders
+                "footnoteReference" | "endnoteReference" | "footNote" | "endNote" => {
+                    continue // listed as dropped `[^label]` placeholders
+                }
                 "moveFromRangeStart" | "moveFromRangeEnd" | "moveToRangeStart" | "moveToRangeEnd" => {
                     "tracked-move ranges"
                 }

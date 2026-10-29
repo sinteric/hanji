@@ -1239,6 +1239,9 @@ impl<'a> Exporter<'a> {
                 Atom::Ins(_) | Atom::Del(_) => {
                     return Err("tracked changes are not supported by the pptx engine yet".into())
                 }
+                Atom::NoteRef(_) => {
+                    return Err("footnotes are not supported by the pptx engine yet".into())
+                }
                 _ => {}
             }
         }

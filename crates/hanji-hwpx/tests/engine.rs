@@ -1400,3 +1400,81 @@ fn an_equation_whose_script_the_math_grammar_cannot_hold_stays_a_placeholder() {
     assert_eq!(imp.text.matches("kind=\"math\"").count(), 2, "{}", imp.text);
     assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg));
 }
+
+fn footnote(number: &str, text: &str) -> String {
+    format!(
+        r#"<hp:ctrl><hp:footNote number="{number}" suffixChar="41" instId="{number}"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="TOP" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0"><hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="0"><hp:ctrl><hp:autoNum num="{number}" numType="FOOTNOTE"><hp:autoNumFormat type="DIGIT" userChar="" prefixChar="" suffixChar=")" supscript="0"/></hp:autoNum></hp:ctrl><hp:t>{text}</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>"#
+    )
+}
+
+#[test]
+fn a_plain_footnote_shows_as_a_reference_and_definition() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>값 </hp:t>{}<hp:t> 이다</hp:t>",
+        footnote("1", " 설명")
+    ))]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("값 [^1] 이다"), "{}", imp.text);
+    assert!(imp.text.contains("[^1]:  설명"), "{}", imp.text);
+    assert!(!imp.text.contains("kind=\"footnote\""), "{}", imp.text);
+}
+
+#[test]
+fn unedited_footnote_keeps_the_section() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>값 </hp:t>{}<hp:t> 이다</hp:t>",
+        footnote("1", " 설명")
+    ))]);
+    let imp = import(&pkg);
+    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg));
+}
+
+#[test]
+fn editing_the_footnote_body_writes_it_back() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>값 </hp:t>{}<hp:t> 이다</hp:t>",
+        footnote("1", " 설명")
+    ))]);
+    let imp = import(&pkg);
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "[^1]:  설명",
+        "[^1]:  고침",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = export(&r.text, &r.remainder);
+    let sec = section(&out);
+    assert!(sec.contains("<hp:t> 고침</hp:t>"), "{sec}");
+    assert!(sec.contains(r#"number="1""#), "{sec}");
+    assert!(sec.contains(r#"suffixChar="41""#), "{sec}");
+    let back = import(&out);
+    assert!(back.text.contains("[^1]:  고침"), "{}", back.text);
+}
+
+#[test]
+fn deleting_the_footnote_reference_removes_the_control() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>값 </hp:t>{}<hp:t> 이다</hp:t>",
+        footnote("1", " 설명")
+    ))]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "값 [^1] 이다", "값 이다", CAPS).unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.2.contains("footnote") || x.2.contains("all of its text")),
+        "{:?}",
+        r.report
+    );
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(!sec.contains("<hp:footNote"), "{sec}");
+    assert!(sec.contains("값 이다") || sec.contains("값이다"), "{sec}");
+}

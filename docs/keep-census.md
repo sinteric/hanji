@@ -39,11 +39,11 @@ date.
 
 | format | files | failed | with keeps | keeps |
 | ------ | ----: | -----: | ---------: | ----: |
-| docx   |    13 |      0 |         12 |   139 |
-| hwpx   |    16 |      0 |         12 |    38 |
+| docx   |    13 |      0 |         12 |   131 |
+| hwpx   |    16 |      0 |         11 |    28 |
 | pptx   |    27 |      0 |         16 |    44 |
 | xlsx   |    46 |      0 |         21 |    47 |
-| all    |   102 |      0 |         61 |   268 |
+| all    |   102 |      0 |         60 |   250 |
 
 ## By kind, most first
 
@@ -54,10 +54,8 @@ date.
 | pptx   | table              |    15 |    10 |
 | hwpx   | table              |    13 |     6 |
 | pptx   | field              |    11 |     4 |
-| hwpx   | footnote           |    10 |     2 |
 | docx   | object             |     8 |     2 |
 | xlsx   | chart              |     8 |     6 |
-| docx   | footnote           |     7 |     7 |
 | docx   | symbol             |     7 |     1 |
 | pptx   | picture            |     7 |     6 |
 | xlsx   | hyperlinks         |     7 |     7 |
@@ -72,12 +70,13 @@ date.
 | xlsx   | shape              |     5 |     3 |
 | docx   | table              |     4 |     3 |
 | xlsx   | data-validation    |     4 |     4 |
-| docx   | endnote            |     3 |     3 |
 | hwpx   | text               |     3 |     1 |
 | docx   | break              |     2 |     2 |
 | docx   | math               |     2 |     2 |
 | docx   | tracked-move       |     2 |     1 |
 | xlsx   | pivot-table        |     2 |     1 |
+| docx   | endnote            |     1 |     1 |
+| docx   | footnote           |     1 |     1 |
 | hwpx   | number             |     1 |     1 |
 | xlsx   | group              |     1 |     1 |
 | xlsx   | merged-cells       |     1 |     1 |
@@ -91,20 +90,20 @@ date.
 | `prototype/remainder/corpus/delins.docx`                             | docx   |     0 | |
 | `prototype/remainder/corpus/docx4j-tables.docx`                      | docx   |     3 | drawing 1, table 2 |
 | `prototype/remainder/corpus/fdo76098.docx`                           | docx   |     2 | drawing 2 |
-| `prototype/remainder/corpus/form_footnotes.docx`                     | docx   |    82 | drawing 5, field 69, footnote 1, symbol 7 |
-| `prototype/remainder/corpus/korean-report.docx`                      | docx   |     2 | drawing 1, footnote 1 |
-| `prototype/remainder/corpus/loadAndSave.docx`                        | docx   |     6 | drawing 3, endnote 1, footnote 1, math 1 |
+| `prototype/remainder/corpus/form_footnotes.docx`                     | docx   |    81 | drawing 5, field 69, symbol 7 |
+| `prototype/remainder/corpus/korean-report.docx`                      | docx   |     1 | drawing 1 |
+| `prototype/remainder/corpus/loadAndSave.docx`                        | docx   |     4 | drawing 3, math 1 |
 | `prototype/remainder/corpus/sample-docx.docx`                        | docx   |     3 | drawing 3 |
-| `prototype/remainder/corpus/tdf124637_sectionMargin.docx`            | docx   |     2 | break 1, footnote 1 |
+| `prototype/remainder/corpus/tdf124637_sectionMargin.docx`            | docx   |     1 | break 1 |
 | `prototype/remainder/corpus/tdf154481.docx`                          | docx   |     4 | break 1, drawing 1, field 2 |
-| `prototype/remainder/corpus/testWORD_2006ml.docx`                    | docx   |    20 | content-control 4, drawing 5, endnote 1, field 2, footnote 1, math 1, object 3, table 1, tracked-move 2 |
-| `prototype/remainder/corpus/testWORD_various.docx`                   | docx   |     2 | drawing 1, footnote 1 |
+| `prototype/remainder/corpus/testWORD_2006ml.docx`                    | docx   |    18 | content-control 4, drawing 5, field 2, math 1, object 3, table 1, tracked-move 2 |
+| `prototype/remainder/corpus/testWORD_various.docx`                   | docx   |     1 | drawing 1 |
 | `crates/hanji-hwpx/corpus/basic-table-01.hwpx`                       | hwpx   |     0 | |
 | `crates/hanji-hwpx/corpus/eq-002.hwpx`                               | hwpx   |     1 | number 1 |
 | `crates/hanji-hwpx/corpus/fdi-2025q2.hwpx`                           | hwpx   |     3 | drawing 1, table 2 |
 | `crates/hanji-hwpx/corpus/field-multipara-clickhere.hwpx`            | hwpx   |     2 | table 2 |
-| `crates/hanji-hwpx/corpus/footnote-01.hwpx`                          | hwpx   |     9 | footnote 9 |
-| `crates/hanji-hwpx/corpus/footnote-tbox-01.hwpx`                     | hwpx   |     2 | drawing 1, footnote 1 |
+| `crates/hanji-hwpx/corpus/footnote-01.hwpx`                          | hwpx   |     0 | |
+| `crates/hanji-hwpx/corpus/footnote-tbox-01.hwpx`                     | hwpx   |     1 | drawing 1 |
 | `crates/hanji-hwpx/corpus/form-01.hwpx`                              | hwpx   |     5 | form-control 5 |
 | `crates/hanji-hwpx/corpus/hcar-001.hwpx`                             | hwpx   |     3 | table 3 |
 | `crates/hanji-hwpx/corpus/hy-002.hwpx`                               | hwpx   |     2 | drawing 2 |
