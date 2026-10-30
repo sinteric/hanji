@@ -194,9 +194,11 @@ conversion runs natively only, and the rhwp check is a separate crate
   (`hp:equation`): an existing object's script is that math, and a new
   `$…$` creates one; Hancom's cached box (`hp:sz`) is left as stored.
 - §10.8 leftovers: `gridBefore`/`gridAfter`, nested tables and row-level
-  content controls stay block placeholders (4 of the corpus's 29 tables, 40
-  of the table survey's 506 docx tables). Zero-width markers between rows,
-  cells or cell paragraphs are remainder entries and do not block a table.
+  content controls stay block placeholders (3 of the corpus's 29 tables, 40
+  of the table survey's 506 docx tables). A shown cell-level content control
+  wrapping one cell is a pipe table; the control stays in the remainder.
+  Zero-width markers between rows, cells or cell paragraphs are remainder
+  entries and do not block a table.
 - §4 rule 5: DOCX/HWPX native layout fidelity and XLSX print/advanced visual
   fidelity. PPTX has no live reload or bundled Korean font pack (§7.1).
 - §9 validity in Word: exports are checked for well-formed XML and a
@@ -224,9 +226,11 @@ hwpx, in addition:
 - A table's own position (`table-align`, `table-indent` on its table line,
   docx `w:jc` and `w:tblInd`) is refused with the reason, as table styles
   are.
-- A table that shares its paragraph with text stays a placeholder, so the
-  text stays visible; spaces after a table do not count. Nested tables and
-  tables with content after their rows (`hp:label`) stay placeholders.
+- A table that shares its paragraph with text is a pipe table, and the
+  text is a paragraph next to it (before the tables, or after); spaces
+  after a table do not count as text. Nested tables, and a table with
+  text on both sides, stay placeholders. Mailing-label geometry
+  (`hp:label` after the rows) stays in the remainder.
 - XML comments and processing instructions inside a section are refused on
   import, as in docx.
 - §9 validity in Hancom: exports are re-opened with rhwp only; LibreOffice

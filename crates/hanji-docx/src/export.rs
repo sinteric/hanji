@@ -907,9 +907,20 @@ impl<'a> Exporter<'a> {
                 }
                 let path = [bi, ri, ci];
                 self.bmarkers(&mut tr, &path);
-                let (mut tc, tcpr) = match self.at(&path, Kind::Tc).first() {
-                    Some(e) => (fragment(&e.xml[0]), e.xml.get(1).map(|x| fragment(x))),
-                    None => (el("w:tc"), None),
+                let (mut tc, tcpr, cell_sdt) = match self.at(&path, Kind::Tc).first() {
+                    Some(e) => {
+                        let sdt = (e.meta.tag == "w:sdt/cell")
+                            .then(|| e.xml.last().map(|x| fragment(x)))
+                            .flatten();
+                        let tcpr = match (e.meta.tag.as_str(), e.xml.len()) {
+                            ("w:sdt/cell", 3) => Some(fragment(&e.xml[1])),
+                            ("w:sdt/cell", _) => None,
+                            (_, n) if n >= 2 => Some(fragment(&e.xml[1])),
+                            _ => None,
+                        };
+                        (fragment(&e.xml[0]), tcpr, sdt)
+                    }
+                    None => (el("w:tc"), None, None),
                 };
                 let below_up = t.rows.get(ri + 1).and_then(|r| r.get(ci)) == Some(&Cell::Up);
                 let mut tcpr = merge_props(tcpr, span, *cell == Cell::Up, below_up);
@@ -974,7 +985,13 @@ impl<'a> Exporter<'a> {
                     }
                 };
                 self.bmarkers(&mut tc, &[bi, ri, ci, n_paras]);
-                tr.children.push(node(tc));
+                let cell = if let Some(mut sdt) = cell_sdt {
+                    sdt_content_mut(&mut sdt).children.push(node(tc));
+                    sdt
+                } else {
+                    tc
+                };
+                tr.children.push(node(cell));
                 ci += span;
             }
             self.bmarkers(&mut tr, &[bi, ri, row.len()]);

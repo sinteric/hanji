@@ -54,8 +54,11 @@ pub struct Stats {
 ///   `<math>…</math>` with a `Wrap`. A footnote or endnote whose body is
 ///   ordinary text in one paragraph is `[^label]` / `[^label]: body`
 ///   with a `Wrap`.
-/// - A paragraph holding only tables (side by side or one): one table block
-///   per table; the paragraph itself is a `Tbl` entry of the first.
+/// - A paragraph holding pipe tables, alone or with one run of other
+///   content (text before the tables, or after): one table block per
+///   table, and a paragraph block for the other content when it is there;
+///   the original paragraph is a `Tbl` entry of the first. Nested tables
+///   and a table interleaved with text on both sides stay inline `Keep`.
 /// - A paragraph with a tracked change, or inside one: a block `Bkeep`.
 /// - The run holding a section's `hp:secPr` goes with the section, so it
 ///   stays at the start of the section whatever happens to its paragraph.
@@ -449,57 +452,58 @@ impl<'a> Importer<'a> {
 
     // ------------------------------------------------------------ tables
 
-    /// A paragraph that holds only tables (and zero-width controls): one
-    /// table block per table, if every one is a pipe table.
+    /// A paragraph whose pipe tables the text can hold: one table block per
+    /// table, and a paragraph block for the other content when the tables
+    /// share the paragraph with one run of text (before them or after).
     fn tables_only(&mut self, p: &Element, bi: usize) -> Result<Option<Vec<Block>>, String> {
-        let mut tbls: Vec<&Element> = vec![];
-        for n in &p.children {
-            match n {
-                Node::El(r) if r.is("hp:run") => {
-                    for c in &r.children {
-                        match c {
-                            Node::El(t) if t.is("hp:tbl") => tbls.push(t),
-                            // Spaces after a table lay the line out; they stay in the paragraph.
-                            Node::El(t) if t.is("hp:t") && t.attrs.is_empty() && spaces_only(t) => {
-                            }
-                            Node::El(c)
-                                if c.is("hp:ctrl")
-                                    && ctrl_kind(c).is_some_and(|k| {
-                                        MARKER_CTRLS.contains(&k.name.as_str())
-                                    }) => {}
-                            n if is_blank(n) => {}
-                            _ => return Ok(None),
-                        }
-                    }
-                }
-                Node::El(l) if l.is("hp:linesegarray") => {}
-                n if is_blank(n) => {}
-                _ => return Ok(None),
-            }
-        }
-        if tbls.is_empty() || tbls.iter().any(|t| table_reason(t).is_some()) {
+        let Some(flow) = para_flow(p) else {
             return Ok(None);
-        }
+        };
+        let (tbls, text_first, mixed) = match flow {
+            Flow::TablesOnly(tbls) => (tbls, false, false),
+            Flow::Mixed { tbls, text_first } => (tbls, text_first, true),
+        };
         let mark = self.checkpoint();
         let group = self.next_group;
         let mut out = vec![];
-        for (k, t) in tbls.iter().enumerate() {
-            let at = bi + k;
-            match self.table(t, at)? {
-                Some(table) => out.push(Block::Table(table)),
-                None => {
-                    self.rollback(mark);
-                    return Ok(None);
+        let emit_tables = |imp: &mut Self, out: &mut Vec<Block>| -> Result<bool, String> {
+            for t in &tbls {
+                let at = bi + out.len();
+                match imp.table(t, at)? {
+                    Some(table) => out.push(Block::Table(table)),
+                    None => return Ok(false),
                 }
             }
-            let (tag, xml, f) = if k == 0 {
-                // The paragraph, its tables left as empty `hp:tbl` slots.
+            Ok(true)
+        };
+        if mixed && text_first {
+            let stripped = strip_ok_tables(p);
+            let para = self.para(&stripped, &[bi])?;
+            out.push(Block::Para(para));
+        }
+        if !emit_tables(self, &mut out)? {
+            self.rollback(mark);
+            return Ok(None);
+        }
+        if mixed && !text_first {
+            let at = bi + out.len();
+            let stripped = strip_ok_tables(p);
+            let para = self.para(&stripped, &[at])?;
+            out.push(Block::Para(para));
+        }
+        // Group tags live on table blocks only: a Kind::Tbl on a paragraph
+        // would not re-anchor (placement maps Tbl onto Table). The mixed
+        // text is the paragraph before the first table, or after the last.
+        let mut table_i = 0usize;
+        for (k, b) in out.iter().enumerate() {
+            if !matches!(b, Block::Table(_)) {
+                continue;
+            }
+            let at = bi + k;
+            let (tag, xml, f) = if table_i == 0 {
+                // The paragraph, its pipe tables left as empty `hp:tbl` slots.
                 let mut anchor = p.clone();
-                for r in anchor.elements_mut().filter(|r| r.is("hp:run")) {
-                    for c in r.elements_mut().filter(|c| c.is("hp:tbl")) {
-                        *c = Element::new("hp:tbl");
-                    }
-                }
+                empty_ok_tbl_slots(&mut anchor);
                 // Its fingerprint leaves out the page break (a block of the
                 // text) and the layout cache (export may drop it).
                 let mut shown = anchor.clone();
@@ -512,16 +516,41 @@ impl<'a> Importer<'a> {
             } else {
                 ("hwpx:join", vec![], "hwpx:join".into())
             };
+            let mut aux = vec![group.to_string(), table_i.to_string()];
+            if mixed {
+                aux.push("text".into());
+            }
             let meta = Meta {
                 tag: tag.into(),
-                aux: vec![group.to_string(), k.to_string()],
+                aux,
                 ..Default::default()
             };
             self.entry(Kind::Tbl, xml, f, &[at], None, None, meta);
+            table_i += 1;
+        }
+        if mixed {
+            // On the text paragraph, so a later edit that splits it from the
+            // tables does not join the tables to a neighbour. A second Ppr
+            // re-anchors with the paragraph; Kind::Tbl only maps onto a table.
+            let para_k = if text_first { 0 } else { out.len() - 1 };
+            let meta = Meta {
+                tag: "hwpx:text".into(),
+                aux: vec![group.to_string()],
+                ..Default::default()
+            };
+            self.entry(
+                Kind::Ppr,
+                vec![],
+                "hwpx:text".into(),
+                &[bi + para_k],
+                None,
+                None,
+                meta,
+            );
         }
         self.next_group += 1;
-        self.stats.tables_modelled += out.len();
-        self.stats.side_by_side += (out.len() > 1) as usize;
+        self.stats.tables_modelled += tbls.len();
+        self.stats.side_by_side += (tbls.len() > 1) as usize;
         Ok(Some(out))
     }
 
@@ -1110,8 +1139,117 @@ fn t_modellable(t: &Element) -> bool {
     })
 }
 
+/// How a paragraph's pipe tables sit among its other content.
+enum Flow<'a> {
+    /// Only pipe tables (and spaces or zero-width controls).
+    TablesOnly(Vec<&'a Element>),
+    /// Pipe tables and one run of other content, which leads or follows.
+    Mixed {
+        tbls: Vec<&'a Element>,
+        text_first: bool,
+    },
+}
+
+/// A paragraph whose pipe tables can be blocks: they stand alone, or they
+/// share the paragraph with one run of other content (text before them, or
+/// after). Nested tables, and a table with text on both sides, stay in the
+/// paragraph as `<keep/>`.
+fn para_flow(p: &Element) -> Option<Flow<'_>> {
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum St {
+        Start,
+        Text,
+        Tables,
+        TablesAfterText,
+        TextAfterTables,
+        Bad,
+    }
+    let skip = |n: &Node| match n {
+        Node::El(t) if t.is("hp:t") && t.attrs.is_empty() && spaces_only(t) => true,
+        Node::El(c)
+            if c.is("hp:ctrl")
+                && ctrl_kind(c).is_some_and(|k| MARKER_CTRLS.contains(&k.name.as_str())) =>
+        {
+            true
+        }
+        n if is_blank(n) => true,
+        _ => false,
+    };
+    let bump = |st: St, table: bool| match (st, table) {
+        (St::Bad, _) => St::Bad,
+        (St::Start, true) => St::Tables,
+        (St::Start, false) => St::Text,
+        (St::Text, false) => St::Text,
+        (St::Text, true) => St::TablesAfterText,
+        (St::Tables, true) => St::Tables,
+        (St::Tables, false) => St::TextAfterTables,
+        (St::TablesAfterText, true) => St::TablesAfterText,
+        (St::TablesAfterText, false) => St::Bad,
+        (St::TextAfterTables, false) => St::TextAfterTables,
+        (St::TextAfterTables, true) => St::Bad,
+    };
+    let mut st = St::Start;
+    let mut tbls = vec![];
+    let mut saw_other = false;
+    for n in &p.children {
+        match n {
+            Node::El(r) if r.is("hp:run") => {
+                for c in &r.children {
+                    if skip(c) {
+                        continue;
+                    }
+                    if let Node::El(t) = c {
+                        if t.is("hp:tbl") && table_reason(t).is_none() {
+                            tbls.push(t);
+                            st = bump(st, true);
+                            continue;
+                        }
+                    }
+                    saw_other = true;
+                    st = bump(st, false);
+                }
+            }
+            Node::El(l) if l.is("hp:linesegarray") => {}
+            n if is_blank(n) => {}
+            _ => return None,
+        }
+    }
+    if tbls.is_empty() || matches!(st, St::Bad | St::Start) {
+        return None;
+    }
+    if !saw_other {
+        return Some(Flow::TablesOnly(tbls));
+    }
+    Some(Flow::Mixed {
+        tbls,
+        text_first: matches!(st, St::TablesAfterText),
+    })
+}
+
+/// The paragraph without its pipe tables, so the remaining text (and any
+/// nested table kept inline) is one paragraph block.
+fn strip_ok_tables(p: &Element) -> Element {
+    let mut q = p.clone();
+    for r in q.elements_mut().filter(|r| r.is("hp:run")) {
+        r.children
+            .retain(|n| !matches!(n, Node::El(t) if t.is("hp:tbl") && table_reason(t).is_none()));
+    }
+    q
+}
+
+/// Empty `hp:tbl` slots for pipe tables; a nested table stays as it is.
+fn empty_ok_tbl_slots(p: &mut Element) {
+    for r in p.elements_mut().filter(|r| r.is("hp:run")) {
+        for c in r.elements_mut().filter(|c| c.is("hp:tbl")) {
+            if table_reason(c).is_none() {
+                *c = Element::new("hp:tbl");
+            }
+        }
+    }
+}
+
 /// An `hp:t` of spaces, or empty.
-fn spaces_only(t: &Element) -> bool {
+pub(crate) fn spaces_only(t: &Element) -> bool {
     t.children
         .iter()
         .all(|n| matches!(n, Node::Text(s) if unescape(s).chars().all(|c| c == ' ')))
@@ -1146,6 +1284,9 @@ pub fn table_reason(tbl: &Element) -> Option<String> {
     for n in &tbl.children {
         match n {
             Node::El(e) if e.is("hp:tr") => past_rows = true,
+            // Mailing-label geometry sits after the rows; the text cannot
+            // show it, so it stays with the table's other unshown properties.
+            Node::El(e) if e.is("hp:label") => {}
             Node::El(e) if past_rows => {
                 return Some(format!("table-level {} after a row", e.local()))
             }

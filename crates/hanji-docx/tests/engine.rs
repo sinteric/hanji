@@ -847,6 +847,115 @@ fn a_marker_among_table_properties_keeps_the_table_whole() {
 }
 
 #[test]
+fn a_cell_level_content_control_keeps_the_pipe_table() {
+    let cell = |t: &str| {
+        format!(
+            "<w:tc><w:tcPr><w:tcW w:w=\"2000\" w:type=\"dxa\"/></w:tcPr>{}</w:tc>",
+            p(t)
+        )
+    };
+    let body = format!(
+        "<w:tbl><w:tblPr><w:tblW w:w=\"0\" w:type=\"auto\"/></w:tblPr><w:tblGrid><w:gridCol w:w=\"2000\"/><w:gridCol w:w=\"2000\"/></w:tblGrid>\
+         <w:tr>{}{}</w:tr></w:tbl>{}",
+        cell("left"),
+        sdt(&sdt_id("10"), &cell("Rich_text_in_cell")),
+        p("after")
+    );
+    let pkg = docx(&body, vec![]);
+    let (_, _, _, stats) = DocxEngine::split(&pkg, &ImportOptions::default()).unwrap();
+    assert_eq!(
+        (stats.tables_modelled, stats.tables_kept),
+        (1, 0),
+        "{:?}",
+        stats.kept_reasons
+    );
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(
+        imp.text.contains("| left | Rich_text_in_cell |") && !imp.text.contains("kind=\"table\""),
+        "{}",
+        imp.text
+    );
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&out), canon_doc(&pkg), "GetPut");
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "Rich_text_in_cell",
+        "edited cell",
+        CAPS,
+    )
+    .unwrap();
+    let xml = doc_xml(&DocxEngine.export(&r.text, &r.remainder).unwrap());
+    assert!(xml.contains("edited cell"), "{xml}");
+    assert!(xml.contains("<w:sdt>"), "the cell control stays: {xml}");
+    assert_eq!(
+        DocxEngine
+            .import(
+                &DocxEngine.export(&r.text, &r.remainder).unwrap(),
+                &ImportOptions::default()
+            )
+            .unwrap()
+            .text,
+        r.text,
+        "PutGet"
+    );
+}
+
+#[test]
+fn a_nested_table_stays_a_placeholder() {
+    let cell = |inner: &str| {
+        format!("<w:tc><w:tcPr><w:tcW w:w=\"2000\" w:type=\"dxa\"/></w:tcPr>{inner}</w:tc>")
+    };
+    let inner = format!(
+        "<w:tbl><w:tblPr/><w:tblGrid><w:gridCol w:w=\"2000\"/></w:tblGrid><w:tr>{}</w:tr></w:tbl>",
+        cell(&p("inner"))
+    );
+    let body = format!(
+        "<w:tbl><w:tblPr/><w:tblGrid><w:gridCol w:w=\"2000\"/><w:gridCol w:w=\"2000\"/></w:tblGrid>\
+         <w:tr>{}{}</w:tr></w:tbl>{}",
+        cell(&p("outer")),
+        cell(&format!("{inner}{}", p(""))),
+        p("after")
+    );
+    let pkg = docx(&body, vec![]);
+    let (_, _, _, stats) = DocxEngine::split(&pkg, &ImportOptions::default()).unwrap();
+    assert_eq!(stats.tables_kept, 1, "{:?}", stats.kept_reasons);
+    assert!(
+        stats.kept_reasons.iter().any(|r| r.contains("tbl")),
+        "{:?}",
+        stats.kept_reasons
+    );
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(imp.text.contains("kind=\"table\""), "{}", imp.text);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&out), canon_doc(&pkg));
+}
+
+#[test]
+fn grid_before_keeps_the_table_whole() {
+    let cell = |t: &str| {
+        format!(
+            "<w:tc><w:tcPr><w:tcW w:w=\"2000\" w:type=\"dxa\"/></w:tcPr>{}</w:tc>",
+            p(t)
+        )
+    };
+    let body = format!(
+        "<w:tbl><w:tblPr/><w:tblGrid><w:gridCol w:w=\"2000\"/><w:gridCol w:w=\"2000\"/></w:tblGrid>\
+         <w:tr><w:trPr><w:gridBefore w:val=\"1\"/><w:wBefore w:w=\"2000\" w:type=\"dxa\"/></w:trPr>{}</w:tr></w:tbl>{}",
+        cell("shifted"),
+        p("after")
+    );
+    let pkg = docx(&body, vec![]);
+    let (_, _, _, stats) = DocxEngine::split(&pkg, &ImportOptions::default()).unwrap();
+    assert_eq!(stats.tables_kept, 1, "{:?}", stats.kept_reasons);
+    assert!(
+        stats.kept_reasons[0].contains("gridBefore"),
+        "{:?}",
+        stats.kept_reasons
+    );
+}
+
+#[test]
 fn a_bold_page_break_keeps_its_bold() {
     // Survey GetPut failures (7 of 167 files): `<pagebreak/>` cannot state
     // marks, so the run's own marks must survive export.
