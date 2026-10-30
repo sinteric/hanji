@@ -143,6 +143,36 @@ fn anchor(tables: &[String]) -> String {
     )
 }
 
+/// A paragraph holding `table` and `text`, tables first or text first.
+fn mixed(table: &str, text: &str, text_first: bool) -> String {
+    let inner = if text_first {
+        format!("<hp:t>{text}</hp:t>{table}")
+    } else {
+        format!("{table}<hp:t>{text}</hp:t>")
+    };
+    format!(
+        r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="0">{inner}</hp:run></hp:p>"#
+    )
+}
+
+/// `table` with mailing-label geometry after its rows.
+fn with_label(table: &str) -> String {
+    table.replace(
+        "</hp:tbl>",
+        r#"<hp:label topmargin="0" leftmargin="0" boxwidth="1000" boxlength="1000" boxmarginhor="0" boxmarginver="0" labelcols="1" labelrows="1"/></hp:tbl>"#,
+    )
+}
+
+/// A 1×1 table whose cell holds `inner` (a nested table).
+fn nested_tbl(inner: &str) -> String {
+    let para = format!(
+        r#"<hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="0">{inner}<hp:t/></hp:run></hp:p>"#
+    );
+    format!(
+        r#"<hp:tbl id="2" rowCnt="1" colCnt="1" borderFillIDRef="3"><hp:sz width="4000" height="1000"/><hp:pos treatAsChar="0"/><hp:outMargin left="283"/><hp:inMargin left="510"/><hp:tr><hp:tc name="" header="0" borderFillIDRef="3"><hp:subList id="" vertAlign="CENTER">{para}</hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="1000" height="282"/><hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc></hp:tr></hp:tbl>"#
+    )
+}
+
 /// Keep a package next to the corpus exports, so the rhwp check (`validate/`) re-opens it too.
 fn save(dir: &str, what: &str, pkg: &[u8]) {
     let d = std::path::PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
@@ -414,6 +444,137 @@ fn side_by_side_tables_are_separate_blocks_in_one_paragraph() {
             && sec.find("뒤").unwrap() < sec.find("홍길동").unwrap()
     );
     assert_eq!(import(&out).text, r.text, "PutGet");
+}
+
+#[test]
+fn a_table_that_shares_its_paragraph_with_following_text_is_a_pipe_table() {
+    let t = tbl(
+        &[
+            &[("지역", 1, 1), ("매출", 1, 1)],
+            &[("서울", 1, 1), ("120", 1, 1)],
+        ],
+        2,
+    );
+    let pkg = hwpx(&[p("앞"), mixed(&t, "※ 단위: 억원", false), p("뒤")]);
+    let (_, _, _, stats) = HwpxEngine::split(&pkg, &ImportOptions::default()).unwrap();
+    assert_eq!(
+        (stats.tables_modelled, stats.tables_kept),
+        (1, 0),
+        "{:?}",
+        stats.kept_reasons
+    );
+    let imp = import(&pkg);
+    assert!(
+        imp.text
+            .contains("| 지역 | 매출 |\n|---|---|\n| 서울 | 120 |")
+            && imp.text.contains("※ 단위: 억원"),
+        "{}",
+        imp.text
+    );
+    assert!(!imp.text.contains("kind=\"table\""), "{}", imp.text);
+    let out = export(&imp.text, &imp.remainder);
+    assert_eq!(canon(&out), canon(&pkg), "GetPut");
+    let r = edit(&imp.remainder, &imp.text, "120", "150", CAPS).unwrap();
+    let out = export(&r.text, &r.remainder);
+    assert!(section(&out).contains("150"), "{}", section(&out));
+    assert_eq!(import(&out).text, r.text, "PutGet cell");
+    let r = edit(&imp.remainder, &imp.text, "※ 단위: 억원", "※ 억 원", CAPS).unwrap();
+    let out = export(&r.text, &r.remainder);
+    assert!(section(&out).contains("※ 억 원"), "{}", section(&out));
+    assert_eq!(import(&out).text, r.text, "PutGet text");
+    // A paragraph inserted between the table and its original text must not
+    // inherit the table (the group tag stays on the original paragraph).
+    let split = imp.text.replace(
+        "| 서울 | 120 |\n\n※ 단위: 억원",
+        "| 서울 | 120 |\n\n사이\n\n※ 단위: 억원",
+    );
+    let r = rewrite(&imp.remainder, &imp.text, &split, CAPS).unwrap();
+    let out = export(&r.text, &r.remainder);
+    let sec = section(&out);
+    assert!(
+        sec.find("사이").unwrap() < sec.find("※ 단위: 억원").unwrap(),
+        "{sec}"
+    );
+    assert_eq!(import(&out).text, r.text, "PutGet split");
+}
+
+#[test]
+fn a_table_that_shares_its_paragraph_with_leading_text_is_a_pipe_table() {
+    let t = tbl(
+        &[
+            &[("A11", 1, 1), ("A12", 1, 1)],
+            &[("A21", 1, 1), ("A22", 1, 1)],
+        ],
+        2,
+    );
+    let pkg = hwpx(&[mixed(&t, "ISSUE 1510 CENTER TITLE", true)]);
+    let imp = import(&pkg);
+    assert!(
+        imp.text.contains("ISSUE 1510 CENTER TITLE")
+            && imp.text.contains("| A11 | A12 |\n|---|---|\n| A21 | A22 |")
+            && !imp.text.contains("kind=\"table\""),
+        "{}",
+        imp.text
+    );
+    let out = export(&imp.text, &imp.remainder);
+    assert_eq!(canon(&out), canon(&pkg), "GetPut");
+    assert_eq!(import(&out).text, imp.text, "PutGet");
+}
+
+#[test]
+fn a_table_with_a_label_after_its_rows_is_a_pipe_table() {
+    let t = with_label(&tbl(&[&[("소속", 1, 1), ("인원", 1, 1)]], 2));
+    let pkg = hwpx(&[p("앞"), anchor(&[t]), p("뒤")]);
+    let (_, _, _, stats) = HwpxEngine::split(&pkg, &ImportOptions::default()).unwrap();
+    assert_eq!(
+        (stats.tables_modelled, stats.tables_kept),
+        (1, 0),
+        "{:?}",
+        stats.kept_reasons
+    );
+    let imp = import(&pkg);
+    assert!(
+        imp.text.contains("| 소속 | 인원 |") && !imp.text.contains("kind=\"table\""),
+        "{}",
+        imp.text
+    );
+    let out = export(&imp.text, &imp.remainder);
+    assert_eq!(
+        canon(&out),
+        canon(&pkg),
+        "GetPut keeps hp:label after the rows"
+    );
+    assert!(
+        section(&out).contains("<hp:label ")
+            && section(&out).find("</hp:tr>").unwrap() < section(&out).find("<hp:label ").unwrap(),
+        "{}",
+        section(&out)
+    );
+}
+
+#[test]
+fn a_nested_table_stays_a_placeholder() {
+    let inner = tbl(&[&[("안쪽", 1, 1)]], 1);
+    let pkg = hwpx(&[p("앞"), anchor(&[nested_tbl(&inner)]), p("뒤")]);
+    let (_, _, _, stats) = HwpxEngine::split(&pkg, &ImportOptions::default()).unwrap();
+    assert_eq!(stats.tables_kept, 1, "{:?}", stats.kept_reasons);
+    assert!(
+        stats.kept_reasons.iter().any(|r| r.contains("tbl")),
+        "{:?}",
+        stats.kept_reasons
+    );
+    let imp = import(&pkg);
+    assert!(imp.text.contains("kind=\"table\""), "{}", imp.text);
+    let out = export(&imp.text, &imp.remainder);
+    assert_eq!(canon(&out), canon(&pkg), "GetPut");
+}
+
+#[test]
+fn deleting_the_first_side_by_side_table_leaves_the_second() {
+    let a = tbl(&[&[("담당 부서", 1, 1), ("기획과", 1, 1)]], 2);
+    let b = tbl(&[&[("담당자", 1, 1), ("홍길동", 1, 1)]], 2);
+    let pkg = hwpx(&[p("앞"), anchor(&[a, b]), p("뒤")]);
+    let imp = import(&pkg);
     // Deleting the first table leaves the second in the shared paragraph.
     let gone = imp
         .text

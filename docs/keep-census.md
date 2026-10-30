@@ -39,11 +39,11 @@ date.
 
 | format | files | failed | with keeps | keeps |
 | ------ | ----: | -----: | ---------: | ----: |
-| docx   |    13 |      0 |         12 |   131 |
-| hwpx   |    16 |      0 |         11 |    28 |
+| docx   |    13 |      0 |         12 |   130 |
+| hwpx   |    16 |      0 |         10 |    24 |
 | pptx   |    27 |      0 |         16 |    44 |
 | xlsx   |    46 |      0 |         21 |    47 |
-| all    |   102 |      0 |         60 |   250 |
+| all    |   102 |      0 |         59 |   245 |
 
 ## By kind, most first
 
@@ -52,8 +52,8 @@ date.
 | docx   | field              |    73 |     3 |
 | docx   | drawing            |    26 |    10 |
 | pptx   | table              |    15 |    10 |
-| hwpx   | table              |    13 |     6 |
 | pptx   | field              |    11 |     4 |
+| hwpx   | drawing            |    10 |     7 |
 | docx   | object             |     8 |     2 |
 | xlsx   | chart              |     8 |     6 |
 | docx   | symbol             |     7 |     1 |
@@ -61,15 +61,15 @@ date.
 | xlsx   | hyperlinks         |     7 |     7 |
 | xlsx   | notes              |     7 |     7 |
 | xlsx   | picture            |     7 |     3 |
-| hwpx   | drawing            |     6 |     5 |
 | pptx   | diagram            |     6 |     3 |
 | docx   | content-control    |     5 |     2 |
 | hwpx   | form-control       |     5 |     1 |
+| hwpx   | table              |     5 |     3 |
 | pptx   | chart              |     5 |     5 |
 | xlsx   | conditional-format |     5 |     5 |
 | xlsx   | shape              |     5 |     3 |
-| docx   | table              |     4 |     3 |
 | xlsx   | data-validation    |     4 |     4 |
+| docx   | table              |     3 |     2 |
 | hwpx   | text               |     3 |     1 |
 | docx   | break              |     2 |     2 |
 | docx   | math               |     2 |     2 |
@@ -85,7 +85,7 @@ date.
 
 | file                                                                 | format | keeps | kinds |
 | -------------------------------------------------------------------- | ------ | ----: | ----- |
-| `prototype/remainder/corpus/Bug54849.docx`                           | docx   |     4 | content-control 1, endnote 1, footnote 1, table 1 |
+| `prototype/remainder/corpus/Bug54849.docx`                           | docx   |     3 | content-control 1, endnote 1, footnote 1 |
 | `prototype/remainder/corpus/WordWithAttachments.docx`                | docx   |     9 | drawing 4, object 5 |
 | `prototype/remainder/corpus/delins.docx`                             | docx   |     0 | |
 | `prototype/remainder/corpus/docx4j-tables.docx`                      | docx   |     3 | drawing 1, table 2 |
@@ -100,17 +100,17 @@ date.
 | `prototype/remainder/corpus/testWORD_various.docx`                   | docx   |     1 | drawing 1 |
 | `crates/hanji-hwpx/corpus/basic-table-01.hwpx`                       | hwpx   |     0 | |
 | `crates/hanji-hwpx/corpus/eq-002.hwpx`                               | hwpx   |     1 | number 1 |
-| `crates/hanji-hwpx/corpus/fdi-2025q2.hwpx`                           | hwpx   |     3 | drawing 1, table 2 |
-| `crates/hanji-hwpx/corpus/field-multipara-clickhere.hwpx`            | hwpx   |     2 | table 2 |
+| `crates/hanji-hwpx/corpus/fdi-2025q2.hwpx`                           | hwpx   |     1 | drawing 1 |
+| `crates/hanji-hwpx/corpus/field-multipara-clickhere.hwpx`            | hwpx   |     3 | drawing 2, table 1 |
 | `crates/hanji-hwpx/corpus/footnote-01.hwpx`                          | hwpx   |     0 | |
 | `crates/hanji-hwpx/corpus/footnote-tbox-01.hwpx`                     | hwpx   |     1 | drawing 1 |
 | `crates/hanji-hwpx/corpus/form-01.hwpx`                              | hwpx   |     5 | form-control 5 |
 | `crates/hanji-hwpx/corpus/hcar-001.hwpx`                             | hwpx   |     3 | table 3 |
 | `crates/hanji-hwpx/corpus/hy-002.hwpx`                               | hwpx   |     2 | drawing 2 |
-| `crates/hanji-hwpx/corpus/issue1535_coanchored_float_exclusion.hwpx` | hwpx   |     3 | table 3 |
-| `crates/hanji-hwpx/corpus/issue1948_cross_para_fieldend.hwpx`        | hwpx   |     2 | table 2 |
+| `crates/hanji-hwpx/corpus/issue1535_coanchored_float_exclusion.hwpx` | hwpx   |     0 | |
+| `crates/hanji-hwpx/corpus/issue1948_cross_para_fieldend.hwpx`        | hwpx   |     3 | drawing 2, table 1 |
 | `crates/hanji-hwpx/corpus/landscape-001.hwpx`                        | hwpx   |     0 | |
-| `crates/hanji-hwpx/corpus/mel-001.hwpx`                              | hwpx   |     5 | drawing 1, table 1, text 3 |
+| `crates/hanji-hwpx/corpus/mel-001.hwpx`                              | hwpx   |     4 | drawing 1, text 3 |
 | `crates/hanji-hwpx/corpus/para-001.hwpx`                             | hwpx   |     0 | |
 | `crates/hanji-hwpx/corpus/table-text.hwpx`                           | hwpx   |     0 | |
 | `crates/hanji-hwpx/corpus/tb-img-03.hwpx`                            | hwpx   |     1 | drawing 1 |

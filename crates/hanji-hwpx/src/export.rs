@@ -7,11 +7,11 @@ use std::collections::{BTreeMap, HashMap};
 use hanji_core::{Block, Entry, Kind, ListPlan, StyleSet};
 use hanji_format::styled::{self, StyleTable};
 use hanji_format::{Atom, Cell, Inline, Key, Marks, Note, Props, Value};
-use hanji_package::xml::{assemble, escape_text, fragment, Element, Node};
+use hanji_package::xml::{assemble, escape_text, fragment, is_blank, Element, Node};
 
 use crate::header::{list_heading, list_num, Header, Style};
-use crate::import::{char_key, dims, layout_key};
-use crate::owpml::{self, char_element};
+use crate::import::{char_key, dims, layout_key, spaces_only};
+use crate::owpml::{self, char_element, ctrl_kind, MARKER_CTRLS};
 use crate::{PackageShell, SectionShell};
 
 pub struct Exporter<'a> {
@@ -186,6 +186,35 @@ impl<'a> Exporter<'a> {
             .unwrap_or_default()
     }
 
+    fn tbl_tag(&self, k: usize, t: &str) -> Option<&'a Entry> {
+        self.at(&[k], Kind::Tbl)
+            .into_iter()
+            .find(|e| e.meta.tag == t)
+    }
+
+    fn mixed_text(e: &Entry) -> bool {
+        e.meta.aux.get(2).map(|s| s.as_str()) == Some("text")
+    }
+
+    fn text_ppr(&self, k: usize) -> Option<&'a Entry> {
+        self.at(&[k], Kind::Ppr)
+            .into_iter()
+            .find(|e| e.meta.tag == "hwpx:text")
+    }
+
+    /// A paragraph that was the text before the pipe tables it shared its
+    /// original paragraph with: it still carries the group tag, and the
+    /// next block is that group's first table.
+    fn leading_mixed_text(&self, blocks: &[Block], bi: usize) -> bool {
+        let Some(w) = self.text_ppr(bi) else {
+            return false;
+        };
+        matches!(blocks.get(bi + 1), Some(Block::Table(_)))
+            && self
+                .tbl_tag(bi + 1, "hwpx:anchor")
+                .is_some_and(|a| a.meta.aux.first() == w.meta.aux.first() && Self::mixed_text(a))
+    }
+
     fn keep_entry(&self, id: &str) -> Result<&'a Entry, String> {
         self.keep
             .get(id)
@@ -257,14 +286,26 @@ impl<'a> Exporter<'a> {
                     1
                 }
                 Block::Para(p) => {
-                    // A list item keeps the paragraph style the remainder
-                    // has, unless the text shows formatting (and its style).
-                    let style =
-                        (p.item.is_none() || self.fmt.is_some()).then_some(p.style.as_str());
-                    let pel =
-                        self.para(&p.content, style, Some(&p.props), &[bi], Some((bi, blocks)))?;
-                    self.emit(&mut out, pel);
-                    1
+                    if self.leading_mixed_text(blocks, bi) {
+                        let section = out.sections.last().map_or(0, |s| s.shell);
+                        let (pel, n) = self.table_group(blocks, bi, section)?;
+                        self.emit(&mut out, pel);
+                        n
+                    } else {
+                        // A list item keeps the paragraph style the remainder
+                        // has, unless the text shows formatting (and its style).
+                        let style =
+                            (p.item.is_none() || self.fmt.is_some()).then_some(p.style.as_str());
+                        let pel = self.para(
+                            &p.content,
+                            style,
+                            Some(&p.props),
+                            &[bi],
+                            Some((bi, blocks)),
+                        )?;
+                        self.emit(&mut out, pel);
+                        1
+                    }
                 }
                 Block::Table(_) => {
                     let section = out.sections.last().map_or(0, |s| s.shell);
@@ -1011,58 +1052,86 @@ impl<'a> Exporter<'a> {
     // ------------------------------------------------------------ tables
 
     /// The paragraph holding the table at `bi` and the side-by-side tables
-    /// after it that shared its paragraph; how many blocks it took.
+    /// (and, when they shared it with text, that paragraph) after it that
+    /// shared its paragraph; how many blocks it took.
     fn table_group(
         &mut self,
         blocks: &[Block],
         bi: usize,
         section: usize,
     ) -> Result<(Element, usize), String> {
-        let tag = |k: usize, t: &str| {
-            self.at(&[k], Kind::Tbl)
-                .into_iter()
-                .find(|e| e.meta.tag == t)
+        let from_para = matches!(blocks.get(bi), Some(Block::Para(_)));
+        let (mut anchor, group, mixed) = if from_para {
+            match self.tbl_tag(bi + 1, "hwpx:anchor") {
+                Some(a) => (fragment(&a.xml[0]), Some(a.meta.aux[0].clone()), true),
+                None => {
+                    return Err("a mixed-paragraph table has no remainder".into());
+                }
+            }
+        } else {
+            match self.tbl_tag(bi, "hwpx:anchor") {
+                Some(a) => (
+                    fragment(&a.xml[0]),
+                    Some(a.meta.aux[0].clone()),
+                    Self::mixed_text(a),
+                ),
+                None => (
+                    self.fresh_anchor(self.tbl_tag(bi, "hwpx:join"))?,
+                    None,
+                    false,
+                ),
+            }
         };
-        let (mut anchor, group) = match tag(bi, "hwpx:anchor") {
-            Some(a) => (fragment(&a.xml[0]), Some(a.meta.aux[0].clone())),
-            None => (self.fresh_anchor(tag(bi, "hwpx:join"))?, None),
+        let mut members = if from_para {
+            vec![bi, bi + 1]
+        } else {
+            vec![bi]
         };
-        let mut members = vec![bi];
         if let Some(g) = &group {
-            let mut k = bi + 1;
+            let mut k = members.last().copied().unwrap() + 1;
             while k < blocks.len()
-                && matches!(blocks[k], Block::Table(_))
                 && self.at(&[k], Kind::Bmarker).is_empty()
-                && tag(k, "hwpx:join").is_some_and(|j| &j.meta.aux[0] == g)
+                && self
+                    .tbl_tag(k, "hwpx:join")
+                    .is_some_and(|j| &j.meta.aux[0] == g)
+                && matches!(blocks[k], Block::Table(_))
             {
                 members.push(k);
                 k += 1;
             }
+            if mixed
+                && !from_para
+                && matches!(blocks.get(k), Some(Block::Para(_)))
+                && self
+                    .text_ppr(k)
+                    .is_some_and(|w| w.meta.aux.first() == Some(g))
+            {
+                members.push(k);
+            }
         }
         let mut tables = vec![];
+        let mut text = None;
         for &k in &members {
-            let Block::Table(t) = &blocks[k] else {
-                unreachable!()
-            };
-            tables.push(self.table(t, k, section)?);
-        }
-        // Fill the `hp:tbl` slots in order; slots of tables that went are dropped.
-        let mut tables = tables.into_iter();
-        for r in anchor.elements_mut().filter(|r| r.is("hp:run")) {
-            let mut kids = vec![];
-            for n in std::mem::take(&mut r.children) {
-                match n {
-                    Node::El(e) if e.is("hp:tbl") && e.children.is_empty() => {
-                        if let Some(t) = tables.next() {
-                            kids.push(node(t));
-                        }
-                    }
-                    n => kids.push(n),
-                }
+            match &blocks[k] {
+                Block::Table(t) => tables.push(self.table(t, k, section)?),
+                Block::Para(p) => text = Some((k, p)),
+                _ => {}
             }
-            r.children = kids;
         }
-        Ok((anchor, members.len()))
+        if let Some((ti, p)) = text {
+            let style = (p.item.is_none() || self.fmt.is_some()).then_some(p.style.as_str());
+            let mut pel =
+                self.para(&p.content, style, Some(&p.props), &[ti], Some((ti, blocks)))?;
+            let lead = tables_lead(&anchor);
+            splice_tables(&mut pel, tables, lead);
+            Ok((pel, members.len()))
+        } else {
+            if mixed {
+                clear_modelled_text(&mut anchor);
+            }
+            fill_tbl_slots(&mut anchor, tables);
+            Ok((anchor, members.len()))
+        }
     }
 
     /// A paragraph for one table: the shell of its group's paragraph, or a
@@ -1239,6 +1308,16 @@ impl<'a> Exporter<'a> {
             }
             tbl.children.push(node(tr));
         }
+        // `hp:label` is stored with the table head; OWPML writes it after the rows.
+        let mut trailing = vec![];
+        tbl.children.retain(|n| {
+            let label = matches!(n, Node::El(e) if e.is("hp:label"));
+            if label {
+                trailing.push(n.clone());
+            }
+            !label
+        });
+        tbl.children.extend(trailing);
         Ok(tbl)
     }
 
@@ -1322,6 +1401,100 @@ fn new_cell(border: u32, width: u32) -> Vec<String> {
         format!(r#"<hp:cellSz width="{width}" height="282"/>"#),
         r#"<hp:cellMargin left="510" right="510" top="141" bottom="141"/>"#.into(),
     ]
+}
+
+/// Fill empty `hp:tbl` slots in order; slots of tables that went are dropped.
+fn fill_tbl_slots(anchor: &mut Element, tables: Vec<Element>) {
+    let mut tables = tables.into_iter();
+    for r in anchor.elements_mut().filter(|r| r.is("hp:run")) {
+        let mut kids = vec![];
+        for n in std::mem::take(&mut r.children) {
+            match n {
+                Node::El(e) if e.is("hp:tbl") && e.children.is_empty() => {
+                    if let Some(t) = tables.next() {
+                        kids.push(node(t));
+                    }
+                }
+                n => kids.push(n),
+            }
+        }
+        r.children = kids;
+    }
+}
+
+/// Put `tables` at the start of the first run (`lead`) or at the end of the
+/// last run, so a table that shared its paragraph with text keeps that order.
+fn splice_tables(p: &mut Element, tables: Vec<Element>, lead: bool) {
+    if tables.is_empty() {
+        return;
+    }
+    let nodes: Vec<Node> = tables.into_iter().map(node).collect();
+    if lead {
+        if let Some(i) = p
+            .children
+            .iter()
+            .position(|n| matches!(n, Node::El(e) if e.is("hp:run")))
+        {
+            if let Node::El(r) = &mut p.children[i] {
+                let mut kids = nodes;
+                kids.append(&mut r.children);
+                r.children = kids;
+                return;
+            }
+        }
+        let mut r = empty_run(0);
+        r.children = nodes;
+        p.children.insert(0, node(r));
+        return;
+    }
+    if let Some(i) = p
+        .children
+        .iter()
+        .rposition(|n| matches!(n, Node::El(e) if e.is("hp:run")))
+    {
+        if let Node::El(r) = &mut p.children[i] {
+            r.children.extend(nodes);
+            return;
+        }
+    }
+    let mut r = empty_run(0);
+    r.children = nodes;
+    let at = p
+        .children
+        .iter()
+        .position(|n| matches!(n, Node::El(e) if e.is("hp:linesegarray")))
+        .unwrap_or(p.children.len());
+    p.children.insert(at, node(r));
+}
+
+/// Whether the original paragraph held its tables before its modelled text.
+fn tables_lead(p: &Element) -> bool {
+    for r in p.elements().filter(|e| e.is("hp:run")) {
+        for c in &r.children {
+            match c {
+                Node::El(t) if t.is("hp:tbl") => return true,
+                Node::El(t) if t.is("hp:t") && !spaces_only(t) => return false,
+                Node::El(e) if e.is("hp:secPr") => {}
+                Node::El(c)
+                    if c.is("hp:ctrl")
+                        && ctrl_kind(c)
+                            .is_some_and(|k| MARKER_CTRLS.contains(&k.name.as_str())) => {}
+                n if is_blank(n) => {}
+                Node::El(_) => return false,
+                _ => {}
+            }
+        }
+    }
+    true
+}
+
+/// Drop the modelled text of a mixed paragraph whose text block went.
+fn clear_modelled_text(p: &mut Element) {
+    p.walk_mut(&mut |e| {
+        if e.is("hp:t") {
+            e.children.clear();
+        }
+    });
 }
 
 /// A zero-width item whose paragraph went, as a run of its own: a marker

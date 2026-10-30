@@ -449,7 +449,7 @@ impl<'a> Importer<'a> {
         let mut grid: Vec<Vec<Cell>> = vec![];
         for (ri, tr) in tbl.elements().filter(|e| e.is("w:tr")).enumerate() {
             let mut row = vec![];
-            if let Some(r) = structure_reason(tr, &["w:tblPrEx", "w:trPr"], "w:tc", "row") {
+            if let Some(r) = row_structure_reason(tr) {
                 return Some(r);
             }
             if let Some(trpr) = tr.child("w:trPr") {
@@ -457,7 +457,7 @@ impl<'a> Importer<'a> {
                     return Some("gridBefore/gridAfter".into());
                 }
             }
-            for tc in tr.elements().filter(|e| e.is("w:tc")) {
+            for (tc, _) in row_cells(tr) {
                 let ps: Vec<&Node> = tc
                     .children
                     .iter()
@@ -623,19 +623,23 @@ impl<'a> Importer<'a> {
             self.entry(Kind::Tr, xml, fpv, &[bi, ri], None, None, Meta::default());
             let mut row = vec![];
             let mut brow = vec![];
-            for tc in tr.elements() {
-                if MARKERS.contains(&tc.name.as_str()) {
+            for el in tr.elements() {
+                if MARKERS.contains(&el.name.as_str()) {
                     // A marker between cells (or after the last): before grid column `row.len()`.
-                    self.bmarker(tc, &[bi, ri, row.len()]);
+                    self.bmarker(el, &[bi, ri, row.len()]);
                     continue;
                 }
-                if !tc.is("w:tc") {
+                let (tc, wrap) = if el.is("w:tc") {
+                    (el, None)
+                } else if let Some(inner) = cell_sdt(el) {
+                    (inner, Some(el))
+                } else {
                     continue;
-                }
+                };
                 let gc = row.len();
                 let tcpr = tc.child("w:tcPr");
                 let tcs = tc.shell();
-                let xml = std::iter::once(self.frag(&tcs))
+                let mut xml: Vec<String> = std::iter::once(self.frag(&tcs))
                     .chain(tcpr.map(|t| self.frag(t)))
                     .collect();
                 let mut rest = tcpr.cloned();
@@ -644,8 +648,22 @@ impl<'a> Importer<'a> {
                         remove_child(x, n);
                     }
                 }
-                let f = self.fp(&[Some(&tcs), rest.as_ref()]);
-                self.entry(Kind::Tc, xml, f, &[bi, ri, gc], None, None, Meta::default());
+                let mut fparts: Vec<Option<&Element>> = vec![Some(&tcs), rest.as_ref()];
+                let sdt_shell = wrap.map(sdt_cell_shell);
+                if let Some(s) = &sdt_shell {
+                    xml.push(self.frag(s));
+                    fparts.push(Some(s));
+                }
+                let f = self.fp(&fparts);
+                let meta = Meta {
+                    tag: if wrap.is_some() {
+                        "w:sdt/cell".into()
+                    } else {
+                        String::new()
+                    },
+                    ..Default::default()
+                };
+                self.entry(Kind::Tc, xml, f, &[bi, ri, gc], None, None, meta);
                 let mut paras = vec![];
                 let cell_ps: Vec<&Element> = tc.elements().filter(|e| e.is("w:p")).collect();
                 let cell_span = span_roles(&cell_ps);
@@ -1321,6 +1339,72 @@ impl<'a> Importer<'a> {
     }
 }
 
+/// A shown cell-level content control: `tr > sdt > sdtContent > tc` (one
+/// cell). Several cells, or inner content the table model cannot hold,
+/// stay a table placeholder (DESIGN.md §5.1).
+fn cell_sdt(sdt: &Element) -> Option<&Element> {
+    if !sdt.is("w:sdt") || !sdt_shown(sdt) {
+        return None;
+    }
+    let c = sdt.child("w:sdtContent")?;
+    let mut tc = None;
+    for n in &c.children {
+        match n {
+            Node::El(e) if e.is("w:tc") => {
+                if tc.is_some() {
+                    return None;
+                }
+                tc = Some(e);
+            }
+            Node::El(e) if MARKERS.contains(&e.name.as_str()) => {}
+            n if is_blank(n) => {}
+            _ => return None,
+        }
+    }
+    tc
+}
+
+/// Direct cells of a row, each with the content control that wraps it.
+fn row_cells(tr: &Element) -> Vec<(&Element, Option<&Element>)> {
+    let mut out = vec![];
+    for e in tr.elements() {
+        if e.is("w:tc") {
+            out.push((e, None));
+        } else if let Some(tc) = cell_sdt(e) {
+            out.push((tc, Some(e)));
+        }
+    }
+    out
+}
+
+/// Why a `w:tr` cannot be a pipe-table row: anything but its properties,
+/// its cells (a shown cell-level `w:sdt` counts as its inner cell), and
+/// zero-width markers after the properties.
+fn row_structure_reason(tr: &Element) -> Option<String> {
+    let mut past_head = false;
+    for ch in &tr.children {
+        match ch {
+            Node::El(x) if x.is("w:tblPrEx") || x.is("w:trPr") => {
+                if past_head {
+                    return Some(format!(
+                        "row-level {} after a row, cell or marker",
+                        x.local()
+                    ));
+                }
+            }
+            Node::El(x)
+                if x.is("w:tc") || MARKERS.contains(&x.name.as_str()) || cell_sdt(x).is_some() =>
+            {
+                past_head = true;
+            }
+            Node::El(x) => return Some(format!("row-level {}", x.local())),
+            n if is_blank(n) => {}
+            _ => return Some("text or comment in a table row".into()),
+        }
+    }
+    None
+}
+
 /// Why a `w:tbl` or `w:tr` cannot be a pipe table: anything but its
 /// properties (`head`, first and in that order), its rows or cells (`item`),
 /// and zero-width markers after the properties.
@@ -1826,6 +1910,25 @@ fn expand_sdt<'a>(sdt: &'a Element, out: &mut Vec<WalkItem<'a>>) -> Result<(), S
     expand_nodes(&content.children, out)?;
     out.push(WalkItem::CloseSdt);
     Ok(())
+}
+
+/// The `w:sdt` shell of a cell-level control: properties and an empty
+/// `sdtContent` (export puts the cell back).
+fn sdt_cell_shell(sdt: &Element) -> Element {
+    let mut shell = sdt.shell();
+    let mut content = None;
+    for n in &sdt.children {
+        let Node::El(e) = n else { continue };
+        if e.is("w:sdtPr") || e.is("w:sdtEndPr") {
+            shell.children.push(Node::El(e.clone()));
+        } else if e.is("w:sdtContent") {
+            content = Some(e.shell());
+        }
+    }
+    shell.children.push(Node::El(
+        content.unwrap_or_else(|| Element::new("w:sdtContent")),
+    ));
+    shell
 }
 
 /// The `w:sdt` shell: properties and an `sdtContent` holding only leading
