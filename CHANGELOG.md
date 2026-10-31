@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- `page::Page::new`, `page::Path::new`, `page::Group::new` and
+  `page::Shadow::new`: the display list's structs are `#[non_exhaustive]`, so
+  a caller that draws pages could not build one to test its drawing.
 - Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx#22 (`944ce69`,
   on main `73894d2`): header and footer paragraphs with a positioned frame
   (`w:framePr`, such as the page-number gallery's) are placed at their anchor

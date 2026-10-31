@@ -99,6 +99,15 @@ pub struct Path {
     pub fill_rule: FillRule,
 }
 
+impl Path {
+    pub fn new(commands: Vec<PathCommand>, fill_rule: FillRule) -> Path {
+        Path {
+            commands,
+            fill_rule,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct GradientStop {
     pub offset: f64,
@@ -233,6 +242,17 @@ pub struct Shadow {
     pub color: Color,
 }
 
+impl Shadow {
+    pub fn new(dx: f64, dy: f64, blur: f64, color: Color) -> Shadow {
+        Shadow {
+            dx,
+            dy,
+            blur,
+            color,
+        }
+    }
+}
+
 /// What a group does to the items until its [`Item::PopGroup`]. The clip is
 /// in the group's own space, after `transform`.
 #[derive(Clone, Debug, PartialEq)]
@@ -242,6 +262,19 @@ pub struct Group {
     pub clip: Option<Path>,
     pub opacity: f64,
     pub shadows: Vec<Shadow>,
+}
+
+impl Group {
+    /// A group that only maps what it holds by `transform`: no clip, fully
+    /// opaque, no shadow. Set the other fields on what it returns.
+    pub fn new(transform: Transform) -> Group {
+        Group {
+            transform,
+            clip: None,
+            opacity: 1.0,
+            shadows: Vec::new(),
+        }
+    }
 }
 
 /// One drawing step. Coordinates are in the space of the innermost open
@@ -265,6 +298,18 @@ pub struct Page {
     pub width: f64,
     pub height: f64,
     pub items: Vec<Item>,
+}
+
+impl Page {
+    /// A page of `items`, `width` × `height` points. A caller that draws
+    /// pages builds one to test its drawing; the white first item is its own.
+    pub fn new(width: f64, height: f64, items: Vec<Item>) -> Page {
+        Page {
+            width,
+            height,
+            items,
+        }
+    }
 }
 
 /// One document laid out, held until dropped. Pages are made on demand.
