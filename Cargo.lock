@@ -1803,7 +1803,7 @@ dependencies = [
 [[package]]
 name = "oxml-chart"
 version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=73894d216764a21801aff08c83ffc58f4fa3b11e#73894d216764a21801aff08c83ffc58f4fa3b11e"
+source = "git+https://github.com/sinteric/rdocx?rev=944ce696e90125dc0a14bf76728cf54c74bb423e#944ce696e90125dc0a14bf76728cf54c74bb423e"
 dependencies = [
  "oxml-core",
  "oxml-drawing",
@@ -1815,7 +1815,7 @@ dependencies = [
 [[package]]
 name = "oxml-core"
 version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=73894d216764a21801aff08c83ffc58f4fa3b11e#73894d216764a21801aff08c83ffc58f4fa3b11e"
+source = "git+https://github.com/sinteric/rdocx?rev=944ce696e90125dc0a14bf76728cf54c74bb423e#944ce696e90125dc0a14bf76728cf54c74bb423e"
 dependencies = [
  "quick-xml 0.41.0",
  "thiserror",
@@ -1824,7 +1824,7 @@ dependencies = [
 [[package]]
 name = "oxml-drawing"
 version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=73894d216764a21801aff08c83ffc58f4fa3b11e#73894d216764a21801aff08c83ffc58f4fa3b11e"
+source = "git+https://github.com/sinteric/rdocx?rev=944ce696e90125dc0a14bf76728cf54c74bb423e#944ce696e90125dc0a14bf76728cf54c74bb423e"
 dependencies = [
  "oxml-core",
  "quick-xml 0.41.0",
@@ -1833,7 +1833,7 @@ dependencies = [
 [[package]]
 name = "oxml-layout"
 version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=73894d216764a21801aff08c83ffc58f4fa3b11e#73894d216764a21801aff08c83ffc58f4fa3b11e"
+source = "git+https://github.com/sinteric/rdocx?rev=944ce696e90125dc0a14bf76728cf54c74bb423e#944ce696e90125dc0a14bf76728cf54c74bb423e"
 dependencies = [
  "fontdb 0.23.0",
  "harfrust",
@@ -1848,12 +1848,12 @@ dependencies = [
 [[package]]
 name = "oxml-media"
 version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=73894d216764a21801aff08c83ffc58f4fa3b11e#73894d216764a21801aff08c83ffc58f4fa3b11e"
+source = "git+https://github.com/sinteric/rdocx?rev=944ce696e90125dc0a14bf76728cf54c74bb423e#944ce696e90125dc0a14bf76728cf54c74bb423e"
 
 [[package]]
 name = "oxml-opc"
 version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=73894d216764a21801aff08c83ffc58f4fa3b11e#73894d216764a21801aff08c83ffc58f4fa3b11e"
+source = "git+https://github.com/sinteric/rdocx?rev=944ce696e90125dc0a14bf76728cf54c74bb423e#944ce696e90125dc0a14bf76728cf54c74bb423e"
 dependencies = [
  "quick-xml 0.41.0",
  "thiserror",
@@ -1863,7 +1863,7 @@ dependencies = [
 [[package]]
 name = "oxml-pdf"
 version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=73894d216764a21801aff08c83ffc58f4fa3b11e#73894d216764a21801aff08c83ffc58f4fa3b11e"
+source = "git+https://github.com/sinteric/rdocx?rev=944ce696e90125dc0a14bf76728cf54c74bb423e#944ce696e90125dc0a14bf76728cf54c74bb423e"
 dependencies = [
  "jpeg-encoder",
  "miniz_oxide 0.9.1",
@@ -1880,7 +1880,7 @@ dependencies = [
 [[package]]
 name = "oxml-sml"
 version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=73894d216764a21801aff08c83ffc58f4fa3b11e#73894d216764a21801aff08c83ffc58f4fa3b11e"
+source = "git+https://github.com/sinteric/rdocx?rev=944ce696e90125dc0a14bf76728cf54c74bb423e#944ce696e90125dc0a14bf76728cf54c74bb423e"
 dependencies = [
  "oxml-opc",
  "quick-xml 0.41.0",
@@ -2329,7 +2329,7 @@ checksum = "a611d15b50743feb4c76b7d03edcb0e64f399c26961e4efe6975bc398be6aa3d"
 [[package]]
 name = "rdocx"
 version = "0.16.4"
-source = "git+https://github.com/sinteric/rdocx?rev=73894d216764a21801aff08c83ffc58f4fa3b11e#73894d216764a21801aff08c83ffc58f4fa3b11e"
+source = "git+https://github.com/sinteric/rdocx?rev=944ce696e90125dc0a14bf76728cf54c74bb423e#944ce696e90125dc0a14bf76728cf54c74bb423e"
 dependencies = [
  "base64 0.23.1",
  "encoding_rs",
@@ -2358,7 +2358,7 @@ dependencies = [
 [[package]]
 name = "rdocx-html"
 version = "0.16.4"
-source = "git+https://github.com/sinteric/rdocx?rev=73894d216764a21801aff08c83ffc58f4fa3b11e#73894d216764a21801aff08c83ffc58f4fa3b11e"
+source = "git+https://github.com/sinteric/rdocx?rev=944ce696e90125dc0a14bf76728cf54c74bb423e#944ce696e90125dc0a14bf76728cf54c74bb423e"
 dependencies = [
  "rdocx-oxml",
 ]
@@ -2366,7 +2366,7 @@ dependencies = [
 [[package]]
 name = "rdocx-layout"
 version = "0.16.4"
-source = "git+https://github.com/sinteric/rdocx?rev=73894d216764a21801aff08c83ffc58f4fa3b11e#73894d216764a21801aff08c83ffc58f4fa3b11e"
+source = "git+https://github.com/sinteric/rdocx?rev=944ce696e90125dc0a14bf76728cf54c74bb423e#944ce696e90125dc0a14bf76728cf54c74bb423e"
 dependencies = [
  "oxml-chart",
  "oxml-drawing",
@@ -2378,7 +2378,7 @@ dependencies = [
 [[package]]
 name = "rdocx-oxml"
 version = "0.16.4"
-source = "git+https://github.com/sinteric/rdocx?rev=73894d216764a21801aff08c83ffc58f4fa3b11e#73894d216764a21801aff08c83ffc58f4fa3b11e"
+source = "git+https://github.com/sinteric/rdocx?rev=944ce696e90125dc0a14bf76728cf54c74bb423e#944ce696e90125dc0a14bf76728cf54c74bb423e"
 dependencies = [
  "itoa",
  "oxml-core",
@@ -2604,7 +2604,7 @@ dependencies = [
 [[package]]
 name = "rpptx"
 version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=73894d216764a21801aff08c83ffc58f4fa3b11e#73894d216764a21801aff08c83ffc58f4fa3b11e"
+source = "git+https://github.com/sinteric/rdocx?rev=944ce696e90125dc0a14bf76728cf54c74bb423e#944ce696e90125dc0a14bf76728cf54c74bb423e"
 dependencies = [
  "gif 0.14.2",
  "jpeg-encoder",
@@ -2633,7 +2633,7 @@ dependencies = [
 [[package]]
 name = "rpptx-layout"
 version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=73894d216764a21801aff08c83ffc58f4fa3b11e#73894d216764a21801aff08c83ffc58f4fa3b11e"
+source = "git+https://github.com/sinteric/rdocx?rev=944ce696e90125dc0a14bf76728cf54c74bb423e#944ce696e90125dc0a14bf76728cf54c74bb423e"
 dependencies = [
  "oxml-chart",
  "oxml-drawing",
@@ -2644,7 +2644,7 @@ dependencies = [
 [[package]]
 name = "rpptx-oxml"
 version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=73894d216764a21801aff08c83ffc58f4fa3b11e#73894d216764a21801aff08c83ffc58f4fa3b11e"
+source = "git+https://github.com/sinteric/rdocx?rev=944ce696e90125dc0a14bf76728cf54c74bb423e#944ce696e90125dc0a14bf76728cf54c74bb423e"
 dependencies = [
  "oxml-core",
  "oxml-drawing",
@@ -2655,7 +2655,7 @@ dependencies = [
 [[package]]
 name = "rpptx-render"
 version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=73894d216764a21801aff08c83ffc58f4fa3b11e#73894d216764a21801aff08c83ffc58f4fa3b11e"
+source = "git+https://github.com/sinteric/rdocx?rev=944ce696e90125dc0a14bf76728cf54c74bb423e#944ce696e90125dc0a14bf76728cf54c74bb423e"
 dependencies = [
  "oxml-drawing",
  "oxml-layout",
