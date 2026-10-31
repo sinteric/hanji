@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Draw an HWPX text's bold or italic synthetically when the face hanji chose
+  has none, in the page display list and the PNG preview, as rhwp does. usvg
+  synthesizes neither, so bold text was drawn regular wherever only a regular
+  face was available (the client bundles one).
 - `page::Page::new`, `page::Path::new`, `page::Group::new` and
   `page::Shadow::new`: the display list's structs are `#[non_exhaustive]`, so
   a caller that draws pages could not build one to test its drawing.
