@@ -20,9 +20,20 @@ use crate::page::{
 };
 use crate::Diagnostic;
 
-/// usvg's font ids mapped to the face numbers that [`Glyphs::face`] carries
-/// and each face's units per em.
-pub(crate) type Faces = HashMap<usvg::fontdb::ID, (usize, u16)>;
+/// usvg's font ids mapped to hanji's faces.
+pub(crate) type Faces = HashMap<usvg::fontdb::ID, SvgFace>;
+
+/// A face as the page draws it. usvg resolves `font-weight` and `font-style`
+/// to the face hanji named and synthesizes neither, so where the text asked
+/// for a bold or italic the face does not have, its glyph runs say so.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct SvgFace {
+    /// The face number [`Glyphs::face`] carries.
+    pub(crate) id: usize,
+    pub(crate) units: u16,
+    pub(crate) embolden: bool,
+    pub(crate) slant: bool,
+}
 
 /// Lowers one page.
 pub(crate) struct SvgLowering<'a> {
@@ -256,7 +267,13 @@ impl<'a> SvgLowering<'a> {
             let size = f64::from(span.font_size.get());
             let mut run: Option<Glyphs> = None;
             for glyph in &span.positioned_glyphs {
-                let Some(&(face, units)) = self.faces.get(&glyph.font) else {
+                let Some(&SvgFace {
+                    id: face,
+                    units,
+                    embolden,
+                    slant,
+                }) = self.faces.get(&glyph.font)
+                else {
                     self.diagnose(&path, "glyph from a face hanji did not supply was omitted");
                     continue;
                 };
@@ -284,6 +301,8 @@ impl<'a> SvgLowering<'a> {
                 match &mut run {
                     Some(r)
                         if r.face.0 as usize == face
+                            && r.embolden == embolden
+                            && r.slant == slant
                             && close(&r.matrix, &matrix)
                             && (r.size - size).abs() < 1e-9 =>
                     {
@@ -302,8 +321,8 @@ impl<'a> SvgLowering<'a> {
                             matrix,
                             glyphs: vec![at],
                             text: glyph.text.clone(),
-                            embolden: false,
-                            slant: false,
+                            embolden,
+                            slant,
                         });
                     }
                 }

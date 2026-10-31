@@ -76,6 +76,7 @@ fn real_pptx_doughnut_has_distinct_wedges_and_category_legend() {
     let root = hanji_package::xml::parse(svg.as_bytes()).unwrap().root;
     let mut wedge_colors = BTreeSet::new();
     let mut chart_labels = BTreeSet::new();
+    let mut series_names = 0;
     root.walk(&mut |e| {
         // The three large curved wedges are distinct from the rectangular
         // legend swatches, including the slide's separate manual legend.
@@ -85,7 +86,9 @@ fn real_pptx_doughnut_has_distinct_wedges_and_category_legend() {
             }
         }
         if e.local() == "text" {
-            chart_labels.insert(e.text_of(&["text", "tspan"]));
+            let text = e.text_of(&["text", "tspan"]);
+            series_names += usize::from(text == "비중");
+            chart_labels.insert(text);
         }
     });
     assert_eq!(
@@ -100,10 +103,10 @@ fn real_pptx_doughnut_has_distinct_wedges_and_category_legend() {
             "missing chart category {label}"
         );
     }
-    assert!(
-        !chart_labels.contains("비중"),
-        "a series legend loses the category labels"
-    );
+    // The one series' name is the chart's automatic title (no c:title, and
+    // c:autoTitleDeleted is 0), as PowerPoint draws it. A second copy would
+    // be a series legend, which loses the category labels.
+    assert_eq!(series_names, 1, "a series legend loses the category labels");
 }
 
 #[test]

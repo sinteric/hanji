@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+- Draw an HWPX text's bold or italic synthetically when the face hanji chose
+  has none, in the page display list and the PNG preview, as rhwp does. usvg
+  synthesizes neither, so bold text was drawn regular wherever only a regular
+  face was available (the client bundles one).
+- `page::Page::new`, `page::Path::new`, `page::Group::new` and
+  `page::Shadow::new`: the display list's structs are `#[non_exhaustive]`, so
+  a caller that draws pages could not build one to test its drawing.
+- Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx#22 (`944ce69`,
+  on main `73894d2`): header and footer paragraphs with a positioned frame
+  (`w:framePr`, such as the page-number gallery's) are placed at their anchor
+  instead of taking flow room, contextual spacing drops space between
+  paragraphs of one style, a PowerPoint layout placeholder inherits the master
+  placeholder of its type, and chart labels take the chart's `c:txPr` with a
+  one-series chart showing its automatic title.
 - Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `73894d2`
   (S95.4 / rdocx 0.16.4, rpptx and oxml-layout 0.14.4: Word legacy/modern
   form-field authoring, mail merge, relationship/style preservation, body
