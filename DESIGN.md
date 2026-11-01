@@ -1544,7 +1544,9 @@ requested face and script slot is looked up, in order, in:
    or `HANJI_FONT_DIR`;
 2. the document's own embedded copy (proposed; pptx `embeddedFontLst`, hwpx
    `isEmbedded`);
-3. installed system fonts.
+3. installed system fonts. A byte-only caller (`FontOptions`) gets them
+   only when it asks, with `with_system_fonts` (feature `system-fonts`, no
+   wasm), scanned once per process.
 
 Names match across languages (맑은 고딕 = Malgun Gothic). The bundled set
 (4, below) comes in only as a fallback. Optional: a font policy,
@@ -1660,7 +1662,16 @@ face if available, else the substitute. Measured Hangul advances: 맑은 고딕,
 바탕, 돋움 and 굴림 1.000 em; HCR Batang and Dotum 0.970; Noto Serif CJK KR
 0.966; Nanum Myeongjo 0.950; Nanum Gothic 0.940; Noto Sans CJK KR 0.920. A
 맑은 고딕 line on Noto Sans metrics holds about 8% more Hangul and breaks
-elsewhere: the LibreOffice + Nanum effect on file 09 (W 0.26).
+elsewhere: the LibreOffice + Nanum effect on file 09 (W 0.26). Vertical
+metrics (measured 2026-11-01 from the `hhea` of the faces Word for Mac
+embedded in its PDFs of the docx baseline): 맑은 고딕 ascent 1.088 and
+descent 0.242 em, 바탕 0.858 and 0.142 em, against Noto Sans KR's 1.160 and
+0.288. Word spaces an East Asian face's lines at 1.3 × that ascent +
+descent (Word's 12 pt 바탕 lines are 15.6 pt apart, its 11 pt 맑은 고딕
+lines 19.0 pt before spacing), and rdocx does the same, so a docx
+substitute drawing East Asian text takes the requested face's (`line` in
+the table): on Noto Sans KR's own, a 맑은 고딕 line is 9% and a 바탕 line
+45% too tall.
 
 **Bundled set and shipping.**
 

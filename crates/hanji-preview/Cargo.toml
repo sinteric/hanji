@@ -11,7 +11,10 @@ rust-version = "1.93"
 [features]
 # Keep the existing native API; byte-only consumers can disable this adapter.
 default = ["host-fonts", "hwpx"]
-host-fonts = ["dep:hanji-store", "oxml-layout/system-fonts", "fontdb/fs", "fontdb/fontconfig"]
+host-fonts = ["system-fonts", "dep:hanji-store", "oxml-layout/system-fonts"]
+# Installed system fonts, for a byte-only caller too (`FontOptions::with_system_fonts`).
+# Scanning maps each font file instead of reading it whole.
+system-fonts = ["fontdb/fs", "fontdb/memmap", "fontdb/fontconfig"]
 # The CLI includes HWPX; small PPTX/DOCX byte-only consumers can omit rhwp.
 hwpx = ["dep:rhwp"]
 

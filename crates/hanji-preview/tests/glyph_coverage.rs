@@ -15,7 +15,7 @@ fn named(data: &[u8], family: &str) -> Vec<u8> {
             family: family.into(),
             bold: false,
             italic: false,
-            line_em: None,
+            line: None,
             ea_advance: None,
         },
     )

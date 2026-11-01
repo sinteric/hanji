@@ -13,7 +13,7 @@ fn supplied() -> FontOptions {
             family: "Caller Sans".into(),
             bold: false,
             italic: false,
-            line_em: None,
+            line: None,
             ea_advance: None,
         },
     )
@@ -188,7 +188,7 @@ fn per_style_resolved_faces_drive_reports_and_html_substitution_marks() {
                     family: "Style Test".into(),
                     bold,
                     italic,
-                    line_em: None,
+                    line: None,
                     ea_advance: None,
                 },
             )

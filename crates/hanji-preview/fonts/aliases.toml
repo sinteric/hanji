@@ -13,6 +13,11 @@
 # `ea_advance` (optional): the requested face's Hangul and CJK advance in em,
 # measured (§7.1). A substitute is laid out with it, so lines break where the
 # requested face breaks them ("metrics: table" in the report).
+#
+# `line` (optional): the requested face's ascent and descent in em, from its
+# `hhea` table, measured (§7.1). Word spaces an East Asian face's lines by
+# these, and a DOCX substitute drawing East Asian text is laid out with them,
+# so its lines are as tall as the requested face's.
 
 # Korean, Microsoft
 [[family]]
@@ -20,6 +25,7 @@ names = ["맑은 고딕", "Malgun Gothic", "MalgunGothic"]
 substitute = ["Noto Sans CJK KR", "Noto Sans KR", "Source Han Sans K", "Source Han Sans KR", "Apple SD Gothic Neo", "NanumGothic"]
 class = "sans"
 ea_advance = 1.0
+line = [1.08838, 0.24170]
 
 [[family]]
 names = ["굴림", "Gulim", "굴림체", "GulimChe"]
@@ -38,6 +44,7 @@ names = ["바탕", "Batang", "바탕체", "BatangChe"]
 substitute = ["Noto Serif CJK KR", "Noto Serif KR", "Source Han Serif K", "Source Han Serif KR", "AppleMyungjo", "NanumMyeongjo"]
 class = "serif"
 ea_advance = 1.0
+line = [0.85840, 0.14160]
 
 [[family]]
 names = ["궁서", "Gungsuh", "궁서체", "GungsuhChe"]

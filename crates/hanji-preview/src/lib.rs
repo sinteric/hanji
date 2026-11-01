@@ -52,24 +52,39 @@ use serde::Serialize;
 use fonts::{Fonts, Metrics, Script, Source};
 
 /// Caller fonts and alias policy. Assets remain inside the PPTX package.
-/// The default uses only document-embedded and bundled fonts, with no host discovery.
+/// The default uses only document-embedded and bundled fonts, with no host
+/// discovery; [`FontOptions::with_system_fonts`] adds the installed fonts.
 #[derive(Clone, Debug, Default)]
 #[non_exhaustive]
 pub struct FontOptions {
     pub fonts: Vec<FontData>,
     pub aliases: Option<fonts::Aliases>,
+    /// Whether installed system fonts are searched, after `fonts` and the
+    /// document's own and before the bundled faces.
+    #[cfg(all(feature = "system-fonts", not(target_family = "wasm")))]
+    pub system_fonts: bool,
 }
 
 impl FontOptions {
     pub fn from_fonts(fonts: Vec<FontData>) -> FontOptions {
         FontOptions {
             fonts,
-            aliases: None,
+            ..FontOptions::default()
         }
     }
 
     pub fn with_aliases(mut self, aliases: fonts::Aliases) -> FontOptions {
         self.aliases = Some(aliases);
+        self
+    }
+
+    /// Search the installed system fonts too. They are scanned once per
+    /// process, so a font installed later is found after a restart. The same
+    /// document can then lay out differently on two machines, as it does in
+    /// the application that made it.
+    #[cfg(all(feature = "system-fonts", not(target_family = "wasm")))]
+    pub fn with_system_fonts(mut self) -> FontOptions {
+        self.system_fonts = true;
         self
     }
 }
@@ -798,7 +813,7 @@ pub fn render_pptx_with_fonts_and_limits(
     limits.validate()?;
     let p = {
         let (input, stock) = resolve_pptx(package)?;
-        let fonts = Fonts::from_bytes(&opts.fonts, &input.fonts, opts.aliases.clone())?;
+        let fonts = Fonts::from_options(opts, &input.fonts)?;
         layout_preview(input, stock, &fonts)?
     };
     finish_preview_with_limits(p, limits)
@@ -835,7 +850,7 @@ pub(crate) fn layout_pptx(
     limits.validate()?;
     let p = {
         let (input, stock) = resolve_pptx(package)?;
-        let fonts = Fonts::from_bytes(&opts.fonts, &input.fonts, opts.aliases.clone())?;
+        let fonts = Fonts::from_options(opts, &input.fonts)?;
         layout_preview(input, stock, &fonts)?
     };
     finish_layout(p, limits)
@@ -965,7 +980,7 @@ fn layout_preview(
                 family: label(i),
                 bold: b,
                 italic: it,
-                line_em: Some(LINE_EM),
+                line: Some(sfnt::Line::Height(LINE_EM)),
                 ea_advance: face.ea_advance.filter(|_| draws_script),
             };
             match sfnt::build(data, index, &adj) {
@@ -1021,7 +1036,7 @@ fn layout_preview(
                 family: family.clone(),
                 bold: face.is_bold(),
                 italic: face.is_italic(),
-                line_em: None,
+                line: None,
                 ea_advance: None,
             },
         )?;
@@ -2269,7 +2284,7 @@ mod tests {
                     family: family.into(),
                     bold: false,
                     italic: false,
-                    line_em: None,
+                    line: None,
                     ea_advance: None,
                 },
             )

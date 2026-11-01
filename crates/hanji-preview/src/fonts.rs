@@ -113,6 +113,9 @@ pub struct Family {
     pub class: Option<String>,
     #[serde(default)]
     pub ea_advance: Option<f64>,
+    /// The requested face's ascent and descent in em, from its `hhea`.
+    #[serde(default)]
+    pub line: Option<[f64; 2]>,
 }
 
 /// A class's last candidates, per script.
@@ -178,6 +181,13 @@ pub fn same_name(a: &str, b: &str) -> bool {
     key(a) == key(b)
 }
 
+/// What a substitute borrows from the requested face (`metrics: table`).
+#[derive(Clone, Copy, Debug, Default)]
+struct Borrowed {
+    ea_advance: Option<f64>,
+    line: Option<[f64; 2]>,
+}
+
 /// A face found for a request.
 #[derive(Clone, Debug)]
 pub struct Drawn {
@@ -187,6 +197,8 @@ pub struct Drawn {
     pub metrics: Metrics,
     /// The East Asian advance to lay the face out with (`metrics: table`).
     pub ea_advance: Option<f64>,
+    /// The ascent and descent in em to lay the face out with (`metrics: table`).
+    pub line: Option<[f64; 2]>,
     tier: usize,
 }
 
@@ -216,6 +228,8 @@ pub struct ResolvedFont {
     pub source: Source,
     pub metrics: Metrics,
     pub ea_advance: Option<f64>,
+    /// The requested face's ascent and descent in em, for a substitute.
+    pub line: Option<[f64; 2]>,
     pub font: FontData,
 }
 
@@ -231,12 +245,18 @@ impl ResolvedFont {
             source,
             metrics,
             ea_advance: None,
+            line: None,
             font,
         }
     }
 
     pub fn with_ea_advance(mut self, ea_advance: Option<f64>) -> ResolvedFont {
         self.ea_advance = ea_advance;
+        self
+    }
+
+    pub fn with_line(mut self, line: Option<[f64; 2]>) -> ResolvedFont {
+        self.line = line;
         self
     }
 }
@@ -318,6 +338,19 @@ pub struct Fonts {
     pub warnings: Vec<String>,
 }
 
+/// The installed system fonts, scanned on first use and kept for the process.
+#[cfg(all(feature = "system-fonts", not(target_family = "wasm")))]
+fn system_fonts() -> fontdb::Database {
+    static SYSTEM: std::sync::OnceLock<fontdb::Database> = std::sync::OnceLock::new();
+    SYSTEM
+        .get_or_init(|| {
+            let mut db = fontdb::Database::new();
+            db.load_system_fonts();
+            db
+        })
+        .clone()
+}
+
 /// Font files and directories in `HANJI_FONT_DIR` (a path list).
 #[cfg(all(feature = "host-fonts", not(target_family = "wasm")))]
 pub fn env_font_dirs() -> Vec<PathBuf> {
@@ -337,6 +370,34 @@ impl Fonts {
         supplied: &[FontData],
         embedded: &[oxml_layout::FontFile],
         aliases: Option<Aliases>,
+    ) -> Result<Fonts, String> {
+        Self::from_bytes_before_bundled(supplied, embedded, aliases, vec![])
+    }
+
+    /// [`Fonts::from_bytes`] with `options`' fonts and aliases, and the
+    /// installed system fonts after the document's own when `options` asks
+    /// for them ([`crate::FontOptions::with_system_fonts`]).
+    pub fn from_options(
+        options: &crate::FontOptions,
+        embedded: &[oxml_layout::FontFile],
+    ) -> Result<Fonts, String> {
+        #[cfg(all(feature = "system-fonts", not(target_family = "wasm")))]
+        let after = if options.system_fonts {
+            vec![(Source::System, system_fonts())]
+        } else {
+            vec![]
+        };
+        #[cfg(not(all(feature = "system-fonts", not(target_family = "wasm"))))]
+        let after = vec![];
+        Self::from_bytes_before_bundled(&options.fonts, embedded, options.aliases.clone(), after)
+    }
+
+    /// Caller fonts, document-embedded fonts, `after`, then bundled faces.
+    fn from_bytes_before_bundled(
+        supplied: &[FontData],
+        embedded: &[oxml_layout::FontFile],
+        aliases: Option<Aliases>,
+        after: Vec<(Source, fontdb::Database)>,
     ) -> Result<Fonts, String> {
         let mut supplied_db = fontdb::Database::new();
         for (i, font) in supplied.iter().enumerate() {
@@ -366,7 +427,7 @@ impl Fonts {
                 ));
             }
         }
-        let mut fonts = Self::from_tiers(vec![(Source::Supplied, supplied_db)], embedded, vec![]);
+        let mut fonts = Self::from_tiers(vec![(Source::Supplied, supplied_db)], embedded, after);
         if let Some(aliases) = aliases {
             fonts.aliases.merge(aliases);
         }
@@ -403,10 +464,11 @@ impl Fonts {
                 }
             }
         }
-        let mut system_db = fontdb::Database::new();
-        if system {
-            system_db.load_system_fonts();
-        }
+        let system_db = if system {
+            system_fonts()
+        } else {
+            fontdb::Database::new()
+        };
         let mut fonts = Self::from_tiers(
             vec![(Source::FontDir, dir_db)],
             embedded,
@@ -493,7 +555,7 @@ impl Fonts {
         name: &str,
         script: Script,
         metrics: Metrics,
-        ea_advance: Option<f64>,
+        borrowed: Borrowed,
     ) -> Option<Drawn> {
         (0..self.tiers.len()).find_map(|tier| {
             let (_, family) = self.query(tier, name, false, false, script.probe())?;
@@ -501,7 +563,8 @@ impl Fonts {
                 family,
                 source: self.tiers[tier].0,
                 metrics: metrics.clone(),
-                ea_advance,
+                ea_advance: borrowed.ea_advance,
+                line: borrowed.line,
                 tier,
             })
         })
@@ -516,8 +579,14 @@ impl Fonts {
         if let Some(e) = entry {
             names.extend(e.names.iter().map(String::as_str));
         }
-        let advance = entry.and_then(|e| e.ea_advance).filter(|_| ea);
-        let as_substitute = if advance.is_some() {
+        // What a substitute borrows from the requested face, for East Asian
+        // text only: a Latin substitute is not an East Asian face, which
+        // rdocx spaces by other metrics.
+        let borrowed = Borrowed {
+            ea_advance: entry.and_then(|e| e.ea_advance).filter(|_| ea),
+            line: entry.and_then(|e| e.line).filter(|_| ea),
+        };
+        let as_substitute = if borrowed.ea_advance.is_some() || borrowed.line.is_some() {
             Metrics::Table
         } else {
             Metrics::Substitute
@@ -534,17 +603,24 @@ impl Fonts {
             .flatten();
         names
             .iter()
-            .find_map(|n| self.find(n, script, Metrics::Original, None))
+            .find_map(|n| self.find(n, script, Metrics::Original, Borrowed::default()))
             .or_else(|| {
                 let mut metric = entry.into_iter().flat_map(|e| &e.metric);
-                metric.find_map(|m| self.find(m, script, Metrics::Compatible(m.clone()), None))
+                metric.find_map(|m| {
+                    self.find(
+                        m,
+                        script,
+                        Metrics::Compatible(m.clone()),
+                        Borrowed::default(),
+                    )
+                })
             })
             .or_else(|| {
                 let mut substitutes = entry
                     .into_iter()
                     .flat_map(|e| &e.substitute)
                     .chain(by_class);
-                substitutes.find_map(|s| self.find(s, script, as_substitute.clone(), advance))
+                substitutes.find_map(|s| self.find(s, script, as_substitute.clone(), borrowed))
             })
             .or_else(|| self.any_face(script))
     }
@@ -566,6 +642,7 @@ impl Fonts {
                             source: *source,
                             metrics: Metrics::Substitute,
                             ea_advance: None,
+                            line: None,
                             tier,
                         })
                     })
@@ -599,6 +676,7 @@ impl FontResolver for Fonts {
             source: drawn.source,
             metrics: drawn.metrics,
             ea_advance: drawn.ea_advance,
+            line: drawn.line,
             font: FontData {
                 data: data.into(),
                 face_index,
@@ -634,6 +712,7 @@ impl FontResolver for Fonts {
                 if covers_text(&font.font.data, font.font.face_index, text) {
                     font.metrics = Metrics::Substitute;
                     font.ea_advance = None;
+                    font.line = None;
                     return Some(font);
                 }
             }
@@ -658,6 +737,7 @@ impl FontResolver for Fonts {
                     source: *source,
                     metrics: Metrics::Substitute,
                     ea_advance: None,
+                    line: None,
                     font: FontData {
                         data: data.into(),
                         face_index,
@@ -765,6 +845,44 @@ mod tests {
             .face_data(&f.resolve("Arial", Script::Latin).unwrap(), true, false)
             .unwrap();
         assert!(ttf_parser::Face::parse(&data, 0).unwrap().is_bold());
+    }
+
+    #[test]
+    fn the_table_gives_measured_korean_faces_their_line_and_latin_text_none() {
+        let a = Aliases::builtin();
+        assert_eq!(
+            a.family("Malgun Gothic").unwrap().line,
+            Some([1.08838, 0.24170])
+        );
+        assert_eq!(a.family("바탕").unwrap().line, Some([0.85840, 0.14160]));
+        assert_eq!(a.family("Calibri").unwrap().line, None);
+        // Latin text drawn by a substitute borrows no East Asian line: rdocx
+        // spaces a face with no East Asian code page by other metrics.
+        let d = bundled_only().resolve("맑은 고딕", Script::Latin).unwrap();
+        assert_ne!(d.metrics, Metrics::Original);
+        assert_eq!((d.line, d.ea_advance), (None, None));
+    }
+
+    #[test]
+    #[cfg(all(feature = "system-fonts", not(target_family = "wasm")))]
+    fn installed_fonts_come_after_the_document_s_own_and_before_the_bundled() {
+        let options = crate::FontOptions::default().with_system_fonts();
+        let fonts = Fonts::from_options(&options, &[]).unwrap();
+        let sources: Vec<_> = fonts.tiers.iter().map(|(source, _)| *source).collect();
+        assert_eq!(
+            sources,
+            [
+                Source::Supplied,
+                Source::Embedded,
+                Source::System,
+                Source::Bundled
+            ]
+        );
+        let fonts = Fonts::from_options(&crate::FontOptions::default(), &[]).unwrap();
+        assert!(fonts
+            .tiers
+            .iter()
+            .all(|(source, _)| *source != Source::System));
     }
 
     #[test]

@@ -26,7 +26,7 @@ pub fn render_with_fonts_and_limits(
     let document = rdocx::Document::from_bytes(bytes)
         .map_err(|e| format!("rdocx cannot open the document: {e}"))?;
     let embedded = embedded_fonts(&document);
-    let fonts = Fonts::from_bytes(&options.fonts, &embedded, options.aliases.clone())?;
+    let fonts = Fonts::from_options(options, &embedded)?;
     finish_preview_with_limits(build(&document, bytes, &fonts)?, limits)
 }
 
@@ -41,7 +41,7 @@ pub(crate) fn layout(
     let document = rdocx::Document::from_bytes(bytes)
         .map_err(|e| format!("rdocx cannot open the document: {e}"))?;
     let embedded = embedded_fonts(&document);
-    let fonts = Fonts::from_bytes(&options.fonts, &embedded, options.aliases.clone())?;
+    let fonts = Fonts::from_options(options, &embedded)?;
     crate::finish_layout(build(&document, bytes, &fonts)?, limits)
 }
 
@@ -267,7 +267,10 @@ fn build(
                     family: requested.clone(),
                     bold: style.0,
                     italic: style.1,
-                    line_em: None,
+                    line: face
+                        .line
+                        .filter(|_| draws_script)
+                        .map(|[ascent, descent]| sfnt::Line::Borrowed { ascent, descent }),
                     ea_advance: face.ea_advance.filter(|_| draws_script),
                 },
             )?;
@@ -337,7 +340,7 @@ fn build(
                 family: face.family.clone(),
                 bold: parsed.is_bold(),
                 italic: parsed.is_italic(),
-                line_em: None,
+                line: None,
                 ea_advance: None,
             },
         )?;
@@ -426,6 +429,85 @@ mod tests {
         })
         .collect::<Vec<_>>();
         package::write(&parts).unwrap()
+    }
+
+    #[test]
+    fn a_substitute_is_laid_out_with_the_line_its_resolver_borrows() {
+        // Draws every request with Carlito, as a substitute for the requested
+        // face, with `line` as that face's ascent and descent.
+        struct Substitute(Option<[f64; 2]>);
+        impl FontResolver for Substitute {
+            fn resolve_font(
+                &self,
+                _: &str,
+                _: Script,
+                _: bool,
+                _: bool,
+            ) -> Option<crate::ResolvedFont> {
+                let carlito = oxml_layout::bundled_fonts::bundled_font_data()
+                    .into_iter()
+                    .find(|(family, _)| *family == "Carlito")?
+                    .1;
+                Some(
+                    crate::ResolvedFont::new(
+                        "Carlito",
+                        Source::Bundled,
+                        Metrics::Table,
+                        crate::FontData::new(carlito),
+                    )
+                    .with_line(self.0),
+                )
+            }
+        }
+        let document = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:rPr><w:rFonts w:ascii="맑은 고딕" w:hAnsi="맑은 고딕"/></w:rPr><w:t>Line</w:t></w:r></w:p></w:body></w:document>"#;
+        let mut parts = package::read(include_bytes!(
+            "../../../prototype/preview/baseline/08-docx-new-report-en.docx"
+        ))
+        .unwrap();
+        parts
+            .iter_mut()
+            .find(|part| part.name == "word/document.xml")
+            .unwrap()
+            .data = document.as_bytes().into();
+        let bytes = package::write(&parts).unwrap();
+        let parsed = rdocx::Document::from_bytes(&bytes).unwrap();
+        // The ascent and descent rdocx was handed for the requested face.
+        let line = |resolver: &Substitute| {
+            let preview = build(&parsed, &bytes, resolver).unwrap();
+            let font = preview
+                .layout
+                .fonts
+                .iter()
+                .find(|font| font.family == "맑은 고딕")
+                .expect("the requested face lays the text out");
+            let face = ttf_parser::Face::parse(&font.data, font.face_index).unwrap();
+            let em = f64::from(face.units_per_em());
+            let hhea = face.tables().hhea;
+            (
+                f64::from(hhea.ascender) / em,
+                f64::from(-hhea.descender) / em,
+                hhea.line_gap,
+            )
+        };
+        // 맑은 고딕's own, from the alias table.
+        let (ascent, descent, gap) = line(&Substitute(Some([1.08838, 0.24170])));
+        assert!((ascent - 1.08838).abs() < 0.001, "{ascent}");
+        assert!((descent - 0.24170).abs() < 0.001, "{descent}");
+        assert_eq!(gap, 0);
+        // With no line to borrow, the substitute keeps its own.
+        let carlito = ttf_parser::Face::parse(
+            oxml_layout::bundled_fonts::bundled_font_data()
+                .into_iter()
+                .find(|(family, _)| *family == "Carlito")
+                .unwrap()
+                .1,
+            0,
+        )
+        .unwrap();
+        let em = f64::from(carlito.units_per_em());
+        let (ascent, descent, _) = line(&Substitute(None));
+        assert!((ascent - f64::from(carlito.ascender()) / em).abs() < 0.001);
+        assert!((descent - f64::from(-carlito.descender()) / em).abs() < 0.001);
     }
 
     #[test]
