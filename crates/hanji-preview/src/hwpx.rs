@@ -48,7 +48,7 @@ pub struct Preview {
 /// Render HWPX using caller bytes, document fonts, then bundled fallbacks.
 pub fn render_with_fonts(bytes: &[u8], options: &FontOptions) -> Result<Preview, String> {
     let (pages, embedded, diagnostics) = resolve(bytes)?;
-    let fonts = Fonts::from_bytes(&options.fonts, &embedded, options.aliases.clone())?;
+    let fonts = Fonts::from_options(options, &embedded)?;
     finish(pages, diagnostics, &fonts)
 }
 
@@ -238,7 +238,7 @@ fn finish(
                         family: format!("hanji-font-{id}"),
                         bold: style.0,
                         italic: style.1,
-                        line_em: None,
+                        line: None,
                         ea_advance: None,
                     },
                 ) {
@@ -911,7 +911,7 @@ mod tests {
                 family: "Sparse Test".into(),
                 bold: false,
                 italic: false,
-                line_em: None,
+                line: None,
                 ea_advance: None,
             },
         )

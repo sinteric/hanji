@@ -247,7 +247,7 @@ impl Workbook {
         fonts: &FontOptions,
     ) -> Result<Window, String> {
         let window = {
-            let resolver = Fonts::from_bytes(&fonts.fonts, &[], fonts.aliases.clone())?;
+            let resolver = Fonts::from_options(fonts, &[])?;
             self.layout_window(sheet, range, &resolver)?
         };
         finish_window(window)

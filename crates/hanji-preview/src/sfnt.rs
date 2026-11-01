@@ -1,4 +1,4 @@
-//! The face the preview hands rpptx for one requested family: the chosen
+//! The face the preview hands rpptx or rdocx for one requested family: the chosen
 //! face cut out of its file (one face of a `.ttc`), renamed to the
 //! requested family, and with the engine-compat metric changes below. Only
 //! the `name`, `hhea`, `OS/2` and `hmtx` tables change; the outlines are the
@@ -18,6 +18,12 @@
 //!   the requested face's `ea_advance`, §7.1 "metric-adjusted substitute"):
 //!   every Hangul and CJK glyph is given that advance, so lines break where
 //!   the requested face breaks them. Glyphs keep their left side bearing.
+//! - **The requested face's line** (DOCX, only for a substitute whose alias
+//!   entry gives the requested face's `line`, §7.1 "metric-adjusted
+//!   substitute"): the ascent and descent become the requested face's and
+//!   the line gap 0. Word spaces an East Asian face's lines by its `hhea`
+//!   ascent and descent, and rdocx follows it, so a line is as tall as the
+//!   requested face makes it.
 
 use ttf_parser::{RawFace, Tag};
 
@@ -28,10 +34,34 @@ pub struct Adjust {
     pub family: String,
     pub bold: bool,
     pub italic: bool,
-    /// Line height in em (ascent + descent, no line gap); `None` keeps the face's.
-    pub line_em: Option<f64>,
+    /// The face's line; `None` keeps the face's.
+    pub line: Option<Line>,
     /// Advance in em for Hangul and CJK glyphs; `None` keeps the face's.
     pub ea_advance: Option<f64>,
+}
+
+/// A face's line, in em, with no line gap.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum Line {
+    /// Ascent + descent, split as the face splits them.
+    Height(f64),
+    /// This ascent and descent, below the baseline positive: the requested
+    /// face's own (its alias entry's `line`).
+    Borrowed { ascent: f64, descent: f64 },
+}
+
+impl Line {
+    /// Ascent and descent in font units, the descent positive, for a face
+    /// whose own are `ascent` and `descent`.
+    fn units(self, ascent: i16, descent: i16, upem: f64) -> (i16, i16) {
+        match self {
+            Line::Height(em) => line_metrics(ascent, descent, em * upem),
+            Line::Borrowed { ascent, descent } => (
+                (ascent * upem).round() as i16,
+                (descent * upem).round() as i16,
+            ),
+        }
+    }
 }
 
 /// Hangul, Hangul jamo, CJK symbols, punctuation and ideographs, and full-width forms.
@@ -186,17 +216,16 @@ pub fn build(data: &[u8], index: u32, adj: &Adjust) -> Result<Vec<u8>, String> {
         match &tag.to_bytes() {
             b"name" => *d = name_table(&adj.family, adj.bold, adj.italic),
             b"hhea" if d.len() >= 36 => {
-                if let Some(em) = adj.line_em {
-                    let (asc, desc) = line_metrics(be16(d, 4) as i16, be16(d, 6) as i16, em * upem);
+                if let Some(line) = adj.line {
+                    let (asc, desc) = line.units(be16(d, 4) as i16, be16(d, 6) as i16, upem);
                     put16(d, 4, asc as u16);
                     put16(d, 6, (-desc) as u16);
                     put16(d, 8, 0);
                 }
             }
             b"OS/2" if d.len() >= 78 => {
-                if let Some(em) = adj.line_em {
-                    let (asc, desc) =
-                        line_metrics(be16(d, 68) as i16, be16(d, 70) as i16, em * upem);
+                if let Some(line) = adj.line {
+                    let (asc, desc) = line.units(be16(d, 68) as i16, be16(d, 70) as i16, upem);
                     put16(d, 68, asc as u16);
                     put16(d, 70, (-desc) as u16);
                     put16(d, 72, 0);
@@ -345,7 +374,7 @@ mod tests {
             family: "맑은 고딕".into(),
             bold: false,
             italic: false,
-            line_em: None,
+            line: None,
             ea_advance: None,
         };
         let out = build(carlito(), 0, &adj).unwrap();
@@ -371,7 +400,7 @@ mod tests {
             family: "X".into(),
             bold: true,
             italic: false,
-            line_em: Some(1.2),
+            line: Some(Line::Height(1.2)),
             ea_advance: None,
         };
         let out = build(carlito(), 0, &adj).unwrap();
@@ -391,7 +420,7 @@ mod tests {
             family: "X".into(),
             bold: false,
             italic: false,
-            line_em: None,
+            line: None,
             ea_advance: Some(1.0),
         };
         let out = build(carlito(), 0, &adj).unwrap();
@@ -401,6 +430,33 @@ mod tests {
         );
         let g = a.glyph_index('W').unwrap();
         assert_eq!(a.glyph_hor_advance(g), b.glyph_hor_advance(g));
+    }
+
+    #[test]
+    fn a_borrowed_line_is_the_requested_face_s_ascent_and_descent() {
+        // 맑은 고딕's hhea, 2229 and -495 at 2048 units per em.
+        let adj = Adjust {
+            family: "맑은 고딕".into(),
+            bold: false,
+            italic: false,
+            line: Some(Line::Borrowed {
+                ascent: 2229.0 / 2048.0,
+                descent: 495.0 / 2048.0,
+            }),
+            ea_advance: None,
+        };
+        let out = build(carlito(), 0, &adj).unwrap();
+        let f = ttf_parser::Face::parse(&out, 0).unwrap();
+        let em = f64::from(f.units_per_em());
+        let hhea = f.tables().hhea;
+        assert_eq!(hhea.line_gap, 0);
+        assert!((f64::from(hhea.ascender) / em - 1.08838).abs() < 0.001);
+        assert!((f64::from(-hhea.descender) / em - 0.24170).abs() < 0.001);
+        let os2 = f.tables().os2.unwrap();
+        assert_eq!(os2.typographic_ascender(), hhea.ascender);
+        assert_eq!(os2.typographic_descender(), hhea.descender);
+        assert_eq!(os2.windows_ascender(), hhea.ascender);
+        assert_eq!(os2.windows_descender(), hhea.descender);
     }
 
     #[test]

@@ -12,7 +12,7 @@ fn main() -> Result<(), String> {
             family: "Caller Sans".into(),
             bold: false,
             italic: false,
-            line_em: None,
+            line: None,
             ea_advance: None,
         },
     )?;
