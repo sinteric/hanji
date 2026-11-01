@@ -50,9 +50,11 @@ do not discover host fonts. Native `Options` can load `--font-dir`,
 the output reports actual missing characters when one is unavailable.
 
 PPTX/DOCX share one immutable git source for rdocx 0.16.4 and the rpptx /
-oxml-layout 0.14.4 family. The pinned `73894d216764a21801aff08c83ffc58f4fa3b11e`
-(sinteric/rdocx main) merges upstream S95.4 on top of S95.2, S95.3, S95.11, S94
-(zip 9.0.3), S93 and the chart-legend-omitted layout diagnostic
+oxml-layout 0.14.4 family. The pinned `944ce696e90125dc0a14bf76728cf54c74bb423e`
+(sinteric/rdocx#22, on main `73894d2`) adds Word header and footer frames and
+contextual spacing, PowerPoint placeholder inheritance by type and chart text
+defaults to main, which merges upstream S95.4 on top of S95.2, S95.3, S95.11,
+S94 (zip 9.0.3), S93 and the chart-legend-omitted layout diagnostic
 (sinteric/rdocx#20).
 This is a renderer-family update, not an isolated syntax patch. HWPX uses rhwp 0.8.7 from sinteric/rhwp main
 (`d2fdbebf32e5182bb7f2e365ed9642bf7f5a9924`, zip 9.0.4).

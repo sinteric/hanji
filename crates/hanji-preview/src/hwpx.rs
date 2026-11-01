@@ -18,6 +18,10 @@ struct Face {
     data: Arc<[u8]>,
     bold: bool,
     italic: bool,
+    /// The text asked for bold or italic and the face has none of its own,
+    /// so the page draws it synthetically ([`crate::page::Glyphs`]).
+    synthetic_bold: bool,
+    synthetic_italic: bool,
     chars: BTreeSet<char>,
     count: usize,
     pages: BTreeSet<usize>,
@@ -260,6 +264,8 @@ fn finish(
                     data: Arc::from(data),
                     bold: style.0,
                     italic: style.1,
+                    synthetic_bold: bold && !style.0,
+                    synthetic_italic: italic && !style.1,
                     chars: BTreeSet::new(),
                     count: 0,
                     pages: BTreeSet::new(),
@@ -572,7 +578,7 @@ impl Preview {
 
     /// Page `index` parsed by usvg with each face's full bytes, so glyph ids
     /// are the faces' own and one face numbers its glyphs alike on every page.
-    /// The second value maps usvg's font ids to face numbers and units per em.
+    /// The second value maps usvg's font ids to hanji's faces.
     pub(crate) fn usvg_page(
         &self,
         index: usize,
@@ -588,11 +594,20 @@ impl Preview {
                     .load_font_source(resvg::usvg::fontdb::Source::Binary(Arc::new(
                         self.faces[id].data.clone(),
                     )));
-            let units = ttf_parser::Face::parse(&self.faces[id].data, 0)
-                .map_or(1000, |face| face.units_per_em());
+            let face = &self.faces[id];
+            let units =
+                ttf_parser::Face::parse(&face.data, 0).map_or(1000, |parsed| parsed.units_per_em());
             if let Some(&loaded) = loaded.first() {
                 names.insert(format!("hanji-font-{id}"), loaded);
-                faces.insert(loaded, (id, units));
+                faces.insert(
+                    loaded,
+                    crate::page_svg::SvgFace {
+                        id,
+                        units,
+                        embolden: face.synthetic_bold,
+                        slant: face.synthetic_italic,
+                    },
+                );
             }
         }
         options.font_resolver = resvg::usvg::FontResolver {
@@ -608,6 +623,62 @@ impl Preview {
                 .map(|tree| (tree, faces))
                 .map_err(|e| format!("usvg: {e}")),
         )
+    }
+
+    /// `svg` with each synthetic bold or italic drawn into it, for resvg,
+    /// which synthesizes neither: a bold is also stroked in its fill colour,
+    /// [`crate::page::EMBOLDEN_EM`] of its size wide with round joins and caps,
+    /// and an italic is sheared by [`crate::page::SLANT`] about its baseline
+    /// origin, as the display list draws them ([`crate::page::Glyphs`]). The
+    /// SVG output keeps neither, since a browser synthesizes both itself.
+    fn synthesized(&self, svg: &xml::Element) -> String {
+        let mut svg = svg.clone();
+        svg.walk_mut(&mut |e| {
+            if e.local() != "text" {
+                return;
+            }
+            let Some(face) = e
+                .get("font-family")
+                .and_then(|f| f.strip_prefix("hanji-font-")?.parse::<usize>().ok())
+                .and_then(|id| self.faces.get(id))
+            else {
+                return;
+            };
+            if face.synthetic_bold {
+                let size = e
+                    .get("font-size")
+                    .and_then(|s| s.parse::<f64>().ok())
+                    .unwrap_or(16.0);
+                let fill = e.get("fill").unwrap_or_else(|| "#000000".into());
+                e.set("stroke", &fill);
+                e.set(
+                    "stroke-width",
+                    &format!("{}", size * crate::page::EMBOLDEN_EM),
+                );
+                e.set("stroke-linejoin", "round");
+                e.set("stroke-linecap", "round");
+            }
+            if face.synthetic_italic {
+                let first = |name: &str| {
+                    e.get(name)
+                        .and_then(|v| v.split([' ', ',']).find_map(|n| n.parse::<f64>().ok()))
+                        .unwrap_or(0.0)
+                };
+                let (x, y) = (first("x"), first("y"));
+                let shear = format!(
+                    "translate({x} {y}) matrix(1 0 {} 1 0 0) translate({} {})",
+                    -crate::page::SLANT,
+                    -x,
+                    -y
+                );
+                let transform = match e.get("transform") {
+                    Some(outer) => format!("{outer} {shear}"),
+                    None => shear,
+                };
+                e.set("transform", &transform);
+            }
+        });
+        svg.to_xml()
     }
 
     fn css(&self, subsets: &BTreeMap<usize, Arc<[u8]>>, prefix: &str) -> String {
@@ -676,7 +747,7 @@ impl Preview {
                         }),
                         select_fallback: Box::new(|_, _, _| None),
                     };
-                    let tree = resvg::usvg::Tree::from_str(&page.svg.to_xml(), &options)
+                    let tree = resvg::usvg::Tree::from_str(&self.synthesized(&page.svg), &options)
                         .map_err(|e| format!("usvg: {e}"))?;
                     let scale = dpi / 96.0;
                     let (width, height) = (

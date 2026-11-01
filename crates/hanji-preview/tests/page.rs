@@ -105,6 +105,25 @@ fn hwpx_glyphs_come_from_hanjis_faces() {
     );
 }
 
+#[test]
+fn hwpx_bold_with_no_bold_face_is_emboldened() {
+    // Page 4 of the form asks for bold on its title and its "별첨" line and
+    // for regular on its field labels. usvg resolves both to the regular face
+    // hanji chose and synthesizes neither, so the runs must say which to
+    // embolden, as rhwp draws them.
+    let layout =
+        page::layout_with_fonts(DocumentKind::Hwpx, HWPX, &FontOptions::default()).unwrap();
+    let page = layout.page(3).unwrap();
+    let embolden = |text: &str| {
+        page.items.iter().find_map(|item| match item {
+            Item::Glyphs(run) if run.text.contains(text) => Some(run.embolden),
+            _ => None,
+        })
+    };
+    assert_eq!(embolden("첨"), Some(true), "the bold 별첨 line");
+    assert_eq!(embolden("관"), Some(false), "the regular 기관명 label");
+}
+
 /// Mean absolute channel difference (0–255) between the display list drawn
 /// here and the SVG preview's PNG, over the pixels either one inks (not
 /// white), page by page: white margins would hide a missing line of text.

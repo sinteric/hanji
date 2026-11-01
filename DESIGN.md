@@ -1505,7 +1505,10 @@ it, with the faces hanji chose (`page_svg.rs`), not rhwp's page layer tree:
 the SVG is where hanji puts its own font selection (`hanji-font-N`), so the
 list draws the same picture as the HWPX PNG preview, and the layer tree would
 need that selection rebuilt. Its glyph runs carry a linear map for 장평 and
-rotation. What a page leaves out, with a diagnostic as the SVG does: links,
+rotation, and synthesize a bold or italic the text asks for and its face does
+not have, as rhwp draws them: usvg synthesizes neither, so the PNG preview
+strokes and shears those texts itself (`hwpx.rs`, `synthesized`). What a page
+leaves out, with a diagnostic as the SVG does: links,
 tile paints, images neither PNG nor JPEG; for HWPX also masks, filters,
 pattern paints and non-pad gradient spreads (drawn padded). Measured
 2026-10-25 against each format's PNG preview on the baseline (first four
