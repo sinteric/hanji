@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.8.0 — 2026-11-02
+
+**Breaking / API changes**
+
+- `hanji_format::Atom::NoteRef` payload is `Note { label, body, kind }`
+  instead of a `String` label. `Note` and `NoteKind` are new.
+- `hanji_preview::sfnt::Adjust.line_em: Option<f64>` is
+  `line: Option<Line>` (`Line::Height` is PowerPoint's 1.2 em as before;
+  `Line::Borrowed` is the requested face). `Drawn` and `Family` gain a
+  public `line: Option<[f64; 2]>` field.
+
 - Show a one-paragraph DOCX text box (`w:txbxContent` / VML) whose content
   is ordinary text as that text instead of a `<keep kind="drawing"/>`
   placeholder. Geometry, anchoring, styling and the original XML stay as a
@@ -70,12 +81,15 @@
   an HWPX drawing stays inside that drawing's keep. Corpus keeps: 268 →
   250 (docx `footnote` 7 → 1, `endnote` 3 → 1, hwpx `footnote` 10 → 0).
   The leftover footnote and endnote keeps are a content-control body
-  (`Bug54849.docx`).
+  (`Bug54849.docx`). `Atom::NoteRef` now carries that `Note` instead of a
+  `String` label.
 - Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `73894d2`
   (S95.4 / rdocx 0.16.4, rpptx and oxml-layout 0.14.4: Word legacy/modern
   form-field authoring, mail merge, relationship/style preservation, body
   read/edit bounds, PowerPoint publisher bounds, CJK line measurement,
   rendering changes, plus an upstream merge).
+- Corpus `<keep/>` placeholders went 268 → 241 since 0.7.0
+  (`docs/keep-census.md`).
 
 ## 0.7.0 — 2026-10-28
 
