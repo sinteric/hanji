@@ -973,6 +973,9 @@ fn not_carried(rem: &Remainder, from: Format, has_items: bool) -> Vec<NotCarried
                 "sdt" | "sdt/block" => {
                     "content controls (the text stays, the control properties do not)"
                 }
+                "drawing" | "pict" | "AlternateContent" | "rect" | "ellipse" | "arc"
+                | "polygon" | "curve" | "connectLine" | "line" | "container" | "textart"
+                | "pic" => "text boxes (the text stays, the object does not)",
                 // Shown as math placeholders; size and placement do not cross.
                 "equation" => continue,
                 // A layout hint Word writes for the page it last rendered.

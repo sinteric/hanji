@@ -14,6 +14,18 @@ use crate::ooxml::*;
 use crate::track::Track;
 use crate::xml::{self, assemble, fragment, Element, Node};
 
+/// The characters a shown text-box wrap covers.
+fn drawing_body(p: &Inline, w: &Entry) -> String {
+    let (s, e) = (w.start.unwrap_or(0), w.end.unwrap_or(0));
+    p.units[s.min(p.units.len())..e.min(p.units.len())]
+        .iter()
+        .filter_map(|u| match &u.atom {
+            Atom::Char(c) => Some(*c),
+            _ => None,
+        })
+        .collect()
+}
+
 pub struct Exporter<'a> {
     styles: &'a StyleSet,
     by: HashMap<(Vec<usize>, Kind), Vec<&'a Entry>>,
@@ -478,9 +490,20 @@ impl<'a> Exporter<'a> {
         }
         let markers = self.at(path, Kind::Marker);
         let wraps = self.at(path, Kind::Wrap);
+        let drawings: Vec<&Entry> = wraps
+            .iter()
+            .copied()
+            .filter(|e| is_drawing(e) && e.meta.run.is_some())
+            .collect();
         for w in &wraps {
             if is_comment(w) || is_revision(w) || is_note(w) {
                 pkeep.insert(w.start.unwrap(), w);
+            }
+            if is_drawing(w) && w.meta.run.is_none() {
+                let (s, e) = (w.start.unwrap(), w.end.unwrap());
+                for c in s..e.min(n) {
+                    pkeep.insert(c, w);
+                }
             }
         }
         let closing = self.close_at.get(path).cloned().unwrap_or_default();
@@ -488,6 +511,9 @@ impl<'a> Exporter<'a> {
             markers.iter().map(|m| m.start.unwrap()).collect();
         bounds.extend(zruns.iter().map(|z| z.start.unwrap()));
         for w in &wraps {
+            if is_drawing(w) {
+                continue;
+            }
             bounds.insert(w.start.unwrap());
             if w.meta.end_path.is_none() {
                 bounds.insert(w.end.unwrap());
@@ -613,7 +639,7 @@ impl<'a> Exporter<'a> {
         }
         let mut items: Vec<(usize, u8, u64, It)> = vec![];
         for w in &wraps {
-            if is_comment(w) || is_revision(w) || is_note(w) {
+            if is_comment(w) || is_revision(w) || is_note(w) || is_drawing(w) {
                 continue;
             }
             items.push((w.start.unwrap(), 0, w.seq, It::Open(w)));
@@ -638,7 +664,7 @@ impl<'a> Exporter<'a> {
         }
         items.sort_by_key(|t| (t.0, t.1, t.2));
         let mut stack: Vec<(Option<u64>, Element)> = vec![(None, std::mem::take(&mut pel))];
-        for (_, _, _, it) in items {
+        for (at, _, _, it) in items {
             match it {
                 // A complex field's parts are siblings of its result's runs:
                 // they are gathered in a holder that closing unwraps.
@@ -699,6 +725,17 @@ impl<'a> Exporter<'a> {
                             .1
                             .children
                             .push(node(fragment(&x)));
+                    } else if is_drawing(k) {
+                        if k.start != Some(at) {
+                            continue;
+                        }
+                        let x = crate::drawing::with_body(&k.xml[0], &drawing_body(p, k));
+                        stack
+                            .last_mut()
+                            .unwrap()
+                            .1
+                            .children
+                            .push(node(fragment(&x)));
                     } else {
                         for x in &k.xml {
                             stack.last_mut().unwrap().1.children.push(node(fragment(x)));
@@ -727,6 +764,7 @@ impl<'a> Exporter<'a> {
                             .get(&Target::Seg(si))
                             .map(Vec::as_slice)
                             .unwrap_or(&[]),
+                        &drawings,
                     )?;
                     if let Some(f) = &self.fmt {
                         let (a, _, own) = segs[si];
@@ -761,6 +799,7 @@ impl<'a> Exporter<'a> {
         eff: &[Marks],
         seg: (usize, usize, Option<&Entry>),
         rmarkers: &[&Entry],
+        drawings: &[&Entry],
     ) -> Result<Element, String> {
         let (a, b, own) = seg;
         let (mut r, mut rpr, t_attrs): (Element, Option<Element>, Vec<Element>) = match own {
@@ -805,6 +844,18 @@ impl<'a> Exporter<'a> {
             buf.clear();
         };
         for c in a..b {
+            if let Some(w) = drawings
+                .iter()
+                .copied()
+                .find(|e| e.start.is_some_and(|s| s <= c) && e.end.is_some_and(|en| c < en))
+            {
+                if Some(c) == w.start {
+                    flush(&mut buf, &mut r, &mut tcount);
+                    let x = crate::drawing::with_body(&w.xml[0], &drawing_body(p, w));
+                    r.children.push(node(fragment(&x)));
+                }
+                continue;
+            }
             for m in rm.get(&c).into_iter().flatten() {
                 flush(&mut buf, &mut r, &mut tcount);
                 r.children.push(node(fragment(&m.xml[0])));

@@ -935,6 +935,8 @@ impl<'a> Importer<'a> {
             }
             if name == "w:r" {
                 self.run(k, path, pb)?;
+            } else if crate::drawing::shown(k).is_some() {
+                self.txbx(k, path, None, Marks::NONE)?;
             } else if name == "w:sdt" && sdt_shown(k) && !sdt_content_is_block(k) {
                 let shell = sdt_inline_shell(k);
                 let pr = k.child("w:sdtPr");
@@ -1003,6 +1005,45 @@ impl<'a> Importer<'a> {
             }
             i += 1;
         }
+        Ok(())
+    }
+
+    /// A drawing whose text box the model shows: a wrap over the inner
+    /// characters, holding the original object (DESIGN.md §5.1). Geometry,
+    /// anchoring and styling stay in the wrap.
+    fn txbx(
+        &mut self,
+        el: &Element,
+        path: &[usize],
+        run: Option<u64>,
+        marks: Marks,
+    ) -> Result<(), String> {
+        let body =
+            crate::drawing::shown(el).ok_or_else(|| "a text box has no shown body".to_string())?;
+        let fp_el = crate::drawing::fingerprint_el(el);
+        let f = self.fp(&[Some(&fp_el)]);
+        let at = self.pos();
+        let idx = self.entry(
+            Kind::Wrap,
+            vec![self.frag(el)],
+            f,
+            path,
+            Some(at),
+            None,
+            Meta {
+                run,
+                tag: el.name.clone(),
+                ..Default::default()
+            },
+        );
+        for ch in body.chars() {
+            self.push(Atom::Char(ch), marks);
+        }
+        let end = self.pos();
+        let close = self.seq();
+        let w = &mut self.entries[idx];
+        w.end = Some(end);
+        w.meta.seq_close = close;
         Ok(())
     }
 
@@ -1316,6 +1357,9 @@ impl<'a> Importer<'a> {
                             ..Default::default()
                         },
                     );
+                }
+                _ if crate::drawing::shown(c).is_some() => {
+                    self.txbx(c, path, Some(run_id), marks)?;
                 }
                 _ => {
                     let pos = self.pos();

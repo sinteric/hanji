@@ -33,16 +33,16 @@
   "total": {
     "files": 102,
     "failed": 0,
-    "with_keeps": 59,
-    "keeps": 245
+    "with_keeps": 58,
+    "keeps": 241
   },
   "formats": [
     {
       "format": "docx",
       "files": 13,
       "failed": 0,
-      "with_keeps": 12,
-      "keeps": 130
+      "with_keeps": 11,
+      "keeps": 126
     },
     {
       "format": "hwpx",
@@ -76,8 +76,8 @@
     {
       "format": "docx",
       "kind": "drawing",
-      "keeps": 26,
-      "files": 10
+      "keeps": 22,
+      "files": 9
     },
     {
       "format": "pptx",
@@ -318,9 +318,9 @@
     {
       "path": "prototype/remainder/corpus/loadAndSave.docx",
       "format": "docx",
-      "keeps": 4,
+      "keeps": 3,
       "kinds": {
-        "drawing": 3,
+        "drawing": 2,
         "math": 1
       }
     },
@@ -353,10 +353,10 @@
     {
       "path": "prototype/remainder/corpus/testWORD_2006ml.docx",
       "format": "docx",
-      "keeps": 18,
+      "keeps": 16,
       "kinds": {
         "content-control": 4,
-        "drawing": 5,
+        "drawing": 3,
         "field": 2,
         "math": 1,
         "object": 3,
@@ -367,10 +367,8 @@
     {
       "path": "prototype/remainder/corpus/testWORD_various.docx",
       "format": "docx",
-      "keeps": 1,
-      "kinds": {
-        "drawing": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-hwpx/corpus/basic-table-01.hwpx",

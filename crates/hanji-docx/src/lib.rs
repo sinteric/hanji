@@ -8,6 +8,7 @@
 //! remainder must store.
 
 pub mod comment;
+pub mod drawing;
 pub mod export;
 pub mod format;
 pub mod import;

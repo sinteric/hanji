@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Show a one-paragraph DOCX text box (`w:txbxContent` / VML) whose content
+  is ordinary text as that text instead of a `<keep kind="drawing"/>`
+  placeholder. Geometry, anchoring, styling and the original XML stay as a
+  `Wrap`. Editing the body rewrites `w:t` in Choice and Fallback and keeps
+  those attributes; deleting all of the text removes the object and is
+  reported. Pictures, charts, groups, OLE, empty shapes, and boxes that
+  hold more than one paragraph, a table or nested objects stay
+  placeholders. The same rule applies to an HWPX drawing whose
+  `hp:drawText` is one paragraph of ordinary text. Corpus keeps: 245 → 241
+  (docx `drawing` 26 → 22; hwpx `drawing` 10 unchanged).
 - Draw an HWPX text's bold or italic synthetically when the face hanji chose
   has none, in the page display list and the PNG preview, as rhwp does. usvg
   synthesizes neither, so bold text was drawn regular wherever only a regular

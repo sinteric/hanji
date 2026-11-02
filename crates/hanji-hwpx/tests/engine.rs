@@ -1639,3 +1639,99 @@ fn deleting_the_footnote_reference_removes_the_control() {
     assert!(!sec.contains("<hp:footNote"), "{sec}");
     assert!(sec.contains("값 이다") || sec.contains("값이다"), "{sec}");
 }
+
+fn draw_rect(text: &str) -> String {
+    format!(
+        r#"<hp:rect id="7" zOrder="1" numberingType="PICTURE" textWrap="SQUARE" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None"><hp:sz width="1000" widthRelTo="ABSOLUTE" height="1000" heightRelTo="ABSOLUTE" protect="0"/><hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/><hp:drawText><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="TOP" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0"><hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="0"><hp:t>{text}</hp:t></hp:run></hp:p></hp:subList></hp:drawText></hp:rect>"#
+    )
+}
+
+#[test]
+fn a_one_paragraph_draw_text_shows_as_ordinary_text() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>앞 </hp:t>{}<hp:t> 뒤</hp:t>",
+        draw_rect("글상자")
+    ))]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("앞 글상자 뒤"), "{}", imp.text);
+    assert!(!imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+}
+
+#[test]
+fn unedited_draw_text_keeps_the_section() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>앞 </hp:t>{}<hp:t> 뒤</hp:t>",
+        draw_rect("글상자")
+    ))]);
+    let imp = import(&pkg);
+    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg));
+}
+
+#[test]
+fn editing_draw_text_writes_it_back_and_keeps_geometry() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>앞 </hp:t>{}<hp:t> 뒤</hp:t>",
+        draw_rect("글상자")
+    ))]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "글상자", "고침", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = export(&r.text, &r.remainder);
+    let sec = section(&out);
+    assert!(sec.contains("<hp:t>고침</hp:t>"), "{sec}");
+    assert!(sec.contains(r#"id="7""#), "{sec}");
+    assert!(sec.contains(r#"width="1000""#), "{sec}");
+    assert!(sec.contains("<hp:drawText>"), "{sec}");
+    let back = import(&out);
+    assert!(back.text.contains("앞 고침 뒤"), "{}", back.text);
+}
+
+#[test]
+fn deleting_draw_text_removes_the_object() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>앞 </hp:t>{}<hp:t> 뒤</hp:t>",
+        draw_rect("글상자")
+    ))]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "앞 글상자 뒤", "앞  뒤", CAPS).unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.2.contains("drawing") || x.2.contains("all of its text")),
+        "{:?}",
+        r.report
+    );
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(!sec.contains("<hp:rect"), "{sec}");
+    assert!(!sec.contains("<hp:drawText"), "{sec}");
+}
+
+#[test]
+fn two_paragraphs_in_draw_text_stay_a_placeholder() {
+    let inner = draw_rect("a").replace(
+        "<hp:t>a</hp:t></hp:run></hp:p>",
+        "<hp:t>a</hp:t></hp:run></hp:p><hp:p id=\"1\" paraPrIDRef=\"0\" styleIDRef=\"0\" pageBreak=\"0\" columnBreak=\"0\" merged=\"0\"><hp:run charPrIDRef=\"0\"><hp:t>b</hp:t></hp:run></hp:p>",
+    );
+    let pkg = hwpx(&[p_with(&inner)]);
+    let imp = import(&pkg);
+    assert_eq!(
+        imp.text.matches("kind=\"drawing\"").count(),
+        1,
+        "{}",
+        imp.text
+    );
+    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg));
+}
+
+#[test]
+fn a_picture_stays_a_placeholder() {
+    let pic = r#"<hp:pic id="1" zOrder="1" numberingType="PICTURE" textWrap="SQUARE" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None"><hp:img binaryItemIDRef="image1"/><hp:sz width="1000" widthRelTo="ABSOLUTE" height="1000" heightRelTo="ABSOLUTE" protect="0"/><hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/></hp:pic>"#;
+    let pkg = hwpx(&[p_with(pic)]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+}
