@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+- Borrow the requested face's line height when a DOCX substitute draws East
+  Asian text: the alias table's `line` (ascent and descent in em) is written
+  into the substitute's `hhea` and `OS/2`, so lines are as tall as Word
+  draws them. A face drawn as itself, or by a metric twin, borrows nothing;
+  Latin text borrows nothing. Measured for 맑은 고딕 and 바탕. `sfnt::Adjust`
+  takes `line: Option<Line>` in place of `line_em` (`Line::Height` is
+  PowerPoint's 1.2 em, as before; `Line::Borrowed` is the requested face). A
+  custom resolver passes it with `ResolvedFont::with_line`.
+- `FontOptions::with_system_fonts`: a byte-only caller can search the
+  installed fonts, after its own and the document's and before the bundled
+  faces. New feature `system-fonts` (not built on wasm); `host-fonts` now
+  builds on it. The installed fonts are scanned once per process, and each
+  file is mapped, not read whole.
+- Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx#23 (`4bd556a`,
+  on main `55bb2a2`): a paragraph keeps its space before at the top of a
+  section's first page, as Word does; a Word shape (`wps:wsp`) draws its
+  `a:ln` outline and its text box text sits inside the `bodyPr` insets;
+  and a table with no `w:tblLayout`, an automatic `w:tblW` and no `w:tcW`
+  is sized to its content (hanji writes every table this way).
 - Draw an HWPX text's bold or italic synthetically when the face hanji chose
   has none, in the page display list and the PNG preview, as rhwp does. usvg
   synthesizes neither, so bold text was drawn regular wherever only a regular
@@ -16,6 +35,32 @@
   paragraphs of one style, a PowerPoint layout placeholder inherits the master
   placeholder of its type, and chart labels take the chart's `c:txPr` with a
   one-series chart showing its automatic title.
+- Show an HWPX table that shares a paragraph with one run of text, and a
+  DOCX table whose cells are wrapped in a shown single-cell content control
+  (`w:sdt`), as ordinary GFM pipe tables instead of a `<keep kind="table"/>`
+  placeholder. The mixed HWPX paragraph stays as an `hwpx:anchor` remainder;
+  the cell's `w:sdt` shell stays as a `Wrap`. Nested tables, a row that
+  starts or ends short of the grid (`w:gridBefore` / `w:gridAfter`), text on
+  both sides of an HWPX table, and row-level or unshown content controls
+  stay placeholders. Unwrapping a mixed-paragraph table also surfaces
+  pictures the parent keep had hidden. Corpus keeps: 250 → 245 (hwpx `table`
+  13 → 5, docx `table` 4 → 3; hwpx `drawing` 6 → 10).
+- Show a DOCX or HWPX footnote or endnote whose body is ordinary text in
+  one paragraph as `[^label]` at the reference and `[^label]: body` for
+  the definition, instead of a `<keep kind="footnote"/>` /
+  `<keep kind="endnote"/>` placeholder. Endnotes are labelled `e1`,
+  `e2`, … so they do not collide with footnotes. Canonical form writes
+  each definition after the block that first uses the label. The original
+  run or Hancom control stays as a `Wrap`. Editing the definition
+  rewrites the note's text and keeps the rest; deleting the `[^label]`
+  removes the note and is reported; a note that was not in the file
+  cannot be created. Notes that hold a table, drawing, content
+  control, or several paragraphs stay placeholders. Tracked-change
+  export refuses a change, move or deletion of a note. A footnote inside
+  an HWPX drawing stays inside that drawing's keep. Corpus keeps: 268 →
+  250 (docx `footnote` 7 → 1, `endnote` 3 → 1, hwpx `footnote` 10 → 0).
+  The leftover footnote and endnote keeps are a content-control body
+  (`Bug54849.docx`).
 - Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `73894d2`
   (S95.4 / rdocx 0.16.4, rpptx and oxml-layout 0.14.4: Word legacy/modern
   form-field authoring, mail merge, relationship/style preservation, body
