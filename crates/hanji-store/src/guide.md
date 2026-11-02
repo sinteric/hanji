@@ -26,6 +26,7 @@ In docx, a comment whose body is ordinary text is `<comment>body</comment>` at t
 In docx and hwpx, a footnote or endnote whose body is ordinary text in one paragraph is `[^1]` at the mark and `[^1]: body` after the paragraph that first uses it (endnotes are `[^e1]`, `[^e2]`, …): edit the definition to change the note; delete the `[^label]` to remove it. Notes that hold a table, image or several paragraphs stay placeholders. A footnote inside a drawing stays inside that drawing's placeholder.
 In docx, a tracked insertion or deletion whose text is one line is `<ins>body</ins>` or `<del>body</del>`: edit the body to change the text and keep it a tracked change of that author; delete the tag to drop the revision mark. Moves, revisions that wrap a paragraph or table, and inner content these tags cannot hold stay placeholders.
 In hwpx, a Hancom equation whose script is ordinary text is `$script$` or `<math>script</math>`: edit the script to change the formula; size, baseline and font stay as the file has them. Delete the math to remove the equation. An equation whose script the math grammar cannot hold stays a placeholder. docx equations (OMML) stay placeholders.
+In docx and hwpx, a text box whose content is ordinary text in one paragraph is that text: editing it keeps the box; deleting all of it removes the object. Pictures, charts, groups, OLE, empty shapes, and boxes that hold more than one paragraph, a table or nested objects stay placeholders.
 
 Document (docx, hwpx)
 - `#` … `######`: the file's Heading 1–6.

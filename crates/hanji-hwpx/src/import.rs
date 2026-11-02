@@ -51,9 +51,10 @@ pub struct Stats {
 /// - Objects in a run (tables in text, pictures, shapes, form controls,
 ///   footnotes whose body is not ordinary text): inline `Keep`. An
 ///   `hp:equation` whose script the math grammar can hold is `$…$` /
-///   `<math>…</math>` with a `Wrap`. A footnote or endnote whose body is
-///   ordinary text in one paragraph is `[^label]` / `[^label]: body`
-///   with a `Wrap`.
+///   `<math>…</math>` with a `Wrap`. A drawing whose `hp:drawText` is
+///   ordinary text in one paragraph is that text with a `Wrap`. A
+///   footnote or endnote whose body is ordinary text in one paragraph is
+///   `[^label]` / `[^label]: body` with a `Wrap`.
 /// - A paragraph holding pipe tables, alone or with one run of other
 ///   content (text before the tables, or after): one table block per
 ///   table, and a paragraph block for the other content when it is there;
@@ -944,6 +945,8 @@ impl<'a> Importer<'a> {
                 self.note(c, path, run_id, marks);
             } else if c.is("hp:equation") {
                 self.equation(c, path, run_id, marks);
+            } else if shown_draw_text(c).is_some() {
+                self.draw_text(c, path, run_id, marks);
             } else {
                 let kind = match c.name.as_str() {
                     "hp:ctrl" => ctrl_kind(c).map_or("control".into(), |k| keep_kind(&k.name)),
@@ -972,6 +975,42 @@ impl<'a> Importer<'a> {
         e.end = Some(end);
         (e.meta.aux_at, e.meta.aux) = tabs.into_iter().unzip();
         Ok(())
+    }
+
+    /// A drawing whose `hp:drawText` the model shows: a wrap over the inner
+    /// characters, holding the original object (DESIGN.md §5.1). Geometry,
+    /// anchoring and styling stay in the wrap.
+    fn draw_text(&mut self, e: &Element, path: &[usize], run_id: u64, marks: Marks) {
+        let Some(body) = shown_draw_text(e) else {
+            let pos = self.buf.len();
+            let keep = self.keep_entry(Kind::Keep, e, path, Some(pos), Some(run_id), "drawing");
+            self.push(Atom::Keep(keep), marks);
+            return;
+        };
+        let fp_el = fingerprint_drawing(e);
+        let f = self.fp(&[Some(&fp_el)]);
+        let at = self.buf.len();
+        let idx = self.entry(
+            Kind::Wrap,
+            vec![e.to_xml()],
+            f,
+            path,
+            Some(at),
+            None,
+            Meta {
+                run: Some(run_id),
+                tag: e.name.clone(),
+                ..Default::default()
+            },
+        );
+        for ch in body.chars() {
+            self.push(Atom::Char(ch), marks);
+        }
+        let end = self.buf.len();
+        let close = self.seq();
+        let w = &mut self.entries[idx];
+        w.end = Some(end);
+        w.meta.seq_close = close;
     }
 
     /// An `hp:equation` whose script the math grammar can hold: a length-1

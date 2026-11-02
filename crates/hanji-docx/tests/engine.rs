@@ -3680,3 +3680,185 @@ fn a_footnote_whose_body_holds_a_content_control_stays_a_placeholder() {
     assert!(imp.text.contains("kind=\"footnote\""), "{}", imp.text);
     assert!(!imp.text.contains("[^1]"), "{}", imp.text);
 }
+
+fn txbx_p(text: &str) -> String {
+    format!("<w:p><w:r><w:t>{text}</w:t></w:r></w:p>")
+}
+
+fn txbx(inner: &str) -> String {
+    format!(
+        r#"<mc:AlternateContent><mc:Choice Requires="wps"><w:drawing><wp:inline><wp:docPr id="1" name="Text Box 1"/><a:graphic><a:graphicData><wps:wsp><wps:txbx><w:txbxContent>{inner}</w:txbxContent></wps:txbx></wps:wsp></a:graphicData></a:graphic></wp:inline></w:drawing></mc:Choice><mc:Fallback><w:pict><v:shape id="tb1"><v:textbox><w:txbxContent>{inner}</w:txbxContent></v:textbox></v:shape></w:pict></mc:Fallback></mc:AlternateContent>"#
+    )
+}
+
+fn drawing_docx(inner: &str) -> Vec<u8> {
+    docx(
+        &format!("<w:p><w:r><w:t xml:space=\"preserve\">before </w:t></w:r><w:r>{inner}</w:r><w:r><w:t xml:space=\"preserve\"> after</w:t></w:r></w:p>"),
+        vec![],
+    )
+}
+
+#[test]
+fn a_one_paragraph_text_box_shows_as_ordinary_text() {
+    let imp = DocxEngine
+        .import(
+            &drawing_docx(&txbx(&txbx_p("Hello world"))),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    assert!(
+        imp.text.contains("before Hello world after"),
+        "{}",
+        imp.text
+    );
+    assert!(!imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+}
+
+#[test]
+fn unedited_text_box_keeps_document_xml() {
+    use hanji_package::xml;
+    let source = drawing_docx(&txbx(&txbx_p("Hello world")));
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    let before = package::read(&source).unwrap();
+    let after = package::read(&out).unwrap();
+    assert_eq!(
+        xml::canon_part(package::get(&before, "word/document.xml").unwrap()).unwrap(),
+        xml::canon_part(package::get(&after, "word/document.xml").unwrap()).unwrap()
+    );
+}
+
+#[test]
+fn editing_a_text_box_rewrites_choice_and_fallback_and_keeps_geometry() {
+    let imp = DocxEngine
+        .import(
+            &drawing_docx(&txbx(&txbx_p("Hello world"))),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    let r = edit(&imp.remainder, &imp.text, "Hello world", "Hi", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains(">Hi</w:t>"), "{xml}");
+    assert_eq!(xml.matches(">Hi</w:t>").count(), 2, "{xml}");
+    assert!(!xml.contains("Hello world"), "{xml}");
+    assert!(xml.contains("name=\"Text Box 1\""), "{xml}");
+    assert!(
+        xml.contains("mc:Choice") && xml.contains("mc:Fallback"),
+        "{xml}"
+    );
+    assert!(
+        xml.contains("v:shape") && xml.contains("id=\"tb1\""),
+        "{xml}"
+    );
+}
+
+#[test]
+fn deleting_text_box_text_removes_the_object() {
+    let imp = DocxEngine
+        .import(
+            &drawing_docx(&txbx(&txbx_p("Hello world"))),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "before Hello world after",
+        "before  after",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.1 == Kind::Wrap && x.2.contains("all of its text")),
+        "{:?}",
+        r.report
+    );
+    let xml = doc_xml(&DocxEngine.export(&r.text, &r.remainder).unwrap());
+    assert!(
+        !xml.contains("w:drawing") && !xml.contains("w:txbxContent"),
+        "{xml}"
+    );
+    assert!(xml.contains("before") && xml.contains("after"), "{xml}");
+}
+
+#[test]
+fn a_vml_textbox_shows_as_ordinary_text() {
+    let pict = concat!(
+        "<w:pict><v:shape id=\"v1\"><v:textbox>",
+        "<w:txbxContent><w:p><w:r><w:t>VML box</w:t></w:r></w:p></w:txbxContent>",
+        "</v:textbox></v:shape></w:pict>",
+    );
+    let source = drawing_docx(pict);
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("before VML box after"), "{}", imp.text);
+    assert!(!imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    use hanji_package::xml;
+    let before = package::read(&source).unwrap();
+    let after = package::read(&out).unwrap();
+    assert_eq!(
+        xml::canon_part(package::get(&before, "word/document.xml").unwrap()).unwrap(),
+        xml::canon_part(package::get(&after, "word/document.xml").unwrap()).unwrap()
+    );
+}
+
+#[test]
+fn two_paragraphs_in_a_text_box_stay_a_placeholder() {
+    let inner = format!("{}{}", txbx_p("a"), txbx_p("b"));
+    let imp = DocxEngine
+        .import(&drawing_docx(&txbx(&inner)), &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+    assert!(!imp.text.contains("before a"), "{}", imp.text);
+}
+
+#[test]
+fn an_empty_text_box_stays_a_placeholder() {
+    let imp = DocxEngine
+        .import(&drawing_docx(&txbx("<w:p/>")), &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+}
+
+#[test]
+fn a_table_inside_a_text_box_stays_a_placeholder() {
+    let inner = "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl>";
+    let imp = DocxEngine
+        .import(&drawing_docx(&txbx(inner)), &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+}
+
+#[test]
+fn a_picture_drawing_stays_a_placeholder() {
+    let pic = concat!(
+        "<w:drawing><wp:inline><wp:docPr id=\"1\" name=\"Picture 1\"/>",
+        "<a:graphic><a:graphicData><pic:pic><pic:blipFill>",
+        "<a:blip r:embed=\"rId1\"/></pic:blipFill></pic:pic></a:graphicData></a:graphic>",
+        "</wp:inline></w:drawing>",
+    );
+    let imp = DocxEngine
+        .import(&drawing_docx(pic), &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+}

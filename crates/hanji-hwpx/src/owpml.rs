@@ -1,7 +1,7 @@
 //! OWPML (KS X 6101) names and small helpers shared by import and export.
 
 use hanji_format::NoteKind;
-use hanji_package::xml::{escape_text, Element, Node};
+use hanji_package::xml::{escape_text, is_blank, Element, Node};
 
 pub const HEADER_PART: &str = "Contents/header.xml";
 pub const CONTENT_PART: &str = "Contents/content.hpf";
@@ -185,6 +185,155 @@ fn set_note_t(e: &mut Element, body: &str, used: &mut bool) {
     }
     for c in e.elements_mut() {
         set_note_t(c, body, used);
+    }
+}
+
+/// Locals a shown `hp:drawText` paragraph may hold. Nested pictures,
+/// controls, tables and equations stay placeholders.
+const DRAW_SHOWN: &[&str] = &["p", "run", "t", "linesegarray", "lineseg"];
+
+/// The `hp:drawText` body a drawing object can show: ordinary one-line text
+/// in a single paragraph.
+pub fn shown_draw_text(el: &Element) -> Option<String> {
+    if keep_kind(&el.name) != "drawing" {
+        return None;
+    }
+    let dt = el.descendants("hp:drawText").into_iter().next()?;
+    let sub = dt.child("hp:subList")?;
+    let mut para = None;
+    for n in &sub.children {
+        match n {
+            Node::El(e) if e.is("hp:p") => {
+                if para.is_some() {
+                    return None;
+                }
+                para = Some(e);
+            }
+            n if is_blank(n) => {}
+            Node::El(e) if e.is("hp:textMargin") => {}
+            _ => return None,
+        }
+    }
+    let p = para?;
+    let mut outer = true;
+    let mut ok = true;
+    p.walk(&mut |e| {
+        if outer {
+            outer = false;
+            return;
+        }
+        if !DRAW_SHOWN.contains(&e.local()) {
+            ok = false;
+        }
+    });
+    if !ok {
+        return None;
+    }
+    let body = p.text_of(&["hp:t"]);
+    if body.is_empty() || body.contains('\n') || body.contains('\r') {
+        return None;
+    }
+    Some(body)
+}
+
+/// `xml` of a stored drawing, with every `hp:drawText` `hp:t` set to
+/// `body`. Unchanged text keeps the original fragment.
+pub fn with_draw_text(xml: &str, body: &str) -> String {
+    let mut e = hanji_package::xml::fragment(xml);
+    if !set_draw_text(&mut e, body) {
+        return xml.to_string();
+    }
+    e.to_xml()
+}
+
+/// Writes `body` into every `hp:t` of `hp:drawText`. Unchanged text is a
+/// no-op.
+pub fn set_draw_text(el: &mut Element, body: &str) -> bool {
+    if shown_draw_text(el).as_deref() == Some(body) {
+        return false;
+    }
+    let mut used = false;
+    set_draw_text_body(el, body, &mut used);
+    if !used {
+        add_draw_t(el, body);
+    }
+    true
+}
+
+fn set_draw_text_body(e: &mut Element, body: &str, used: &mut bool) {
+    if e.is("hp:drawText") {
+        set_draw_t(e, body, used);
+        return;
+    }
+    for c in e.elements_mut() {
+        set_draw_text_body(c, body, used);
+    }
+}
+
+fn set_draw_t(e: &mut Element, body: &str, used: &mut bool) {
+    if e.is("hp:t") {
+        if !*used {
+            e.children = vec![Node::Text(escape_text(body))];
+            *used = true;
+        } else {
+            e.children.clear();
+        }
+        return;
+    }
+    for c in e.elements_mut() {
+        set_draw_t(c, body, used);
+    }
+}
+
+fn add_draw_t(el: &mut Element, body: &str) {
+    let mut t = Element::new("hp:t");
+    t.children.push(Node::Text(escape_text(body)));
+    let mut run = Element::new("hp:run");
+    run.children.push(Node::El(t));
+    let mut p = Element::new("hp:p");
+    p.children.push(Node::El(run));
+    if let Some(dt) = find_draw_text_mut(el) {
+        if let Some(sub) = dt.child_mut("hp:subList") {
+            sub.children.push(Node::El(p));
+            return;
+        }
+        let mut sub = Element::new("hp:subList");
+        sub.children.push(Node::El(p));
+        dt.children.push(Node::El(sub));
+    }
+}
+
+fn find_draw_text_mut(el: &mut Element) -> Option<&mut Element> {
+    if el.is("hp:drawText") {
+        return Some(el);
+    }
+    for c in el.elements_mut() {
+        if let Some(d) = find_draw_text_mut(c) {
+            return Some(d);
+        }
+    }
+    None
+}
+
+/// A copy whose draw-text runs are empty, so the wrap's fingerprint is the
+/// object, not the words.
+pub fn fingerprint_drawing(el: &Element) -> Element {
+    let mut x = el.clone();
+    clear_draw_t(&mut x);
+    x
+}
+
+fn clear_draw_t(e: &mut Element) {
+    if e.is("hp:drawText") {
+        e.walk_mut(&mut |x| {
+            if x.is("hp:t") {
+                x.children.clear();
+            }
+        });
+        return;
+    }
+    for c in e.elements_mut() {
+        clear_draw_t(c);
     }
 }
 
@@ -423,4 +572,52 @@ pub fn drop_stale_layouts(e: &mut Element) {
 pub fn drop_layout(p: &mut Element) {
     p.children
         .retain(|n| !matches!(n, Node::El(e) if e.is("hp:linesegarray")));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use hanji_package::xml::fragment;
+
+    fn rect(inner: &str) -> String {
+        format!(
+            r#"<hp:rect id="1"><hp:drawText><hp:subList>{inner}</hp:subList></hp:drawText></hp:rect>"#
+        )
+    }
+
+    fn p(text: &str) -> String {
+        format!("<hp:p><hp:run><hp:t>{text}</hp:t></hp:run></hp:p>")
+    }
+
+    #[test]
+    fn a_one_paragraph_draw_text_is_shown() {
+        let e = fragment(&rect(&p("글상자")));
+        assert_eq!(shown_draw_text(&e).as_deref(), Some("글상자"));
+    }
+
+    #[test]
+    fn two_paragraphs_stay_unshown() {
+        let e = fragment(&rect(&format!("{}{}", p("a"), p("b"))));
+        assert!(shown_draw_text(&e).is_none());
+    }
+
+    #[test]
+    fn a_nested_picture_stays_unshown() {
+        let inner = "<hp:p><hp:run><hp:pic/><hp:t>alt</hp:t></hp:run></hp:p>";
+        assert!(shown_draw_text(&fragment(&rect(inner))).is_none());
+    }
+
+    #[test]
+    fn with_draw_text_keeps_the_fragment_when_unchanged() {
+        let xml = rect(&p("글상자"));
+        assert_eq!(with_draw_text(&xml, "글상자"), xml);
+    }
+
+    #[test]
+    fn with_draw_text_rewrites_t() {
+        let xml = rect(&p("글상자"));
+        let out = with_draw_text(&xml, "고침");
+        assert_eq!(shown_draw_text(&fragment(&out)).as_deref(), Some("고침"));
+        assert!(!out.contains("글상자"), "{out}");
+    }
 }

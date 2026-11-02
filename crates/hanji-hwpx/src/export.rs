@@ -11,7 +11,7 @@ use hanji_package::xml::{assemble, escape_text, fragment, is_blank, Element, Nod
 
 use crate::header::{list_heading, list_num, Header, Style};
 use crate::import::{char_key, dims, layout_key, spaces_only};
-use crate::owpml::{self, char_element, ctrl_kind, MARKER_CTRLS};
+use crate::owpml::{self, char_element, ctrl_kind, keep_kind, MARKER_CTRLS};
 use crate::{PackageShell, SectionShell};
 
 pub struct Exporter<'a> {
@@ -679,6 +679,11 @@ impl<'a> Exporter<'a> {
             .filter(|e| e.meta.tag == "hp:equation")
             .filter_map(|e| Some((e.start?, e)))
             .collect();
+        let drawings: Vec<&Entry> = self
+            .at(path, Kind::Wrap)
+            .into_iter()
+            .filter(|e| keep_kind(&e.meta.tag) == "drawing")
+            .collect();
         let notes: HashMap<usize, &Entry> = self
             .at(path, Kind::Wrap)
             .into_iter()
@@ -825,6 +830,7 @@ impl<'a> Exporter<'a> {
                         &mut tabs,
                         &eqs,
                         &notes,
+                        &drawings,
                     )?;
                     out.push(node(r));
                 }
@@ -835,7 +841,9 @@ impl<'a> Exporter<'a> {
                         .find_map(|m| m.xml.get(1))
                         .map_or_else(|| empty_run(style.char_pr), |x| fragment(x));
                     r.children.clear();
-                    self.fill_run(&mut r, p, s, s, ms, None, &mut tabs, &eqs, &notes)?;
+                    self.fill_run(
+                        &mut r, p, s, s, ms, None, &mut tabs, &eqs, &notes, &drawings,
+                    )?;
                     out.push(node(r));
                 }
                 It::Seg(si) => {
@@ -867,7 +875,7 @@ impl<'a> Exporter<'a> {
                     unit_cp[a..b].fill(cp);
                     self.set_char_pr(&mut r, cp, old_style, style);
                     let ms = at.get(&Target::Seg(si)).unwrap_or(&none);
-                    self.fill_run(&mut r, p, a, b, ms, own, &mut tabs, &eqs, &notes)?;
+                    self.fill_run(&mut r, p, a, b, ms, own, &mut tabs, &eqs, &notes, &drawings)?;
                     out.push(node(r));
                 }
             }
@@ -907,6 +915,7 @@ impl<'a> Exporter<'a> {
         tabs: &mut HashMap<u64, usize>,
         eqs: &HashMap<usize, &Entry>,
         notes: &HashMap<usize, &Entry>,
+        drawings: &[&Entry],
     ) -> Result<(), String> {
         let mut by_pos: BTreeMap<usize, Vec<&Entry>> = BTreeMap::new();
         for m in zw {
@@ -943,6 +952,25 @@ impl<'a> Exporter<'a> {
             }
             if c == b {
                 break;
+            }
+            if let Some(w) = drawings
+                .iter()
+                .copied()
+                .find(|e| e.start.is_some_and(|s| s <= c) && e.end.is_some_and(|en| c < en))
+            {
+                if Some(c) == w.start {
+                    close(&mut t, r);
+                    let body: String = p.units[w.start.unwrap()..w.end.unwrap().min(p.units.len())]
+                        .iter()
+                        .filter_map(|u| match &u.atom {
+                            Atom::Char(ch) => Some(*ch),
+                            _ => None,
+                        })
+                        .collect();
+                    r.children
+                        .push(node(fragment(&owpml::with_draw_text(&w.xml[0], &body))));
+                }
+                continue;
             }
             match &p.units[c].atom {
                 Atom::Char(ch) => {
