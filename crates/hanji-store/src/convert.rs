@@ -967,7 +967,7 @@ fn not_carried(rem: &Remainder, from: Format, has_items: bool) -> Vec<NotCarried
                 }
                 "hyperlink" => "hyperlinks (the text stays, the address does not)",
                 "fieldBegin" | "fieldEnd" => "field ranges",
-                "fldChar" | "fldSimple" => {
+                "fldChar" | "fldSimple" | "fld" => {
                     "fields (the result's text stays, the instruction does not)"
                 }
                 "sdt" | "sdt/block" => {
