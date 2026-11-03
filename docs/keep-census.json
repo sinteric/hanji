@@ -34,7 +34,7 @@
     "files": 102,
     "failed": 0,
     "with_keeps": 58,
-    "keeps": 241
+    "keeps": 237
   },
   "formats": [
     {
@@ -56,7 +56,7 @@
       "files": 27,
       "failed": 0,
       "with_keeps": 16,
-      "keeps": 44
+      "keeps": 40
     },
     {
       "format": "xlsx",
@@ -86,12 +86,6 @@
       "files": 10
     },
     {
-      "format": "pptx",
-      "kind": "field",
-      "keeps": 11,
-      "files": 4
-    },
-    {
       "format": "hwpx",
       "kind": "drawing",
       "keeps": 10,
@@ -112,6 +106,12 @@
     {
       "format": "docx",
       "kind": "symbol",
+      "keeps": 7,
+      "files": 1
+    },
+    {
+      "format": "pptx",
+      "kind": "field",
       "keeps": 7,
       "files": 1
     },
@@ -498,10 +498,9 @@
     {
       "path": "crates/hanji-pptx/corpus/60810.pptx",
       "format": "pptx",
-      "keeps": 6,
+      "keeps": 4,
       "kinds": {
-        "diagram": 4,
-        "field": 2
+        "diagram": 4
       }
     },
     {
@@ -591,9 +590,8 @@
     {
       "path": "crates/hanji-pptx/corpus/layouts.pptx",
       "format": "pptx",
-      "keeps": 2,
+      "keeps": 1,
       "kinds": {
-        "field": 1,
         "picture": 1
       }
     },
@@ -681,9 +679,8 @@
     {
       "path": "crates/hanji-pptx/corpus/txt-text.pptx",
       "format": "pptx",
-      "keeps": 2,
+      "keeps": 1,
       "kinds": {
-        "field": 1,
         "table": 1
       }
     },

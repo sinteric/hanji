@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Show a PPTX text field (`a:fld`: a slide number, a date/time) whose cached
+  result is not blank as that text instead of a `<keep kind="field"/>`
+  placeholder. The field's id, type, `a:rPr` and `a:pPr` stay as a `Wrap`.
+  Editing the text replaces the cached `a:t` and keeps the field;
+  deleting all of it removes the field and is reported. Empty fields
+  (unfilled slide-number placeholders with no cached text) stay
+  placeholders. Corpus keeps: 241 → 237 (pptx `field` 11 → 7).
+
 ## 0.8.0 — 2026-11-02
 
 **Breaking / API changes**

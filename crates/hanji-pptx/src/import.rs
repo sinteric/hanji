@@ -28,7 +28,9 @@
 //! - `a:p`: a paragraph (`Ppr`: its shell, `a:pPr`, `a:endParaRPr`); a list
 //!   item when its bullet (own, else inherited) is a character or a number.
 //! - `a:r`, `a:br`: `Run` (shell and `a:rPr`; bold, italic, underline and
-//!   strike from its attributes). `a:fld` and other paragraph content: inline `Keep`.
+//!   strike from its attributes). An `a:fld` whose cached result is text: that
+//!   text and a `Wrap` (id, type, `a:rPr`, `a:pPr`). Other paragraph content:
+//!   inline `Keep`.
 
 use serde::{Deserialize, Serialize};
 
@@ -717,11 +719,12 @@ impl Importer<'_> {
         self.buf.clear();
         self.ustyle.clear();
         let mut texts: Vec<(usize, String)> = vec![];
-        // As `text::has_hangul` reads the units: only the text of runs the text models.
-        let hangul = p
-            .elements()
-            .filter(|c| c.is("a:r") && run_modellable(c))
-            .any(|c| c.text_of(&["a:t"]).chars().any(text::is_hangul));
+        // As `text::has_hangul` reads the units: only the text of runs and
+        // fields the text models.
+        let hangul = p.elements().any(|c| {
+            ((c.is("a:r") && run_modellable(c)) || shown_field(c))
+                && c.text_of(&["a:t"]).chars().any(text::is_hangul)
+        });
         for c in &p.children {
             let c = match c {
                 Node::El(c) => c,
@@ -737,6 +740,9 @@ impl Importer<'_> {
                 }
                 "a:br" if c.elements().all(|x| x.is("a:rPr")) => {
                     self.run(c, &path, "", true, under.as_ref(), hangul);
+                }
+                "a:fld" if shown_field(c) => {
+                    self.field(c, &path, under.as_ref(), hangul);
                 }
                 _ => {
                     let pos = self.buf.len();
@@ -861,6 +867,53 @@ impl Importer<'_> {
             ..Default::default()
         };
         self.entry(Kind::Run, xml, f, path, Some(start), Some(end), meta)
+    }
+
+    /// An `a:fld` whose cached result the text edits: a [`Kind::Wrap`] over
+    /// the characters, holding the field's id, type, `a:rPr` and `a:pPr`.
+    fn field(&mut self, f: &Element, path: &[usize], under: Option<&RunStyle>, hangul: bool) {
+        let t = f.text_of(&["a:t"]);
+        let rpr = f.child("a:rPr");
+        let shown = under.map(|u| {
+            rpr.map_or(RunStyle::default(), |x| RunStyle::of(x, &self.fonts))
+                .over(u)
+                .shown_for(hangul)
+        });
+        let marks = marks_of(rpr);
+        let mut stored = f.clone();
+        stored
+            .children
+            .retain(|n| !matches!(n, Node::El(e) if e.is("a:t")) && !is_blank(n));
+        let mut for_fp = stored.clone();
+        if let Some(x) = for_fp.child_mut("a:rPr") {
+            for a in MARK_ATTRS {
+                x.remove_attr(a);
+            }
+            if under.is_some() {
+                text::without_shown(x);
+            }
+        }
+        let fprint = self.fp(&[Some(&for_fp)]);
+        let start = self.buf.len();
+        self.buf
+            .extend(t.chars().map(|c| Unit::new(Atom::Char(c), marks)));
+        let end = self.buf.len();
+        self.ustyle.resize(end, shown.unwrap_or_default());
+        let meta = Meta {
+            tag: "a:fld".into(),
+            marks,
+            ..Default::default()
+        };
+        let idx = self.entry(
+            Kind::Wrap,
+            vec![stored.to_xml()],
+            fprint,
+            path,
+            Some(start),
+            Some(end),
+            meta,
+        );
+        self.entries[idx].meta.seq_close = self.seq();
     }
 }
 
@@ -1177,10 +1230,24 @@ pub fn has_text(sp: &Element) -> bool {
 fn run_modellable(r: &Element) -> bool {
     r.elements()
         .all(|c| c.is("a:rPr") || (c.is("a:t") && !c.has_elements()))
-        && !r
-            .text_of(&["a:t"])
-            .chars()
-            .any(|c| (c as u32) < 0x20 && c != '\t')
+        && !control_in_text(r)
+}
+
+/// An `a:fld` whose cached result the text can edit: `a:rPr` / `a:pPr` /
+/// `a:t` only, no control characters, and `a:t` is not blank (an empty slide
+/// number would disappear from the text).
+fn shown_field(f: &Element) -> bool {
+    f.is("a:fld")
+        && f.elements()
+            .all(|c| c.is("a:rPr") || c.is("a:pPr") || (c.is("a:t") && !c.has_elements()))
+        && !control_in_text(f)
+        && f.text_of(&["a:t"]).chars().any(|c| !c.is_whitespace())
+}
+
+fn control_in_text(el: &Element) -> bool {
+    el.text_of(&["a:t"])
+        .chars()
+        .any(|c| (c as u32) < 0x20 && c != '\t')
 }
 
 /// A placeholder with no text: its element with one empty paragraph (the

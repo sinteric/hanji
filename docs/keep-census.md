@@ -41,9 +41,9 @@ date.
 | ------ | ----: | -----: | ---------: | ----: |
 | docx   |    13 |      0 |         11 |   126 |
 | hwpx   |    16 |      0 |         10 |    24 |
-| pptx   |    27 |      0 |         16 |    44 |
+| pptx   |    27 |      0 |         16 |    40 |
 | xlsx   |    46 |      0 |         21 |    47 |
-| all    |   102 |      0 |         58 |   241 |
+| all    |   102 |      0 |         58 |   237 |
 
 ## By kind, most first
 
@@ -52,11 +52,11 @@ date.
 | docx   | field              |    73 |     3 |
 | docx   | drawing            |    22 |     9 |
 | pptx   | table              |    15 |    10 |
-| pptx   | field              |    11 |     4 |
 | hwpx   | drawing            |    10 |     7 |
 | docx   | object             |     8 |     2 |
 | xlsx   | chart              |     8 |     6 |
 | docx   | symbol             |     7 |     1 |
+| pptx   | field              |     7 |     1 |
 | pptx   | picture            |     7 |     6 |
 | xlsx   | hyperlinks         |     7 |     7 |
 | xlsx   | notes              |     7 |     7 |
@@ -115,7 +115,7 @@ date.
 | `crates/hanji-hwpx/corpus/table-text.hwpx`                           | hwpx   |     0 | |
 | `crates/hanji-hwpx/corpus/tb-img-03.hwpx`                            | hwpx   |     1 | drawing 1 |
 | `crates/hanji-pptx/corpus/45545_Comment.pptx`                        | pptx   |     0 | |
-| `crates/hanji-pptx/corpus/60810.pptx`                                | pptx   |     6 | diagram 4, field 2 |
+| `crates/hanji-pptx/corpus/60810.pptx`                                | pptx   |     4 | diagram 4 |
 | `crates/hanji-pptx/corpus/EmbeddedVideo.pptx`                        | pptx   |     1 | picture 1 |
 | `crates/hanji-pptx/corpus/SampleShow.pptx`                           | pptx   |     0 | |
 | `crates/hanji-pptx/corpus/SimpleMacro.pptm`                          | pptx   |     0 | |
@@ -127,7 +127,7 @@ date.
 | `crates/hanji-pptx/corpus/audit/synth-modern-pitch.pptx`             | pptx   |     2 | chart 1, table 1 |
 | `crates/hanji-pptx/corpus/ext-rels.pptx`                             | pptx   |     0 | |
 | `crates/hanji-pptx/corpus/korean-deck.pptx`                          | pptx   |     1 | table 1 |
-| `crates/hanji-pptx/corpus/layouts.pptx`                              | pptx   |     2 | field 1, picture 1 |
+| `crates/hanji-pptx/corpus/layouts.pptx`                              | pptx   |     1 | picture 1 |
 | `crates/hanji-pptx/corpus/ph-populated-placeholders.pptx`            | pptx   |     5 | chart 1, diagram 1, picture 2, table 1 |
 | `crates/hanji-pptx/corpus/ph-unpopulated-placeholders.pptx`          | pptx   |     0 | |
 | `crates/hanji-pptx/corpus/prs-notes.pptx`                            | pptx   |     0 | |
@@ -139,7 +139,7 @@ date.
 | `crates/hanji-pptx/corpus/tbl-cell.pptx`                             | pptx   |     4 | table 4 |
 | `crates/hanji-pptx/corpus/turns-deck.pptx`                           | pptx   |     1 | picture 1 |
 | `crates/hanji-pptx/corpus/txt-font-props.pptx`                       | pptx   |     0 | |
-| `crates/hanji-pptx/corpus/txt-text.pptx`                             | pptx   |     2 | field 1, table 1 |
+| `crates/hanji-pptx/corpus/txt-text.pptx`                             | pptx   |     1 | table 1 |
 | `crates/hanji-pptx/corpus/with_japanese.pptx`                        | pptx   |     1 | table 1 |
 | `crates/hanji-xlsx/corpus/50867_with_table.xlsx`                     | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/54084-Greek-beyond-BMP.xlsx`               | xlsx   |     0 | |

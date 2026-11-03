@@ -252,6 +252,14 @@ fields), inline `<keep/>`.
   that would hide the field), or parts sharing a run with the result. A
   blank field whose result is only a hyperlink wrapping an empty nested
   field is one `<keep kind="field"/>`, not four `field-part` keeps.
+- **Fields (pptx):** a DrawingML text field (`a:fld`: a slide number, a
+  date/time) whose cached `a:t` is not blank is read as that text, as a
+  run's is; the field's id, type, `a:rPr` and `a:pPr` stay in the remainder
+  around it (a `Wrap` entry). Editing the text replaces the cached result
+  and keeps the field, so PowerPoint may compute it again when it updates
+  fields. Deleting all of it removes the field, and the report says so; a
+  result split across paragraphs is refused. A field with no result or a
+  blank one (an unfilled slide-number placeholder) stays a `<keep/>`.
 - **Comments (docx):** a comment whose body is ordinary text in one
   paragraph (no table, drawing, tracked change or reply) is
   `<comment>body</comment>` at the balloon (`w:commentReference`). The

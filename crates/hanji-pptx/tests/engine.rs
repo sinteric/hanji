@@ -2,7 +2,9 @@
 //! moved, notes, layout changes, refusals, and §8 neutralisation.
 
 use hanji_core::edit::{edit_in, reanchor_span_in, rewrite_in};
-use hanji_core::{Capabilities, Engine, EngineError, ImportOptions, Imported, Part, Remainder};
+use hanji_core::{
+    Capabilities, Engine, EngineError, ImportOptions, Imported, Kind, Part, Refusal, Remainder,
+};
 use hanji_package::{opc, package};
 use hanji_pptx::{PptxEngine, PptxModel};
 
@@ -819,5 +821,173 @@ fn an_exact_edit_that_cuts_a_slide_line_is_read_by_whole_lines_or_refused() {
                 .all(|x| x.2.contains("cuts through the line \"layout: Title Only\"")),
         "{:?}",
         r.report
+    );
+}
+
+/// A shape whose paragraph is `before {fld} after`, `fld` an `a:fld` with
+/// inner XML `inner` (`a:rPr`, optional `a:pPr`, `a:t`).
+fn field_pkg(inner: &str) -> Vec<u8> {
+    let mut parts = package::read(&deck("korean-deck.pptx")).unwrap();
+    let first = slides(&parts)[0].clone();
+    let s = parts.iter_mut().find(|p| p.name == first).unwrap();
+    let x = String::from_utf8(s.data.clone()).unwrap().replace(
+        "</p:spTree>",
+        &format!(
+            "<p:sp><p:nvSpPr><p:cNvPr id=\"99\" name=\"FieldBox\"/><p:cNvSpPr txBox=\"1\"/><p:nvPr/></p:nvSpPr><p:spPr/><p:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>before </a:t></a:r><a:fld id=\"{{11111111-1111-1111-1111-111111111111}}\" type=\"slidenum\">{inner}</a:fld><a:r><a:t> after</a:t></a:r></a:p></p:txBody></p:sp></p:spTree>"
+        ),
+    );
+    assert!(x.contains("FieldBox"), "the field shape was not inserted");
+    s.data = x.into_bytes();
+    package::write(&parts).unwrap()
+}
+
+fn field_inner(result: &str) -> String {
+    format!("<a:rPr lang=\"en-US\" smtClean=\"0\"/><a:t>{result}</a:t>")
+}
+
+#[test]
+fn a_field_result_is_text_and_exports_unchanged() {
+    let source = field_pkg(&field_inner("SLIDEFIELD"));
+    let imp = import(&source);
+    assert!(imp.text.contains("before SLIDEFIELD after"), "{}", imp.text);
+    assert!(!imp.text.contains("kind=\"field\""), "{}", imp.text);
+    let unchanged = export(&imp.text, &imp.remainder);
+    let first = slides(&package::read(&source).unwrap())[0].clone();
+    assert_eq!(
+        hanji_package::xml::canon_part(
+            package::get(&package::read(&source).unwrap(), &first).unwrap()
+        )
+        .unwrap(),
+        hanji_package::xml::canon_part(package::get(&unchanged, &first).unwrap()).unwrap()
+    );
+}
+
+#[test]
+fn editing_a_field_result_replaces_the_cached_result_and_keeps_the_field() {
+    let source = field_pkg(&field_inner("SLIDEFIELD"));
+    let imp = import(&source);
+    let r = edit_in(
+        &PptxModel,
+        &imp.remainder,
+        &imp.text,
+        "SLIDEFIELD",
+        "SLIDENEW",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let parts = export(&r.text, &r.remainder);
+    let first = &slides(&parts)[0];
+    let x = xml(&parts, first);
+    assert!(
+        x.contains("type=\"slidenum\"")
+            && x.contains("id=\"{11111111-1111-1111-1111-111111111111}\"")
+            && x.contains("<a:t>SLIDENEW</a:t>"),
+        "{x}"
+    );
+    assert!(!x.contains("SLIDEFIELD"), "{x}");
+}
+
+#[test]
+fn deleting_a_field_result_removes_the_field_and_says_so() {
+    let source = field_pkg(&field_inner("SLIDEFIELD"));
+    let imp = import(&source);
+    let r = edit_in(
+        &PptxModel,
+        &imp.remainder,
+        &imp.text,
+        "before SLIDEFIELD after",
+        "before  after",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.1 == Kind::Wrap && x.2.contains("all of its text")),
+        "{:?}",
+        r.report
+    );
+    let parts = export(&r.text, &r.remainder);
+    let x = xml(&parts, &slides(&parts)[0]);
+    assert!(!x.contains("a:fld") && !x.contains("SLIDEFIELD"), "{x}");
+}
+
+#[test]
+fn a_field_result_split_across_paragraphs_is_refused() {
+    let source = field_pkg(&field_inner("SLIDEFIELD"));
+    let imp = import(&source);
+    let new = imp.text.replace("SLIDEFIELD", "SLIDE<p/>FIELD");
+    match rewrite_in(&PptxModel, &imp.remainder, &imp.text, &new, CAPS) {
+        Err(Refusal::Unplaceable(r)) => assert!(
+            r.refused
+                .iter()
+                .any(|x| x.1 == Kind::Wrap && x.2.contains("different paragraphs")),
+            "{r:?}"
+        ),
+        other => panic!("{other:?}"),
+    }
+}
+
+#[test]
+fn fields_without_a_text_result_stay_placeholders() {
+    let empty = field_pkg("<a:rPr lang=\"en-US\"></a:rPr><a:t></a:t>");
+    let spaces = field_pkg("<a:rPr lang=\"en-US\"/><a:t>     </a:t>");
+    for (pkg, why) in [(empty, "empty"), (spaces, "blank")] {
+        let imp = import(&pkg);
+        assert!(imp.text.contains("kind=\"field\""), "{why}: {}", imp.text);
+        let _ = export(&imp.text, &imp.remainder);
+    }
+}
+
+#[test]
+fn a_field_with_paragraph_properties_exports_unchanged() {
+    let inner =
+        "<a:rPr lang=\"en-GB\" smtClean=\"0\"/><a:pPr><a:defRPr/></a:pPr><a:t>SLIDEFIELD</a:t>";
+    let source = field_pkg(inner);
+    let imp = import(&source);
+    assert!(imp.text.contains("SLIDEFIELD"), "{}", imp.text);
+    let unchanged = export(&imp.text, &imp.remainder);
+    let first = slides(&package::read(&source).unwrap())[0].clone();
+    assert_eq!(
+        hanji_package::xml::canon_part(
+            package::get(&package::read(&source).unwrap(), &first).unwrap()
+        )
+        .unwrap(),
+        hanji_package::xml::canon_part(package::get(&unchanged, &first).unwrap()).unwrap()
+    );
+}
+
+#[test]
+fn corpus_field_results_are_text() {
+    for name in ["txt-text.pptx", "layouts.pptx", "60810.pptx"] {
+        let pkg = deck(name);
+        let imp = import(&pkg);
+        assert!(
+            imp.remainder
+                .entries
+                .iter()
+                .any(|e| e.kind == Kind::Wrap && e.meta.tag == "a:fld"),
+            "{name} should show at least one field as text"
+        );
+        assert_eq!(
+            imp.text.matches("kind=\"field\"").count(),
+            0,
+            "{name} field keeps: {}",
+            imp.text
+        );
+        let _ = export(&imp.text, &imp.remainder);
+    }
+    let empty = import(&deck("audit/onlyoffice-sample.pptx"));
+    assert_eq!(
+        empty.text.matches("kind=\"field\"").count(),
+        7,
+        "{}",
+        empty.text
     );
 }

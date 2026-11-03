@@ -283,7 +283,10 @@ These are not supported yet:
   keeps the address or the field instruction, and Word may compute an
   edited result again when it updates fields. A filled legacy form field
   (`FORMTEXT`) is the same. Empty form fields, checkboxes, and fields
-  without a shown result stay placeholders. A Word content control
+  without a shown result stay placeholders. In pptx, a text field
+  (`a:fld`: a slide number, a date/time) whose cached result is not
+  blank is the same: editing it keeps the field; an empty field stays a
+  placeholder. A Word content control
   (`w:sdt`) whose value is that displayed text (rich or plain text, a
   combo/dropdown, a citation, a TOC or bibliography `docPartObj`) is
   the same: the text is editable and the control properties stay in

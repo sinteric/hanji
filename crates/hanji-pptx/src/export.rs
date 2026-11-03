@@ -1023,8 +1023,25 @@ impl<'a> Exporter<'a> {
         // the text writes their brackets (§5.3), each on shown text.
         let as_written = istyle::lift(&[c]).2.remove(0);
         let eff = as_written.written_marks(&|k| owner[k].map_or(Marks::NONE, |o| o.meta.marks));
+        let mut covered: HashSet<usize> = HashSet::new();
+        let mut fields: Vec<&Entry> = vec![];
+        for w in self.at(bi, Kind::Wrap) {
+            if w.meta.tag != "a:fld" {
+                continue;
+            }
+            self.check_part(w, part)?;
+            let s = w.start.unwrap_or(0);
+            let en = w.end.unwrap_or(s);
+            for k in s..en.min(n) {
+                covered.insert(k);
+            }
+            fields.push(w);
+        }
         let mut keeps: BTreeMap<usize, &Entry> = BTreeMap::new();
         for (k, u) in c.units.iter().enumerate() {
+            if covered.contains(&k) {
+                continue;
+            }
             if let Atom::Keep(kp) = &u.atom {
                 let e = self
                     .keep
@@ -1066,13 +1083,18 @@ impl<'a> Exporter<'a> {
         let mut segs: Vec<(usize, usize)> = vec![];
         let mut k = 0;
         while k < n {
-            if keeps.contains_key(&k) {
+            if keeps.contains_key(&k) || covered.contains(&k) {
                 k += 1;
                 continue;
             }
             let a = k;
             k += 1;
-            while k < n && !keeps.contains_key(&k) && !zat.contains(&k) && key(k) == key(a) {
+            while k < n
+                && !keeps.contains_key(&k)
+                && !covered.contains(&k)
+                && !zat.contains(&k)
+                && key(k) == key(a)
+            {
                 k += 1;
             }
             segs.push((a, k));
@@ -1080,6 +1102,7 @@ impl<'a> Exporter<'a> {
         enum It<'e> {
             Zrun(&'e Entry),
             Keep(&'e Entry),
+            Field(&'e Entry),
             Seg(usize, usize),
         }
         let mut items: Vec<(usize, u8, u64, It)> = vec![];
@@ -1088,6 +1111,9 @@ impl<'a> Exporter<'a> {
         }
         for (k, e) in &keeps {
             items.push((*k, 1, e.seq, It::Keep(e)));
+        }
+        for w in &fields {
+            items.push((w.start.unwrap_or(0), 1, w.seq, It::Field(w)));
         }
         for &(a, b) in &segs {
             items.push((a, 1, owner[a].map_or(u64::MAX, |o| o.seq), It::Seg(a, b)));
@@ -1118,6 +1144,14 @@ impl<'a> Exporter<'a> {
                     pel.children.push(Node::El(r));
                 }
                 It::Keep(e) => pel.children.push(Node::El(fragment(&e.xml[0]))),
+                It::Field(e) => self.write_field(
+                    pel,
+                    c,
+                    e,
+                    &eff,
+                    lang,
+                    under.zip(wanted.get(e.start.unwrap_or(0)).and_then(|s| s.as_ref())),
+                )?,
                 It::Seg(a, b) => self.seg(
                     pel,
                     c,
@@ -1158,7 +1192,7 @@ impl<'a> Exporter<'a> {
                 }
             })
             .collect();
-        let (shell, rpr) = match own {
+        let (shell, mut rpr) = match own {
             Some(o) => {
                 let s = fragment(&o.xml[0]);
                 let shell = if s.is("a:r") { s } else { el("a:r") };
@@ -1174,39 +1208,7 @@ impl<'a> Exporter<'a> {
                 (el("a:r"), Some(r))
             }
         };
-        let mut rpr = rpr.map(|mut r| {
-            set_marks(&mut r, eff[a]);
-            r
-        });
-        // Text formatting (§5.3): what the text states and the run does not
-        // show where it now stands is written; the rest stays as it is.
-        if let Some((u, want)) = style {
-            // What the text leaves unsaid, the run inherits.
-            let hangul = text::has_hangul(&c.units);
-            let mut want = want.over(&u.now.shown_for(hangul));
-            let own = rpr
-                .as_ref()
-                .map_or_else(RunStyle::default, |r| RunStyle::of(r, u.fonts));
-            let had = own.over(u.now).shown_for(hangul);
-            // A colour kept as the file stores it (`*`, a gradient…) is not
-            // written from the text: one the run showed under the slide's old
-            // layout is copied from there.
-            let then = own.over(u.then);
-            let mut pin = None;
-            if want.color.as_ref().is_some_and(|c| text::is_kept(c)) && want.color == then.color {
-                if want.color != had.color {
-                    pin = then.fill.clone();
-                }
-                want.color = had.color.clone();
-            }
-            if had != want || pin.is_some() {
-                let r = rpr.get_or_insert_with(|| el("a:rPr").with_attr("lang", lang));
-                text::write(r, &want, &had, u.now, hangul)?;
-                if let Some(f) = pin {
-                    text::set_fill(r, &f);
-                }
-            }
-        }
+        self.apply_rpr_style(&mut rpr, eff[a], lang, text::has_hangul(&c.units), style)?;
         let mut buf = String::new();
         let flush = |buf: &mut String, pel: &mut Element| {
             if buf.is_empty() {
@@ -1246,6 +1248,150 @@ impl<'a> Exporter<'a> {
             }
         }
         flush(&mut buf, pel);
+        Ok(())
+    }
+
+    /// A field wrap: the edited characters as `a:t`, the stored `a:fld` (id,
+    /// type, `a:rPr`, `a:pPr`) around them. A line break inside the result is
+    /// written beside the field; only the first text piece keeps the `a:fld`.
+    fn write_field(
+        &self,
+        pel: &mut Element,
+        c: &Inline,
+        e: &Entry,
+        eff: &[Marks],
+        lang: &str,
+        style: Option<(Under, &TextStyle)>,
+    ) -> Result<(), String> {
+        let s = e.start.unwrap_or(0);
+        let en = e.end.unwrap_or(s).min(c.units.len());
+        let hangul = text::has_hangul(&c.units);
+        let marks = eff.get(s).copied().unwrap_or(Marks::NONE);
+        let mut rpr = e
+            .xml
+            .first()
+            .and_then(|x| fragment(x).child("a:rPr").cloned());
+        self.apply_rpr_style(&mut rpr, marks, lang, hangul, style)?;
+        let mut fld_used = false;
+        let mut buf = String::new();
+        let flush =
+            |buf: &mut String, pel: &mut Element, fld_used: &mut bool, rpr: &Option<Element>| {
+                if buf.is_empty() {
+                    return;
+                }
+                let mut t = el("a:t");
+                t.children.push(Node::Text(xml::escape_text(buf)));
+                if !*fld_used {
+                    if let Some(x) = e.xml.first() {
+                        let mut fld = fragment(x);
+                        fld.children
+                            .retain(|n| !matches!(n, Node::El(c) if c.is("a:t")));
+                        match (fld.child_mut("a:rPr"), rpr.as_ref()) {
+                            (Some(had), Some(new)) => *had = new.clone(),
+                            (None, Some(new)) => fld.children.insert(0, Node::El(new.clone())),
+                            _ => {}
+                        }
+                        fld.children.push(Node::El(t));
+                        pel.children.push(Node::El(fld));
+                    } else {
+                        let mut r = el("a:r");
+                        if let Some(x) = rpr {
+                            r.children.push(Node::El(x.clone()));
+                        }
+                        r.children.push(Node::El(t));
+                        pel.children.push(Node::El(r));
+                    }
+                    *fld_used = true;
+                } else {
+                    let mut r = el("a:r");
+                    if let Some(x) = rpr {
+                        r.children.push(Node::El(x.clone()));
+                    }
+                    r.children.push(Node::El(t));
+                    pel.children.push(Node::El(r));
+                }
+                buf.clear();
+            };
+        for u in &c.units[s..en] {
+            match &u.atom {
+                Atom::Char(ch) => buf.push(*ch),
+                Atom::Break => {
+                    flush(&mut buf, pel, &mut fld_used, &rpr);
+                    let mut br = el("a:br");
+                    if let Some(x) = &rpr {
+                        br.children.push(Node::El(x.clone()));
+                    }
+                    pel.children.push(Node::El(br));
+                }
+                Atom::Keep(kp) => {
+                    flush(&mut buf, pel, &mut fld_used, &rpr);
+                    let ke =
+                        self.keep.get(kp.id.as_str()).copied().ok_or_else(|| {
+                            format!("placeholder {} has no remainder entry", kp.id)
+                        })?;
+                    pel.children.push(Node::El(fragment(&ke.xml[0])));
+                }
+                Atom::Comment(_) => {
+                    return Err("comments are not supported by the pptx engine yet".into())
+                }
+                Atom::Ins(_) | Atom::Del(_) => {
+                    return Err("tracked changes are not supported by the pptx engine yet".into())
+                }
+                Atom::NoteRef(_) => {
+                    return Err("footnotes are not supported by the pptx engine yet".into())
+                }
+                _ => {}
+            }
+        }
+        flush(&mut buf, pel, &mut fld_used, &rpr);
+        Ok(())
+    }
+
+    /// Bold/italic/underline/strike and the formatting the text states, on a
+    /// run's or field's `a:rPr`. Unchanged values keep the stored XML.
+    fn apply_rpr_style(
+        &self,
+        rpr: &mut Option<Element>,
+        marks: Marks,
+        lang: &str,
+        hangul: bool,
+        style: Option<(Under, &TextStyle)>,
+    ) -> Result<(), String> {
+        if let Some(r) = rpr.as_mut() {
+            set_marks(r, marks);
+        }
+        // Text formatting (§5.3): what the text states and the run does not
+        // show where it now stands is written; the rest stays as it is.
+        if let Some((u, want)) = style {
+            // What the text leaves unsaid, the run inherits.
+            let mut want = want.over(&u.now.shown_for(hangul));
+            let own = rpr
+                .as_ref()
+                .map_or_else(RunStyle::default, |r| RunStyle::of(r, u.fonts));
+            let had = own.over(u.now).shown_for(hangul);
+            // A colour kept as the file stores it (`*`, a gradient…) is not
+            // written from the text: one the run showed under the slide's old
+            // layout is copied from there.
+            let then = own.over(u.then);
+            let mut pin = None;
+            if want.color.as_ref().is_some_and(|c| text::is_kept(c)) && want.color == then.color {
+                if want.color != had.color {
+                    pin = then.fill.clone();
+                }
+                want.color = had.color.clone();
+            }
+            if had != want || pin.is_some() {
+                let created = rpr.is_none();
+                let r = rpr.get_or_insert_with(|| el("a:rPr").with_attr("lang", lang));
+                if created {
+                    set_marks(r, marks);
+                }
+                text::write(r, &want, &had, u.now, hangul)?;
+                if let Some(f) = pin {
+                    text::set_fill(r, &f);
+                }
+            }
+        }
         Ok(())
     }
 

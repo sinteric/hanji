@@ -73,10 +73,12 @@ pub fn line_look(c: &Element, sty: Option<Styling>) -> Look {
 }
 
 /// One source unit of a paragraph: its atom, marks and the run (`a:rPr`) it
-/// comes from.
+/// comes from. A character from `a:fld` also keeps the field's shell (id,
+/// type, `a:pPr`) so a rewrite can write the field back.
 struct Src {
     unit: Unit,
     rpr: Option<Element>,
+    fld: Option<Element>,
 }
 
 /// A paragraph's units as the text reads them, each with its run's `a:rPr`.
@@ -87,16 +89,25 @@ fn sources(p: &Element) -> Vec<Src> {
             "a:r" | "a:fld" => {
                 let rpr = c.child("a:rPr").cloned();
                 let m = marks_of(rpr.as_ref());
+                let fld = c.is("a:fld").then(|| {
+                    let mut shell = c.clone();
+                    shell
+                        .children
+                        .retain(|n| !matches!(n, Node::El(e) if e.is("a:t") || e.is("a:rPr")));
+                    shell
+                });
                 for ch in c.text_of(&["a:t"]).chars().filter(|ch| *ch as u32 >= 0x20) {
                     out.push(Src {
                         unit: Unit::new(Atom::Char(ch), m),
                         rpr: rpr.clone(),
+                        fld: fld.clone(),
                     });
                 }
             }
             "a:br" => out.push(Src {
                 unit: Unit::new(Atom::Break, Marks::NONE),
                 rpr: c.child("a:rPr").cloned(),
+                fld: None,
             }),
             _ => {}
         }
@@ -190,10 +201,12 @@ pub fn write(
             out.push(p);
             continue;
         }
-        if let Some(c) = p
-            .elements()
-            .find(|c| !matches!(c.name.as_str(), "a:pPr" | "a:r" | "a:br" | "a:endParaRPr"))
-        {
+        if let Some(c) = p.elements().find(|c| {
+            !matches!(
+                c.name.as_str(),
+                "a:pPr" | "a:r" | "a:br" | "a:fld" | "a:endParaRPr"
+            )
+        }) {
             return Err(format!(
                 "a paragraph of {what} holds {} the text does not show: its text cannot be written here; edit it in PowerPoint",
                 c.name
@@ -255,8 +268,10 @@ fn paragraph(
         vec![]
     };
     let mut tpl: Vec<Option<Element>> = vec![None; n.units.len()];
+    let mut tpl_fld: Vec<Option<Element>> = vec![None; n.units.len()];
     for &(a, b) in &pairs {
         tpl[b] = src[a].rpr.clone();
+        tpl_fld[b] = src[a].fld.clone();
     }
     let aligned: Vec<bool> = {
         let mut v = vec![false; n.units.len()];
@@ -267,11 +282,12 @@ fn paragraph(
     };
     for k in 0..tpl.len() {
         if !aligned[k] {
-            tpl[k] = (0..k)
+            let j = (0..k)
                 .rev()
                 .find(|&j| aligned[j])
-                .or_else(|| (k + 1..tpl.len()).find(|&j| aligned[j]))
-                .map_or(first.clone(), |j| tpl[j].clone());
+                .or_else(|| (k + 1..tpl.len()).find(|&j| aligned[j]));
+            tpl[k] = j.map_or(first.clone(), |j| tpl[j].clone());
+            tpl_fld[k] = j.and_then(|j| tpl_fld[j].clone());
         }
     }
     let lifted = istyle::lift(&[n]).2.remove(0);
@@ -309,6 +325,7 @@ fn paragraph(
             };
             let same = k == a
                 || (tpl[k] == tpl[a]
+                    && tpl_fld[k] == tpl_fld[a]
                     && marks[k] == marks[a]
                     && (want[k] == want[a] || !istyle::visible(&n.units[k].atom)));
             if !same {
@@ -321,12 +338,23 @@ fn paragraph(
             // A placeholder or other unit a group's text cannot hold.
             return Err("a group's shape holds only text and line breaks here".into());
         }
-        let mut r = Element::new("a:r");
-        r.children.push(Node::El(rpr));
         let mut te = Element::new("a:t");
         te.children.push(Node::Text(xml::escape_text(&t)));
-        r.children.push(Node::El(te));
-        out.children.push(Node::El(r));
+        let run = if let Some(mut fld) = tpl_fld[a].clone() {
+            if let Some(x) = fld.child_mut("a:rPr") {
+                *x = rpr;
+            } else {
+                fld.children.insert(0, Node::El(rpr));
+            }
+            fld.children.push(Node::El(te));
+            fld
+        } else {
+            let mut r = Element::new("a:r");
+            r.children.push(Node::El(rpr));
+            r.children.push(Node::El(te));
+            r
+        };
+        out.children.push(Node::El(run));
     }
     if let Some(end) = p.child("a:endParaRPr") {
         out.children.push(Node::El(end.clone()));
