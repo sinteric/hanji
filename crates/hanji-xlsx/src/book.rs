@@ -387,6 +387,11 @@ impl Book {
         id
     }
 
+    /// Replace a part's bytes (or add it without a content-type override).
+    pub fn put_part(&mut self, name: &str, data: Vec<u8>) {
+        self.set_part(name, data);
+    }
+
     /// Add a part with its content type.
     pub fn add_part(&mut self, name: &str, data: Vec<u8>, ct: &str) {
         let dos_time = self
@@ -417,8 +422,13 @@ impl Book {
 
     /// A free part name `dir/stemN.xml`.
     pub fn free_part(&self, dir: &str, stem: &str) -> String {
+        self.free_named(dir, stem, "xml")
+    }
+
+    /// A free part name `dir/stemN.ext`.
+    pub fn free_named(&self, dir: &str, stem: &str, ext: &str) -> String {
         (1..)
-            .map(|k| format!("{dir}/{stem}{k}.xml"))
+            .map(|k| format!("{dir}/{stem}{k}.{ext}"))
             .find(|n| !self.parts.iter().any(|p| &p.name == n))
             .unwrap()
     }

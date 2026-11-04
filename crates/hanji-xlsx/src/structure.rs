@@ -1,13 +1,14 @@
 //! Edits to the structure text (§5.4: the structure is text the model may
 //! edit): a column's type, format or formula, a new column at the end of a
-//! table, a new table, a new sheet at the end, merged ranges, a deleted
-//! placeholder. Table, sheet and column edits become range operations, so
-//! the text and the operations share one validator and one implementation.
-//! Merged ranges are applied from the `<merge range/>` lines. Any other
-//! change is refused with the form it should take.
+//! table, a new table, a new sheet at the end, merged ranges, hyperlinks,
+//! notes, a deleted placeholder. Table, sheet and column edits become range
+//! operations, so the text and the operations share one validator and one
+//! implementation. Merged ranges, hyperlinks and notes are applied from
+//! their structure lines. Any other change is refused with the form it
+//! should take.
 
 use hanji_format::ops::{ColumnSpec, RangeOp};
-use hanji_format::sheet::{MergeDecl, SheetItem, Spreadsheet, TableDecl};
+use hanji_format::sheet::{HyperlinkDecl, MergeDecl, NoteDecl, SheetItem, Spreadsheet, TableDecl};
 
 /// Whether two structures are the same (front matter aside).
 pub fn same(a: &Spreadsheet, b: &Spreadsheet) -> bool {
@@ -47,6 +48,28 @@ pub fn merge_ranges(items: &[SheetItem]) -> Vec<&MergeDecl> {
         .iter()
         .filter_map(|i| match i {
             SheetItem::Merge(m) => Some(m),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The `<hyperlink/>` lines of a sheet, in the order written.
+pub fn hyperlinks(items: &[SheetItem]) -> Vec<&HyperlinkDecl> {
+    items
+        .iter()
+        .filter_map(|i| match i {
+            SheetItem::Hyperlink(h) => Some(h),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The `<note/>` lines of a sheet, in the order written.
+pub fn notes(items: &[SheetItem]) -> Vec<&NoteDecl> {
+    items
+        .iter()
+        .filter_map(|i| match i {
+            SheetItem::Note(n) => Some(n),
             _ => None,
         })
         .collect()
