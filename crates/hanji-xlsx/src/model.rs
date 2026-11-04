@@ -9,16 +9,16 @@ use hanji_core::cells::{parse_sqref, CellRange, CellRef};
 use hanji_core::{Entry, KeepIds, Kind, Meta};
 use hanji_format::cellfmt::{self, CellFormat, FormatLine};
 use hanji_format::sheet::{
-    format_kind, ColumnDecl, FormatKind, MergeDecl, SheetDecl, SheetItem, Spreadsheet, TableDecl,
-    MAX_MERGE_LINES,
+    format_kind, ColumnDecl, FormatKind, HyperlinkDecl, MergeDecl, SheetDecl, SheetItem,
+    Spreadsheet, TableDecl, MAX_HYPERLINK_LINES, MAX_MERGE_LINES,
 };
 use hanji_format::{formula, FrontMatter, Keep};
 use hanji_package::clip;
 use hanji_package::xml::{self, Element, Node};
 
 use crate::book::{Book, SheetKind, TableInfo, ValueKind};
-use crate::drawing;
 use crate::store::SHEET_ORDER;
+use crate::{drawing, notes};
 
 /// The worksheet children that become range entries: (container, child, anchor attribute).
 pub const RANGE_ELEMENTS: &[(Option<&str>, &str, &str)] = &[
@@ -192,6 +192,9 @@ pub fn keeps(book: &Book) -> Vec<(usize, Keep)> {
             if child == "mergeCell" && modelled_merges(book, i).is_some() {
                 continue;
             }
+            if child == "hyperlink" && modelled_hyperlinks(book, i).is_some() {
+                continue;
+            }
             let ranges: Vec<&str> = book
                 .entries
                 .iter()
@@ -207,6 +210,9 @@ pub fn keeps(book: &Book) -> Vec<(usize, Keep)> {
         match s.kind {
             SheetKind::Work => {
                 for o in drawing::sheet_objects(book, i) {
+                    if o.kind == "notes" && notes::modelled(book, i).is_some() {
+                        continue;
+                    }
                     push(&o.kind, o.summary, &mut out);
                 }
             }
@@ -255,6 +261,69 @@ fn modelled_merges(book: &Book, i: usize) -> Option<Vec<String>> {
         }
     }
     Some(rs.into_iter().map(|r| r.to_string()).collect())
+}
+
+/// This sheet's hyperlinks as `<hyperlink/>` lines, or `None` when they stay
+/// a placeholder: more than [`MAX_HYPERLINK_LINES`], an unparsable ref,
+/// overlapping ranges, a missing or shared relationship, or a relationship
+/// that is not an external hyperlink.
+pub(crate) fn modelled_hyperlinks(book: &Book, i: usize) -> Option<Vec<HyperlinkDecl>> {
+    let part = &book.sheets[i].part;
+    let rels = book.rels_of(part);
+    let mut out = vec![];
+    let mut used_ids: Vec<String> = vec![];
+    for e in &book.entries {
+        if e.kind != Kind::Range || e.path.first() != Some(&i) || e.meta.tag != "hyperlink" {
+            continue;
+        }
+        let r = CellRange::parse(e.meta.range.as_deref()?)?;
+        let el = xml::fragment(&e.xml[0]);
+        let rid = el
+            .attrs
+            .iter()
+            .find(|a| a.0.ends_with(":id"))
+            .map(|a| xml::unescape(&a.1));
+        let location = el.get("location").filter(|s| !s.is_empty());
+        let target = if let Some(id) = &rid {
+            if used_ids.iter().any(|x| x == id) {
+                return None;
+            }
+            let rel = rels.iter().find(|r| r.id == *id)?;
+            if rel.short_type() != "hyperlink" || !rel.external {
+                return None;
+            }
+            used_ids.push(id.clone());
+            Some(rel.target.clone())
+        } else {
+            None
+        };
+        if target.is_none() && location.is_none() {
+            return None;
+        }
+        out.push(HyperlinkDecl {
+            range: r.to_string(),
+            target,
+            location,
+            display: el.get("display"),
+            tooltip: el.get("tooltip"),
+        });
+    }
+    if out.len() > MAX_HYPERLINK_LINES {
+        return None;
+    }
+    let rs: Vec<CellRange> = out
+        .iter()
+        .filter_map(|h| CellRange::parse(&h.range))
+        .collect();
+    if rs.len() != out.len() {
+        return None;
+    }
+    for (a, x) in rs.iter().enumerate() {
+        if rs[a + 1..].iter().any(|y| x.intersects(y)) {
+            return None;
+        }
+    }
+    Some(out)
 }
 
 fn list_summary(ranges: &[&str]) -> String {
@@ -385,6 +454,12 @@ pub fn structure(book: &mut Book, template: Option<&str>) -> Result<Spreadsheet,
                     ms.into_iter()
                         .map(|range| SheetItem::Merge(MergeDecl { range })),
                 );
+            }
+            if let Some(hs) = modelled_hyperlinks(book, i) {
+                items.extend(hs.into_iter().map(SheetItem::Hyperlink));
+            }
+            if let Some(ns) = notes::modelled(book, i) {
+                items.extend(ns.into_iter().map(SheetItem::Note));
             }
         }
         items.extend(

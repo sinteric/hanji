@@ -1034,6 +1034,10 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
 
   <merge range="A1:G1"/>
 
+  <hyperlink range="H4" target="https://example.com/sales"/>
+
+  <note range="A3" author="작성자" text="월은 매월 1일로 적습니다."/>
+
   <keep id="k1" kind="data-validation" summary="B2:B1201"/>
   </sheet>
   ```
@@ -1088,12 +1092,21 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
   empty cells in General format). Merged cells are `<merge range="A1:G1"/>`
   lines: the model may keep, add, remove or change them. A merge is a
   rectangle of two or more cells; overlapping or out-of-grid ranges are
-  refused. A sheet with more merged ranges than the text will hold (1,024)
-  keeps them as a `<keep/>` placeholder, because listing tens of thousands
-  of ranges would grow the structure with the grid (rule 11). Validations,
-  conditional formats, notes, pictures and pivot tables are `<keep/>`
-  placeholders (rule 8). A syntax for validations is still open; until then
-  they are placeholders, and a value that breaks one is refused.
+  refused. Cell hyperlinks are
+  `<hyperlink range="H4" target="https://example.com/sales"/>` lines
+  (optional `location` for a sheet cell or defined name, `display` and
+  `tooltip`). Notes are
+  `<note range="A3" author="작성자" text="월은 매월 1일로 적습니다."/>`
+  lines; a newline in the text is `&#10;`. The model may keep, add, remove
+  or change both. A sheet with more merged ranges, hyperlinks or notes
+  than the text will hold (1,024) keeps that kind as a `<keep/>`
+  placeholder, because listing tens of thousands of ranges would grow the
+  structure with the grid (rule 11). Overlapping hyperlinks or notes, a hyperlink whose
+  relationship is not a unique external Target, and a threaded comment stay
+  placeholders. Validations, conditional formats, pictures and pivot tables
+  are `<keep/>` placeholders (rule 8). A syntax for validations is still
+  open; until then they are placeholders, and a value that breaks one is
+  refused.
 
 - **Cell data** is read through a row window of one table or range: a pipe
   table whose first column is the read-only sheet row number, then one cell

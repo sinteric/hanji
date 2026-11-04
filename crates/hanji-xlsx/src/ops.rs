@@ -20,16 +20,19 @@ use hanji_format::ops::{
     check_ops, date_of, parse_ops, render_errors, ColumnSpec, Formats, RangeOp, Row, SortKey, Value,
 };
 use hanji_format::sheet::{
-    format_kind, parse_spreadsheet, serialize_spreadsheet, FormatKind, SheetItem,
+    format_kind, parse_spreadsheet, serialize_spreadsheet, FormatKind, HyperlinkDecl, SheetItem,
 };
+use hanji_package::opc::{self, Rel};
 use hanji_package::xml::{self, Element, Node};
 
-use crate::book::{Book, SheetInfo, SheetKind, TableCol, TableInfo, CT_SHEET, MAIN_NS, R_NS};
+use crate::book::{
+    Book, SheetInfo, SheetKind, TableCol, TableInfo, CT_SHEET, MAIN_NS, REL_BASE, R_NS,
+};
 use crate::calc::{self, Changed, Recalc};
 use crate::shift::{self, f_element};
 use crate::store::{has_formula, holds, Cell, SHEET_ORDER};
 use crate::value::CellValue;
-use crate::{book_of, model, numfmt, remainder_of, structure, Applied, XlsxEngine};
+use crate::{book_of, model, notes, numfmt, remainder_of, structure, Applied, XlsxEngine};
 
 /// Number formats round 4 lists, allowed in every workbook besides its own and the built-in ones.
 pub const ROUND4_FORMATS: &[&str] = &[
@@ -181,7 +184,7 @@ pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, Eng
     let n_text = text_ops.len();
     for (k, op) in all.iter().enumerate() {
         if k == n_text {
-            apply_merges(&mut book, &parsed, &mut next_id)
+            apply_structure_lines(&mut book, &parsed, &mut next_id)
                 .map_err(|m| refused(format!("the structure text: {m}")))?;
         }
         let which = if k < n_text {
@@ -192,7 +195,7 @@ pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, Eng
         apply_op(&mut book, op, &mut cx).map_err(|m| refused(format!("{which}: {m}")))?;
     }
     if n_text == all.len() {
-        apply_merges(&mut book, &parsed, &mut next_id)
+        apply_structure_lines(&mut book, &parsed, &mut next_id)
             .map_err(|m| refused(format!("the structure text: {m}")))?;
     }
     let recalc = calc::recompute(&mut book, &cx.changed).map_err(refused)?;
@@ -232,6 +235,16 @@ pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, Eng
         remainder,
         report,
     })
+}
+
+fn apply_structure_lines(
+    book: &mut Book,
+    parsed: &hanji_format::sheet::Spreadsheet,
+    next_id: &mut u64,
+) -> Result<(), String> {
+    apply_merges(book, parsed, next_id)?;
+    apply_hyperlinks(book, parsed, next_id)?;
+    apply_notes(book, parsed)
 }
 
 /// Apply the `<merge range/>` lines of `parsed` to each sheet. A sheet that
@@ -362,6 +375,273 @@ fn set_sheet_merges(
     Ok(())
 }
 
+/// Apply the `<hyperlink/>` lines of `parsed` to each sheet. A sheet that
+/// still has a hyperlinks placeholder is left alone.
+fn apply_hyperlinks(
+    book: &mut Book,
+    parsed: &hanji_format::sheet::Spreadsheet,
+    next_id: &mut u64,
+) -> Result<(), String> {
+    for (i, ns) in parsed.sheets.iter().enumerate() {
+        if ns
+            .items
+            .iter()
+            .any(|it| matches!(it, SheetItem::Keep(k) if k.kind == "hyperlinks"))
+        {
+            continue;
+        }
+        let wanted: Vec<HyperlinkDecl> = structure::hyperlinks(&ns.items)
+            .into_iter()
+            .cloned()
+            .collect();
+        let have = model::modelled_hyperlinks(book, i).unwrap_or_default();
+        if have == wanted {
+            continue;
+        }
+        set_sheet_hyperlinks(book, i, &wanted, next_id)?;
+    }
+    Ok(())
+}
+
+fn set_sheet_hyperlinks(
+    book: &mut Book,
+    i: usize,
+    wanted: &[HyperlinkDecl],
+    next_id: &mut u64,
+) -> Result<(), String> {
+    book.load_store(i)?;
+    let prefix = book.store(i).prefix.clone();
+    let scope = xml::scope_of(&book.store(i).skel.root);
+    let part = book.sheets[i].part.clone();
+    let rp = rel_prefix(book, i)?;
+    let mut old: Vec<Entry> = vec![];
+    book.entries.retain(|e| {
+        if e.kind == Kind::Range && e.path.first() == Some(&i) && e.meta.tag == "hyperlink" {
+            old.push(e.clone());
+            false
+        } else {
+            true
+        }
+    });
+    let rels_now = book.rels_of(&part);
+    let decl_of = |e: &Entry| -> Option<HyperlinkDecl> {
+        let el = xml::fragment(&e.xml[0]);
+        let range = CellRange::parse(e.meta.range.as_deref()?)?;
+        let rid = el
+            .attrs
+            .iter()
+            .find(|a| a.0.ends_with(":id"))
+            .map(|a| xml::unescape(&a.1));
+        let location = el.get("location").filter(|s| !s.is_empty());
+        let target = rid.as_ref().and_then(|id| {
+            rels_now
+                .iter()
+                .find(|r| r.id == *id && r.short_type() == "hyperlink" && r.external)
+                .map(|r| r.target.clone())
+        });
+        Some(HyperlinkDecl {
+            range: range.to_string(),
+            target,
+            location,
+            display: el.get("display"),
+            tooltip: el.get("tooltip"),
+        })
+    };
+    let mut unused = vec![true; old.len()];
+    let mut placed: Vec<Option<Entry>> = vec![None; wanted.len()];
+    for (wi, w) in wanted.iter().enumerate() {
+        let Some(k) = old
+            .iter()
+            .enumerate()
+            .find(|(k, e)| unused[*k] && decl_of(e).as_ref() == Some(w))
+        else {
+            continue;
+        };
+        unused[k.0] = false;
+        placed[wi] = Some(k.1.clone());
+    }
+    let leftover: Vec<Entry> = old
+        .into_iter()
+        .enumerate()
+        .filter(|(k, _)| unused[*k])
+        .map(|(_, e)| e)
+        .collect();
+    let mut leftover = leftover.into_iter();
+    let mut seq = book
+        .entries
+        .iter()
+        .filter(|e| e.path.first() == Some(&i))
+        .map(|e| e.seq)
+        .max()
+        .unwrap_or(0);
+    let mut rels = rels_now;
+    let mut used_rids: Vec<String> = vec![];
+    let mut out = vec![];
+    for (w, slot) in wanted.iter().zip(placed) {
+        if let Some(e) = slot {
+            if let Some(id) = hyperlink_rid(&e.xml[0]) {
+                used_rids.push(id);
+            }
+            out.push(e);
+            continue;
+        }
+        if let Some(mut e) = leftover.next() {
+            sync_hyperlink(&mut e, w, &mut rels, &rp, &scope, &mut used_rids);
+            out.push(e);
+            continue;
+        }
+        seq += 1;
+        let mut el = Element::new(&format!("{prefix}hyperlink")).with_attr("ref", &w.range);
+        if let Some(url) = &w.target {
+            let id = opc::free_rel_id(&rels);
+            rels.push(Rel {
+                id: id.clone(),
+                ty: format!("{REL_BASE}hyperlink"),
+                target: url.clone(),
+                external: true,
+            });
+            el = el.with_attr(&format!("{rp}:id"), &id);
+            used_rids.push(id);
+        }
+        if let Some(l) = &w.location {
+            el = el.with_attr("location", l);
+        }
+        if let Some(d) = &w.display {
+            el = el.with_attr("display", d);
+        }
+        if let Some(t) = &w.tooltip {
+            el = el.with_attr("tooltip", t);
+        }
+        out.push(Entry {
+            id: *next_id,
+            kind: Kind::Range,
+            xml: vec![el.to_xml()],
+            fp: xml::canon(&el, &scope),
+            path: vec![i],
+            start: None,
+            end: None,
+            seq,
+            meta: Meta {
+                tag: "hyperlink".into(),
+                range: Some(w.range.clone()),
+                ..Default::default()
+            },
+        });
+        *next_id += 1;
+    }
+    rels.retain(|r| !(r.short_type() == "hyperlink" && r.external && !used_rids.contains(&r.id)));
+    if rels != book.rels_of(&part) {
+        book.set_rels(&part, rels);
+    }
+    book.entries.extend(out);
+    Ok(())
+}
+
+fn hyperlink_rid(xml: &str) -> Option<String> {
+    xml::fragment(xml)
+        .attrs
+        .iter()
+        .find(|a| a.0.ends_with(":id"))
+        .map(|a| xml::unescape(&a.1))
+}
+
+fn sync_hyperlink(
+    e: &mut Entry,
+    w: &HyperlinkDecl,
+    rels: &mut Vec<Rel>,
+    rp: &str,
+    scope: &xml::Scope,
+    used_rids: &mut Vec<String>,
+) {
+    let mut x = xml::fragment(&e.xml[0]);
+    x.set("ref", &w.range);
+    e.meta.range = Some(w.range.clone());
+    let rid_attr = x
+        .attrs
+        .iter()
+        .find(|a| a.0.ends_with(":id"))
+        .map(|a| a.0.clone());
+    let current_id = rid_attr.as_ref().and_then(|k| x.get(k));
+    match (&w.target, current_id, rid_attr) {
+        (Some(url), Some(id), _) => {
+            if let Some(r) = rels.iter_mut().find(|r| r.id == id) {
+                r.target = url.clone();
+            } else {
+                rels.push(Rel {
+                    id: id.clone(),
+                    ty: format!("{REL_BASE}hyperlink"),
+                    target: url.clone(),
+                    external: true,
+                });
+            }
+            used_rids.push(id);
+        }
+        (Some(url), None, _) => {
+            let id = opc::free_rel_id(rels);
+            rels.push(Rel {
+                id: id.clone(),
+                ty: format!("{REL_BASE}hyperlink"),
+                target: url.clone(),
+                external: true,
+            });
+            x.set(&format!("{rp}:id"), &id);
+            used_rids.push(id);
+        }
+        (None, _, Some(attr)) => {
+            x.remove_attr(&attr);
+        }
+        (None, _, None) => {}
+    }
+    set_opt_attr(&mut x, "location", w.location.as_deref());
+    set_opt_attr(&mut x, "display", w.display.as_deref());
+    set_opt_attr(&mut x, "tooltip", w.tooltip.as_deref());
+    e.xml[0] = x.to_xml();
+    e.fp = xml::canon(&x, scope);
+}
+
+fn set_opt_attr(el: &mut Element, k: &str, v: Option<&str>) {
+    match v {
+        Some(v) => el.set(k, v),
+        None => {
+            el.remove_attr(k);
+        }
+    }
+}
+
+fn rel_prefix(book: &mut Book, i: usize) -> Result<String, String> {
+    let st = book.store_mut(i)?;
+    let root = &mut st.skel.root;
+    Ok(
+        match root
+            .attrs
+            .iter()
+            .find(|x| x.1 == R_NS)
+            .and_then(|x| x.0.strip_prefix("xmlns:"))
+        {
+            Some(p) => p.to_string(),
+            None => {
+                root.attrs.push(("xmlns:r".into(), R_NS.into()));
+                "r".into()
+            }
+        },
+    )
+}
+
+fn apply_notes(book: &mut Book, parsed: &hanji_format::sheet::Spreadsheet) -> Result<(), String> {
+    for (i, ns) in parsed.sheets.iter().enumerate() {
+        if ns
+            .items
+            .iter()
+            .any(|it| matches!(it, SheetItem::Keep(k) if k.kind == "notes"))
+        {
+            continue;
+        }
+        let wanted: Vec<_> = structure::notes(&ns.items).into_iter().cloned().collect();
+        notes::apply(book, i, &wanted)?;
+    }
+    Ok(())
+}
+
 /// Remove what a deleted placeholder stood for (§2 rule 8: an explicit act).
 fn drop_keep(book: &mut Book, rem: &Remainder, id: &str, cx: &mut Ctx) -> Result<(), String> {
     let e = rem
@@ -376,6 +656,16 @@ fn drop_keep(book: &mut Book, rem: &Remainder, id: &str, cx: &mut Ctx) -> Result
         "conditional-format" => "conditionalFormatting",
         "data-validation" => "dataValidation",
         "hyperlinks" => "hyperlink",
+        "notes" => {
+            notes::clear(book, sheet)?;
+            notice(
+                &mut cx.notices,
+                "removed",
+                format!("{} {}", book.sheets[sheet].name, k.kind),
+                format!("the placeholder was deleted: {}", k.summary),
+            );
+            return Ok(());
+        }
         other => {
             return Err(format!(
                 "deleting the {other} placeholder {id} is not supported yet; keep its line <keep id=\"{id}\" …/> (the {other} stays in the file)"

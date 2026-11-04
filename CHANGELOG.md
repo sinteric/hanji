@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Show XLSX cell hyperlinks as editable `<hyperlink range="A1"
+  target="https://example.com"/>` lines (optional `location`, `display`,
+  `tooltip`) and cell notes as `<note range="B2" author="John"
+  text="Some text"/>` lines instead of `<keep kind="hyperlinks"/>` /
+  `<keep kind="notes"/>` placeholders. Each can be kept, added, removed
+  or changed. A newline in note text is `&#10;`. Sheets with more than
+  1024 of either kind, overlapping ranges, a hyperlink whose relationship
+  is not a unique external Target, and threaded comments stay
+  placeholders. Unedited comments, VML drawing and relationship parts stay
+  byte-identical. Corpus keeps: 237 → 223 (xlsx `hyperlinks` 7 → 0, `notes`
+  7 → 0).
 - Show a PPTX text field (`a:fld`: a slide number, a date/time) whose cached
   result is not blank as that text instead of a `<keep kind="field"/>`
   placeholder. The field's id, type, `a:rPr` and `a:pPr` stay as a `Wrap`.

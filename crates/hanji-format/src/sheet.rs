@@ -1,10 +1,11 @@
 //! The Spreadsheet grammar (DESIGN.md §5.4): the workbook's structure as text
 //! — `<sheet>` blocks holding `<table>` blocks (one pipe-table line per
 //! column: name, type, number format, formula), `<merge range/>` lines,
-//! `<chart/>` lines and placeholders — and the row window through which cell
-//! data is read (a pipe table whose first column is the read-only sheet row
-//! number, values as displayed; §6 round 4, read view A). Cell data is
-//! written by range operations (`ops.rs`), never as text.
+//! `<hyperlink/>` lines, `<note/>` lines, `<chart/>` lines and placeholders —
+//! and the row window through which cell data is read (a pipe table whose
+//! first column is the read-only sheet row number, values as displayed; §6
+//! round 4, read view A). Cell data is written by range operations (`ops.rs`),
+//! never as text.
 
 use crate::ast::{FrontMatter, Keep};
 use crate::cellfmt::{self, CellFormat, FormatLine};
@@ -26,6 +27,14 @@ pub const CHART_TYPES: &[&str] = &[
 /// (tens of thousands of merged ranges) keeps them as a placeholder: the
 /// structure text does not grow with the grid (§2 rule 11).
 pub const MAX_MERGE_LINES: usize = 1024;
+
+/// At most this many `<hyperlink/>` lines on one sheet. A sheet with more
+/// keeps them as a placeholder (§2 rule 11).
+pub const MAX_HYPERLINK_LINES: usize = 1024;
+
+/// At most this many `<note/>` lines on one sheet. A sheet with more keeps
+/// them as a placeholder (§2 rule 11).
+pub const MAX_NOTE_LINES: usize = 1024;
 
 /// Excel's last row and column (A1's `XFD1048576`).
 const MAX_ROW: u32 = 1_048_576;
@@ -55,6 +64,8 @@ pub struct SheetDecl {
 pub enum SheetItem {
     Table(TableDecl),
     Merge(MergeDecl),
+    Hyperlink(HyperlinkDecl),
+    Note(NoteDecl),
     Chart(ChartDecl),
     Keep(Keep),
 }
@@ -64,6 +75,31 @@ pub enum SheetItem {
 pub struct MergeDecl {
     /// Canonical A1 range (`A1:F1`), two or more cells.
     pub range: String,
+}
+
+/// One cell hyperlink (`<hyperlink range="A1" target="https://example.com"/>`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HyperlinkDecl {
+    /// Canonical A1 cell or range (`A1`, `A3:A5`).
+    pub range: String,
+    /// External URL (`TargetMode="External"` relationship), when there is one.
+    pub target: Option<String>,
+    /// Location inside the target (a sheet cell, a defined name, a bookmark).
+    pub location: Option<String>,
+    /// Optional display string stored on the hyperlink, not the cell value.
+    pub display: Option<String>,
+    /// Optional tooltip.
+    pub tooltip: Option<String>,
+}
+
+/// One cell note (`<note range="B2" author="John" text="Some text"/>`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NoteDecl {
+    /// Canonical A1 cell or range the note is anchored to.
+    pub range: String,
+    pub author: String,
+    /// Plain text of the balloon; a newline is `&#10;` in the attribute.
+    pub text: String,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -264,6 +300,9 @@ fn hanji_cell_like(u: &str) -> bool {
 const SHEET_FORM: &str = "<sheet name=\"…\"> … </sheet>";
 const TABLE_FORM: &str = "<table name=\"…\" range=\"A1:F20\">, the lines | column | type | format | formula | and |---|---|---|---|, one line | name | type | format | formula | per column, and </table>";
 const MERGE_FORM: &str = "<merge range=\"A1:B2\"/>";
+const HYPERLINK_FORM: &str =
+    "<hyperlink range=\"A1\" target=\"https://example.com\"/> or <hyperlink range=\"B2\" location=\"Sheet2!A1\"/>";
+const NOTE_FORM: &str = "<note range=\"B2\" author=\"…\" text=\"…\"/>";
 const CHART_FORM: &str = "<chart type=\"bar\" data=\"Table[Column],Table[Column]\" title=\"…\"/>";
 const KEEP_FORM: &str = "<keep id=\"…\" kind=\"…\" summary=\"…\"/>";
 
@@ -368,6 +407,36 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
             i += 1;
             continue;
         }
+        if t.starts_with("<hyperlink") {
+            let prev: Vec<String> = sheet
+                .items
+                .iter()
+                .filter_map(|it| match it {
+                    SheetItem::Hyperlink(h) => Some(h.range.clone()),
+                    _ => None,
+                })
+                .collect();
+            if let Some(h) = hyperlink_tag(&mut p, i, &prev) {
+                sheet.items.push(SheetItem::Hyperlink(h));
+            }
+            i += 1;
+            continue;
+        }
+        if t.starts_with("<note") {
+            let prev: Vec<String> = sheet
+                .items
+                .iter()
+                .filter_map(|it| match it {
+                    SheetItem::Note(n) => Some(n.range.clone()),
+                    _ => None,
+                })
+                .collect();
+            if let Some(n) = note_tag(&mut p, i, &prev) {
+                sheet.items.push(SheetItem::Note(n));
+            }
+            i += 1;
+            continue;
+        }
         if t.starts_with("<chart") {
             if let Some(c) = chart_tag(&mut p, i) {
                 sheet.items.push(SheetItem::Chart(c));
@@ -388,7 +457,7 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
         } else if t.starts_with('|') {
             p.err(i, col, format!("a pipe table here belongs inside a table block: {TABLE_FORM}. Cell data is written by range operations."));
         } else {
-            p.err(i, col, format!("a sheet holds only table blocks ({TABLE_FORM}), merge lines ({MERGE_FORM}), chart lines ({CHART_FORM}), placeholders ({KEEP_FORM}) and the format lines of its cells."));
+            p.err(i, col, format!("a sheet holds only table blocks ({TABLE_FORM}), merge lines ({MERGE_FORM}), hyperlink lines ({HYPERLINK_FORM}), note lines ({NOTE_FORM}), chart lines ({CHART_FORM}), placeholders ({KEEP_FORM}) and the format lines of its cells."));
         }
         i += 1;
     }
@@ -774,6 +843,137 @@ fn merge_tag(p: &mut Parser<'_>, i: usize, prev: &[String]) -> Option<MergeDecl>
     Some(MergeDecl { range })
 }
 
+fn hyperlink_tag(p: &mut Parser<'_>, i: usize, prev: &[String]) -> Option<HyperlinkDecl> {
+    let attrs = tag_attrs(
+        p,
+        i,
+        "hyperlink",
+        HYPERLINK_FORM,
+        &["range", "target", "location", "display", "tooltip"],
+    )?;
+    let Some(raw) = get(&attrs, "range") else {
+        p.err(i, 1, format!("<hyperlink> has a range: {HYPERLINK_FORM}."));
+        return None;
+    };
+    if prev.len() >= MAX_HYPERLINK_LINES {
+        p.err(
+            i,
+            1,
+            format!(
+                "this sheet already has {MAX_HYPERLINK_LINES} hyperlinks; at most {MAX_HYPERLINK_LINES} are written as {HYPERLINK_FORM} lines (a sheet with more keeps them as a placeholder)."
+            ),
+        );
+        return None;
+    }
+    let range = match parse_sheet_range(raw) {
+        Ok(r) => r,
+        Err(m) => {
+            p.err(i, 1, m);
+            return None;
+        }
+    };
+    let target = get(&attrs, "target").map(str::to_string);
+    let location = get(&attrs, "location").map(str::to_string);
+    if target.as_ref().is_some_and(|s| s.is_empty()) {
+        p.err(
+            i,
+            1,
+            format!("target is empty; an external hyperlink is {HYPERLINK_FORM}."),
+        );
+        return None;
+    }
+    if location.as_ref().is_some_and(|s| s.is_empty()) {
+        p.err(
+            i,
+            1,
+            "location is empty; an internal hyperlink names a sheet cell or a defined name, such as Sheet2!A1.",
+        );
+        return None;
+    }
+    if target.is_none() && location.is_none() {
+        p.err(
+            i,
+            1,
+            format!("<hyperlink> has a target URL or a location: {HYPERLINK_FORM}."),
+        );
+        return None;
+    }
+    if overlap_error(p, i, &range, prev, "hyperlinks") {
+        return None;
+    }
+    Some(HyperlinkDecl {
+        range,
+        target,
+        location,
+        display: opt_attr(&attrs, "display"),
+        tooltip: opt_attr(&attrs, "tooltip"),
+    })
+}
+
+fn note_tag(p: &mut Parser<'_>, i: usize, prev: &[String]) -> Option<NoteDecl> {
+    let attrs = tag_attrs(p, i, "note", NOTE_FORM, &["range", "author", "text"])?;
+    let (Some(raw), Some(author), Some(text)) = (
+        get(&attrs, "range"),
+        get(&attrs, "author"),
+        get(&attrs, "text"),
+    ) else {
+        p.err(
+            i,
+            1,
+            format!("<note> has a range, an author and text: {NOTE_FORM}."),
+        );
+        return None;
+    };
+    if prev.len() >= MAX_NOTE_LINES {
+        p.err(
+            i,
+            1,
+            format!(
+                "this sheet already has {MAX_NOTE_LINES} notes; at most {MAX_NOTE_LINES} are written as {NOTE_FORM} lines (a sheet with more keeps them as a placeholder)."
+            ),
+        );
+        return None;
+    }
+    let range = match parse_sheet_range(raw) {
+        Ok(r) => r,
+        Err(m) => {
+            p.err(i, 1, m);
+            return None;
+        }
+    };
+    if overlap_error(p, i, &range, prev, "notes") {
+        return None;
+    }
+    Some(NoteDecl {
+        range,
+        author: author.to_string(),
+        text: text.to_string(),
+    })
+}
+
+fn opt_attr(attrs: &[(String, String)], k: &str) -> Option<String> {
+    get(attrs, k).map(str::to_string)
+}
+
+fn overlap_error(p: &mut Parser<'_>, i: usize, range: &str, prev: &[String], what: &str) -> bool {
+    let Some(rect) = range_rect(range) else {
+        return false;
+    };
+    for old in prev {
+        if let Some(o) = range_rect(old) {
+            if rect.overlaps(&o) {
+                p.err(
+                    i,
+                    1,
+                    format!("range=\"{range}\" overlaps {old}; {what} on a sheet do not overlap."),
+                );
+                return true;
+            }
+        }
+    }
+    false
+}
+
 /// Canonical A1 form of a merge (`B2:A1` → `A1:B2`). Two or more cells,
 /// inside Excel's grid.
 fn parse_merge_range(s: &str) -> Result<String, String> {
@@ -798,6 +998,38 @@ fn parse_merge_range(s: &str) -> Result<String, String> {
         col_letters(last_col),
         last_row
     ))
+}
+
+/// Canonical A1 form of a cell or range (`B2:A1` → `A1:B2`, `A1:A1` → `A1`).
+fn parse_sheet_range(s: &str) -> Result<String, String> {
+    let form = "an A1 cell or range such as A1 or A1:B2 (Excel's last cell is XFD1048576)";
+    match s.split_once(':') {
+        None => {
+            let Some(p) = parse_a1(s) else {
+                return Err(format!("range=\"{s}\" is not {form}."));
+            };
+            Ok(format!("{}{}", col_letters(p.0), p.1))
+        }
+        Some((a, b)) => {
+            let (Some(p), Some(q)) = (parse_a1(a), parse_a1(b)) else {
+                return Err(format!("range=\"{s}\" is not {form}."));
+            };
+            let first_col = p.0.min(q.0);
+            let last_col = p.0.max(q.0);
+            let first_row = p.1.min(q.1);
+            let last_row = p.1.max(q.1);
+            if first_col == last_col && first_row == last_row {
+                return Ok(format!("{}{}", col_letters(first_col), first_row));
+            }
+            Ok(format!(
+                "{}{}:{}{}",
+                col_letters(first_col),
+                first_row,
+                col_letters(last_col),
+                last_row
+            ))
+        }
+    }
 }
 
 fn parse_a1(s: &str) -> Option<(u32, u32)> {
@@ -856,14 +1088,31 @@ impl MergeRect {
 
 fn merge_rect(s: &str) -> Option<MergeRect> {
     let (a, b) = s.split_once(':')?;
-    let p = parse_a1(a)?;
-    let q = parse_a1(b)?;
-    Some(MergeRect {
-        c0: p.0.min(q.0),
-        r0: p.1.min(q.1),
-        c1: p.0.max(q.0),
-        r1: p.1.max(q.1),
-    })
+    range_rect(&format!("{a}:{b}")).filter(|r| r.c0 != r.c1 || r.r0 != r.r1)
+}
+
+fn range_rect(s: &str) -> Option<MergeRect> {
+    match s.split_once(':') {
+        Some((a, b)) => {
+            let p = parse_a1(a)?;
+            let q = parse_a1(b)?;
+            Some(MergeRect {
+                c0: p.0.min(q.0),
+                r0: p.1.min(q.1),
+                c1: p.0.max(q.0),
+                r1: p.1.max(q.1),
+            })
+        }
+        None => {
+            let p = parse_a1(s)?;
+            Some(MergeRect {
+                c0: p.0,
+                r0: p.1,
+                c1: p.0,
+                r1: p.1,
+            })
+        }
+    }
 }
 
 fn chart_tag(p: &mut Parser<'_>, i: usize) -> Option<ChartDecl> {
@@ -1023,6 +1272,28 @@ pub fn serialize_spreadsheet(s: &Spreadsheet) -> String {
                         }
                     }
                 }
+                SheetItem::Hyperlink(_) => {
+                    while i < sh.items.len() {
+                        match &sh.items[i] {
+                            SheetItem::Hyperlink(h) => {
+                                out.push(hyperlink_line(h));
+                                i += 1;
+                            }
+                            _ => break,
+                        }
+                    }
+                }
+                SheetItem::Note(_) => {
+                    while i < sh.items.len() {
+                        match &sh.items[i] {
+                            SheetItem::Note(n) => {
+                                out.push(note_line(n));
+                                i += 1;
+                            }
+                            _ => break,
+                        }
+                    }
+                }
                 SheetItem::Table(t) => {
                     out.extend(table_lines(t));
                     i += 1;
@@ -1093,6 +1364,37 @@ pub fn chart_line(c: &ChartDecl) -> String {
 
 pub fn merge_line(m: &MergeDecl) -> String {
     format!("<merge range=\"{}\"/>", attr(&m.range))
+}
+
+pub fn hyperlink_line(h: &HyperlinkDecl) -> String {
+    let mut s = format!("<hyperlink range=\"{}\"", attr(&h.range));
+    if let Some(t) = &h.target {
+        s.push_str(&format!(" target=\"{}\"", attr(t)));
+    }
+    if let Some(l) = &h.location {
+        s.push_str(&format!(" location=\"{}\"", attr(l)));
+    }
+    if let Some(d) = &h.display {
+        s.push_str(&format!(" display=\"{}\"", attr(d)));
+    }
+    if let Some(t) = &h.tooltip {
+        s.push_str(&format!(" tooltip=\"{}\"", attr(t)));
+    }
+    s + "/>"
+}
+
+pub fn note_line(n: &NoteDecl) -> String {
+    format!(
+        "<note range=\"{}\" author=\"{}\" text=\"{}\"/>",
+        attr(&n.range),
+        attr(&n.author),
+        attr_text(&n.text)
+    )
+}
+
+/// An attribute that may hold newlines (`&#10;`, `&#13;`).
+fn attr_text(s: &str) -> String {
+    attr(s).replace('\n', "&#10;").replace('\r', "&#13;")
 }
 
 /// What a row window shows: a table's rows, or a range of a sheet.
@@ -1308,5 +1610,95 @@ mod tests {
         assert!(e[0].contains("XFE1:XFE2"), "{e:?}");
         let e = errs(&TEXT.replace("G1:H1", "not-a-range"));
         assert!(e[0].contains("not-a-range"), "{e:?}");
+    }
+
+    #[test]
+    fn hyperlink_and_note_lines_round_trip() {
+        let with = TEXT.replace(
+            "<merge range=\"G1:H1\"/>",
+            "<merge range=\"G1:H1\"/>\n\n<hyperlink range=\"H4\" target=\"https://example.com/sales\"/>\n<hyperlink range=\"A3:A5\" target=\"http://www.apache.org/\" display=\"Apache\" tooltip=\"go\"/>\n\n<note range=\"B2\" author=\"John\" text=\"Some text\"/>\n<note range=\"C5\" author=\"Nick Burch\" text=\"Nick Burch:&#10;This is a comment\"/>",
+        );
+        let s = parse_spreadsheet(&with, &Names::default()).unwrap();
+        let links: Vec<_> = s.sheets[0]
+            .items
+            .iter()
+            .filter_map(|i| match i {
+                SheetItem::Hyperlink(h) => Some((
+                    h.range.as_str(),
+                    h.target.as_deref(),
+                    h.display.as_deref(),
+                    h.tooltip.as_deref(),
+                )),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            links,
+            [
+                ("H4", Some("https://example.com/sales"), None, None),
+                (
+                    "A3:A5",
+                    Some("http://www.apache.org/"),
+                    Some("Apache"),
+                    Some("go")
+                ),
+            ]
+        );
+        let notes: Vec<_> = s.sheets[0]
+            .items
+            .iter()
+            .filter_map(|i| match i {
+                SheetItem::Note(n) => Some((n.range.as_str(), n.author.as_str(), n.text.as_str())),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            notes,
+            [
+                ("B2", "John", "Some text"),
+                ("C5", "Nick Burch", "Nick Burch:\nThis is a comment"),
+            ]
+        );
+        let canon = serialize_spreadsheet(&s);
+        assert_eq!(canon, with);
+        assert_eq!(parse_spreadsheet(&canon, &Names::default()).unwrap(), s);
+        let loc = TEXT.replace(
+            "<merge range=\"G1:H1\"/>",
+            "<hyperlink range=\"B2\" location=\"Sheet2!A1\"/>",
+        );
+        let s = parse_spreadsheet(&loc, &Names::default()).unwrap();
+        let h = s.sheets[0]
+            .items
+            .iter()
+            .find_map(|i| match i {
+                SheetItem::Hyperlink(h) => Some(h),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(h.range, "B2");
+        assert_eq!(h.location.as_deref(), Some("Sheet2!A1"));
+        assert!(h.target.is_none());
+        assert_eq!(serialize_spreadsheet(&s), loc);
+    }
+
+    #[test]
+    fn hyperlink_and_note_errors() {
+        let e = errs(&TEXT.replace("<merge range=\"G1:H1\"/>", "<hyperlink range=\"A1\"/>"));
+        assert!(e[0].contains("target URL or a location"), "{e:?}");
+        let e = errs(&TEXT.replace(
+            "<merge range=\"G1:H1\"/>",
+            "<hyperlink range=\"A1\" target=\"http://a\"/>\n<hyperlink range=\"A1\" target=\"http://b\"/>",
+        ));
+        assert!(e[0].contains("overlaps A1"), "{e:?}");
+        let e = errs(&TEXT.replace(
+            "<merge range=\"G1:H1\"/>",
+            "<note range=\"B2\" author=\"John\"/>",
+        ));
+        assert!(e[0].contains("range, an author and text"), "{e:?}");
+        let e = errs(&TEXT.replace(
+            "<merge range=\"G1:H1\"/>",
+            "<note range=\"B2\" author=\"A\" text=\"one\"/>\n<note range=\"B2\" author=\"B\" text=\"two\"/>",
+        ));
+        assert!(e[0].contains("overlaps B2"), "{e:?}");
     }
 }

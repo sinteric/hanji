@@ -42,8 +42,8 @@ date.
 | docx   |    13 |      0 |         11 |   126 |
 | hwpx   |    16 |      0 |         10 |    24 |
 | pptx   |    27 |      0 |         16 |    40 |
-| xlsx   |    46 |      0 |         21 |    47 |
-| all    |   102 |      0 |         58 |   237 |
+| xlsx   |    46 |      0 |         16 |    33 |
+| all    |   102 |      0 |         53 |   223 |
 
 ## By kind, most first
 
@@ -58,8 +58,6 @@ date.
 | docx   | symbol             |     7 |     1 |
 | pptx   | field              |     7 |     1 |
 | pptx   | picture            |     7 |     6 |
-| xlsx   | hyperlinks         |     7 |     7 |
-| xlsx   | notes              |     7 |     7 |
 | xlsx   | picture            |     7 |     3 |
 | pptx   | diagram            |     6 |     3 |
 | docx   | content-control    |     5 |     2 |
@@ -148,12 +146,12 @@ date.
 | `crates/hanji-xlsx/corpus/DateFormatTests.xlsx`                      | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/ExcelPivotTableSample.xlsx`                | xlsx   |     2 | pivot-table 2 |
 | `crates/hanji-xlsx/corpus/ExcelTables.xlsx`                          | xlsx   |     0 | |
-| `crates/hanji-xlsx/corpus/ExcelWithAttachments.xlsm`                 | xlsx   |     6 | group 1, hyperlinks 1, notes 1, shape 3 |
+| `crates/hanji-xlsx/corpus/ExcelWithAttachments.xlsm`                 | xlsx   |     4 | group 1, shape 3 |
 | `crates/hanji-xlsx/corpus/GeneralFormatTests.xlsx`                   | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/InlineStrings.xlsx`                        | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/SampleSS.xlsx`                             | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/SimpleMacro.xlsm`                          | xlsx   |     0 | |
-| `crates/hanji-xlsx/corpus/SimpleWithComments.xlsx`                   | xlsx   |     1 | notes 1 |
+| `crates/hanji-xlsx/corpus/SimpleWithComments.xlsx`                   | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/StructuredReferences.xlsx`                 | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/Tables.xlsx`                               | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/WithChart.xlsx`                            | xlsx   |     1 | chart 1 |
@@ -161,28 +159,28 @@ date.
 | `crates/hanji-xlsx/corpus/WithDrawing.xlsx`                          | xlsx   |     6 | picture 5, shape 1 |
 | `crates/hanji-xlsx/corpus/WithTable.xlsx`                            | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/WithThreeCharts.xlsx`                      | xlsx   |     3 | chart 3 |
-| `crates/hanji-xlsx/corpus/WithVariousData.xlsx`                      | xlsx   |     2 | hyperlinks 1, notes 1 |
-| `crates/hanji-xlsx/corpus/korean-sales-lo.xlsx`                      | xlsx   |     5 | chart 1, conditional-format 1, data-validation 1, hyperlinks 1, notes 1 |
-| `crates/hanji-xlsx/corpus/korean-sales.xlsx`                         | xlsx   |     5 | chart 1, conditional-format 1, data-validation 1, hyperlinks 1, notes 1 |
+| `crates/hanji-xlsx/corpus/WithVariousData.xlsx`                      | xlsx   |     0 | |
+| `crates/hanji-xlsx/corpus/korean-sales-lo.xlsx`                      | xlsx   |     3 | chart 1, conditional-format 1, data-validation 1 |
+| `crates/hanji-xlsx/corpus/korean-sales.xlsx`                         | xlsx   |     3 | chart 1, conditional-format 1, data-validation 1 |
 | `crates/hanji-xlsx/corpus/link-external-workbook-b.xlsx`             | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_array_formula01.xlsx`                   | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_autofilter01.xlsx`                      | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_chart_bar01.xlsx`                       | xlsx   |     1 | chart 1 |
-| `crates/hanji-xlsx/corpus/rx_comment01.xlsx`                         | xlsx   |     1 | notes 1 |
+| `crates/hanji-xlsx/corpus/rx_comment01.xlsx`                         | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_cond_format01.xlsx`                     | xlsx   |     1 | conditional-format 1 |
 | `crates/hanji-xlsx/corpus/rx_data_validation01.xlsx`                 | xlsx   |     1 | data-validation 1 |
 | `crates/hanji-xlsx/corpus/rx_defined_name01.xlsx`                    | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_dynamic_array01.xlsx`                   | xlsx   |     0 | |
-| `crates/hanji-xlsx/corpus/rx_hyperlink01.xlsx`                       | xlsx   |     1 | hyperlinks 1 |
+| `crates/hanji-xlsx/corpus/rx_hyperlink01.xlsx`                       | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_image01.xlsx`                           | xlsx   |     1 | picture 1 |
 | `crates/hanji-xlsx/corpus/rx_macro01.xlsm`                           | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_merge_range01.xlsx`                     | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_rich_string01.xlsx`                     | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_table01.xlsx`                           | xlsx   |     0 | |
-| `crates/hanji-xlsx/corpus/rx_table05.xlsx`                           | xlsx   |     3 | hyperlinks 1, notes 1, picture 1 |
+| `crates/hanji-xlsx/corpus/rx_table05.xlsx`                           | xlsx   |     1 | picture 1 |
 | `crates/hanji-xlsx/corpus/rx_table14.xlsx`                           | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/shared_formulas.xlsx`                      | xlsx   |     0 | |
-| `crates/hanji-xlsx/corpus/sharedhyperlink.xlsx`                      | xlsx   |     1 | hyperlinks 1 |
+| `crates/hanji-xlsx/corpus/sharedhyperlink.xlsx`                      | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/simple-monthly-budget.xlsx`                | xlsx   |     3 | chart 1, conditional-format 1, shape 1 |
 | `crates/hanji-xlsx/corpus/table-sample.xlsx`                         | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/unicodeSheetName.xlsx`                     | xlsx   |     0 | |

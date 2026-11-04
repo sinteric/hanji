@@ -304,8 +304,13 @@ These are not supported yet:
   writes.
 - xlsx: cell styles beyond formats, new charts, renaming or deleting sheets,
   tables and columns, column insert and delete. Merged cells are
-  `<merge range="A1:B2"/>` lines except on a sheet with more than 1024 of
-  them, which stay a placeholder.
+  `<merge range="A1:B2"/>` lines, cell hyperlinks
+  `<hyperlink range="A1" target="https://example.com"/>` (optional
+  `location`, `display`, `tooltip`) and notes
+  `<note range="B2" author="John" text="Some text"/>` (a newline in the
+  text is `&#10;`), except on a sheet with more than 1024 of that kind,
+  overlapping ranges, a hyperlink whose relationship is not a unique
+  external Target, or a threaded comment, which stay a placeholder.
 - Native-application fidelity for all DOCX/HWPX features, and XLSX print
   layout and advanced visuals. DOCX/HWPX previews are experimental. XLSX
   previews are bounded read-only worksheet windows with explicit cached

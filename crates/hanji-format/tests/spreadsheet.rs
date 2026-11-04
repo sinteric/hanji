@@ -46,6 +46,8 @@ fn the_design_md_example_parses() {
                 )
             }
             SheetItem::Merge(m) => format!("merge {}", m.range),
+            SheetItem::Hyperlink(h) => format!("hyperlink {}", h.range),
+            SheetItem::Note(n) => format!("note {}", n.range),
             SheetItem::Chart(c) => format!("chart {}", c.ty),
             SheetItem::Keep(k) => format!("keep {}", k.kind),
             &_ => unreachable!(),
@@ -57,6 +59,8 @@ fn the_design_md_example_parses() {
             "table Sales date,number,number,number",
             "chart bar",
             "merge A1:G1",
+            "hyperlink H4",
+            "note A3",
             "keep data-validation"
         ]
     );

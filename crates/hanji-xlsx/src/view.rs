@@ -189,6 +189,22 @@ pub fn full_view(book: &mut Book, rows: u32) -> Result<String, String> {
                         }
                     }
                 }
+                hanji_format::sheet::SheetItem::Hyperlink(h) => {
+                    out.push(hanji_format::sheet::hyperlink_line(h));
+                    while let Some(hanji_format::sheet::SheetItem::Hyperlink(_)) = items.peek() {
+                        if let Some(hanji_format::sheet::SheetItem::Hyperlink(h)) = items.next() {
+                            out.push(hanji_format::sheet::hyperlink_line(h));
+                        }
+                    }
+                }
+                hanji_format::sheet::SheetItem::Note(n) => {
+                    out.push(hanji_format::sheet::note_line(n));
+                    while let Some(hanji_format::sheet::SheetItem::Note(_)) = items.peek() {
+                        if let Some(hanji_format::sheet::SheetItem::Note(n)) = items.next() {
+                            out.push(hanji_format::sheet::note_line(n));
+                        }
+                    }
+                }
                 hanji_format::sheet::SheetItem::Keep(k) => out.push(format!(
                     "<keep id=\"{}\" kind=\"{}\" summary=\"{}\"/>",
                     k.id,
