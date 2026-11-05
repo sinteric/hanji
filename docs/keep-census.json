@@ -33,8 +33,8 @@
   "total": {
     "files": 102,
     "failed": 0,
-    "with_keeps": 53,
-    "keeps": 223
+    "with_keeps": 52,
+    "keeps": 215
   },
   "formats": [
     {
@@ -42,14 +42,14 @@
       "files": 13,
       "failed": 0,
       "with_keeps": 11,
-      "keeps": 126
+      "keeps": 119
     },
     {
       "format": "hwpx",
       "files": 16,
       "failed": 0,
-      "with_keeps": 10,
-      "keeps": 24
+      "with_keeps": 9,
+      "keeps": 23
     },
     {
       "format": "pptx",
@@ -102,12 +102,6 @@
       "kind": "chart",
       "keeps": 8,
       "files": 6
-    },
-    {
-      "format": "docx",
-      "kind": "symbol",
-      "keeps": 7,
-      "files": 1
     },
     {
       "format": "pptx",
@@ -224,12 +218,6 @@
       "files": 1
     },
     {
-      "format": "hwpx",
-      "kind": "number",
-      "keeps": 1,
-      "files": 1
-    },
-    {
       "format": "xlsx",
       "kind": "group",
       "keeps": 1,
@@ -288,11 +276,10 @@
     {
       "path": "prototype/remainder/corpus/form_footnotes.docx",
       "format": "docx",
-      "keeps": 81,
+      "keeps": 74,
       "kinds": {
         "drawing": 5,
-        "field": 69,
-        "symbol": 7
+        "field": 69
       }
     },
     {
@@ -367,10 +354,8 @@
     {
       "path": "crates/hanji-hwpx/corpus/eq-002.hwpx",
       "format": "hwpx",
-      "keeps": 1,
-      "kinds": {
-        "number": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-hwpx/corpus/fdi-2025q2.hwpx",

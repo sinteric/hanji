@@ -18,6 +18,7 @@ pub mod ooxml;
 pub mod revision;
 pub mod safety;
 pub mod styles;
+pub mod symbol;
 pub mod track;
 
 pub use hanji_package::{package, xml};

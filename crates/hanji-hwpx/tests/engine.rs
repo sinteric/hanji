@@ -1735,3 +1735,101 @@ fn a_picture_stays_a_placeholder() {
     let imp = import(&pkg);
     assert!(imp.text.contains("kind=\"drawing\""), "{}", imp.text);
 }
+
+fn auto_num(num: &str, prefix: &str, suffix: &str) -> String {
+    format!(
+        r#"<hp:ctrl><hp:autoNum num="{num}" numType="ENDNOTE"><hp:autoNumFormat type="DIGIT" userChar="" prefixChar="{prefix}" suffixChar="{suffix}" supscript="0"/></hp:autoNum></hp:ctrl>"#
+    )
+}
+
+#[test]
+fn a_digit_auto_num_shows_as_ordinary_text() {
+    let pkg = hwpx(&[p_with(&format!(
+        "{}<hp:t> ②</hp:t>",
+        auto_num("11", "문", "）")
+    ))]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("문11） ②"), "{}", imp.text);
+    assert!(!imp.text.contains("kind=\"number\""), "{}", imp.text);
+}
+
+#[test]
+fn unedited_auto_num_keeps_the_section() {
+    let pkg = hwpx(&[p_with(&format!(
+        "{}<hp:t> ②</hp:t>",
+        auto_num("11", "문", "）")
+    ))]);
+    let imp = import(&pkg);
+    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg));
+}
+
+#[test]
+fn editing_an_auto_num_updates_the_stored_number() {
+    let pkg = hwpx(&[p_with(&format!(
+        "{}<hp:t> ②</hp:t>",
+        auto_num("11", "문", "）")
+    ))]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "문11）", "문12）", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = export(&r.text, &r.remainder);
+    let sec = section(&out);
+    assert!(sec.contains(r#"num="12""#), "{sec}");
+    assert!(sec.contains(r#"prefixChar="문""#), "{sec}");
+    assert!(sec.contains("<hp:autoNum"), "{sec}");
+    let back = import(&out);
+    assert!(back.text.contains("문12） ②"), "{}", back.text);
+}
+
+#[test]
+fn editing_an_auto_num_to_other_text_writes_ordinary_t() {
+    let pkg = hwpx(&[p_with(&format!(
+        "{}<hp:t> ②</hp:t>",
+        auto_num("11", "문", "）")
+    ))]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "문11）", "hello", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(!sec.contains("<hp:autoNum"), "{sec}");
+    assert!(sec.contains("<hp:t>hello"), "{sec}");
+    let back = import(&export(&r.text, &r.remainder));
+    assert!(back.text.contains("hello ②"), "{}", back.text);
+}
+
+#[test]
+fn deleting_an_auto_num_removes_the_control() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>앞 </hp:t>{}<hp:t> 뒤</hp:t>",
+        auto_num("11", "문", "）")
+    ))]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "앞 문11） 뒤", "앞  뒤", CAPS).unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.2.contains("all of its text")),
+        "{:?}",
+        r.report
+    );
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(!sec.contains("<hp:autoNum"), "{sec}");
+}
+
+#[test]
+fn a_circled_auto_num_stays_a_placeholder() {
+    let inner = r#"<hp:ctrl><hp:autoNum num="1" numType="ENDNOTE"><hp:autoNumFormat type="CIRCLED_DIGIT" userChar="" prefixChar="" suffixChar="" supscript="0"/></hp:autoNum></hp:ctrl>"#;
+    let pkg = hwpx(&[p_with(inner)]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("kind=\"number\""), "{}", imp.text);
+    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg));
+}

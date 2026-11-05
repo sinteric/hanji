@@ -684,6 +684,11 @@ impl<'a> Exporter<'a> {
             .into_iter()
             .filter(|e| keep_kind(&e.meta.tag) == "drawing")
             .collect();
+        let autonums: Vec<&Entry> = self
+            .at(path, Kind::Wrap)
+            .into_iter()
+            .filter(|e| e.meta.tag == "hp:autoNum")
+            .collect();
         let notes: HashMap<usize, &Entry> = self
             .at(path, Kind::Wrap)
             .into_iter()
@@ -831,6 +836,7 @@ impl<'a> Exporter<'a> {
                         &eqs,
                         &notes,
                         &drawings,
+                        &autonums,
                     )?;
                     out.push(node(r));
                 }
@@ -842,7 +848,7 @@ impl<'a> Exporter<'a> {
                         .map_or_else(|| empty_run(style.char_pr), |x| fragment(x));
                     r.children.clear();
                     self.fill_run(
-                        &mut r, p, s, s, ms, None, &mut tabs, &eqs, &notes, &drawings,
+                        &mut r, p, s, s, ms, None, &mut tabs, &eqs, &notes, &drawings, &autonums,
                     )?;
                     out.push(node(r));
                 }
@@ -875,7 +881,9 @@ impl<'a> Exporter<'a> {
                     unit_cp[a..b].fill(cp);
                     self.set_char_pr(&mut r, cp, old_style, style);
                     let ms = at.get(&Target::Seg(si)).unwrap_or(&none);
-                    self.fill_run(&mut r, p, a, b, ms, own, &mut tabs, &eqs, &notes, &drawings)?;
+                    self.fill_run(
+                        &mut r, p, a, b, ms, own, &mut tabs, &eqs, &notes, &drawings, &autonums,
+                    )?;
                     out.push(node(r));
                 }
             }
@@ -916,6 +924,7 @@ impl<'a> Exporter<'a> {
         eqs: &HashMap<usize, &Entry>,
         notes: &HashMap<usize, &Entry>,
         drawings: &[&Entry],
+        autonums: &[&Entry],
     ) -> Result<(), String> {
         let mut by_pos: BTreeMap<usize, Vec<&Entry>> = BTreeMap::new();
         for m in zw {
@@ -969,6 +978,47 @@ impl<'a> Exporter<'a> {
                         .collect();
                     r.children
                         .push(node(fragment(&owpml::with_draw_text(&w.xml[0], &body))));
+                }
+                continue;
+            }
+            if let Some(w) = autonums
+                .iter()
+                .copied()
+                .find(|e| e.start.is_some_and(|s| s <= c) && e.end.is_some_and(|en| c < en))
+            {
+                if Some(c) == w.start {
+                    let body: String = p.units[w.start.unwrap()..w.end.unwrap().min(p.units.len())]
+                        .iter()
+                        .filter_map(|u| match &u.atom {
+                            Atom::Char(ch) => Some(*ch),
+                            _ => None,
+                        })
+                        .collect();
+                    match owpml::with_auto_num(&w.xml[0], &body) {
+                        Some(xml) => {
+                            close(&mut t, r);
+                            r.children.push(node(fragment(&xml)));
+                        }
+                        None => {
+                            open(&mut t);
+                            let x = t.as_mut().unwrap();
+                            for ch in body.chars() {
+                                match char_element(ch) {
+                                    Some(name) => {
+                                        x.children.push(node(Element::new(name)));
+                                    }
+                                    None => match x.children.last_mut() {
+                                        Some(Node::Text(s)) => {
+                                            s.push_str(&escape_text(&ch.to_string()))
+                                        }
+                                        _ => x
+                                            .children
+                                            .push(Node::Text(escape_text(&ch.to_string()))),
+                                    },
+                                }
+                            }
+                        }
+                    }
                 }
                 continue;
             }

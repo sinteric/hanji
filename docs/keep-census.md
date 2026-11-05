@@ -39,11 +39,11 @@ date.
 
 | format | files | failed | with keeps | keeps |
 | ------ | ----: | -----: | ---------: | ----: |
-| docx   |    13 |      0 |         11 |   126 |
-| hwpx   |    16 |      0 |         10 |    24 |
+| docx   |    13 |      0 |         11 |   119 |
+| hwpx   |    16 |      0 |          9 |    23 |
 | pptx   |    27 |      0 |         16 |    40 |
 | xlsx   |    46 |      0 |         16 |    33 |
-| all    |   102 |      0 |         53 |   223 |
+| all    |   102 |      0 |         52 |   215 |
 
 ## By kind, most first
 
@@ -55,7 +55,6 @@ date.
 | hwpx   | drawing            |    10 |     7 |
 | docx   | object             |     8 |     2 |
 | xlsx   | chart              |     8 |     6 |
-| docx   | symbol             |     7 |     1 |
 | pptx   | field              |     7 |     1 |
 | pptx   | picture            |     7 |     6 |
 | xlsx   | picture            |     7 |     3 |
@@ -75,7 +74,6 @@ date.
 | xlsx   | pivot-table        |     2 |     1 |
 | docx   | endnote            |     1 |     1 |
 | docx   | footnote           |     1 |     1 |
-| hwpx   | number             |     1 |     1 |
 | xlsx   | group              |     1 |     1 |
 | xlsx   | merged-cells       |     1 |     1 |
 
@@ -88,7 +86,7 @@ date.
 | `prototype/remainder/corpus/delins.docx`                             | docx   |     0 | |
 | `prototype/remainder/corpus/docx4j-tables.docx`                      | docx   |     3 | drawing 1, table 2 |
 | `prototype/remainder/corpus/fdo76098.docx`                           | docx   |     2 | drawing 2 |
-| `prototype/remainder/corpus/form_footnotes.docx`                     | docx   |    81 | drawing 5, field 69, symbol 7 |
+| `prototype/remainder/corpus/form_footnotes.docx`                     | docx   |    74 | drawing 5, field 69 |
 | `prototype/remainder/corpus/korean-report.docx`                      | docx   |     1 | drawing 1 |
 | `prototype/remainder/corpus/loadAndSave.docx`                        | docx   |     3 | drawing 2, math 1 |
 | `prototype/remainder/corpus/sample-docx.docx`                        | docx   |     3 | drawing 3 |
@@ -97,7 +95,7 @@ date.
 | `prototype/remainder/corpus/testWORD_2006ml.docx`                    | docx   |    16 | content-control 4, drawing 3, field 2, math 1, object 3, table 1, tracked-move 2 |
 | `prototype/remainder/corpus/testWORD_various.docx`                   | docx   |     0 | |
 | `crates/hanji-hwpx/corpus/basic-table-01.hwpx`                       | hwpx   |     0 | |
-| `crates/hanji-hwpx/corpus/eq-002.hwpx`                               | hwpx   |     1 | number 1 |
+| `crates/hanji-hwpx/corpus/eq-002.hwpx`                               | hwpx   |     0 | |
 | `crates/hanji-hwpx/corpus/fdi-2025q2.hwpx`                           | hwpx   |     1 | drawing 1 |
 | `crates/hanji-hwpx/corpus/field-multipara-clickhere.hwpx`            | hwpx   |     3 | drawing 2, table 1 |
 | `crates/hanji-hwpx/corpus/footnote-01.hwpx`                          | hwpx   |     0 | |

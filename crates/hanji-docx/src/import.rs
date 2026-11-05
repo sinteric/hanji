@@ -1008,6 +1008,42 @@ impl<'a> Importer<'a> {
         Ok(())
     }
 
+    /// A `w:sym` whose stored code the model shows: a length-1 wrap over
+    /// that character, holding the original element (DESIGN.md §5.1). Font
+    /// and hex stay in the wrap.
+    fn sym(
+        &mut self,
+        el: &Element,
+        path: &[usize],
+        run: Option<u64>,
+        marks: Marks,
+    ) -> Result<(), String> {
+        let ch = crate::symbol::shown(el)
+            .ok_or_else(|| "a symbol has no shown character".to_string())?;
+        let f = self.fp(&[Some(el)]);
+        let at = self.pos();
+        let idx = self.entry(
+            Kind::Wrap,
+            vec![self.frag(el)],
+            f,
+            path,
+            Some(at),
+            None,
+            Meta {
+                run,
+                tag: "w:sym".into(),
+                ..Default::default()
+            },
+        );
+        self.push(Atom::Char(ch), marks);
+        let end = self.pos();
+        let close = self.seq();
+        let w = &mut self.entries[idx];
+        w.end = Some(end);
+        w.meta.seq_close = close;
+        Ok(())
+    }
+
     /// A drawing whose text box the model shows: a wrap over the inner
     /// characters, holding the original object (DESIGN.md §5.1). Geometry,
     /// anchoring and styling stay in the wrap.
@@ -1360,6 +1396,9 @@ impl<'a> Importer<'a> {
                 }
                 _ if crate::drawing::shown(c).is_some() => {
                     self.txbx(c, path, Some(run_id), marks)?;
+                }
+                _ if crate::symbol::shown(c).is_some() => {
+                    self.sym(c, path, Some(run_id), marks)?;
                 }
                 _ => {
                     let pos = self.pos();
