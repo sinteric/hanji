@@ -3862,3 +3862,125 @@ fn a_picture_drawing_stays_a_placeholder() {
         .unwrap();
     assert!(imp.text.contains("kind=\"drawing\""), "{}", imp.text);
 }
+
+fn sym_docx(inner: &str) -> Vec<u8> {
+    docx(
+        &format!("<w:p><w:r><w:t xml:space=\"preserve\">before </w:t></w:r><w:r>{inner}</w:r><w:r><w:t xml:space=\"preserve\"> after</w:t></w:r></w:p>"),
+        vec![],
+    )
+}
+
+#[test]
+fn a_symbol_shows_as_its_stored_character() {
+    let imp = DocxEngine
+        .import(
+            &sym_docx(r#"<w:sym w:font="Symbol" w:char="F094"/>"#),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    assert!(imp.text.contains("before \u{F094} after"), "{}", imp.text);
+    assert!(!imp.text.contains("kind=\"symbol\""), "{}", imp.text);
+}
+
+#[test]
+fn unedited_symbol_keeps_document_xml() {
+    use hanji_package::xml;
+    let source = sym_docx(r#"<w:sym w:font="Symbol" w:char="F094"/>"#);
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    let before = package::read(&source).unwrap();
+    let after = package::read(&out).unwrap();
+    assert_eq!(
+        xml::canon_part(package::get(&before, "word/document.xml").unwrap()).unwrap(),
+        xml::canon_part(package::get(&after, "word/document.xml").unwrap()).unwrap()
+    );
+}
+
+#[test]
+fn editing_a_symbol_writes_ordinary_text_and_drops_w_sym() {
+    let imp = DocxEngine
+        .import(
+            &sym_docx(r#"<w:sym w:font="Symbol" w:char="F094"/>"#),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    let r = edit(&imp.remainder, &imp.text, "\u{F094}", "X", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains(">X</w:t>"), "{xml}");
+    assert!(!xml.contains("w:sym"), "{xml}");
+}
+
+#[test]
+fn deleting_a_symbol_removes_the_element() {
+    let imp = DocxEngine
+        .import(
+            &sym_docx(r#"<w:sym w:font="Symbol" w:char="F094"/>"#),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "before \u{F094} after",
+        "before  after",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.1 == Kind::Wrap && x.2.contains("all of its text")),
+        "{:?}",
+        r.report
+    );
+    let xml = doc_xml(&DocxEngine.export(&r.text, &r.remainder).unwrap());
+    assert!(!xml.contains("w:sym"), "{xml}");
+    assert!(xml.contains("before") && xml.contains("after"), "{xml}");
+}
+
+#[test]
+fn a_symbol_sharing_its_run_with_text_keeps_one_run() {
+    use hanji_package::xml;
+    let source = docx(
+        "<w:p><w:r><w:t>before</w:t><w:sym w:font=\"Symbol\" w:char=\"F094\"/><w:t>after</w:t></w:r></w:p>",
+        vec![],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("before\u{F094}after"), "{}", imp.text);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    let before = package::read(&source).unwrap();
+    let after = package::read(&out).unwrap();
+    assert_eq!(
+        xml::canon_part(package::get(&before, "word/document.xml").unwrap()).unwrap(),
+        xml::canon_part(package::get(&after, "word/document.xml").unwrap()).unwrap()
+    );
+}
+
+#[test]
+fn a_symbol_whose_char_is_a_tab_stays_a_placeholder() {
+    let imp = DocxEngine
+        .import(
+            &sym_docx(r#"<w:sym w:font="Symbol" w:char="0009"/>"#),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    assert!(imp.text.contains("kind=\"symbol\""), "{}", imp.text);
+}

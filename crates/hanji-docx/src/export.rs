@@ -495,6 +495,11 @@ impl<'a> Exporter<'a> {
             .copied()
             .filter(|e| is_drawing(e) && e.meta.run.is_some())
             .collect();
+        let symbols: Vec<&Entry> = wraps
+            .iter()
+            .copied()
+            .filter(|e| is_symbol(e) && e.meta.run.is_some())
+            .collect();
         for w in &wraps {
             if is_comment(w) || is_revision(w) || is_note(w) {
                 pkeep.insert(w.start.unwrap(), w);
@@ -511,7 +516,7 @@ impl<'a> Exporter<'a> {
             markers.iter().map(|m| m.start.unwrap()).collect();
         bounds.extend(zruns.iter().map(|z| z.start.unwrap()));
         for w in &wraps {
-            if is_drawing(w) {
+            if is_drawing(w) || is_symbol(w) {
                 continue;
             }
             bounds.insert(w.start.unwrap());
@@ -639,7 +644,7 @@ impl<'a> Exporter<'a> {
         }
         let mut items: Vec<(usize, u8, u64, It)> = vec![];
         for w in &wraps {
-            if is_comment(w) || is_revision(w) || is_note(w) || is_drawing(w) {
+            if is_comment(w) || is_revision(w) || is_note(w) || is_drawing(w) || is_symbol(w) {
                 continue;
             }
             items.push((w.start.unwrap(), 0, w.seq, It::Open(w)));
@@ -765,6 +770,7 @@ impl<'a> Exporter<'a> {
                             .map(Vec::as_slice)
                             .unwrap_or(&[]),
                         &drawings,
+                        &symbols,
                     )?;
                     if let Some(f) = &self.fmt {
                         let (a, _, own) = segs[si];
@@ -800,6 +806,7 @@ impl<'a> Exporter<'a> {
         seg: (usize, usize, Option<&Entry>),
         rmarkers: &[&Entry],
         drawings: &[&Entry],
+        symbols: &[&Entry],
     ) -> Result<Element, String> {
         let (a, b, own) = seg;
         let (mut r, mut rpr, t_attrs): (Element, Option<Element>, Vec<Element>) = match own {
@@ -853,6 +860,23 @@ impl<'a> Exporter<'a> {
                     flush(&mut buf, &mut r, &mut tcount);
                     let x = crate::drawing::with_body(&w.xml[0], &drawing_body(p, w));
                     r.children.push(node(fragment(&x)));
+                }
+                continue;
+            }
+            if let Some(w) = symbols
+                .iter()
+                .copied()
+                .find(|e| e.start.is_some_and(|s| s <= c) && e.end.is_some_and(|en| c < en))
+            {
+                if Some(c) == w.start {
+                    let body = drawing_body(p, w);
+                    match crate::symbol::with_body(&w.xml[0], &body) {
+                        Some(x) => {
+                            flush(&mut buf, &mut r, &mut tcount);
+                            r.children.push(node(fragment(&x)));
+                        }
+                        None => buf.push_str(&body),
+                    }
                 }
                 continue;
             }

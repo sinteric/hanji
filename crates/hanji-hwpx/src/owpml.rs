@@ -447,6 +447,114 @@ pub fn ctrl_kind(ctrl: &Element) -> Option<&Element> {
     ctrl.elements().next()
 }
 
+/// An `hp:ctrl` (or bare `hp:autoNum`) whose formatted number the text can
+/// show: `prefix + num + suffix` when the format is `DIGIT`. Other formats
+/// (circled digits, Hangul, Roman) stay placeholders.
+pub fn shown_auto_num(el: &Element) -> Option<String> {
+    let auto = auto_num_el(el)?;
+    let num = auto.get("num")?;
+    if num.is_empty() || num.contains('\n') || num.contains('\r') {
+        return None;
+    }
+    let (prefix, suffix, ty) = auto_num_format(auto);
+    if ty != "DIGIT" {
+        return None;
+    }
+    Some(format!("{prefix}{num}{suffix}"))
+}
+
+/// `xml` of a stored auto-number when `body` is still that formatted number,
+/// or when it still parses as prefix + digits + suffix (the `num` is
+/// updated). Any other body is ordinary text (the caller writes `hp:t`).
+pub fn with_auto_num(xml: &str, body: &str) -> Option<String> {
+    let mut e = hanji_package::xml::fragment(xml);
+    let shown = shown_auto_num(&e)?;
+    if shown == body {
+        return Some(xml.to_string());
+    }
+    let (prefix, suffix, ty) = auto_num_format(auto_num_el(&e)?);
+    if ty != "DIGIT" {
+        return None;
+    }
+    let inner = body.strip_prefix(&prefix)?.strip_suffix(&suffix)?;
+    if inner.is_empty() || !inner.chars().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    auto_num_el_mut(&mut e)?.set("num", inner);
+    Some(e.to_xml())
+}
+
+/// A copy whose `num` is empty, so the wrap's fingerprint is the format,
+/// not the shown digits.
+pub fn fingerprint_auto_num(el: &Element) -> Element {
+    let mut x = el.clone();
+    x.walk_mut(&mut |e| {
+        if e.is("hp:autoNum") {
+            e.remove_attr("num");
+        }
+    });
+    x
+}
+
+fn auto_num_el(el: &Element) -> Option<&Element> {
+    if el.is("hp:autoNum") {
+        return Some(el);
+    }
+    if !el.is("hp:ctrl") {
+        return None;
+    }
+    let mut auto = None;
+    for c in el.elements() {
+        if c.is("hp:autoNum") {
+            if auto.is_some() {
+                return None;
+            }
+            auto = Some(c);
+        } else {
+            return None;
+        }
+    }
+    auto
+}
+
+fn auto_num_el_mut(el: &mut Element) -> Option<&mut Element> {
+    if el.is("hp:autoNum") {
+        return Some(el);
+    }
+    if !el.is("hp:ctrl") {
+        return None;
+    }
+    let mut found = None;
+    for (i, n) in el.children.iter().enumerate() {
+        let Node::El(c) = n else { continue };
+        if c.is("hp:autoNum") {
+            if found.is_some() {
+                return None;
+            }
+            found = Some(i);
+        } else {
+            return None;
+        }
+    }
+    match found {
+        Some(i) => match &mut el.children[i] {
+            Node::El(c) => Some(c),
+            _ => None,
+        },
+        None => None,
+    }
+}
+
+fn auto_num_format(auto: &Element) -> (String, String, String) {
+    let fmt = auto.child("hp:autoNumFormat");
+    let ty = fmt
+        .and_then(|f| f.get("type"))
+        .unwrap_or_else(|| "DIGIT".into());
+    let prefix = fmt.and_then(|f| f.get("prefixChar")).unwrap_or_default();
+    let suffix = fmt.and_then(|f| f.get("suffixChar")).unwrap_or_default();
+    (prefix, suffix, ty)
+}
+
 /// A child's qualified name, `#text` for character data.
 pub fn node_name(n: &Node) -> &str {
     match n {
@@ -619,5 +727,45 @@ mod tests {
         let out = with_draw_text(&xml, "고침");
         assert_eq!(shown_draw_text(&fragment(&out)).as_deref(), Some("고침"));
         assert!(!out.contains("글상자"), "{out}");
+    }
+
+    fn auto_num_xml(num: &str, prefix: &str, suffix: &str, ty: &str) -> String {
+        format!(
+            r#"<hp:ctrl><hp:autoNum num="{num}" numType="ENDNOTE"><hp:autoNumFormat type="{ty}" userChar="" prefixChar="{prefix}" suffixChar="{suffix}" supscript="0"/></hp:autoNum></hp:ctrl>"#
+        )
+    }
+
+    #[test]
+    fn a_digit_auto_num_is_shown() {
+        let e = fragment(&auto_num_xml("11", "문", "）", "DIGIT"));
+        assert_eq!(shown_auto_num(&e).as_deref(), Some("문11）"));
+    }
+
+    #[test]
+    fn a_circled_auto_num_stays_unshown() {
+        let e = fragment(&auto_num_xml("1", "", "", "CIRCLED_DIGIT"));
+        assert!(shown_auto_num(&e).is_none());
+    }
+
+    #[test]
+    fn with_auto_num_keeps_the_fragment_when_unchanged() {
+        let xml = auto_num_xml("11", "문", "）", "DIGIT");
+        assert_eq!(with_auto_num(&xml, "문11）").as_deref(), Some(xml.as_str()));
+    }
+
+    #[test]
+    fn with_auto_num_updates_the_number() {
+        let xml = auto_num_xml("11", "문", "）", "DIGIT");
+        let out = with_auto_num(&xml, "문12）").expect("parses");
+        assert_eq!(shown_auto_num(&fragment(&out)).as_deref(), Some("문12）"));
+        assert!(out.contains(r#"num="12""#), "{out}");
+        assert!(out.contains(r#"prefixChar="문""#), "{out}");
+    }
+
+    #[test]
+    fn with_auto_num_is_none_when_the_text_is_not_that_format() {
+        let xml = auto_num_xml("11", "문", "）", "DIGIT");
+        assert!(with_auto_num(&xml, "hello").is_none());
+        assert!(with_auto_num(&xml, "11").is_none());
     }
 }

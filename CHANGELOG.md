@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Show a DOCX symbol (`w:sym`) as the character Word stored (`w:char`
+  hex → that Unicode scalar) instead of a `<keep kind="symbol"/>`
+  placeholder. Font and the original element stay as a `Wrap`. Untouched
+  content writes the original `w:sym`. Editing the character to something
+  else writes ordinary `w:t` and drops the symbol; deleting it removes
+  the element and is reported. A missing or unreadable `w:char` (not hex,
+  a C0 control) stays a placeholder. The seven corpus symbols are
+  Symbol `F094` (no Adobe Symbol mapping for 0x94): the text shows
+  U+F094, not a guessed lookalike. An HWPX `DIGIT` auto-number
+  (`hp:autoNum`) shows as `prefix + num + suffix` the same way. Editing
+  digits that still match the format updates `num` and keeps the control;
+  other text becomes ordinary `hp:t`; deleting it removes the control.
+  Circled, Hangul and Roman formats stay placeholders. HWPX `hp:compose`
+  (two private-use characters overlapped) stays `<keep kind="text"/>`:
+  showing them as sequential text would be two characters for one glyph.
+  Corpus keeps: 223 → 215 (docx `symbol` 7 → 0, hwpx `number` 1 → 0;
+  hwpx `text` 3 unchanged).
 - Show XLSX cell hyperlinks as editable `<hyperlink range="A1"
   target="https://example.com"/>` lines (optional `location`, `display`,
   `tooltip`) and cell notes as `<note range="B2" author="John"
