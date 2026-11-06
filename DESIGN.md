@@ -1111,7 +1111,12 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
   Conditional formats that the text models (`cellIs`, `expression`) are
   `<conditional-format range="F4:F48" type="cellIs" operator="lessThan" formula="3000000" dxf="fill=#FFC7CE"/>`
   lines, one per rule (`formula2` for `between`, `stopIfTrue`, `dxf` the
-  differential formatting as the cell vocabulary). The model may keep, add,
+  differential formatting as the cell vocabulary). Line order is Excel's
+  sheet-wide `priority` order (lower number wins when formats conflict);
+  import prints lines sorted by that priority (stable on ties), and a
+  rewrite writes `priority` as the 1-based line index. Adjacent lines with
+  the same range share one `conditionalFormatting` element; separate
+  elements with the same `sqref` are valid. The model may keep, add,
   remove or change them. A sheet with more merged ranges, hyperlinks, notes,
   validations or conditional formats than the text will hold (1,024) keeps
   that kind as a `<keep/>` placeholder, because listing tens of thousands of

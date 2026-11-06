@@ -391,7 +391,8 @@ pub(crate) fn validation_decl(e: &Entry) -> Option<ValidationDecl> {
 }
 
 /// This sheet's conditional formats as `<conditional-format/>` lines (one
-/// per `cfRule`), or `None` when they stay a placeholder: more than
+/// per `cfRule`), in Excel's sheet-wide `priority` order (stable on ties),
+/// or `None` when they stay a placeholder: more than
 /// [`MAX_CONDITIONAL_FORMAT_LINES`], an unparsable sqref, a rule type other
 /// than `cellIs`/`expression`, or a dxf the text cannot write.
 pub(crate) fn modelled_conditional_formats(book: &Book, i: usize) -> Option<Vec<CondFormatDecl>> {
@@ -408,21 +409,29 @@ pub(crate) fn modelled_conditional_formats(book: &Book, i: usize) -> Option<Vec<
     if out.len() > MAX_CONDITIONAL_FORMAT_LINES {
         return None;
     }
-    Some(out)
+    // Excel `priority` is sheet-wide (lower wins). Ties keep document order.
+    out.sort_by_key(|(p, _)| *p);
+    Some(out.into_iter().map(|(_, d)| d).collect())
 }
 
-pub(crate) fn conditional_format_decls(book: &Book, e: &Entry) -> Option<Vec<CondFormatDecl>> {
+fn conditional_format_decls(book: &Book, e: &Entry) -> Option<Vec<(u32, CondFormatDecl)>> {
     let range = parse_sqref(e.meta.range.as_deref()?)?;
     let range = hanji_core::cells::write_sqref(&range);
     let el = xml::fragment(&e.xml[0]);
     let mut out = vec![];
     for rule in el.elements().filter(|c| c.local() == "cfRule") {
-        out.push(cf_rule_decl(book, &range, rule)?);
+        out.push((cf_rule_priority(rule), cf_rule_decl(book, &range, rule)?));
     }
     if el.elements().any(|c| c.local() != "cfRule") {
         return None;
     }
     Some(out)
+}
+
+fn cf_rule_priority(rule: &Element) -> u32 {
+    rule.get("priority")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(u32::MAX)
 }
 
 pub(crate) fn cf_rule_decl(book: &Book, range: &str, rule: &Element) -> Option<CondFormatDecl> {

@@ -90,7 +90,8 @@ pub fn validations(items: &[SheetItem]) -> Vec<&ValidationDecl> {
         .collect()
 }
 
-/// The `<conditional-format/>` lines of a sheet, in the order written.
+/// The `<conditional-format/>` lines of a sheet, in the order written
+/// (Excel's sheet-wide `priority` order).
 pub fn conditional_formats(items: &[SheetItem]) -> Vec<&CondFormatDecl> {
     items
         .iter()

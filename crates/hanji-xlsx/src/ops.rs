@@ -881,11 +881,17 @@ fn set_sheet_conditional_formats(
             true
         }
     });
+    // `priority` is sheet-wide. Grouping every same-range rule together
+    // (even when another range sits between them) would renumber those
+    // rules as a block and change which format wins. Adjacent same-range
+    // lines share one `<conditionalFormatting>`; a later line with that
+    // range after a different one is a separate element (Excel allows
+    // several with the same `sqref`).
     let mut groups: Vec<(String, Vec<&CondFormatDecl>)> = vec![];
     for w in wanted {
-        match groups.iter_mut().find(|(r, _)| *r == w.range) {
-            Some((_, rs)) => rs.push(w),
-            None => groups.push((w.range.clone(), vec![w])),
+        match groups.last_mut() {
+            Some((r, rs)) if *r == w.range => rs.push(w),
+            _ => groups.push((w.range.clone(), vec![w])),
         }
     }
     let mut unused = vec![true; old.len()];
@@ -920,6 +926,7 @@ fn set_sheet_conditional_formats(
         .map(|e| e.seq)
         .max()
         .unwrap_or(0);
+    // Line order is the sheet-wide priority order; rewrite as 1-based index.
     let mut priority = 1u32;
     let mut out = vec![];
     for ((range, rules), slot) in groups.into_iter().zip(placed) {

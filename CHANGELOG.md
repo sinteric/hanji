@@ -16,8 +16,11 @@
   false). Sheets with more than 1024 of
   either kind, a conditional format that is not `cellIs` or `expression`
   (a data bar, color scale or icon set), or a dxf the cell vocabulary
-  cannot write stay placeholders for that sheet. Unedited validation and
-  conditional-format XML stays byte-identical. Corpus keeps: 215 → 207
+  cannot write stay placeholders for that sheet. Line order of
+  `<conditional-format/>` is Excel's sheet-wide `priority` (lower wins
+  when formats conflict); a rewrite writes `priority` as the 1-based line
+  index and groups only adjacent lines with the same range. Unedited
+  validation and conditional-format XML stays byte-identical. Corpus keeps: 215 → 207
   (xlsx `data-validation` 4 → 0, `conditional-format` 5 → 1).
 - Show a DOCX symbol (`w:sym`) as the character Word stored (`w:char`
   hex → that Unicode scalar) instead of a `<keep kind="symbol"/>`
