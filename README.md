@@ -309,10 +309,11 @@ These are not supported yet:
   `location`, `display`, `tooltip`), notes
   `<note range="B2" author="John" text="Some text"/>` (a newline in the
   text is `&#10;`), data validations
-  `<validation range="C2" type="list" formula1="A,B,C"/>` (required
-  `range` and `type`; optional `operator`, `formula2`, `allowBlank`,
-  `showInputMessage`, `promptTitle`, `prompt`, `showErrorMessage`,
-  `errorTitle`, `error`, `errorStyle`) and
+  `<validation range="C2" type="list" formula1="&quot;A,B,C&quot;"/>`
+  (required `range` and `type`; optional `operator`, `formula2`,
+  `allowBlank`, `showInputMessage`, `promptTitle`, `prompt`,
+  `showErrorMessage`, `errorTitle`, `error`, `errorStyle`;
+  `formula1`/`formula2` are Excel's formula text) and
   conditional formats
   `<conditional-format range="A1" type="cellIs" operator="greaterThan"
   formula="5" dxf="fill=#FFC7CE"/>` (only `cellIs` and `expression`;

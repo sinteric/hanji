@@ -373,13 +373,11 @@ pub(crate) fn validation_decl(e: &Entry) -> Option<ValidationDecl> {
         Some(s) if hanji_format::sheet::VALIDATION_ERROR_STYLES.contains(&s) => Some(s.to_string()),
         Some(_) => return None,
     };
-    let formula1 =
-        child_text(&el, "formula1").map(|s| if ty == "list" { strip_quotes(&s) } else { s });
     Some(ValidationDecl {
         range: hanji_core::cells::write_sqref(&range),
         ty,
         operator,
-        formula1,
+        formula1: child_text(&el, "formula1"),
         formula2: child_text(&el, "formula2"),
         allow_blank: xml_flag(&el, "allowBlank") == Some(true),
         show_input_message: match xml_flag(&el, "showInputMessage") {
@@ -478,46 +476,12 @@ pub(crate) fn child_text(e: &Element, local: &str) -> Option<String> {
         .map(|c| c.text_of(&[c.name.as_str()]))
 }
 
-fn strip_quotes(s: &str) -> String {
-    s.strip_prefix('"')
-        .and_then(|x| x.strip_suffix('"'))
-        .unwrap_or(s)
-        .to_string()
-}
-
 fn xml_flag(e: &Element, k: &str) -> Option<bool> {
     match e.get(k).as_deref() {
         Some("1" | "true" | "True") => Some(true),
         Some("0" | "false" | "False") => Some(false),
         _ => None,
     }
-}
-
-/// A list validation's formula1 as the file stores it: a quoted literal, or
-/// a range/name/formula left as written.
-pub(crate) fn list_formula_xml(s: &str) -> String {
-    if list_source_is_formula(s) {
-        s.to_string()
-    } else {
-        format!("\"{s}\"")
-    }
-}
-
-fn list_source_is_formula(s: &str) -> bool {
-    let t = s.trim().trim_start_matches('=');
-    if t.contains('(') || t.contains('!') {
-        return true;
-    }
-    if CellRange::parse(t).is_some() {
-        return true;
-    }
-    !t.is_empty()
-        && !t.contains(',')
-        && t.chars()
-            .all(|c| c.is_alphanumeric() || matches!(c, '_' | '.' | '\\'))
-        && t.chars()
-            .next()
-            .is_some_and(|c| c.is_alphabetic() || c == '_' || c == '\\')
 }
 
 fn list_summary(ranges: &[&str]) -> String {

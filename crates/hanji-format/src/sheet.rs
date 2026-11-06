@@ -145,7 +145,7 @@ pub struct NoteDecl {
     pub text: String,
 }
 
-/// One data validation (`<validation range="C2" type="list" formula1="A,B,C"/>`).
+/// One data validation (`<validation range="C2" type="list" formula1="&quot;A,B,C&quot;"/>`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ValidationDecl {
     /// Canonical A1 range or space-separated ranges (`C2`, `B4:B48`).
@@ -392,7 +392,7 @@ const HYPERLINK_FORM: &str =
     "<hyperlink range=\"A1\" target=\"https://example.com\"/> or <hyperlink range=\"B2\" location=\"Sheet2!A1\"/>";
 const NOTE_FORM: &str = "<note range=\"B2\" author=\"…\" text=\"…\"/>";
 const VALIDATION_FORM: &str =
-    "<validation range=\"C2\" type=\"list\" formula1=\"A,B,C\"/> or <validation range=\"B2:B10\" type=\"whole\" operator=\"between\" formula1=\"1\" formula2=\"100\" allowBlank=\"true\"/>";
+    "<validation range=\"C2\" type=\"list\" formula1=\"&quot;A,B,C&quot;\"/> or <validation range=\"B2:B10\" type=\"whole\" operator=\"between\" formula1=\"1\" formula2=\"100\" allowBlank=\"true\"/>";
 const CONDITIONAL_FORMAT_FORM: &str =
     "<conditional-format range=\"A1:A10\" type=\"cellIs\" operator=\"greaterThan\" formula=\"5\" dxf=\"fill=#FFC7CE\"/>";
 const CHART_FORM: &str = "<chart type=\"bar\" data=\"Table[Column],Table[Column]\" title=\"…\"/>";
@@ -1878,7 +1878,7 @@ pub fn window_text(of: &WindowOf, header: &[String], rows: &[(u32, Vec<String>)]
 mod tests {
     use super::*;
 
-    const TEXT: &str = "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"매출\" range=\"A1:E1201\">\n\n<table name=\"Sales\" range=\"A1:E1201\">\n| column | type | format | formula |\n|---|---|---|---|\n| 월 | date | yyyy-mm |  |\n| 매출 | number | #,##0 |  |\n| 이익 | number | #,##0 | =[@매출]-[@원가] |\n</table>\n\n<chart type=\"bar\" data=\"Sales[월],Sales[이익]\" title=\"월별 이익\"/>\n\n<merge range=\"G1:H1\"/>\n\n<validation range=\"B2:B1201\" type=\"list\" formula1=\"강남,서초,송파\" allowBlank=\"true\"/>\n\n<conditional-format range=\"F4:F48\" type=\"cellIs\" operator=\"lessThan\" formula=\"3000000\" dxf=\"fill=#FFC7CE\"/>\n\n<keep id=\"k1\" kind=\"picture\" summary=\"a drawing\"/>\n</sheet>\n";
+    const TEXT: &str = "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"매출\" range=\"A1:E1201\">\n\n<table name=\"Sales\" range=\"A1:E1201\">\n| column | type | format | formula |\n|---|---|---|---|\n| 월 | date | yyyy-mm |  |\n| 매출 | number | #,##0 |  |\n| 이익 | number | #,##0 | =[@매출]-[@원가] |\n</table>\n\n<chart type=\"bar\" data=\"Sales[월],Sales[이익]\" title=\"월별 이익\"/>\n\n<merge range=\"G1:H1\"/>\n\n<validation range=\"B2:B1201\" type=\"list\" formula1=\"&quot;강남,서초,송파&quot;\" allowBlank=\"true\"/>\n\n<conditional-format range=\"F4:F48\" type=\"cellIs\" operator=\"lessThan\" formula=\"3000000\" dxf=\"fill=#FFC7CE\"/>\n\n<keep id=\"k1\" kind=\"picture\" summary=\"a drawing\"/>\n</sheet>\n";
 
     #[test]
     fn round_trip() {
@@ -2143,7 +2143,7 @@ mod tests {
             .unwrap();
         assert_eq!(v.range, "B2:B1201");
         assert_eq!(v.ty, "list");
-        assert_eq!(v.formula1.as_deref(), Some("강남,서초,송파"));
+        assert_eq!(v.formula1.as_deref(), Some("\"강남,서초,송파\""));
         assert!(v.allow_blank);
         let c = s.sheets[0]
             .items
@@ -2160,7 +2160,7 @@ mod tests {
         assert_eq!(c.dxf.to_string(), "fill=#FFC7CE");
         assert_eq!(serialize_spreadsheet(&s), TEXT);
         let extra = TEXT.replace(
-            "<validation range=\"B2:B1201\" type=\"list\" formula1=\"강남,서초,송파\" allowBlank=\"true\"/>",
+            "<validation range=\"B2:B1201\" type=\"list\" formula1=\"&quot;강남,서초,송파&quot;\" allowBlank=\"true\"/>",
             "<validation range=\"C2:C10\" type=\"whole\" operator=\"greaterThan\" formula1=\"1\" allowBlank=\"true\" showErrorMessage=\"false\" promptTitle=\"Integer Input\" errorStyle=\"warning\"/>",
         );
         let s = parse_spreadsheet(&extra, &Names::default()).unwrap();
@@ -2197,9 +2197,58 @@ mod tests {
     }
 
     #[test]
+    fn list_formula1_is_excel_formula_text() {
+        let quoted = TEXT.replace(
+            "formula1=\"&quot;강남,서초,송파&quot;\"",
+            "formula1=\"&quot;Yes&quot;\"",
+        );
+        let s = parse_spreadsheet(&quoted, &Names::default()).unwrap();
+        let v = s.sheets[0]
+            .items
+            .iter()
+            .find_map(|i| match i {
+                SheetItem::Validation(v) => Some(v),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(v.formula1.as_deref(), Some("\"Yes\""));
+        assert_eq!(serialize_spreadsheet(&s), quoted);
+        let concat = TEXT.replace(
+            "formula1=\"&quot;강남,서초,송파&quot;\"",
+            "formula1=\"&quot;A&quot;&amp;&quot;B&quot;\"",
+        );
+        let s = parse_spreadsheet(&concat, &Names::default()).unwrap();
+        let v = s.sheets[0]
+            .items
+            .iter()
+            .find_map(|i| match i {
+                SheetItem::Validation(v) => Some(v),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(v.formula1.as_deref(), Some("\"A\"&\"B\""));
+        assert_eq!(serialize_spreadsheet(&s), concat);
+        let range = TEXT.replace(
+            "formula1=\"&quot;강남,서초,송파&quot;\"",
+            "formula1=\"$A$1:$A$5\"",
+        );
+        let s = parse_spreadsheet(&range, &Names::default()).unwrap();
+        let v = s.sheets[0]
+            .items
+            .iter()
+            .find_map(|i| match i {
+                SheetItem::Validation(v) => Some(v),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(v.formula1.as_deref(), Some("$A$1:$A$5"));
+        assert_eq!(serialize_spreadsheet(&s), range);
+    }
+
+    #[test]
     fn validation_and_conditional_format_errors() {
         let e = errs(&TEXT.replace(
-            "<validation range=\"B2:B1201\" type=\"list\" formula1=\"강남,서초,송파\" allowBlank=\"true\"/>",
+            "<validation range=\"B2:B1201\" type=\"list\" formula1=\"&quot;강남,서초,송파&quot;\" allowBlank=\"true\"/>",
             "<validation range=\"B2\"/>",
         ));
         assert!(e[0].contains("range and a type"), "{e:?}");

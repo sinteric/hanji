@@ -1038,7 +1038,7 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
 
   <note range="A3" author="작성자" text="월은 매월 1일로 적습니다."/>
 
-  <validation range="B2:B1201" type="list" formula1="강남,서초,송파"/>
+  <validation range="B2:B1201" type="list" formula1="&quot;강남,서초,송파&quot;"/>
 
   <conditional-format range="F4:F48" type="cellIs" operator="lessThan" formula="3000000" dxf="fill=#FFC7CE"/>
   </sheet>
@@ -1101,10 +1101,11 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
   `<note range="A3" author="작성자" text="월은 매월 1일로 적습니다."/>`
   lines; a newline in the text is `&#10;`. The model may keep, add, remove
   or change both. Data validations are
-  `<validation range="B2:B1201" type="list" formula1="강남,서초,송파"/>`
+  `<validation range="B2:B1201" type="list" formula1="&quot;강남,서초,송파&quot;"/>`
   lines (optional `operator`, `formula2`, `allowBlank`, `showInputMessage`,
   `promptTitle`, `prompt`, `showErrorMessage`, `errorTitle`, `error`,
-  `errorStyle`; a quoted list in the file is written without the quotes).
+  `errorStyle`; `formula1`/`formula2` are Excel's formula text: a quoted
+  list keeps its quotes, a range or name stays unquoted).
   Conditional formats that the text models (`cellIs`, `expression`) are
   `<conditional-format range="F4:F48" type="cellIs" operator="lessThan" formula="3000000" dxf="fill=#FFC7CE"/>`
   lines, one per rule (`formula2` for `between`, `stopIfTrue`, `dxf` the

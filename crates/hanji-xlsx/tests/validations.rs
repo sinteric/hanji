@@ -57,7 +57,7 @@ fn unedited_file_keeps_its_validation_xml() {
         .unwrap();
     assert_eq!(
         validation_lines(&imp.text),
-        ["<validation range=\"C2\" type=\"list\" formula1=\"Foo,Bar,Baz\" allowBlank=\"true\"/>"]
+        ["<validation range=\"C2\" type=\"list\" formula1=\"&quot;Foo,Bar,Baz&quot;\" allowBlank=\"true\"/>"]
     );
     let out = XlsxEngine.export(&imp.text, &imp.remainder).unwrap();
     getput(&bytes, &out).unwrap();
@@ -73,7 +73,7 @@ fn editing_a_validation_writes_it_and_reads_back() {
     let a = XlsxEngine::apply(&edited, &imp.remainder, "[]").unwrap();
     assert_eq!(
         validation_lines(&a.text),
-        ["<validation range=\"C2\" type=\"list\" formula1=\"A,B,C\" allowBlank=\"true\"/>"]
+        ["<validation range=\"C2\" type=\"list\" formula1=\"&quot;A,B,C&quot;\" allowBlank=\"true\"/>"]
     );
     let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
     let got = sheet_validations(&out, "xl/worksheets/sheet1.xml");
@@ -92,14 +92,14 @@ fn adding_a_validation_writes_it_and_reads_back() {
         .import(&bytes, &ImportOptions::default())
         .unwrap();
     let edited = imp.text.replace(
-        "<validation range=\"C2\" type=\"list\" formula1=\"Foo,Bar,Baz\" allowBlank=\"true\"/>",
-        "<validation range=\"C2\" type=\"list\" formula1=\"Foo,Bar,Baz\" allowBlank=\"true\"/>\n<validation range=\"D2\" type=\"whole\" operator=\"greaterThan\" formula1=\"0\" allowBlank=\"true\"/>",
+        "<validation range=\"C2\" type=\"list\" formula1=\"&quot;Foo,Bar,Baz&quot;\" allowBlank=\"true\"/>",
+        "<validation range=\"C2\" type=\"list\" formula1=\"&quot;Foo,Bar,Baz&quot;\" allowBlank=\"true\"/>\n<validation range=\"D2\" type=\"whole\" operator=\"greaterThan\" formula1=\"0\" allowBlank=\"true\"/>",
     );
     let a = XlsxEngine::apply(&edited, &imp.remainder, "[]").unwrap();
     assert_eq!(
         validation_lines(&a.text),
         [
-            "<validation range=\"C2\" type=\"list\" formula1=\"Foo,Bar,Baz\" allowBlank=\"true\"/>",
+            "<validation range=\"C2\" type=\"list\" formula1=\"&quot;Foo,Bar,Baz&quot;\" allowBlank=\"true\"/>",
             "<validation range=\"D2\" type=\"whole\" operator=\"greaterThan\" formula1=\"0\" allowBlank=\"true\"/>"
         ]
     );
@@ -119,7 +119,7 @@ fn removing_a_validation_drops_it() {
         .import(&bytes, &ImportOptions::default())
         .unwrap();
     let edited = imp.text.replace(
-        "<validation range=\"C2\" type=\"list\" formula1=\"Foo,Bar,Baz\" allowBlank=\"true\"/>\n",
+        "<validation range=\"C2\" type=\"list\" formula1=\"&quot;Foo,Bar,Baz&quot;\" allowBlank=\"true\"/>\n",
         "",
     );
     assert_ne!(edited, imp.text);
@@ -175,4 +175,127 @@ fn corpus_validation_files_round_trip_the_text() {
         let out = XlsxEngine.export(&imp.text, &imp.remainder).unwrap();
         getput(&bytes, &out).unwrap();
     }
+}
+
+fn with_list_formula1(bytes: &[u8], inner: &str) -> Vec<u8> {
+    let mut parts = package::read(bytes).unwrap();
+    let sheet = parts
+        .iter_mut()
+        .find(|p| p.name == "xl/worksheets/sheet1.xml")
+        .unwrap();
+    let s = String::from_utf8(sheet.data.clone()).unwrap();
+    let next = s.replace(
+        r#"<formula1>"Foo,Bar,Baz"</formula1>"#,
+        &format!("<formula1>{inner}</formula1>"),
+    );
+    assert_ne!(next, s, "formula1 replacement missed");
+    sheet.data = next.into_bytes();
+    package::write(&parts).unwrap()
+}
+
+#[test]
+fn a_one_item_list_literal_keeps_its_quotes() {
+    let bytes = with_list_formula1(&corpus_file("rx_data_validation01.xlsx"), r#""Yes""#);
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
+    assert_eq!(
+        validation_lines(&imp.text),
+        ["<validation range=\"C2\" type=\"list\" formula1=\"&quot;Yes&quot;\" allowBlank=\"true\"/>"]
+    );
+    let out = XlsxEngine.export(&imp.text, &imp.remainder).unwrap();
+    getput(&bytes, &out).unwrap();
+    let got = sheet_validations(&out, "xl/worksheets/sheet1.xml");
+    assert_eq!(got[0].2.as_deref(), Some("\"Yes\""));
+}
+
+#[test]
+fn an_edited_or_new_list_literal_stays_quoted() {
+    let bytes = with_list_formula1(&corpus_file("rx_data_validation01.xlsx"), r#""Yes""#);
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
+    let edited = imp.text.replace(
+        "<validation range=\"C2\" type=\"list\" formula1=\"&quot;Yes&quot;\" allowBlank=\"true\"/>",
+        "<validation range=\"C2\" type=\"list\" formula1=\"&quot;Open&quot;\" allowBlank=\"true\"/>\n<validation range=\"D2\" type=\"list\" formula1=\"&quot;No&quot;\"/>",
+    );
+    let a = XlsxEngine::apply(&edited, &imp.remainder, "[]").unwrap();
+    assert_eq!(
+        validation_lines(&a.text),
+        [
+            "<validation range=\"C2\" type=\"list\" formula1=\"&quot;Open&quot;\" allowBlank=\"true\"/>",
+            "<validation range=\"D2\" type=\"list\" formula1=\"&quot;No&quot;\"/>"
+        ]
+    );
+    let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
+    let got = sheet_validations(&out, "xl/worksheets/sheet1.xml");
+    assert_eq!(
+        got.iter().map(|v| v.2.as_deref()).collect::<Vec<_>>(),
+        [Some("\"Open\""), Some("\"No\"")]
+    );
+    let again = XlsxEngine.import(&out, &ImportOptions::default()).unwrap();
+    assert_eq!(again.text, a.text);
+}
+
+#[test]
+fn a_concatenated_list_formula_round_trips_unchanged() {
+    let bytes = with_list_formula1(&corpus_file("rx_data_validation01.xlsx"), r#""A"&amp;"B""#);
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
+    assert_eq!(
+        validation_lines(&imp.text),
+        ["<validation range=\"C2\" type=\"list\" formula1=\"&quot;A&quot;&amp;&quot;B&quot;\" allowBlank=\"true\"/>"]
+    );
+    let out = XlsxEngine.export(&imp.text, &imp.remainder).unwrap();
+    getput(&bytes, &out).unwrap();
+    let got = sheet_validations(&out, "xl/worksheets/sheet1.xml");
+    assert_eq!(got[0].2.as_deref(), Some("\"A\"&\"B\""));
+    let again = XlsxEngine.import(&out, &ImportOptions::default()).unwrap();
+    assert_eq!(again.text, imp.text);
+}
+
+#[test]
+fn a_list_range_reference_stays_unquoted() {
+    let bytes = with_list_formula1(&corpus_file("rx_data_validation01.xlsx"), "$A$1:$A$5");
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
+    assert_eq!(
+        validation_lines(&imp.text),
+        ["<validation range=\"C2\" type=\"list\" formula1=\"$A$1:$A$5\" allowBlank=\"true\"/>"]
+    );
+    let out = XlsxEngine.export(&imp.text, &imp.remainder).unwrap();
+    getput(&bytes, &out).unwrap();
+    let got = sheet_validations(&out, "xl/worksheets/sheet1.xml");
+    assert_eq!(got[0].2.as_deref(), Some("$A$1:$A$5"));
+
+    let corpus = corpus_file("DataValidations-49244.xlsx");
+    let imp = XlsxEngine
+        .import(&corpus, &ImportOptions::default())
+        .unwrap();
+    let lines = validation_lines(&imp.text);
+    assert!(
+        lines.iter().any(|l| l.contains("formula1=\"$D$1:$F$1\"")),
+        "{lines:?}"
+    );
+    assert!(
+        lines
+            .iter()
+            .any(|l| l.contains("formula1=\"&quot;IN,US,UK&quot;\"")),
+        "{lines:?}"
+    );
+    let out = XlsxEngine.export(&imp.text, &imp.remainder).unwrap();
+    getput(&corpus, &out).unwrap();
+    let got = sheet_validations(&out, "xl/worksheets/sheet1.xml");
+    assert!(
+        got.iter()
+            .any(|v| v.1 == "list" && v.2.as_deref() == Some("$D$1:$F$1")),
+        "{got:?}"
+    );
+    assert!(
+        got.iter()
+            .any(|v| v.1 == "list" && v.2.as_deref() == Some("\"IN,US,UK\"")),
+        "{got:?}"
+    );
 }

@@ -766,8 +766,8 @@ fn write_validation(prefix: &str, w: &ValidationDecl) -> Element {
     if let Some(s) = &w.error_style {
         el.set("errorStyle", s);
     }
-    set_formula_child(&mut el, prefix, "formula1", w.formula1.as_deref(), true);
-    set_formula_child(&mut el, prefix, "formula2", w.formula2.as_deref(), false);
+    set_formula_child(&mut el, prefix, "formula1", w.formula1.as_deref());
+    set_formula_child(&mut el, prefix, "formula2", w.formula2.as_deref());
     el
 }
 
@@ -809,25 +809,20 @@ fn sync_validation(e: &mut Entry, w: &ValidationDecl, prefix: &str, scope: &xml:
             x.remove_attr("errorStyle");
         }
     }
-    set_formula_child(&mut x, prefix, "formula1", w.formula1.as_deref(), true);
-    set_formula_child(&mut x, prefix, "formula2", w.formula2.as_deref(), false);
+    set_formula_child(&mut x, prefix, "formula1", w.formula1.as_deref());
+    set_formula_child(&mut x, prefix, "formula2", w.formula2.as_deref());
     e.xml[0] = x.to_xml();
     e.fp = xml::canon(&x, scope);
 }
 
-fn set_formula_child(el: &mut Element, prefix: &str, local: &str, v: Option<&str>, list1: bool) {
+fn set_formula_child(el: &mut Element, prefix: &str, local: &str, v: Option<&str>) {
     el.children
         .retain(|n| !matches!(n, Node::El(c) if c.local() == local));
     let Some(v) = v else {
         return;
     };
-    let text = if list1 && el.get("type").as_deref() == Some("list") {
-        model::list_formula_xml(v)
-    } else {
-        v.to_string()
-    };
     let mut c = Element::new(&format!("{prefix}{local}"));
-    c.children.push(Node::Text(xml::escape_text(&text)));
+    c.children.push(Node::Text(xml::escape_text(v)));
     const ORDER: [&str; 2] = ["formula1", "formula2"];
     xml::insert_ordered(el, c, &ORDER);
 }
