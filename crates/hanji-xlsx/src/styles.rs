@@ -227,4 +227,55 @@ impl Styles {
         self.changed
             .then(|| xml::write_doc(self.doc.as_ref().unwrap()))
     }
+
+    pub(crate) fn prefix(&self) -> String {
+        self.doc
+            .as_ref()
+            .map(|d| prefix_of(&d.root))
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn dxf_elements(&self) -> Vec<&Element> {
+        self.doc
+            .as_ref()
+            .and_then(|d| d.root.elements().find(|e| e.local() == "dxfs"))
+            .map(|e| e.elements().filter(|x| x.local() == "dxf").collect())
+            .unwrap_or_default()
+    }
+
+    /// Append `dxf` to `dxfs`, creating the list if the part has none.
+    pub(crate) fn push_dxf(&mut self, dxf: Element) -> Result<u32, String> {
+        let doc = self.doc.as_mut().ok_or("the workbook has no styles part")?;
+        let p = prefix_of(&doc.root);
+        let order = [
+            "numFmts",
+            "fonts",
+            "fills",
+            "borders",
+            "cellStyleXfs",
+            "cellXfs",
+            "cellStyles",
+            "dxfs",
+            "tableStyles",
+            "colors",
+            "extLst",
+        ];
+        if !doc.root.elements().any(|e| e.local() == "dxfs") {
+            xml::insert_ordered(
+                &mut doc.root,
+                Element::new(&format!("{p}dxfs")).with_attr("count", "0"),
+                &order,
+            );
+        }
+        let dxfs = doc
+            .root
+            .elements_mut()
+            .find(|e| e.local() == "dxfs")
+            .unwrap();
+        dxfs.children.push(Node::El(dxf));
+        let n = dxfs.elements().count();
+        dxfs.set("count", &n.to_string());
+        self.changed = true;
+        Ok(n as u32 - 1)
+    }
 }

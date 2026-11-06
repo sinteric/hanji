@@ -9,8 +9,9 @@ use hanji_core::cells::{parse_sqref, CellRange, CellRef};
 use hanji_core::{Entry, KeepIds, Kind, Meta};
 use hanji_format::cellfmt::{self, CellFormat, FormatLine};
 use hanji_format::sheet::{
-    format_kind, ColumnDecl, FormatKind, HyperlinkDecl, MergeDecl, SheetDecl, SheetItem,
-    Spreadsheet, TableDecl, MAX_HYPERLINK_LINES, MAX_MERGE_LINES,
+    format_kind, ColumnDecl, CondFormatDecl, FormatKind, HyperlinkDecl, MergeDecl, SheetDecl,
+    SheetItem, Spreadsheet, TableDecl, ValidationDecl, MAX_CONDITIONAL_FORMAT_LINES,
+    MAX_HYPERLINK_LINES, MAX_MERGE_LINES, MAX_VALIDATION_LINES,
 };
 use hanji_format::{formula, FrontMatter, Keep};
 use hanji_package::clip;
@@ -195,6 +196,12 @@ pub fn keeps(book: &Book) -> Vec<(usize, Keep)> {
             if child == "hyperlink" && modelled_hyperlinks(book, i).is_some() {
                 continue;
             }
+            if child == "dataValidation" && modelled_validations(book, i).is_some() {
+                continue;
+            }
+            if child == "conditionalFormatting" && modelled_conditional_formats(book, i).is_some() {
+                continue;
+            }
             let ranges: Vec<&str> = book
                 .entries
                 .iter()
@@ -324,6 +331,170 @@ pub(crate) fn modelled_hyperlinks(book: &Book, i: usize) -> Option<Vec<Hyperlink
         }
     }
     Some(out)
+}
+
+/// This sheet's data validations as `<validation/>` lines, or `None` when
+/// they stay a placeholder: more than [`MAX_VALIDATION_LINES`], an
+/// unparsable sqref, a missing type, or children other than formula1/2.
+pub(crate) fn modelled_validations(book: &Book, i: usize) -> Option<Vec<ValidationDecl>> {
+    let mut out = vec![];
+    for e in &book.entries {
+        if e.kind != Kind::Range || e.path.first() != Some(&i) || e.meta.tag != "dataValidation" {
+            continue;
+        }
+        out.push(validation_decl(e)?);
+    }
+    if out.len() > MAX_VALIDATION_LINES {
+        return None;
+    }
+    Some(out)
+}
+
+pub(crate) fn validation_decl(e: &Entry) -> Option<ValidationDecl> {
+    let range = parse_sqref(e.meta.range.as_deref()?)?;
+    let el = xml::fragment(&e.xml[0]);
+    if el
+        .elements()
+        .any(|c| !matches!(c.local(), "formula1" | "formula2"))
+    {
+        return None;
+    }
+    let ty = el.get("type").filter(|t| !t.is_empty())?;
+    if !hanji_format::sheet::VALIDATION_TYPES.contains(&ty.as_str()) {
+        return None;
+    }
+    let operator = match el.get("operator").as_deref() {
+        None | Some("between") => None,
+        Some(op) if hanji_format::sheet::VALIDATION_OPERATORS.contains(&op) => Some(op.to_string()),
+        Some(_) => return None,
+    };
+    let error_style = match el.get("errorStyle").as_deref() {
+        None | Some("stop") => None,
+        Some(s) if hanji_format::sheet::VALIDATION_ERROR_STYLES.contains(&s) => Some(s.to_string()),
+        Some(_) => return None,
+    };
+    Some(ValidationDecl {
+        range: hanji_core::cells::write_sqref(&range),
+        ty,
+        operator,
+        formula1: child_text(&el, "formula1"),
+        formula2: child_text(&el, "formula2"),
+        allow_blank: xml_flag(&el, "allowBlank") == Some(true),
+        show_input_message: xml_message_off(&el, "showInputMessage"),
+        show_error_message: xml_message_off(&el, "showErrorMessage"),
+        prompt_title: el.get("promptTitle").filter(|s| !s.is_empty()),
+        prompt: el.get("prompt").filter(|s| !s.is_empty()),
+        error_title: el.get("errorTitle").filter(|s| !s.is_empty()),
+        error: el.get("error").filter(|s| !s.is_empty()),
+        error_style,
+    })
+}
+
+/// This sheet's conditional formats as `<conditional-format/>` lines (one
+/// per `cfRule`), in Excel's sheet-wide `priority` order (stable on ties),
+/// or `None` when they stay a placeholder: more than
+/// [`MAX_CONDITIONAL_FORMAT_LINES`], an unparsable sqref, a rule type other
+/// than `cellIs`/`expression`, or a dxf the text cannot write.
+pub(crate) fn modelled_conditional_formats(book: &Book, i: usize) -> Option<Vec<CondFormatDecl>> {
+    let mut out = vec![];
+    for e in &book.entries {
+        if e.kind != Kind::Range
+            || e.path.first() != Some(&i)
+            || e.meta.tag != "conditionalFormatting"
+        {
+            continue;
+        }
+        out.extend(conditional_format_decls(book, e)?);
+    }
+    if out.len() > MAX_CONDITIONAL_FORMAT_LINES {
+        return None;
+    }
+    // Excel `priority` is sheet-wide (lower wins). Ties keep document order.
+    out.sort_by_key(|(p, _)| *p);
+    Some(out.into_iter().map(|(_, d)| d).collect())
+}
+
+fn conditional_format_decls(book: &Book, e: &Entry) -> Option<Vec<(u32, CondFormatDecl)>> {
+    let range = parse_sqref(e.meta.range.as_deref()?)?;
+    let range = hanji_core::cells::write_sqref(&range);
+    let el = xml::fragment(&e.xml[0]);
+    let mut out = vec![];
+    for rule in el.elements().filter(|c| c.local() == "cfRule") {
+        out.push((cf_rule_priority(rule), cf_rule_decl(book, &range, rule)?));
+    }
+    if el.elements().any(|c| c.local() != "cfRule") {
+        return None;
+    }
+    Some(out)
+}
+
+fn cf_rule_priority(rule: &Element) -> u32 {
+    rule.get("priority")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(u32::MAX)
+}
+
+pub(crate) fn cf_rule_decl(book: &Book, range: &str, rule: &Element) -> Option<CondFormatDecl> {
+    let ty = rule.get("type")?;
+    if !hanji_format::sheet::CONDITIONAL_FORMAT_TYPES.contains(&ty.as_str()) {
+        return None;
+    }
+    if rule
+        .elements()
+        .any(|c| !matches!(c.local(), "formula" | "extLst"))
+    {
+        return None;
+    }
+    let formulas: Vec<String> = rule
+        .elements()
+        .filter(|c| c.local() == "formula")
+        .map(|c| c.text_of(&[c.name.as_str()]))
+        .collect();
+    let operator = match (ty.as_str(), rule.get("operator").as_deref()) {
+        ("expression", _) => None,
+        (_, None) | (_, Some("between")) => None,
+        (_, Some(op)) if hanji_format::sheet::VALIDATION_OPERATORS.contains(&op) => {
+            Some(op.to_string())
+        }
+        _ => return None,
+    };
+    let dxf = match rule.get("dxfId").and_then(|s| s.parse::<u32>().ok()) {
+        Some(id) => book.styles.modelled_dxf(id)?,
+        None => CellFormat::default(),
+    };
+    Some(CondFormatDecl {
+        range: range.to_string(),
+        ty,
+        operator,
+        formula: formulas.first().cloned().filter(|s| !s.is_empty()),
+        formula2: formulas.get(1).cloned().filter(|s| !s.is_empty()),
+        dxf,
+        stop_if_true: xml_flag(rule, "stopIfTrue") == Some(true),
+    })
+}
+
+pub(crate) fn child_text(e: &Element, local: &str) -> Option<String> {
+    e.elements()
+        .find(|c| c.local() == local)
+        .map(|c| c.text_of(&[c.name.as_str()]))
+}
+
+fn xml_flag(e: &Element, k: &str) -> Option<bool> {
+    match e.get(k).as_deref() {
+        Some("1" | "true" | "True") => Some(true),
+        Some("0" | "false" | "False") => Some(false),
+        _ => None,
+    }
+}
+
+/// CT_DataValidation `showInputMessage` / `showErrorMessage` default to false
+/// when absent. The text default is on: omit the attr when true, write
+/// `"false"` when off.
+fn xml_message_off(e: &Element, k: &str) -> Option<bool> {
+    match xml_flag(e, k) {
+        Some(true) => None,
+        _ => Some(false),
+    }
 }
 
 fn list_summary(ranges: &[&str]) -> String {
@@ -460,6 +631,15 @@ pub fn structure(book: &mut Book, template: Option<&str>) -> Result<Spreadsheet,
             }
             if let Some(ns) = notes::modelled(book, i) {
                 items.extend(ns.into_iter().map(SheetItem::Note));
+            }
+            if let Some(vs) = modelled_validations(book, i) {
+                items.extend(vs.into_iter().map(SheetItem::Validation));
+            }
+            if let Some(cs) = modelled_conditional_formats(book, i) {
+                items.extend(
+                    cs.into_iter()
+                        .map(|c| SheetItem::ConditionalFormat(Box::new(c))),
+                );
             }
         }
         items.extend(

@@ -1,14 +1,18 @@
 //! Edits to the structure text (§5.4: the structure is text the model may
 //! edit): a column's type, format or formula, a new column at the end of a
 //! table, a new table, a new sheet at the end, merged ranges, hyperlinks,
-//! notes, a deleted placeholder. Table, sheet and column edits become range
-//! operations, so the text and the operations share one validator and one
-//! implementation. Merged ranges, hyperlinks and notes are applied from
+//! notes, data validations, conditional formats, a deleted placeholder.
+//! Table, sheet and column edits become range operations, so the text and
+//! the operations share one validator and one implementation. Merged ranges,
+//! hyperlinks, notes, validations and conditional formats are applied from
 //! their structure lines. Any other change is refused with the form it
 //! should take.
 
 use hanji_format::ops::{ColumnSpec, RangeOp};
-use hanji_format::sheet::{HyperlinkDecl, MergeDecl, NoteDecl, SheetItem, Spreadsheet, TableDecl};
+use hanji_format::sheet::{
+    CondFormatDecl, HyperlinkDecl, MergeDecl, NoteDecl, SheetItem, Spreadsheet, TableDecl,
+    ValidationDecl,
+};
 
 /// Whether two structures are the same (front matter aside).
 pub fn same(a: &Spreadsheet, b: &Spreadsheet) -> bool {
@@ -70,6 +74,29 @@ pub fn notes(items: &[SheetItem]) -> Vec<&NoteDecl> {
         .iter()
         .filter_map(|i| match i {
             SheetItem::Note(n) => Some(n),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The `<validation/>` lines of a sheet, in the order written.
+pub fn validations(items: &[SheetItem]) -> Vec<&ValidationDecl> {
+    items
+        .iter()
+        .filter_map(|i| match i {
+            SheetItem::Validation(v) => Some(v),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The `<conditional-format/>` lines of a sheet, in the order written
+/// (Excel's sheet-wide `priority` order).
+pub fn conditional_formats(items: &[SheetItem]) -> Vec<&CondFormatDecl> {
+    items
+        .iter()
+        .filter_map(|i| match i {
+            SheetItem::ConditionalFormat(c) => Some(c.as_ref()),
             _ => None,
         })
         .collect()

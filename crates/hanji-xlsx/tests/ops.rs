@@ -759,9 +759,10 @@ fn sheet_named(rem: &Remainder, table_or_sheet: &str) -> String {
     }
 }
 
-/// A structure edit in the text (a column's format, a deleted placeholder)
-/// is applied as operations are: the cells show the new format, the
-/// conditional format goes and is reported, and the export reads back so.
+/// A structure edit in the text (a column's format, a deleted
+/// `<conditional-format/>` line) is applied as operations are: the cells
+/// show the new format, the conditional format goes, and the export reads
+/// back so.
 #[test]
 fn structure_edits_in_the_text() {
     let bytes =
@@ -774,7 +775,7 @@ fn structure_edits_in_the_text() {
     let text = XlsxEngine::text_of(&rem, None).unwrap();
     let cf = text
         .lines()
-        .find(|l| l.contains("kind=\"conditional-format\""))
+        .find(|l| l.starts_with("<conditional-format "))
         .unwrap()
         .to_string();
     let edited = text
@@ -782,10 +783,15 @@ fn structure_edits_in_the_text() {
             "| 매출 | number | #,##0 |  |",
             "| 매출 | number | #,##0.00 |  |",
         )
-        .replace(&format!("{cf}\n\n"), "");
+        .replace(&format!("{cf}\n"), "");
     assert_ne!(edited, text);
     let a = XlsxEngine::apply(&edited, &rem, "[]").unwrap();
-    assert_eq!(a.text, edited);
+    assert!(!a.text.contains("<conditional-format "), "{}", a.text);
+    assert!(
+        !a.text.contains("kind=\"conditional-format\""),
+        "{}",
+        a.text
+    );
     let w = XlsxEngine::window(
         &a.remainder,
         &WindowOf::Table {
@@ -802,7 +808,7 @@ fn structure_edits_in_the_text() {
         a.report
             .notices
             .iter()
-            .any(|n| n.kind == "removed" && n.location.contains("conditional-format")),
+            .all(|n| n.kind != "removed" || !n.location.contains("conditional-format")),
         "{:?}",
         a.report.notices
     );

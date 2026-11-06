@@ -1038,7 +1038,9 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
 
   <note range="A3" author="작성자" text="월은 매월 1일로 적습니다."/>
 
-  <keep id="k1" kind="data-validation" summary="B2:B1201"/>
+  <validation range="B2:B1201" type="list" formula1="&quot;강남,서초,송파&quot;"/>
+
+  <conditional-format range="F4:F48" type="cellIs" operator="lessThan" formula="3000000" dxf="fill=#FFC7CE"/>
   </sheet>
   ```
 
@@ -1098,15 +1100,34 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
   `tooltip`). Notes are
   `<note range="A3" author="작성자" text="월은 매월 1일로 적습니다."/>`
   lines; a newline in the text is `&#10;`. The model may keep, add, remove
-  or change both. A sheet with more merged ranges, hyperlinks or notes
-  than the text will hold (1,024) keeps that kind as a `<keep/>`
-  placeholder, because listing tens of thousands of ranges would grow the
-  structure with the grid (rule 11). Overlapping hyperlinks or notes, a hyperlink whose
+  or change both. Data validations are
+  `<validation range="B2:B1201" type="list" formula1="&quot;강남,서초,송파&quot;"/>`
+  lines (optional `operator`, `formula2`, `allowBlank`, `showInputMessage`,
+  `promptTitle`, `prompt`, `showErrorMessage`, `errorTitle`, `error`,
+  `errorStyle`; `formula1`/`formula2` are Excel's formula text: a quoted
+  list keeps its quotes, a range or name stays unquoted;
+  `showInputMessage`/`showErrorMessage` are omitted when on, the text
+  default, and written `"false"` when off).
+  Conditional formats that the text models (`cellIs`, `expression`) are
+  `<conditional-format range="F4:F48" type="cellIs" operator="lessThan" formula="3000000" dxf="fill=#FFC7CE"/>`
+  lines, one per rule (`formula2` for `between`, `stopIfTrue`, `dxf` the
+  differential formatting as the cell vocabulary). Line order is Excel's
+  sheet-wide `priority` order (lower number wins when formats conflict);
+  import prints lines sorted by that priority (stable on ties), and a
+  rewrite writes `priority` as the 1-based line index. Adjacent lines with
+  the same range share one `conditionalFormatting` element; separate
+  elements with the same `sqref` are valid. The model may keep, add,
+  remove or change them. A sheet with more merged ranges, hyperlinks, notes,
+  validations or conditional formats than the text will hold (1,024) keeps
+  that kind as a `<keep/>` placeholder, because listing tens of thousands of
+  ranges would grow the structure with the grid (rule 11). Overlapping
+  hyperlinks or notes, a hyperlink whose
   relationship is not a unique external Target, and a threaded comment stay
-  placeholders. Validations, conditional formats, pictures and pivot tables
-  are `<keep/>` placeholders (rule 8). A syntax for validations is still
-  open; until then they are placeholders, and a value that breaks one is
-  refused.
+  placeholders. A conditional format that is not `cellIs` or `expression`
+  (a data bar, color scale or icon set), or whose dxf the vocabulary cannot
+  write, stays a placeholder for that sheet. Pictures and pivot tables
+  are `<keep/>` placeholders (rule 8). A value that breaks a validation is
+  refused when the rule can be checked.
 
 - **Cell data** is read through a row window of one table or range: a pipe
   table whose first column is the read-only sheet row number, then one cell

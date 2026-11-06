@@ -205,6 +205,26 @@ pub fn full_view(book: &mut Book, rows: u32) -> Result<String, String> {
                         }
                     }
                 }
+                hanji_format::sheet::SheetItem::Validation(v) => {
+                    out.push(hanji_format::sheet::validation_line(v));
+                    while let Some(hanji_format::sheet::SheetItem::Validation(_)) = items.peek() {
+                        if let Some(hanji_format::sheet::SheetItem::Validation(v)) = items.next() {
+                            out.push(hanji_format::sheet::validation_line(v));
+                        }
+                    }
+                }
+                hanji_format::sheet::SheetItem::ConditionalFormat(c) => {
+                    out.push(hanji_format::sheet::conditional_format_line(c));
+                    while let Some(hanji_format::sheet::SheetItem::ConditionalFormat(_)) =
+                        items.peek()
+                    {
+                        if let Some(hanji_format::sheet::SheetItem::ConditionalFormat(c)) =
+                            items.next()
+                        {
+                            out.push(hanji_format::sheet::conditional_format_line(c));
+                        }
+                    }
+                }
                 hanji_format::sheet::SheetItem::Keep(k) => out.push(format!(
                     "<keep id=\"{}\" kind=\"{}\" summary=\"{}\"/>",
                     k.id,

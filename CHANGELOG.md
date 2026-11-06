@@ -2,6 +2,26 @@
 
 ## Unreleased
 
+- Show XLSX data validations as editable `<validation range="C2"
+  type="list" formula1="&quot;A,B,C&quot;"/>` lines and `cellIs`/`expression`
+  conditional formats as `<conditional-format range="A1" type="cellIs"
+  operator="greaterThan" formula="5" dxf="fill=#FFC7CE"/>` lines instead
+  of `<keep kind="data-validation"/>` / `<keep kind="conditional-format"/>`
+  placeholders. Each can be kept, added, removed or changed.
+  `formula1`/`formula2` are Excel's formula text: a quoted list keeps its
+  quotes, a range or name stays unquoted. `showInputMessage`/
+  `showErrorMessage` are omitted in the text when on (the default) and
+  written `"false"` when off; a new or rewritten validation writes the XML
+  attribute as `"1"` when on and omits it when off (SpreadsheetML default
+  false). Sheets with more than 1024 of
+  either kind, a conditional format that is not `cellIs` or `expression`
+  (a data bar, color scale or icon set), or a dxf the cell vocabulary
+  cannot write stay placeholders for that sheet. Line order of
+  `<conditional-format/>` is Excel's sheet-wide `priority` (lower wins
+  when formats conflict); a rewrite writes `priority` as the 1-based line
+  index and groups only adjacent lines with the same range. Unedited
+  validation and conditional-format XML stays byte-identical. Corpus keeps: 215 → 207
+  (xlsx `data-validation` 4 → 0, `conditional-format` 5 → 1).
 - Show a DOCX symbol (`w:sym`) as the character Word stored (`w:char`
   hex → that Unicode scalar) instead of a `<keep kind="symbol"/>`
   placeholder. Font and the original element stay as a `Wrap`. Untouched
