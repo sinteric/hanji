@@ -313,7 +313,9 @@ These are not supported yet:
   (required `range` and `type`; optional `operator`, `formula2`,
   `allowBlank`, `showInputMessage`, `promptTitle`, `prompt`,
   `showErrorMessage`, `errorTitle`, `error`, `errorStyle`;
-  `formula1`/`formula2` are Excel's formula text) and
+  `formula1`/`formula2` are Excel's formula text;
+  `showInputMessage`/`showErrorMessage` omitted when on, `"false"` when
+  off) and
   conditional formats
   `<conditional-format range="A1" type="cellIs" operator="greaterThan"
   formula="5" dxf="fill=#FFC7CE"/>` (only `cellIs` and `expression`;

@@ -156,12 +156,14 @@ pub struct ValidationDecl {
     pub operator: Option<String>,
     pub formula1: Option<String>,
     pub formula2: Option<String>,
-    /// Written `allowBlank="true"` when the file allows blanks.
+    /// Written `allowBlank="true"` when the file allows blanks
+    /// (SpreadsheetML default is false).
     pub allow_blank: bool,
-    /// `None`: Excel's default (show the input message). `Some(false)` when
-    /// the file turns it off.
+    /// Text default is on (omit). `Some(false)` when the alert is off.
+    /// SpreadsheetML defaults to false when the XML attribute is absent.
     pub show_input_message: Option<bool>,
-    /// `None`: Excel's default (show the error). `Some(false)` when off.
+    /// Text default is on (omit). `Some(false)` when the alert is off.
+    /// SpreadsheetML defaults to false when the XML attribute is absent.
     pub show_error_message: Option<bool>,
     pub prompt_title: Option<String>,
     pub prompt: Option<String>,

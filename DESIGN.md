@@ -1105,7 +1105,9 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
   lines (optional `operator`, `formula2`, `allowBlank`, `showInputMessage`,
   `promptTitle`, `prompt`, `showErrorMessage`, `errorTitle`, `error`,
   `errorStyle`; `formula1`/`formula2` are Excel's formula text: a quoted
-  list keeps its quotes, a range or name stays unquoted).
+  list keeps its quotes, a range or name stays unquoted;
+  `showInputMessage`/`showErrorMessage` are omitted when on, the text
+  default, and written `"false"` when off).
   Conditional formats that the text models (`cellIs`, `expression`) are
   `<conditional-format range="F4:F48" type="cellIs" operator="lessThan" formula="3000000" dxf="fill=#FFC7CE"/>`
   lines, one per rule (`formula2` for `between`, `stopIfTrue`, `dxf` the

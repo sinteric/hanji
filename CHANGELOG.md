@@ -9,7 +9,11 @@
   of `<keep kind="data-validation"/>` / `<keep kind="conditional-format"/>`
   placeholders. Each can be kept, added, removed or changed.
   `formula1`/`formula2` are Excel's formula text: a quoted list keeps its
-  quotes, a range or name stays unquoted. Sheets with more than 1024 of
+  quotes, a range or name stays unquoted. `showInputMessage`/
+  `showErrorMessage` are omitted in the text when on (the default) and
+  written `"false"` when off; a new or rewritten validation writes the XML
+  attribute as `"1"` when on and omits it when off (SpreadsheetML default
+  false). Sheets with more than 1024 of
   either kind, a conditional format that is not `cellIs` or `expression`
   (a data bar, color scale or icon set), or a dxf the cell vocabulary
   cannot write stay placeholders for that sheet. Unedited validation and

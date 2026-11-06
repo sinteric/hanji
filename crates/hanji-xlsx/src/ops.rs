@@ -742,15 +742,20 @@ fn write_validation(prefix: &str, w: &ValidationDecl) -> Element {
     if let Some(op) = &w.operator {
         el.set("operator", op);
     }
-    if w.allow_blank {
-        el.set("allowBlank", "1");
-    }
-    if w.show_input_message == Some(false) {
-        el.set("showInputMessage", "0");
-    }
-    if w.show_error_message == Some(false) {
-        el.set("showErrorMessage", "0");
-    }
+    // allowBlank / showInputMessage / showErrorMessage default false in
+    // CT_DataValidation. Write "1" when on; omit when off. showDropDown is
+    // not in the text (spec default false); leftover XML keeps it.
+    set_xml_on(&mut el, "allowBlank", w.allow_blank);
+    set_xml_on(
+        &mut el,
+        "showInputMessage",
+        w.show_input_message != Some(false),
+    );
+    set_xml_on(
+        &mut el,
+        "showErrorMessage",
+        w.show_error_message != Some(false),
+    );
     if let Some(s) = &w.prompt_title {
         el.set("promptTitle", s);
     }
@@ -782,23 +787,17 @@ fn sync_validation(e: &mut Entry, w: &ValidationDecl, prefix: &str, scope: &xml:
             x.remove_attr("operator");
         }
     }
-    if w.allow_blank {
-        x.set("allowBlank", "1");
-    } else {
-        x.remove_attr("allowBlank");
-    }
-    match w.show_input_message {
-        Some(false) => x.set("showInputMessage", "0"),
-        _ => {
-            x.remove_attr("showInputMessage");
-        }
-    }
-    match w.show_error_message {
-        Some(false) => x.set("showErrorMessage", "0"),
-        _ => {
-            x.remove_attr("showErrorMessage");
-        }
-    }
+    set_xml_on(&mut x, "allowBlank", w.allow_blank);
+    set_xml_on(
+        &mut x,
+        "showInputMessage",
+        w.show_input_message != Some(false),
+    );
+    set_xml_on(
+        &mut x,
+        "showErrorMessage",
+        w.show_error_message != Some(false),
+    );
     set_opt_attr(&mut x, "promptTitle", w.prompt_title.as_deref());
     set_opt_attr(&mut x, "prompt", w.prompt.as_deref());
     set_opt_attr(&mut x, "errorTitle", w.error_title.as_deref());
@@ -813,6 +812,14 @@ fn sync_validation(e: &mut Entry, w: &ValidationDecl, prefix: &str, scope: &xml:
     set_formula_child(&mut x, prefix, "formula2", w.formula2.as_deref());
     e.xml[0] = x.to_xml();
     e.fp = xml::canon(&x, scope);
+}
+
+fn set_xml_on(el: &mut Element, k: &str, on: bool) {
+    if on {
+        el.set(k, "1");
+    } else {
+        el.remove_attr(k);
+    }
 }
 
 fn set_formula_child(el: &mut Element, prefix: &str, local: &str, v: Option<&str>) {

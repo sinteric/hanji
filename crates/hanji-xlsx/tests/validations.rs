@@ -26,6 +26,22 @@ fn validation_lines(text: &str) -> Vec<String> {
         .collect()
 }
 
+fn validation_attr(bytes: &[u8], part: &str, sqref: &str, attr: &str) -> Option<String> {
+    let parts = package::read(bytes).unwrap();
+    let data = parts.iter().find(|p| p.name == part).unwrap();
+    let doc = xml::parse(&data.data).unwrap();
+    let list = doc
+        .root
+        .elements()
+        .find(|e| e.local() == "dataValidations")
+        .expect("the worksheet has <dataValidations>");
+    let v = list
+        .elements()
+        .find(|e| e.local() == "dataValidation" && e.get("sqref").as_deref() == Some(sqref))
+        .and_then(|e| e.get(attr));
+    v
+}
+
 fn sheet_validations(bytes: &[u8], part: &str) -> Vec<(String, String, Option<String>)> {
     let parts = package::read(bytes).unwrap();
     let data = parts.iter().find(|p| p.name == part).unwrap();
@@ -298,4 +314,86 @@ fn a_list_range_reference_stays_unquoted() {
             .any(|v| v.1 == "list" && v.2.as_deref() == Some("\"IN,US,UK\"")),
         "{got:?}"
     );
+}
+
+#[test]
+fn a_new_validation_writes_show_error_message_on() {
+    let bytes = corpus_file("rx_data_validation01.xlsx");
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
+    let edited = imp.text.replace(
+        "<validation range=\"C2\" type=\"list\" formula1=\"&quot;Foo,Bar,Baz&quot;\" allowBlank=\"true\"/>",
+        "<validation range=\"C2\" type=\"list\" formula1=\"&quot;Foo,Bar,Baz&quot;\" allowBlank=\"true\"/>\n<validation range=\"D2\" type=\"whole\" operator=\"greaterThan\" formula1=\"0\"/>",
+    );
+    let a = XlsxEngine::apply(&edited, &imp.remainder, "[]").unwrap();
+    assert!(
+        a.text.contains(
+            "<validation range=\"D2\" type=\"whole\" operator=\"greaterThan\" formula1=\"0\"/>"
+        ),
+        "{}",
+        a.text
+    );
+    let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
+    assert_eq!(
+        validation_attr(&out, "xl/worksheets/sheet1.xml", "D2", "showErrorMessage").as_deref(),
+        Some("1")
+    );
+    assert_eq!(
+        validation_attr(&out, "xl/worksheets/sheet1.xml", "D2", "showInputMessage").as_deref(),
+        Some("1")
+    );
+}
+
+#[test]
+fn an_existing_show_error_message_on_survives_an_edit() {
+    let bytes = corpus_file("rx_data_validation01.xlsx");
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
+    assert_eq!(
+        validation_attr(&bytes, "xl/worksheets/sheet1.xml", "C2", "showErrorMessage").as_deref(),
+        Some("1")
+    );
+    let edited = imp.text.replace("Foo,Bar,Baz", "A,B,C");
+    let a = XlsxEngine::apply(&edited, &imp.remainder, "[]").unwrap();
+    let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
+    assert_eq!(
+        validation_attr(&out, "xl/worksheets/sheet1.xml", "C2", "showErrorMessage").as_deref(),
+        Some("1")
+    );
+    assert_eq!(
+        validation_attr(&out, "xl/worksheets/sheet1.xml", "C2", "showInputMessage").as_deref(),
+        Some("1")
+    );
+}
+
+#[test]
+fn an_absent_show_error_message_reads_as_false_and_round_trips() {
+    let orig = corpus_file("rx_data_validation01.xlsx");
+    let mut parts = package::read(&orig).unwrap();
+    let sheet = parts
+        .iter_mut()
+        .find(|p| p.name == "xl/worksheets/sheet1.xml")
+        .unwrap();
+    let s = String::from_utf8(sheet.data.clone()).unwrap();
+    let next = s
+        .replace(r#" showInputMessage="1""#, "")
+        .replace(r#" showErrorMessage="1""#, "");
+    assert_ne!(next, s);
+    sheet.data = next.into_bytes();
+    let bytes = package::write(&parts).unwrap();
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
+    assert_eq!(
+        validation_lines(&imp.text),
+        ["<validation range=\"C2\" type=\"list\" formula1=\"&quot;Foo,Bar,Baz&quot;\" allowBlank=\"true\" showInputMessage=\"false\" showErrorMessage=\"false\"/>"]
+    );
+    let out = XlsxEngine.export(&imp.text, &imp.remainder).unwrap();
+    getput(&bytes, &out).unwrap();
+    assert!(validation_attr(&out, "xl/worksheets/sheet1.xml", "C2", "showErrorMessage").is_none());
+    assert!(validation_attr(&out, "xl/worksheets/sheet1.xml", "C2", "showInputMessage").is_none());
+    let again = XlsxEngine.import(&out, &ImportOptions::default()).unwrap();
+    assert_eq!(again.text, imp.text);
 }

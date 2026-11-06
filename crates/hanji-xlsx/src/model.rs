@@ -380,14 +380,8 @@ pub(crate) fn validation_decl(e: &Entry) -> Option<ValidationDecl> {
         formula1: child_text(&el, "formula1"),
         formula2: child_text(&el, "formula2"),
         allow_blank: xml_flag(&el, "allowBlank") == Some(true),
-        show_input_message: match xml_flag(&el, "showInputMessage") {
-            Some(false) => Some(false),
-            _ => None,
-        },
-        show_error_message: match xml_flag(&el, "showErrorMessage") {
-            Some(false) => Some(false),
-            _ => None,
-        },
+        show_input_message: xml_message_off(&el, "showInputMessage"),
+        show_error_message: xml_message_off(&el, "showErrorMessage"),
         prompt_title: el.get("promptTitle").filter(|s| !s.is_empty()),
         prompt: el.get("prompt").filter(|s| !s.is_empty()),
         error_title: el.get("errorTitle").filter(|s| !s.is_empty()),
@@ -481,6 +475,16 @@ fn xml_flag(e: &Element, k: &str) -> Option<bool> {
         Some("1" | "true" | "True") => Some(true),
         Some("0" | "false" | "False") => Some(false),
         _ => None,
+    }
+}
+
+/// CT_DataValidation `showInputMessage` / `showErrorMessage` default to false
+/// when absent. The text default is on: omit the attr when true, write
+/// `"false"` when off.
+fn xml_message_off(e: &Element, k: &str) -> Option<bool> {
+    match xml_flag(e, k) {
+        Some(true) => None,
+        _ => Some(false),
     }
 }
 
