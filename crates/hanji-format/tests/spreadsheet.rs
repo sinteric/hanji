@@ -48,9 +48,11 @@ fn the_design_md_example_parses() {
             SheetItem::Merge(m) => format!("merge {}", m.range),
             SheetItem::Hyperlink(h) => format!("hyperlink {}", h.range),
             SheetItem::Note(n) => format!("note {}", n.range),
+            SheetItem::Validation(v) => format!("validation {}", v.range),
+            SheetItem::ConditionalFormat(c) => format!("conditional-format {}", c.range),
             SheetItem::Chart(c) => format!("chart {}", c.ty),
             SheetItem::Keep(k) => format!("keep {}", k.kind),
-            &_ => unreachable!(),
+            _ => unreachable!(),
         })
         .collect();
     assert_eq!(
@@ -61,7 +63,8 @@ fn the_design_md_example_parses() {
             "merge A1:G1",
             "hyperlink H4",
             "note A3",
-            "keep data-validation"
+            "validation B2:B1201",
+            "conditional-format F4:F48",
         ]
     );
 }

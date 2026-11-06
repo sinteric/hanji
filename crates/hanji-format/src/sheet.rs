@@ -1,11 +1,12 @@
 //! The Spreadsheet grammar (DESIGN.md §5.4): the workbook's structure as text
 //! — `<sheet>` blocks holding `<table>` blocks (one pipe-table line per
 //! column: name, type, number format, formula), `<merge range/>` lines,
-//! `<hyperlink/>` lines, `<note/>` lines, `<chart/>` lines and placeholders —
-//! and the row window through which cell data is read (a pipe table whose
-//! first column is the read-only sheet row number, values as displayed; §6
-//! round 4, read view A). Cell data is written by range operations (`ops.rs`),
-//! never as text.
+//! `<hyperlink/>` lines, `<note/>` lines, `<validation/>` lines,
+//! `<conditional-format/>` lines, `<chart/>` lines and placeholders — and
+//! the row window through which cell data is read (a pipe table whose first
+//! column is the read-only sheet row number, values as displayed; §6 round 4,
+//! read view A). Cell data is written by range operations (`ops.rs`), never
+//! as text.
 
 use crate::ast::{FrontMatter, Keep};
 use crate::cellfmt::{self, CellFormat, FormatLine};
@@ -35,6 +36,44 @@ pub const MAX_HYPERLINK_LINES: usize = 1024;
 /// At most this many `<note/>` lines on one sheet. A sheet with more keeps
 /// them as a placeholder (§2 rule 11).
 pub const MAX_NOTE_LINES: usize = 1024;
+
+/// At most this many `<validation/>` lines on one sheet. A sheet with more
+/// keeps them as a placeholder (§2 rule 11).
+pub const MAX_VALIDATION_LINES: usize = 1024;
+
+/// At most this many `<conditional-format/>` lines on one sheet. A sheet
+/// with more keeps them as a placeholder (§2 rule 11).
+pub const MAX_CONDITIONAL_FORMAT_LINES: usize = 1024;
+
+/// Data-validation types a `<validation/>` line may name (SpreadsheetML).
+pub const VALIDATION_TYPES: &[&str] = &[
+    "whole",
+    "decimal",
+    "list",
+    "date",
+    "time",
+    "textLength",
+    "custom",
+];
+
+/// Comparison operators a validation or `cellIs` rule may name.
+pub const VALIDATION_OPERATORS: &[&str] = &[
+    "between",
+    "notBetween",
+    "equal",
+    "notEqual",
+    "greaterThan",
+    "lessThan",
+    "greaterThanOrEqual",
+    "lessThanOrEqual",
+];
+
+/// `errorStyle` values Excel writes.
+pub const VALIDATION_ERROR_STYLES: &[&str] = &["stop", "warning", "information"];
+
+/// Conditional-format rule types the text models. Other types (dataBar,
+/// colorScale, iconSet, …) stay a placeholder.
+pub const CONDITIONAL_FORMAT_TYPES: &[&str] = &["cellIs", "expression"];
 
 /// Excel's last row and column (A1's `XFD1048576`).
 const MAX_ROW: u32 = 1_048_576;
@@ -66,6 +105,10 @@ pub enum SheetItem {
     Merge(MergeDecl),
     Hyperlink(HyperlinkDecl),
     Note(NoteDecl),
+    Validation(ValidationDecl),
+    /// Boxed: `CondFormatDecl` holds a `CellFormat`, which would otherwise
+    /// dominate `SheetItem`'s size (clippy `large_enum_variant`).
+    ConditionalFormat(Box<CondFormatDecl>),
     Chart(ChartDecl),
     Keep(Keep),
 }
@@ -100,6 +143,51 @@ pub struct NoteDecl {
     pub author: String,
     /// Plain text of the balloon; a newline is `&#10;` in the attribute.
     pub text: String,
+}
+
+/// One data validation (`<validation range="C2" type="list" formula1="A,B,C"/>`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ValidationDecl {
+    /// Canonical A1 range or space-separated ranges (`C2`, `B4:B48`).
+    pub range: String,
+    /// SpreadsheetML type (`list`, `whole`, `decimal`, …).
+    pub ty: String,
+    /// Omitted when the file uses the default (`between`).
+    pub operator: Option<String>,
+    pub formula1: Option<String>,
+    pub formula2: Option<String>,
+    /// Written `allowBlank="true"` when the file allows blanks.
+    pub allow_blank: bool,
+    /// `None`: Excel's default (show the input message). `Some(false)` when
+    /// the file turns it off.
+    pub show_input_message: Option<bool>,
+    /// `None`: Excel's default (show the error). `Some(false)` when off.
+    pub show_error_message: Option<bool>,
+    pub prompt_title: Option<String>,
+    pub prompt: Option<String>,
+    pub error_title: Option<String>,
+    pub error: Option<String>,
+    /// Omitted when the file uses the default (`stop`).
+    pub error_style: Option<String>,
+}
+
+/// One conditional-format rule (`<conditional-format range="A1" type="cellIs"
+/// operator="greaterThan" formula="5" dxf="fill=#FFC7CE"/>`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CondFormatDecl {
+    /// Canonical A1 range or space-separated ranges.
+    pub range: String,
+    /// `cellIs` or `expression`.
+    pub ty: String,
+    /// Omitted when the file uses the default (`between`), and for
+    /// `expression` rules.
+    pub operator: Option<String>,
+    pub formula: Option<String>,
+    pub formula2: Option<String>,
+    /// Differential formatting; empty when the rule has none.
+    pub dxf: CellFormat,
+    /// Written `stopIfTrue="true"` when the file stops at this rule.
+    pub stop_if_true: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -303,6 +391,10 @@ const MERGE_FORM: &str = "<merge range=\"A1:B2\"/>";
 const HYPERLINK_FORM: &str =
     "<hyperlink range=\"A1\" target=\"https://example.com\"/> or <hyperlink range=\"B2\" location=\"Sheet2!A1\"/>";
 const NOTE_FORM: &str = "<note range=\"B2\" author=\"…\" text=\"…\"/>";
+const VALIDATION_FORM: &str =
+    "<validation range=\"C2\" type=\"list\" formula1=\"A,B,C\"/> or <validation range=\"B2:B10\" type=\"whole\" operator=\"between\" formula1=\"1\" formula2=\"100\" allowBlank=\"true\"/>";
+const CONDITIONAL_FORMAT_FORM: &str =
+    "<conditional-format range=\"A1:A10\" type=\"cellIs\" operator=\"greaterThan\" formula=\"5\" dxf=\"fill=#FFC7CE\"/>";
 const CHART_FORM: &str = "<chart type=\"bar\" data=\"Table[Column],Table[Column]\" title=\"…\"/>";
 const KEEP_FORM: &str = "<keep id=\"…\" kind=\"…\" summary=\"…\"/>";
 
@@ -437,6 +529,30 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
             i += 1;
             continue;
         }
+        if t.starts_with("<validation") {
+            let n = sheet
+                .items
+                .iter()
+                .filter(|it| matches!(it, SheetItem::Validation(_)))
+                .count();
+            if let Some(v) = validation_tag(&mut p, i, n) {
+                sheet.items.push(SheetItem::Validation(v));
+            }
+            i += 1;
+            continue;
+        }
+        if t.starts_with("<conditional-format") {
+            let n = sheet
+                .items
+                .iter()
+                .filter(|it| matches!(it, SheetItem::ConditionalFormat(_)))
+                .count();
+            if let Some(c) = conditional_format_tag(&mut p, i, n) {
+                sheet.items.push(SheetItem::ConditionalFormat(Box::new(c)));
+            }
+            i += 1;
+            continue;
+        }
         if t.starts_with("<chart") {
             if let Some(c) = chart_tag(&mut p, i) {
                 sheet.items.push(SheetItem::Chart(c));
@@ -457,7 +573,7 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
         } else if t.starts_with('|') {
             p.err(i, col, format!("a pipe table here belongs inside a table block: {TABLE_FORM}. Cell data is written by range operations."));
         } else {
-            p.err(i, col, format!("a sheet holds only table blocks ({TABLE_FORM}), merge lines ({MERGE_FORM}), hyperlink lines ({HYPERLINK_FORM}), note lines ({NOTE_FORM}), chart lines ({CHART_FORM}), placeholders ({KEEP_FORM}) and the format lines of its cells."));
+            p.err(i, col, format!("a sheet holds only table blocks ({TABLE_FORM}), merge lines ({MERGE_FORM}), hyperlink lines ({HYPERLINK_FORM}), note lines ({NOTE_FORM}), validation lines ({VALIDATION_FORM}), conditional-format lines ({CONDITIONAL_FORMAT_FORM}), chart lines ({CHART_FORM}), placeholders ({KEEP_FORM}) and the format lines of its cells."));
         }
         i += 1;
     }
@@ -952,7 +1068,243 @@ fn note_tag(p: &mut Parser<'_>, i: usize, prev: &[String]) -> Option<NoteDecl> {
 }
 
 fn opt_attr(attrs: &[(String, String)], k: &str) -> Option<String> {
-    get(attrs, k).map(str::to_string)
+    get(attrs, k).filter(|s| !s.is_empty()).map(str::to_string)
+}
+
+const VALIDATION_ATTRS: &[&str] = &[
+    "range",
+    "type",
+    "operator",
+    "formula1",
+    "formula2",
+    "allowblank",
+    "showinputmessage",
+    "showerrormessage",
+    "prompttitle",
+    "prompt",
+    "errortitle",
+    "error",
+    "errorstyle",
+];
+
+fn validation_tag(p: &mut Parser<'_>, i: usize, have: usize) -> Option<ValidationDecl> {
+    let attrs = tag_attrs(p, i, "validation", VALIDATION_FORM, VALIDATION_ATTRS)?;
+    let (Some(raw), Some(ty)) = (get(&attrs, "range"), get(&attrs, "type")) else {
+        p.err(
+            i,
+            1,
+            format!("<validation> has a range and a type: {VALIDATION_FORM}."),
+        );
+        return None;
+    };
+    if have >= MAX_VALIDATION_LINES {
+        p.err(
+            i,
+            1,
+            format!(
+                "this sheet already has {MAX_VALIDATION_LINES} data validations; at most {MAX_VALIDATION_LINES} are written as {VALIDATION_FORM} lines (a sheet with more keeps them as a placeholder)."
+            ),
+        );
+        return None;
+    }
+    if !VALIDATION_TYPES.contains(&ty) {
+        p.err(
+            i,
+            1,
+            format!(
+                "validation type \"{ty}\" is not one of {}.",
+                quoted_list(VALIDATION_TYPES)
+            ),
+        );
+        return None;
+    }
+    let range = match parse_sqref_text(raw) {
+        Ok(r) => r,
+        Err(m) => {
+            p.err(i, 1, m);
+            return None;
+        }
+    };
+    let operator = match get(&attrs, "operator") {
+        None => None,
+        Some("between") => None,
+        Some(op) if VALIDATION_OPERATORS.contains(&op) => Some(op.to_string()),
+        Some(op) => {
+            p.err(
+                i,
+                1,
+                format!(
+                    "operator \"{op}\" is not one of {}.",
+                    quoted_list(VALIDATION_OPERATORS)
+                ),
+            );
+            return None;
+        }
+    };
+    let error_style = match get(&attrs, "errorstyle") {
+        None | Some("stop") => None,
+        Some(s) if VALIDATION_ERROR_STYLES.contains(&s) => Some(s.to_string()),
+        Some(s) => {
+            p.err(
+                i,
+                1,
+                format!(
+                    "errorStyle \"{s}\" is not one of {}.",
+                    quoted_list(VALIDATION_ERROR_STYLES)
+                ),
+            );
+            return None;
+        }
+    };
+    Some(ValidationDecl {
+        range,
+        ty: ty.to_string(),
+        operator,
+        formula1: opt_attr(&attrs, "formula1"),
+        formula2: opt_attr(&attrs, "formula2"),
+        allow_blank: parse_flag_attr(p, i, &attrs, "allowblank")? == Some(true),
+        show_input_message: match parse_flag_attr(p, i, &attrs, "showinputmessage")? {
+            Some(true) | None => None,
+            Some(false) => Some(false),
+        },
+        show_error_message: match parse_flag_attr(p, i, &attrs, "showerrormessage")? {
+            Some(true) | None => None,
+            Some(false) => Some(false),
+        },
+        prompt_title: opt_attr(&attrs, "prompttitle"),
+        prompt: opt_attr(&attrs, "prompt"),
+        error_title: opt_attr(&attrs, "errortitle"),
+        error: opt_attr(&attrs, "error"),
+        error_style,
+    })
+}
+
+const CONDITIONAL_FORMAT_ATTRS: &[&str] = &[
+    "range",
+    "type",
+    "operator",
+    "formula",
+    "formula2",
+    "dxf",
+    "stopiftrue",
+];
+
+fn conditional_format_tag(p: &mut Parser<'_>, i: usize, have: usize) -> Option<CondFormatDecl> {
+    let attrs = tag_attrs(
+        p,
+        i,
+        "conditional-format",
+        CONDITIONAL_FORMAT_FORM,
+        CONDITIONAL_FORMAT_ATTRS,
+    )?;
+    let (Some(raw), Some(ty)) = (get(&attrs, "range"), get(&attrs, "type")) else {
+        p.err(
+            i,
+            1,
+            format!("<conditional-format> has a range and a type: {CONDITIONAL_FORMAT_FORM}."),
+        );
+        return None;
+    };
+    if have >= MAX_CONDITIONAL_FORMAT_LINES {
+        p.err(
+            i,
+            1,
+            format!(
+                "this sheet already has {MAX_CONDITIONAL_FORMAT_LINES} conditional formats; at most {MAX_CONDITIONAL_FORMAT_LINES} are written as {CONDITIONAL_FORMAT_FORM} lines (a sheet with more keeps them as a placeholder)."
+            ),
+        );
+        return None;
+    }
+    if !CONDITIONAL_FORMAT_TYPES.contains(&ty) {
+        p.err(
+            i,
+            1,
+            format!(
+                "conditional-format type \"{ty}\" is not one of {} (other rules stay a placeholder).",
+                quoted_list(CONDITIONAL_FORMAT_TYPES)
+            ),
+        );
+        return None;
+    }
+    let range = match parse_sqref_text(raw) {
+        Ok(r) => r,
+        Err(m) => {
+            p.err(i, 1, m);
+            return None;
+        }
+    };
+    let operator = match (ty, get(&attrs, "operator")) {
+        ("expression", Some(_)) => {
+            p.err(
+                i,
+                1,
+                "an expression rule has no operator; write type=\"expression\" formula=\"…\".",
+            );
+            return None;
+        }
+        (_, None) | (_, Some("between")) => None,
+        (_, Some(op)) if VALIDATION_OPERATORS.contains(&op) => Some(op.to_string()),
+        (_, Some(op)) => {
+            p.err(
+                i,
+                1,
+                format!(
+                    "operator \"{op}\" is not one of {}.",
+                    quoted_list(VALIDATION_OPERATORS)
+                ),
+            );
+            return None;
+        }
+    };
+    let dxf = match get(&attrs, "dxf") {
+        None => CellFormat::default(),
+        Some(s) => match CellFormat::parse(s) {
+            Ok(f) => f,
+            Err((_, m)) => {
+                p.err(i, 1, format!("dxf: {m}"));
+                return None;
+            }
+        },
+    };
+    Some(CondFormatDecl {
+        range,
+        ty: ty.to_string(),
+        operator,
+        formula: opt_attr(&attrs, "formula"),
+        formula2: opt_attr(&attrs, "formula2"),
+        dxf,
+        stop_if_true: parse_flag_attr(p, i, &attrs, "stopiftrue")? == Some(true),
+    })
+}
+
+fn parse_flag_attr(
+    p: &mut Parser<'_>,
+    i: usize,
+    attrs: &[(String, String)],
+    k: &str,
+) -> Option<Option<bool>> {
+    match get(attrs, k) {
+        None => Some(None),
+        Some("true" | "1") => Some(Some(true)),
+        Some("false" | "0") => Some(Some(false)),
+        Some(v) => {
+            p.err(i, 1, format!("{k}=\"{v}\" is not true or false."));
+            None
+        }
+    }
+}
+
+/// Canonical space-separated A1 ranges (`B2:A1 C3` → `A1:B2 C3`).
+fn parse_sqref_text(s: &str) -> Result<String, String> {
+    let parts: Vec<&str> = s.split_whitespace().collect();
+    if parts.is_empty() {
+        return Err("range is empty; write an A1 cell or range such as A1 or A1:B2.".into());
+    }
+    let mut out = Vec::with_capacity(parts.len());
+    for p in parts {
+        out.push(parse_sheet_range(p)?);
+    }
+    Ok(out.join(" "))
 }
 
 fn overlap_error(p: &mut Parser<'_>, i: usize, range: &str, prev: &[String], what: &str) -> bool {
@@ -1294,6 +1646,28 @@ pub fn serialize_spreadsheet(s: &Spreadsheet) -> String {
                         }
                     }
                 }
+                SheetItem::Validation(_) => {
+                    while i < sh.items.len() {
+                        match &sh.items[i] {
+                            SheetItem::Validation(v) => {
+                                out.push(validation_line(v));
+                                i += 1;
+                            }
+                            _ => break,
+                        }
+                    }
+                }
+                SheetItem::ConditionalFormat(_) => {
+                    while i < sh.items.len() {
+                        match &sh.items[i] {
+                            SheetItem::ConditionalFormat(c) => {
+                                out.push(conditional_format_line(c));
+                                i += 1;
+                            }
+                            _ => break,
+                        }
+                    }
+                }
                 SheetItem::Table(t) => {
                     out.extend(table_lines(t));
                     i += 1;
@@ -1392,6 +1766,60 @@ pub fn note_line(n: &NoteDecl) -> String {
     )
 }
 
+fn push_opt(s: &mut String, k: &str, v: Option<&str>) {
+    if let Some(v) = v {
+        s.push_str(&format!(" {k}=\"{}\"", attr(v)));
+    }
+}
+
+fn push_bool_true(s: &mut String, k: &str, on: bool) {
+    if on {
+        s.push_str(&format!(" {k}=\"true\""));
+    }
+}
+
+fn push_bool_false(s: &mut String, k: &str, v: Option<bool>) {
+    if v == Some(false) {
+        s.push_str(&format!(" {k}=\"false\""));
+    }
+}
+
+pub fn validation_line(v: &ValidationDecl) -> String {
+    let mut s = format!(
+        "<validation range=\"{}\" type=\"{}\"",
+        attr(&v.range),
+        attr(&v.ty)
+    );
+    push_opt(&mut s, "operator", v.operator.as_deref());
+    push_opt(&mut s, "formula1", v.formula1.as_deref());
+    push_opt(&mut s, "formula2", v.formula2.as_deref());
+    push_bool_true(&mut s, "allowBlank", v.allow_blank);
+    push_bool_false(&mut s, "showInputMessage", v.show_input_message);
+    push_bool_false(&mut s, "showErrorMessage", v.show_error_message);
+    push_opt(&mut s, "promptTitle", v.prompt_title.as_deref());
+    push_opt(&mut s, "prompt", v.prompt.as_deref());
+    push_opt(&mut s, "errorTitle", v.error_title.as_deref());
+    push_opt(&mut s, "error", v.error.as_deref());
+    push_opt(&mut s, "errorStyle", v.error_style.as_deref());
+    s + "/>"
+}
+
+pub fn conditional_format_line(c: &CondFormatDecl) -> String {
+    let mut s = format!(
+        "<conditional-format range=\"{}\" type=\"{}\"",
+        attr(&c.range),
+        attr(&c.ty)
+    );
+    push_opt(&mut s, "operator", c.operator.as_deref());
+    push_opt(&mut s, "formula", c.formula.as_deref());
+    push_opt(&mut s, "formula2", c.formula2.as_deref());
+    if !c.dxf.is_empty() {
+        s.push_str(&format!(" dxf=\"{}\"", attr(&c.dxf.write())));
+    }
+    push_bool_true(&mut s, "stopIfTrue", c.stop_if_true);
+    s + "/>"
+}
+
 /// An attribute that may hold newlines (`&#10;`, `&#13;`).
 fn attr_text(s: &str) -> String {
     attr(s).replace('\n', "&#10;").replace('\r', "&#13;")
@@ -1450,7 +1878,7 @@ pub fn window_text(of: &WindowOf, header: &[String], rows: &[(u32, Vec<String>)]
 mod tests {
     use super::*;
 
-    const TEXT: &str = "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"매출\" range=\"A1:E1201\">\n\n<table name=\"Sales\" range=\"A1:E1201\">\n| column | type | format | formula |\n|---|---|---|---|\n| 월 | date | yyyy-mm |  |\n| 매출 | number | #,##0 |  |\n| 이익 | number | #,##0 | =[@매출]-[@원가] |\n</table>\n\n<chart type=\"bar\" data=\"Sales[월],Sales[이익]\" title=\"월별 이익\"/>\n\n<merge range=\"G1:H1\"/>\n\n<keep id=\"k1\" kind=\"data-validation\" summary=\"B2:B1201\"/>\n</sheet>\n";
+    const TEXT: &str = "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"매출\" range=\"A1:E1201\">\n\n<table name=\"Sales\" range=\"A1:E1201\">\n| column | type | format | formula |\n|---|---|---|---|\n| 월 | date | yyyy-mm |  |\n| 매출 | number | #,##0 |  |\n| 이익 | number | #,##0 | =[@매출]-[@원가] |\n</table>\n\n<chart type=\"bar\" data=\"Sales[월],Sales[이익]\" title=\"월별 이익\"/>\n\n<merge range=\"G1:H1\"/>\n\n<validation range=\"B2:B1201\" type=\"list\" formula1=\"강남,서초,송파\" allowBlank=\"true\"/>\n\n<conditional-format range=\"F4:F48\" type=\"cellIs\" operator=\"lessThan\" formula=\"3000000\" dxf=\"fill=#FFC7CE\"/>\n\n<keep id=\"k1\" kind=\"picture\" summary=\"a drawing\"/>\n</sheet>\n";
 
     #[test]
     fn round_trip() {
@@ -1467,8 +1895,8 @@ mod tests {
     fn errs(text: &str) -> Vec<String> {
         let k1 = Keep {
             id: "k1".into(),
-            kind: "data-validation".into(),
-            summary: "B2:B1201".into(),
+            kind: "picture".into(),
+            summary: "a drawing".into(),
         };
         parse_spreadsheet(
             text,
@@ -1500,7 +1928,7 @@ mod tests {
             e[0].contains("placeholder id=\"k2\" is not in this file"),
             "{e:?}"
         );
-        let e = errs(&TEXT.replace("B2:B1201", "B2:B2"));
+        let e = errs(&TEXT.replace("a drawing", "other"));
         assert!(e[0].contains("was altered"), "{e:?}");
         let e = errs(&TEXT.replace("name=\"Sales\"", "name=\"A1\""));
         assert!(e[0].contains("reads as a cell address"), "{e:?}");
@@ -1700,5 +2128,97 @@ mod tests {
             "<note range=\"B2\" author=\"A\" text=\"one\"/>\n<note range=\"B2\" author=\"B\" text=\"two\"/>",
         ));
         assert!(e[0].contains("overlaps B2"), "{e:?}");
+    }
+
+    #[test]
+    fn validation_and_conditional_format_lines_round_trip() {
+        let s = parse_spreadsheet(TEXT, &Names::default()).unwrap();
+        let v = s.sheets[0]
+            .items
+            .iter()
+            .find_map(|i| match i {
+                SheetItem::Validation(v) => Some(v),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(v.range, "B2:B1201");
+        assert_eq!(v.ty, "list");
+        assert_eq!(v.formula1.as_deref(), Some("강남,서초,송파"));
+        assert!(v.allow_blank);
+        let c = s.sheets[0]
+            .items
+            .iter()
+            .find_map(|i| match i {
+                SheetItem::ConditionalFormat(c) => Some(c),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(c.range, "F4:F48");
+        assert_eq!(c.ty, "cellIs");
+        assert_eq!(c.operator.as_deref(), Some("lessThan"));
+        assert_eq!(c.formula.as_deref(), Some("3000000"));
+        assert_eq!(c.dxf.to_string(), "fill=#FFC7CE");
+        assert_eq!(serialize_spreadsheet(&s), TEXT);
+        let extra = TEXT.replace(
+            "<validation range=\"B2:B1201\" type=\"list\" formula1=\"강남,서초,송파\" allowBlank=\"true\"/>",
+            "<validation range=\"C2:C10\" type=\"whole\" operator=\"greaterThan\" formula1=\"1\" allowBlank=\"true\" showErrorMessage=\"false\" promptTitle=\"Integer Input\" errorStyle=\"warning\"/>",
+        );
+        let s = parse_spreadsheet(&extra, &Names::default()).unwrap();
+        let v = s.sheets[0]
+            .items
+            .iter()
+            .find_map(|i| match i {
+                SheetItem::Validation(v) => Some(v),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(v.ty, "whole");
+        assert_eq!(v.operator.as_deref(), Some("greaterThan"));
+        assert_eq!(v.show_error_message, Some(false));
+        assert_eq!(v.error_style.as_deref(), Some("warning"));
+        assert_eq!(serialize_spreadsheet(&s), extra);
+        let expr = TEXT.replace(
+            "<conditional-format range=\"F4:F48\" type=\"cellIs\" operator=\"lessThan\" formula=\"3000000\" dxf=\"fill=#FFC7CE\"/>",
+            "<conditional-format range=\"B9\" type=\"expression\" formula=\"$A$8>5\" dxf=\"color=#FF0000 bold\" stopIfTrue=\"true\"/>",
+        );
+        let s = parse_spreadsheet(&expr, &Names::default()).unwrap();
+        let c = s.sheets[0]
+            .items
+            .iter()
+            .find_map(|i| match i {
+                SheetItem::ConditionalFormat(c) => Some(c),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(c.ty, "expression");
+        assert!(c.operator.is_none());
+        assert!(c.stop_if_true);
+        assert_eq!(serialize_spreadsheet(&s), expr);
+    }
+
+    #[test]
+    fn validation_and_conditional_format_errors() {
+        let e = errs(&TEXT.replace(
+            "<validation range=\"B2:B1201\" type=\"list\" formula1=\"강남,서초,송파\" allowBlank=\"true\"/>",
+            "<validation range=\"B2\"/>",
+        ));
+        assert!(e[0].contains("range and a type"), "{e:?}");
+        let e = errs(&TEXT.replace("type=\"list\"", "type=\"dropdown\""));
+        assert!(e[0].contains("dropdown"), "{e:?}");
+        let e = errs(&TEXT.replace(
+            "type=\"cellIs\" operator=\"lessThan\"",
+            "type=\"dataBar\" operator=\"lessThan\"",
+        ));
+        assert!(
+            e[0].contains("dataBar") && e[0].contains("placeholder"),
+            "{e:?}"
+        );
+        let e = errs(&TEXT.replace(
+            "type=\"cellIs\" operator=\"lessThan\"",
+            "type=\"expression\" operator=\"lessThan\"",
+        ));
+        assert!(e[0].contains("no operator"), "{e:?}");
+        let e = errs(&TEXT.replace("operator=\"lessThan\"", "operator=\"bigger\""));
+        assert!(e[0].contains("bigger"), "{e:?}");
     }
 }

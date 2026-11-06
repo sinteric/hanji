@@ -603,3 +603,161 @@ fn set_alignment(xf: &mut Element, set: &CellFormat, have: &CellFormat, p: &str)
         xf.children.insert(0, Node::El(al));
     }
 }
+
+/// A differential format (`dxf`) as the vocabulary, or `None` when it uses
+/// a fill, colour or border the text does not write (a gradient, a pattern,
+/// a `*` tint).
+pub(crate) fn dxf_cell_format(dxf: &Element) -> Option<CellFormat> {
+    let mut out = CellFormat::default();
+    if let Some(font) = kid(dxf, "font") {
+        if let Some(b) = kid(font, "b") {
+            out.bold = Some(flag(Some(b)));
+        }
+        if let Some(i) = kid(font, "i") {
+            out.italic = Some(flag(Some(i)));
+        }
+        if let Some(u) = kid(font, "u") {
+            out.underline = Some(flag(Some(u)));
+        }
+        if let Some(s) = kid(font, "strike") {
+            out.strike = Some(flag(Some(s)));
+        }
+        if let Some(sz) = kid(font, "sz")
+            .and_then(|s| s.get("val"))
+            .and_then(|v| v.parse::<f64>().ok())
+        {
+            out.size = Some((sz * 100.0).round() as i64);
+        }
+        if let Some(c) = color_of(kid(font, "color")) {
+            if !c.is_writable() {
+                return None;
+            }
+            out.color = Some(c);
+        }
+        out.font = kid(font, "name")
+            .and_then(|n| n.get("val"))
+            .filter(|n| !n.is_empty());
+    }
+    if let Some(fill) = kid(dxf, "fill") {
+        if kid(fill, "gradientFill").is_some() {
+            return None;
+        }
+        if let Some(p) = kid(fill, "patternFill") {
+            let color = match p.get("patternType").as_deref() {
+                Some("solid") => {
+                    color_of(kid(p, "fgColor")).or_else(|| color_of(kid(p, "bgColor")))
+                }
+                None | Some("none") => {
+                    color_of(kid(p, "bgColor")).or_else(|| color_of(kid(p, "fgColor")))
+                }
+                Some(_) => return None,
+            };
+            if let Some(c) = color {
+                if !c.is_writable() {
+                    return None;
+                }
+                out.fill = Some(Fill::Color(c));
+            }
+        }
+    }
+    if let Some(border) = kid(dxf, "border") {
+        for (k, b) in border_values(Some(border)).into_iter().enumerate() {
+            match b {
+                Border::None => {}
+                other if other.is_writable() => out.borders[k] = Some(other),
+                _ => return None,
+            }
+        }
+    }
+    Some(out)
+}
+
+fn write_dxf(fmt: &CellFormat, p: &str) -> Result<Element, String> {
+    if let Some(f) = &fmt.fill {
+        if !f.is_writable() {
+            return Err(format!(
+                "dxf fill={f} is shown but cannot be written; write a colour or none"
+            ));
+        }
+    }
+    for b in fmt.borders.iter().flatten() {
+        if !b.is_writable() {
+            return Err(format!(
+                "dxf {b} cannot be written; write solid, dashed, dotted, double, dash-dot or dash-dot-dot"
+            ));
+        }
+    }
+    let mut dxf = Element::new(&format!("{p}dxf"));
+    let mut font = Element::new(&format!("{p}font"));
+    let put_flag = |font: &mut Element, local: &str, v: Option<bool>| {
+        if let Some(on) = v {
+            let mut e = Element::new(&format!("{p}{local}"));
+            if !on {
+                e.set("val", "0");
+            }
+            xml::insert_ordered(font, e, &FONT_ORDER);
+        }
+    };
+    put_flag(&mut font, "b", fmt.bold);
+    put_flag(&mut font, "i", fmt.italic);
+    put_flag(&mut font, "strike", fmt.strike);
+    put_flag(&mut font, "u", fmt.underline);
+    if let Some(sz) = fmt.size {
+        xml::insert_ordered(
+            &mut font,
+            Element::new(&format!("{p}sz")).with_attr("val", &format!("{}", sz as f64 / 100.0)),
+            &FONT_ORDER,
+        );
+    }
+    if let Some(c) = &fmt.color {
+        xml::insert_ordered(&mut font, color_el(&format!("{p}color"), c)?, &FONT_ORDER);
+    }
+    if let Some(name) = &fmt.font {
+        xml::insert_ordered(
+            &mut font,
+            Element::new(&format!("{p}name")).with_attr("val", name),
+            &FONT_ORDER,
+        );
+        xml::insert_ordered(
+            &mut font,
+            Element::new(&format!("{p}scheme")).with_attr("val", "none"),
+            &FONT_ORDER,
+        );
+    }
+    if font.has_elements() {
+        dxf.children.push(Node::El(font));
+    }
+    if let Some(Fill::Color(c)) = &fmt.fill {
+        let mut pf = Element::new(&format!("{p}patternFill"));
+        pf.children
+            .push(Node::El(color_el(&format!("{p}bgColor"), c)?));
+        let mut fill = Element::new(&format!("{p}fill"));
+        fill.children.push(Node::El(pf));
+        dxf.children.push(Node::El(fill));
+    }
+    if fmt.borders.iter().any(Option::is_some) {
+        dxf.children
+            .push(Node::El(new_border(None, &fmt.borders, p)?));
+    }
+    Ok(dxf)
+}
+
+impl Styles {
+    /// The modelled form of `dxfs` entry `id`, or `None` when that dxf is
+    /// missing or uses something the text does not write.
+    pub(crate) fn modelled_dxf(&self, id: u32) -> Option<CellFormat> {
+        dxf_cell_format(self.dxf_elements().get(id as usize)?)
+    }
+
+    /// Index of a dxf equal to `fmt`, appending one when the part has none.
+    pub(crate) fn dxf_id_of(&mut self, fmt: &CellFormat) -> Result<u32, String> {
+        for (k, e) in self.dxf_elements().into_iter().enumerate() {
+            if dxf_cell_format(e).as_ref() == Some(fmt) {
+                return Ok(k as u32);
+            }
+        }
+        let p = self.prefix();
+        let el = write_dxf(fmt, &p)?;
+        self.push_dxf(el)
+    }
+}

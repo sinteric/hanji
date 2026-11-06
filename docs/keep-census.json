@@ -33,8 +33,8 @@
   "total": {
     "files": 102,
     "failed": 0,
-    "with_keeps": 52,
-    "keeps": 215
+    "with_keeps": 48,
+    "keeps": 207
   },
   "formats": [
     {
@@ -62,8 +62,8 @@
       "format": "xlsx",
       "files": 46,
       "failed": 0,
-      "with_keeps": 16,
-      "keeps": 33
+      "with_keeps": 12,
+      "keeps": 25
     }
   ],
   "kinds": [
@@ -153,21 +153,9 @@
     },
     {
       "format": "xlsx",
-      "kind": "conditional-format",
-      "keeps": 5,
-      "files": 5
-    },
-    {
-      "format": "xlsx",
       "kind": "shape",
       "keeps": 5,
       "files": 3
-    },
-    {
-      "format": "xlsx",
-      "kind": "data-validation",
-      "keeps": 4,
-      "files": 4
     },
     {
       "format": "docx",
@@ -214,6 +202,12 @@
     {
       "format": "docx",
       "kind": "footnote",
+      "keeps": 1,
+      "files": 1
+    },
+    {
+      "format": "xlsx",
+      "kind": "conditional-format",
       "keeps": 1,
       "files": 1
     },
@@ -688,10 +682,8 @@
     {
       "path": "crates/hanji-xlsx/corpus/DataValidations-49244.xlsx",
       "format": "xlsx",
-      "keeps": 1,
-      "kinds": {
-        "data-validation": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/DateFormatTests.xlsx",
@@ -775,10 +767,8 @@
     {
       "path": "crates/hanji-xlsx/corpus/WithConditionalFormatting.xlsx",
       "format": "xlsx",
-      "keeps": 1,
-      "kinds": {
-        "conditional-format": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/WithDrawing.xlsx",
@@ -812,21 +802,17 @@
     {
       "path": "crates/hanji-xlsx/corpus/korean-sales-lo.xlsx",
       "format": "xlsx",
-      "keeps": 3,
+      "keeps": 1,
       "kinds": {
-        "chart": 1,
-        "conditional-format": 1,
-        "data-validation": 1
+        "chart": 1
       }
     },
     {
       "path": "crates/hanji-xlsx/corpus/korean-sales.xlsx",
       "format": "xlsx",
-      "keeps": 3,
+      "keeps": 1,
       "kinds": {
-        "chart": 1,
-        "conditional-format": 1,
-        "data-validation": 1
+        "chart": 1
       }
     },
     {
@@ -864,18 +850,14 @@
     {
       "path": "crates/hanji-xlsx/corpus/rx_cond_format01.xlsx",
       "format": "xlsx",
-      "keeps": 1,
-      "kinds": {
-        "conditional-format": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/rx_data_validation01.xlsx",
       "format": "xlsx",
-      "keeps": 1,
-      "kinds": {
-        "data-validation": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/rx_defined_name01.xlsx",

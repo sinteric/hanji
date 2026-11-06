@@ -1,0 +1,178 @@
+//! Data validations as `<validation/>` lines: parse/print, edit, add/remove,
+//! GetPut of an unedited file.
+
+use std::path::PathBuf;
+
+use hanji_core::{Engine, ImportOptions};
+use hanji_format::sheet::{parse_spreadsheet, serialize_spreadsheet, SheetItem};
+use hanji_xlsx::{package, xml, XlsxEngine};
+
+mod common;
+use common::getput;
+
+fn corpus_file(name: &str) -> Vec<u8> {
+    std::fs::read(
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("corpus")
+            .join(name),
+    )
+    .unwrap()
+}
+
+fn validation_lines(text: &str) -> Vec<String> {
+    text.lines()
+        .filter(|l| l.starts_with("<validation "))
+        .map(str::to_string)
+        .collect()
+}
+
+fn sheet_validations(bytes: &[u8], part: &str) -> Vec<(String, String, Option<String>)> {
+    let parts = package::read(bytes).unwrap();
+    let data = parts.iter().find(|p| p.name == part).unwrap();
+    let doc = xml::parse(&data.data).unwrap();
+    let list = doc
+        .root
+        .elements()
+        .find(|e| e.local() == "dataValidations")
+        .expect("the worksheet has <dataValidations>");
+    list.elements()
+        .filter(|e| e.local() == "dataValidation")
+        .map(|e| {
+            let sqref = e.get("sqref").unwrap();
+            let ty = e.get("type").unwrap();
+            let f1 = e
+                .elements()
+                .find(|c| c.local() == "formula1")
+                .map(|c| c.text_of(&[c.name.as_str()]));
+            (sqref, ty, f1)
+        })
+        .collect()
+}
+
+#[test]
+fn unedited_file_keeps_its_validation_xml() {
+    let bytes = corpus_file("rx_data_validation01.xlsx");
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
+    assert_eq!(
+        validation_lines(&imp.text),
+        ["<validation range=\"C2\" type=\"list\" formula1=\"Foo,Bar,Baz\" allowBlank=\"true\"/>"]
+    );
+    let out = XlsxEngine.export(&imp.text, &imp.remainder).unwrap();
+    getput(&bytes, &out).unwrap();
+}
+
+#[test]
+fn editing_a_validation_writes_it_and_reads_back() {
+    let bytes = corpus_file("rx_data_validation01.xlsx");
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
+    let edited = imp.text.replace("Foo,Bar,Baz", "A,B,C");
+    let a = XlsxEngine::apply(&edited, &imp.remainder, "[]").unwrap();
+    assert_eq!(
+        validation_lines(&a.text),
+        ["<validation range=\"C2\" type=\"list\" formula1=\"A,B,C\" allowBlank=\"true\"/>"]
+    );
+    let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
+    let got = sheet_validations(&out, "xl/worksheets/sheet1.xml");
+    assert_eq!(got.len(), 1, "{got:?}");
+    assert_eq!(got[0].0, "C2");
+    assert_eq!(got[0].1, "list");
+    assert_eq!(got[0].2.as_deref(), Some("\"A,B,C\""));
+    let again = XlsxEngine.import(&out, &ImportOptions::default()).unwrap();
+    assert_eq!(again.text, a.text);
+}
+
+#[test]
+fn adding_a_validation_writes_it_and_reads_back() {
+    let bytes = corpus_file("rx_data_validation01.xlsx");
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
+    let edited = imp.text.replace(
+        "<validation range=\"C2\" type=\"list\" formula1=\"Foo,Bar,Baz\" allowBlank=\"true\"/>",
+        "<validation range=\"C2\" type=\"list\" formula1=\"Foo,Bar,Baz\" allowBlank=\"true\"/>\n<validation range=\"D2\" type=\"whole\" operator=\"greaterThan\" formula1=\"0\" allowBlank=\"true\"/>",
+    );
+    let a = XlsxEngine::apply(&edited, &imp.remainder, "[]").unwrap();
+    assert_eq!(
+        validation_lines(&a.text),
+        [
+            "<validation range=\"C2\" type=\"list\" formula1=\"Foo,Bar,Baz\" allowBlank=\"true\"/>",
+            "<validation range=\"D2\" type=\"whole\" operator=\"greaterThan\" formula1=\"0\" allowBlank=\"true\"/>"
+        ]
+    );
+    let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
+    let got = sheet_validations(&out, "xl/worksheets/sheet1.xml");
+    assert_eq!(got.len(), 2, "{got:?}");
+    assert_eq!(got[1].0, "D2");
+    assert_eq!(got[1].1, "whole");
+    let again = XlsxEngine.import(&out, &ImportOptions::default()).unwrap();
+    assert_eq!(again.text, a.text);
+}
+
+#[test]
+fn removing_a_validation_drops_it() {
+    let bytes = corpus_file("rx_data_validation01.xlsx");
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
+    let edited = imp.text.replace(
+        "<validation range=\"C2\" type=\"list\" formula1=\"Foo,Bar,Baz\" allowBlank=\"true\"/>\n",
+        "",
+    );
+    assert_ne!(edited, imp.text);
+    let a = XlsxEngine::apply(&edited, &imp.remainder, "[]").unwrap();
+    assert!(validation_lines(&a.text).is_empty(), "{:?}", a.text);
+    let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
+    let parts = package::read(&out).unwrap();
+    let sheet = parts
+        .iter()
+        .find(|p| p.name == "xl/worksheets/sheet1.xml")
+        .unwrap();
+    let doc = xml::parse(&sheet.data).unwrap();
+    assert!(
+        doc.root.elements().all(|e| e.local() != "dataValidations"),
+        "dataValidations should go with the last rule"
+    );
+    let again = XlsxEngine.import(&out, &ImportOptions::default()).unwrap();
+    assert_eq!(again.text, a.text);
+}
+
+#[test]
+fn corpus_validation_files_round_trip_the_text() {
+    for name in [
+        "rx_data_validation01.xlsx",
+        "DataValidations-49244.xlsx",
+        "korean-sales.xlsx",
+        "korean-sales-lo.xlsx",
+    ] {
+        let bytes = corpus_file(name);
+        let imp = XlsxEngine
+            .import(&bytes, &ImportOptions::default())
+            .unwrap();
+        assert!(
+            !validation_lines(&imp.text).is_empty(),
+            "{name} should show <validation/> lines:\n{}",
+            imp.text
+        );
+        assert!(
+            !imp.text.contains("kind=\"data-validation\""),
+            "{name} still has a data-validation placeholder:\n{}",
+            imp.text
+        );
+        let names = XlsxEngine::names(&imp.remainder);
+        let parsed = parse_spreadsheet(&imp.text, &names).unwrap();
+        assert_eq!(serialize_spreadsheet(&parsed), imp.text, "{name}");
+        assert!(
+            parsed.sheets.iter().any(|s| s
+                .items
+                .iter()
+                .any(|i| matches!(i, SheetItem::Validation(_)))),
+            "{name}"
+        );
+        let out = XlsxEngine.export(&imp.text, &imp.remainder).unwrap();
+        getput(&bytes, &out).unwrap();
+    }
+}
