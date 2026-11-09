@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Show an HWPX drawing whose `hp:drawText` is ordinary text in one or more
+  paragraphs as that text instead of a `<keep kind="drawing"/>` placeholder.
+  Several paragraphs join with `<br/>`; a shown footnote or endnote inside
+  the box is `[^n]`. Geometry, anchoring, styling and the original XML stay
+  as a `Wrap`. Editing the body rewrites outer `hp:t` and keeps the rest;
+  editing a note inside the box rewrites that note; deleting all of the
+  text removes the object and is reported. Pictures, charts, groups, OLE,
+  empty shapes, and boxes that hold a table or nested objects stay
+  placeholders. XLSX shapes stay placeholders: the spreadsheet grammar has
+  no shape line. Corpus keeps: 207 → 206 (hwpx `drawing` 10 → 9).
 - Show XLSX data validations as editable `<validation range="C2"
   type="list" formula1="&quot;A,B,C&quot;"/>` lines and `cellIs`/`expression`
   conditional formats as `<conditional-format range="A1" type="cellIs"

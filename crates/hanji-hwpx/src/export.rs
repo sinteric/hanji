@@ -969,15 +969,25 @@ impl<'a> Exporter<'a> {
             {
                 if Some(c) == w.start {
                     close(&mut t, r);
-                    let body: String = p.units[w.start.unwrap()..w.end.unwrap().min(p.units.len())]
+                    let span = &p.units[w.start.unwrap()..w.end.unwrap().min(p.units.len())];
+                    let body: String = span
                         .iter()
                         .filter_map(|u| match &u.atom {
                             Atom::Char(ch) => Some(*ch),
+                            Atom::Break => Some('\n'),
                             _ => None,
                         })
                         .collect();
-                    r.children
-                        .push(node(fragment(&owpml::with_draw_text(&w.xml[0], &body))));
+                    let note_s: Vec<&str> = span
+                        .iter()
+                        .filter_map(|u| match &u.atom {
+                            Atom::NoteRef(n) => Some(n.body.as_str()),
+                            _ => None,
+                        })
+                        .collect();
+                    r.children.push(node(fragment(&owpml::with_draw_contents(
+                        &w.xml[0], &body, &note_s,
+                    ))));
                 }
                 continue;
             }

@@ -52,7 +52,8 @@ pub struct Stats {
 ///   footnotes whose body is not ordinary text): inline `Keep`. An
 ///   `hp:equation` whose script the math grammar can hold is `$…$` /
 ///   `<math>…</math>` with a `Wrap`. A drawing whose `hp:drawText` is
-///   ordinary text in one paragraph is that text with a `Wrap`. A
+///   ordinary text (one or more paragraphs, shown notes as `[^n]`) is
+///   that text with a `Wrap`; `<br/>` joins paragraphs. A
 ///   footnote or endnote whose body is ordinary text in one paragraph is
 ///   `[^label]` / `[^label]: body` with a `Wrap`. An `hp:autoNum` whose
 ///   format is `DIGIT` is `prefix + num + suffix` with a `Wrap`.
@@ -948,8 +949,8 @@ impl<'a> Importer<'a> {
                 self.auto_num(c, path, run_id, marks);
             } else if c.is("hp:equation") {
                 self.equation(c, path, run_id, marks);
-            } else if shown_draw_text(c).is_some() {
-                self.draw_text(c, path, run_id, marks);
+            } else if let Some(bits) = draw_bits(c) {
+                self.draw_text(c, bits, path, run_id, marks);
             } else {
                 let kind = match c.name.as_str() {
                     "hp:ctrl" => ctrl_kind(c).map_or("control".into(), |k| keep_kind(&k.name)),
@@ -1017,15 +1018,16 @@ impl<'a> Importer<'a> {
     }
 
     /// A drawing whose `hp:drawText` the model shows: a wrap over the inner
-    /// characters, holding the original object (DESIGN.md §5.1). Geometry,
-    /// anchoring and styling stay in the wrap.
-    fn draw_text(&mut self, e: &Element, path: &[usize], run_id: u64, marks: Marks) {
-        let Some(body) = shown_draw_text(e) else {
-            let pos = self.buf.len();
-            let keep = self.keep_entry(Kind::Keep, e, path, Some(pos), Some(run_id), "drawing");
-            self.push(Atom::Keep(keep), marks);
-            return;
-        };
+    /// characters, notes and paragraph breaks, holding the original object
+    /// (DESIGN.md §5.1). Geometry, anchoring and styling stay in the wrap.
+    fn draw_text(
+        &mut self,
+        e: &Element,
+        bits: Vec<DrawBit<'_>>,
+        path: &[usize],
+        run_id: u64,
+        marks: Marks,
+    ) {
         let fp_el = fingerprint_drawing(e);
         let f = self.fp(&[Some(&fp_el)]);
         let at = self.buf.len();
@@ -1042,8 +1044,16 @@ impl<'a> Importer<'a> {
                 ..Default::default()
             },
         );
-        for ch in body.chars() {
-            self.push(Atom::Char(ch), marks);
+        for b in bits {
+            match b {
+                DrawBit::Text(s) => {
+                    for ch in s.chars() {
+                        self.push(Atom::Char(ch), marks);
+                    }
+                }
+                DrawBit::Break => self.push(Atom::Break, marks),
+                DrawBit::Note(c) => self.note(c, path, run_id, marks),
+            }
         }
         let end = self.buf.len();
         let close = self.seq();
