@@ -40,10 +40,10 @@ date.
 | format | files | failed | with keeps | keeps |
 | ------ | ----: | -----: | ---------: | ----: |
 | docx   |    13 |      0 |         11 |   119 |
-| hwpx   |    16 |      0 |          9 |    23 |
+| hwpx   |    16 |      0 |          8 |    22 |
 | pptx   |    27 |      0 |         16 |    40 |
 | xlsx   |    46 |      0 |         12 |    25 |
-| all    |   102 |      0 |         48 |   207 |
+| all    |   102 |      0 |         47 |   206 |
 
 ## By kind, most first
 
@@ -52,7 +52,7 @@ date.
 | docx   | field              |    73 |     3 |
 | docx   | drawing            |    22 |     9 |
 | pptx   | table              |    15 |    10 |
-| hwpx   | drawing            |    10 |     7 |
+| hwpx   | drawing            |     9 |     6 |
 | docx   | object             |     8 |     2 |
 | xlsx   | chart              |     8 |     6 |
 | pptx   | field              |     7 |     1 |
@@ -98,7 +98,7 @@ date.
 | `crates/hanji-hwpx/corpus/fdi-2025q2.hwpx`                           | hwpx   |     1 | drawing 1 |
 | `crates/hanji-hwpx/corpus/field-multipara-clickhere.hwpx`            | hwpx   |     3 | drawing 2, table 1 |
 | `crates/hanji-hwpx/corpus/footnote-01.hwpx`                          | hwpx   |     0 | |
-| `crates/hanji-hwpx/corpus/footnote-tbox-01.hwpx`                     | hwpx   |     1 | drawing 1 |
+| `crates/hanji-hwpx/corpus/footnote-tbox-01.hwpx`                     | hwpx   |     0 | |
 | `crates/hanji-hwpx/corpus/form-01.hwpx`                              | hwpx   |     5 | form-control 5 |
 | `crates/hanji-hwpx/corpus/hcar-001.hwpx`                             | hwpx   |     3 | table 3 |
 | `crates/hanji-hwpx/corpus/hy-002.hwpx`                               | hwpx   |     2 | drawing 2 |

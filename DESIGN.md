@@ -295,8 +295,9 @@ fields), inline `<keep/>`.
   the definition need not be deleted by hand. A note that was not in the
   file cannot be created. A note stays a `<keep/>` when its body is not
   this text (several paragraphs, a table or image, a content control).
-  A footnote inside a drawing (hwpx text box) stays inside that
-  drawing's `<keep/>`. Tracked-change export refuses a change to, move
+  A shown footnote inside an HWPX text box is `[^n]` in that box's
+  text. A footnote inside a drawing the text cannot show stays inside
+  that drawing's `<keep/>`. Tracked-change export refuses a change to, move
   of, or deletion of the reference.
 - **Tracked changes (docx):** a run-level `w:ins` or `w:del` whose inner
   text is one line (runs, proof errors, fields, run-property changes; no
@@ -358,17 +359,19 @@ fields), inline `<keep/>`.
   Hancom lays it out when it opens the file). An equation whose script
   the math grammar cannot hold stays `<keep kind="math"/>`. docx math
   (OMML) stays a placeholder; pptx refuses `$…$`.
-- **Text boxes (docx, hwpx):** a drawing whose text box is ordinary text in
-  one paragraph (docx `w:txbxContent` / VML `v:textbox`; hwpx `hp:drawText`;
-  no table, nested drawing, content control, field, note or break) is that
-  text, as a field's result is; geometry, anchoring, styling and the original
-  XML stay in the remainder as a `Wrap`. Editing the text rewrites the inner
-  `w:t` / `hp:t` (docx Choice and Fallback together) and keeps the rest;
-  deleting all of it removes the object and is reported. A box stays
-  `<keep kind="drawing"/>` when its content is not this text (several
-  paragraphs, a table, a picture, a chart, a group, OLE, empty). Pictures
-  have no Document image syntax (Presentation `<picture/>` is not that
-  grammar).
+- **Text boxes (docx, hwpx):** a drawing whose text box is ordinary text
+  (docx `w:txbxContent` / VML `v:textbox` in one paragraph; hwpx
+  `hp:drawText` in one or more paragraphs) is that text, as a field's
+  result is; geometry, anchoring, styling and the original XML stay in the
+  remainder as a `Wrap`. hwpx paragraphs join with `<br/>`; a shown
+  footnote or endnote inside the box is `[^n]` / `[^en]`. Editing the text
+  rewrites the inner `w:t` / `hp:t` (docx Choice and Fallback together;
+  hwpx keeps a shown note at its mark) and keeps the rest; deleting all
+  of it removes the object and is reported. A
+  box stays `<keep kind="drawing"/>` when its content is not this text (docx
+  several paragraphs; a table, a picture, a chart, a group, OLE, empty; an
+  unshown note). Pictures have no Document image syntax (Presentation
+  `<picture/>` is not that grammar).
 - **Comment:** `<comment>…</comment>` is a DOCX comment body's text, raw up
   to `</comment>` on the same line (an empty one is `<comment/>`). The
   highlighted range is ordinary text; the tag sits at the balloon. hwpx and

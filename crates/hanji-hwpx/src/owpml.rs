@@ -1,7 +1,7 @@
 //! OWPML (KS X 6101) names and small helpers shared by import and export.
 
 use hanji_format::NoteKind;
-use hanji_package::xml::{escape_text, is_blank, Element, Node};
+use hanji_package::xml::{escape_text, is_blank, unescape, Element, Node};
 
 pub const HEADER_PART: &str = "Contents/header.xml";
 pub const CONTENT_PART: &str = "Contents/content.hpf";
@@ -188,118 +188,428 @@ fn set_note_t(e: &mut Element, body: &str, used: &mut bool) {
     }
 }
 
-/// Locals a shown `hp:drawText` paragraph may hold. Nested pictures,
-/// controls, tables and equations stay placeholders.
-const DRAW_SHOWN: &[&str] = &["p", "run", "t", "linesegarray", "lineseg"];
+/// A piece of a shown `hp:drawText`: outer run text, a paragraph break, or
+/// a footnote/endnote the text already models as `[^n]`.
+pub(crate) enum DrawBit<'a> {
+    Text(String),
+    Break,
+    Note(&'a Element),
+}
 
-/// The `hp:drawText` body a drawing object can show: ordinary one-line text
-/// in a single paragraph.
+/// The `hp:drawText` body a drawing object can show: ordinary text in one
+/// or more paragraphs, and shown notes. Paragraphs join with `\n` (`<br/>`
+/// in the text). Nested pictures, tables, equations and unshown controls
+/// stay placeholders.
 pub fn shown_draw_text(el: &Element) -> Option<String> {
+    let bits = draw_bits(el)?;
+    let mut body = String::new();
+    let mut notes = false;
+    for b in &bits {
+        match b {
+            DrawBit::Text(s) => body.push_str(s),
+            DrawBit::Break => body.push('\n'),
+            DrawBit::Note(_) => notes = true,
+        }
+    }
+    if body.contains('\r') {
+        return None;
+    }
+    if body.is_empty() && !notes {
+        return None;
+    }
+    Some(body)
+}
+
+/// Pieces of a shown drawing, in order, or `None` when the object stays a
+/// placeholder.
+pub(crate) fn draw_bits(el: &Element) -> Option<Vec<DrawBit<'_>>> {
     if keep_kind(&el.name) != "drawing" {
         return None;
     }
     let dt = el.descendants("hp:drawText").into_iter().next()?;
     let sub = dt.child("hp:subList")?;
-    let mut para = None;
+    let mut paras = Vec::new();
     for n in &sub.children {
         match n {
             Node::El(e) if e.is("hp:p") => {
-                if para.is_some() {
+                if !draw_para_showable(e) {
                     return None;
                 }
-                para = Some(e);
+                paras.push(e);
             }
             n if is_blank(n) => {}
             Node::El(e) if e.is("hp:textMargin") => {}
             _ => return None,
         }
     }
-    let p = para?;
-    let mut outer = true;
-    let mut ok = true;
-    p.walk(&mut |e| {
-        if outer {
-            outer = false;
-            return;
-        }
-        if !DRAW_SHOWN.contains(&e.local()) {
-            ok = false;
-        }
-    });
-    if !ok {
+    if paras.is_empty() {
         return None;
     }
-    let body = p.text_of(&["hp:t"]);
-    if body.is_empty() || body.contains('\n') || body.contains('\r') {
-        return None;
+    let mut bits = Vec::new();
+    let mut any = false;
+    for (i, p) in paras.iter().enumerate() {
+        if i > 0 {
+            bits.push(DrawBit::Break);
+        }
+        for b in draw_para_bits(p) {
+            match &b {
+                DrawBit::Text(s) if !s.is_empty() => any = true,
+                DrawBit::Note(_) => any = true,
+                _ => {}
+            }
+            bits.push(b);
+        }
     }
-    Some(body)
+    any.then_some(bits)
 }
 
-/// `xml` of a stored drawing, with every `hp:drawText` `hp:t` set to
-/// `body`. Unchanged text keeps the original fragment.
-pub fn with_draw_text(xml: &str, body: &str) -> String {
-    let mut e = hanji_package::xml::fragment(xml);
-    if !set_draw_text(&mut e, body) {
-        return xml.to_string();
-    }
-    e.to_xml()
-}
-
-/// Writes `body` into every `hp:t` of `hp:drawText`. Unchanged text is a
-/// no-op.
-pub fn set_draw_text(el: &mut Element, body: &str) -> bool {
-    if shown_draw_text(el).as_deref() == Some(body) {
-        return false;
-    }
-    let mut used = false;
-    set_draw_text_body(el, body, &mut used);
-    if !used {
-        add_draw_t(el, body);
+fn draw_para_showable(p: &Element) -> bool {
+    for n in &p.children {
+        match n {
+            Node::El(e) if e.is("hp:run") => {
+                for c in e.elements() {
+                    if c.is("hp:t") {
+                        if !draw_t_plain(c) {
+                            return false;
+                        }
+                    } else if !(c.is("hp:ctrl") && shown_note(c).is_some()) {
+                        return false;
+                    }
+                }
+            }
+            Node::El(e) if e.is("hp:linesegarray") => {}
+            n if is_blank(n) => {}
+            _ => return false,
+        }
     }
     true
 }
 
-fn set_draw_text_body(e: &mut Element, body: &str, used: &mut bool) {
-    if e.is("hp:drawText") {
-        set_draw_t(e, body, used);
-        return;
-    }
-    for c in e.elements_mut() {
-        set_draw_text_body(c, body, used);
-    }
+fn draw_t_plain(t: &Element) -> bool {
+    t.children.iter().all(|n| match n {
+        Node::Text(s) => {
+            let u = unescape(s);
+            !u.contains('\n') && !u.contains('\r')
+        }
+        Node::CData(s) => !s.contains('\n') && !s.contains('\r'),
+        Node::Comment(_) => true,
+        _ => false,
+    })
 }
 
-fn set_draw_t(e: &mut Element, body: &str, used: &mut bool) {
-    if e.is("hp:t") {
-        if !*used {
-            e.children = vec![Node::Text(escape_text(body))];
-            *used = true;
-        } else {
-            e.children.clear();
+fn draw_para_bits(p: &Element) -> Vec<DrawBit<'_>> {
+    let mut bits = Vec::new();
+    for r in p.elements().filter(|e| e.is("hp:run")) {
+        for c in r.elements() {
+            if c.is("hp:t") {
+                let mut s = String::new();
+                for n in &c.children {
+                    match n {
+                        Node::Text(t) => s.push_str(&unescape(t)),
+                        Node::CData(t) => s.push_str(t),
+                        _ => {}
+                    }
+                }
+                bits.push(DrawBit::Text(s));
+            } else if c.is("hp:ctrl") {
+                bits.push(DrawBit::Note(c));
+            }
         }
-        return;
     }
-    for c in e.elements_mut() {
-        set_draw_t(c, body, used);
-    }
+    bits
 }
 
-fn add_draw_t(el: &mut Element, body: &str) {
-    let mut t = Element::new("hp:t");
-    t.children.push(Node::Text(escape_text(body)));
-    let mut run = Element::new("hp:run");
-    run.children.push(Node::El(t));
-    let mut p = Element::new("hp:p");
-    p.children.push(Node::El(run));
-    if let Some(dt) = find_draw_text_mut(el) {
-        if let Some(sub) = dt.child_mut("hp:subList") {
-            sub.children.push(Node::El(p));
-            return;
+fn draw_note_bodies(el: &Element) -> Vec<String> {
+    draw_bits(el)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|b| match b {
+            DrawBit::Note(c) => shown_note(c).map(|(_, body)| body),
+            _ => None,
+        })
+        .collect()
+}
+
+/// A piece of edited `hp:drawText`: outer text, a paragraph break, or a
+/// shown note's body. Note marks keep their place among the characters.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DrawOut {
+    Text(String),
+    Break,
+    Note(String),
+}
+
+/// `xml` of a stored drawing, with outer `hp:drawText` `hp:t` set to `body`
+/// (`\n` is a paragraph). Unchanged text keeps the original fragment.
+pub fn with_draw_text(xml: &str, body: &str) -> String {
+    with_draw_contents(xml, &pieces_from_body(body))
+}
+
+/// Like [`with_draw_text`], and writes shown notes inside the box from
+/// `pieces` (a note sits where [`DrawOut::Note`] is). Extra stored notes
+/// are dropped; the original fragment is kept when the layout of text,
+/// breaks and notes matches.
+pub(crate) fn with_draw_contents(xml: &str, pieces: &[DrawOut]) -> String {
+    let mut e = hanji_package::xml::fragment(xml);
+    let notes = notes_of_pieces(pieces);
+    let same_shape =
+        stored_draw_out(&e).is_some_and(|stored| draw_shape(&stored) == draw_shape(pieces));
+    let same_notes = draw_note_bodies(&e)
+        .iter()
+        .map(String::as_str)
+        .eq(notes.iter().map(String::as_str));
+    if same_shape && same_notes {
+        return xml.to_string();
+    }
+    if same_shape {
+        let refs: Vec<&str> = notes.iter().map(String::as_str).collect();
+        set_draw_notes(&mut e, &refs);
+    } else {
+        set_draw_pieces(&mut e, pieces);
+    }
+    drop_stale_layouts(&mut e);
+    e.to_xml()
+}
+
+/// Writes `body` into the outer `hp:t` of `hp:drawText` (one paragraph per
+/// `\n`). Unchanged text is a no-op.
+pub fn set_draw_text(el: &mut Element, body: &str) -> bool {
+    if shown_draw_text(el).as_deref() == Some(body) {
+        return false;
+    }
+    set_draw_pieces(el, &pieces_from_body(body));
+    true
+}
+
+fn pieces_from_body(body: &str) -> Vec<DrawOut> {
+    let mut out = Vec::new();
+    for (i, part) in body.split('\n').enumerate() {
+        if i > 0 {
+            out.push(DrawOut::Break);
         }
+        out.push(DrawOut::Text(part.to_string()));
+    }
+    out
+}
+
+fn notes_of_pieces(pieces: &[DrawOut]) -> Vec<String> {
+    pieces
+        .iter()
+        .filter_map(|p| match p {
+            DrawOut::Note(s) => Some(s.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn stored_draw_out(el: &Element) -> Option<Vec<DrawOut>> {
+    Some(
+        draw_bits(el)?
+            .into_iter()
+            .map(|b| match b {
+                DrawBit::Text(s) => DrawOut::Text(s),
+                DrawBit::Break => DrawOut::Break,
+                DrawBit::Note(c) => {
+                    DrawOut::Note(shown_note(c).map(|(_, body)| body).unwrap_or_default())
+                }
+            })
+            .collect(),
+    )
+}
+
+#[derive(Eq, PartialEq)]
+enum DrawShape {
+    Text(String),
+    Break,
+    Note,
+}
+
+fn draw_shape(pieces: &[DrawOut]) -> Vec<DrawShape> {
+    let mut out = Vec::new();
+    for p in pieces {
+        match p {
+            DrawOut::Text(s) if s.is_empty() => {}
+            DrawOut::Text(s) => match out.last_mut() {
+                Some(DrawShape::Text(prev)) => prev.push_str(s),
+                _ => out.push(DrawShape::Text(s.clone())),
+            },
+            DrawOut::Break => out.push(DrawShape::Break),
+            DrawOut::Note(_) => out.push(DrawShape::Note),
+        }
+    }
+    out
+}
+
+fn set_draw_pieces(el: &mut Element, pieces: &[DrawOut]) {
+    let Some(dt) = find_draw_text_mut(el) else {
+        return;
+    };
+    let mut notes = take_shown_note_ctrls(dt);
+    let mut ni = 0usize;
+    let paras = paras_of(pieces);
+    let Some(sub) = dt.child_mut("hp:subList") else {
         let mut sub = Element::new("hp:subList");
-        sub.children.push(Node::El(p));
+        for para in &paras {
+            let mut p = draw_para(None);
+            set_para_bits(&mut p, para, &mut notes, &mut ni);
+            sub.children.push(Node::El(p));
+        }
         dt.children.push(Node::El(sub));
+        return;
+    };
+    let model = sub.elements().find(|e| e.is("hp:p")).map(Element::shell);
+    let mut kept = Vec::new();
+    let mut pi = 0usize;
+    for n in std::mem::take(&mut sub.children) {
+        match n {
+            Node::El(mut p) if p.is("hp:p") => {
+                if pi < paras.len() {
+                    set_para_bits(&mut p, &paras[pi], &mut notes, &mut ni);
+                    kept.push(Node::El(p));
+                    pi += 1;
+                }
+            }
+            other => kept.push(other),
+        }
+    }
+    sub.children = kept;
+    while pi < paras.len() {
+        let mut p = draw_para(model.as_ref());
+        set_para_bits(&mut p, &paras[pi], &mut notes, &mut ni);
+        sub.children.push(Node::El(p));
+        pi += 1;
+    }
+}
+
+fn paras_of(pieces: &[DrawOut]) -> Vec<Vec<&DrawOut>> {
+    let mut paras = vec![Vec::new()];
+    for p in pieces {
+        if let DrawOut::Break = p {
+            paras.push(Vec::new());
+        } else {
+            let i = paras.len() - 1;
+            paras[i].push(p);
+        }
+    }
+    paras
+}
+
+fn draw_para(model: Option<&Element>) -> Element {
+    let mut p = model.cloned().unwrap_or_else(|| Element::new("hp:p"));
+    p.children.clear();
+    p.children.push(Node::El(Element::new("hp:run")));
+    p
+}
+
+fn set_para_bits(p: &mut Element, bits: &[&DrawOut], notes: &mut [Element], ni: &mut usize) {
+    drop_layout(p);
+    let mut kids = Vec::new();
+    for b in bits {
+        match b {
+            DrawOut::Text(s) => kids.push(Node::El(t_text(s))),
+            DrawOut::Note(body) => {
+                if *ni < notes.len() {
+                    set_note_body(&mut notes[*ni], body);
+                    kids.push(Node::El(notes[*ni].clone()));
+                    *ni += 1;
+                }
+            }
+            DrawOut::Break => {}
+        }
+    }
+    if kids.is_empty() {
+        kids.push(Node::El(t_text("")));
+    }
+    let mut got_run = false;
+    p.children.retain_mut(|n| match n {
+        Node::El(r) if r.is("hp:run") => {
+            if got_run {
+                false
+            } else {
+                r.children = std::mem::take(&mut kids);
+                got_run = true;
+                true
+            }
+        }
+        Node::El(e) if e.is("hp:linesegarray") => false,
+        _ => true,
+    });
+    if !got_run {
+        let mut run = Element::new("hp:run");
+        run.children = kids;
+        p.children.push(Node::El(run));
+    }
+}
+
+fn t_text(s: &str) -> Element {
+    let mut t = Element::new("hp:t");
+    t.children.push(Node::Text(escape_text(s)));
+    t
+}
+
+fn take_shown_note_ctrls(e: &mut Element) -> Vec<Element> {
+    let mut out = Vec::new();
+    take_note_ctrls(e, &mut out);
+    out
+}
+
+fn take_note_ctrls(e: &mut Element, out: &mut Vec<Element>) {
+    if e.is("hp:run") {
+        let mut kept = Vec::new();
+        for n in std::mem::take(&mut e.children) {
+            match n {
+                Node::El(c) if c.is("hp:ctrl") && shown_note(&c).is_some() => out.push(c),
+                other => kept.push(other),
+            }
+        }
+        e.children = kept;
+        return;
+    }
+    for c in e.elements_mut() {
+        take_note_ctrls(c, out);
+    }
+}
+
+fn set_draw_notes(el: &mut Element, notes: &[&str]) {
+    let Some(dt) = find_draw_text_mut(el) else {
+        return;
+    };
+    let mut i = 0usize;
+    set_draw_note_ctrls(dt, notes, &mut i);
+    let mut keep = notes.len();
+    retain_draw_notes(dt, &mut keep);
+}
+
+fn set_draw_note_ctrls(e: &mut Element, notes: &[&str], i: &mut usize) {
+    if e.is("hp:ctrl") && shown_note(e).is_some() {
+        if *i < notes.len() {
+            set_note_body(e, notes[*i]);
+            *i += 1;
+        }
+        return;
+    }
+    for c in e.elements_mut() {
+        set_draw_note_ctrls(c, notes, i);
+    }
+}
+
+fn retain_draw_notes(e: &mut Element, keep: &mut usize) {
+    if e.is("hp:run") {
+        e.children.retain(|n| match n {
+            Node::El(c) if c.is("hp:ctrl") && shown_note(c).is_some() => {
+                if *keep > 0 {
+                    *keep -= 1;
+                    true
+                } else {
+                    false
+                }
+            }
+            _ => true,
+        });
+        return;
+    }
+    for c in e.elements_mut() {
+        retain_draw_notes(c, keep);
     }
 }
 
@@ -704,9 +1014,101 @@ mod tests {
     }
 
     #[test]
-    fn two_paragraphs_stay_unshown() {
+    fn two_paragraphs_are_shown_joined() {
         let e = fragment(&rect(&format!("{}{}", p("a"), p("b"))));
-        assert!(shown_draw_text(&e).is_none());
+        assert_eq!(shown_draw_text(&e).as_deref(), Some("a\nb"));
+    }
+
+    #[test]
+    fn a_shown_note_in_draw_text_is_not_in_the_body() {
+        let note = "<hp:ctrl><hp:footNote><hp:subList><hp:p><hp:run><hp:t> 각주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>";
+        let inner = format!("<hp:p><hp:run><hp:t>앞</hp:t>{note}<hp:t>뒤</hp:t></hp:run></hp:p>");
+        let e = fragment(&rect(&inner));
+        assert_eq!(shown_draw_text(&e).as_deref(), Some("앞뒤"));
+        assert_eq!(draw_note_bodies(&e), vec![" 각주"]);
+    }
+
+    #[test]
+    fn with_draw_contents_keeps_the_fragment_when_notes_match() {
+        let note = "<hp:ctrl><hp:footNote><hp:subList><hp:p><hp:run><hp:t> 각주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>";
+        let inner = format!("<hp:p><hp:run><hp:t>앞</hp:t>{note}<hp:t>뒤</hp:t></hp:run></hp:p>");
+        let xml = rect(&inner);
+        assert_eq!(
+            with_draw_contents(
+                &xml,
+                &[
+                    DrawOut::Text("앞".into()),
+                    DrawOut::Note(" 각주".into()),
+                    DrawOut::Text("뒤".into()),
+                ]
+            ),
+            xml
+        );
+    }
+
+    #[test]
+    fn with_draw_contents_rewrites_outer_t_and_keeps_the_note() {
+        let note = "<hp:ctrl><hp:footNote><hp:subList><hp:p><hp:run><hp:t> 각주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>";
+        let inner = format!("<hp:p><hp:run><hp:t>앞</hp:t>{note}<hp:t>뒤</hp:t></hp:run></hp:p>");
+        let out = with_draw_contents(
+            &rect(&inner),
+            &[DrawOut::Text("고침".into()), DrawOut::Note(" 각주".into())],
+        );
+        assert_eq!(shown_draw_text(&fragment(&out)).as_deref(), Some("고침"));
+        assert!(out.contains("<hp:t> 각주</hp:t>"), "{out}");
+        assert!(out.contains("<hp:footNote"), "{out}");
+    }
+
+    #[test]
+    fn with_draw_contents_keeps_a_note_when_paragraphs_join() {
+        let note = "<hp:ctrl><hp:footNote><hp:subList><hp:p><hp:run><hp:t> 각주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>";
+        let inner = format!(
+            "{}<hp:p><hp:run><hp:t>b</hp:t>{note}</hp:run></hp:p>",
+            p("a")
+        );
+        let out = with_draw_contents(
+            &rect(&inner),
+            &[DrawOut::Text("ab".into()), DrawOut::Note(" 각주".into())],
+        );
+        assert_eq!(shown_draw_text(&fragment(&out)).as_deref(), Some("ab"));
+        assert_eq!(draw_note_bodies(&fragment(&out)), vec![" 각주"]);
+        assert!(out.contains("<hp:footNote"), "{out}");
+    }
+
+    #[test]
+    fn with_draw_contents_moves_a_note_when_the_mark_moves() {
+        let note = "<hp:ctrl><hp:footNote><hp:subList><hp:p><hp:run><hp:t> 각주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>";
+        let inner = format!("<hp:p><hp:run><hp:t>앞</hp:t>{note}<hp:t>뒤</hp:t></hp:run></hp:p>");
+        let xml = rect(&inner);
+        let out = with_draw_contents(
+            &xml,
+            &[DrawOut::Text("앞뒤".into()), DrawOut::Note(" 각주".into())],
+        );
+        assert_ne!(out, xml);
+        assert_eq!(shown_draw_text(&fragment(&out)).as_deref(), Some("앞뒤"));
+        let t = out.find("<hp:t>앞뒤</hp:t>").unwrap();
+        let ctrl = out.find("<hp:footNote").unwrap();
+        assert!(t < ctrl, "{out}");
+        assert!(!out.contains("<hp:t>앞</hp:t>"), "{out}");
+    }
+
+    #[test]
+    fn with_draw_contents_keeps_a_note_between_edited_text() {
+        let note = "<hp:ctrl><hp:footNote><hp:subList><hp:p><hp:run><hp:t> 각주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>";
+        let inner = format!("<hp:p><hp:run><hp:t>앞</hp:t>{note}<hp:t>뒤</hp:t></hp:run></hp:p>");
+        let out = with_draw_contents(
+            &rect(&inner),
+            &[
+                DrawOut::Text("앞X".into()),
+                DrawOut::Note(" 각주".into()),
+                DrawOut::Text("뒤".into()),
+            ],
+        );
+        assert_eq!(shown_draw_text(&fragment(&out)).as_deref(), Some("앞X뒤"));
+        let t_note = out.find("<hp:t>앞X</hp:t>").unwrap();
+        let ctrl = out.find("<hp:footNote").unwrap();
+        let t_after = out.find("<hp:t>뒤</hp:t>").unwrap();
+        assert!(t_note < ctrl && ctrl < t_after, "{out}");
     }
 
     #[test]
@@ -727,6 +1129,15 @@ mod tests {
         let out = with_draw_text(&xml, "고침");
         assert_eq!(shown_draw_text(&fragment(&out)).as_deref(), Some("고침"));
         assert!(!out.contains("글상자"), "{out}");
+    }
+
+    #[test]
+    fn with_draw_text_rewrites_each_paragraph() {
+        let xml = rect(&format!("{}{}", p("a"), p("b")));
+        assert_eq!(with_draw_text(&xml, "a\nb"), xml);
+        let out = with_draw_text(&xml, "x\ny");
+        assert_eq!(shown_draw_text(&fragment(&out)).as_deref(), Some("x\ny"));
+        assert!(!out.contains(">a<"), "{out}");
     }
 
     fn auto_num_xml(num: &str, prefix: &str, suffix: &str, ty: &str) -> String {
