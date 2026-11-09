@@ -365,8 +365,9 @@ fields), inline `<keep/>`.
   result is; geometry, anchoring, styling and the original XML stay in the
   remainder as a `Wrap`. hwpx paragraphs join with `<br/>`; a shown
   footnote or endnote inside the box is `[^n]` / `[^en]`. Editing the text
-  rewrites the inner `w:t` / `hp:t` (docx Choice and Fallback together) and
-  keeps the rest; deleting all of it removes the object and is reported. A
+  rewrites the inner `w:t` / `hp:t` (docx Choice and Fallback together;
+  hwpx keeps a shown note at its mark) and keeps the rest; deleting all
+  of it removes the object and is reported. A
   box stays `<keep kind="drawing"/>` when its content is not this text (docx
   several paragraphs; a table, a picture, a chart, a group, OLE, empty; an
   unshown note). Pictures have no Document image syntax (Presentation

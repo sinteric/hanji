@@ -1813,6 +1813,55 @@ fn editing_a_footnote_inside_draw_text_writes_it_back_and_keeps_the_box() {
 }
 
 #[test]
+fn joining_draw_text_paragraphs_keeps_a_footnote() {
+    let inner = draw_rect("a").replace(
+        "<hp:t>a</hp:t></hp:run></hp:p>",
+        &format!(
+            "<hp:t>a</hp:t></hp:run></hp:p><hp:p id=\"1\" paraPrIDRef=\"0\" styleIDRef=\"0\" pageBreak=\"0\" columnBreak=\"0\" merged=\"0\"><hp:run charPrIDRef=\"0\"><hp:t>b</hp:t>{}</hp:run></hp:p>",
+            footnote("1", " 각주")
+        ),
+    );
+    let pkg = hwpx(&[p_with(&inner)]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("a<br/>b[^1]"), "{}", imp.text);
+    let r = edit(&imp.remainder, &imp.text, "a<br/>b[^1]", "ab[^1]", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(sec.contains("<hp:footNote"), "{sec}");
+    assert!(sec.contains("<hp:t> 각주</hp:t>"), "{sec}");
+    let back = import(&export(&r.text, &r.remainder));
+    assert!(back.text.contains("ab[^1]"), "{}", back.text);
+    assert!(back.text.contains("[^1]:  각주"), "{}", back.text);
+}
+
+#[test]
+fn editing_draw_text_around_a_footnote_keeps_the_mark() {
+    let inner = draw_rect("앞").replace(
+        "<hp:t>앞</hp:t>",
+        &format!("<hp:t>앞</hp:t>{}<hp:t>뒤</hp:t>", footnote("1", " 각주")),
+    );
+    let pkg = hwpx(&[p_with(&inner)]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "앞[^1]뒤", "앞X[^1]뒤", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let sec = section(&export(&r.text, &r.remainder));
+    let t_before = sec.find("<hp:t>앞X</hp:t>").unwrap();
+    let ctrl = sec.find("<hp:footNote").unwrap();
+    let t_after = sec.find("<hp:t>뒤</hp:t>").unwrap();
+    assert!(t_before < ctrl && ctrl < t_after, "{sec}");
+    let back = import(&export(&r.text, &r.remainder));
+    assert!(back.text.contains("앞X[^1]뒤"), "{}", back.text);
+}
+
+#[test]
 fn deleting_draw_text_with_a_footnote_removes_the_object() {
     let inner = draw_rect("앞").replace(
         "<hp:t>앞</hp:t>",

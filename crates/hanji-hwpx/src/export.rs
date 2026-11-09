@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use hanji_core::{Block, Entry, Kind, ListPlan, StyleSet};
 use hanji_format::styled::{self, StyleTable};
-use hanji_format::{Atom, Cell, Inline, Key, Marks, Note, Props, Value};
+use hanji_format::{Atom, Cell, Inline, Key, Marks, Note, Props, Unit, Value};
 use hanji_package::xml::{assemble, escape_text, fragment, is_blank, Element, Node};
 
 use crate::header::{list_heading, list_num, Header, Style};
@@ -970,23 +970,9 @@ impl<'a> Exporter<'a> {
                 if Some(c) == w.start {
                     close(&mut t, r);
                     let span = &p.units[w.start.unwrap()..w.end.unwrap().min(p.units.len())];
-                    let body: String = span
-                        .iter()
-                        .filter_map(|u| match &u.atom {
-                            Atom::Char(ch) => Some(*ch),
-                            Atom::Break => Some('\n'),
-                            _ => None,
-                        })
-                        .collect();
-                    let note_s: Vec<&str> = span
-                        .iter()
-                        .filter_map(|u| match &u.atom {
-                            Atom::NoteRef(n) => Some(n.body.as_str()),
-                            _ => None,
-                        })
-                        .collect();
                     r.children.push(node(fragment(&owpml::with_draw_contents(
-                        &w.xml[0], &body, &note_s,
+                        &w.xml[0],
+                        &draw_out(span),
                     ))));
                 }
                 continue;
@@ -1583,6 +1569,32 @@ fn clear_modelled_text(p: &mut Element) {
             e.children.clear();
         }
     });
+}
+
+fn draw_out(span: &[Unit]) -> Vec<owpml::DrawOut> {
+    let mut out = Vec::new();
+    let mut buf = String::new();
+    let flush = |out: &mut Vec<owpml::DrawOut>, buf: &mut String| {
+        if !buf.is_empty() {
+            out.push(owpml::DrawOut::Text(std::mem::take(buf)));
+        }
+    };
+    for u in span {
+        match &u.atom {
+            Atom::Char(ch) => buf.push(*ch),
+            Atom::Break => {
+                flush(&mut out, &mut buf);
+                out.push(owpml::DrawOut::Break);
+            }
+            Atom::NoteRef(n) => {
+                flush(&mut out, &mut buf);
+                out.push(owpml::DrawOut::Note(n.body.clone()));
+            }
+            _ => {}
+        }
+    }
+    flush(&mut out, &mut buf);
+    out
 }
 
 /// A zero-width item whose paragraph went, as a run of its own: a marker

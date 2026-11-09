@@ -6,9 +6,10 @@
   paragraphs as that text instead of a `<keep kind="drawing"/>` placeholder.
   Several paragraphs join with `<br/>`; a shown footnote or endnote inside
   the box is `[^n]`. Geometry, anchoring, styling and the original XML stay
-  as a `Wrap`. Editing the body rewrites outer `hp:t` and keeps the rest;
-  editing a note inside the box rewrites that note; deleting all of the
-  text removes the object and is reported. Pictures, charts, groups, OLE,
+  as a `Wrap`. Editing the body rewrites the inner runs and keeps geometry;
+  a shown footnote stays at its mark when paragraphs join or the text
+  around it changes; editing a note inside the box rewrites that note;
+  deleting all of the text removes the object and is reported. Pictures, charts, groups, OLE,
   empty shapes, and boxes that hold a table or nested objects stay
   placeholders. XLSX shapes stay placeholders: the spreadsheet grammar has
   no shape line. Corpus keeps: 207 → 206 (hwpx `drawing` 10 → 9).

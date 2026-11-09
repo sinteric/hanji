@@ -330,54 +330,102 @@ fn draw_note_bodies(el: &Element) -> Vec<String> {
         .collect()
 }
 
+/// A piece of edited `hp:drawText`: outer text, a paragraph break, or a
+/// shown note's body. Note marks keep their place among the characters.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum DrawOut {
+    Text(String),
+    Break,
+    Note(String),
+}
+
 /// `xml` of a stored drawing, with outer `hp:drawText` `hp:t` set to `body`
 /// (`\n` is a paragraph). Unchanged text keeps the original fragment.
 pub fn with_draw_text(xml: &str, body: &str) -> String {
-    with_draw_contents(xml, body, &[])
+    with_draw_contents(xml, &pieces_from_body(body))
 }
 
 /// Like [`with_draw_text`], and writes shown notes inside the box from
-/// `notes` in order. Extra stored notes are dropped; the original fragment
-/// is kept when body and notes match.
-pub fn with_draw_contents(xml: &str, body: &str, notes: &[&str]) -> String {
+/// `pieces` (a note sits where [`DrawOut::Note`] is). Extra stored notes
+/// are dropped; the original fragment is kept when body and notes match.
+pub(crate) fn with_draw_contents(xml: &str, pieces: &[DrawOut]) -> String {
     let mut e = hanji_package::xml::fragment(xml);
-    let same_body = shown_draw_text(&e).as_deref() == Some(body);
+    let body = body_of_pieces(pieces);
+    let notes = notes_of_pieces(pieces);
+    let same_body = shown_draw_text(&e).as_deref() == Some(body.as_str());
     let same_notes = draw_note_bodies(&e)
         .iter()
         .map(String::as_str)
-        .eq(notes.iter().copied());
+        .eq(notes.iter().map(String::as_str));
     if same_body && same_notes {
         return xml.to_string();
     }
     if !same_body {
-        set_draw_paras(&mut e, body);
-    }
-    if !same_notes {
-        set_draw_notes(&mut e, notes);
+        set_draw_pieces(&mut e, pieces);
+    } else {
+        let refs: Vec<&str> = notes.iter().map(String::as_str).collect();
+        set_draw_notes(&mut e, &refs);
     }
     drop_stale_layouts(&mut e);
     e.to_xml()
 }
 
 /// Writes `body` into the outer `hp:t` of `hp:drawText` (one paragraph per
-/// `\n`). Unchanged text is a no-op. Does not touch notes.
+/// `\n`). Unchanged text is a no-op.
 pub fn set_draw_text(el: &mut Element, body: &str) -> bool {
     if shown_draw_text(el).as_deref() == Some(body) {
         return false;
     }
-    set_draw_paras(el, body);
+    set_draw_pieces(el, &pieces_from_body(body));
     true
 }
 
-fn set_draw_paras(el: &mut Element, body: &str) {
+fn pieces_from_body(body: &str) -> Vec<DrawOut> {
+    let mut out = Vec::new();
+    for (i, part) in body.split('\n').enumerate() {
+        if i > 0 {
+            out.push(DrawOut::Break);
+        }
+        out.push(DrawOut::Text(part.to_string()));
+    }
+    out
+}
+
+fn body_of_pieces(pieces: &[DrawOut]) -> String {
+    let mut body = String::new();
+    for p in pieces {
+        match p {
+            DrawOut::Text(s) => body.push_str(s),
+            DrawOut::Break => body.push('\n'),
+            DrawOut::Note(_) => {}
+        }
+    }
+    body
+}
+
+fn notes_of_pieces(pieces: &[DrawOut]) -> Vec<String> {
+    pieces
+        .iter()
+        .filter_map(|p| match p {
+            DrawOut::Note(s) => Some(s.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+fn set_draw_pieces(el: &mut Element, pieces: &[DrawOut]) {
     let Some(dt) = find_draw_text_mut(el) else {
         return;
     };
-    let parts: Vec<&str> = body.split('\n').collect();
+    let mut notes = take_shown_note_ctrls(dt);
+    let mut ni = 0usize;
+    let paras = paras_of(pieces);
     let Some(sub) = dt.child_mut("hp:subList") else {
         let mut sub = Element::new("hp:subList");
-        for part in &parts {
-            sub.children.push(Node::El(draw_para(None, part)));
+        for para in &paras {
+            let mut p = draw_para(None);
+            set_para_bits(&mut p, para, &mut notes, &mut ni);
+            sub.children.push(Node::El(p));
         }
         dt.children.push(Node::El(sub));
         return;
@@ -388,9 +436,8 @@ fn set_draw_paras(el: &mut Element, body: &str) {
     for n in std::mem::take(&mut sub.children) {
         match n {
             Node::El(mut p) if p.is("hp:p") => {
-                if pi < parts.len() {
-                    set_para_outer_t(&mut p, parts[pi]);
-                    drop_layout(&mut p);
+                if pi < paras.len() {
+                    set_para_bits(&mut p, &paras[pi], &mut notes, &mut ni);
                     kept.push(Node::El(p));
                     pi += 1;
                 }
@@ -399,51 +446,100 @@ fn set_draw_paras(el: &mut Element, body: &str) {
         }
     }
     sub.children = kept;
-    while pi < parts.len() {
-        sub.children
-            .push(Node::El(draw_para(model.as_ref(), parts[pi])));
+    while pi < paras.len() {
+        let mut p = draw_para(model.as_ref());
+        set_para_bits(&mut p, &paras[pi], &mut notes, &mut ni);
+        sub.children.push(Node::El(p));
         pi += 1;
     }
 }
 
-fn draw_para(model: Option<&Element>, body: &str) -> Element {
-    let mut t = Element::new("hp:t");
-    t.children.push(Node::Text(escape_text(body)));
-    let mut run = Element::new("hp:run");
-    run.children.push(Node::El(t));
+fn paras_of(pieces: &[DrawOut]) -> Vec<Vec<&DrawOut>> {
+    let mut paras = vec![Vec::new()];
+    for p in pieces {
+        if let DrawOut::Break = p {
+            paras.push(Vec::new());
+        } else {
+            let i = paras.len() - 1;
+            paras[i].push(p);
+        }
+    }
+    paras
+}
+
+fn draw_para(model: Option<&Element>) -> Element {
     let mut p = model.cloned().unwrap_or_else(|| Element::new("hp:p"));
     p.children.clear();
-    p.children.push(Node::El(run));
+    p.children.push(Node::El(Element::new("hp:run")));
     p
 }
 
-fn set_para_outer_t(p: &mut Element, body: &str) {
-    let mut used = false;
-    for n in &mut p.children {
-        let Node::El(r) = n else { continue };
-        if !r.is("hp:run") {
-            continue;
-        }
-        for c in r.elements_mut() {
-            if !c.is("hp:t") {
-                continue;
+fn set_para_bits(p: &mut Element, bits: &[&DrawOut], notes: &mut [Element], ni: &mut usize) {
+    drop_layout(p);
+    let mut kids = Vec::new();
+    for b in bits {
+        match b {
+            DrawOut::Text(s) => kids.push(Node::El(t_text(s))),
+            DrawOut::Note(body) => {
+                if *ni < notes.len() {
+                    set_note_body(&mut notes[*ni], body);
+                    kids.push(Node::El(notes[*ni].clone()));
+                    *ni += 1;
+                }
             }
-            if !used {
-                c.children = vec![Node::Text(escape_text(body))];
-                used = true;
-            } else {
-                c.children.clear();
-            }
+            DrawOut::Break => {}
         }
     }
-    if !used {
-        p.children.push(Node::El({
-            let mut t = Element::new("hp:t");
-            t.children.push(Node::Text(escape_text(body)));
-            let mut run = Element::new("hp:run");
-            run.children.push(Node::El(t));
-            run
-        }));
+    if kids.is_empty() {
+        kids.push(Node::El(t_text("")));
+    }
+    let mut got_run = false;
+    p.children.retain_mut(|n| match n {
+        Node::El(r) if r.is("hp:run") => {
+            if got_run {
+                false
+            } else {
+                r.children = std::mem::take(&mut kids);
+                got_run = true;
+                true
+            }
+        }
+        Node::El(e) if e.is("hp:linesegarray") => false,
+        _ => true,
+    });
+    if !got_run {
+        let mut run = Element::new("hp:run");
+        run.children = kids;
+        p.children.push(Node::El(run));
+    }
+}
+
+fn t_text(s: &str) -> Element {
+    let mut t = Element::new("hp:t");
+    t.children.push(Node::Text(escape_text(s)));
+    t
+}
+
+fn take_shown_note_ctrls(e: &mut Element) -> Vec<Element> {
+    let mut out = Vec::new();
+    take_note_ctrls(e, &mut out);
+    out
+}
+
+fn take_note_ctrls(e: &mut Element, out: &mut Vec<Element>) {
+    if e.is("hp:run") {
+        let mut kept = Vec::new();
+        for n in std::mem::take(&mut e.children) {
+            match n {
+                Node::El(c) if c.is("hp:ctrl") && shown_note(&c).is_some() => out.push(c),
+                other => kept.push(other),
+            }
+        }
+        e.children = kept;
+        return;
+    }
+    for c in e.elements_mut() {
+        take_note_ctrls(c, out);
     }
 }
 
@@ -910,17 +1006,65 @@ mod tests {
         let note = "<hp:ctrl><hp:footNote><hp:subList><hp:p><hp:run><hp:t> 각주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>";
         let inner = format!("<hp:p><hp:run><hp:t>앞</hp:t>{note}<hp:t>뒤</hp:t></hp:run></hp:p>");
         let xml = rect(&inner);
-        assert_eq!(with_draw_contents(&xml, "앞뒤", &[" 각주"]), xml);
+        assert_eq!(
+            with_draw_contents(
+                &xml,
+                &[
+                    DrawOut::Text("앞".into()),
+                    DrawOut::Note(" 각주".into()),
+                    DrawOut::Text("뒤".into()),
+                ]
+            ),
+            xml
+        );
     }
 
     #[test]
     fn with_draw_contents_rewrites_outer_t_and_keeps_the_note() {
         let note = "<hp:ctrl><hp:footNote><hp:subList><hp:p><hp:run><hp:t> 각주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>";
         let inner = format!("<hp:p><hp:run><hp:t>앞</hp:t>{note}<hp:t>뒤</hp:t></hp:run></hp:p>");
-        let out = with_draw_contents(&rect(&inner), "고침", &[" 각주"]);
+        let out = with_draw_contents(
+            &rect(&inner),
+            &[DrawOut::Text("고침".into()), DrawOut::Note(" 각주".into())],
+        );
         assert_eq!(shown_draw_text(&fragment(&out)).as_deref(), Some("고침"));
         assert!(out.contains("<hp:t> 각주</hp:t>"), "{out}");
         assert!(out.contains("<hp:footNote"), "{out}");
+    }
+
+    #[test]
+    fn with_draw_contents_keeps_a_note_when_paragraphs_join() {
+        let note = "<hp:ctrl><hp:footNote><hp:subList><hp:p><hp:run><hp:t> 각주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>";
+        let inner = format!(
+            "{}<hp:p><hp:run><hp:t>b</hp:t>{note}</hp:run></hp:p>",
+            p("a")
+        );
+        let out = with_draw_contents(
+            &rect(&inner),
+            &[DrawOut::Text("ab".into()), DrawOut::Note(" 각주".into())],
+        );
+        assert_eq!(shown_draw_text(&fragment(&out)).as_deref(), Some("ab"));
+        assert_eq!(draw_note_bodies(&fragment(&out)), vec![" 각주"]);
+        assert!(out.contains("<hp:footNote"), "{out}");
+    }
+
+    #[test]
+    fn with_draw_contents_keeps_a_note_between_edited_text() {
+        let note = "<hp:ctrl><hp:footNote><hp:subList><hp:p><hp:run><hp:t> 각주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>";
+        let inner = format!("<hp:p><hp:run><hp:t>앞</hp:t>{note}<hp:t>뒤</hp:t></hp:run></hp:p>");
+        let out = with_draw_contents(
+            &rect(&inner),
+            &[
+                DrawOut::Text("앞X".into()),
+                DrawOut::Note(" 각주".into()),
+                DrawOut::Text("뒤".into()),
+            ],
+        );
+        assert_eq!(shown_draw_text(&fragment(&out)).as_deref(), Some("앞X뒤"));
+        let t_note = out.find("<hp:t>앞X</hp:t>").unwrap();
+        let ctrl = out.find("<hp:footNote").unwrap();
+        let t_after = out.find("<hp:t>뒤</hp:t>").unwrap();
+        assert!(t_note < ctrl && ctrl < t_after, "{out}");
     }
 
     #[test]
