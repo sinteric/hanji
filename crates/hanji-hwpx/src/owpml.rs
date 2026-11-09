@@ -347,24 +347,25 @@ pub fn with_draw_text(xml: &str, body: &str) -> String {
 
 /// Like [`with_draw_text`], and writes shown notes inside the box from
 /// `pieces` (a note sits where [`DrawOut::Note`] is). Extra stored notes
-/// are dropped; the original fragment is kept when body and notes match.
+/// are dropped; the original fragment is kept when the layout of text,
+/// breaks and notes matches.
 pub(crate) fn with_draw_contents(xml: &str, pieces: &[DrawOut]) -> String {
     let mut e = hanji_package::xml::fragment(xml);
-    let body = body_of_pieces(pieces);
     let notes = notes_of_pieces(pieces);
-    let same_body = shown_draw_text(&e).as_deref() == Some(body.as_str());
+    let same_shape =
+        stored_draw_out(&e).is_some_and(|stored| draw_shape(&stored) == draw_shape(pieces));
     let same_notes = draw_note_bodies(&e)
         .iter()
         .map(String::as_str)
         .eq(notes.iter().map(String::as_str));
-    if same_body && same_notes {
+    if same_shape && same_notes {
         return xml.to_string();
     }
-    if !same_body {
-        set_draw_pieces(&mut e, pieces);
-    } else {
+    if same_shape {
         let refs: Vec<&str> = notes.iter().map(String::as_str).collect();
         set_draw_notes(&mut e, &refs);
+    } else {
+        set_draw_pieces(&mut e, pieces);
     }
     drop_stale_layouts(&mut e);
     e.to_xml()
@@ -391,18 +392,6 @@ fn pieces_from_body(body: &str) -> Vec<DrawOut> {
     out
 }
 
-fn body_of_pieces(pieces: &[DrawOut]) -> String {
-    let mut body = String::new();
-    for p in pieces {
-        match p {
-            DrawOut::Text(s) => body.push_str(s),
-            DrawOut::Break => body.push('\n'),
-            DrawOut::Note(_) => {}
-        }
-    }
-    body
-}
-
 fn notes_of_pieces(pieces: &[DrawOut]) -> Vec<String> {
     pieces
         .iter()
@@ -411,6 +400,44 @@ fn notes_of_pieces(pieces: &[DrawOut]) -> Vec<String> {
             _ => None,
         })
         .collect()
+}
+
+fn stored_draw_out(el: &Element) -> Option<Vec<DrawOut>> {
+    Some(
+        draw_bits(el)?
+            .into_iter()
+            .map(|b| match b {
+                DrawBit::Text(s) => DrawOut::Text(s),
+                DrawBit::Break => DrawOut::Break,
+                DrawBit::Note(c) => {
+                    DrawOut::Note(shown_note(c).map(|(_, body)| body).unwrap_or_default())
+                }
+            })
+            .collect(),
+    )
+}
+
+#[derive(Eq, PartialEq)]
+enum DrawShape {
+    Text(String),
+    Break,
+    Note,
+}
+
+fn draw_shape(pieces: &[DrawOut]) -> Vec<DrawShape> {
+    let mut out = Vec::new();
+    for p in pieces {
+        match p {
+            DrawOut::Text(s) if s.is_empty() => {}
+            DrawOut::Text(s) => match out.last_mut() {
+                Some(DrawShape::Text(prev)) => prev.push_str(s),
+                _ => out.push(DrawShape::Text(s.clone())),
+            },
+            DrawOut::Break => out.push(DrawShape::Break),
+            DrawOut::Note(_) => out.push(DrawShape::Note),
+        }
+    }
+    out
 }
 
 fn set_draw_pieces(el: &mut Element, pieces: &[DrawOut]) {
@@ -1046,6 +1073,23 @@ mod tests {
         assert_eq!(shown_draw_text(&fragment(&out)).as_deref(), Some("ab"));
         assert_eq!(draw_note_bodies(&fragment(&out)), vec![" 각주"]);
         assert!(out.contains("<hp:footNote"), "{out}");
+    }
+
+    #[test]
+    fn with_draw_contents_moves_a_note_when_the_mark_moves() {
+        let note = "<hp:ctrl><hp:footNote><hp:subList><hp:p><hp:run><hp:t> 각주</hp:t></hp:run></hp:p></hp:subList></hp:footNote></hp:ctrl>";
+        let inner = format!("<hp:p><hp:run><hp:t>앞</hp:t>{note}<hp:t>뒤</hp:t></hp:run></hp:p>");
+        let xml = rect(&inner);
+        let out = with_draw_contents(
+            &xml,
+            &[DrawOut::Text("앞뒤".into()), DrawOut::Note(" 각주".into())],
+        );
+        assert_ne!(out, xml);
+        assert_eq!(shown_draw_text(&fragment(&out)).as_deref(), Some("앞뒤"));
+        let t = out.find("<hp:t>앞뒤</hp:t>").unwrap();
+        let ctrl = out.find("<hp:footNote").unwrap();
+        assert!(t < ctrl, "{out}");
+        assert!(!out.contains("<hp:t>앞</hp:t>"), "{out}");
     }
 
     #[test]

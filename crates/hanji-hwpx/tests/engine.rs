@@ -1839,6 +1839,27 @@ fn joining_draw_text_paragraphs_keeps_a_footnote() {
 }
 
 #[test]
+fn moving_a_footnote_mark_inside_draw_text_keeps_it_at_the_new_place() {
+    let inner = draw_rect("앞").replace(
+        "<hp:t>앞</hp:t>",
+        &format!("<hp:t>앞</hp:t>{}<hp:t>뒤</hp:t>", footnote("1", " 각주")),
+    );
+    let pkg = hwpx(&[p_with(&inner)]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "앞[^1]뒤", "앞뒤[^1]", CAPS).unwrap();
+    assert!(r.report.refused.is_empty(), "{:?}", r.report);
+    assert!(r.text.contains("앞뒤[^1]"), "{}", r.text);
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(sec.contains("<hp:drawText"), "{sec}");
+    assert!(sec.contains(r#"id="7""#), "{sec}");
+    let t = sec.find("<hp:t>앞뒤</hp:t>").unwrap();
+    let ctrl = sec.find("<hp:footNote").unwrap();
+    assert!(t < ctrl, "{sec}");
+    let back = import(&export(&r.text, &r.remainder));
+    assert!(back.text.contains("앞뒤[^1]"), "{}", back.text);
+}
+
+#[test]
 fn editing_draw_text_around_a_footnote_keeps_the_mark() {
     let inner = draw_rect("앞").replace(
         "<hp:t>앞</hp:t>",
