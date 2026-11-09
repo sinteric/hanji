@@ -286,9 +286,15 @@ fn draw_para_showable(p: &Element) -> bool {
 }
 
 fn draw_t_plain(t: &Element) -> bool {
-    t.children
-        .iter()
-        .all(|n| matches!(n, Node::Text(_) | Node::CData(_) | Node::Comment(_)))
+    t.children.iter().all(|n| match n {
+        Node::Text(s) => {
+            let u = unescape(s);
+            !u.contains('\n') && !u.contains('\r')
+        }
+        Node::CData(s) => !s.contains('\n') && !s.contains('\r'),
+        Node::Comment(_) => true,
+        _ => false,
+    })
 }
 
 fn draw_para_bits(p: &Element) -> Vec<DrawBit<'_>> {

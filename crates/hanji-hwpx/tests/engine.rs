@@ -1856,6 +1856,17 @@ fn footnote_tbox_corpus_shows_the_box_text_and_its_note() {
 }
 
 #[test]
+fn a_draw_text_with_a_newline_in_t_stays_a_placeholder() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>앞 </hp:t>{}<hp:t> 뒤</hp:t>",
+        draw_rect("한\n줄")
+    ))]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+    assert!(!imp.text.contains("한<br/>줄"), "{}", imp.text);
+}
+
+#[test]
 fn a_picture_stays_a_placeholder() {
     let pic = r#"<hp:pic id="1" zOrder="1" numberingType="PICTURE" textWrap="SQUARE" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None"><hp:img binaryItemIDRef="image1"/><hp:sz width="1000" widthRelTo="ABSOLUTE" height="1000" heightRelTo="ABSOLUTE" protect="0"/><hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/></hp:pic>"#;
     let pkg = hwpx(&[p_with(pic)]);
