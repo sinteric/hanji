@@ -13,8 +13,28 @@
   original XML until the shape is retexted. Connectors, charts, pictures,
   cell-linked text, absolute-anchor objects, and groups that hold those
   stay placeholders. A sheet with more than 1024 modelled shapes keeps
-  them as placeholders. Corpus keeps: 206 → 200 (xlsx `shape` 5 → 0,
+  them as placeholders. Corpus keeps: 203 → 197 (xlsx `shape` 5 → 0,
   `group` 1 → 0).
+- Show XLSX data-bar conditional formats as
+  `<conditional-format range="E4" type="dataBar" min="num:0" max="max" fill="#638EC6"/>`
+  lines (round 7 A: `min`/`max` one token, `fill` the cell-format colour)
+  instead of `<keep kind="conditional-format"/>`. Range, min/max and colour
+  can be kept, added, removed or changed. Line order is still Excel's
+  sheet-wide `priority`; a rewrite groups only adjacent same-range lines.
+  Unedited x14 data-bar extensions (negative fill, axis, gradient, border)
+  stay as stored; a rewrite of the modelled fields patches them in place.
+  A color scale, an icon set, or a dataBar whose x14 extension cannot be
+  carried faithfully stays a placeholder for that sheet. Corpus keeps:
+  204 → 203 (xlsx `conditional-format` 1 → 0).
+- Show a DOCX page or column break inside a paragraph (`w:br type=page` /
+  `type=column`) as `<pagebreak/>` / `<columnbreak/>` at that point instead
+  of a `<keep kind="break"/>` placeholder. A line holding only
+  `<pagebreak/>` is still a page break between paragraphs; `<br/>` is only
+  a line break. Export writes `w:br w:type="page"` / `w:type="column"` in
+  the run; an unedited paragraph stays byte-identical. A `w:br` with
+  `w:clear` or another type, and `w:lastRenderedPageBreak`, stay as they
+  were. hwpx and pptx do not grow an equivalent. Corpus keeps: 206 → 204
+  (docx `break` 2 → 0).
 - Show an HWPX drawing whose `hp:drawText` is ordinary text in one or more
   paragraphs as that text instead of a `<keep kind="drawing"/>` placeholder.
   Several paragraphs join with `<br/>`; a shown footnote or endnote inside

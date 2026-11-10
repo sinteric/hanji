@@ -318,12 +318,13 @@ These are not supported yet:
   off) and
   conditional formats
   `<conditional-format range="A1" type="cellIs" operator="greaterThan"
-  formula="5" dxf="fill=#FFC7CE"/>` (only `cellIs` and `expression`;
-  `dxf` uses the cell-format vocabulary), except on a sheet with more
+  formula="5" dxf="fill=#FFC7CE"/>` (`cellIs`, `expression` and `dataBar`;
+  `dxf` uses the cell-format vocabulary; a data bar is
+  `type="dataBar" min="num:0" max="max" fill="#638EC6"`), except on a sheet with more
   than 1024 of that kind, overlapping hyperlink or note ranges, a
   hyperlink whose relationship is not a unique external Target, a
-  threaded comment, or a conditional format that is not `cellIs` or
-  `expression` (a data bar, color scale or icon set), which stay a
+  threaded comment, or a conditional format that is not `cellIs`,
+  `expression` or `dataBar` (a color scale or icon set), which stay a
   placeholder.
 - Native-application fidelity for all DOCX/HWPX features, and XLSX print
   layout and advanced visuals. DOCX/HWPX previews are experimental. XLSX

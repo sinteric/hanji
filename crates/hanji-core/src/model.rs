@@ -975,6 +975,7 @@ pub fn key(a: &Atom) -> u32 {
         Atom::Comment(c) => h(5, c),
         Atom::Ins(c) => h(6, c),
         Atom::Del(c) => h(7, c),
+        Atom::ColumnBreak => h(8, ""),
         _ => h(255, ""),
     }
 }

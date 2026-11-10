@@ -248,10 +248,11 @@ xlsx, in addition:
   `<hyperlink/>` lines, except overlapping ranges, more than 1024 of either
   kind on a sheet, a hyperlink whose relationship is not a unique external
   Target, or a threaded comment. Data validations are `<validation/>` lines
-  and `cellIs`/`expression` conditional formats `<conditional-format/>`
-  lines (`dxf` uses the cell-format vocabulary, e.g. `fill=#FFC7CE`), except
+  and `cellIs`/`expression`/`dataBar` conditional formats `<conditional-format/>`
+  lines (`dxf` uses the cell-format vocabulary, e.g. `fill=#FFC7CE`; a data
+  bar is `min="num:0" max="max" fill="#638EC6"`), except
   more than 1024 of either kind on a sheet, or a conditional format that is
-  not `cellIs` or `expression` (a data bar, color scale or icon set).
+  not `cellIs`, `expression` or `dataBar` (a color scale or icon set).
 - The structure text cannot rename or delete a sheet, table or column, or
   change a table's range; range operations do the rest.
 - Operations that would tear a merged area, an array formula, a data table,

@@ -714,6 +714,7 @@ fn unit(out: &mut Out, units: &[Unit], i: usize, in_link: bool) {
         Atom::Ins(c) => out.text(&raw_tag("ins", c)),
         Atom::Del(c) => out.text(&raw_tag("del", c)),
         Atom::PageBreak => out.text("<pagebreak/>"),
+        Atom::ColumnBreak => out.text("<columnbreak/>"),
     }
 }
 

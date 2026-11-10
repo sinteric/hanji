@@ -34,15 +34,15 @@
     "files": 102,
     "failed": 0,
     "with_keeps": 46,
-    "keeps": 200
+    "keeps": 203
   },
   "formats": [
     {
       "format": "docx",
       "files": 13,
       "failed": 0,
-      "with_keeps": 11,
-      "keeps": 119
+      "with_keeps": 10,
+      "keeps": 117
     },
     {
       "format": "hwpx",
@@ -62,8 +62,8 @@
       "format": "xlsx",
       "files": 46,
       "failed": 0,
-      "with_keeps": 11,
-      "keeps": 19
+      "with_keeps": 12,
+      "keeps": 24
     }
   ],
   "kinds": [
@@ -152,6 +152,12 @@
       "files": 5
     },
     {
+      "format": "xlsx",
+      "kind": "shape",
+      "keeps": 5,
+      "files": 3
+    },
+    {
       "format": "docx",
       "kind": "table",
       "keeps": 3,
@@ -162,12 +168,6 @@
       "kind": "text",
       "keeps": 3,
       "files": 1
-    },
-    {
-      "format": "docx",
-      "kind": "break",
-      "keeps": 2,
-      "files": 2
     },
     {
       "format": "docx",
@@ -201,7 +201,7 @@
     },
     {
       "format": "xlsx",
-      "kind": "conditional-format",
+      "kind": "group",
       "keeps": 1,
       "files": 1
     },
@@ -292,17 +292,14 @@
     {
       "path": "prototype/remainder/corpus/tdf124637_sectionMargin.docx",
       "format": "docx",
-      "keeps": 1,
-      "kinds": {
-        "break": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "prototype/remainder/corpus/tdf154481.docx",
       "format": "docx",
-      "keeps": 4,
+      "keeps": 3,
       "kinds": {
-        "break": 1,
         "drawing": 1,
         "field": 2
       }
@@ -694,8 +691,11 @@
     {
       "path": "crates/hanji-xlsx/corpus/ExcelWithAttachments.xlsm",
       "format": "xlsx",
-      "keeps": 0,
-      "kinds": {}
+      "keeps": 4,
+      "kinds": {
+        "group": 1,
+        "shape": 3
+      }
     },
     {
       "path": "crates/hanji-xlsx/corpus/GeneralFormatTests.xlsx",
@@ -756,9 +756,10 @@
     {
       "path": "crates/hanji-xlsx/corpus/WithDrawing.xlsx",
       "format": "xlsx",
-      "keeps": 5,
+      "keeps": 6,
       "kinds": {
-        "picture": 5
+        "picture": 5,
+        "shape": 1
       }
     },
     {
@@ -923,7 +924,7 @@
       "keeps": 2,
       "kinds": {
         "chart": 1,
-        "conditional-format": 1
+        "shape": 1
       }
     },
     {

@@ -14,6 +14,7 @@ use crate::diag::{quoted, Diagnostic};
 use crate::names::Names;
 use crate::parse::{chars_of, decode_attr, parse_tag, Parser};
 use crate::serialize::{attr, front_lines};
+use crate::vocab::Color;
 
 /// Column types (§5.4, §8: typed by the source, never guessed). `mixed` is
 /// a column whose cells do not share one type; each cell keeps its own.
@@ -75,9 +76,12 @@ pub const VALIDATION_OPERATORS: &[&str] = &[
 /// `errorStyle` values Excel writes.
 pub const VALIDATION_ERROR_STYLES: &[&str] = &["stop", "warning", "information"];
 
-/// Conditional-format rule types the text models. Other types (dataBar,
-/// colorScale, iconSet, …) stay a placeholder.
-pub const CONDITIONAL_FORMAT_TYPES: &[&str] = &["cellIs", "expression"];
+/// Conditional-format rule types the text models. Other types (colorScale,
+/// iconSet, …) stay a placeholder.
+pub const CONDITIONAL_FORMAT_TYPES: &[&str] = &["cellIs", "expression", "dataBar"];
+
+/// Data-bar `min`/`max` types (`min="num:0"`, `max="max"`). Round 7 A.
+pub const CFVO_TYPES: &[&str] = &["min", "max", "num", "percent", "percentile", "formula"];
 
 /// Excel's last row and column (A1's `XFD1048576`).
 const MAX_ROW: u32 = 1_048_576;
@@ -207,16 +211,86 @@ pub struct ValidationDecl {
     pub error_style: Option<String>,
 }
 
+/// A data-bar threshold as one token (`min`, `num:0`, `formula:=A1`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Cfvo {
+    pub ty: String,
+    /// Present when `ty` is not `min` or `max`.
+    pub val: Option<String>,
+}
+
+impl Cfvo {
+    /// Parse `min`, `max`, `num:0`, `percent:50`, `percentile:90` or
+    /// `formula:=A1`. A formula without `=` is stored with one.
+    pub fn parse(s: &str) -> Result<Cfvo, String> {
+        let form = "min, max, num:0, percent:50, percentile:90 or formula:=A1";
+        let (ty, val) = match s.split_once(':') {
+            Some((ty, rest)) => (ty, Some(rest)),
+            None => (s, None),
+        };
+        if !CFVO_TYPES.contains(&ty) {
+            return Err(format!("{s:?} is not a data-bar min or max; write {form}."));
+        }
+        match (ty, val) {
+            ("min" | "max", Some(_)) => Err(format!("{ty} takes no value; write {ty}, not {s:?}.")),
+            ("min" | "max", None) => Ok(Cfvo {
+                ty: ty.to_string(),
+                val: None,
+            }),
+            (_, None) | (_, Some("")) => Err(format!(
+                "{ty} needs a value: {ty}:0, {ty}:name or {ty}:=A1."
+            )),
+            ("percent" | "percentile", Some(v)) => {
+                let n: f64 = v
+                    .parse()
+                    .map_err(|_| format!("{ty} \"{v}\" is not a number 0–100."))?;
+                if !(0.0..=100.0).contains(&n) || !n.is_finite() {
+                    return Err(format!("{ty} \"{v}\" is not a number 0–100."));
+                }
+                Ok(Cfvo {
+                    ty: ty.to_string(),
+                    val: Some(v.to_string()),
+                })
+            }
+            ("formula", Some(v)) => {
+                let v = if v.starts_with('=') {
+                    v.to_string()
+                } else {
+                    format!("={v}")
+                };
+                Ok(Cfvo {
+                    ty: ty.to_string(),
+                    val: Some(v),
+                })
+            }
+            ("num", Some(v)) => Ok(Cfvo {
+                ty: ty.to_string(),
+                val: Some(v.to_string()),
+            }),
+            _ => Err(format!("{s:?} is not a data-bar min or max; write {form}.")),
+        }
+    }
+
+    /// Canonical token (`num:0`, `max`, `formula:=A1`).
+    pub fn write(&self) -> String {
+        match &self.val {
+            None => self.ty.clone(),
+            Some(v) => format!("{}:{v}", self.ty),
+        }
+    }
+}
+
 /// One conditional-format rule (`<conditional-format range="A1" type="cellIs"
-/// operator="greaterThan" formula="5" dxf="fill=#FFC7CE"/>`).
+/// operator="greaterThan" formula="5" dxf="fill=#FFC7CE"/>`, or
+/// `type="dataBar" min="num:0" max="max" fill="#638EC6"`).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CondFormatDecl {
     /// Canonical A1 range or space-separated ranges.
     pub range: String,
-    /// `cellIs` or `expression`.
+    /// `cellIs`, `expression` or `dataBar`.
     pub ty: String,
     /// Omitted when the file uses the default (`between`), and for
-    /// `expression` rules.
+    /// `expression` and `dataBar` rules.
     pub operator: Option<String>,
     pub formula: Option<String>,
     pub formula2: Option<String>,
@@ -224,6 +298,11 @@ pub struct CondFormatDecl {
     pub dxf: CellFormat,
     /// Written `stopIfTrue="true"` when the file stops at this rule.
     pub stop_if_true: bool,
+    /// Data bar: `min="num:0"`. Required for `dataBar`, absent otherwise.
+    pub min: Option<Cfvo>,
+    pub max: Option<Cfvo>,
+    /// Data bar fill (`#638EC6`, `accent1`).
+    pub fill: Option<Color>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -430,7 +509,7 @@ const NOTE_FORM: &str = "<note range=\"B2\" author=\"…\" text=\"…\"/>";
 const VALIDATION_FORM: &str =
     "<validation range=\"C2\" type=\"list\" formula1=\"&quot;A,B,C&quot;\"/> or <validation range=\"B2:B10\" type=\"whole\" operator=\"between\" formula1=\"1\" formula2=\"100\" allowBlank=\"true\"/>";
 const CONDITIONAL_FORMAT_FORM: &str =
-    "<conditional-format range=\"A1:A10\" type=\"cellIs\" operator=\"greaterThan\" formula=\"5\" dxf=\"fill=#FFC7CE\"/>";
+    "<conditional-format range=\"A1:A10\" type=\"cellIs\" operator=\"greaterThan\" formula=\"5\" dxf=\"fill=#FFC7CE\"/> or <conditional-format range=\"E4\" type=\"dataBar\" min=\"num:0\" max=\"max\" fill=\"#638EC6\"/>";
 const CHART_FORM: &str = "<chart type=\"bar\" data=\"Table[Column],Table[Column]\" title=\"…\"/>";
 const SHAPE_FORM: &str =
     "<shape name=\"…\" anchor=\"B2:D5\">text</shape> or <shape name=\"…\" anchor=\"B2:D5\"/>";
@@ -1536,6 +1615,9 @@ const CONDITIONAL_FORMAT_ATTRS: &[&str] = &[
     "formula2",
     "dxf",
     "stopiftrue",
+    "min",
+    "max",
+    "fill",
 ];
 
 fn conditional_format_tag(p: &mut Parser<'_>, i: usize, have: usize) -> Option<CondFormatDecl> {
@@ -1582,6 +1664,20 @@ fn conditional_format_tag(p: &mut Parser<'_>, i: usize, have: usize) -> Option<C
             return None;
         }
     };
+    if ty == "dataBar" {
+        return data_bar_tag(p, i, &attrs, range);
+    }
+    if get(&attrs, "min").is_some() || get(&attrs, "max").is_some() || get(&attrs, "fill").is_some()
+    {
+        p.err(
+            i,
+            1,
+            format!(
+                "min, max and fill belong on type=\"dataBar\", not type=\"{ty}\"; a {ty} rule is {CONDITIONAL_FORMAT_FORM}."
+            ),
+        );
+        return None;
+    }
     let operator = match (ty, get(&attrs, "operator")) {
         ("expression", Some(_)) => {
             p.err(
@@ -1623,6 +1719,85 @@ fn conditional_format_tag(p: &mut Parser<'_>, i: usize, have: usize) -> Option<C
         formula2: opt_attr(&attrs, "formula2"),
         dxf,
         stop_if_true: parse_flag_attr(p, i, &attrs, "stopiftrue")? == Some(true),
+        min: None,
+        max: None,
+        fill: None,
+    })
+}
+
+fn data_bar_tag(
+    p: &mut Parser<'_>,
+    i: usize,
+    attrs: &[(String, String)],
+    range: String,
+) -> Option<CondFormatDecl> {
+    for (k, label) in [
+        ("operator", "operator"),
+        ("formula", "formula"),
+        ("formula2", "formula2"),
+        ("dxf", "dxf"),
+    ] {
+        if get(attrs, k).is_some() {
+            p.err(
+                i,
+                1,
+                format!("a dataBar has min, max and fill, not {label}: {CONDITIONAL_FORMAT_FORM}."),
+            );
+            return None;
+        }
+    }
+    let (Some(min_raw), Some(max_raw), Some(fill_raw)) =
+        (get(attrs, "min"), get(attrs, "max"), get(attrs, "fill"))
+    else {
+        p.err(
+            i,
+            1,
+            format!("a dataBar has min, max and fill: {CONDITIONAL_FORMAT_FORM}."),
+        );
+        return None;
+    };
+    let min = match Cfvo::parse(min_raw) {
+        Ok(v) => v,
+        Err(m) => {
+            p.err(i, 1, format!("min: {m}"));
+            return None;
+        }
+    };
+    let max = match Cfvo::parse(max_raw) {
+        Ok(v) => v,
+        Err(m) => {
+            p.err(i, 1, format!("max: {m}"));
+            return None;
+        }
+    };
+    let fill = match Color::parse(fill_raw) {
+        Ok(c) if c.alpha.is_none() && c.is_writable() => c,
+        Ok(c) => {
+            p.err(
+                i,
+                1,
+                format!(
+                    "fill {c} cannot be written on a dataBar; write #RRGGBB or a theme colour (accent1)."
+                ),
+            );
+            return None;
+        }
+        Err(m) => {
+            p.err(i, 1, format!("fill: {m}"));
+            return None;
+        }
+    };
+    Some(CondFormatDecl {
+        range,
+        ty: "dataBar".into(),
+        operator: None,
+        formula: None,
+        formula2: None,
+        dxf: CellFormat::default(),
+        stop_if_true: parse_flag_attr(p, i, attrs, "stopiftrue")? == Some(true),
+        min: Some(min),
+        max: Some(max),
+        fill: Some(fill),
     })
 }
 
@@ -2206,6 +2381,19 @@ pub fn conditional_format_line(c: &CondFormatDecl) -> String {
         attr(&c.range),
         attr(&c.ty)
     );
+    if c.ty == "dataBar" {
+        if let Some(min) = &c.min {
+            s.push_str(&format!(" min=\"{}\"", attr(&min.write())));
+        }
+        if let Some(max) = &c.max {
+            s.push_str(&format!(" max=\"{}\"", attr(&max.write())));
+        }
+        if let Some(fill) = &c.fill {
+            s.push_str(&format!(" fill=\"{}\"", attr(&fill.to_string())));
+        }
+        push_bool_true(&mut s, "stopIfTrue", c.stop_if_true);
+        return s + "/>";
+    }
     push_opt(&mut s, "operator", c.operator.as_deref());
     push_opt(&mut s, "formula", c.formula.as_deref());
     push_opt(&mut s, "formula2", c.formula2.as_deref());
@@ -2670,6 +2858,57 @@ mod tests {
         assert!(c.operator.is_none());
         assert!(c.stop_if_true);
         assert_eq!(serialize_spreadsheet(&s), expr);
+        let bar = TEXT.replace(
+            "<conditional-format range=\"F4:F48\" type=\"cellIs\" operator=\"lessThan\" formula=\"3000000\" dxf=\"fill=#FFC7CE\"/>",
+            "<conditional-format range=\"E4:E15\" type=\"dataBar\" min=\"num:0\" max=\"num:월간수입합계\" fill=\"#638EC6\"/>",
+        );
+        let s = parse_spreadsheet(&bar, &Names::default()).unwrap();
+        let c = s.sheets[0]
+            .items
+            .iter()
+            .find_map(|i| match i {
+                SheetItem::ConditionalFormat(c) => Some(c),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(c.ty, "dataBar");
+        assert_eq!(c.min.as_ref().map(Cfvo::write).as_deref(), Some("num:0"));
+        assert_eq!(
+            c.max.as_ref().map(Cfvo::write).as_deref(),
+            Some("num:월간수입합계")
+        );
+        assert_eq!(
+            c.fill.as_ref().map(|c| c.to_string()).as_deref(),
+            Some("#638EC6")
+        );
+        assert_eq!(serialize_spreadsheet(&s), bar);
+        let auto = TEXT.replace(
+            "<conditional-format range=\"F4:F48\" type=\"cellIs\" operator=\"lessThan\" formula=\"3000000\" dxf=\"fill=#FFC7CE\"/>",
+            "<conditional-format range=\"G4:G15\" type=\"dataBar\" min=\"min\" max=\"max\" fill=\"accent1\"/>",
+        );
+        let s = parse_spreadsheet(&auto, &Names::default()).unwrap();
+        assert_eq!(serialize_spreadsheet(&s), auto);
+        let formula = TEXT.replace(
+            "<conditional-format range=\"F4:F48\" type=\"cellIs\" operator=\"lessThan\" formula=\"3000000\" dxf=\"fill=#FFC7CE\"/>",
+            "<conditional-format range=\"A1\" type=\"dataBar\" min=\"formula:A1\" max=\"percent:100\" fill=\"#FFC7CE\"/>",
+        );
+        let s = parse_spreadsheet(&formula, &Names::default()).unwrap();
+        let c = s.sheets[0]
+            .items
+            .iter()
+            .find_map(|i| match i {
+                SheetItem::ConditionalFormat(c) => Some(c),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(
+            c.min.as_ref().map(Cfvo::write).as_deref(),
+            Some("formula:=A1")
+        );
+        assert_eq!(
+            serialize_spreadsheet(&s),
+            formula.replace("min=\"formula:A1\"", "min=\"formula:=A1\"")
+        );
     }
 
     #[test]
@@ -2732,12 +2971,40 @@ mod tests {
         assert!(e[0].contains("dropdown"), "{e:?}");
         let e = errs(&TEXT.replace(
             "type=\"cellIs\" operator=\"lessThan\"",
+            "type=\"colorScale\" operator=\"lessThan\"",
+        ));
+        assert!(
+            e[0].contains("colorScale") && e[0].contains("placeholder"),
+            "{e:?}"
+        );
+        let e = errs(&TEXT.replace(
+            "type=\"cellIs\" operator=\"lessThan\" formula=\"3000000\" dxf=\"fill=#FFC7CE\"",
+            "type=\"dataBar\" min=\"num:0\" max=\"max\"",
+        ));
+        assert!(e[0].contains("min, max and fill"), "{e:?}");
+        let e = errs(&TEXT.replace(
+            "type=\"cellIs\" operator=\"lessThan\"",
             "type=\"dataBar\" operator=\"lessThan\"",
         ));
         assert!(
-            e[0].contains("dataBar") && e[0].contains("placeholder"),
+            e[0].contains("dataBar") && e[0].contains("not operator"),
             "{e:?}"
         );
+        let e = errs(&TEXT.replace(
+            "<conditional-format range=\"F4:F48\" type=\"cellIs\" operator=\"lessThan\" formula=\"3000000\" dxf=\"fill=#FFC7CE\"/>",
+            "<conditional-format range=\"E4\" type=\"dataBar\" min=\"min:0\" max=\"max\" fill=\"#638EC6\"/>",
+        ));
+        assert!(e[0].contains("min") && e[0].contains("no value"), "{e:?}");
+        let e = errs(&TEXT.replace(
+            "<conditional-format range=\"F4:F48\" type=\"cellIs\" operator=\"lessThan\" formula=\"3000000\" dxf=\"fill=#FFC7CE\"/>",
+            "<conditional-format range=\"E4\" type=\"dataBar\" min=\"percent:120\" max=\"max\" fill=\"#638EC6\"/>",
+        ));
+        assert!(e[0].contains("0–100"), "{e:?}");
+        let e = errs(&TEXT.replace(
+            "type=\"cellIs\" operator=\"lessThan\" formula=\"3000000\" dxf=\"fill=#FFC7CE\"",
+            "type=\"cellIs\" operator=\"lessThan\" formula=\"3000000\" dxf=\"fill=#FFC7CE\" min=\"min\"",
+        ));
+        assert!(e[0].contains("dataBar"), "{e:?}");
         let e = errs(&TEXT.replace(
             "type=\"cellIs\" operator=\"lessThan\"",
             "type=\"expression\" operator=\"lessThan\"",

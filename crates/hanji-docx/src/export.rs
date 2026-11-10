@@ -899,6 +899,11 @@ impl<'a> Exporter<'a> {
                     r.children
                         .push(node(el("w:br").with_attr("w:type", "page")));
                 }
+                Atom::ColumnBreak => {
+                    flush(&mut buf, &mut r, &mut tcount);
+                    r.children
+                        .push(node(el("w:br").with_attr("w:type", "column")));
+                }
                 Atom::Keep(k) => {
                     flush(&mut buf, &mut r, &mut tcount);
                     for x in &self.keep_entry(&k.id)?.xml {

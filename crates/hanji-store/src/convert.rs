@@ -545,6 +545,12 @@ impl<'a> Convert<'a> {
                 Atom::Math(body) if !self.caps.math => {
                     self.dropped_atom("math", "m", "equation", body, off(k))
                 }
+                Atom::PageBreak if self.to == Format::Hwpx => {
+                    self.dropped_atom("pagebreak", "pb", "pagebreak", "", off(k))
+                }
+                Atom::ColumnBreak if self.to == Format::Hwpx => {
+                    self.dropped_atom("columnbreak", "cb", "columnbreak", "", off(k))
+                }
                 _ if u.props.is_empty() => units.push(u.clone()),
                 _ => {
                     let place = self.line(off(k));

@@ -20,7 +20,7 @@ use hanji_format::ops::{
     check_ops, date_of, parse_ops, render_errors, ColumnSpec, Formats, RangeOp, Row, SortKey, Value,
 };
 use hanji_format::sheet::{
-    format_kind, parse_spreadsheet, serialize_spreadsheet, CondFormatDecl, FormatKind,
+    format_kind, parse_spreadsheet, serialize_spreadsheet, Cfvo, CondFormatDecl, FormatKind,
     HyperlinkDecl, SheetItem, ValidationDecl,
 };
 use hanji_package::opc::{self, Rel};
@@ -895,6 +895,10 @@ fn set_sheet_conditional_formats(
             _ => groups.push((w.range.clone(), vec![w])),
         }
     }
+    let old_ids: Vec<String> = old
+        .iter()
+        .flat_map(|e| model::entry_x14_ids(&e.xml[0]))
+        .collect();
     let mut unused = vec![true; old.len()];
     let mut placed: Vec<Option<Entry>> = vec![None; groups.len()];
     for (gi, (range, _)) in groups.iter().enumerate() {
@@ -959,7 +963,38 @@ fn set_sheet_conditional_formats(
         sync_conditional_format(&mut e, &range, &rules, &mut priority, book, &prefix, &scope)?;
         out.push(e);
     }
+    sync_x14_data_bars(book, i, &out, &old_ids)?;
     book.entries.extend(out);
+    Ok(())
+}
+
+fn sync_x14_data_bars(
+    book: &mut Book,
+    i: usize,
+    entries: &[Entry],
+    old_ids: &[String],
+) -> Result<(), String> {
+    let mut patches = vec![];
+    let mut live_ids = vec![];
+    for e in entries {
+        let el = xml::fragment(&e.xml[0]);
+        let range = e.meta.range.as_deref().unwrap_or_default();
+        for rule in el.elements().filter(|c| c.local() == "cfRule") {
+            if let Some(id) = model::cf_rule_x14_id(rule) {
+                live_ids.push(id.clone());
+                if let Some(decl) = model::cf_rule_decl(book, range, rule) {
+                    if decl.ty == "dataBar" {
+                        patches.push((id, decl));
+                    }
+                }
+            }
+        }
+    }
+    let st = book.store_mut(i)?;
+    for (id, decl) in &patches {
+        model::patch_x14_data_bar(&mut st.skel.root, id, decl)?;
+    }
+    model::prune_x14_conditional_formats(&mut st.skel.root, old_ids, &live_ids);
     Ok(())
 }
 
@@ -1033,6 +1068,9 @@ fn write_cf_rule(
     book: &mut Book,
     prefix: &str,
 ) -> Result<(), String> {
+    if w.ty == "dataBar" {
+        return write_data_bar_rule(rule, w, priority, prefix);
+    }
     rule.set("type", &w.ty);
     rule.set("priority", &priority.to_string());
     match &w.operator {
@@ -1058,6 +1096,7 @@ fn write_cf_rule(
         match &n {
             Node::El(c) if c.local() == "formula" => {}
             Node::El(c) if c.local() == "extLst" => ext.push(n),
+            Node::El(c) if c.local() == "dataBar" => {}
             _ => rest.push(n),
         }
     }
@@ -1068,6 +1107,96 @@ fn write_cf_rule(
         rule.children.push(Node::El(f));
     }
     rule.children.extend(ext);
+    Ok(())
+}
+
+fn write_data_bar_rule(
+    rule: &mut Element,
+    w: &CondFormatDecl,
+    priority: u32,
+    prefix: &str,
+) -> Result<(), String> {
+    let (Some(min), Some(max), Some(fill)) = (&w.min, &w.max, &w.fill) else {
+        return Err("a dataBar has min, max and fill".into());
+    };
+    let was_bar = rule.get("type").as_deref() == Some("dataBar");
+    rule.set("type", "dataBar");
+    rule.set("priority", &priority.to_string());
+    rule.remove_attr("operator");
+    rule.remove_attr("dxfId");
+    if w.stop_if_true {
+        rule.set("stopIfTrue", "1");
+    } else {
+        rule.remove_attr("stopIfTrue");
+    }
+    let mut bar = None;
+    let mut ext = vec![];
+    let mut rest = vec![];
+    for n in std::mem::take(&mut rule.children) {
+        match &n {
+            Node::El(c) if c.local() == "dataBar" => bar = Some(c.clone()),
+            Node::El(c) if c.local() == "extLst" && was_bar => ext.push(n),
+            Node::El(c) if c.local() == "formula" => {}
+            _ if was_bar => rest.push(n),
+            _ => {}
+        }
+    }
+    let mut bar = bar.unwrap_or_else(|| Element::new(&format!("{prefix}dataBar")));
+    write_data_bar(&mut bar, min, max, fill, prefix)?;
+    rule.children = rest;
+    rule.children.push(Node::El(bar));
+    rule.children.extend(ext);
+    Ok(())
+}
+
+fn write_data_bar(
+    bar: &mut Element,
+    min: &Cfvo,
+    max: &Cfvo,
+    fill: &hanji_format::vocab::Color,
+    prefix: &str,
+) -> Result<(), String> {
+    let cfvo_idx: Vec<usize> = bar
+        .children
+        .iter()
+        .enumerate()
+        .filter_map(|(k, n)| match n {
+            Node::El(c) if c.local() == "cfvo" => Some(k),
+            _ => None,
+        })
+        .collect();
+    if cfvo_idx.len() == 2 {
+        if let Node::El(c) = &mut bar.children[cfvo_idx[0]] {
+            if model::parse_cfvo(c).as_ref() != Some(min) {
+                model::write_cfvo(c, min);
+            }
+        }
+        if let Node::El(c) = &mut bar.children[cfvo_idx[1]] {
+            if model::parse_cfvo(c).as_ref() != Some(max) {
+                model::write_cfvo(c, max);
+            }
+        }
+    } else {
+        bar.children
+            .retain(|n| !matches!(n, Node::El(c) if c.local() == "cfvo"));
+        let mut a = Element::new(&format!("{prefix}cfvo"));
+        model::write_cfvo(&mut a, min);
+        let mut b = Element::new(&format!("{prefix}cfvo"));
+        model::write_cfvo(&mut b, max);
+        bar.children.insert(0, Node::El(b));
+        bar.children.insert(0, Node::El(a));
+    }
+    let has_color = bar.elements().any(|c| c.local() == "color");
+    if has_color {
+        if let Some(c) = bar.elements_mut().find(|c| c.local() == "color") {
+            if crate::format::color_of(Some(c)).as_ref() != Some(fill) {
+                model::put_color(c, fill)?;
+            }
+        }
+    } else {
+        let color = crate::format::color_el(&format!("{prefix}color"), fill)?;
+        bar.children.push(Node::El(color));
+    }
     Ok(())
 }
 
