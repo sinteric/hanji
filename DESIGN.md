@@ -1044,6 +1044,12 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
   <validation range="B2:B1201" type="list" formula1="&quot;강남,서초,송파&quot;"/>
 
   <conditional-format range="F4:F48" type="cellIs" operator="lessThan" formula="3000000" dxf="fill=#FFC7CE"/>
+
+  <shape name="입력 안내" anchor="B25:D27">아래에 입력하면 표가 늘어납니다.</shape>
+  <group name="신호등">
+  <shape name="매출 배지" anchor="F2:G5">매출 +12%</shape>
+  <shape name="이익 배지" anchor="F2:G5">이익 +8%</shape>
+  </group>
   </sheet>
   ```
 
@@ -1128,9 +1134,19 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
   relationship is not a unique external Target, and a threaded comment stay
   placeholders. A conditional format that is not `cellIs` or `expression`
   (a data bar, color scale or icon set), or whose dxf the vocabulary cannot
-  write, stays a placeholder for that sheet. Pictures and pivot tables
-  are `<keep/>` placeholders (rule 8). A value that breaks a validation is
-  refused when the rule can be checked.
+  write, stays a placeholder for that sheet. Drawing shapes are
+  `<shape name="입력 안내" anchor="B25:D27">text</shape>` lines (a newline
+  in the text is `&#10;`; an empty shape is self-closing). Grouped shapes
+  are a `<group name="신호등">` … `</group>` wrapper; each member is a
+  shape line or a nested group, and members share the group's two-cell or
+  one-cell anchor. The model may keep, add, remove or change them.
+  Geometry, fills, outlines, WordArt and other styling the syntax does not
+  name stay as the original XML. A connector, chart, picture, cell-linked
+  text (`textlink`), an absolute-anchor object, or a group that holds those
+  stays a placeholder. A sheet with more than 1,024 modelled shapes keeps
+  them as placeholders. Pictures and pivot tables are `<keep/>`
+  placeholders (rule 8). A value that breaks a validation is refused when
+  the rule can be checked.
 
 - **Cell data** is read through a row window of one table or range: a pipe
   table whose first column is the read-only sheet row number, then one cell
@@ -2008,17 +2024,17 @@ side.
     do not cross (neither engine writes section properties from the text), and
     the report says so.
 12. **Inline page/column breaks, xlsx shapes/groups, and dataBar conditional
-    formats (decided 2026-11-10, not yet in the engines)** — by §6 round 7,
-    all three A: docx inline page and column breaks as `<pagebreak/>` /
-    `<columnbreak/>` inside the paragraph (block `<pagebreak/>` and `<br/>`
-    stay as they are); xlsx drawing shapes as `<shape name anchor>text</shape>`
-    with a `<group>` wrapper; xlsx dataBar as `min` / `max` / `fill` on the
-    existing `<conditional-format>` tag. Today they still stay placeholders
-    until the engines grow them: docx `break` (tdf154481.docx,
-    tdf124637_sectionMargin.docx); xlsx `shape`/`group`
+    formats (decided 2026-11-10)** — by §6 round 7, all three A: docx inline
+    page and column breaks as `<pagebreak/>` / `<columnbreak/>` inside the
+    paragraph (block `<pagebreak/>` and `<br/>` stay as they are); xlsx
+    drawing shapes as `<shape name anchor>text</shape>` with a `<group>`
+    wrapper; xlsx dataBar as `min` / `max` / `fill` on the existing
+    `<conditional-format>` tag. xlsx shapes/groups are in the engine
     (simple-monthly-budget.xlsx, WithDrawing.xlsx,
-    ExcelWithAttachments.xlsm); xlsx `conditional-format` of type dataBar
-    (simple-monthly-budget.xlsx E4). The kit is
+    ExcelWithAttachments.xlsm). Inline breaks and dataBar still stay
+    placeholders until the engines grow them: docx `break` (tdf154481.docx,
+    tdf124637_sectionMargin.docx); xlsx `conditional-format` of type
+    dataBar (simple-monthly-budget.xlsx E4). The kit is
     [fluency/round7/](fluency/round7/).
 
 ## 11. Blind spots

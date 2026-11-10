@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Show XLSX drawing shapes as editable `<shape name="Tip"
+  anchor="B25:D27">text</shape>` lines and grouped shapes as a
+  `<group name="Group 1">` … `</group>` wrapper (fluency round 7 A)
+  instead of `<keep kind="shape"/>` / `<keep kind="group"/>`
+  placeholders. Each can be kept, added, removed, retexted or moved by
+  its A1 anchor. A newline in the text is `&#10;`; an empty shape is
+  self-closing. Unedited drawing XML stays byte-identical; geometry,
+  fills, outlines and other styling the syntax does not name stay as the
+  original XML until the shape is retexted. Connectors, charts, pictures,
+  cell-linked text, absolute-anchor objects, and groups that hold those
+  stay placeholders. A sheet with more than 1024 modelled shapes keeps
+  them as placeholders. Corpus keeps: 206 → 200 (xlsx `shape` 5 → 0,
+  `group` 1 → 0).
 - Show an HWPX drawing whose `hp:drawText` is ordinary text in one or more
   paragraphs as that text instead of a `<keep kind="drawing"/>` placeholder.
   Several paragraphs join with `<br/>`; a shown footnote or endnote inside

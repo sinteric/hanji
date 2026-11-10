@@ -1,6 +1,7 @@
 //! What a sheet shows that the text does not model (§2 rule 8): the objects
-//! of its drawing (charts, pictures, shapes), its notes, its pivot tables and
-//! its 2010 extensions, summarised for their placeholders.
+//! of its drawing (charts, pictures, unmodelled shapes), its notes, its
+//! pivot tables and its 2010 extensions, summarised for their placeholders.
+//! Modelled drawing shapes are `<shape>` / `<group>` lines (`shapes.rs`).
 
 use hanji_package::xml::{self, Element};
 use hanji_package::{clip, opc, package};
@@ -109,83 +110,84 @@ pub fn drawing_objects(book: &Book, part: &str) -> Vec<Shown> {
         return vec![];
     };
     let rels = book.rels_of(part);
-    let mut out = vec![];
-    for a in d.root.elements() {
-        let at = anchor_cell(a)
-            .map(|c| format!(" at {c}"))
-            .unwrap_or_default();
-        let Some(obj) = a
-            .elements()
-            .find(|e| !matches!(e.local(), "from" | "to" | "pos" | "ext" | "clientData"))
-        else {
-            continue;
-        };
-        let name = obj
-            .elements()
-            .find(|e| e.local().starts_with("nv"))
-            .and_then(|nv| nv.elements().find(|e| e.local() == "cNvPr"))
-            .map(|c| {
-                c.get("descr")
-                    .filter(|d| !d.is_empty())
-                    .or_else(|| c.get("name"))
-                    .unwrap_or_default()
-            })
-            .unwrap_or_default();
-        let (kind, summary) = match obj.local() {
-            "graphicFrame" => {
-                let mut chart = None;
-                let mut other = None;
-                obj.walk(&mut |e| {
-                    if e.local() == "chart" {
-                        chart = e
-                            .attrs
-                            .iter()
-                            .find(|x| x.0.ends_with(":id"))
-                            .map(|x| x.1.clone());
-                    }
-                    if e.local() == "graphicData" {
-                        other = e.get("uri");
-                    }
-                });
-                match chart.and_then(|id| {
-                    rels.iter()
-                        .find(|r| r.id == id)
-                        .map(|r| opc::resolve_target(part, &r.target))
-                }) {
-                    Some(cp) => ("chart", format!("{}{at}", chart_summary(&book.parts, &cp))),
-                    None if other.as_deref().is_some_and(|u| u.contains("diagram")) => {
-                        ("smartart", format!("SmartArt {name}{at}"))
-                    }
-                    None => ("object", format!("{name}{at}")),
+    d.root
+        .elements()
+        .filter_map(|a| shown_of(book, part, a, &rels))
+        .collect()
+}
+
+/// One drawing anchor as a placeholder, when the text does not model it.
+pub fn shown_of(book: &Book, part: &str, a: &Element, rels: &[opc::Rel]) -> Option<Shown> {
+    let at = anchor_cell(a)
+        .map(|c| format!(" at {c}"))
+        .unwrap_or_default();
+    let obj = a
+        .elements()
+        .find(|e| !matches!(e.local(), "from" | "to" | "pos" | "ext" | "clientData"))?;
+    let name = obj
+        .elements()
+        .find(|e| e.local().starts_with("nv"))
+        .and_then(|nv| nv.elements().find(|e| e.local() == "cNvPr"))
+        .map(|c| {
+            c.get("descr")
+                .filter(|d| !d.is_empty())
+                .or_else(|| c.get("name"))
+                .unwrap_or_default()
+        })
+        .unwrap_or_default();
+    let (kind, summary) = match obj.local() {
+        "graphicFrame" => {
+            let mut chart = None;
+            let mut other = None;
+            obj.walk(&mut |e| {
+                if e.local() == "chart" {
+                    chart = e
+                        .attrs
+                        .iter()
+                        .find(|x| x.0.ends_with(":id"))
+                        .map(|x| x.1.clone());
                 }
+                if e.local() == "graphicData" {
+                    other = e.get("uri");
+                }
+            });
+            match chart.and_then(|id| {
+                rels.iter()
+                    .find(|r| r.id == id)
+                    .map(|r| opc::resolve_target(part, &r.target))
+            }) {
+                Some(cp) => ("chart", format!("{}{at}", chart_summary(&book.parts, &cp))),
+                None if other.as_deref().is_some_and(|u| u.contains("diagram")) => {
+                    ("smartart", format!("SmartArt {name}{at}"))
+                }
+                None => ("object", format!("{name}{at}")),
             }
-            "pic" => ("picture", format!("{name}{at}")),
-            "sp" => {
-                let t = text_of(obj);
-                (
-                    "shape",
-                    if t.is_empty() {
-                        format!("{name}{at}")
-                    } else {
-                        format!("{name}{at}: {t}")
-                    },
-                )
-            }
-            "grpSp" => ("group", format!("{name}{at}: {}", text_of(obj))),
-            "cxnSp" => ("connector", format!("{name}{at}")),
-            "AlternateContent" => {
-                // A slicer, a timeline or a 2010 shape with its fallback.
-                let t = text_of(obj);
-                ("object", format!("{name}{at} {t}"))
-            }
-            other => ("object", format!("{other} {name}{at}")),
-        };
-        out.push(Shown {
-            kind: kind.into(),
-            summary: clip(summary.trim(), 160),
-        });
-    }
-    out
+        }
+        "pic" => ("picture", format!("{name}{at}")),
+        "sp" => {
+            let t = text_of(obj);
+            (
+                "shape",
+                if t.is_empty() {
+                    format!("{name}{at}")
+                } else {
+                    format!("{name}{at}: {t}")
+                },
+            )
+        }
+        "grpSp" => ("group", format!("{name}{at}: {}", text_of(obj))),
+        "cxnSp" => ("connector", format!("{name}{at}")),
+        "AlternateContent" => {
+            // A slicer, a timeline or a 2010 shape with its fallback.
+            let t = text_of(obj);
+            ("object", format!("{name}{at} {t}"))
+        }
+        other => ("object", format!("{other} {name}{at}")),
+    };
+    Some(Shown {
+        kind: kind.into(),
+        summary: clip(summary.trim(), 160),
+    })
 }
 
 /// Everything sheet `i` shows as placeholders besides its range entries.
@@ -193,10 +195,21 @@ pub fn sheet_objects(book: &Book, i: usize) -> Vec<Shown> {
     let part = &book.sheets[i].part;
     let rels = book.rels_of(part);
     let mut out = vec![];
+    let mut drawings = false;
     for r in rels.iter().filter(|r| !r.external) {
         let target = opc::resolve_target(part, &r.target);
         match r.short_type() {
-            "drawing" => out.extend(drawing_objects(book, &target)),
+            "drawing" => {
+                if drawings {
+                    continue;
+                }
+                drawings = true;
+                for line in crate::shapes::lines(book, i) {
+                    if let crate::shapes::DrawingLine::Keep(s) = line {
+                        out.push(s);
+                    }
+                }
+            }
             "comments" => {
                 let Some(d) = package::get(&book.parts, &target).and_then(|d| xml::parse(d).ok())
                 else {

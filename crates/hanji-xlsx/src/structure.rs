@@ -1,17 +1,17 @@
 //! Edits to the structure text (§5.4: the structure is text the model may
 //! edit): a column's type, format or formula, a new column at the end of a
 //! table, a new table, a new sheet at the end, merged ranges, hyperlinks,
-//! notes, data validations, conditional formats, a deleted placeholder.
-//! Table, sheet and column edits become range operations, so the text and
-//! the operations share one validator and one implementation. Merged ranges,
-//! hyperlinks, notes, validations and conditional formats are applied from
-//! their structure lines. Any other change is refused with the form it
-//! should take.
+//! notes, data validations, conditional formats, drawing shapes, a deleted
+//! placeholder. Table, sheet and column edits become range operations, so
+//! the text and the operations share one validator and one implementation.
+//! Merged ranges, hyperlinks, notes, validations, conditional formats and
+//! drawing shapes are applied from their structure lines. Any other change
+//! is refused with the form it should take.
 
 use hanji_format::ops::{ColumnSpec, RangeOp};
 use hanji_format::sheet::{
-    CondFormatDecl, HyperlinkDecl, MergeDecl, NoteDecl, SheetItem, Spreadsheet, TableDecl,
-    ValidationDecl,
+    CondFormatDecl, DrawingItem, HyperlinkDecl, MergeDecl, NoteDecl, SheetItem, Spreadsheet,
+    TableDecl, ValidationDecl,
 };
 
 /// Whether two structures are the same (front matter aside).
@@ -97,6 +97,18 @@ pub fn conditional_formats(items: &[SheetItem]) -> Vec<&CondFormatDecl> {
         .iter()
         .filter_map(|i| match i {
             SheetItem::ConditionalFormat(c) => Some(c.as_ref()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The `<shape>` / `<group>` lines of a sheet, in the order written.
+pub fn drawing_items(items: &[SheetItem]) -> Vec<DrawingItem> {
+    items
+        .iter()
+        .filter_map(|i| match i {
+            SheetItem::Shape(s) => Some(DrawingItem::Shape(s.clone())),
+            SheetItem::Group(g) => Some(DrawingItem::Group(g.clone())),
             _ => None,
         })
         .collect()

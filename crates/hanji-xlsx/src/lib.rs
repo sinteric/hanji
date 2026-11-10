@@ -3,7 +3,8 @@
 //! formats and formulas, merged ranges as `<merge range/>` lines, hyperlinks
 //! as `<hyperlink/>` lines, notes as `<note/>` lines, data validations as
 //! `<validation/>` lines, conditional formats as `<conditional-format/>`
-//! lines, and placeholders for what the text does not model),
+//! lines, drawing shapes as `<shape/>` / `<group>` lines, and placeholders
+//! for what the text does not model),
 //! and its cells are read through row windows and written by range
 //! operations. The cell grid stays in the remainder, in its home encoding
 //! (each worksheet's rows, the shared strings), because a 100k-row sheet is
@@ -28,6 +29,7 @@ pub mod notes;
 pub mod numfmt;
 pub mod ops;
 pub mod safety;
+pub mod shapes;
 pub mod shift;
 pub mod sst;
 pub mod store;
