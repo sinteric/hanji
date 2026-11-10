@@ -33,16 +33,16 @@
   "total": {
     "files": 102,
     "failed": 0,
-    "with_keeps": 47,
-    "keeps": 206
+    "with_keeps": 46,
+    "keeps": 204
   },
   "formats": [
     {
       "format": "docx",
       "files": 13,
       "failed": 0,
-      "with_keeps": 11,
-      "keeps": 119
+      "with_keeps": 10,
+      "keeps": 117
     },
     {
       "format": "hwpx",
@@ -168,12 +168,6 @@
       "kind": "text",
       "keeps": 3,
       "files": 1
-    },
-    {
-      "format": "docx",
-      "kind": "break",
-      "keeps": 2,
-      "files": 2
     },
     {
       "format": "docx",
@@ -304,17 +298,14 @@
     {
       "path": "prototype/remainder/corpus/tdf124637_sectionMargin.docx",
       "format": "docx",
-      "keeps": 1,
-      "kinds": {
-        "break": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "prototype/remainder/corpus/tdf154481.docx",
       "format": "docx",
-      "keeps": 4,
+      "keeps": 3,
       "kinds": {
-        "break": 1,
         "drawing": 1,
         "field": 2
       }

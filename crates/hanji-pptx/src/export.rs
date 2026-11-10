@@ -1244,6 +1244,11 @@ impl<'a> Exporter<'a> {
                 Atom::NoteRef(_) => {
                     return Err("footnotes are not supported by the pptx engine yet".into())
                 }
+                Atom::PageBreak | Atom::ColumnBreak => {
+                    return Err(
+                        "page and column breaks are not supported by the pptx engine".into(),
+                    )
+                }
                 _ => {}
             }
         }
@@ -1339,6 +1344,11 @@ impl<'a> Exporter<'a> {
                 }
                 Atom::NoteRef(_) => {
                     return Err("footnotes are not supported by the pptx engine yet".into())
+                }
+                Atom::PageBreak | Atom::ColumnBreak => {
+                    return Err(
+                        "page and column breaks are not supported by the pptx engine".into(),
+                    )
                 }
                 _ => {}
             }

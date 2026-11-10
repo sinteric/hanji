@@ -18,7 +18,7 @@ schema: 1
 ---
 (`type` is document, presentation or spreadsheet; `format` is docx or hwpx, pptx, xlsx; an optional `template:` line.)
 Canonical form: one paragraph per line (no hard wraps), a blank line between blocks, no table padding, `1.` for every numbered item. hanji stores text in this form; read again after an edit that reports `canonicalized`.
-Inline: **bold**, *italic*, ~~strike~~, <u>underline</u>, <br/> (a line break inside a paragraph).
+Inline: **bold**, *italic*, ~~strike~~, <u>underline</u>, <br/> (a line break inside a paragraph). In a Document, <pagebreak/> or <columnbreak/> inside a paragraph starts a new page or column there; a line holding only <pagebreak/> is still a page break between paragraphs.
 docx, hwpx, pptx and xlsx texts show their formatting (below).
 <keep id="k3" kind="drawing" summary="…"/> stands for something the text does not model (a picture, chart, a rich comment, …). Leave it as it is; you may move it or delete its line, never create or change one.
 In docx, a field's shown result (a page number, a caption number, a cross-reference, a filled FORMTEXT, a table of contents) is that text: editing it replaces the cached result and keeps the instruction; Word may compute it again when it updates fields. Empty form fields, checkboxes, and fields with no shown result stay placeholders. In pptx, a text field (`a:fld`: a slide number, a date) whose cached result is not blank is the same: editing it keeps the field; an empty field stays a placeholder. A content control whose displayed value is text (rich/plain text, a combo/dropdown, a citation, a TOC or bibliography) is the same: editing the text keeps the control; dates, repeating sections, data-bound controls and placeholder (`showingPlcHdr`) controls stay placeholders.
@@ -40,7 +40,7 @@ Document (docx, hwpx)
   | ^^ | 종로 | 95 |
   | 합계 || 215 |
   `^^` as the whole cell: merged into the cell above. `||` (no space between the pipes): the cell to the left extends into this column; `|||` spans three. Text goes in the top-left cell of a merge only. In a cell, <p/> starts another paragraph. A line {style="Name"} right before the header row sets the table style (docx; hwpx has none); without it a table has the file's default.
-- <pagebreak/> on its own line.
+- <pagebreak/> on its own line: a page break between paragraphs. Inside a paragraph, <pagebreak/> and <columnbreak/> are a page or column break at that point; <br/> is only a line break.
 
 Formatting (docx, hwpx)
 Formatting comes from named styles, listed once at the top; each paragraph, cell and stretch of text shows only what differs from its style.
