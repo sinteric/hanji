@@ -60,6 +60,21 @@ fn keep_kinds(text: &str) -> Vec<String> {
         .collect()
 }
 
+fn drawing_object_names(xml_bytes: &[u8]) -> Vec<String> {
+    fn first_name(e: &xml::Element) -> Option<String> {
+        if e.local() == "cNvPr" {
+            return e.get("name");
+        }
+        e.elements().find_map(first_name)
+    }
+    xml::parse(xml_bytes)
+        .unwrap()
+        .root
+        .elements()
+        .filter_map(first_name)
+        .collect()
+}
+
 fn drawing_object_local(xml_bytes: &[u8], name: &str) -> String {
     let doc = xml::parse(xml_bytes).unwrap();
     fn named(e: &xml::Element, name: &str) -> bool {
@@ -229,6 +244,11 @@ fn moving_a_shape_rewrites_its_anchor() {
     assert!(xml.contains("<xdr:row>4</xdr:row>"), "to row 5: {xml}");
     assert_eq!(xfrm_blob(&drawing, "TextBox 8"), xfrm);
     assert!(xml.contains("name=\"Picture 1\""), "pictures stay");
+    assert_eq!(
+        drawing_object_names(&drawing),
+        drawing_object_names(&orig),
+        "the text box stays between Picture 6 and Picture 7"
+    );
     let again = XlsxEngine.import(&out, &ImportOptions::default()).unwrap();
     assert_eq!(again.text, a.text);
 }
@@ -397,6 +417,123 @@ fn retexting_one_grouped_shape_leaves_the_other() {
         "{xml}"
     );
     assert_eq!(xfrm_blob(&drawing, "AutoShape 2"), xfrm);
+}
+
+#[test]
+fn editing_a_shape_keeps_its_place_among_pictures() {
+    let bytes = corpus_file("WithDrawing.xlsx");
+    let (_, orig) = drawing_part(&bytes);
+    let before = drawing_object_names(&orig);
+    assert_eq!(
+        before,
+        [
+            "Picture 1",
+            "Picture 2",
+            "Picture 4",
+            "Picture 6",
+            "TextBox 8",
+            "Picture 7",
+        ]
+    );
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
+    let edited = imp.text.replace(
+        "Sheet with various pictures&#10;(jpeg, png, wmf, emf and pict)",
+        "edited caption",
+    );
+    let a = XlsxEngine::apply(&edited, &imp.remainder, "[]").unwrap();
+    let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
+    let (_, drawing) = drawing_part(&out);
+    assert_eq!(drawing_object_names(&drawing), before);
+    let xml = String::from_utf8_lossy(&drawing);
+    assert!(xml.contains("edited caption"), "{xml}");
+}
+
+#[test]
+fn adding_a_shape_goes_on_top_of_pictures() {
+    let bytes = corpus_file("WithDrawing.xlsx");
+    let (_, orig) = drawing_part(&bytes);
+    let mut names = drawing_object_names(&orig);
+    names.push("Callout".into());
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
+    let edited = imp.text.replacen(
+        "</sheet>",
+        "<shape name=\"Callout\" anchor=\"B2:D5\">hi</shape>\n</sheet>",
+        1,
+    );
+    let a = XlsxEngine::apply(&edited, &imp.remainder, "[]").unwrap();
+    let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
+    let (_, drawing) = drawing_part(&out);
+    assert_eq!(drawing_object_names(&drawing), names);
+}
+
+#[test]
+fn a_sheet_with_two_drawing_parts_refuses_an_edit() {
+    let bytes = with_second_drawing(&corpus_file("WithDrawing.xlsx"));
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
+    XlsxEngine::apply(&imp.text, &imp.remainder, "[]").unwrap();
+    let edited = imp.text.replace("anchor=\"D16\"", "anchor=\"B2:D5\"");
+    let err = XlsxEngine::apply(&edited, &imp.remainder, "[]").unwrap_err();
+    let msg = err.to_string();
+    assert!(msg.contains("more than one drawing part"), "{msg}");
+}
+
+fn with_second_drawing(bytes: &[u8]) -> Vec<u8> {
+    let mut parts = package::read(bytes).unwrap();
+    let template = parts
+        .iter()
+        .find(|p| p.name == "xl/drawings/drawing1.xml")
+        .expect("drawing1")
+        .clone();
+    let drawing2 = hanji_core::Part {
+        name: "xl/drawings/drawing2.xml".into(),
+        data: concat!(
+            r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#,
+            "\n",
+            r#"<xdr:wsDr xmlns:xdr="http://schemas.openxmlformats.org/drawingml/2006/spreadsheetDrawing" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"/>"#,
+        )
+        .into(),
+        ..template
+    };
+    for p in &mut parts {
+        match p.name.as_str() {
+            "[Content_Types].xml" => {
+                let s = String::from_utf8(p.data.clone()).unwrap();
+                p.data = s
+                    .replace(
+                        "</Types>",
+                        concat!(
+                            r#"<Override PartName="/xl/drawings/drawing2.xml" "#,
+                            r#"ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>"#,
+                            "</Types>",
+                        ),
+                    )
+                    .into_bytes();
+            }
+            "xl/worksheets/_rels/sheet1.xml.rels" => {
+                let s = String::from_utf8(p.data.clone()).unwrap();
+                p.data = s
+                    .replace(
+                        "</Relationships>",
+                        concat!(
+                            r#"<Relationship Id="rId2" "#,
+                            r#"Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing" "#,
+                            r#"Target="../drawings/drawing2.xml"/>"#,
+                            "</Relationships>",
+                        ),
+                    )
+                    .into_bytes();
+            }
+            _ => {}
+        }
+    }
+    parts.push(drawing2);
+    package::write(&parts).unwrap()
 }
 
 #[test]

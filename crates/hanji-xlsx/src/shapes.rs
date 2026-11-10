@@ -1,9 +1,11 @@
 //! Drawing shapes as `<shape name anchor>text</shape>` lines and groups as
 //! `<group name>` wrappers (DESIGN.md §6 round 7 A, §10 item 12). Unedited
 //! shapes leave the drawing part as it was; an edit rewrites only the
-//! anchors that changed. Geometry and styling the syntax does not name stay
-//! as the original XML. Connectors, charts, pictures, cell-linked text, and
-//! groups that hold those stay placeholders.
+//! anchors that changed, and leaves each reused anchor in its original
+//! z-order among pictures and charts. Geometry and styling the syntax does
+//! not name stay as the original XML. Connectors, charts, pictures,
+//! cell-linked text, and groups that hold those stay placeholders. A sheet
+//! with more than one drawing part can be read but not edited.
 
 use hanji_core::cells::{CellRange, CellRef};
 use hanji_format::sheet::{DrawingItem, GroupDecl, ShapeDecl, MAX_SHAPE_LINES};
@@ -89,7 +91,14 @@ pub fn apply(book: &mut Book, i: usize, wanted: &[DrawingItem]) -> Result<(), St
     if wanted.is_empty() {
         return clear_modelled(book, i);
     }
-    let part = match drawing_parts(book, i).into_iter().next() {
+    let parts = drawing_parts(book, i);
+    if parts.len() > 1 {
+        return Err(
+            "this sheet has more than one drawing part; editing its shapes is not supported yet"
+                .into(),
+        );
+    }
+    let part = match parts.into_iter().next() {
         Some(p) => p,
         None => create_drawing(book, i)?,
     };
@@ -97,14 +106,14 @@ pub fn apply(book: &mut Book, i: usize, wanted: &[DrawingItem]) -> Result<(), St
     let mut d = xml::parse(data).map_err(|e| format!("{part}: {e}"))?;
     let xdr = ns_prefix(&d.root.name);
     let a = a_prefix(&d.root);
-    let orig = take_modelled_anchors(&mut d.root);
+    let orig = modelled_items(&d.root);
     let mut unused = vec![true; orig.len()];
     let mut placed: Vec<Option<usize>> = vec![None; wanted.len()];
     for (wi, w) in wanted.iter().enumerate() {
         let Some(k) = orig
             .iter()
             .enumerate()
-            .find(|(k, (_, have))| unused[*k] && have == w)
+            .find(|&(k, have)| unused[k] && have == w)
         else {
             continue;
         };
@@ -113,22 +122,7 @@ pub fn apply(book: &mut Book, i: usize, wanted: &[DrawingItem]) -> Result<(), St
     }
     place_leftovers(&orig, &unused, wanted, &mut placed);
     let mut next_id = max_cnv_id(&d.root);
-    for id in orig.iter().map(|(e, _)| max_cnv_id(e)) {
-        next_id = next_id.max(id);
-    }
-    for (w, slot) in wanted.iter().zip(placed) {
-        let el = match slot {
-            Some(k) => {
-                let (mut el, have) = orig[k].clone();
-                if have != *w {
-                    patch_anchor(&mut el, w, &xdr, &a, &mut next_id)?;
-                }
-                el
-            }
-            None => new_anchor(w, &xdr, &a, &mut next_id),
-        };
-        d.root.children.push(Node::El(el));
-    }
+    put_wanted_anchors(&mut d.root, &orig, wanted, &placed, &xdr, &a, &mut next_id)?;
     if d.root.elements().next().is_none() {
         drop_drawing(book, i, &part)?;
         return Ok(());
@@ -331,6 +325,16 @@ fn a_prefix(root: &Element) -> String {
         .unwrap_or_else(|| "a:".into())
 }
 
+fn modelled_items(root: &Element) -> Vec<DrawingItem> {
+    root.children
+        .iter()
+        .filter_map(|n| match n {
+            Node::El(e) => modelled_anchor(e),
+            _ => None,
+        })
+        .collect()
+}
+
 fn take_modelled_anchors(root: &mut Element) -> Vec<(Element, DrawingItem)> {
     let mut orig = vec![];
     let mut kept = vec![];
@@ -347,11 +351,57 @@ fn take_modelled_anchors(root: &mut Element) -> Vec<(Element, DrawingItem)> {
     orig
 }
 
+/// Put each reused wanted anchor back where that original sat among pictures
+/// and charts; append only new ones, so an edit does not raise a shape over
+/// an object that used to sit on top of it.
+fn put_wanted_anchors(
+    root: &mut Element,
+    orig: &[DrawingItem],
+    wanted: &[DrawingItem],
+    placed: &[Option<usize>],
+    xdr: &str,
+    a: &str,
+    next_id: &mut u32,
+) -> Result<(), String> {
+    let mut at_orig = vec![None; orig.len()];
+    for (wi, slot) in placed.iter().enumerate() {
+        if let Some(k) = *slot {
+            at_orig[k] = Some(wi);
+        }
+    }
+    let mut orig_i = 0;
+    let mut kept = Vec::with_capacity(root.children.len() + wanted.len());
+    for n in std::mem::take(&mut root.children) {
+        match n {
+            Node::El(e) if modelled_anchor(&e).is_some() => {
+                let k = orig_i;
+                orig_i += 1;
+                let Some(wi) = at_orig[k] else {
+                    continue;
+                };
+                let mut el = e;
+                if orig[k] != wanted[wi] {
+                    patch_anchor(&mut el, &wanted[wi], xdr, a, next_id)?;
+                }
+                kept.push(Node::El(el));
+            }
+            other => kept.push(other),
+        }
+    }
+    for (w, slot) in wanted.iter().zip(placed) {
+        if slot.is_none() {
+            kept.push(Node::El(new_anchor(w, xdr, a, next_id)));
+        }
+    }
+    root.children = kept;
+    Ok(())
+}
+
 /// Reuse leftover originals only when they are the same object: same kind
 /// and name first, then same kind and anchor. Document order is not a
 /// fallback, so deleting A and editing B does not patch B onto A's XML.
 fn place_leftovers(
-    orig: &[(Element, DrawingItem)],
+    orig: &[DrawingItem],
     unused: &[bool],
     wanted: &[DrawingItem],
     placed: &mut [Option<usize>],
@@ -367,7 +417,7 @@ fn place_leftovers(
             if slot.is_some() {
                 continue;
             }
-            let Some(pos) = leftover.iter().position(|&k| pred(&orig[k].1, &wanted[i])) else {
+            let Some(pos) = leftover.iter().position(|&k| pred(&orig[k], &wanted[i])) else {
                 continue;
             };
             *slot = Some(leftover.remove(pos));
@@ -674,7 +724,8 @@ fn reconcile_group(
         unused[k.0] = false;
         placed[wi] = Some(k.0);
     }
-    place_leftovers(&orig, &unused, &wanted.items, &mut placed);
+    let orig_items: Vec<DrawingItem> = orig.iter().map(|(_, it)| it.clone()).collect();
+    place_leftovers(&orig_items, &unused, &wanted.items, &mut placed);
     for (w, slot) in wanted.items.iter().zip(placed) {
         let el = match slot {
             Some(k) => {
