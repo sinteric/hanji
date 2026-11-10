@@ -99,7 +99,7 @@ pub fn color_of(e: Option<&Element>) -> Option<Color> {
 }
 
 /// The vocabulary's colour as an Excel colour element named `name`.
-fn color_el(name: &str, c: &Color) -> Result<Element, String> {
+pub(crate) fn color_el(name: &str, c: &Color) -> Result<Element, String> {
     if c.alpha.is_some() {
         return Err(format!(
             "{c}: a workbook has no transparent colours; write the colour without /NN%"
