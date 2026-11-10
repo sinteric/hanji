@@ -216,6 +216,59 @@ def merge_text(parts):
     return out
 
 
+BREAK_TOKS = ('page', 'col', 'br')
+
+
+def norm_inlines(parts):
+    """Whitespace next to a page, column or line break is not compared.
+
+    Gold for the add-a-break tasks kept the space after the period
+    (`보고합니다. <pagebreak/>`); every subject wrote `보고합니다.<pagebreak/>` or
+    put the space after the tag. The seed and the guide have no space around
+    an inline break. That space is not syntax.
+    """
+    out = []
+    for p in inlines_of(parts):
+        if p[0] == 't':
+            if out and out[-1][0] in BREAK_TOKS:
+                p[1] = p[1].lstrip()
+            out.append(p)
+        elif p[0] in BREAK_TOKS:
+            if out and out[-1][0] == 't':
+                out[-1][1] = out[-1][1].rstrip()
+                if out[-1][1] == '':
+                    out.pop()
+            out.append(p)
+        else:
+            out.append(p)
+    return merge_text(out)
+
+
+def canon_shape_sheet(sh):
+    """Drawing items are compared by name, not by position in the sheet.
+
+    Gold for the add-a-shape tasks appended before `</sheet>`. Every subject
+    inserted the new shape next to the existing callout. The task does not
+    ask for a list position; membership of a group still matters.
+    """
+    structure, drawings = [], []
+    for it in sh['items']:
+        k = it.get('k')
+        if k == 'shape':
+            drawings.append({'k': 'shape', 'name': it.get('name'), 'anchor': it.get('anchor'),
+                             'text': it.get('text') or '', 'group': None})
+        elif k == 'group':
+            ch = [{'k': 'shape', 'name': c.get('name'), 'anchor': c.get('anchor'),
+                   'text': c.get('text') or '', 'group': it.get('name')}
+                  for c in it.get('children', [])]
+            drawings.append({'k': 'group', 'name': it.get('name'), 'children': ch})
+        else:
+            structure.append(it)
+    drawings.sort(key=lambda d: (d['k'], d.get('name') or ''))
+    return {'name': sh.get('name'), 'range': sh.get('range'), 'structure': structure,
+            'drawings': drawings}
+
+
 def render_inlines(parts, cand):
     out = []
     for p in parts:
@@ -774,7 +827,15 @@ def parse(text, unit):
 def semantic(model, decision):
     """Drop fm formatting noise; keep comparable structure."""
     if decision == 'breaks':
-        return {'blocks': model['blocks']}
+        blocks = []
+        for b in model['blocks']:
+            b = dict(b)
+            if 'text' in b:
+                b['text'] = norm_inlines(b['text'])
+            blocks.append(b)
+        return {'blocks': blocks}
+    if decision == 'shapes':
+        return {'sheets': [canon_shape_sheet(s) for s in model['sheets']]}
     return {'sheets': model['sheets']}
 
 

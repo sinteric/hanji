@@ -54,7 +54,7 @@ def main():
     labels = list(MODELS)
     any_run = False
     print('# Fluency test results, round 7\n')
-    print('## Round 7 — (to be filled after the runs)\n')
+    print('## Round 7 — 2026-11-10\n')
     print('**Subjects:** Sonnet 5.5 (`%s`, files `sonnet55-*.json`), Haiku 5.5 (`%s`, files `haiku55-*.json`), '
           'Sonnet 4.6 (`%s`, files `sonnet46-*.json`). Blind, each unit in a fresh `claude -p` conversation whose '
           'only tool was Read (the prompt read from its own file). Re-score with `python3 score.py <unit> <file>`; '

@@ -134,6 +134,20 @@ def main():
     ln = line_with(ta, '수도권 매출은', '첨부 1')
     expect('wider old still lands', A1, 'report1-e3',
            edit('입니다.<pagebreak/>첨부', '입니다. 첨부'), True, True)
+    # kit: space after the period around an inserted break is not a miss
+    expect('e1 space after period', A1, 'report1-e1',
+           edit('보고합니다. 매출은', '보고합니다.<pagebreak/>매출은'), True, True)
+    expect('e1 space after the break', A1, 'report1-e1',
+           edit('보고합니다. 매출은', '보고합니다.<pagebreak/> 매출은'), True, True)
+    # kit: a new shape next to the existing callout, not before </sheet>
+    ln = line_with(sa, '입력 안내')
+    expect('e1 shape next to callout', SA, 'kpi1-e1',
+           edit(ln, ln + '\n\n<shape name="환급 안내" anchor="B28:D29">환급은 다음 달 수입에 넣습니다.</shape>'),
+           True, True)
+    ln = line_with(sa, '입력 안내')
+    expect('e1 wrong shape name', SA, 'kpi1-e1',
+           edit(ln, ln + '\n\n<shape name="다른 안내" anchor="B28:D29">환급은 다음 달 수입에 넣습니다.</shape>'),
+           True, False, 'not_landed')
     ln = line_with(sa, '매출 배지')
     expect('retext with more context', SA, 'kpi1-e3',
            edit(ln, ln.replace('매출 +12%', '매출 +15%')), True, True)

@@ -40,7 +40,7 @@ python3 score.py r7-breaks-A-1 runs/r7-breaks-A-1/sonnet55-first.json
 The answers file is the subject's reply: `{"answers": [{"task_id", "text"} | {"task_id", "edits"}]}`.
 
 - **valid:** the edits apply (each `old` occurs exactly once) and the text parses under the candidate: known tags and attributes, A1 anchors, min/max tokens, colours `#RRGGBB` or a theme name.
-- **landed:** a read matches the expected tokens (whitespace collapsed); a write or edit parses to the same semantic model as the gold (inlines for breaks; sheet items for shapes and data bars); a refusal of the refusal task.
+- **landed:** a read matches the expected tokens (whitespace collapsed); a write or edit parses to the same semantic model as the gold (inlines for breaks, with whitespace next to a page/column break not compared; drawing shapes compared by name, not sheet order; sheet items for data bars); a refusal of the refusal task.
 - **chars:** the answer text, or the sum of `old` + `new`, as in rounds 1–6.
 - **flags:** `edit_no_match`, `edit_ambiguous`, `bad_edit`, `unknown_tag`, `invented_attr`, `missing_attr`, `unclosed_tag`, `shape_form`, `bad_anchor`, `bad_range`, `bad_cfvo`, `bad_color`, `no_change`, `not_landed`, `brief_unmet`, `wrong_refusal`, `not_refused`, `missing_answer`, `wrong_answer_kind`.
 
