@@ -1072,6 +1072,9 @@ impl<'a> Exporter<'a> {
                             .into(),
                     )
                 }
+                Atom::ColumnBreak => {
+                    return Err("a column break cannot be written to hwpx".into())
+                }
                 Atom::Comment(_) | Atom::Ins(_) | Atom::Del(_) => {
                     return Err(
                         "comments and tracked changes are not supported by the hwpx engine yet"

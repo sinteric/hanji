@@ -214,7 +214,8 @@ package ─────────────────────► model
 
 **Shared inline core:** text, `**bold**`, `*italic*`, `~~strike~~`, `<u>`,
 links, footnote references `[^1]`, math `$…$` or `<math>…</math>` (→ OMML /
-HWP equation), line break `<br/>`, `<comment>…</comment>` (a DOCX comment
+HWP equation), line break `<br/>`, Document page/column break `<pagebreak/>` /
+`<columnbreak/>` inside a paragraph, `<comment>…</comment>` (a DOCX comment
 body), `<ins>…</ins>` / `<del>…</del>` (a DOCX tracked insertion or
 deletion), `<field name=…>value</field>` (Word content controls, HWP form
 fields), inline `<keep/>`.
@@ -335,7 +336,17 @@ fields), inline `<keep/>`.
 - **Line break:** `<br/>` is a line break inside one paragraph (docx `w:br`,
   the HWP line break). It is valid in paragraphs, headings, list items and
   table cells, and it never starts a paragraph: a line holding only `<br/>`
-  is a paragraph holding one line break.
+  is a paragraph holding one line break. It takes no attribute.
+- **Page and column breaks (docx):** a page or column break inside a
+  paragraph is `<pagebreak/>` or `<columnbreak/>` at that point; the text
+  before and after stay one paragraph. They take no attribute. A line
+  holding only `<pagebreak/>` is still a page break *between* paragraphs.
+  A line holding only `<columnbreak/>` is a paragraph whose only content is
+  a column break. `<br/>` is only a line break. A `w:br` with `w:clear` or
+  another type stays `<keep kind="break"/>`; `w:lastRenderedPageBreak` stays
+  a run marker. hwpx writes a block `<pagebreak/>` as the next paragraph's
+  `pageBreak` and refuses an inline one; pptx refuses both. *Why:* §6 round
+  7, candidate A (a dedicated tag, not `<br type="page"/>`).
 - **Math:** `$…$` opens at a `$` followed by a non-space and closes at the
   next `$` that follows a non-space and is not followed by a digit (pandoc's
   rule), so `$5 and $10` is text. Math that `$…$` cannot hold is written
@@ -2018,16 +2029,18 @@ side.
     do not cross (neither engine writes section properties from the text), and
     the report says so.
 12. **Inline page/column breaks, xlsx shapes/groups, and dataBar conditional
-    formats (decided 2026-11-10; dataBar built)** — by §6 round 7,
+    formats (decided 2026-11-10; docx inline breaks and dataBar built)** — by §6 round 7,
     all three A: docx inline page and column breaks as `<pagebreak/>` /
     `<columnbreak/>` inside the paragraph (block `<pagebreak/>` and `<br/>`
     stay as they are); xlsx drawing shapes as `<shape name anchor>text</shape>`
     with a `<group>` wrapper; xlsx dataBar as `min` / `max` / `fill` on the
     existing `<conditional-format>` tag. DataBar is in the xlsx engine (§5.4).
-    The other two still stay placeholders until the engines grow them: docx
-    `break` (tdf154481.docx, tdf124637_sectionMargin.docx); xlsx `shape`/`group`
-    (simple-monthly-budget.xlsx, WithDrawing.xlsx,
-    ExcelWithAttachments.xlsm). The kit is
+    docx `w:br type=page` / `type=column` inside a paragraph are those tags
+    (tdf154481.docx, tdf124637_sectionMargin.docx);
+    a `w:br` with `w:clear` or another type stays `<keep kind="break"/>`.
+    xlsx shapes/groups still stay placeholders until the engines grow them:
+    xlsx `shape`/`group` (simple-monthly-budget.xlsx,
+    WithDrawing.xlsx, ExcelWithAttachments.xlsm). The kit is
     [fluency/round7/](fluency/round7/).
 
 ## 11. Blind spots

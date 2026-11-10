@@ -1003,6 +1003,18 @@ fn deleting_the_first_paragraph_keeps_the_section_settings() {
         Err(EngineError::Refused(m)) => assert!(m.contains("two page breaks"), "{m}"),
         other => panic!("{other:?}"),
     }
+    let inline = imp.text.replace("둘째", "둘<pagebreak/>째");
+    match HwpxEngine.export(&inline, &imp.remainder) {
+        Err(EngineError::Refused(m)) => {
+            assert!(m.contains("page break inside a paragraph"), "{m}")
+        }
+        other => panic!("{other:?}"),
+    }
+    let col = imp.text.replace("둘째", "둘<columnbreak/>째");
+    match HwpxEngine.export(&col, &imp.remainder) {
+        Err(EngineError::Refused(m)) => assert!(m.contains("column break"), "{m}"),
+        other => panic!("{other:?}"),
+    }
 }
 
 #[test]

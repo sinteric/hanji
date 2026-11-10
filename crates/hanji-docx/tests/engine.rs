@@ -977,6 +977,135 @@ fn a_bold_page_break_keeps_its_bold() {
     assert_eq!(canon(&out), canon(&pkg));
 }
 
+fn inline_break_body(br: &str, before: &str, after: &str) -> String {
+    format!(
+        "<w:p><w:r><w:t xml:space=\"preserve\">{before}</w:t>{br}<w:t xml:space=\"preserve\">{after}</w:t></w:r></w:p>"
+    )
+}
+
+#[test]
+fn an_inline_page_break_shows_as_pagebreak_inside_the_paragraph() {
+    let pkg = docx(
+        &inline_break_body(r#"<w:br w:type="page"/>"#, "앞.", "뒤"),
+        vec![],
+    );
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(imp.text.contains("앞.<pagebreak/>뒤"), "{}", imp.text);
+    assert!(!imp.text.contains("kind=\"break\""), "{}", imp.text);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&out), canon_doc(&pkg));
+}
+
+#[test]
+fn an_inline_column_break_in_the_same_run_as_text_round_trips() {
+    let body = r#"<w:p><w:r><w:br w:type="column"/><w:t>test</w:t></w:r></w:p>"#;
+    let pkg = docx(body, vec![]);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(imp.text.contains("<columnbreak/>test"), "{}", imp.text);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&out), canon_doc(&pkg));
+}
+
+#[test]
+fn an_inline_page_break_in_its_own_run_then_text_round_trips() {
+    let body = concat!(
+        r#"<w:p><w:r><w:br w:type="page"/></w:r>"#,
+        r#"<w:r><w:lastRenderedPageBreak/><w:t>XXXXXXXXXXXXXXXXXX</w:t></w:r></w:p>"#,
+    );
+    let pkg = docx(body, vec![]);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(
+        imp.text.contains("<pagebreak/>XXXXXXXXXXXXXXXXXX"),
+        "{}",
+        imp.text
+    );
+    assert!(!imp.text.contains("kind=\"break\""), "{}", imp.text);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&out), canon_doc(&pkg));
+    let xml = doc_xml(&out);
+    assert!(xml.contains(r#"<w:lastRenderedPageBreak/>"#), "{xml}");
+}
+
+#[test]
+fn a_break_with_clear_stays_a_placeholder() {
+    let body =
+        r#"<w:p><w:r><w:br w:type="textWrapping" w:clear="all"/><w:t>next</w:t></w:r></w:p>"#;
+    let pkg = docx(body, vec![]);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(imp.text.contains("kind=\"break\""), "{}", imp.text);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&out), canon_doc(&pkg));
+}
+
+#[test]
+fn adding_moving_and_removing_an_inline_break_writes_w_br_in_the_run() {
+    let pkg = docx(&p("앞문장 뒤문장"), vec![]);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    let added = edit(
+        &imp.remainder,
+        &imp.text,
+        "앞문장 뒤문장",
+        "앞문장<pagebreak/>뒤문장",
+        CAPS,
+    )
+    .unwrap();
+    assert!(added.report.refused.is_empty(), "{:?}", added.report);
+    assert!(
+        added.text.contains("앞문장<pagebreak/>뒤문장"),
+        "{}",
+        added.text
+    );
+    let out = DocxEngine.export(&added.text, &added.remainder).unwrap();
+    let xml = doc_xml(&out);
+    assert!(xml.contains(r#"<w:br w:type="page"/>"#), "{xml}");
+    assert!(
+        xml.find(r#"<w:br w:type="page"/>"#).unwrap()
+            < xml.find(">뒤문장<").or_else(|| xml.find("뒤문장")).unwrap(),
+        "{xml}"
+    );
+
+    let moved = edit(
+        &added.remainder,
+        &added.text,
+        "앞문장<pagebreak/>뒤문장",
+        "앞문장 뒤<columnbreak/>문장",
+        CAPS,
+    )
+    .unwrap();
+    assert!(moved.report.refused.is_empty(), "{:?}", moved.report);
+    let out = DocxEngine.export(&moved.text, &moved.remainder).unwrap();
+    let xml = doc_xml(&out);
+    assert!(xml.contains(r#"<w:br w:type="column"/>"#), "{xml}");
+    assert!(!xml.contains(r#"w:type="page""#), "{xml}");
+
+    let removed = edit(
+        &moved.remainder,
+        &moved.text,
+        "앞문장 뒤<columnbreak/>문장",
+        "앞문장 뒤문장",
+        CAPS,
+    )
+    .unwrap();
+    assert!(removed.report.refused.is_empty(), "{:?}", removed.report);
+    assert!(
+        !removed.text.contains("<columnbreak/>") && !removed.text.contains("<pagebreak/>"),
+        "{}",
+        removed.text
+    );
+    let out = DocxEngine
+        .export(&removed.text, &removed.remainder)
+        .unwrap();
+    let xml = doc_xml(&out);
+    assert!(!xml.contains("<w:br"), "{xml}");
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        removed.text
+    );
+}
+
 #[test]
 fn overlapping_old_text_is_ambiguous_and_bad_spans_are_refused() {
     let pkg = docx(&p("x aaa"), vec![]);
