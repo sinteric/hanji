@@ -65,6 +65,7 @@ fn the_design_md_example_parses() {
             "note A3",
             "validation B2:B1201",
             "conditional-format F4:F48",
+            "conditional-format E4:E15",
         ]
     );
 }

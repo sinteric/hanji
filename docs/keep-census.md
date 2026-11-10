@@ -42,39 +42,38 @@ date.
 | docx   |    13 |      0 |         11 |   119 |
 | hwpx   |    16 |      0 |          8 |    22 |
 | pptx   |    27 |      0 |         16 |    40 |
-| xlsx   |    46 |      0 |         12 |    25 |
-| all    |   102 |      0 |         47 |   206 |
+| xlsx   |    46 |      0 |         12 |    24 |
+| all    |   102 |      0 |         47 |   205 |
 
 ## By kind, most first
 
-| format | kind               | keeps | files |
-| ------ | ------------------ | ----: | ----: |
-| docx   | field              |    73 |     3 |
-| docx   | drawing            |    22 |     9 |
-| pptx   | table              |    15 |    10 |
-| hwpx   | drawing            |     9 |     6 |
-| docx   | object             |     8 |     2 |
-| xlsx   | chart              |     8 |     6 |
-| pptx   | field              |     7 |     1 |
-| pptx   | picture            |     7 |     6 |
-| xlsx   | picture            |     7 |     3 |
-| pptx   | diagram            |     6 |     3 |
-| docx   | content-control    |     5 |     2 |
-| hwpx   | form-control       |     5 |     1 |
-| hwpx   | table              |     5 |     3 |
-| pptx   | chart              |     5 |     5 |
-| xlsx   | shape              |     5 |     3 |
-| docx   | table              |     3 |     2 |
-| hwpx   | text               |     3 |     1 |
-| docx   | break              |     2 |     2 |
-| docx   | math               |     2 |     2 |
-| docx   | tracked-move       |     2 |     1 |
-| xlsx   | pivot-table        |     2 |     1 |
-| docx   | endnote            |     1 |     1 |
-| docx   | footnote           |     1 |     1 |
-| xlsx   | conditional-format |     1 |     1 |
-| xlsx   | group              |     1 |     1 |
-| xlsx   | merged-cells       |     1 |     1 |
+| format | kind            | keeps | files |
+| ------ | --------------- | ----: | ----: |
+| docx   | field           |    73 |     3 |
+| docx   | drawing         |    22 |     9 |
+| pptx   | table           |    15 |    10 |
+| hwpx   | drawing         |     9 |     6 |
+| docx   | object          |     8 |     2 |
+| xlsx   | chart           |     8 |     6 |
+| pptx   | field           |     7 |     1 |
+| pptx   | picture         |     7 |     6 |
+| xlsx   | picture         |     7 |     3 |
+| pptx   | diagram         |     6 |     3 |
+| docx   | content-control |     5 |     2 |
+| hwpx   | form-control    |     5 |     1 |
+| hwpx   | table           |     5 |     3 |
+| pptx   | chart           |     5 |     5 |
+| xlsx   | shape           |     5 |     3 |
+| docx   | table           |     3 |     2 |
+| hwpx   | text            |     3 |     1 |
+| docx   | break           |     2 |     2 |
+| docx   | math            |     2 |     2 |
+| docx   | tracked-move    |     2 |     1 |
+| xlsx   | pivot-table     |     2 |     1 |
+| docx   | endnote         |     1 |     1 |
+| docx   | footnote        |     1 |     1 |
+| xlsx   | group           |     1 |     1 |
+| xlsx   | merged-cells    |     1 |     1 |
 
 ## By file
 
@@ -178,7 +177,7 @@ date.
 | `crates/hanji-xlsx/corpus/rx_table14.xlsx`                           | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/shared_formulas.xlsx`                      | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/sharedhyperlink.xlsx`                      | xlsx   |     0 | |
-| `crates/hanji-xlsx/corpus/simple-monthly-budget.xlsx`                | xlsx   |     3 | chart 1, conditional-format 1, shape 1 |
+| `crates/hanji-xlsx/corpus/simple-monthly-budget.xlsx`                | xlsx   |     2 | chart 1, shape 1 |
 | `crates/hanji-xlsx/corpus/table-sample.xlsx`                         | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/unicodeSheetName.xlsx`                     | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/xlookup.xlsx`                              | xlsx   |     0 | |

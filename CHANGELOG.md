@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- Show XLSX data-bar conditional formats as
+  `<conditional-format range="E4" type="dataBar" min="num:0" max="max" fill="#638EC6"/>`
+  lines (round 7 A: `min`/`max` one token, `fill` the cell-format colour)
+  instead of `<keep kind="conditional-format"/>`. Range, min/max and colour
+  can be kept, added, removed or changed. Line order is still Excel's
+  sheet-wide `priority`; a rewrite groups only adjacent same-range lines.
+  Unedited x14 data-bar extensions (negative fill, axis, gradient, border)
+  stay as stored; a rewrite of the modelled fields patches them in place.
+  A color scale, an icon set, or a dataBar whose x14 extension cannot be
+  carried faithfully stays a placeholder for that sheet. Corpus keeps:
+  206 → 205 (xlsx `conditional-format` 1 → 0).
 - Show an HWPX drawing whose `hp:drawText` is ordinary text in one or more
   paragraphs as that text instead of a `<keep kind="drawing"/>` placeholder.
   Several paragraphs join with `<br/>`; a shown footnote or endnote inside

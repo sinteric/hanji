@@ -34,7 +34,7 @@
     "files": 102,
     "failed": 0,
     "with_keeps": 47,
-    "keeps": 206
+    "keeps": 205
   },
   "formats": [
     {
@@ -63,7 +63,7 @@
       "files": 46,
       "failed": 0,
       "with_keeps": 12,
-      "keeps": 25
+      "keeps": 24
     }
   ],
   "kinds": [
@@ -202,12 +202,6 @@
     {
       "format": "docx",
       "kind": "footnote",
-      "keeps": 1,
-      "files": 1
-    },
-    {
-      "format": "xlsx",
-      "kind": "conditional-format",
       "keeps": 1,
       "files": 1
     },
@@ -936,10 +930,9 @@
     {
       "path": "crates/hanji-xlsx/corpus/simple-monthly-budget.xlsx",
       "format": "xlsx",
-      "keeps": 3,
+      "keeps": 2,
       "kinds": {
         "chart": 1,
-        "conditional-format": 1,
         "shape": 1
       }
     },
