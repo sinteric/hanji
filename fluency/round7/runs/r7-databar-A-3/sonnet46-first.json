@@ -1,0 +1,44 @@
+{
+ "answers": [
+  {
+   "task_id": "score3-q1",
+   "text": "ANSWER: min=percentile:10 max=percentile:90 fill=#638EC6"
+  },
+  {
+   "task_id": "score3-w",
+   "text": "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"요약\" range=\"A1:C6\">\n\n<table name=\"요약표\" range=\"A1:C4\">\n| column | type | format | formula |\n|---|---|---|---|\n| 팀 | text |  |  |\n| 점수 | number | 0 |  |\n| 목표 | number | 0 |  |\n</table>\n\n<conditional-format range=\"B2:B4\" type=\"dataBar\" min=\"min\" max=\"max\" fill=\"#FFEB84\"/>\n\n</sheet>\n"
+  },
+  {
+   "task_id": "score3-e1",
+   "edits": [
+    {
+     "old": "<conditional-format range=\"B2:B12\" type=\"dataBar\" min=\"percentile:10\" max=\"percentile:90\" fill=\"#638EC6\"/>",
+     "new": "<conditional-format range=\"B2:B14\" type=\"dataBar\" min=\"percentile:10\" max=\"percentile:90\" fill=\"#638EC6\"/>"
+    }
+   ]
+  },
+  {
+   "task_id": "score3-e2",
+   "edits": [
+    {
+     "old": "<conditional-format range=\"B2:B12\" type=\"dataBar\" min=\"percentile:10\" max=\"percentile:90\" fill=\"#638EC6\"/>",
+     "new": "<conditional-format range=\"B2:B12\" type=\"dataBar\" min=\"percentile:10\" max=\"percentile:90\" fill=\"#FFC7CE\"/>"
+    }
+   ]
+  },
+  {
+   "task_id": "score3-e3",
+   "edits": [
+    {
+     "old": "<conditional-format range=\"B2:B12\" type=\"dataBar\" min=\"percentile:10\" max=\"percentile:90\" fill=\"#638EC6\"/>",
+     "new": "<conditional-format range=\"B2:B12\" type=\"dataBar\" min=\"num:0\" max=\"num:100\" fill=\"#638EC6\"/>"
+    }
+   ]
+  },
+  {
+   "task_id": "score3-r",
+   "text": "REFUSE: Icon sets and axis position on data bars cannot be expressed in this file format.",
+   "edits": []
+  }
+ ]
+}

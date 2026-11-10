@@ -1,0 +1,44 @@
+{
+ "answers": [
+  {
+   "task_id": "launch3-q1",
+   "text": "ANSWER: 인쇄물 마감은 출시일 11월 | 오른쪽 칼럼은 개인 고객용입니다."
+  },
+  {
+   "task_id": "launch3-w",
+   "text": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 출시 당일 공지\n\n한빛 노트 판매를 시작합니다.<pagebreak/>자사몰 쿠폰은 오늘 자정까지입니다.\n\n기업 고객 안내.<columnbreak/>개인 고객 안내.\n"
+  },
+  {
+   "task_id": "launch3-e1",
+   "edits": [
+    {
+     "old": "제안합니다. 핵심 기능 3가지는 공동",
+     "new": "제안합니다.<pagebreak/>핵심 기능 3가지는 공동"
+    }
+   ]
+  },
+  {
+   "task_id": "launch3-e2",
+   "edits": [
+    {
+     "old": "기업 고객용입니다.<columnbreak/>오른쪽 칼럼은 개인 고객용입니다. 핵심",
+     "new": "기업 고객용입니다. 오른쪽 칼럼은 개인 고객용입니다.<columnbreak/>핵심"
+    }
+   ]
+  },
+  {
+   "task_id": "launch3-e3",
+   "edits": [
+    {
+     "old": "11월 13일부터입니다.<pagebreak/>인쇄물",
+     "new": "11월 13일부터입니다. 인쇄물"
+    }
+   ]
+  },
+  {
+   "task_id": "launch3-r",
+   "text": "REFUSE: A continuous section break with a newspaper column count and gap cannot be expressed in this format.",
+   "edits": []
+  }
+ ]
+}
