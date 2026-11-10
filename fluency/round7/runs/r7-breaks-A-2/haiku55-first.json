@@ -1,0 +1,44 @@
+{
+ "answers": [
+  {
+   "task_id": "ministry2-q1",
+   "text": "ANSWER: page: 지정 공고는 11월 둘째 주에 나갑니다 | column: 업종은 지붕·축사, 벌목, 질식 위험 작업부터입니다"
+  },
+  {
+   "task_id": "ministry2-w",
+   "text": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 산업안전 주간 메모\n\n이번 주 점검은 50인 미만 3곳입니다.<pagebreak/>결과는 금요일에 올립니다.\n\n지붕·축사.<columnbreak/>벌목.\n\n다음 단계 안내는 별도 공지입니다."
+  },
+  {
+   "task_id": "ministry2-e1",
+   "edits": [
+    {
+     "old": "1.1%p 올랐습니다. 일경험",
+     "new": "1.1%p 올랐습니다.<pagebreak/> 일경험"
+    }
+   ]
+  },
+  {
+   "task_id": "ministry2-e2",
+   "edits": [
+    {
+     "old": "늘립니다.<columnbreak/>업종은 지붕·축사, 벌목, 질식",
+     "new": "늘립니다.업종은 지붕·축사, 벌목, <columnbreak/>질식"
+    }
+   ]
+  },
+  {
+   "task_id": "ministry2-e3",
+   "edits": [
+    {
+     "old": "지정합니다.<pagebreak/>지정 공고는",
+     "new": "지정합니다. 지정 공고는"
+    }
+   ]
+  },
+  {
+   "task_id": "ministry2-r",
+   "text": "REFUSE: An odd-page section break and a change of column count are not expressible in this file format, so the edit cannot be made.",
+   "edits": []
+  }
+ ]
+}

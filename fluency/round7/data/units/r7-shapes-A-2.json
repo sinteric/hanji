@@ -1,0 +1,52 @@
+{
+ "unit_id": "r7-shapes-A-2",
+ "decision": "shapes",
+ "candidate": "A",
+ "replicate": 2,
+ "names": {},
+ "fm": {
+  "type": "spreadsheet",
+  "format": "xlsx",
+  "schema": "1"
+ },
+ "seed": "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"지역매출\" range=\"A1:H28\">\n\n<table name=\"지역\" range=\"A1:E16\">\n| column | type | format | formula |\n|---|---|---|---|\n| 지역 | text |  |  |\n| 지점 | text |  |  |\n| 매출 | number | #,##0 |  |\n| 목표 | number | #,##0 |  |\n| 달성 | number | 0% |  |\n</table>\n\n<note range=\"E2\" author=\"작성자\" text=\"부산 해운대는 목표 미달 (잠정).\"/>\n\n<shape name=\"서울 콜아웃\" anchor=\"B18:D20\">서울 14곳, 전년 대비 +12%</shape>\n\n<shape name=\"부산 콜아웃\" anchor=\"B22:D24\">목표 미달</shape>\n\n<group name=\"권역 배지\">\n<shape name=\"수도권 배지\" anchor=\"F2:G3\">수도권 21곳</shape>\n<shape name=\"지방 배지\" anchor=\"F4:G5\">지방 13곳</shape>\n<shape name=\"합계 배지\" anchor=\"F6:G7\">합계 34곳</shape>\n</group>\n\n<keep id=\"k2\" kind=\"chart\" summary=\"지역별 막대\"/>\n\n</sheet>\n",
+ "tasks": [
+  {
+   "task_id": "region2-q1",
+   "kind": "read",
+   "text": "Which shape is named 부산 콜아웃, what is its anchor, and what is its text? Answer as `ANSWER: <anchor> | <text>`.",
+   "expect": "ANSWER: B22:D24 | 목표 미달"
+  },
+  {
+   "task_id": "region2-w",
+   "kind": "write",
+   "text": "Write a new workbook with exactly one sheet 메모, range A1:D8, containing: a table 메모표 on A1:B3 with columns 지역 (text) and 상태 (text); a shape named 경고 anchored C2:D3 text \"목표 미달\"; a group named 등 of two shapes, 녹 at C5:D6 text \"녹\" and 적 at C7:D8 text \"적\". No other items."
+  },
+  {
+   "task_id": "region2-e1",
+   "kind": "edit",
+   "text": "Add a shape named 대구 콜아웃, anchored B26:D28, with text \"대구 3곳, 전년 대비 +4%\". Do not change 서울 콜아웃."
+  },
+  {
+   "task_id": "region2-e2",
+   "kind": "edit",
+   "text": "Move 부산 콜아웃 so its anchor is E22:G24. Keep its text \"목표 미달\". Do not edit the note that also says 목표 미달."
+  },
+  {
+   "task_id": "region2-e3",
+   "kind": "edit",
+   "text": "Change the text of 부산 콜아웃 to \"목표 달성\". Do not edit the note that says 목표 미달 (잠정)."
+  },
+  {
+   "task_id": "region2-e4",
+   "kind": "edit",
+   "text": "Resize 서울 콜아웃 so its anchor is B18:E21. Keep its text."
+  },
+  {
+   "task_id": "region2-r",
+   "kind": "refuse",
+   "text": "Connect 서울 콜아웃 to 부산 콜아웃 with an elbow connector, and give 수도권 배지 a drop shadow."
+  }
+ ],
+ "unreachable": []
+}

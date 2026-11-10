@@ -1,0 +1,53 @@
+{
+ "answers": [
+  {
+   "task_id": "exec3-q1",
+   "text": "ANSWER: 증가 화살표 | 화살표"
+  },
+  {
+   "task_id": "exec3-w",
+   "text": "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"메모\" range=\"A1:D8\">\n\n<table name=\"메모표\" range=\"A1:B3\">\n| column | type | format | formula |\n|---|---|---|---|\n| 사업 | text |  |  |\n| 집행률 | number | 0% |  |\n</table>\n\n<shape name=\"제목\" anchor=\"C1:D2\" text=\"주간 집행\"/>\n\n<shape name=\"양호\" anchor=\"C4:D5\" text=\"양호\" group=\"표시\"/>\n<shape name=\"주의\" anchor=\"C6:D7\" text=\"주의\" group=\"표시\"/>\n\n</sheet>\n"
+  },
+  {
+   "task_id": "exec3-e1",
+   "edits": [
+    {
+     "old": "<shape name=\"입력 안내\" anchor=\"B20:D22\" text=\"행을 추가하려면 마지막 사업명 아래칸에 입력합니다.\"/>\n",
+     "new": "<shape name=\"입력 안내\" anchor=\"B20:D22\" text=\"행을 추가하려면 마지막 사업명 아래칸에 입력합니다.\"/>\n\n<shape name=\"마감 안내\" anchor=\"B23:D24\" text=\"10월 마감은 11월 5일입니다.\"/>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "exec3-e2",
+   "edits": [
+    {
+     "old": "anchor=\"A16:C17\"",
+     "new": "anchor=\"A18:C19\""
+    }
+   ]
+  },
+  {
+   "task_id": "exec3-e3",
+   "edits": [
+    {
+     "old": "text=\"집행률 82%\" group=\"화살표\"",
+     "new": "text=\"집행률 85%\" group=\"화살표\""
+    }
+   ]
+  },
+  {
+   "task_id": "exec3-e4",
+   "edits": [
+    {
+     "old": "anchor=\"B20:D22\"",
+     "new": "anchor=\"B20:E23\""
+    }
+   ]
+  },
+  {
+   "task_id": "exec3-r",
+   "text": "REFUSE: Shape type, fill and outline cannot be expressed in this format, which only supports name, anchor, text and group.",
+   "edits": []
+  }
+ ]
+}

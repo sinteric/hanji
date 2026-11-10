@@ -1,0 +1,65 @@
+{
+ "unit_id": "r7-breaks-B-2",
+ "decision": "breaks",
+ "candidate": "B",
+ "replicate": 2,
+ "names": {
+  "paragraph_styles": [
+   [
+    "Note",
+    "작은 회색 참고 문단"
+   ],
+   [
+    "표 제목",
+    "표 바로 위의 제목 줄"
+   ]
+  ],
+  "table_styles": [
+   [
+    "표 눈금",
+    "모든 칸에 가는 검은 실선"
+   ]
+  ]
+ },
+ "fm": {
+  "type": "document",
+  "format": "docx",
+  "template": "org/report",
+  "schema": "1"
+ },
+ "seed": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 2026년 하반기 고용노동 업무보고\n\n장관 주재 업무보고입니다. 핵심은 청년 일자리, 산업안전, 노동시간 단축 세 가지이며, 수치는 내부 집계 기준입니다.\n\n## 1. 청년 일자리\n\n청년 고용률은 45.2%로 전년 동기 44.1%보다 1.1%p 올랐습니다. 일경험 프로그램 참여자는 12,400명입니다.\n\n다음 단계로 대학일자리+센터 30곳을 추가 지정합니다.<br type=\"page\"/>지정 공고는 11월 둘째 주에 나갑니다.\n\n<div style=\"표 제목\">표 1. 일경험 프로그램 (명)</div>\n\n{style=\"표 눈금\"}\n| 구분 | 상반기 | 하반기 | 합계 |\n|---|---|---|---|\n| 공공 | 3,200 | 3,400 | 6,600 |\n| 민간 | 2,800 | 3,000 | 5,800 |\n| 합계 | 6,000 | 6,400 | 12,400 |\n\n## 2. 산업안전\n\n사고사망자는 3분기 누적 457명으로 전년 동기 443명보다 14명 늘었습니다. 50인 미만 사업장에서 26명이 늘었습니다.\n\n다음 단계로 초소규모 사업장 점검 횟수를 두 배로 늘립니다.<br type=\"column\"/>업종은 지붕·축사, 벌목, 질식 위험 작업부터입니다.\n\n다음 단계 일정은 12월 초 관계부처 회의에서 확정합니다. 다음 주 내부 검토가 있습니다.\n\n- 50인 이상 사업장은 12명 감소, 50인 미만은 26명 증가.\n- 한파·온열 등 새로운 위험 요인을 점검 항목에 넣습니다.\n\n<div style=\"Note\">「다음 단계」는 각 과제의 후속 조치이며, 문단마다 가리키는 과제가 다릅니다.</div>\n\n<pagebreak/>\n\n## 3. 노동시간\n\n실노동시간 단축 지원법 입법은 3월, 패키지 입법은 5월을 목표로 합니다.\n\n다음 단계로 야간노동자 실태조사를 6월까지 마칩니다.\n\n<keep id=\"k1\" kind=\"drawing\" summary=\"조직도, 본부 5개\"/>\n\n문의는 기획조정실 (☎ 044-000-1234)입니다.\n",
+ "tasks": [
+  {
+   "task_id": "ministry2-q1",
+   "kind": "read",
+   "text": "The file uses the words 다음 단계 in several paragraphs. Which 다음 단계 paragraph has an inline page break, and which has an inline column break? Answer as `ANSWER: page: <the words after the page break, up to the period> | column: <the words after the column break, up to the period>`.",
+   "expect": "ANSWER: page: 지정 공고는 11월 둘째 주에 나갑니다 | column: 업종은 지붕·축사, 벌목, 질식 위험 작업부터입니다"
+  },
+  {
+   "task_id": "ministry2-w",
+   "kind": "write",
+   "text": "Write a new document with exactly these blocks, in this order, and nothing else: a heading level 1 \"산업안전 주간 메모\"; a default-style paragraph \"이번 주 점검은 50인 미만 3곳입니다.\" then an inline page break then \"결과는 금요일에 올립니다.\"; a default-style paragraph \"지붕·축사.\" then an inline column break then \"벌목.\"; a default-style paragraph \"다음 단계 안내는 별도 공지입니다.\""
+  },
+  {
+   "task_id": "ministry2-e1",
+   "kind": "edit",
+   "text": "In the paragraph that begins 청년 고용률은 45.2%, insert an inline page break after the first sentence (after \"올랐습니다.\"). Do not touch the 다음 단계 paragraph that already has a page break."
+  },
+  {
+   "task_id": "ministry2-e2",
+   "kind": "edit",
+   "text": "In the paragraph about 초소규모 사업장 점검, move the inline column break so it falls just before \"질식 위험 작업부터입니다.\" (after \"벌목, \"). Keep the rest of that paragraph. Do not edit the other 다음 단계 paragraphs."
+  },
+  {
+   "task_id": "ministry2-e3",
+   "kind": "edit",
+   "text": "Remove the inline page break from the 다음 단계로 대학일자리+센터 paragraph. Keep it as one paragraph, with a space where the break was. Do not remove the page break between paragraphs before \"3. 노동시간\"."
+  },
+  {
+   "task_id": "ministry2-r",
+   "kind": "refuse",
+   "text": "Insert an odd-page section break before \"3. 노동시간\" so that heading always starts on a right-hand page, and set that section to three columns."
+  }
+ ],
+ "unreachable": []
+}

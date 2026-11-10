@@ -1,0 +1,33 @@
+---
+type: spreadsheet
+format: xlsx
+schema: 1
+---
+
+<sheet name="지역매출" range="A1:H28">
+
+<table name="지역" range="A1:E16">
+| column | type | format | formula |
+|---|---|---|---|
+| 지역 | text |  |  |
+| 지점 | text |  |  |
+| 매출 | number | #,##0 |  |
+| 목표 | number | #,##0 |  |
+| 달성 | number | 0% |  |
+</table>
+
+<note range="E2" author="작성자" text="부산 해운대는 목표 미달 (잠정)."/>
+
+<shape name="서울 콜아웃" anchor="B18:D20">서울 14곳, 전년 대비 +12%</shape>
+
+<shape name="부산 콜아웃" anchor="B22:D24">목표 미달</shape>
+
+<group name="권역 배지">
+<shape name="수도권 배지" anchor="F2:G3">수도권 21곳</shape>
+<shape name="지방 배지" anchor="F4:G5">지방 13곳</shape>
+<shape name="합계 배지" anchor="F6:G7">합계 34곳</shape>
+</group>
+
+<keep id="k2" kind="chart" summary="지역별 막대"/>
+
+</sheet>

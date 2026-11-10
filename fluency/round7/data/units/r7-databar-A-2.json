@@ -1,0 +1,47 @@
+{
+ "unit_id": "r7-databar-A-2",
+ "decision": "databar",
+ "candidate": "A",
+ "replicate": 2,
+ "names": {},
+ "fm": {
+  "type": "spreadsheet",
+  "format": "xlsx",
+  "schema": "1"
+ },
+ "seed": "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"달성\" range=\"A1:F18\">\n\n<table name=\"지역\" range=\"A1:F14\">\n| column | type | format | formula |\n|---|---|---|---|\n| 지역 | text |  |  |\n| 매출 | number | #,##0 |  |\n| 목표 | number | #,##0 |  |\n| 달성률 | number | 0% |  |\n| 전년 | number | 0% |  |\n| 증감 | number | 0% |  |\n</table>\n\n<conditional-format range=\"D2:D14\" type=\"dataBar\" min=\"num:0\" max=\"percent:100\" fill=\"#638EC6\"/>\n\n<conditional-format range=\"E2:E14\" type=\"dataBar\" min=\"num:0\" max=\"percent:100\" fill=\"#63BE7B\"/>\n\n<conditional-format range=\"F2:F14\" type=\"cellIs\" operator=\"lessThan\" formula=\"0\" dxf=\"fill=#FFC7CE\"/>\n\n</sheet>\n",
+ "tasks": [
+  {
+   "task_id": "rate2-q1",
+   "kind": "read",
+   "text": "Two columns have a data bar from 0 to 100 percent. What is the fill of the 달성률 column (D), and what is the fill of the 전년 column (E)? Answer as `ANSWER: D=<…> | E=<…>`.",
+   "expect": "ANSWER: D=#638EC6 | E=#63BE7B"
+  },
+  {
+   "task_id": "rate2-w",
+   "kind": "write",
+   "text": "Write a new workbook with exactly one sheet 요약, range A1:C6, containing: a table 요약표 on A1:C4 with columns 지역 (text), 달성률 (number, format 0%), 전년 (number, format 0%); one data-bar rule on B2:B4 whose minimum is the number 0, whose maximum is 100 percent, and whose fill is #63BE7B. No other items."
+  },
+  {
+   "task_id": "rate2-e1",
+   "kind": "edit",
+   "text": "Change the 달성률 data bar (column D) so its range is D2:D16. Do not change the 전년 bar on E."
+  },
+  {
+   "task_id": "rate2-e2",
+   "kind": "edit",
+   "text": "Change the fill of the 달성률 data bar to #FFC7CE. Leave the 전년 bar green."
+  },
+  {
+   "task_id": "rate2-e3",
+   "kind": "edit",
+   "text": "Change the 달성률 data bar so its minimum is 0 percent and its maximum is 100 percent (percent types, not num). Keep its fill and range."
+  },
+  {
+   "task_id": "rate2-r",
+   "kind": "refuse",
+   "text": "Make the 달성률 data bar a gradient bar (the bar fades) and hide the cell values (showValue off)."
+  }
+ ],
+ "unreachable": []
+}

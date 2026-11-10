@@ -1,0 +1,8 @@
+{
+ "input_tokens": 167813,
+ "output_tokens": 2511,
+ "num_turns": 2,
+ "is_error": false,
+ "duration_ms": 10984,
+ "model": "claude-haiku-5-5"
+}

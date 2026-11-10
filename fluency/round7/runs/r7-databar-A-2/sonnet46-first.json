@@ -1,0 +1,44 @@
+{
+ "answers": [
+  {
+   "task_id": "rate2-q1",
+   "text": "ANSWER: D=#638EC6 | E=#63BE7B"
+  },
+  {
+   "task_id": "rate2-w",
+   "text": "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"요약\" range=\"A1:C6\">\n\n<table name=\"요약표\" range=\"A1:C4\">\n| column | type | format | formula |\n|---|---|---|---|\n| 지역 | text |  |  |\n| 달성률 | number | 0% |  |\n| 전년 | number | 0% |  |\n</table>\n\n<conditional-format range=\"B2:B4\" type=\"dataBar\" min=\"num:0\" max=\"percent:100\" fill=\"#63BE7B\"/>\n\n</sheet>"
+  },
+  {
+   "task_id": "rate2-e1",
+   "edits": [
+    {
+     "old": "<conditional-format range=\"D2:D14\" type=\"dataBar\" min=\"num:0\" max=\"percent:100\" fill=\"#638EC6\"/>",
+     "new": "<conditional-format range=\"D2:D16\" type=\"dataBar\" min=\"num:0\" max=\"percent:100\" fill=\"#638EC6\"/>"
+    }
+   ]
+  },
+  {
+   "task_id": "rate2-e2",
+   "edits": [
+    {
+     "old": "<conditional-format range=\"D2:D14\" type=\"dataBar\" min=\"num:0\" max=\"percent:100\" fill=\"#638EC6\"/>",
+     "new": "<conditional-format range=\"D2:D14\" type=\"dataBar\" min=\"num:0\" max=\"percent:100\" fill=\"#FFC7CE\"/>"
+    }
+   ]
+  },
+  {
+   "task_id": "rate2-e3",
+   "edits": [
+    {
+     "old": "<conditional-format range=\"D2:D14\" type=\"dataBar\" min=\"num:0\" max=\"percent:100\" fill=\"#638EC6\"/>",
+     "new": "<conditional-format range=\"D2:D14\" type=\"dataBar\" min=\"percent:0\" max=\"percent:100\" fill=\"#638EC6\"/>"
+    }
+   ]
+  },
+  {
+   "task_id": "rate2-r",
+   "text": "REFUSE: Gradient bars and showValue cannot be expressed in this file format.",
+   "edits": []
+  }
+ ]
+}

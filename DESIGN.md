@@ -1,7 +1,7 @@
 ---
 status: draft
 date: 2026-09-29
-measured: library and project facts below were checked 2026-09-28/29 against crates.io, npm, PyPI, GitHub and project docs; the §5 syntax choices were measured by fluency rounds 1–4 (2026-09-28, two Claude models) and the Presentation geometry by round 5 (2026-09-29, the same models); direct formatting (§10 item 10, proposed) by round 6 (2026-09-30, the same models); the preview font system (§7.1) by font files, engine sources and secondary licence sources (2026-10-01); the remainder anchoring (§10.3) by the remainder prototype (2026-09-28, 13 docx); nothing here has yet been opened in real Office by this project
+measured: library and project facts below were checked 2026-09-28/29 against crates.io, npm, PyPI, GitHub and project docs; the §5 syntax choices were measured by fluency rounds 1–4 (2026-09-28, two Claude models) and the Presentation geometry by round 5 (2026-09-29, the same models); direct formatting (§10 item 10, proposed) by round 6 (2026-09-30, the same models); inline page/column breaks, xlsx shapes/groups and dataBar CF by round 7 (2026-11-10, Sonnet 5.5, Haiku 5.5, Sonnet 4.6); the preview font system (§7.1) by font files, engine sources and secondary licence sources (2026-10-01); the remainder anchoring (§10.3) by the remainder prototype (2026-09-28, 13 docx); nothing here has yet been opened in real Office by this project
 ---
 
 # hanji — office documents for LLM agents (design)
@@ -1501,6 +1501,50 @@ F1, effective formatting inline; F2o, only what the object sets itself.
 - Limits: formatting read, written and checked by the kit, not the engines
   or Office; no large docx; one run per prompt; part D at the ceiling.
 
+**Round 7 results (2026-11-10)** — kit in [fluency/round7/](fluency/round7/),
+candidates in [fluency/round7/CANDIDATES.md](fluency/round7/CANDIDATES.md),
+details in [fluency/round7/RESULTS.md](fluency/round7/RESULTS.md). Three
+models (Sonnet 5.5, Haiku 5.5, Sonnet 4.6), 18 blind units, each prompt read
+from its own file with Read as the only tool. It decides three keep-reducing
+syntaxes: docx inline page and column breaks (A dedicated `<pagebreak/>` /
+`<columnbreak/>` vs B `<br type="page"/>` / `<br type="column"/>`); xlsx
+drawing shapes and groups as sheet lines (A element body and a `<group>`
+wrapper vs B self-closing `text=` / `group=`); xlsx dataBar conditional
+formats (A compact `min` / `max` / `fill` vs B `min-type` / `max-type` /
+`color`). 114 tasks × 3 models = 342 answers; 0/342 invalid on the first
+try, so the fix round sent nothing back.
+
+| Decision | landed A / B | chars A / B | Verdict |
+|---|---|---|---|
+| Inline page/column breaks | 45/54 / 45/54 | 4,929 / 5,221 | A: `<pagebreak/>` / `<columnbreak/>` |
+| xlsx shapes/groups | 63/63 / 63/63 | 8,880 / 9,147 | A: `<shape>…</shape>` and `<group>` |
+| xlsx dataBar | 54/54 / 48/54 | 7,455 / 7,980 | A: `min` / `max` / `fill` |
+
+- Landed is first try, of 54 per breaks/databar cell (6 tasks × 3 seeds × 3
+  models) and 63 per shapes cell (7 × 3 × 3). All 342 answers were valid.
+  All 54 refusals refused; every write landed.
+- At run time, breaks e1 and shapes e1 missed 18/18 under both candidates:
+  gold kept a space after the period (`보고합니다. <pagebreak/>`) and
+  appended a new shape before `</sheet>`, while every model inserted the
+  break next to the period without that space and the shape next to the
+  existing callout. Kit strictness, not syntax. After the scorer treats
+  whitespace around an inline break as equivalent and compares drawing
+  items by name rather than sheet order, those 36 answers land, and seven
+  e2 answers that only dropped a space next to the moved break land too
+  (as scored on the day: breaks 32/54 vs 33/54, shapes 54/63 each).
+  Verdicts unchanged.
+- Remaining breaks misses are a five-word quote that ran long (q1) and
+  punctuation around a moved column break (e2: a comma where gold has a
+  period, or two sentences joined without a space). databar B dropped 6 of
+  9 reads that asked for min/max tokens, answering in A's `min=` / `fill=`
+  names even with B's file in front of them.
+- A on all three. breaks: a landed tie, A 6% smaller in answers and it does
+  not overload `<br/>`. shapes: a tie at the ceiling after the kit fix (a
+  tie at 18/21 on the day), A's body and `<group>` also how a grouped shape
+  is written in the seed, 3% smaller in answers. databar: A at the ceiling,
+  B's names are not what models reach for on a read. No engine syntax in
+  this change.
+
 ## 7. Engines (surveyed 2026-09-28)
 
 Engines work only at import, export and preview. Every engine is behind this
@@ -1963,6 +2007,19 @@ side.
     values so either can be chosen. Open too: page setup, headers and footers
     do not cross (neither engine writes section properties from the text), and
     the report says so.
+12. **Inline page/column breaks, xlsx shapes/groups, and dataBar conditional
+    formats (decided 2026-11-10, not yet in the engines)** — by §6 round 7,
+    all three A: docx inline page and column breaks as `<pagebreak/>` /
+    `<columnbreak/>` inside the paragraph (block `<pagebreak/>` and `<br/>`
+    stay as they are); xlsx drawing shapes as `<shape name anchor>text</shape>`
+    with a `<group>` wrapper; xlsx dataBar as `min` / `max` / `fill` on the
+    existing `<conditional-format>` tag. Today they still stay placeholders
+    until the engines grow them: docx `break` (tdf154481.docx,
+    tdf124637_sectionMargin.docx); xlsx `shape`/`group`
+    (simple-monthly-budget.xlsx, WithDrawing.xlsx,
+    ExcelWithAttachments.xlsm); xlsx `conditional-format` of type dataBar
+    (simple-monthly-budget.xlsx E4). The kit is
+    [fluency/round7/](fluency/round7/).
 
 ## 11. Blind spots
 
