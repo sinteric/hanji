@@ -2,17 +2,17 @@
 //! — `<sheet>` blocks holding `<table>` blocks (one pipe-table line per
 //! column: name, type, number format, formula), `<merge range/>` lines,
 //! `<hyperlink/>` lines, `<note/>` lines, `<validation/>` lines,
-//! `<conditional-format/>` lines, `<chart/>` lines and placeholders — and
-//! the row window through which cell data is read (a pipe table whose first
-//! column is the read-only sheet row number, values as displayed; §6 round 4,
-//! read view A). Cell data is written by range operations (`ops.rs`), never
-//! as text.
+//! `<conditional-format/>` lines, drawing `<shape>` / `<group>` lines,
+//! `<chart/>` lines and placeholders — and the row window through which
+//! cell data is read (a pipe table whose first column is the read-only
+//! sheet row number, values as displayed; §6 round 4, read view A). Cell
+//! data is written by range operations (`ops.rs`), never as text.
 
 use crate::ast::{FrontMatter, Keep};
 use crate::cellfmt::{self, CellFormat, FormatLine};
 use crate::diag::{quoted, Diagnostic};
 use crate::names::Names;
-use crate::parse::{chars_of, parse_tag, Parser};
+use crate::parse::{chars_of, decode_attr, parse_tag, Parser};
 use crate::serialize::{attr, front_lines};
 use crate::vocab::Color;
 
@@ -45,6 +45,10 @@ pub const MAX_VALIDATION_LINES: usize = 1024;
 /// At most this many `<conditional-format/>` lines on one sheet. A sheet
 /// with more keeps them as a placeholder (§2 rule 11).
 pub const MAX_CONDITIONAL_FORMAT_LINES: usize = 1024;
+
+/// At most this many `<shape>` lines on one sheet (grouped shapes count).
+/// A sheet with more keeps them as a placeholder (§2 rule 11).
+pub const MAX_SHAPE_LINES: usize = 1024;
 
 /// Data-validation types a `<validation/>` line may name (SpreadsheetML).
 pub const VALIDATION_TYPES: &[&str] = &[
@@ -113,8 +117,38 @@ pub enum SheetItem {
     /// Boxed: `CondFormatDecl` holds a `CellFormat`, which would otherwise
     /// dominate `SheetItem`'s size (clippy `large_enum_variant`).
     ConditionalFormat(Box<CondFormatDecl>),
+    /// A drawing shape (`<shape name="…" anchor="B2:D5">text</shape>`).
+    Shape(ShapeDecl),
+    /// A group of drawing shapes (`<group name="…">` … `</group>`).
+    Group(GroupDecl),
     Chart(ChartDecl),
     Keep(Keep),
+}
+
+/// One drawing shape on a sheet (`<shape name="Tip" anchor="B25:D27">text</shape>`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ShapeDecl {
+    pub name: String,
+    /// Canonical A1 cell or range of Excel's two-cell (or one-cell) anchor.
+    pub anchor: String,
+    /// Plain text of the shape; a newline is `&#10;` in the body. Empty
+    /// when the shape has none (`<shape …/>`).
+    pub text: String,
+}
+
+/// One group of drawing shapes (`<group name="신호등">` … `</group>`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GroupDecl {
+    pub name: String,
+    pub items: Vec<DrawingItem>,
+}
+
+/// A shape or nested group inside a [`GroupDecl`] (or collected from a
+/// sheet's drawing lines).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum DrawingItem {
+    Shape(ShapeDecl),
+    Group(GroupDecl),
 }
 
 /// One merged range on a sheet (`<merge range="A1:F1"/>`).
@@ -477,6 +511,9 @@ const VALIDATION_FORM: &str =
 const CONDITIONAL_FORMAT_FORM: &str =
     "<conditional-format range=\"A1:A10\" type=\"cellIs\" operator=\"greaterThan\" formula=\"5\" dxf=\"fill=#FFC7CE\"/> or <conditional-format range=\"E4\" type=\"dataBar\" min=\"num:0\" max=\"max\" fill=\"#638EC6\"/>";
 const CHART_FORM: &str = "<chart type=\"bar\" data=\"Table[Column],Table[Column]\" title=\"…\"/>";
+const SHAPE_FORM: &str =
+    "<shape name=\"…\" anchor=\"B2:D5\">text</shape> or <shape name=\"…\" anchor=\"B2:D5\"/>";
+const GROUP_FORM: &str = "<group name=\"…\">, one <shape> line per member, and </group>";
 const KEEP_FORM: &str = "<keep id=\"…\" kind=\"…\" summary=\"…\"/>";
 
 /// Parse the structure text of a Spreadsheet, checking placeholders
@@ -493,6 +530,7 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
     let mut i = first;
     let mut open: Option<(usize, SheetDecl)> = None;
     let mut default_format: Option<CellFormat> = None;
+    let mut n_shapes: usize = 0;
     while i < n {
         let text = p.lines[i].text;
         let t = text.trim();
@@ -510,6 +548,7 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
                     format!("</sheet> closes no sheet; a sheet is {SHEET_FORM}."),
                 ),
             }
+            n_shapes = 0;
             i += 1;
             continue;
         }
@@ -525,6 +564,7 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
             if let Some(s) = sheet_tag(&mut p, i) {
                 open = Some((i, s));
             }
+            n_shapes = 0;
             i += 1;
             continue;
         }
@@ -641,6 +681,30 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
             i += 1;
             continue;
         }
+        if t.starts_with("<shape") {
+            if let Some(s) = shape_tag(&mut p, i, &mut n_shapes) {
+                sheet.items.push(SheetItem::Shape(s));
+            }
+            i += 1;
+            continue;
+        }
+        if t.starts_with("<group") {
+            let (g, next) = group_block(&mut p, i, &mut n_shapes);
+            if let Some(g) = g {
+                sheet.items.push(SheetItem::Group(g));
+            }
+            i = next;
+            continue;
+        }
+        if t.starts_with("</group") {
+            p.err(
+                i,
+                col,
+                format!("</group> closes no group; a group is {GROUP_FORM}."),
+            );
+            i += 1;
+            continue;
+        }
         if t.starts_with("<keep") {
             if let Some(k) = keep_tag(&mut p, i) {
                 keeps.push((i, col, k.clone()));
@@ -654,7 +718,7 @@ pub fn parse_spreadsheet(text: &str, names: &Names) -> Result<Spreadsheet, Vec<D
         } else if t.starts_with('|') {
             p.err(i, col, format!("a pipe table here belongs inside a table block: {TABLE_FORM}. Cell data is written by range operations."));
         } else {
-            p.err(i, col, format!("a sheet holds only table blocks ({TABLE_FORM}), merge lines ({MERGE_FORM}), hyperlink lines ({HYPERLINK_FORM}), note lines ({NOTE_FORM}), validation lines ({VALIDATION_FORM}), conditional-format lines ({CONDITIONAL_FORMAT_FORM}), chart lines ({CHART_FORM}), placeholders ({KEEP_FORM}) and the format lines of its cells."));
+            p.err(i, col, format!("a sheet holds only table blocks ({TABLE_FORM}), merge lines ({MERGE_FORM}), hyperlink lines ({HYPERLINK_FORM}), note lines ({NOTE_FORM}), validation lines ({VALIDATION_FORM}), conditional-format lines ({CONDITIONAL_FORMAT_FORM}), shape lines ({SHAPE_FORM}), group blocks ({GROUP_FORM}), chart lines ({CHART_FORM}), placeholders ({KEEP_FORM}) and the format lines of its cells."));
         }
         i += 1;
     }
@@ -1146,6 +1210,289 @@ fn note_tag(p: &mut Parser<'_>, i: usize, prev: &[String]) -> Option<NoteDecl> {
         author: author.to_string(),
         text: text.to_string(),
     })
+}
+
+fn shape_tag(p: &mut Parser<'_>, i: usize, n_shapes: &mut usize) -> Option<ShapeDecl> {
+    let line = &p.lines[i];
+    let lead = line.text.len() - line.text.trim_start().len();
+    let src = chars_of(line, lead);
+    let col = lead + 1;
+    let Some((tag, end)) = parse_tag(&src, 0) else {
+        p.err(
+            i,
+            col,
+            format!("this line is not a well-formed tag; it is {SHAPE_FORM}."),
+        );
+        return None;
+    };
+    if tag.name != "shape" || tag.closing {
+        p.err(i, col, format!("expected {SHAPE_FORM}."));
+        return None;
+    }
+    let mut attrs = vec![];
+    for (k, v, c) in &tag.attrs {
+        if !matches!(k.as_str(), "name" | "anchor") {
+            p.err(
+                i,
+                *c,
+                format!("<shape> has no attribute \"{k}\"; it is {SHAPE_FORM}."),
+            );
+            return None;
+        }
+        if attrs.iter().any(|(x, _): &(String, String)| x == k) {
+            p.err(i, *c, format!("\"{k}\" appears twice in <shape>."));
+            return None;
+        }
+        attrs.push((k.clone(), v.clone()));
+    }
+    let (Some(name), Some(raw)) = (get(&attrs, "name"), get(&attrs, "anchor")) else {
+        p.err(
+            i,
+            col,
+            format!("<shape> has a name and an anchor: {SHAPE_FORM}."),
+        );
+        return None;
+    };
+    if name.is_empty() {
+        p.err(i, col, format!("name is empty; a shape is {SHAPE_FORM}."));
+        return None;
+    }
+    if *n_shapes >= MAX_SHAPE_LINES {
+        p.err(
+            i,
+            col,
+            format!(
+                "this sheet already has {MAX_SHAPE_LINES} shapes; at most {MAX_SHAPE_LINES} are written as {SHAPE_FORM} lines (a sheet with more keeps them as a placeholder)."
+            ),
+        );
+        return None;
+    }
+    let anchor = match parse_sheet_range(raw) {
+        Ok(r) => r,
+        Err(m) => {
+            p.err(i, col, m.replace("range=", "anchor="));
+            return None;
+        }
+    };
+    let text = if tag.self_closing {
+        if src[end..].iter().any(|s| !s.2.is_whitespace()) {
+            p.err(
+                i,
+                src.get(end).map_or(col, |s| s.1),
+                format!("nothing follows the tag on its line; it is {SHAPE_FORM}."),
+            );
+            return None;
+        }
+        String::new()
+    } else {
+        let rest = &src[end..];
+        let mut k = 0;
+        let mut close = None;
+        while k < rest.len() {
+            if rest[k].2 == '<' {
+                match parse_tag(rest, k) {
+                    Some((ct, cend)) if ct.closing && ct.name == "shape" => {
+                        close = Some((k, cend, ct.col));
+                        break;
+                    }
+                    Some(_) => {
+                        p.err(
+                            i,
+                            rest[k].1,
+                            "shape text cannot hold a tag; write < as &lt;.",
+                        );
+                        return None;
+                    }
+                    None => {
+                        p.err(
+                            i,
+                            rest[k].1,
+                            format!("<shape> is not closed; it is {SHAPE_FORM}."),
+                        );
+                        return None;
+                    }
+                }
+            }
+            k += 1;
+        }
+        let Some((ck, cend, _)) = close else {
+            p.err(
+                i,
+                col,
+                format!("<shape> is not closed; it is {SHAPE_FORM}."),
+            );
+            return None;
+        };
+        if rest[cend..].iter().any(|s| !s.2.is_whitespace()) {
+            p.err(
+                i,
+                rest.get(cend).map_or(col, |s| s.1),
+                format!("nothing follows </shape> on its line; it is {SHAPE_FORM}."),
+            );
+            return None;
+        }
+        let raw: String = rest[..ck].iter().map(|s| s.2).collect();
+        decode_attr(&raw)
+    };
+    *n_shapes += 1;
+    Some(ShapeDecl {
+        name: name.to_string(),
+        anchor,
+        text,
+    })
+}
+
+fn group_open(p: &mut Parser<'_>, i: usize) -> Option<String> {
+    let attrs = tag_open(p, i, "group", GROUP_FORM, &["name"])?;
+    let Some(name) = get(&attrs, "name") else {
+        p.err(i, 1, format!("<group> has a name: {GROUP_FORM}."));
+        return None;
+    };
+    if name.is_empty() {
+        p.err(i, 1, format!("name is empty; a group is {GROUP_FORM}."));
+        return None;
+    }
+    Some(name.to_string())
+}
+
+/// `<name attr="…">` on its own line, not self-closing.
+fn tag_open(
+    p: &mut Parser<'_>,
+    i: usize,
+    name: &str,
+    form: &str,
+    allowed: &[&str],
+) -> Option<Vec<(String, String)>> {
+    let line = &p.lines[i];
+    let lead = line.text.len() - line.text.trim_start().len();
+    let src = chars_of(line, lead);
+    let col = lead + 1;
+    let Some((tag, end)) = parse_tag(&src, 0) else {
+        p.err(
+            i,
+            col,
+            format!("this line is not a well-formed tag; it is {form}."),
+        );
+        return None;
+    };
+    if tag.name != name || tag.closing {
+        p.err(i, col, format!("expected {form}."));
+        return None;
+    }
+    if tag.self_closing {
+        p.err(
+            i,
+            col,
+            format!("<{name}> is not closed by />; it is {form}."),
+        );
+        return None;
+    }
+    if src[end..].iter().any(|s| !s.2.is_whitespace()) {
+        p.err(
+            i,
+            src.get(end).map_or(col, |s| s.1),
+            format!("nothing follows the tag on its line; it is {form}."),
+        );
+        return None;
+    }
+    let mut out = vec![];
+    for (k, v, c) in &tag.attrs {
+        if !allowed.contains(&k.as_str()) {
+            p.err(
+                i,
+                *c,
+                format!("<{name}> has no attribute \"{k}\"; it is {form}."),
+            );
+            return None;
+        }
+        if out.iter().any(|(x, _): &(String, String)| x == k) {
+            p.err(i, *c, format!("\"{k}\" appears twice in <{name}>."));
+            return None;
+        }
+        out.push((k.clone(), v.clone()));
+    }
+    Some(out)
+}
+
+fn group_block(p: &mut Parser<'_>, i: usize, n_shapes: &mut usize) -> (Option<GroupDecl>, usize) {
+    let n = p.lines.len();
+    let Some(name) = group_open(p, i) else {
+        return (None, i + 1);
+    };
+    let mut items = vec![];
+    let mut j = i + 1;
+    let mut closed = false;
+    while j < n {
+        let t = p.lines[j].text.trim();
+        if t.is_empty() {
+            j += 1;
+            continue;
+        }
+        if t.starts_with("</group") {
+            let line = &p.lines[j];
+            let lead = line.text.len() - line.text.trim_start().len();
+            let src = chars_of(line, lead);
+            match parse_tag(&src, 0) {
+                Some((tag, end)) if tag.name == "group" && tag.closing && !tag.self_closing => {
+                    if src[end..].iter().any(|s| !s.2.is_whitespace()) {
+                        p.err(
+                            j,
+                            src.get(end).map_or(lead + 1, |s| s.1),
+                            format!(
+                                "nothing follows </group> on its line; a group is {GROUP_FORM}."
+                            ),
+                        );
+                    }
+                }
+                _ => p.err(
+                    j,
+                    lead + 1,
+                    format!("expected </group>; a group is {GROUP_FORM}."),
+                ),
+            }
+            j += 1;
+            closed = true;
+            break;
+        }
+        if t.starts_with("<group") {
+            let (g, next) = group_block(p, j, n_shapes);
+            if let Some(g) = g {
+                items.push(DrawingItem::Group(g));
+            }
+            j = next;
+            continue;
+        }
+        if t.starts_with("<shape") {
+            if let Some(s) = shape_tag(p, j, n_shapes) {
+                items.push(DrawingItem::Shape(s));
+            }
+            j += 1;
+            continue;
+        }
+        p.err(
+            j,
+            1,
+            format!("a group holds shape lines ({SHAPE_FORM}) and nested groups ({GROUP_FORM})."),
+        );
+        j += 1;
+    }
+    if !closed {
+        p.err(
+            i,
+            1,
+            format!("group \"{name}\" is not closed by a line </group>."),
+        );
+        return (None, j);
+    }
+    if items.is_empty() {
+        p.err(
+            i,
+            1,
+            format!("group \"{name}\" is empty; a group is {GROUP_FORM}."),
+        );
+        return (None, j);
+    }
+    (Some(GroupDecl { name, items }), j)
 }
 
 fn opt_attr(attrs: &[(String, String)], k: &str) -> Option<String> {
@@ -1845,6 +2192,21 @@ pub fn serialize_spreadsheet(s: &Spreadsheet) -> String {
                         }
                     }
                 }
+                SheetItem::Shape(_) | SheetItem::Group(_) => {
+                    while i < sh.items.len() {
+                        match &sh.items[i] {
+                            SheetItem::Shape(s) => {
+                                out.push(shape_line(s));
+                                i += 1;
+                            }
+                            SheetItem::Group(g) => {
+                                out.extend(group_lines(g));
+                                i += 1;
+                            }
+                            _ => break,
+                        }
+                    }
+                }
                 SheetItem::Table(t) => {
                     out.extend(table_lines(t));
                     i += 1;
@@ -1915,6 +2277,38 @@ pub fn chart_line(c: &ChartDecl) -> String {
 
 pub fn merge_line(m: &MergeDecl) -> String {
     format!("<merge range=\"{}\"/>", attr(&m.range))
+}
+
+pub fn shape_line(s: &ShapeDecl) -> String {
+    let open = format!(
+        "<shape name=\"{}\" anchor=\"{}\"",
+        attr(&s.name),
+        attr(&s.anchor)
+    );
+    if s.text.is_empty() {
+        format!("{open}/>")
+    } else {
+        format!("{open}>{}</shape>", shape_body(&s.text))
+    }
+}
+
+pub fn group_lines(g: &GroupDecl) -> Vec<String> {
+    let mut out = vec![format!("<group name=\"{}\">", attr(&g.name))];
+    for it in &g.items {
+        match it {
+            DrawingItem::Shape(s) => out.push(shape_line(s)),
+            DrawingItem::Group(inner) => out.extend(group_lines(inner)),
+        }
+    }
+    out.push("</group>".into());
+    out
+}
+
+fn shape_body(s: &str) -> String {
+    attr(s)
+        .replace('>', "&gt;")
+        .replace('\n', "&#10;")
+        .replace('\r', "&#13;")
 }
 
 pub fn hyperlink_line(h: &HyperlinkDecl) -> String {
@@ -2297,6 +2691,86 @@ mod tests {
         assert_eq!(h.location.as_deref(), Some("Sheet2!A1"));
         assert!(h.target.is_none());
         assert_eq!(serialize_spreadsheet(&s), loc);
+    }
+
+    #[test]
+    fn shape_and_group_lines_round_trip() {
+        let with = TEXT.replace(
+            "<merge range=\"G1:H1\"/>",
+            "<shape name=\"입력 안내\" anchor=\"B25:D27\">아래에 입력하면 표가 늘어납니다.</shape>\n<shape name=\"빈\" anchor=\"A1\"/>\n<group name=\"신호등\">\n<shape name=\"매출 배지\" anchor=\"F2:G3\">매출 +12%</shape>\n<shape name=\"이익 배지\" anchor=\"F4:G5\">이익 +8%</shape>\n</group>",
+        );
+        let s = parse_spreadsheet(&with, &Names::default()).unwrap();
+        let items: Vec<_> = s.sheets[0]
+            .items
+            .iter()
+            .filter_map(|i| match i {
+                SheetItem::Shape(sh) => {
+                    Some(format!("shape {} {} {:?}", sh.name, sh.anchor, sh.text))
+                }
+                SheetItem::Group(g) => Some(format!("group {} {}", g.name, g.items.len())),
+                _ => None,
+            })
+            .collect();
+        assert_eq!(
+            items,
+            [
+                "shape 입력 안내 B25:D27 \"아래에 입력하면 표가 늘어납니다.\"",
+                "shape 빈 A1 \"\"",
+                "group 신호등 2",
+            ]
+        );
+        let DrawingItem::Shape(inner) = &s.sheets[0]
+            .items
+            .iter()
+            .find_map(|i| match i {
+                SheetItem::Group(g) => Some(&g.items[0]),
+                _ => None,
+            })
+            .unwrap()
+        else {
+            panic!("grouped shape");
+        };
+        assert_eq!(inner.name, "매출 배지");
+        assert_eq!(inner.anchor, "F2:G3");
+        let nl = TEXT.replace(
+            "<merge range=\"G1:H1\"/>",
+            "<shape name=\"Tip\" anchor=\"B2\">line1&#10;line2</shape>",
+        );
+        let s = parse_spreadsheet(&nl, &Names::default()).unwrap();
+        let t = s.sheets[0]
+            .items
+            .iter()
+            .find_map(|i| match i {
+                SheetItem::Shape(sh) => Some(sh.text.as_str()),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(t, "line1\nline2");
+        assert_eq!(serialize_spreadsheet(&s), nl);
+        let canon = serialize_spreadsheet(&parse_spreadsheet(&with, &Names::default()).unwrap());
+        assert_eq!(canon, with);
+    }
+
+    #[test]
+    fn shape_and_group_errors() {
+        let e = errs(&TEXT.replace("<merge range=\"G1:H1\"/>", "<shape anchor=\"B2\"/>"));
+        assert!(e[0].contains("name and an anchor"), "{e:?}");
+        let e = errs(&TEXT.replace(
+            "<merge range=\"G1:H1\"/>",
+            "<shape name=\"Tip\" anchor=\"not-a-range\"/>",
+        ));
+        assert!(e[0].contains("anchor="), "{e:?}");
+        let e = errs(&TEXT.replace(
+            "<merge range=\"G1:H1\"/>",
+            "<shape name=\"Tip\" anchor=\"B2\" fill=\"red\"/>",
+        ));
+        assert!(e[0].contains("no attribute \"fill\""), "{e:?}");
+        let e = errs(&TEXT.replace("<merge range=\"G1:H1\"/>", "<group name=\"g\">\n</group>"));
+        assert!(e[0].contains("empty"), "{e:?}");
+        let e = errs(&TEXT.replace("<merge range=\"G1:H1\"/>", "<group name=\"g\">"));
+        assert!(e[0].contains("not closed"), "{e:?}");
+        let e = errs(&TEXT.replace("<merge range=\"G1:H1\"/>", "</group>"));
+        assert!(e[0].contains("closes no group"), "{e:?}");
     }
 
     #[test]

@@ -247,7 +247,8 @@ fn apply_structure_lines(
     apply_hyperlinks(book, parsed, next_id)?;
     apply_notes(book, parsed)?;
     apply_validations(book, parsed, next_id)?;
-    apply_conditional_formats(book, parsed, next_id)
+    apply_conditional_formats(book, parsed, next_id)?;
+    apply_drawings(book, parsed)
 }
 
 /// Apply the `<merge range/>` lines of `parsed` to each sheet. A sheet that
@@ -1195,6 +1196,20 @@ fn write_data_bar(
     } else {
         let color = crate::format::color_el(&format!("{prefix}color"), fill)?;
         bar.children.push(Node::El(color));
+    }
+    Ok(())
+}
+
+fn apply_drawings(
+    book: &mut Book,
+    parsed: &hanji_format::sheet::Spreadsheet,
+) -> Result<(), String> {
+    for (i, ns) in parsed.sheets.iter().enumerate() {
+        if book.sheets.get(i).is_none_or(|s| s.kind != SheetKind::Work) {
+            continue;
+        }
+        let wanted = structure::drawing_items(&ns.items);
+        crate::shapes::apply(book, i, &wanted)?;
     }
     Ok(())
 }

@@ -9,9 +9,9 @@ use hanji_core::cells::{parse_sqref, CellRange, CellRef};
 use hanji_core::{Entry, KeepIds, Kind, Meta};
 use hanji_format::cellfmt::{self, CellFormat, FormatLine};
 use hanji_format::sheet::{
-    format_kind, Cfvo, ColumnDecl, CondFormatDecl, FormatKind, HyperlinkDecl, MergeDecl, SheetDecl,
-    SheetItem, Spreadsheet, TableDecl, ValidationDecl, MAX_CONDITIONAL_FORMAT_LINES,
-    MAX_HYPERLINK_LINES, MAX_MERGE_LINES, MAX_VALIDATION_LINES,
+    format_kind, Cfvo, ColumnDecl, CondFormatDecl, DrawingItem, FormatKind, HyperlinkDecl,
+    MergeDecl, SheetDecl, SheetItem, Spreadsheet, TableDecl, ValidationDecl,
+    MAX_CONDITIONAL_FORMAT_LINES, MAX_HYPERLINK_LINES, MAX_MERGE_LINES, MAX_VALIDATION_LINES,
 };
 use hanji_format::vocab::Color;
 use hanji_format::{formula, FrontMatter, Keep};
@@ -20,7 +20,7 @@ use hanji_package::xml::{self, Element, Node};
 
 use crate::book::{Book, SheetKind, TableInfo, ValueKind};
 use crate::store::SHEET_ORDER;
-use crate::{drawing, notes};
+use crate::{drawing, notes, shapes};
 
 /// The worksheet children that become range entries: (container, child, anchor attribute).
 pub const RANGE_ELEMENTS: &[(Option<&str>, &str, &str)] = &[
@@ -1022,6 +1022,17 @@ pub fn structure(book: &mut Book, template: Option<&str>) -> Result<Spreadsheet,
                     cs.into_iter()
                         .map(|c| SheetItem::ConditionalFormat(Box::new(c))),
                 );
+            }
+            for line in shapes::lines(book, i) {
+                match line {
+                    shapes::DrawingLine::Item(DrawingItem::Shape(s)) => {
+                        items.push(SheetItem::Shape(s));
+                    }
+                    shapes::DrawingLine::Item(DrawingItem::Group(g)) => {
+                        items.push(SheetItem::Group(g));
+                    }
+                    shapes::DrawingLine::Keep(_) => {}
+                }
             }
         }
         items.extend(

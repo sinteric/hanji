@@ -225,6 +225,14 @@ pub fn full_view(book: &mut Book, rows: u32) -> Result<String, String> {
                         }
                     }
                 }
+                hanji_format::sheet::SheetItem::Shape(s) => {
+                    out.push(hanji_format::sheet::shape_line(s));
+                    push_drawing_items(&mut out, &mut items);
+                }
+                hanji_format::sheet::SheetItem::Group(g) => {
+                    out.extend(hanji_format::sheet::group_lines(g));
+                    push_drawing_items(&mut out, &mut items);
+                }
                 hanji_format::sheet::SheetItem::Keep(k) => out.push(format!(
                     "<keep id=\"{}\" kind=\"{}\" summary=\"{}\"/>",
                     k.id,
@@ -263,4 +271,21 @@ pub fn full_view(book: &mut Book, rows: u32) -> Result<String, String> {
         out.push(String::new());
     }
     Ok(out.join("\n"))
+}
+
+fn push_drawing_items<'a, I>(out: &mut Vec<String>, items: &mut std::iter::Peekable<I>)
+where
+    I: Iterator<Item = &'a hanji_format::sheet::SheetItem>,
+{
+    use hanji_format::sheet::SheetItem;
+    while matches!(
+        items.peek(),
+        Some(SheetItem::Shape(_) | SheetItem::Group(_))
+    ) {
+        match items.next() {
+            Some(SheetItem::Shape(s)) => out.push(hanji_format::sheet::shape_line(s)),
+            Some(SheetItem::Group(g)) => out.extend(hanji_format::sheet::group_lines(g)),
+            _ => break,
+        }
+    }
 }

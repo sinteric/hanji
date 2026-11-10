@@ -50,9 +50,11 @@ fn the_design_md_example_parses() {
             SheetItem::Note(n) => format!("note {}", n.range),
             SheetItem::Validation(v) => format!("validation {}", v.range),
             SheetItem::ConditionalFormat(c) => format!("conditional-format {}", c.range),
+            SheetItem::Shape(s) => format!("shape {} {}", s.name, s.anchor),
+            SheetItem::Group(g) => format!("group {}", g.name),
             SheetItem::Chart(c) => format!("chart {}", c.ty),
             SheetItem::Keep(k) => format!("keep {}", k.kind),
-            _ => unreachable!(),
+            _ => format!("{i:?}"),
         })
         .collect();
     assert_eq!(
@@ -66,6 +68,8 @@ fn the_design_md_example_parses() {
             "validation B2:B1201",
             "conditional-format F4:F48",
             "conditional-format E4:E15",
+            "shape 입력 안내 B25:D27",
+            "group 신호등",
         ]
     );
 }
