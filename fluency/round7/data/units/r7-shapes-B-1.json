@@ -1,0 +1,52 @@
+{
+ "unit_id": "r7-shapes-B-1",
+ "decision": "shapes",
+ "candidate": "B",
+ "replicate": 1,
+ "names": {},
+ "fm": {
+  "type": "spreadsheet",
+  "format": "xlsx",
+  "schema": "1"
+ },
+ "seed": "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"월별수지\" range=\"A1:G30\">\n\n<table name=\"수지\" range=\"A1:D20\">\n| column | type | format | formula |\n|---|---|---|---|\n| 월 | date | yyyy-mm |  |\n| 수입 | number | #,##0 |  |\n| 지출 | number | #,##0 |  |\n| 잔액 | number | #,##0 | =[@수입]-[@지출] |\n</table>\n\n<merge range=\"A1:D1\"/>\n\n<note range=\"C3\" author=\"작성자\" text=\"지출은 카드 승인 기준입니다.\"/>\n\n<hyperlink range=\"G2\" target=\"https://example.com/budget\"/>\n\n<validation range=\"B2:B20\" type=\"list\" formula1=\"&quot;급여,부수입,환급&quot;\"/>\n\n<conditional-format range=\"D2:D20\" type=\"cellIs\" operator=\"lessThan\" formula=\"0\" dxf=\"fill=#FFC7CE\"/>\n\n<chart type=\"column\" data=\"수지[월],수지[잔액]\" title=\"월별 잔액\"/>\n\n<shape name=\"입력 안내\" anchor=\"B25:D27\" text=\"아래에 입력하면 표가 늘어납니다. 마지막 행에서 Enter.\"/>\n\n<shape name=\"매출 배지\" anchor=\"F2:G3\" text=\"매출 +12%\" group=\"신호등\"/>\n<shape name=\"이익 배지\" anchor=\"F4:G5\" text=\"이익 +8%\" group=\"신호등\"/>\n\n<keep id=\"k1\" kind=\"picture\" summary=\"로고\"/>\n\n</sheet>\n",
+ "tasks": [
+  {
+   "task_id": "kpi1-q1",
+   "kind": "read",
+   "text": "What is the anchor of the shape 입력 안내, and which two shape names are in the group 신호등? Answer as `ANSWER: <anchor> | <name>, <name>` in the order they are written.",
+   "expect": "ANSWER: B25:D27 | 매출 배지, 이익 배지"
+  },
+  {
+   "task_id": "kpi1-w",
+   "kind": "write",
+   "text": "Write a new workbook with exactly one sheet 메모, range A1:D8, containing: a table 메모표 on A1:B4 with columns 항목 (text) and 값 (text); a shape named 오늘, anchor C2:D3, text \"오늘은 마감일입니다.\"; a group named 뱃지 of two shapes, 통과 at C5:D6 text \"통과\" and 보류 at C7:D8 text \"보류\". No other items. Use the front matter of a spreadsheet (type spreadsheet, format xlsx, schema 1)."
+  },
+  {
+   "task_id": "kpi1-e1",
+   "kind": "edit",
+   "text": "Add a shape named 환급 안내, anchored B28:D29, with text \"환급은 다음 달 수입에 넣습니다.\" Leave the 입력 안내 shape where it is."
+  },
+  {
+   "task_id": "kpi1-e2",
+   "kind": "edit",
+   "text": "Move the 입력 안내 shape so its anchor is B28:D30. Do not change its text. Do not move the 신호등 group."
+  },
+  {
+   "task_id": "kpi1-e3",
+   "kind": "edit",
+   "text": "Change the text of 매출 배지 to \"매출 +15%\". Do not edit 이익 배지, and do not change any cell note."
+  },
+  {
+   "task_id": "kpi1-e4",
+   "kind": "edit",
+   "text": "Resize 이익 배지 so its anchor is F4:H6. Keep its text and keep it in the 신호등 group."
+  },
+  {
+   "task_id": "kpi1-r",
+   "kind": "refuse",
+   "text": "Add a picture from files/org.png as a drawing over H2:J10, and rotate the 입력 안내 shape 15 degrees."
+  }
+ ],
+ "unreachable": []
+}

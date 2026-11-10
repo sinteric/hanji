@@ -1501,6 +1501,17 @@ F1, effective formatting inline; F2o, only what the object sets itself.
 - Limits: formatting read, written and checked by the kit, not the engines
   or Office; no large docx; one run per prompt; part D at the ceiling.
 
+**Round 7 kit (2026-11-10)** — kit in [fluency/round7/](fluency/round7/),
+candidates in [fluency/round7/CANDIDATES.md](fluency/round7/CANDIDATES.md).
+It decides three keep-reducing syntaxes the owner approved adding, each by
+a fluency test first: docx inline page and column breaks inside a paragraph
+(today `keep kind="break"`; block `<pagebreak/>` and `<br/>` stay as they
+are); xlsx drawing shapes and groups as sheet lines (today `shape`/`group`
+keeps); xlsx `<conditional-format>` dataBar rules (today a keep). Subjects:
+Sonnet 5.5, Haiku 5.5, Sonnet 4.6. Results to be filled in
+[fluency/round7/RESULTS.md](fluency/round7/RESULTS.md); no engine syntax
+until the test decides.
+
 ## 7. Engines (surveyed 2026-09-28)
 
 Engines work only at import, export and preview. Every engine is behind this
@@ -1963,6 +1974,15 @@ side.
     values so either can be chosen. Open too: page setup, headers and footers
     do not cross (neither engine writes section properties from the text), and
     the report says so.
+12. **Inline page/column breaks, xlsx shapes/groups, and dataBar conditional
+    formats (proposed, 2026-11-10)** — the owner approved adding these three
+    to reduce `<keep/>`, each decided by §6 round 7. Today they stay
+    placeholders: docx `break` (tdf154481.docx, tdf124637_sectionMargin.docx);
+    xlsx `shape`/`group` (simple-monthly-budget.xlsx, WithDrawing.xlsx,
+    ExcelWithAttachments.xlsm); xlsx `conditional-format` of type dataBar
+    (simple-monthly-budget.xlsx E4). The kit is
+    [fluency/round7/](fluency/round7/). No engine syntax until the test
+    decides.
 
 ## 11. Blind spots
 
