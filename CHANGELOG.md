@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- Show a DOCX page or column break inside a paragraph (`w:br type=page` /
+  `type=column`) as `<pagebreak/>` / `<columnbreak/>` at that point instead
+  of a `<keep kind="break"/>` placeholder. A line holding only
+  `<pagebreak/>` is still a page break between paragraphs; `<br/>` is only
+  a line break. Export writes `w:br w:type="page"` / `w:type="column"` in
+  the run; an unedited paragraph stays byte-identical. A `w:br` with
+  `w:clear` or another type, and `w:lastRenderedPageBreak`, stay as they
+  were. hwpx and pptx do not grow an equivalent. Corpus keeps: 206 → 204
+  (docx `break` 2 → 0).
 - Show an HWPX drawing whose `hp:drawText` is ordinary text in one or more
   paragraphs as that text instead of a `<keep kind="drawing"/>` placeholder.
   Several paragraphs join with `<br/>`; a shown footnote or endnote inside

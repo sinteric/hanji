@@ -691,9 +691,6 @@ impl<'a> Importer<'a> {
                     row.push(Cell::Up);
                     brow.push(Props::new());
                 } else {
-                    if !paras.iter().all(|p| cell_writable(&p.content)) {
-                        return Ok(None);
-                    }
                     row.push(Cell::Text(paras));
                     brow.push(
                         tcpr.map(format::tcpr_props)
@@ -732,8 +729,7 @@ impl<'a> Importer<'a> {
         let sid = ppr
             .and_then(|x| x.child("w:pStyle"))
             .and_then(|s| s.get("w:val"));
-        let default_id = self.styles.default_paragraph_id().to_string();
-        let sid = sid.unwrap_or_else(|| default_id.clone());
+        let sid = sid.unwrap_or_else(|| self.styles.default_paragraph_id().to_string());
         let style = match self.styles.paragraph_name(&sid) {
             Some(n) => n.to_string(),
             None => {
@@ -784,8 +780,7 @@ impl<'a> Importer<'a> {
             .diff(&base);
         self.text_base = base.only(&Key::TEXT);
         self.buf.clear();
-        let page_break_only = sid == default_id && is_page_break_para(p);
-        self.walk_para(p, path, page_break_only, span)?;
+        self.walk_para(p, path, span)?;
         self.inherited.truncate(saved);
         let mut content = Inline {
             units: std::mem::take(&mut self.buf),
@@ -864,8 +859,8 @@ impl<'a> Importer<'a> {
         self.buf.len()
     }
 
-    fn walk(&mut self, container: &Element, path: &[usize], pb: bool) -> Result<(), String> {
-        self.walk_kids(&content_kids(container)?, path, pb)
+    fn walk(&mut self, container: &Element, path: &[usize]) -> Result<(), String> {
+        self.walk_kids(&content_kids(container)?, path)
     }
 
     /// A paragraph: its children, with a spanning field's begin and/or end
@@ -874,7 +869,6 @@ impl<'a> Importer<'a> {
         &mut self,
         p: &Element,
         path: &[usize],
-        pb: bool,
         span: Option<ParaSpan>,
     ) -> Result<(), String> {
         let kids = content_kids(p)?;
@@ -882,24 +876,24 @@ impl<'a> Importer<'a> {
         if let Some(sp) = span {
             if let (Some(end), Some((begin, _))) = (sp.close, sp.open) {
                 if begin < end {
-                    return self.walk_kids(&kids, path, pb);
+                    return self.walk_kids(&kids, path);
                 }
             }
             if let Some(end) = sp.close {
-                self.walk_kids(&kids[i..end], path, pb)?;
+                self.walk_kids(&kids[i..end], path)?;
                 i = self.close_spanning(&kids, end, path)? + 1;
             }
             if let Some((begin, sep)) = sp.open {
-                self.walk_kids(&kids[i..begin], path, pb)?;
+                self.walk_kids(&kids[i..begin], path)?;
                 self.open_spanning(&kids, begin, sep, path)?;
                 i = sep + 1;
             }
         }
-        self.walk_kids(&kids[i..], path, pb)
+        self.walk_kids(&kids[i..], path)
     }
 
     /// [`Importer::walk`] over a paragraph's or wrapper's children.
-    fn walk_kids(&mut self, kids: &[&Element], path: &[usize], pb: bool) -> Result<(), String> {
+    fn walk_kids(&mut self, kids: &[&Element], path: &[usize]) -> Result<(), String> {
         let groups = field_groups(kids);
         let mut i = 0;
         while i < kids.len() {
@@ -907,7 +901,7 @@ impl<'a> Importer<'a> {
             if let Some(&end) = groups.get(&i) {
                 if let Some(sep) = shown_field(kids, i, end) {
                     let close = field_close(kids, i, end);
-                    self.field(kids, (i, sep, end), close, path, pb)?;
+                    self.field(kids, (i, sep, end), close, path)?;
                     i = close + 1;
                     continue;
                 }
@@ -934,7 +928,7 @@ impl<'a> Importer<'a> {
                 continue;
             }
             if name == "w:r" {
-                self.run(k, path, pb)?;
+                self.run(k, path)?;
             } else if crate::drawing::shown(k).is_some() {
                 self.txbx(k, path, None, Marks::NONE)?;
             } else if name == "w:sdt" && sdt_shown(k) && !sdt_content_is_block(k) {
@@ -951,7 +945,7 @@ impl<'a> Importer<'a> {
                 let saved = self.inherited.len();
                 self.inherit(k);
                 if let Some(c) = k.child("w:sdtContent") {
-                    self.walk(c, path, pb)?;
+                    self.walk(c, path)?;
                 }
                 self.inherited.truncate(saved);
                 let end = self.pos();
@@ -981,7 +975,7 @@ impl<'a> Importer<'a> {
                 let idx = self.entry(Kind::Wrap, vec![x], f, path, Some(at), None, meta);
                 let saved = self.inherited.len();
                 self.inherit(k);
-                self.walk(k, path, pb)?;
+                self.walk(k, path)?;
                 self.inherited.truncate(saved);
                 let end = self.pos();
                 let close = self.seq();
@@ -1212,7 +1206,6 @@ impl<'a> Importer<'a> {
         (begin, sep, end): (usize, usize, usize),
         close_at: usize,
         path: &[usize],
-        pb: bool,
     ) -> Result<(), String> {
         let open: Vec<&Element> = kids[begin..=sep].to_vec();
         let tail: Vec<&Element> = if close_at > end {
@@ -1235,7 +1228,7 @@ impl<'a> Importer<'a> {
         let xml = open.iter().map(|e| self.frag(e)).collect();
         let at = self.pos();
         let idx = self.entry(Kind::Wrap, xml, f, path, Some(at), None, meta);
-        self.walk_kids(&kids[sep + 1..end], path, pb)?;
+        self.walk_kids(&kids[sep + 1..end], path)?;
         let end = self.pos();
         let close = self.seq();
         let e = &mut self.entries[idx];
@@ -1305,7 +1298,7 @@ impl<'a> Importer<'a> {
         Ok(close_at)
     }
 
-    fn run(&mut self, r: &Element, path: &[usize], pb: bool) -> Result<(), String> {
+    fn run(&mut self, r: &Element, path: &[usize]) -> Result<(), String> {
         let rpr = r.child("w:rPr");
         let flag = |n: &str| rpr.and_then(|x| x.child(n));
         let marks = Marks::NONE
@@ -1374,9 +1367,7 @@ impl<'a> Importer<'a> {
                 "w:br" if c.attrs.is_empty() && c.children.is_empty() => {
                     self.push(Atom::Break, marks)
                 }
-                "w:br" if pb && c.children.is_empty() && is_page_br(c) => {
-                    self.push(Atom::PageBreak, marks)
-                }
+                "w:br" if let Some(atom) = typed_br(c) => self.push(atom, marks),
                 n if RUN_MARKERS.contains(&n) => {
                     let (x, f) = (self.frag(c), self.fp(&[Some(c)]));
                     let at = self.pos();
@@ -1523,35 +1514,16 @@ fn text_modellable(t: &Element) -> bool {
     !t.text_of(&["w:t"]).chars().any(|c| (c as u32) < 0x20) && t.elements().next().is_none()
 }
 
-fn is_page_br(c: &Element) -> bool {
-    c.attrs.len() == 1 && c.get("w:type").as_deref() == Some("page")
-}
-
-/// A default-style paragraph holding only a page break: `<pagebreak/>`.
-fn is_page_break_para(p: &Element) -> bool {
-    let mut brs = 0;
-    for n in &p.children {
-        let e = match n {
-            Node::El(e) => e,
-            n if is_blank(n) => continue,
-            _ => return false,
-        };
-        if e.is("w:pPr") || MARKERS.contains(&e.name.as_str()) {
-            continue;
-        }
-        if !e.is("w:r") {
-            return false;
-        }
-        for c in e.elements() {
-            match c.name.as_str() {
-                "w:rPr" => {}
-                "w:br" if is_page_br(c) && c.children.is_empty() => brs += 1,
-                n if RUN_MARKERS.contains(&n) => {}
-                _ => return false,
-            }
-        }
+/// A `w:br` the text models: `type=page` or `type=column`, and nothing else.
+fn typed_br(c: &Element) -> Option<Atom> {
+    if !c.children.is_empty() || c.attrs.len() != 1 {
+        return None;
     }
-    brs == 1
+    match c.get("w:type").as_deref() {
+        Some("page") => Some(Atom::PageBreak),
+        Some("column") => Some(Atom::ColumnBreak),
+        _ => None,
+    }
 }
 
 /// A covered cell's paragraph: no text and nothing shown as a placeholder.
@@ -1573,11 +1545,6 @@ fn para_is_blank(p: &Element) -> bool {
         }
     }
     ok
-}
-
-/// Text a pipe table cell can hold as it is.
-fn cell_writable(i: &Inline) -> bool {
-    !i.units.iter().any(|u| matches!(u.atom, Atom::PageBreak))
 }
 
 /// A spanning field's begin and/or end in one paragraph of the range.

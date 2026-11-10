@@ -189,7 +189,7 @@ fn fm_form(doc_type: &str) -> String {
 const P_FORM: &str =
     "<p/> and <p style=\"Name\"/> are single tags that start a paragraph: no </p>, and no attribute but style.";
 const INLINE_TAGS: &str =
-    "<u>…</u>, <br/>, <math>…</math>, <comment>…</comment>, <ins>…</ins>, <del>…</del>, <field name=\"…\">…</field>, <keep id=\"…\" kind=\"…\" summary=\"…\"/>, and <p/> in a table cell";
+    "<u>…</u>, <br/>, <pagebreak/>, <columnbreak/>, <math>…</math>, <comment>…</comment>, <ins>…</ins>, <del>…</del>, <field name=\"…\">…</field>, <keep id=\"…\" kind=\"…\" summary=\"…\"/>, and <p/> in a table cell";
 
 impl<'a> Parser<'a> {
     pub(crate) fn new(text: &'a str, names: &'a Names) -> Parser<'a> {
@@ -1628,6 +1628,24 @@ impl<'a> Parser<'a> {
                             }
                             st.push(off, Atom::Break);
                         }
+                        ("pagebreak", false) => {
+                            if !tag.attrs.is_empty() {
+                                fail!(x, "<pagebreak/> takes no attributes.");
+                            }
+                            st.push(off, Atom::PageBreak);
+                        }
+                        ("pagebreak", true) => {
+                            fail!(x, "a page break is <pagebreak/>, a single tag; there is no </pagebreak>.")
+                        }
+                        ("columnbreak", false) => {
+                            if !tag.attrs.is_empty() {
+                                fail!(x, "<columnbreak/> takes no attributes.");
+                            }
+                            st.push(off, Atom::ColumnBreak);
+                        }
+                        ("columnbreak", true) => {
+                            fail!(x, "a column break is <columnbreak/>, a single tag; there is no </columnbreak>.")
+                        }
                         ("u", false) if !tag.self_closing => {
                             if st.marks.has(Marks::UNDERLINE) {
                                 fail!(x, "<u> inside <u>: underline is already open here.");
@@ -1676,7 +1694,6 @@ impl<'a> Parser<'a> {
                         ("p", false) if tag.self_closing => fail!(x, "<p/> inside a line starts a paragraph only in a table cell; elsewhere a paragraph is its own line, and an empty paragraph is a line holding only <p/>."),
                         ("p", _) => fail!(x, "{P_FORM}"),
                         ("div", _) => fail!(x, "a <div> is a whole line, <div style=\"Name\">text</div>, and cannot contain another <div>."),
-                        ("pagebreak", _) => fail!(x, "a page break is its own line: write <pagebreak/> alone on a line."),
                         ("table", _) => fail!(x, "a table style is a line {{style=\"Name\"}} directly before the header row; there is no <table> tag."),
                         (name, _) => fail!(x, "<{name}> is not a tag of this format. Inline tags are {INLINE_TAGS}; write \\< for a literal <."),
                     }

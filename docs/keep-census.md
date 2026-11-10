@@ -39,11 +39,11 @@ date.
 
 | format | files | failed | with keeps | keeps |
 | ------ | ----: | -----: | ---------: | ----: |
-| docx   |    13 |      0 |         11 |   119 |
+| docx   |    13 |      0 |         10 |   117 |
 | hwpx   |    16 |      0 |          8 |    22 |
 | pptx   |    27 |      0 |         16 |    40 |
 | xlsx   |    46 |      0 |         12 |    25 |
-| all    |   102 |      0 |         47 |   206 |
+| all    |   102 |      0 |         46 |   204 |
 
 ## By kind, most first
 
@@ -66,7 +66,6 @@ date.
 | xlsx   | shape              |     5 |     3 |
 | docx   | table              |     3 |     2 |
 | hwpx   | text               |     3 |     1 |
-| docx   | break              |     2 |     2 |
 | docx   | math               |     2 |     2 |
 | docx   | tracked-move       |     2 |     1 |
 | xlsx   | pivot-table        |     2 |     1 |
@@ -89,8 +88,8 @@ date.
 | `prototype/remainder/corpus/korean-report.docx`                      | docx   |     1 | drawing 1 |
 | `prototype/remainder/corpus/loadAndSave.docx`                        | docx   |     3 | drawing 2, math 1 |
 | `prototype/remainder/corpus/sample-docx.docx`                        | docx   |     3 | drawing 3 |
-| `prototype/remainder/corpus/tdf124637_sectionMargin.docx`            | docx   |     1 | break 1 |
-| `prototype/remainder/corpus/tdf154481.docx`                          | docx   |     4 | break 1, drawing 1, field 2 |
+| `prototype/remainder/corpus/tdf124637_sectionMargin.docx`            | docx   |     0 | |
+| `prototype/remainder/corpus/tdf154481.docx`                          | docx   |     3 | drawing 1, field 2 |
 | `prototype/remainder/corpus/testWORD_2006ml.docx`                    | docx   |    16 | content-control 4, drawing 3, field 2, math 1, object 3, table 1, tracked-move 2 |
 | `prototype/remainder/corpus/testWORD_various.docx`                   | docx   |     0 | |
 | `crates/hanji-hwpx/corpus/basic-table-01.hwpx`                       | hwpx   |     0 | |

@@ -665,9 +665,12 @@ pub enum Atom {
     Ins(String),
     /// `<del>…</del>`: a DOCX tracked deletion's text (DESIGN.md §5.1).
     Del(String),
-    /// Only as the whole content of a resolved page-break paragraph; the
-    /// text form is the block line `<pagebreak/>`.
+    /// `<pagebreak/>`: a page break at this point. As the whole content of a
+    /// default-style paragraph it is the block line `<pagebreak/>`.
     PageBreak,
+    /// `<columnbreak/>`: a column break at this point. A line holding only
+    /// this tag is a paragraph whose only content is a column break.
+    ColumnBreak,
 }
 
 impl Atom {
@@ -877,7 +880,9 @@ impl Inline {
             for m in Marks::ALL {
                 let unstated = |i: usize| !self.units[i].marks.has(m);
                 for (i, x) in out.iter_mut().enumerate().take(b).skip(a) {
-                    if self.units[i].atom == Atom::PageBreak && unstated(i) {
+                    if matches!(self.units[i].atom, Atom::PageBreak | Atom::ColumnBreak)
+                        && unstated(i)
+                    {
                         *x = x.with(m, fallback(i).has(m));
                     }
                 }
