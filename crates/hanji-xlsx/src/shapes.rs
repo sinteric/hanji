@@ -111,20 +111,7 @@ pub fn apply(book: &mut Book, i: usize, wanted: &[DrawingItem]) -> Result<(), St
         unused[k.0] = false;
         placed[wi] = Some(k.0);
     }
-    let leftover: Vec<usize> = unused
-        .iter()
-        .enumerate()
-        .filter(|(_, u)| **u)
-        .map(|(k, _)| k)
-        .collect();
-    let mut leftover = leftover.into_iter();
-    for slot in &mut placed {
-        if slot.is_none() {
-            if let Some(k) = leftover.next() {
-                *slot = Some(k);
-            }
-        }
-    }
+    place_leftovers(&orig, &unused, wanted, &mut placed);
     let mut next_id = max_cnv_id(&d.root);
     for id in orig.iter().map(|(e, _)| max_cnv_id(e)) {
         next_id = next_id.max(id);
@@ -358,6 +345,43 @@ fn take_modelled_anchors(root: &mut Element) -> Vec<(Element, DrawingItem)> {
     }
     root.children = kept;
     orig
+}
+
+/// Reuse leftover originals only when the wanted item is the same kind
+/// (shape with shape, group with group). A kind mismatch is a new object,
+/// so a deleted group is not patched into a new shape (or the reverse).
+fn place_leftovers(
+    orig: &[(Element, DrawingItem)],
+    unused: &[bool],
+    wanted: &[DrawingItem],
+    placed: &mut [Option<usize>],
+) {
+    let mut leftover: Vec<usize> = unused
+        .iter()
+        .enumerate()
+        .filter(|(_, u)| **u)
+        .map(|(k, _)| k)
+        .collect();
+    for (i, slot) in placed.iter_mut().enumerate() {
+        if slot.is_some() {
+            continue;
+        }
+        let Some(pos) = leftover
+            .iter()
+            .position(|&k| same_kind(&orig[k].1, &wanted[i]))
+        else {
+            continue;
+        };
+        *slot = Some(leftover.remove(pos));
+    }
+}
+
+fn same_kind(a: &DrawingItem, b: &DrawingItem) -> bool {
+    matches!(
+        (a, b),
+        (DrawingItem::Shape(_), DrawingItem::Shape(_))
+            | (DrawingItem::Group(_), DrawingItem::Group(_))
+    )
 }
 
 fn max_cnv_id(e: &Element) -> u32 {
@@ -635,20 +659,7 @@ fn reconcile_group(
         unused[k.0] = false;
         placed[wi] = Some(k.0);
     }
-    let leftover: Vec<usize> = unused
-        .iter()
-        .enumerate()
-        .filter(|(_, u)| **u)
-        .map(|(k, _)| k)
-        .collect();
-    let mut leftover = leftover.into_iter();
-    for slot in &mut placed {
-        if slot.is_none() {
-            if let Some(k) = leftover.next() {
-                *slot = Some(k);
-            }
-        }
-    }
+    place_leftovers(&orig, &unused, &wanted.items, &mut placed);
     for (w, slot) in wanted.items.iter().zip(placed) {
         let el = match slot {
             Some(k) => {

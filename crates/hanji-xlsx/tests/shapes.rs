@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use hanji_core::{Engine, ImportOptions};
 use hanji_format::sheet::{parse_spreadsheet, serialize_spreadsheet, SheetItem};
-use hanji_xlsx::{package, XlsxEngine};
+use hanji_xlsx::{package, xml, XlsxEngine};
 
 mod common;
 use common::getput;
@@ -58,6 +58,27 @@ fn keep_kinds(text: &str) -> Vec<String> {
             _ => None,
         })
         .collect()
+}
+
+fn drawing_object_local(xml_bytes: &[u8], name: &str) -> String {
+    let doc = xml::parse(xml_bytes).unwrap();
+    fn named(e: &xml::Element, name: &str) -> bool {
+        e.elements().any(|c| {
+            (c.local() == "cNvPr" && c.get("name").as_deref() == Some(name)) || named(c, name)
+        })
+    }
+    fn search(e: &xml::Element, name: &str) -> Option<String> {
+        if named(e, name) && matches!(e.local(), "sp" | "grpSp") {
+            for c in e.elements() {
+                if let Some(t) = search(c, name) {
+                    return Some(t);
+                }
+            }
+            return Some(e.local().into());
+        }
+        e.elements().find_map(|c| search(c, name))
+    }
+    search(&doc.root, name).unwrap_or_else(|| panic!("no object named {name}"))
 }
 
 fn xfrm_blob(xml_bytes: &[u8], name: &str) -> String {
@@ -238,6 +259,38 @@ fn removing_a_shape_drops_it() {
     assert!(!xml.contains("WordArt 5"), "{xml}");
     assert!(xml.contains("WordArt 6"), "{xml}");
     assert!(xml.contains("Group 1"), "{xml}");
+}
+
+#[test]
+fn replacing_a_group_with_a_shape_does_not_reuse_the_group_xml() {
+    let bytes = corpus_file("ExcelWithAttachments.xlsm");
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
+    let start = imp
+        .text
+        .find("<group name=\"Group 1\">")
+        .expect("Group 1 in the text");
+    let end = start + imp.text[start..].find("</group>").expect("</group>") + "</group>".len();
+    let edited = format!(
+        "{}<shape name=\"Callout\" anchor=\"A18:B25\">hi</shape>{}",
+        &imp.text[..start],
+        &imp.text[end..]
+    );
+    let a = XlsxEngine::apply(&edited, &imp.remainder, "[]").unwrap();
+    assert!(
+        !shape_lines(&a.text)
+            .iter()
+            .any(|l| l.contains("Group 1") || l.contains("AutoShape 2")),
+        "{:?}",
+        shape_lines(&a.text)
+    );
+    let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
+    let (_, drawing) = drawing_part(&out);
+    assert_eq!(drawing_object_local(&drawing, "Callout"), "sp");
+    let xml = String::from_utf8_lossy(&drawing);
+    assert!(!xml.contains("Group 1"), "{xml}");
+    assert!(!xml.contains("AutoShape 2"), "{xml}");
 }
 
 #[test]
