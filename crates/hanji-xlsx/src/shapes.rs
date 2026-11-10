@@ -347,9 +347,9 @@ fn take_modelled_anchors(root: &mut Element) -> Vec<(Element, DrawingItem)> {
     orig
 }
 
-/// Reuse leftover originals only when the wanted item is the same kind
-/// (shape with shape, group with group). A kind mismatch is a new object,
-/// so a deleted group is not patched into a new shape (or the reverse).
+/// Reuse leftover originals only when they are the same object: same kind
+/// and name first, then same kind and anchor. Document order is not a
+/// fallback, so deleting A and editing B does not patch B onto A's XML.
 fn place_leftovers(
     orig: &[(Element, DrawingItem)],
     unused: &[bool],
@@ -362,18 +362,19 @@ fn place_leftovers(
         .filter(|(_, u)| **u)
         .map(|(k, _)| k)
         .collect();
-    for (i, slot) in placed.iter_mut().enumerate() {
-        if slot.is_some() {
-            continue;
+    let mut take = |pred: fn(&DrawingItem, &DrawingItem) -> bool| {
+        for (i, slot) in placed.iter_mut().enumerate() {
+            if slot.is_some() {
+                continue;
+            }
+            let Some(pos) = leftover.iter().position(|&k| pred(&orig[k].1, &wanted[i])) else {
+                continue;
+            };
+            *slot = Some(leftover.remove(pos));
         }
-        let Some(pos) = leftover
-            .iter()
-            .position(|&k| same_kind(&orig[k].1, &wanted[i]))
-        else {
-            continue;
-        };
-        *slot = Some(leftover.remove(pos));
-    }
+    };
+    take(|o, w| same_kind(o, w) && item_name(o) == item_name(w));
+    take(|o, w| same_kind(o, w) && item_anchor(o) == item_anchor(w));
 }
 
 fn same_kind(a: &DrawingItem, b: &DrawingItem) -> bool {
@@ -382,6 +383,20 @@ fn same_kind(a: &DrawingItem, b: &DrawingItem) -> bool {
         (DrawingItem::Shape(_), DrawingItem::Shape(_))
             | (DrawingItem::Group(_), DrawingItem::Group(_))
     )
+}
+
+fn item_name(item: &DrawingItem) -> &str {
+    match item {
+        DrawingItem::Shape(s) => &s.name,
+        DrawingItem::Group(g) => &g.name,
+    }
+}
+
+fn item_anchor(item: &DrawingItem) -> String {
+    match item {
+        DrawingItem::Shape(s) => s.anchor.clone(),
+        DrawingItem::Group(_) => shared_anchor(item),
+    }
 }
 
 fn max_cnv_id(e: &Element) -> u32 {

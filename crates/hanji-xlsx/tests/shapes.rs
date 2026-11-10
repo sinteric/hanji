@@ -262,6 +262,53 @@ fn removing_a_shape_drops_it() {
 }
 
 #[test]
+fn deleting_one_shape_does_not_steal_anothers_geometry() {
+    let bytes = corpus_file("ExcelWithAttachments.xlsm");
+    let (_, orig) = drawing_part(&bytes);
+    let xfrm5 = xfrm_blob(&orig, "WordArt 5");
+    let xfrm6 = xfrm_blob(&orig, "WordArt 6");
+    assert_ne!(xfrm5, xfrm6);
+    let imp = XlsxEngine
+        .import(&bytes, &ImportOptions::default())
+        .unwrap();
+    let line5 = imp
+        .text
+        .lines()
+        .find(|l| l.contains("WordArt 5"))
+        .unwrap()
+        .to_string();
+    let line6 = imp
+        .text
+        .lines()
+        .find(|l| l.contains("WordArt 6"))
+        .unwrap()
+        .to_string();
+    let new6 = line6.replace("Мой текст здесь", "edited");
+    assert_ne!(new6, line6, "WordArt 6 text is in the line: {line6}");
+    let edited = imp
+        .text
+        .replace(&format!("{line5}\n"), "")
+        .replace(&line6, &new6);
+    let a = XlsxEngine::apply(&edited, &imp.remainder, "[]").unwrap();
+    assert!(
+        !shape_lines(&a.text).iter().any(|l| l.contains("WordArt 5")),
+        "{:?}",
+        shape_lines(&a.text)
+    );
+    assert!(
+        shape_lines(&a.text)
+            .iter()
+            .any(|l| l.contains("WordArt 6") && l.contains("edited")),
+        "{:?}",
+        shape_lines(&a.text)
+    );
+    let out = XlsxEngine.export(&a.text, &a.remainder).unwrap();
+    let (_, drawing) = drawing_part(&out);
+    assert_eq!(xfrm_blob(&drawing, "WordArt 6"), xfrm6);
+    assert_ne!(xfrm_blob(&drawing, "WordArt 6"), xfrm5);
+}
+
+#[test]
 fn replacing_a_group_with_a_shape_does_not_reuse_the_group_xml() {
     let bytes = corpus_file("ExcelWithAttachments.xlsm");
     let imp = XlsxEngine
