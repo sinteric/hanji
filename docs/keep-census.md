@@ -42,8 +42,8 @@ date.
 | docx   |    13 |      0 |         10 |   117 |
 | hwpx   |    16 |      0 |          8 |    22 |
 | pptx   |    27 |      0 |         16 |    40 |
-| xlsx   |    46 |      0 |         12 |    24 |
-| all    |   102 |      0 |         46 |   203 |
+| xlsx   |    46 |      0 |         11 |    18 |
+| all    |   102 |      0 |         45 |   197 |
 
 ## By kind, most first
 
@@ -63,7 +63,6 @@ date.
 | hwpx   | form-control    |     5 |     1 |
 | hwpx   | table           |     5 |     3 |
 | pptx   | chart           |     5 |     5 |
-| xlsx   | shape           |     5 |     3 |
 | docx   | table           |     3 |     2 |
 | hwpx   | text            |     3 |     1 |
 | docx   | math            |     2 |     2 |
@@ -71,7 +70,6 @@ date.
 | xlsx   | pivot-table     |     2 |     1 |
 | docx   | endnote         |     1 |     1 |
 | docx   | footnote        |     1 |     1 |
-| xlsx   | group           |     1 |     1 |
 | xlsx   | merged-cells    |     1 |     1 |
 
 ## By file
@@ -141,7 +139,7 @@ date.
 | `crates/hanji-xlsx/corpus/DateFormatTests.xlsx`                      | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/ExcelPivotTableSample.xlsx`                | xlsx   |     2 | pivot-table 2 |
 | `crates/hanji-xlsx/corpus/ExcelTables.xlsx`                          | xlsx   |     0 | |
-| `crates/hanji-xlsx/corpus/ExcelWithAttachments.xlsm`                 | xlsx   |     4 | group 1, shape 3 |
+| `crates/hanji-xlsx/corpus/ExcelWithAttachments.xlsm`                 | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/GeneralFormatTests.xlsx`                   | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/InlineStrings.xlsx`                        | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/SampleSS.xlsx`                             | xlsx   |     0 | |
@@ -151,7 +149,7 @@ date.
 | `crates/hanji-xlsx/corpus/Tables.xlsx`                               | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/WithChart.xlsx`                            | xlsx   |     1 | chart 1 |
 | `crates/hanji-xlsx/corpus/WithConditionalFormatting.xlsx`            | xlsx   |     0 | |
-| `crates/hanji-xlsx/corpus/WithDrawing.xlsx`                          | xlsx   |     6 | picture 5, shape 1 |
+| `crates/hanji-xlsx/corpus/WithDrawing.xlsx`                          | xlsx   |     5 | picture 5 |
 | `crates/hanji-xlsx/corpus/WithTable.xlsx`                            | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/WithThreeCharts.xlsx`                      | xlsx   |     3 | chart 3 |
 | `crates/hanji-xlsx/corpus/WithVariousData.xlsx`                      | xlsx   |     0 | |
@@ -176,7 +174,7 @@ date.
 | `crates/hanji-xlsx/corpus/rx_table14.xlsx`                           | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/shared_formulas.xlsx`                      | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/sharedhyperlink.xlsx`                      | xlsx   |     0 | |
-| `crates/hanji-xlsx/corpus/simple-monthly-budget.xlsx`                | xlsx   |     2 | chart 1, shape 1 |
+| `crates/hanji-xlsx/corpus/simple-monthly-budget.xlsx`                | xlsx   |     1 | chart 1 |
 | `crates/hanji-xlsx/corpus/table-sample.xlsx`                         | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/unicodeSheetName.xlsx`                     | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/xlookup.xlsx`                              | xlsx   |     0 | |

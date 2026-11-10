@@ -33,8 +33,8 @@
   "total": {
     "files": 102,
     "failed": 0,
-    "with_keeps": 46,
-    "keeps": 203
+    "with_keeps": 45,
+    "keeps": 197
   },
   "formats": [
     {
@@ -62,8 +62,8 @@
       "format": "xlsx",
       "files": 46,
       "failed": 0,
-      "with_keeps": 12,
-      "keeps": 24
+      "with_keeps": 11,
+      "keeps": 18
     }
   ],
   "kinds": [
@@ -152,12 +152,6 @@
       "files": 5
     },
     {
-      "format": "xlsx",
-      "kind": "shape",
-      "keeps": 5,
-      "files": 3
-    },
-    {
       "format": "docx",
       "kind": "table",
       "keeps": 3,
@@ -196,12 +190,6 @@
     {
       "format": "docx",
       "kind": "footnote",
-      "keeps": 1,
-      "files": 1
-    },
-    {
-      "format": "xlsx",
-      "kind": "group",
       "keeps": 1,
       "files": 1
     },
@@ -691,11 +679,8 @@
     {
       "path": "crates/hanji-xlsx/corpus/ExcelWithAttachments.xlsm",
       "format": "xlsx",
-      "keeps": 4,
-      "kinds": {
-        "group": 1,
-        "shape": 3
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/GeneralFormatTests.xlsx",
@@ -756,10 +741,9 @@
     {
       "path": "crates/hanji-xlsx/corpus/WithDrawing.xlsx",
       "format": "xlsx",
-      "keeps": 6,
+      "keeps": 5,
       "kinds": {
-        "picture": 5,
-        "shape": 1
+        "picture": 5
       }
     },
     {
@@ -921,10 +905,9 @@
     {
       "path": "crates/hanji-xlsx/corpus/simple-monthly-budget.xlsx",
       "format": "xlsx",
-      "keeps": 2,
+      "keeps": 1,
       "kinds": {
-        "chart": 1,
-        "shape": 1
+        "chart": 1
       }
     },
     {
