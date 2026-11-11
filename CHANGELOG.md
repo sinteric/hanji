@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx#25 (`571ebef`,
+  on main, which has #24): tensorbee/rdocx S96 sprint sync (Word 0.17.0 /
+  PowerPoint 0.15.0 / shared OOXML 0.15.0). The Hanji tbRl header/footer
+  clearance reservation is now opt-in; DOCX preview and layout loads call
+  `Document::set_vertical_story_clearance(true)` so vertical text still
+  keeps clear of headers and footers.
 - Show XLSX drawing shapes as editable `<shape name="Tip"
   anchor="B25:D27">text</shape>` lines and grouped shapes as a
   `<group name="Group 1">` … `</group>` wrapper (fluency round 7 A)
