@@ -23,8 +23,7 @@ pub fn render_with_fonts_and_limits(
     limits: ImageLimits,
 ) -> Result<Preview, String> {
     limits.validate()?;
-    let document = rdocx::Document::from_bytes(bytes)
-        .map_err(|e| format!("rdocx cannot open the document: {e}"))?;
+    let document = open_document(bytes)?;
     let embedded = embedded_fonts(&document);
     let fonts = Fonts::from_options(options, &embedded)?;
     finish_preview_with_limits(build(&document, bytes, &fonts)?, limits)
@@ -38,8 +37,7 @@ pub(crate) fn layout(
     limits: ImageLimits,
 ) -> Result<Preview, String> {
     limits.validate()?;
-    let document = rdocx::Document::from_bytes(bytes)
-        .map_err(|e| format!("rdocx cannot open the document: {e}"))?;
+    let document = open_document(bytes)?;
     let embedded = embedded_fonts(&document);
     let fonts = Fonts::from_options(options, &embedded)?;
     crate::finish_layout(build(&document, bytes, &fonts)?, limits)
@@ -59,11 +57,22 @@ pub fn render_native_with_limits(
     limits: ImageLimits,
 ) -> Result<Preview, String> {
     limits.validate()?;
-    let document = rdocx::Document::from_bytes(bytes)
-        .map_err(|e| format!("rdocx cannot open the document: {e}"))?;
+    let document = open_document(bytes)?;
     let embedded = embedded_fonts(&document);
     let fonts = Fonts::load(&options.font_dirs, &embedded, options.system_fonts);
     finish_preview_with_limits(build(&document, bytes, &fonts)?, limits)
+}
+
+/// Load a DOCX for layout, preview or page count.
+///
+/// sinteric/rdocx#25 made the Hanji tbRl header/footer clearance reservation
+/// opt-in (default false, matching Word). Hanji still needs the old
+/// reservation, so every render/layout load turns it on.
+fn open_document(bytes: &[u8]) -> Result<rdocx::Document, String> {
+    let mut document = rdocx::Document::from_bytes(bytes)
+        .map_err(|e| format!("rdocx cannot open the document: {e}"))?;
+    document.set_vertical_story_clearance(true);
+    Ok(document)
 }
 
 fn embedded_fonts(document: &rdocx::Document) -> Vec<FontFile> {
@@ -470,7 +479,7 @@ mod tests {
             .unwrap()
             .data = document.as_bytes().into();
         let bytes = package::write(&parts).unwrap();
-        let parsed = rdocx::Document::from_bytes(&bytes).unwrap();
+        let parsed = open_document(&bytes).unwrap();
         // The ascent and descent rdocx was handed for the requested face.
         let line = |resolver: &Substitute| {
             let preview = build(&parsed, &bytes, resolver).unwrap();

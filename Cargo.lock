@@ -1802,8 +1802,8 @@ dependencies = [
 
 [[package]]
 name = "oxml-chart"
-version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce#4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce"
+version = "0.15.0"
+source = "git+https://github.com/sinteric/rdocx?rev=571ebef700e2d09feb4d80ac57c7a564bf5151dd#571ebef700e2d09feb4d80ac57c7a564bf5151dd"
 dependencies = [
  "oxml-core",
  "oxml-drawing",
@@ -1814,8 +1814,8 @@ dependencies = [
 
 [[package]]
 name = "oxml-core"
-version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce#4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce"
+version = "0.15.0"
+source = "git+https://github.com/sinteric/rdocx?rev=571ebef700e2d09feb4d80ac57c7a564bf5151dd#571ebef700e2d09feb4d80ac57c7a564bf5151dd"
 dependencies = [
  "quick-xml 0.41.0",
  "thiserror",
@@ -1823,8 +1823,8 @@ dependencies = [
 
 [[package]]
 name = "oxml-drawing"
-version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce#4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce"
+version = "0.15.0"
+source = "git+https://github.com/sinteric/rdocx?rev=571ebef700e2d09feb4d80ac57c7a564bf5151dd#571ebef700e2d09feb4d80ac57c7a564bf5151dd"
 dependencies = [
  "oxml-core",
  "quick-xml 0.41.0",
@@ -1832,8 +1832,8 @@ dependencies = [
 
 [[package]]
 name = "oxml-layout"
-version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce#4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce"
+version = "0.15.0"
+source = "git+https://github.com/sinteric/rdocx?rev=571ebef700e2d09feb4d80ac57c7a564bf5151dd#571ebef700e2d09feb4d80ac57c7a564bf5151dd"
 dependencies = [
  "fontdb 0.23.0",
  "harfrust",
@@ -1847,13 +1847,13 @@ dependencies = [
 
 [[package]]
 name = "oxml-media"
-version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce#4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce"
+version = "0.15.0"
+source = "git+https://github.com/sinteric/rdocx?rev=571ebef700e2d09feb4d80ac57c7a564bf5151dd#571ebef700e2d09feb4d80ac57c7a564bf5151dd"
 
 [[package]]
 name = "oxml-opc"
-version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce#4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce"
+version = "0.15.0"
+source = "git+https://github.com/sinteric/rdocx?rev=571ebef700e2d09feb4d80ac57c7a564bf5151dd#571ebef700e2d09feb4d80ac57c7a564bf5151dd"
 dependencies = [
  "quick-xml 0.41.0",
  "thiserror",
@@ -1862,8 +1862,8 @@ dependencies = [
 
 [[package]]
 name = "oxml-pdf"
-version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce#4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce"
+version = "0.15.0"
+source = "git+https://github.com/sinteric/rdocx?rev=571ebef700e2d09feb4d80ac57c7a564bf5151dd#571ebef700e2d09feb4d80ac57c7a564bf5151dd"
 dependencies = [
  "jpeg-encoder",
  "miniz_oxide 0.9.1",
@@ -1879,8 +1879,8 @@ dependencies = [
 
 [[package]]
 name = "oxml-sml"
-version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce#4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce"
+version = "0.15.0"
+source = "git+https://github.com/sinteric/rdocx?rev=571ebef700e2d09feb4d80ac57c7a564bf5151dd#571ebef700e2d09feb4d80ac57c7a564bf5151dd"
 dependencies = [
  "oxml-opc",
  "quick-xml 0.41.0",
@@ -2212,9 +2212,9 @@ dependencies = [
 
 [[package]]
 name = "pulldown-cmark"
-version = "0.13.4"
+version = "0.13.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e9f068eba8e7071c5f9511831b44f32c740d5adf574e990f946ddb53db2f314e"
+checksum = "3db2be46835f013dd3f4fa7f5f7402c537787b54ebb6fe2b94bbdd7e2669bb7b"
 dependencies = [
  "bitflags 2.13.2",
  "memchr",
@@ -2328,8 +2328,8 @@ checksum = "a611d15b50743feb4c76b7d03edcb0e64f399c26961e4efe6975bc398be6aa3d"
 
 [[package]]
 name = "rdocx"
-version = "0.16.4"
-source = "git+https://github.com/sinteric/rdocx?rev=4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce#4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce"
+version = "0.17.0"
+source = "git+https://github.com/sinteric/rdocx?rev=571ebef700e2d09feb4d80ac57c7a564bf5151dd#571ebef700e2d09feb4d80ac57c7a564bf5151dd"
 dependencies = [
  "base64 0.23.1",
  "encoding_rs",
@@ -2357,34 +2357,36 @@ dependencies = [
 
 [[package]]
 name = "rdocx-html"
-version = "0.16.4"
-source = "git+https://github.com/sinteric/rdocx?rev=4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce#4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce"
+version = "0.17.0"
+source = "git+https://github.com/sinteric/rdocx?rev=571ebef700e2d09feb4d80ac57c7a564bf5151dd#571ebef700e2d09feb4d80ac57c7a564bf5151dd"
 dependencies = [
  "rdocx-oxml",
 ]
 
 [[package]]
 name = "rdocx-layout"
-version = "0.16.4"
-source = "git+https://github.com/sinteric/rdocx?rev=4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce#4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce"
+version = "0.17.0"
+source = "git+https://github.com/sinteric/rdocx?rev=571ebef700e2d09feb4d80ac57c7a564bf5151dd#571ebef700e2d09feb4d80ac57c7a564bf5151dd"
 dependencies = [
  "oxml-chart",
  "oxml-drawing",
  "oxml-layout",
+ "quick-xml 0.41.0",
  "rdocx-oxml",
  "ttf-parser",
 ]
 
 [[package]]
 name = "rdocx-oxml"
-version = "0.16.4"
-source = "git+https://github.com/sinteric/rdocx?rev=4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce#4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce"
+version = "0.17.0"
+source = "git+https://github.com/sinteric/rdocx?rev=571ebef700e2d09feb4d80ac57c7a564bf5151dd#571ebef700e2d09feb4d80ac57c7a564bf5151dd"
 dependencies = [
  "itoa",
  "oxml-core",
  "oxml-drawing",
  "quick-xml 0.41.0",
  "regex",
+ "serde_json",
  "thiserror",
 ]
 
@@ -2603,8 +2605,8 @@ dependencies = [
 
 [[package]]
 name = "rpptx"
-version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce#4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce"
+version = "0.15.0"
+source = "git+https://github.com/sinteric/rdocx?rev=571ebef700e2d09feb4d80ac57c7a564bf5151dd#571ebef700e2d09feb4d80ac57c7a564bf5151dd"
 dependencies = [
  "gif 0.14.2",
  "jpeg-encoder",
@@ -2632,8 +2634,8 @@ dependencies = [
 
 [[package]]
 name = "rpptx-layout"
-version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce#4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce"
+version = "0.15.0"
+source = "git+https://github.com/sinteric/rdocx?rev=571ebef700e2d09feb4d80ac57c7a564bf5151dd#571ebef700e2d09feb4d80ac57c7a564bf5151dd"
 dependencies = [
  "oxml-chart",
  "oxml-drawing",
@@ -2643,8 +2645,8 @@ dependencies = [
 
 [[package]]
 name = "rpptx-oxml"
-version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce#4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce"
+version = "0.15.0"
+source = "git+https://github.com/sinteric/rdocx?rev=571ebef700e2d09feb4d80ac57c7a564bf5151dd#571ebef700e2d09feb4d80ac57c7a564bf5151dd"
 dependencies = [
  "oxml-core",
  "oxml-drawing",
@@ -2654,8 +2656,8 @@ dependencies = [
 
 [[package]]
 name = "rpptx-render"
-version = "0.14.4"
-source = "git+https://github.com/sinteric/rdocx?rev=4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce#4bd556a9f7cd9431d9c6e13780f1f0f2f6ac39ce"
+version = "0.15.0"
+source = "git+https://github.com/sinteric/rdocx?rev=571ebef700e2d09feb4d80ac57c7a564bf5151dd#571ebef700e2d09feb4d80ac57c7a564bf5151dd"
 dependencies = [
  "oxml-drawing",
  "oxml-layout",

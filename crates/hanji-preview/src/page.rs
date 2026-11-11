@@ -794,7 +794,6 @@ impl<'a> Lowering<'a> {
                                 blur: blur.max(0.0),
                                 color: color_of(*color),
                             }),
-                            #[allow(unreachable_patterns)]
                             _ => self.diagnose(
                                 &format!("{path}.effects[{index}]"),
                                 "unsupported group effect was omitted while its children were preserved",
