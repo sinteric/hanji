@@ -235,8 +235,20 @@ impl<'a> SvgLowering<'a> {
     /// span's decorations as paths. A span painted other than in one colour,
     /// or stroked, is drawn from usvg's flattened outlines instead.
     fn text(&mut self, node: &usvg::Text, path: &str) {
+        // PDF spike: a solid stroke in the fill's own colour (rhwp's bold)
+        // stays text, stroked, instead of being flattened to outlines.
+        let same_stroke = |span: &usvg::layout::Span| match (&span.fill, &span.stroke) {
+            (_, None) => true,
+            (Some(f), Some(s)) => match (f.paint(), s.paint()) {
+                (usvg::Paint::Color(a), usvg::Paint::Color(b)) => {
+                    a == b && f.opacity() == s.opacity() && s.dasharray().is_none()
+                }
+                _ => false,
+            },
+            (None, Some(_)) => false,
+        };
         let solid = node.layouted().iter().all(|span| {
-            span.stroke.is_none()
+            same_stroke(span)
                 && span
                     .fill
                     .as_ref()
@@ -265,6 +277,7 @@ impl<'a> SvgLowering<'a> {
                 self.path(decoration, &format!("{path}.decoration"));
             }
             let size = f64::from(span.font_size.get());
+            let stroke = span.stroke.as_ref().map(|s| f64::from(s.width().get()));
             let mut run: Option<Glyphs> = None;
             for glyph in &span.positioned_glyphs {
                 let Some(&SvgFace {
@@ -321,6 +334,7 @@ impl<'a> SvgLowering<'a> {
                             matrix,
                             glyphs: vec![at],
                             text: glyph.text.clone(),
+                            stroke,
                             embolden,
                             slant,
                         });

@@ -205,6 +205,9 @@ pub struct Glyphs {
     /// The face has no bold of its own: also stroke each outline, centred,
     /// [`EMBOLDEN_EM`] of the size wide, with round joins and caps.
     pub embolden: bool,
+    /// PDF spike: also stroke each outline this wide, in points, in the
+    /// run's colour (HWPX bold drawn as fill and stroke by rhwp).
+    pub stroke: Option<f64>,
     /// The face has no italic of its own: shear the run about `origin`,
     /// x' = x − [`SLANT`] · (y − origin.y).
     pub slant: bool,
@@ -288,6 +291,58 @@ pub enum Item {
     Image { rect: Rect, image: Image },
     PushGroup(Group),
     PopGroup,
+    /// PDF spike: a link over `rect`, in the current group's space. Only a
+    /// paged export follows it; a preview draws nothing.
+    Link { rect: Rect, url: String },
+    /// PDF spike: the items until the matching [`Item::EndMarked`] are the
+    /// content of structure node `Some(n)` ([`Layout::structure`]), or an
+    /// artifact outside the reading order (`None`).
+    BeginMarked(Option<u32>),
+    EndMarked,
+}
+
+/// PDF spike: a node's semantic role in [`Structure`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Role {
+    Document,
+    Paragraph,
+    Heading(u8),
+    List,
+    ListItem,
+    Table,
+    TableRow,
+    TableHeaderCell,
+    TableCell,
+    Figure,
+}
+
+/// PDF spike: one node of the logical structure tree. Ids are one-based.
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct StructureNode {
+    pub id: u32,
+    pub role: Role,
+    pub children: Vec<u32>,
+    pub alternate_text: Option<String>,
+}
+
+/// PDF spike: the logical structure the engine's layout carries.
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct Structure {
+    pub root: u32,
+    pub nodes: Vec<StructureNode>,
+}
+
+/// PDF spike: a heading, for a bookmark.
+#[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub struct Heading {
+    pub title: String,
+    pub level: u32,
+    pub page: usize,
+    pub y: f64,
 }
 
 /// One page: its size in points and its items in drawing order. The first
@@ -537,6 +592,72 @@ impl Layout {
         })
     }
 
+    /// PDF spike: a face's font file bytes and collection index.
+    pub fn face_data(&self, face: FaceId) -> Option<(Arc<[u8]>, u32)> {
+        let face = self.faces.get(&face)?;
+        Some((face.data.clone(), face.index))
+    }
+
+    /// PDF spike: whether the face has variation coordinates set, which a
+    /// PDF writer must apply itself.
+    pub fn face_is_varied(&self, face: FaceId) -> bool {
+        self.faces
+            .get(&face)
+            .is_some_and(|f| !f.variations.is_empty())
+    }
+
+    /// PDF spike: the logical structure, where the engine has one (DOCX).
+    pub fn structure(&self) -> Option<Structure> {
+        let Source::Engine { preview, .. } = &self.source else {
+            return None;
+        };
+        let structure = preview.layout.structure.as_ref()?;
+        Some(Structure {
+            root: structure.root.get(),
+            nodes: structure
+                .nodes
+                .iter()
+                .map(|n| StructureNode {
+                    id: n.id.get(),
+                    role: match n.role {
+                        oxml_layout::StructureRole::Document => Role::Document,
+                        oxml_layout::StructureRole::Paragraph => Role::Paragraph,
+                        oxml_layout::StructureRole::Heading(l) => Role::Heading(l),
+                        oxml_layout::StructureRole::List => Role::List,
+                        oxml_layout::StructureRole::ListItem => Role::ListItem,
+                        oxml_layout::StructureRole::Table => Role::Table,
+                        oxml_layout::StructureRole::TableRow => Role::TableRow,
+                        oxml_layout::StructureRole::TableHeaderCell => Role::TableHeaderCell,
+                        oxml_layout::StructureRole::TableCell => Role::TableCell,
+                        oxml_layout::StructureRole::Figure => Role::Figure,
+                        #[allow(unreachable_patterns)]
+                        _ => Role::Paragraph,
+                    },
+                    children: n.children.iter().map(|c| c.get()).collect(),
+                    alternate_text: n.alternate_text.clone(),
+                })
+                .collect(),
+        })
+    }
+
+    /// PDF spike: the headings the engine found, for bookmarks.
+    pub fn headings(&self) -> Vec<Heading> {
+        let Source::Engine { preview, .. } = &self.source else {
+            return Vec::new();
+        };
+        preview
+            .layout
+            .outlines
+            .iter()
+            .map(|o| Heading {
+                title: o.title.clone(),
+                level: o.level,
+                page: o.page_index,
+                y: o.y_position,
+            })
+            .collect()
+    }
+
     pub fn fonts(&self) -> &FontsReport {
         match &self.source {
             Source::Engine { preview, .. } => &preview.fonts,
@@ -743,8 +864,13 @@ impl<'a> Lowering<'a> {
                     paint: Paint::Solid(color_of(*color)),
                 }),
                 PositionedElement::Image { rect, data, .. } => self.image(*rect, data, &path),
-                PositionedElement::LinkAnnotation { .. } => {
-                    self.diagnose(&path, "link was omitted: a page follows no links")
+                PositionedElement::LinkAnnotation { rect, url } => {
+                    if self.output {
+                        self.items.push(Item::Link {
+                            rect: rect_of(*rect),
+                            url: url.clone(),
+                        });
+                    }
                 }
                 PositionedElement::Path(element) => {
                     let shape = path_of(&element.path);
@@ -817,8 +943,18 @@ impl<'a> Lowering<'a> {
                     self.elements(&group.children, &format!("{path}.children"));
                     self.items.push(Item::PopGroup);
                 }
-                PositionedElement::MarkedContent { children, .. } => {
-                    self.elements(children, &format!("{path}.children"))
+                PositionedElement::MarkedContent {
+                    structure,
+                    children,
+                } => {
+                    if self.output {
+                        self.items
+                            .push(Item::BeginMarked(structure.map(|id| id.get())));
+                    }
+                    self.elements(children, &format!("{path}.children"));
+                    if self.output {
+                        self.items.push(Item::EndMarked);
+                    }
                 }
                 #[allow(unreachable_patterns)]
                 _ => self.diagnose(&path, "unsupported positioned element was omitted"),
@@ -875,6 +1011,7 @@ impl<'a> Lowering<'a> {
             matrix: Transform::IDENTITY,
             glyphs,
             text: run.text.clone(),
+            stroke: None,
             embolden: synthetic_bold,
             slant: synthetic_italic,
         }));

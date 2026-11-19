@@ -1,0 +1,26 @@
+# Spike: PDF export straight from Hanji's page display list with krilla,
+# next to the page SVG -> svg2pdf route for comparison. Its own workspace so
+# the main Cargo.lock does not change.
+[package]
+name = "pdf-krilla-spike"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+hanji-preview = { path = "../../crates/hanji-preview" }
+krilla = { version = "=0.8.2", default-features = false, features = ["raster-images"] }
+svg2pdf = "0.13"
+usvg = "0.45"
+base64 = "0.22"
+serde_json = "1"
+
+[patch.crates-io]
+svg2pdf = { git = "https://github.com/edwardkim/svg2pdf", rev = "2caeb0a038f9128b79833d803b94c2667565c4da" }
+
+[profile.dev]
+opt-level = 1
+[profile.dev.package."*"]
+opt-level = 2
