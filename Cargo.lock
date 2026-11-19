@@ -1152,6 +1152,7 @@ dependencies = [
  "hanji-format",
  "hanji-package",
  "hanji-testkit",
+ "rhwp",
  "serde",
  "serde_json",
 ]

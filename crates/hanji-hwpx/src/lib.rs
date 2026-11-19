@@ -8,11 +8,14 @@
 //! rhwp is not on the import/export path: it parses into its own document
 //! model and writes the package from it, which drops what that model does
 //! not hold (tracked changes, without a loss report). The remainder needs
-//! the section XML as written. rhwp validates exports in the tests.
+//! the section XML as written. rhwp validates exports in the tests, and
+//! with the `hwp` feature it converts binary HWP to HWPX and back at the
+//! container boundary ([`hwp`]), outside the engine.
 
 pub mod export;
 pub mod format;
 pub mod header;
+pub mod hwp;
 pub mod import;
 pub mod owpml;
 pub mod safety;

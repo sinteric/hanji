@@ -103,6 +103,66 @@ fn round_trip(env: &Env, file: &str, old: &str, new: &str) {
 }
 
 #[test]
+fn hwp() {
+    // A binary .hwp opens as an hwpx document through rhwp, exports as .hwp
+    // when the path says so, and reopens as the text written (§5.6).
+    let env = Env::new("hwp");
+    let file = corpus("crates/hanji-hwpx/corpus/hwp/hcar-001.hwp");
+    let text = env.cmd().args(["open", &file]).output().unwrap();
+    let text = String::from_utf8(text.stdout).unwrap();
+    assert!(
+        text.contains("read from binary HWP through rhwp: nothing lost"),
+        "{text}"
+    );
+    let copy = env.path("copy.hwp");
+    std::fs::copy(&file, &copy).unwrap();
+    let o = env.ok(&["open", &copy]);
+    assert_eq!(o["format"], "hwpx");
+    assert_eq!(o["from_hwp"]["losses"].as_array().unwrap().len(), 0);
+    let id = o["doc_id"].as_str().unwrap().to_string();
+    env.ok(&[
+        "edit",
+        &id,
+        "--rev",
+        "1",
+        "--old",
+        "2026년 전기자동차 구매 지원신청서",
+        "--new",
+        "2027년 전기자동차 구매 지원신청서",
+    ]);
+    let written = env.read(&id);
+    let out = env.path("out.hwp");
+    let e = env.ok(&["export", &id, &out, "--acknowledge-surfaced"]);
+    assert_eq!(e["hwp"], true);
+    let bytes = std::fs::read(&out).unwrap();
+    assert!(
+        bytes.starts_with(&[0xd0, 0xcf, 0x11, 0xe0]),
+        "binary HWP 5.0"
+    );
+    let back = env.ok(&["open", &out]);
+    assert!(back["from_hwp"].is_object());
+    let reread = env.read(back["doc_id"].as_str().unwrap());
+    assert!(reread.contains("2027년 전기자동차 구매 지원신청서"));
+    assert_eq!(
+        reread
+            .lines()
+            .filter(|l| !l.contains("<keep "))
+            .collect::<Vec<_>>(),
+        written
+            .lines()
+            .filter(|l| !l.contains("<keep "))
+            .collect::<Vec<_>>(),
+        "PutGet, placeholder ids aside"
+    );
+    let hwpx = env.path("out.hwpx");
+    let e = env.ok(&["export", &id, &hwpx, "--acknowledge-surfaced"]);
+    assert!(e["hwp"].is_null());
+    assert!(std::fs::read(&hwpx).unwrap().starts_with(b"PK"));
+    let p = env.ok(&["preview", &file, "--out", &env.path("pv")]);
+    assert_eq!(p["format"], "hwpx");
+}
+
+#[test]
 fn docx() {
     round_trip(
         &Env::new("docx"),

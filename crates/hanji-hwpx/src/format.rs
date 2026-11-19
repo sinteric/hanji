@@ -115,11 +115,15 @@ pub fn snap_props(p: &mut Props) {
 
 // ---------------------------------------------------------------- reading
 
-/// `#RRGGBB` (or `#AARRGGBB`); `none` is no colour.
+/// `#RRGGBB` (or `#AARRGGBB`); `none` is no colour, and so is `#FFFFFFFF`,
+/// the HWP 5.0 COLORREF for none, which rhwp writes where Hancom writes `none`.
 pub fn color(v: Option<String>) -> Option<Color> {
     let v = v?;
     let h = v.trim().trim_start_matches('#');
-    if h.len() < 6 || !h.chars().all(|c| c.is_ascii_hexdigit()) {
+    if h.len() < 6
+        || !h.chars().all(|c| c.is_ascii_hexdigit())
+        || h.eq_ignore_ascii_case("FFFFFFFF")
+    {
         return None;
     }
     Color::parse(&format!("#{}", &h[h.len() - 6..])).ok()

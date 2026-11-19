@@ -1,7 +1,7 @@
 # hanji
 
 hanji reads Word, PowerPoint, Excel and Hancom files (docx, pptx, xlsx,
-hwpx) as a Markdown-like text, and writes your edits to that text back into
+hwpx, and hwp through hwpx) as a Markdown-like text, and writes your edits to that text back into
 the original file. Anything the text does not show (formatting, pictures,
 charts, comment metadata, field instructions) is kept in the file. It is built for coding agents,
 and it also works as a command-line tool.
@@ -205,7 +205,7 @@ download. Later runs use the cached binary. For details, see
 | `hanji write DOC --rev N FILE` | Replace the whole text. hanji aligns the old and new text to find where unshown content goes |
 | `hanji ops DOC --rev N OPS` | Write spreadsheet cells with JSON range operations (set, append/insert/delete rows, fill_formula, sort, add_table, format, …) |
 | `hanji validate FILE` | Check a text against the grammar, and with `--doc` the document's style, layout and placeholder names |
-| `hanji export DOC PATH` | Write a revision to a file. Refused until surfaced content (comments, hidden text, metadata) is acknowledged (`--acknowledge-surfaced`); `--tracked-changes` for docx; `--format hwpx` or `docx` writes a Document in its other format and lists what did not cross |
+| `hanji export DOC PATH` | Write a revision to a file. Refused until surfaced content (comments, hidden text, metadata) is acknowledged (`--acknowledge-surfaced`); `--tracked-changes` for docx; `--format hwpx` or `docx` writes a Document in its other format and lists what did not cross; a path ending in `.hwp` writes an hwpx document as binary HWP, refused if anything would change |
 | `hanji reimport DOC PATH --base-rev N` | Bring back a file edited in Office or Hancom only if its exported base revision is still current; refuse if newer revisions were committed |
 | `hanji history DOC`, `hanji diff DOC A B` | List a document's revisions, and show the diff between two of them |
 | `hanji preview DOC` | Render PPTX slides, experimental DOCX/HWPX pages or a bounded XLSX worksheet window to HTML, SVG or PNG, with font and rendering diagnostics |
@@ -238,7 +238,13 @@ retain authoritative replacement semantics for compatibility.
 | Formulas | — | — | — | yes; changed formulas are recalculated |
 | Removed on open | macros, ActiveX, OLE, fetching fields, external links | scripts, OLE, linked files | macros, ActiveX, OLE, program actions, external links | macros, external links, DDE, connections |
 
-The old binary formats (.doc, .ppt, .xls, .hwp) are not supported.
+Hancom's binary .hwp (HWP 5.0, and HWP 3.0 to read) opens as an hwpx
+document through rhwp, known by its header, with rhwp's list of anything
+that did not cross. It exports as .hwpx; `hanji export DOC out.hwp` writes
+.hwp only when the file came back unchanged from .hwp to hwpx and back when
+it was opened, and the written .hwp reads back as the text. Otherwise the
+export is refused with what would change (DESIGN.md §5.6). The other old
+binary formats (.doc, .ppt, .xls) are not supported.
 
 ## What is verified
 

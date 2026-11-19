@@ -235,9 +235,12 @@ hwpx, in addition:
   import, as in docx.
 - §9 validity in Hancom: exports are re-opened with rhwp only; LibreOffice
   24.2 cannot open hwpx.
-- HWP 5.0 (`.hwp`): rhwp can convert it to hwpx (all 25 of rhwp's Hancom
-  `.hwp` samples then import and round-trip), but that puts rhwp's document
-  model on the import path and exports hwpx, not hwp.
+- Binary HWP (`.hwp`, feature `hwp`, on by default in `hanji-store`):
+  `hanji_hwpx::hwp` converts it to HWPX through rhwp and back, at the
+  container boundary; the engine sees only HWPX. An .hwp export is refused
+  unless the file's unedited round trip, rhwp's own check and hanji's
+  read-back all show no change (DESIGN.md §5.6, measured with
+  `hwp-roundtrip/`, which fetches rhwp from git and is not in the workspace).
 
 xlsx, in addition:
 

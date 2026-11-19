@@ -25,3 +25,11 @@ fetch mel-001.hwpx                               mel-001.hwpx                   
 fetch para-001.hwpx                              para-001.hwpx                                      3feded11906a573dda366b4299428bce2de573a153d11059fa8e1e26b6fc354d
 fetch table-text.hwpx                            table-text.hwpx                                    c31c5267c4c686cefd5b5df1056e0e4bc64d13c8c67dcdaeb2933a28e9df6c8f
 fetch tb-img-03.hwpx                             tb-img-03.hwpx                                     072faaadf15bc0786f22383d8231d3c5cdfe76e0181f3d7915c8bfead4f07d93
+
+# The binary HWP 5.0 fixtures (hwp/, DESIGN.md §5.6), from a later commit.
+RHWP=https://raw.githubusercontent.com/edwardkim/rhwp/981ce66b4183b13c1a3b5907e04a8969c8c42034/samples
+fetch hwp/eq-002.hwp                             eq-002.hwp                                         e3306c23cf1d991debb3fdf113e5f27c5a28e614e6c95c246afb18ce8a549ea9
+fetch hwp/footnote-01.hwp                        footnote-01.hwp                                    5bbc8a8fd23415aad59dd91d1eb261050946d9c64635933fcd49609ec2cc94e5
+fetch hwp/hcar-001.hwp                           hcar-001.hwp                                       1ba79b18b75745faad58da4844603f9f1e094fc48aa0d27330d806188f19ab6e
+fetch hwp/stroke.hwp                             issue8403/stroke.hwp                               1059be20e316c7b7342269cf4cd49637df1c313b0c505bab980758a9d6ead429
+fetch hwp/page-activated.hwp                     issue6133/156483831_poster_title_above_offset_float.hwp 1d2ecde2a4b34bf9abc5cfab8551f9b6bfc417d9013504dcdbbb07a41a62e4e8

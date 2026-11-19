@@ -12,13 +12,12 @@ application fidelity target.
 | DOCX | `hanji preview report.docx --format svg --out DIR` | `docx::render_with_fonts` or `render_document_with_fonts(DocumentKind::Docx, ...)` | Experimental, every page. Paragraphs, tables, images, headings, sections and headers/footers are exercised by actual files. Word pagination, vertical text, OfficeMath and legacy VML features can differ or be omitted. |
 | HWPX | `hanji preview plan.hwpx --format html --out DIR` | `hwpx::render_with_fonts` or `render_document_with_fonts(DocumentKind::Hwpx, ...)`, with feature `hwpx` | Experimental, every page. rhwp supplies source/table geometry, images and controls; Hanji selects drawing fonts and embeds subsets. Substitution does not trigger exact-font reflow. Table overflow/overlap counters are reported; the integration does not have comprehensive diagnostics for every unsupported Hancom control. |
 | XLSX/XLSM | `hanji preview book.xlsx --sheet NAME --range A1:H40 --format png --out DIR` | `xlsx::open_xlsx`, then `render_window_with_fonts` / `render_window_with_resolver` | One bounded worksheet window, not printed pages. Cached formula values only. No formula calculation, macros or external-link refresh. Charts, images, conditional formatting and print layout are omitted with diagnostics. |
-| Binary HWP, HML, legacy DOC/PPT/XLS, ODF | No preview entry point | No document-kind variant | These input formats are outside this preview integration. HWPX is a ZIP/XML format, not binary HWP. |
+| Binary HWP | `hanji preview plan.hwp --format html --out DIR` | Convert with `hanji_hwpx::hwp::to_hwpx` (feature `hwp`), then as HWPX | As HWPX: the .hwp is opened as the HWPX rhwp writes for it (DESIGN.md §5.6), so the preview is of what hanji would export. Known by its header, whatever the file is called. |
+| HML, legacy DOC/PPT/XLS, ODF | No preview entry point | No document-kind variant | These input formats are outside this preview integration. |
 
-rhwp itself can open binary HWP and HML. Hanji's HWPX adapter explicitly
-requires the ZIP/XML header, and its import/store format model excludes those
-inputs. A future preview-only adapter could use rhwp's parsers; that would
-require separate input routing and validation rather than removing a renderer
-page limit or adding editing support.
+rhwp itself can open HML. Hanji's HWPX adapter requires the ZIP/XML header;
+binary HWP reaches it only as the HWPX rhwp converts it to, at the store's
+open path.
 
 Output names retain `<doc>-r<rev>-slide-N` for PPTX and use
 `<doc>-r<rev>-page-N` for DOCX/HWPX. HTML has one viewer file. The JSON result

@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+- Open Hancom's binary .hwp (HWP 5.0; HWP 3.0 to read) as an hwpx
+  document through rhwp (DESIGN.md §5.6). The file is known by its header,
+  whatever it is called; `open` and `reimport` report what rhwp did not
+  carry across (`from_hwp.losses`), and `preview` takes an .hwp too. It
+  exports as .hwpx. `hanji export DOC out.hwp` (`ExportOptions::with_hwp`)
+  writes HWP 5.0 only when three checks find no change: the unedited file's
+  round trip through HWPX measured at open (`from_hwp.hwp_changes`), rhwp's
+  own write check, and the .hwp reading back as the revision's text.
+  Otherwise it is refused with the list. On rhwp's 833 sample .hwp files up
+  to 1 MB: 829 open, 715 can be saved back as .hwp, and every one of those
+  that took an edit (714) wrote an .hwp that reads back as the edit. New
+  feature `hwp` in `hanji-hwpx` (on by default in `hanji-store`), new
+  measurement tool `crates/hanji-hwpx/hwp-roundtrip`, and five .hwp
+  fixtures from rhwp's samples. HWPX colours read `#FFFFFFFF` (the HWP
+  COLORREF for none, which rhwp writes) as no colour. The plugin skill
+  still says .hwp is unsupported until a release carries this.
+
 - Bump rhwp from sinteric/rhwp `d2fdbebf` (0.8.7) to main `f705d7f` (0.9.1,
   sinteric/rhwp#7). The HWPX preview opens documents through
   `DocumentCore`, because rhwp 0.9.1 builds `wasm_api` only with its
