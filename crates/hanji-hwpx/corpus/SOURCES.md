@@ -50,5 +50,17 @@ tracked-changes spike: 0 of rhwp's 543 hwpx files have any), so the §10.2
 test writes the marks into a synthetic package itself (`tests/engine.rs`),
 in the shape the spike took from the OWPML schema.
 
-HWP 5.0 binaries are out of scope here; rhwp's samples include the `.hwp`
-originals of several of these files.
+## Binary HWP (`hwp/`)
+
+Five HWP 5.0 files for the .hwp path (DESIGN.md §5.6), from rhwp's samples
+at the later commit `981ce66b4183b13c1a3b5907e04a8969c8c42034` (MIT).
+Three are the `.hwp` originals of hwpx files above; one is renamed.
+`fetch.sh` checks them too.
+
+| File | Upstream (`samples/`) | What it exercises |
+|---|---|---|
+| hwp/eq-002.hwp | `eq-002.hwp` | equations; opens, edits and saves as .hwp with nothing lost |
+| hwp/footnote-01.hwp | `footnote-01.hwp` | footnotes and lists; the same |
+| hwp/hcar-001.hwp | `hcar-001.hwp` | the EV subsidy form: 3 sections, nested tables; the same |
+| hwp/stroke.hwp | `issue8403/stroke.hwp` (rhwp test) | precise character strokes (정밀 문자 획), which rhwp reads but reports it cannot write back: the refused .hwp export |
+| hwp/page-activated.hwp | `issue6133/156483831_poster_title_above_offset_float.hwp` (rhwp test: one page of an event-poster attachment) | a section without a column definition, which rhwp opens on the default A4 page as Hancom does: its declared margins do not come back from HWP to HWPX and back, so its .hwp export is refused |

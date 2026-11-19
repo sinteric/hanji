@@ -13,6 +13,11 @@ hanji-core.workspace = true
 hanji-package.workspace = true
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+rhwp = { workspace = true, optional = true }
+
+[features]
+# Binary HWP through rhwp (`hwp` module): read .hwp as HWPX, write HWPX back as .hwp.
+hwp = ["dep:rhwp"]
 
 [dev-dependencies]
 hanji-testkit.workspace = true

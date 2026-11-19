@@ -65,7 +65,7 @@ Found while testing the rules, and adopted:
 9. **Preserved content can be unsafe.** Active and remote content is
    neutralised on import; hidden content is surfaced before export (§8).
 10. **Format scope is decided up front.** Ruled 2026-09-28 — in: docx,
-    pptx, xlsx, hwp/hwpx; later or out: odt/odp/ods, legacy binary
+    pptx, xlsx, hwp/hwpx (binary .hwp as HWPX through rhwp, §5.6); later or out: odt/odp/ods, legacy binary
     doc/xls/ppt, Google formats (reachable by exporting them to OOXML).
 11. **Large files need partial views** — a 100-page Document or a 100k-row
     Spreadsheet is never one text blob in a prompt.
@@ -1286,6 +1286,77 @@ stored. The path's extension must be the target's.
   a table style (two of them); theme colours resolved in four docx. Not run:
   rhwp's re-open of the converted hwpx (`hanji-hwpx/validate`, which fetches
   rhwp from git), and Word and Hancom opening the files (§9).
+
+### 5.6 Binary HWP
+
+*Built 2026-11-19.* HWP 5.0 (`.hwp`) and HWPX are one document
+model in two containers: a CFB file of binary records, and a zip of OWPML.
+hanji edits an .hwp as the HWPX rhwp writes for it, and writes .hwp back
+only when the whole way round is measured to change nothing. HWP has no
+conversion to or from docx; this is the container, not another format.
+
+- **Open by the header, not the name.** A file that starts with the CFB
+  signature or `HWP Document File` (HWP 3.0) is binary HWP whatever it is
+  called; a zip named `.hwp` opens as the hwpx it is. rhwp refuses a CFB file
+  that is not HWP (a `.doc`, `.xls` or `.ppt`) and a DRM-protected one, as
+  `package` errors. The document is an hwpx document (`format: hwpx`); the
+  store remembers that it came from .hwp.
+- **In: rhwp's HWPX, with what did not cross.** `hanji_hwpx::hwp::to_hwpx` is
+  rhwp's `export-hwpx --verify`: rhwp's HWPX export, rhwp's content-loss
+  report, and its comparison of its model of the .hwp with its model of the
+  HWPX, without the differences that are only the containers' spelling of
+  one thing. The result's `from_hwp.losses` lists each line; the CLI prints
+  them. Then the HWPX engine imports the package as any other .hwpx (§8
+  runs). Preview and re-import take an .hwp the same way.
+- **Out: .hwpx by default.** An export is an .hwpx file; Hancom Office opens
+  it and can save it as .hwp.
+- **Out as .hwp only when nothing changes.** `export DOC out.hwp` (a path
+  ending in `.hwp`, or `ExportOptions::with_hwp` in the library) writes
+  HWP 5.0, for an hwpx document only. Three checks, and any line refuses the
+  export (`refused`, listing the lines, and pointing to .hwpx):
+  1. *At open*, the unedited round trip: the HWPX hanji exports for the
+     file, written as .hwp, against the original file, both as rhwp parses
+     them (`hwp::round_trip`; kept with the document as `hwp_changes`, and
+     in `from_hwp`). rhwp's model of an opened .hwp is what Hancom would
+     show, which is not always what the file declares (a section without
+     a column definition takes the default A4 page; an empty cell paragraph
+     gets a line), and rhwp's own .hwp save writes the original records
+     back where the way through HWPX cannot. Each direction's own check
+     compares against rhwp's model and does not see it.
+  2. *At export*, rhwp's `convert --verify`: its HWPX-to-HWP adapter on a
+     copy, the HWP write, its content-loss report, and its model of the
+     adapted document against its model of the .hwp written.
+  3. *At export*, hanji's own read-back: the .hwp read again through rhwp
+     and imported gives the revision's text, placeholder ids aside (an id
+     hashes the preserved XML, and rhwp writes the same object with other
+     bytes, which check 2 compared as a model).
+- **Found and worked around in rhwp 0.9.1:** its HWPX reader makes every
+  picture a link (`BinData` attribute 0), and the raw HWP writer writes that
+  as it is, so a .hwp made from HWPX lost its pictures; the adapter (check 2)
+  sets them back. rhwp writes the COLORREF for no colour as `#FFFFFFFF`
+  where Hancom writes `none`; hanji reads both as no colour.
+- **Measured (2026-11-19)** with `crates/hanji-hwpx/hwp-roundtrip` on rhwp's
+  833 sample `.hwp` files of 1 MB or less (81 larger ones were left out for
+  time):
+  - open: 829; 4 failed (3 are not HWP, 1 needs a password). 815 with no
+    loss line, 14 with some (field parameters, character shapes, metadata);
+  - import 829 of 829; GetPut 806 equal, 20 differ, 3 refused by hanji's
+    validator (a `- ` paragraph, a negative space after); an appended
+    paragraph exports and reads back (PutGet) for 814;
+  - check 1, the unedited round trip: 715 of 826 come back the same and can
+    be saved as .hwp. Of the other 111, 2 are rhwp's own losses (stroke
+    detail) and 109 change in the file: default A4 margins written for
+    declared ones, lines added to empty cell paragraphs, duplicate
+    page-number controls dropped, character-shape boundaries moved by
+    them, picture crop rectangles filled in, and in single files a cell
+    picture and a character overlap lost. rhwp's own .hwp save keeps 100 of
+    those 109 the same;
+  - checks 2 and 3 after the edit: 809 of 814 pass; the 5 refused lose cell
+    content or formatting. Of the 715 that pass check 1, 714 took the edit
+    and all 714 pass, so an edited document whose unedited round trip was
+    clean exported as .hwp in every case measured;
+  - rhwp alone (its parser, then its HWP writer): 820 of 833 unchanged.
+  - Not run: Hancom opening the written .hwp files (§9).
 
 ## 6. Fluency — designed for, then measured
 

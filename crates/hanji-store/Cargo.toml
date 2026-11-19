@@ -18,5 +18,11 @@ hanji-xlsx = { path = "../hanji-xlsx" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 
+[features]
+default = ["hwp"]
+# Binary .hwp through rhwp (DESIGN.md §5.6): opened as HWPX, written back as
+# .hwp when rhwp's check finds nothing lost.
+hwp = ["hanji-hwpx/hwp"]
+
 [lints]
 workspace = true

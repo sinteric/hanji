@@ -88,6 +88,14 @@ pub struct DocRecord {
     /// The file it was opened from.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub source: Option<String>,
+    /// The file was binary HWP, opened as the HWPX rhwp wrote for it (§5.6).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub from_hwp: bool,
+    /// What saving the file as .hwp unedited would change, measured when it
+    /// was opened or re-imported from .hwp ([`FromHwp::hwp_changes`]). An .hwp
+    /// export is refused while this is not empty.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub hwp_changes: Vec<String>,
     pub head: u32,
     pub revisions: Vec<Revision>,
 }
@@ -126,6 +134,20 @@ impl From<&hanji_core::ImportReport> for ImportReport {
     }
 }
 
+/// A binary HWP file read through rhwp as HWPX (§5.6): what did not cross,
+/// rhwp's content-loss entries and the differences between rhwp's model of
+/// the .hwp and of the HWPX it wrote. Empty when nothing was lost.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
+#[non_exhaustive]
+pub struct FromHwp {
+    pub losses: Vec<String>,
+    /// What saving the file as .hwp again, unedited, would change: the HWPX
+    /// written back as .hwp and compared with the original file. Empty when
+    /// it comes back the same, which an .hwp export needs.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub hwp_changes: Vec<String>,
+}
+
 #[derive(Clone, Debug, Serialize)]
 #[non_exhaustive]
 pub struct Opened {
@@ -137,6 +159,9 @@ pub struct Opened {
     pub template: Option<String>,
     pub lines: usize,
     pub report: ImportReport,
+    /// The file was binary HWP: it was opened as HWPX through rhwp.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_hwp: Option<FromHwp>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -243,6 +268,9 @@ pub struct ExportOptions {
     /// other one (docx ↔ hwpx, §3), with a report of what did not cross.
     /// Another type's format is refused.
     pub format: Option<Format>,
+    /// Write an hwpx Document as binary HWP 5.0 through rhwp (§5.6). Refused,
+    /// with what would be lost, unless rhwp's check finds nothing lost.
+    pub hwp: bool,
 }
 
 impl ExportOptions {
@@ -251,6 +279,7 @@ impl ExportOptions {
         acknowledge_surfaced: true,
         tracked_changes: false,
         format: None,
+        hwp: false,
     };
 
     pub fn new(
@@ -262,6 +291,7 @@ impl ExportOptions {
             acknowledge_surfaced,
             tracked_changes,
             format,
+            hwp: false,
         }
     }
 
@@ -272,6 +302,12 @@ impl ExportOptions {
 
     pub fn with_tracked_changes(mut self) -> ExportOptions {
         self.tracked_changes = true;
+        self
+    }
+
+    /// Write binary HWP instead of HWPX (an hwpx Document only).
+    pub fn with_hwp(mut self) -> ExportOptions {
+        self.hwp = true;
         self
     }
 }
@@ -292,6 +328,9 @@ pub struct Exported {
     /// An export in the document's other format: what it did not carry across.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub conversion: Option<Conversion>,
+    /// The bytes are binary HWP 5.0, which rhwp wrote and checked: nothing was lost.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub hwp: bool,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -306,6 +345,9 @@ pub struct Reimported {
     /// The person's changes to the text, as a unified diff, followed by
     /// bounded cell value/formula/cache changes for a Spreadsheet.
     pub diff: String,
+    /// The file was binary HWP: it was read as HWPX through rhwp.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub from_hwp: Option<FromHwp>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -487,6 +529,137 @@ fn engine_err(e: hanji_core::EngineError) -> Error {
     }
 }
 
+/// Binary HWP in (§5.6): the HWPX rhwp writes for it, and what did not cross.
+fn hwp_in(bytes: &[u8]) -> Result<(Vec<u8>, FromHwp)> {
+    #[cfg(feature = "hwp")]
+    {
+        use hanji_core::Engine;
+        let c = hanji_hwpx::hwp::to_hwpx(bytes)?;
+        // The round trip of the HWPX hanji will export for the unedited file.
+        let engine = hanji_hwpx::HwpxEngine;
+        let imp = engine.import(&c.bytes, &ImportOptions::default())?;
+        let ours = engine.export(&imp.text, &imp.remainder)?;
+        let hwp_changes = hanji_hwpx::hwp::round_trip(bytes, &ours)?;
+        Ok((
+            c.bytes,
+            FromHwp {
+                losses: c.losses,
+                hwp_changes,
+            },
+        ))
+    }
+    #[cfg(not(feature = "hwp"))]
+    {
+        let _ = bytes;
+        Err(hwp_off())
+    }
+}
+
+/// HWPX out as binary HWP (§5.6), refused with what would be lost. A
+/// document opened from .hwp must have come back unchanged from the round
+/// trip measured then ([`DocRecord::hwp_changes`]); rhwp checks its own
+/// write (its model of the .hwp against its model of the HWPX); and the .hwp
+/// read back through rhwp must give `text`, the text of the HWPX, so nothing
+/// hanji shows is lost either.
+fn hwp_out(doc: &DocRecord, rev: u32, hwpx: &[u8], text: &str) -> Result<Vec<u8>> {
+    let refused = |what: &str, losses: &[String]| {
+        let list: Vec<String> = losses.iter().map(|l| format!("- {l}")).collect();
+        Error::new(
+            Code::Refused,
+            format!(
+                "rhwp cannot write revision {rev} of {} as .hwp without losing content{what}:\n{}\nExport it as .hwpx instead: Hancom Office opens that and can save it as .hwp.",
+                doc.id,
+                list.join("\n")
+            ),
+        )
+    };
+    if !doc.hwp_changes.is_empty() {
+        return Err(refused(
+            ": the .hwp it was read from does not come back the same even unedited (measured when it was read)",
+            &doc.hwp_changes,
+        ));
+    }
+    #[cfg(feature = "hwp")]
+    {
+        let c = hanji_hwpx::hwp::to_hwp(hwpx)?;
+        let mut losses = c.losses;
+        if losses.is_empty() {
+            use hanji_core::Engine;
+            let back = hanji_hwpx::hwp::to_hwpx(&c.bytes)?;
+            let read = hanji_hwpx::HwpxEngine.import(&back.bytes, &ImportOptions::default())?;
+            let (text, read) = (without_keep_ids(text), without_keep_ids(&read.text));
+            let (a, b): (Vec<&str>, Vec<&str>) = (text.lines().collect(), read.lines().collect());
+            if a != b {
+                let k = a
+                    .iter()
+                    .zip(&b)
+                    .position(|(x, y)| x != y)
+                    .unwrap_or(a.len().min(b.len()));
+                losses.push(format!(
+                    "the .hwp reads back as other text from line {}: {:?} became {:?}",
+                    k + 1,
+                    a.get(k).unwrap_or(&""),
+                    b.get(k).unwrap_or(&"")
+                ));
+            }
+        }
+        if losses.is_empty() {
+            return Ok(c.bytes);
+        }
+        Err(refused("", &losses))
+    }
+    #[cfg(not(feature = "hwp"))]
+    {
+        let _ = (refused, hwpx, text);
+        Err(hwp_off())
+    }
+}
+
+/// The text with each placeholder's id blank. An id names the preserved
+/// XML it stands for by its bytes, and rhwp writes the same object again with
+/// other bytes (its own attribute order and instance ids), which its check
+/// has already compared as a model.
+#[cfg(feature = "hwp")]
+fn without_keep_ids(text: &str) -> String {
+    const ID: &str = "<keep id=\"";
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(k) = rest.find(ID) {
+        out.push_str(&rest[..k + ID.len()]);
+        rest = &rest[k + ID.len()..];
+        rest = rest.find('"').map_or("", |e| &rest[e..]);
+    }
+    out.push_str(rest);
+    out
+}
+
+#[cfg(not(feature = "hwp"))]
+fn hwp_off() -> Error {
+    Error::new(
+        Code::Unsupported,
+        "this build of hanji has no binary HWP support (the hwp feature is off): use .hwpx, which Hancom Office opens and saves.",
+    )
+}
+
+/// The format of a file by its bytes and name: binary HWP by its header
+/// (opened as hwpx), a zip package by its extension. `None` for binary HWP
+/// means the bytes need [`hwp_in`] first.
+fn format_of(name: &str, bytes: &[u8]) -> std::result::Result<Option<Format>, Error> {
+    if hanji_hwpx::hwp::is_hwp(bytes) {
+        return Ok(None);
+    }
+    let ext = name.rsplit_once('.').map(|e| e.1.to_lowercase());
+    // An .hwp that is a zip package is HWPX under the old extension.
+    if ext.as_deref() == Some("hwp") && bytes.starts_with(b"PK\x03\x04") {
+        return Ok(Some(Format::Hwpx));
+    }
+    Format::of_name(name).map(Some).ok_or_else(|| {
+        Error::bad(format!(
+            "cannot tell the format of {name:?}: hanji opens .docx, .hwp, .hwpx, .pptx and .xlsx files."
+        ))
+    })
+}
+
 impl<S: Storage> Workspace<S> {
     pub fn new(storage: S) -> Workspace<S> {
         Workspace { storage }
@@ -661,6 +834,7 @@ impl<S: Storage> Workspace<S> {
         Ok(out)
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn import(
         &mut self,
         id_from: &str,
@@ -669,6 +843,7 @@ impl<S: Storage> Workspace<S> {
         template: Option<String>,
         source: Option<String>,
         op: RevOp,
+        from_hwp: Option<FromHwp>,
     ) -> Result<Opened> {
         let opts = ImportOptions::default().with_template(template.clone());
         let imp = format.engine().import(bytes, &opts)?;
@@ -679,6 +854,11 @@ impl<S: Storage> Workspace<S> {
             format,
             template: template.clone(),
             source,
+            from_hwp: from_hwp.is_some(),
+            hwp_changes: from_hwp
+                .as_ref()
+                .map(|f| f.hwp_changes.clone())
+                .unwrap_or_default(),
             head: 0,
             revisions: vec![],
         };
@@ -699,21 +879,34 @@ impl<S: Storage> Workspace<S> {
             template,
             lines: imp.text.lines().count(),
             report: (&imp.report).into(),
+            from_hwp,
         })
     }
 
     /// Import a package (§8 neutralisation runs); `name` gives its format
-    /// and the document id.
+    /// and the document id. Binary HWP, known by its header, opens as the
+    /// HWPX rhwp writes for it, with what did not cross (§5.6).
     pub fn open_bytes(
         &mut self,
         name: &str,
         bytes: &[u8],
         source: Option<String>,
     ) -> Result<Opened> {
-        let format = Format::of_name(name).ok_or_else(|| {
-            Error::bad(format!("cannot tell the format of {name:?}: hanji opens .docx, .hwpx, .pptx and .xlsx files."))
-        })?;
-        self.import(name, format, bytes, None, source, RevOp::Open)
+        match format_of(name, bytes)? {
+            Some(format) => self.import(name, format, bytes, None, source, RevOp::Open, None),
+            None => {
+                let (hwpx, from) = hwp_in(bytes)?;
+                self.import(
+                    name,
+                    Format::Hwpx,
+                    &hwpx,
+                    None,
+                    source,
+                    RevOp::Open,
+                    Some(from),
+                )
+            }
+        }
     }
 
     /// A new file of `ty` (rule 3): the blank package of its format, or a
@@ -744,7 +937,7 @@ impl<S: Storage> Workspace<S> {
             None => (blank::package(format), None),
         };
         let name = reference.clone().unwrap_or_else(|| ty.name().to_string());
-        self.import(&name, format, &bytes, reference, None, RevOp::New)
+        self.import(&name, format, &bytes, reference, None, RevOp::New, None)
     }
 
     /// A revision's text (the current one by default), or the part `w` asks
@@ -1019,6 +1212,13 @@ impl<S: Storage> Workspace<S> {
         let rev = revision.unwrap_or(doc.head);
         let (text, rem) = self.revision(&doc, rev)?;
         let target = opts.format.unwrap_or(doc.format);
+        if opts.hwp && target != Format::Hwpx {
+            return Err(Error::bad(format!(
+                ".hwp is HWPX in a binary container; {} exports as {}, not as hwpx.",
+                doc.id,
+                target.name()
+            )));
+        }
         let engine = target.engine();
         let (bytes, conversion) = if target != doc.format {
             convert::refuse_across(doc.format, target)?;
@@ -1054,6 +1254,11 @@ impl<S: Storage> Workspace<S> {
             e.detail.surfaced = surfaced;
             return Err(e);
         }
+        let bytes = if opts.hwp {
+            hwp_out(&doc, rev, &bytes, &back.text)?
+        } else {
+            bytes
+        };
         let out = Exported {
             doc_id: doc.id,
             revision: rev,
@@ -1063,6 +1268,7 @@ impl<S: Storage> Workspace<S> {
             digest: format!("fnv1a64:{:016x}", fnv1a(bytes.iter().copied())),
             surfaced,
             conversion,
+            hwp: opts.hwp,
         };
         Ok((out, bytes))
     }
@@ -1153,14 +1359,31 @@ impl<S: Storage> Workspace<S> {
         name: &str,
         bytes: &[u8],
     ) -> Result<Reimported> {
-        if let Some(f) = Format::of_name(name).filter(|f| *f != doc.format) {
-            return Err(Error::bad(format!(
-                "{} is a {} document; {name:?} is {}.",
-                doc.id,
-                doc.format.name(),
-                f.name()
-            )));
-        }
+        let (hwpx, from_hwp) = if hanji_hwpx::hwp::is_hwp(bytes) {
+            if doc.format != Format::Hwpx {
+                return Err(Error::bad(format!(
+                    "{} is a {} document; {name:?} is binary HWP, which re-imports into an hwpx document.",
+                    doc.id,
+                    doc.format.name()
+                )));
+            }
+            let (hwpx, from) = hwp_in(bytes)?;
+            doc.from_hwp = true;
+            doc.hwp_changes = from.hwp_changes.clone();
+            (Some(hwpx), Some(from))
+        } else {
+            let named = format_of(name, bytes).ok().flatten();
+            if let Some(f) = named.filter(|f| *f != doc.format) {
+                return Err(Error::bad(format!(
+                    "{} is a {} document; {name:?} is {}.",
+                    doc.id,
+                    doc.format.name(),
+                    f.name()
+                )));
+            }
+            (None, None)
+        };
+        let bytes = hwpx.as_deref().unwrap_or(bytes);
         let opts = ImportOptions::default().with_template(doc.template.clone());
         let imp = doc.format.engine().import(bytes, &opts)?;
         let parent = doc.head;
@@ -1187,6 +1410,7 @@ impl<S: Storage> Workspace<S> {
                 unchanged: true,
                 report,
                 diff,
+                from_hwp,
             });
         }
         if doc.format == Format::Xlsx && diff.is_empty() {
@@ -1207,6 +1431,7 @@ impl<S: Storage> Workspace<S> {
             unchanged: false,
             report,
             diff,
+            from_hwp,
         })
     }
 
@@ -1526,15 +1751,21 @@ mod native {
             path: &Path,
             opts: &ExportOptions,
         ) -> Result<Exported> {
-            let (mut out, bytes) = self.export_bytes(id, revision, opts)?;
-            // The extension must be the format's own: an export carries no macros.
+            // A path ending in .hwp asks for binary HWP (§5.6).
             let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase());
+            let hwp = opts.hwp || ext.as_deref() == Some("hwp");
+            let opts = ExportOptions {
+                hwp,
+                ..opts.clone()
+            };
+            let (mut out, bytes) = self.export_bytes(id, revision, &opts)?;
+            // The extension must be the format's own: an export carries no macros.
+            let own = if out.hwp { "hwp" } else { out.format.name() };
             if ext.as_deref().is_some_and(|e| {
-                e != out.format.name() && Format::of_name(&format!("x.{e}")).is_some()
+                e != own && (e == "hwp" || Format::of_name(&format!("x.{e}")).is_some())
             }) {
                 return Err(Error::bad(format!(
-                    "{id} exports as .{}; {} names another kind of file.",
-                    out.format.name(),
+                    "{id} exports as .{own}; {} names another kind of file.",
                     path.display()
                 )));
             }

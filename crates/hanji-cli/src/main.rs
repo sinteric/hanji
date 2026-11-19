@@ -34,6 +34,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Cmd {
     /// Open a file as a new document (active and remote content is neutralised).
+    /// A binary .hwp opens as hwpx through rhwp, with what did not cross.
     Open { path: PathBuf },
     /// Make a new document from a blank package or a template.
     New {
@@ -96,7 +97,8 @@ enum Cmd {
         #[arg(long)]
         doc: Option<String>,
     },
-    /// Export a revision to a file.
+    /// Export a revision to a file. An hwpx document exported to a path
+    /// ending in .hwp is written as binary HWP, refused if anything would be lost.
     Export {
         doc: String,
         path: PathBuf,
@@ -114,7 +116,7 @@ enum Cmd {
     },
     /// Render PPTX slides, experimental DOCX/HWPX pages or an XLSX window to HTML, SVG or PNG.
     Preview {
-        /// A stored document or a .docx/.pptx/.xlsx/.hwpx file (file previews are not stored).
+        /// A stored document or a .docx/.pptx/.xlsx/.hwpx/.hwp file (file previews are not stored).
         doc: String,
         #[arg(long)]
         rev: Option<u32>,
@@ -213,7 +215,11 @@ fn preview(
 ) -> Result<Out> {
     let opts = hanji_preview::Options::with_font_dirs(font_dirs);
     let path = Path::new(doc);
-    let file_format = path.is_file().then(|| Format::of_name(doc)).flatten();
+    // A binary .hwp previews as the hwpx it opens as (§5.6).
+    let of_file = |d: &str| {
+        Format::of_name(d).or_else(|| d.to_lowercase().ends_with(".hwp").then_some(Format::Hwpx))
+    };
+    let file_format = path.is_file().then(|| of_file(doc)).flatten();
     if file_format.is_some() && rev.is_some() {
         return Err(Error::bad(
             "--rev names a revision of a stored document; a file is previewed as it is.",
@@ -356,6 +362,31 @@ fn out<T: Serialize>(v: &T, text: String) -> Out {
     }
 }
 
+/// What did not cross from a binary HWP file to HWPX (§5.6).
+fn hwp_lines(from: Option<&hanji_store::FromHwp>) -> String {
+    let Some(f) = from else {
+        return String::new();
+    };
+    let mut s = if f.losses.is_empty() {
+        "read from binary HWP through rhwp: nothing lost\n".to_string()
+    } else {
+        format!(
+            "read from binary HWP through rhwp: {} lost\n",
+            f.losses.len()
+        )
+    };
+    for l in &f.losses {
+        s.push_str(&format!("lost from the .hwp: {l}\n"));
+    }
+    if !f.hwp_changes.is_empty() {
+        s.push_str("saving it as .hwp again would change it, so it exports as .hwpx only:\n");
+    }
+    for l in &f.hwp_changes {
+        s.push_str(&format!("- {l}\n"));
+    }
+    s
+}
+
 fn report_lines(r: &ImportReport) -> String {
     let mut s = String::new();
     for (what, list) in [
@@ -417,13 +448,14 @@ fn run(cli: Cli) -> Result<Out> {
         Cmd::Open { path } => {
             let o = ws.open(&path)?;
             let t = format!(
-                "opened {} as {} ({} {}), revision {}, {} lines\n{}",
+                "opened {} as {} ({} {}), revision {}, {} lines\n{}{}",
                 path.display(),
                 o.doc_id,
                 o.format.name(),
                 o.doc_type.name(),
                 o.revision,
                 o.lines,
+                hwp_lines(o.from_hwp.as_ref()),
                 report_lines(&o.report)
             );
             out(&o, t)
@@ -565,6 +597,9 @@ fn run(cli: Cli) -> Result<Out> {
                 e.doc_id,
                 e.digest
             );
+            if e.hwp {
+                t.push_str("written as binary HWP through rhwp, checked: nothing lost\n");
+            }
             for s in &e.surfaced {
                 t.push_str(&format!(
                     "left with the file (acknowledged): {} at {}: {}\n",
@@ -613,10 +648,11 @@ fn run(cli: Cli) -> Result<Out> {
                 )
             } else {
                 format!(
-                    "{}: revision {} (re-imported {})\n{}{}",
+                    "{}: revision {} (re-imported {})\n{}{}{}",
                     r.doc_id,
                     r.revision,
                     path.display(),
+                    hwp_lines(r.from_hwp.as_ref()),
                     report_lines(&r.report),
                     r.diff
                 )

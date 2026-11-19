@@ -1,0 +1,18 @@
+[package]
+name = "hwp-roundtrip"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Measures .hwp through hanji (rhwp to HWPX, hanji's HWPX engine, rhwp back to HWP) over a folder of .hwp files. Not part of the workspace: rhwp comes from git and is large."
+
+# Standalone: an empty [workspace] keeps this crate out of the hanji workspace build.
+[workspace]
+
+[dependencies]
+hanji-core = { path = "../../hanji-core" }
+hanji-package = { path = "../../hanji-package" }
+hanji-hwpx = { path = "..", features = ["hwp"] }
+rhwp = { git = "https://github.com/sinteric/rhwp", rev = "f705d7fbadac017be9810dce4ad2597f2131f70b", default-features = false }
+
+[profile.release]
+debug = false
