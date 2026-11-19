@@ -348,9 +348,14 @@ fn draw(layout: &Layout, index: usize, width: u32, height: u32, exact: bool) -> 
                         t.pre_concat(em),
                         mask,
                     );
-                    if run.embolden {
+                    let stroke = match (run.stroke, run.embolden) {
+                        (Some(w), _) => Some(w),
+                        (None, true) => Some(page::EMBOLDEN_EM * run.size),
+                        (None, false) => None,
+                    };
+                    if let Some(width) = stroke {
                         let s = tiny_skia::Stroke {
-                            width: (page::EMBOLDEN_EM * run.size) as f32,
+                            width: width as f32,
                             line_cap: tiny_skia::LineCap::Round,
                             line_join: tiny_skia::LineJoin::Round,
                             ..Default::default()
