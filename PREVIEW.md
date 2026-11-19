@@ -56,8 +56,8 @@ contextual spacing, PowerPoint placeholder inheritance by type and chart text
 defaults to main, which merges upstream S95.4 on top of S95.2, S95.3, S95.11,
 S94 (zip 9.0.3), S93 and the chart-legend-omitted layout diagnostic
 (sinteric/rdocx#20).
-This is a renderer-family update, not an isolated syntax patch. HWPX uses rhwp 0.8.7 from sinteric/rhwp main
-(`d2fdbebf32e5182bb7f2e365ed9642bf7f5a9924`, zip 9.0.4).
+This is a renderer-family update, not an isolated syntax patch. HWPX uses rhwp 0.9.1 from sinteric/rhwp main
+(`f705d7fbadac017be9810dce4ad2597f2131f70b`, sinteric/rhwp#7, zip 9.0.4).
 `Cargo.toml` records exact revision pins and `Cargo.lock` records the resolved
 source. A crate's version alone does not identify these fork patches.
 

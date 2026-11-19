@@ -9,5 +9,5 @@ description = "Re-opens every hwpx export of the corpus test with rhwp (§9 vali
 [workspace]
 
 [dependencies]
-rhwp = { git = "https://github.com/edwardkim/rhwp", rev = "680111ec7bea2fe11110de18c3676ba5a1cf7847", default-features = false }
-zip = { version = "8", default-features = false, features = ["deflate"] }
+rhwp = { git = "https://github.com/sinteric/rhwp", rev = "f705d7fbadac017be9810dce4ad2597f2131f70b", default-features = false }
+zip = { version = "9.0.4", default-features = false, features = ["deflate"] }

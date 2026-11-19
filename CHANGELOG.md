@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- Bump rhwp from sinteric/rhwp `d2fdbebf` (0.8.7) to main `f705d7f` (0.9.1,
+  sinteric/rhwp#7). The HWPX preview opens documents through
+  `DocumentCore`, because rhwp 0.9.1 builds `wasm_api` only with its
+  `wasm-api` feature. rhwp now vendors its svg2pdf fork, so the workspace
+  `[patch.crates-io]` entry for it is gone. `hanji-hwpx/validate` now pins
+  the same sinteric/rhwp revision (it pinned upstream edwardkim/rhwp
+  `680111ec`) and zip 9.0.4.
 - Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx#25 (`571ebef`,
   on main, which has #24): tensorbee/rdocx S96 sprint sync (Word 0.17.0 /
   PowerPoint 0.15.0 / shared OOXML 0.15.0). The Hanji tbRl header/footer
