@@ -5,8 +5,10 @@ Hanji renders previews with two forks: [sinteric/rhwp](https://github.com/sinter
 [sinteric/rdocx](https://github.com/sinteric/rdocx) (from
 [tensorbee/rdocx](https://github.com/tensorbee/rdocx), which also holds rpptx and
 oxml-layout). Each fork is upstream `main` plus a small set of Hanji patches.
-A scheduled task brings upstream `main` into each fork once a day, and then
-moves Hanji's pins in `Cargo.toml` to the result.
+A scheduled task brings upstream `main` into each fork once a day, at 10:44
+Korea time, and then moves Hanji's pins in `Cargo.toml` to the result. The
+rhwp maintainers are in Korea, so a late-morning run picks up a release from
+the night before.
 
 [`scripts/sync-forks.py`](../scripts/sync-forks.py) does the git work. Its
 docstring has the commands. This page is the procedure, and the daily task
