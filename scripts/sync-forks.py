@@ -170,7 +170,10 @@ def status(name):
         pin_state = "inconsistent"
     else:
         git(repo, "fetch", "--quiet", "origin", pin, check=False)
-        if git(repo, "rev-parse", f"{pin}^{{tree}}", check=False) == git(repo, "rev-parse", "refs/remotes/origin/main^{tree}"):
+        # A fork commit that only touches its own CI (.github/) changes nothing Hanji builds.
+        same = subprocess.run(["git", "-C", repo, "diff", "--quiet", pin, "refs/remotes/origin/main",
+                               "--", ".", ":(exclude).github"]).returncode == 0
+        if same:
             pin_state = "current"
         elif is_ancestor(repo, pin, main):
             pin_state = "behind"
