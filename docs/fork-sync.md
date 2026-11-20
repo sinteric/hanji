@@ -71,7 +71,8 @@ commit (not squash): the pinned commit is then part of the fork's `main`, and
 
 A fork PR merged without an upstream sync (a new Hanji patch, for example)
 leaves Hanji's pin behind. Open the same Hanji pin PR with the fork's `main`
-head, as in step 6.
+head, as in step 6. A fork PR that changes only the fork's `.github/` does not
+count: `status` still reports the pin as current.
 
 ## Disk
 
