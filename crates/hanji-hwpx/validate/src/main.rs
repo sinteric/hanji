@@ -29,7 +29,7 @@ fn marks(pkg: &[u8]) -> usize {
     let mut n = 0;
     for i in 0..z.len() {
         let mut f = z.by_index(i).unwrap();
-        if f.name().starts_with("Contents/section") {
+        if f.name().unwrap().starts_with("Contents/section") {
             let mut s = String::new();
             std::io::Read::read_to_string(&mut f, &mut s).unwrap();
             n += ["<hp:insertBegin", "<hp:insertEnd", "<hp:deleteBegin", "<hp:deleteEnd"]

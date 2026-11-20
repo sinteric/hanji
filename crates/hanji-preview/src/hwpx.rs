@@ -69,7 +69,7 @@ fn resolve(bytes: &[u8]) -> Result<Resolved, String> {
         );
     }
     drop(parts);
-    let document = rhwp::wasm_api::HwpDocument::from_bytes(bytes)
+    let document = rhwp::document_core::DocumentCore::from_bytes(bytes)
         .map_err(|e| format!("rhwp cannot open the HWPX document: {e}"))?;
     let mut pages = Vec::new();
     let mut diagnostics = Vec::new();
