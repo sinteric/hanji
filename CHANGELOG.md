@@ -2,12 +2,15 @@
 
 ## Unreleased
 
+- Lay out vertical (tbRl) DOCX bodies in their written margin band, as Word
+  16.114 and rdocx's default do. DOCX preview and layout loads no longer call
+  `Document::set_vertical_story_clearance(true)`, so a tall header or footer
+  no longer pushes vertical body text inward. This retires Hanji's use of the
+  sinteric/rdocx clearance reservation.
 - Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx#25 (`571ebef`,
   on main, which has #24): tensorbee/rdocx S96 sprint sync (Word 0.17.0 /
   PowerPoint 0.15.0 / shared OOXML 0.15.0). The Hanji tbRl header/footer
-  clearance reservation is now opt-in; DOCX preview and layout loads call
-  `Document::set_vertical_story_clearance(true)` so vertical text still
-  keeps clear of headers and footers.
+  clearance reservation is now opt-in.
 - Show XLSX drawing shapes as editable `<shape name="Tip"
   anchor="B25:D27">text</shape>` lines and grouped shapes as a
   `<group name="Group 1">` … `</group>` wrapper (fluency round 7 A)

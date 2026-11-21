@@ -65,14 +65,11 @@ pub fn render_native_with_limits(
 
 /// Load a DOCX for layout, preview or page count.
 ///
-/// sinteric/rdocx#25 made the Hanji tbRl header/footer clearance reservation
-/// opt-in (default false, matching Word). Hanji still needs the old
-/// reservation, so every render/layout load turns it on.
+/// A vertical (tbRl) body keeps its written margin band, as in Word 16.114
+/// and rdocx's default. Hanji no longer turns on the fork's opt-in
+/// header/footer clearance reservation.
 fn open_document(bytes: &[u8]) -> Result<rdocx::Document, String> {
-    let mut document = rdocx::Document::from_bytes(bytes)
-        .map_err(|e| format!("rdocx cannot open the document: {e}"))?;
-    document.set_vertical_story_clearance(true);
-    Ok(document)
+    rdocx::Document::from_bytes(bytes).map_err(|e| format!("rdocx cannot open the document: {e}"))
 }
 
 fn embedded_fonts(document: &rdocx::Document) -> Vec<FontFile> {
