@@ -7,6 +7,9 @@
   `Document::set_vertical_story_clearance(true)`, so a tall header or footer
   no longer pushes vertical body text inward. This retires Hanji's use of the
   sinteric/rdocx clearance reservation.
+- Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx#27 (`dbf115f`),
+  which removes the now unused opt-in clearance reservation from the fork.
+  Rendered output is unchanged.
 - Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx#25 (`571ebef`,
   on main, which has #24): tensorbee/rdocx S96 sprint sync (Word 0.17.0 /
   PowerPoint 0.15.0 / shared OOXML 0.15.0). The Hanji tbRl header/footer
