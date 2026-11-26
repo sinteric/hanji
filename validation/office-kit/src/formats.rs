@@ -32,7 +32,7 @@ impl Format for Docx {
         Ok((b, r, rep, format!("tables {}/{} kept {:?}", s.tables_modelled, s.tables_kept, s.kept_reasons)))
     }
     fn text_of(&self, blocks: &[Block], rem: &Remainder) -> String {
-        DocxEngine::text_of(blocks, rem, None)
+        DocxEngine::text_of(blocks.to_vec(), rem, None)
     }
     fn export_blocks(&self, blocks: &[Block], rem: &Remainder) -> Result<(Vec<u8>, bool), EngineError> {
         let doc = export_document(blocks, rem)?;
@@ -86,7 +86,7 @@ impl Format for Pptx {
         Ok((b, r, rep, line))
     }
     fn text_of(&self, blocks: &[Block], rem: &Remainder) -> String {
-        PptxEngine::text_of(blocks, rem, None)
+        PptxEngine::text_of(blocks.to_vec(), rem, None)
     }
     fn export_blocks(&self, blocks: &[Block], rem: &Remainder) -> Result<(Vec<u8>, bool), EngineError> {
         let parts = export_parts(blocks, rem)?;
@@ -150,7 +150,7 @@ impl Format for Hwpx {
         Ok((b, r, rep, line))
     }
     fn text_of(&self, blocks: &[Block], rem: &Remainder) -> String {
-        HwpxEngine::text_of(blocks, rem, None)
+        HwpxEngine::text_of(blocks.to_vec(), rem, None)
     }
     fn export_blocks(&self, blocks: &[Block], rem: &Remainder) -> Result<(Vec<u8>, bool), EngineError> {
         let out = export_sections(blocks, rem)?;

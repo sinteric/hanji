@@ -395,7 +395,7 @@ fn docx(kit: &mut Kit) {
         let out = DocxEngine.export(&r.text, &r.remainder).unwrap_or_else(|e| panic!("{source}: {e}"));
         let again = DocxEngine.import(&out, &ImportOptions::default()).unwrap();
         // The canonical text adds the style lines of the styles it uses (§5.2).
-        assert_eq!(again.text, DocxEngine::text_of(&r.new, &r.remainder, None), "{source}: PutGet");
+        assert_eq!(again.text, DocxEngine::text_of(r.new.clone(), &r.remainder, None), "{source}: PutGet");
         kit.add(
             "docx",
             source,
@@ -1252,7 +1252,7 @@ fn hwpx(kit: &mut Kit) {
                 let (_, mut blocks) = hanji_core::model_of(&r.text, &r.remainder, CAPS).unwrap();
                 let mut done = r.remainder.clone();
                 HwpxEngine::complete(&mut blocks, &mut done);
-                let new_text = HwpxEngine::text_of(&blocks, &done, None);
+                let new_text = HwpxEngine::text_of(blocks, &done, None);
                 let out = HwpxEngine.export(&new_text, &done).unwrap();
                 hwpx_layout_ok(name, "e10", &out);
                 let back = HwpxEngine.import(&out, &ImportOptions::default()).unwrap();
