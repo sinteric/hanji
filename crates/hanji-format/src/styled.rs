@@ -150,7 +150,7 @@ pub fn common_text(inl: &Inline) -> Props {
     };
     let mut out = first.props.only(&Key::TEXT);
     for u in units {
-        out.0.retain(|k, v| u.props.get(*k) == Some(v));
+        out.retain(|k, v| u.props.get(k) == Some(v));
     }
     out
 }

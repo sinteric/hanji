@@ -74,7 +74,7 @@ fn run(body: &str, edits: &[(&str, &str)]) -> Result<String, EngineError> {
         h.push(&r)?;
         // The text as the store returns it: canonical, with the style
         // lines of the styles it now uses.
-        t = DocxEngine::text_of(&r.new, &r.remainder, None);
+        t = DocxEngine::text_of(r.new.clone(), &r.remainder, None);
         rem = r.remainder;
     }
     let out = DocxEngine.export_with(&t, &rem, &tracked(), Some(&h))?;

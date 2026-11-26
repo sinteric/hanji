@@ -256,82 +256,107 @@ impl fmt::Display for Value {
 }
 
 /// A set of properties: each key at most once.
+///
+/// Held as a box that is absent when the set is empty, never as an empty
+/// map: every character carries a set ([`crate::Unit::props`]) and nearly
+/// every one is empty, so this is 8 bytes where a map is 24.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct Props(pub BTreeMap<Key, Value>);
+#[expect(
+    clippy::box_collection,
+    reason = "the box is the point: 8 bytes a character, not 24"
+)]
+pub struct Props(Option<Box<BTreeMap<Key, Value>>>);
 
 impl Props {
-    pub fn new() -> Props {
-        Props::default()
+    /// The empty set.
+    pub const EMPTY: Props = Props(None);
+
+    pub const fn new() -> Props {
+        Props::EMPTY
     }
 
     pub fn is_empty(&self) -> bool {
-        self.0.is_empty()
+        self.0.is_none()
     }
 
     pub fn get(&self, k: Key) -> Option<&Value> {
-        self.0.get(&k)
+        self.0.as_ref()?.get(&k)
     }
 
     pub fn has(&self, k: Key) -> bool {
-        self.0.contains_key(&k)
+        self.0.as_ref().is_some_and(|m| m.contains_key(&k))
     }
 
     pub fn set(&mut self, k: Key, v: Value) {
-        self.0.insert(k, v);
+        self.0.get_or_insert_with(Box::default).insert(k, v);
     }
 
     pub fn remove(&mut self, k: Key) -> Option<Value> {
-        self.0.remove(&k)
+        let map = self.0.as_mut()?;
+        let removed = map.remove(&k);
+        if map.is_empty() {
+            self.0 = None;
+        }
+        removed
+    }
+
+    /// Keep only the properties `keep` says yes to.
+    pub fn retain(&mut self, mut keep: impl FnMut(Key, &Value) -> bool) {
+        if let Some(map) = self.0.as_mut() {
+            map.retain(|k, v| keep(*k, v));
+            if map.is_empty() {
+                self.0 = None;
+            }
+        }
     }
 
     pub fn iter(&self) -> impl Iterator<Item = (Key, &Value)> {
-        self.0.iter().map(|(k, v)| (*k, v))
+        self.0.iter().flat_map(|m| m.iter()).map(|(k, v)| (*k, v))
+    }
+
+    /// Each property with its value, to change in place.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Key, &mut Value)> {
+        self.0
+            .iter_mut()
+            .flat_map(|m| m.iter_mut())
+            .map(|(k, v)| (*k, v))
     }
 
     pub fn keys(&self) -> impl Iterator<Item = Key> + '_ {
-        self.0.keys().copied()
+        self.iter().map(|(k, _)| k)
     }
 
     /// The properties of `keys` only.
     pub fn only(&self, keys: &[Key]) -> Props {
-        Props(
-            self.0
-                .iter()
-                .filter(|(k, _)| keys.contains(k))
-                .map(|(k, v)| (*k, v.clone()))
-                .collect(),
-        )
+        self.iter()
+            .filter(|(k, _)| keys.contains(k))
+            .map(|(k, v)| (k, v.clone()))
+            .collect()
     }
 
     /// Without the properties of `keys`.
     pub fn without(&self, keys: &[Key]) -> Props {
-        Props(
-            self.0
-                .iter()
-                .filter(|(k, _)| !keys.contains(k))
-                .map(|(k, v)| (*k, v.clone()))
-                .collect(),
-        )
+        self.iter()
+            .filter(|(k, _)| !keys.contains(k))
+            .map(|(k, v)| (k, v.clone()))
+            .collect()
     }
 
     /// `self` with `over`'s properties on top.
     pub fn overlay(&self, over: &Props) -> Props {
         let mut out = self.clone();
-        for (k, v) in &over.0 {
-            out.0.insert(*k, v.clone());
+        for (k, v) in over.iter() {
+            out.set(k, v.clone());
         }
         out
     }
 
     /// The properties of `self` that `base` does not have with the same value.
     pub fn diff(&self, base: &Props) -> Props {
-        Props(
-            self.0
-                .iter()
-                .filter(|(k, v)| base.0.get(k) != Some(v))
-                .map(|(k, v)| (*k, v.clone()))
-                .collect(),
-        )
+        self.iter()
+            .filter(|(k, v)| base.get(*k) != Some(*v))
+            .map(|(k, v)| (k, v.clone()))
+            .collect()
     }
 
     /// Canonical text, no braces: canonical key order, `border` for four
@@ -354,6 +379,13 @@ impl Props {
             });
         }
         out.join(" ")
+    }
+}
+
+impl FromIterator<(Key, Value)> for Props {
+    fn from_iter<I: IntoIterator<Item = (Key, Value)>>(items: I) -> Props {
+        let map: BTreeMap<Key, Value> = items.into_iter().collect();
+        Props((!map.is_empty()).then(|| Box::new(map)))
     }
 }
 

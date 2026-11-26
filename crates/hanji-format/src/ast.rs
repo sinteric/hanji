@@ -533,7 +533,7 @@ impl Table {
 }
 
 /// An empty property set.
-pub static NO_PROPS: Props = Props(std::collections::BTreeMap::new());
+pub static NO_PROPS: Props = Props::EMPTY;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -652,11 +652,13 @@ pub enum Atom {
     Char(char),
     /// `<br/>`.
     Break,
-    /// Inline `<keep/>`.
-    Keep(Keep),
+    /// Inline `<keep/>`. Boxed, as [`Atom::NoteRef`] is, because an atom is
+    /// held once per character: unboxed, these two made every character's
+    /// [`Unit`] 104 bytes.
+    Keep(Box<Keep>),
     /// `[^label]`; the definition's body is stored so canonical form can
     /// emit `[^label]: body` (DESIGN.md §5.1).
-    NoteRef(Note),
+    NoteRef(Box<Note>),
     /// `$…$`, kept opaque.
     Math(String),
     /// `<comment>…</comment>`: a DOCX comment body's text (DESIGN.md §5.1).
@@ -942,7 +944,7 @@ pub(crate) fn normalize_blocks(blocks: &mut [Block]) {
                 {
                     let u = &p.content.units[0];
                     match &u.atom {
-                        Atom::Keep(k) if u.marks.is_empty() => *b = Block::Keep(k.clone()),
+                        Atom::Keep(k) if u.marks.is_empty() => *b = Block::Keep((**k).clone()),
                         Atom::PageBreak => *b = Block::PageBreak,
                         _ => {}
                     }

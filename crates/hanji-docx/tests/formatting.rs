@@ -115,7 +115,7 @@ fn formatting_edits_rewrite_only_what_they_change() {
     );
     let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
     // PutGet: the export reads back as the canonical text.
-    let canonical = DocxEngine::text_of(&r.new, &r.remainder, None);
+    let canonical = DocxEngine::text_of(r.new.clone(), &r.remainder, None);
     assert_eq!(
         DocxEngine
             .import(&out, &ImportOptions::default())
@@ -264,7 +264,7 @@ fn a_table_s_own_position_reads_and_writes_back_child_by_child() {
     let check = |list: &[(&str, &str)], stored: &str, becomes: &str| {
         let r = edits(t, rem, list);
         let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
-        let canonical = DocxEngine::text_of(&r.new, &r.remainder, None);
+        let canonical = DocxEngine::text_of(r.new.clone(), &r.remainder, None);
         assert_eq!(
             DocxEngine
                 .import(&out, &ImportOptions::default())
@@ -333,7 +333,7 @@ fn a_table_s_own_position_reads_and_writes_back_child_by_child() {
             .import(&out, &ImportOptions::default())
             .unwrap()
             .text,
-        DocxEngine::text_of(&r.new, &r.remainder, None)
+        DocxEngine::text_of(r.new.clone(), &r.remainder, None)
     );
     let x0 = tblpr(&source);
     let x1 = x0.replace(

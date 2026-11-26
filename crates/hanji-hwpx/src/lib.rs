@@ -71,8 +71,9 @@ fn section_parts(parts: &[hanji_core::Part]) -> Vec<String> {
 }
 
 impl HwpxEngine {
-    /// Model text for resolved blocks and a remainder.
-    pub fn text_of(blocks: &[Block], rem: &Remainder, template: Option<&str>) -> String {
+    /// Model text for resolved blocks and a remainder. It takes the blocks
+    /// (`hanji_core::model::unresolve`).
+    pub fn text_of(blocks: Vec<Block>, rem: &Remainder, template: Option<&str>) -> String {
         let front = FrontMatter::document("hwpx", template);
         let d = hanji_core::model::unresolve(blocks, &rem.styles, front, &|id| {
             rem.keep(id).cloned().expect("keep in remainder")
@@ -172,7 +173,7 @@ impl Engine for HwpxEngine {
 
     fn import(&self, package: &[u8], opts: &ImportOptions) -> Result<Imported, EngineError> {
         let (blocks, remainder, report, _) = Self::split(package, opts)?;
-        let text = Self::text_of(&blocks, &remainder, opts.template.as_deref());
+        let text = Self::text_of(blocks, &remainder, opts.template.as_deref());
         Ok(Imported::new(text, remainder, report))
     }
 
@@ -255,6 +256,7 @@ impl HwpxEngine {
                     .collect();
             }
         }
+        let unshown = rem.first_by_path(|e| e.kind == Kind::Ppr && e.meta.unshown);
         let mut fill = |path: Vec<usize>, style: &str, content: &mut Inline, props: &mut Props| {
             format::snap_props(props);
             for u in &mut content.units {
@@ -263,13 +265,11 @@ impl HwpxEngine {
             if !styled::shows(content) {
                 return;
             }
-            let Some(e) = rem
-                .entries
-                .iter_mut()
-                .find(|e| e.kind == Kind::Ppr && e.path == path && e.meta.unshown)
-            else {
+            // Each path comes once, so the first unshown entry is still unshown.
+            let Some(&i) = unshown.get(&path) else {
                 return;
             };
+            let e = &mut rem.entries[i];
             e.meta.unshown = false;
             if !props.is_empty() {
                 return;
@@ -328,11 +328,8 @@ impl HwpxEngine {
     /// its shape; unless its text writes an indent of its own.
     fn level_indents(blocks: &mut [Block], rem: &Remainder, header: &Header, f: &export::Fmt) {
         let ind = import::LIST_INDENT;
-        let own = |bi: usize| {
-            rem.entries
-                .iter()
-                .find(|e| e.kind == Kind::Ppr && e.path == [bi])
-        };
+        let ppr = rem.first_by_path(|e| e.kind == Kind::Ppr);
+        let own = |bi: usize| ppr.get([bi].as_slice()).map(|&i| &rem.entries[i]);
         fn item_of(b: &Block) -> Option<(hanji_core::ListItem, &hanji_core::Para)> {
             match b {
                 Block::Para(p) => p.item.map(|i| (i, p)),

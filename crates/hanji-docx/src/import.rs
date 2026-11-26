@@ -913,7 +913,7 @@ impl<'a> Importer<'a> {
                 }
                 let pos = self.pos();
                 let keep = self.keep_entry(Kind::Keep, &kids[i..=end], path, Some(pos), None);
-                self.push(Atom::Keep(keep), Marks::NONE);
+                self.push(Atom::Keep(Box::new(keep)), Marks::NONE);
                 i = end + 1;
                 continue;
             }
@@ -999,7 +999,7 @@ impl<'a> Importer<'a> {
             } else {
                 let pos = self.pos();
                 let keep = self.keep_entry(Kind::Keep, &[k], path, Some(pos), None);
-                self.push(Atom::Keep(keep), Marks::NONE);
+                self.push(Atom::Keep(Box::new(keep)), Marks::NONE);
             }
             i += 1;
         }
@@ -1114,7 +1114,10 @@ impl<'a> Importer<'a> {
             None,
             meta,
         );
-        self.push(Atom::NoteRef(Note { label, body, kind }), Marks::NONE);
+        self.push(
+            Atom::NoteRef(Box::new(Note { label, body, kind })),
+            Marks::NONE,
+        );
         let end = self.pos();
         let close = self.seq();
         let e = &mut self.entries[idx];
@@ -1320,7 +1323,7 @@ impl<'a> Importer<'a> {
                 _ => {
                     let pos = self.pos();
                     let keep = self.keep_entry(Kind::Keep, &[c], path, Some(pos), Some(run_id));
-                    self.push(Atom::Keep(keep), marks);
+                    self.push(Atom::Keep(Box::new(keep)), marks);
                 }
             }
         }

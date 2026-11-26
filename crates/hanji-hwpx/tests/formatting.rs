@@ -152,7 +152,7 @@ fn formatting_edits_add_shapes_cloned_from_the_element_s() {
     let (_, mut blocks) = hanji_core::model_of(&r.text, &r.remainder, CAPS).unwrap();
     let mut rem = r.remainder.clone();
     HwpxEngine::complete(&mut blocks, &mut rem);
-    let text = HwpxEngine::text_of(&blocks, &rem, None);
+    let text = HwpxEngine::text_of(blocks, &rem, None);
     assert!(
         text.contains(
             "<style name=\"Callout\" fill=#FFF2CC border-left=\"1.98pt solid #C00000\"/>"

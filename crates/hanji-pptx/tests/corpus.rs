@@ -42,7 +42,7 @@ impl Format for Pptx {
         Ok((b, r, rep, line))
     }
     fn text_of(&self, blocks: &[Block], rem: &Remainder) -> String {
-        PptxEngine::text_of(blocks, rem, None)
+        PptxEngine::text_of(blocks.to_vec(), rem, None)
     }
     fn export_blocks(
         &self,

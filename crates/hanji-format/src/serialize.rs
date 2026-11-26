@@ -238,7 +238,7 @@ fn with_own(content: &Inline, props: &Props, base: &Props, tl: &Props) -> (Strin
         common = Some(match common {
             None => e,
             Some(mut c) => {
-                c.0.retain(|k, v| e.get(*k) == Some(v));
+                c.retain(|k, v| e.get(k) == Some(v));
                 c
             }
         });

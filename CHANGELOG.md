@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- Write and edit no longer take time quadratic in a document's paragraphs:
+  DOCX and HWPX completion searched the remainder from the front for every
+  paragraph's entry, and now looks each up in one index
+  (`Remainder::first_by_path`). A one-word write to a DOCX of 142,336 short
+  paragraphs took 325 s and now takes 21 s (2026-11-26).
+- A character's unit is 48 bytes instead of 104: `Atom::Keep` and
+  `Atom::NoteRef` are boxed, and `Props` holds no map while it is empty (its
+  map is private now; `iter_mut`, `retain` and `FromIterator` replace reaching
+  into it). `text_of` and `model::unresolve` take the blocks by value instead
+  of copying them. Importing that DOCX peaked at 2.6 GiB and now at 0.9 GiB.
 - Draw an HWPX text's bold or italic synthetically when the face hanji chose
   has none, in the page display list and the PNG preview, as rhwp does. usvg
   synthesizes neither, so bold text was drawn regular wherever only a regular

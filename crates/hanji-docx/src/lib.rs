@@ -73,9 +73,10 @@ impl DocShell {
 }
 
 impl DocxEngine {
-    /// Model text for resolved blocks and a remainder.
+    /// Model text for resolved blocks and a remainder. It takes the blocks
+    /// (`hanji_core::model::unresolve`).
     pub fn text_of(
-        blocks: &[hanji_core::Block],
+        blocks: Vec<hanji_core::Block>,
         rem: &Remainder,
         template: Option<&str>,
     ) -> String {
@@ -98,17 +99,16 @@ impl DocxEngine {
         }
         let f = export::Fmt::new(&rem.styles, format::Theme::read(&rem.parts));
         let default_id = rem.styles.default_paragraph_id().to_string();
+        let unshown = rem.first_by_path(|e| e.kind == Kind::Ppr && e.meta.unshown);
         let mut fill = |path: Vec<usize>, style: &str, content: &Inline, props: &mut Props| {
             if !styled::shows(content) {
                 return;
             }
-            let Some(e) = rem
-                .entries
-                .iter_mut()
-                .find(|e| e.kind == Kind::Ppr && e.path == path && e.meta.unshown)
-            else {
+            // Each path comes once, so the first unshown entry is still unshown.
+            let Some(&i) = unshown.get(&path) else {
                 return;
             };
+            let e = &mut rem.entries[i];
             e.meta.unshown = false;
             if props.is_empty() {
                 let style = if style.is_empty() {
@@ -291,7 +291,7 @@ impl Engine for DocxEngine {
 
     fn import(&self, package: &[u8], opts: &ImportOptions) -> Result<Imported, EngineError> {
         let (blocks, remainder, report, _) = Self::split(package, opts)?;
-        let text = Self::text_of(&blocks, &remainder, opts.template.as_deref());
+        let text = Self::text_of(blocks, &remainder, opts.template.as_deref());
         Ok(Imported::new(text, remainder, report))
     }
 

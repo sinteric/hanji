@@ -2,6 +2,8 @@
 //! revision, the namespace map once per document, and the package parts the
 //! engine copies through.
 
+use std::collections::HashMap;
+
 use crate::model::{ListItem, Path, StyleSet};
 use hanji_format::{Keep, Marks};
 use serde::{Deserialize, Serialize};
@@ -235,6 +237,21 @@ impl Remainder {
 
     pub fn keep(&self, id: &str) -> Option<&Keep> {
         self.keeps().find(|(k, _)| k.id == id).map(|(k, _)| k)
+    }
+
+    /// The index of the first entry `pick` takes at each path: what a search
+    /// from the front for that path finds, in one pass. A caller that looks
+    /// up every paragraph uses this, since a search per paragraph is
+    /// quadratic (a 10,000-paragraph docx write spent a third of its time in
+    /// one).
+    pub fn first_by_path(&self, pick: impl Fn(&Entry) -> bool) -> HashMap<Path, usize> {
+        let mut at = HashMap::new();
+        for (i, e) in self.entries.iter().enumerate() {
+            if pick(e) {
+                at.entry(e.path.clone()).or_insert(i);
+            }
+        }
+        at
     }
 
     /// The entry list as JSON lines (one entry per line, for inspection).

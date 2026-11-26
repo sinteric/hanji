@@ -261,11 +261,11 @@ fn random_inline(r: &mut Rng, notes: &mut Vec<String>, allow_spans: bool) -> Inl
         }
         let atom = match r.below(20) {
             0 => Atom::Break,
-            1 => Atom::Keep(Keep {
+            1 => Atom::Keep(Box::new(Keep {
                 id: format!("k{}", r.below(99)),
                 kind: "drawing".into(),
                 summary: "a \"b\" <c> & d".into(),
-            }),
+            })),
             // Bodies `$…$` cannot hold are written <math>…</math>.
             2 => Atom::Math(
                 [
@@ -284,11 +284,11 @@ fn random_inline(r: &mut Rng, notes: &mut Vec<String>, allow_spans: bool) -> Inl
             3 => {
                 let l = format!("n{}", r.below(3));
                 notes.push(l.clone());
-                Atom::NoteRef(Note {
+                Atom::NoteRef(Box::new(Note {
                     label: l,
                     body: String::new(),
                     kind: NoteKind::Footnote,
-                })
+                }))
             }
             4 => Atom::Comment(["note", "re-check", "a $ b", ""][r.below(4)].into()),
             5 => Atom::Ins(["added", "8%", "a $ b", ""][r.below(4)].into()),
@@ -1128,4 +1128,18 @@ fn the_design_md_example_parses() {
     assert_eq!(got, [(false, 0), (false, 1), (true, 0)]);
     let again = serialize(&d);
     assert_eq!(parse(&again).unwrap(), d);
+}
+
+/// A document holds one unit per character, so a unit's size multiplies by
+/// the text's length: at 104 bytes, importing a docx of 142,336 short
+/// paragraphs peaked at 2.6 GiB (2026-11-26). The rare atoms are boxed and an
+/// empty property set holds no map, which keeps it at 48.
+#[test]
+#[cfg(target_pointer_width = "64")]
+fn a_unit_stays_small() {
+    assert!(
+        size_of::<Unit>() <= 48,
+        "a unit is {} bytes",
+        size_of::<Unit>()
+    );
 }

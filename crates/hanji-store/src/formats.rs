@@ -177,7 +177,8 @@ impl Format {
     }
 
     /// The canonical text of resolved blocks (Documents and Presentations).
-    pub fn text_of(self, blocks: &[Block], rem: &Remainder, template: Option<&str>) -> String {
+    /// It takes the blocks (`hanji_core::model::unresolve`).
+    pub fn text_of(self, blocks: Vec<Block>, rem: &Remainder, template: Option<&str>) -> String {
         match self {
             Format::Docx => DocxEngine::text_of(blocks, rem, template),
             Format::Hwpx => HwpxEngine::text_of(blocks, rem, template),
