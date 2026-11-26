@@ -198,7 +198,7 @@ fn completed(text: &str, rem: &hanji_core::Remainder) -> (String, hanji_core::Re
     let (_, mut blocks) = hanji_core::model_of(text, rem, CAPS).unwrap();
     let mut rem = rem.clone();
     HwpxEngine::complete(&mut blocks, &mut rem);
-    (HwpxEngine::text_of(&blocks, &rem, None), rem)
+    (HwpxEngine::text_of(blocks, &rem, None), rem)
 }
 
 fn section(pkg: &[u8]) -> String {

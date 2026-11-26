@@ -747,7 +747,8 @@ impl Importer<'_> {
                 _ => {
                     let pos = self.buf.len();
                     let keep = self.keep_entry(Kind::Keep, c, &path, Some(pos), "", "");
-                    self.buf.push(Unit::new(Atom::Keep(keep), Marks::NONE));
+                    self.buf
+                        .push(Unit::new(Atom::Keep(Box::new(keep)), Marks::NONE));
                     self.ustyle.push(TextStyle::default());
                 }
             }

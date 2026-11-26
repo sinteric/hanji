@@ -54,7 +54,7 @@ impl Format for Docx {
         ))
     }
     fn text_of(&self, blocks: &[Block], rem: &Remainder) -> String {
-        DocxEngine::text_of(blocks, rem, None)
+        DocxEngine::text_of(blocks.to_vec(), rem, None)
     }
     fn export_blocks(
         &self,
@@ -312,7 +312,7 @@ fn reviewer() -> ExportOptions {
 
 fn text_of_package(pkg: &[u8]) -> Result<String, String> {
     let (b, r, _, _) = DocxEngine::split(pkg, &RAW).map_err(|e| e.to_string())?;
-    Ok(DocxEngine::text_of(&b, &r, None))
+    Ok(DocxEngine::text_of(b, &r, None))
 }
 
 /// §10.2's gate, the automatable part: with the option off, export is

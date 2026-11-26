@@ -108,8 +108,8 @@ pub fn snap(k: Key, v: &Value) -> Value {
 
 /// [`snap`] on every value of `p`.
 pub fn snap_props(p: &mut Props) {
-    for (k, v) in p.0.iter_mut() {
-        *v = snap(*k, v);
+    for (k, v) in p.iter_mut() {
+        *v = snap(k, v);
     }
 }
 

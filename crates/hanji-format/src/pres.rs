@@ -481,7 +481,7 @@ fn object(p: &mut Parser, i: usize) -> Option<(ObjectItem, ItemMap)> {
             content,
             ..
         }) if content.units.len() == 1 => match &content.units[0].atom {
-            Atom::Keep(k) => k.clone(),
+            Atom::Keep(k) => (**k).clone(),
             _ => return None,
         },
         Block::Keep(k) => k,

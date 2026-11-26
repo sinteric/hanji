@@ -1510,11 +1510,11 @@ impl<'a> Parser<'a> {
                         self.refs.push((line, col_of(x), label.clone()));
                         st.push(
                             off,
-                            Atom::NoteRef(Note {
+                            Atom::NoteRef(Box::new(Note {
                                 kind: NoteKind::from_label(&label),
                                 body: String::new(),
                                 label,
-                            }),
+                            })),
                         );
                         x = end + 1;
                         continue;
@@ -1665,7 +1665,7 @@ impl<'a> Parser<'a> {
                             }
                             let k = self.keep_tag(line, &tag)?;
                             self.keeps.push((line, col_of(x), k.clone()));
-                            st.push(off, Atom::Keep(k));
+                            st.push(off, Atom::Keep(Box::new(k)));
                         }
                         ("field", false) if !tag.self_closing => {
                             if st.field.is_some() || st.link.is_some() {

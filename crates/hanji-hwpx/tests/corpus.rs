@@ -38,7 +38,7 @@ impl Format for Hwpx {
         Ok((b, r, rep, line))
     }
     fn text_of(&self, blocks: &[Block], rem: &Remainder) -> String {
-        HwpxEngine::text_of(blocks, rem, None)
+        HwpxEngine::text_of(blocks.to_vec(), rem, None)
     }
     fn export_blocks(
         &self,
@@ -146,7 +146,7 @@ fn a_new_table_can_be_added_to_every_file() {
         let (_, mut blocks) = hanji_core::model_of(&r.text, &r.remainder, caps).unwrap();
         let mut rem = r.remainder.clone();
         HwpxEngine::complete(&mut blocks, &mut rem);
-        let text = HwpxEngine::text_of(&blocks, &rem, None);
+        let text = HwpxEngine::text_of(blocks, &rem, None);
         let bytes = HwpxEngine
             .export(&text, &rem)
             .unwrap_or_else(|e| panic!("{name}: {e}"));

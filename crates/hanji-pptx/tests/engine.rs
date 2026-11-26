@@ -27,7 +27,7 @@ fn canonical(text: &str, rem: &Remainder) -> String {
     let (blocks, _) = PptxModel
         .resolve(text, rem, CAPS)
         .unwrap_or_else(|e| panic!("{e:?}"));
-    PptxEngine::text_of(&blocks, rem, None)
+    PptxEngine::text_of(blocks, rem, None)
 }
 
 /// Exports `text`, checks that the export reads back as its canonical form, and returns its parts.

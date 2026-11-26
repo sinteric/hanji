@@ -132,7 +132,7 @@ fn missing_styles_part_keeps_ordinary_text_and_direct_formatting_edits() {
                 .import(&out, &ImportOptions::default())
                 .unwrap()
                 .text,
-            DocxEngine::text_of(&r.new, &r.remainder, None),
+            DocxEngine::text_of(r.new.clone(), &r.remainder, None),
         );
     }
 }
@@ -460,7 +460,7 @@ fn an_existing_styles_part_still_accepts_style_edits() {
             .import(&out, &ImportOptions::default())
             .unwrap()
             .text,
-        DocxEngine::text_of(&r.new, &r.remainder, None),
+        DocxEngine::text_of(r.new.clone(), &r.remainder, None),
     );
     let parts = package::read(&out).unwrap();
     let styles = std::str::from_utf8(package::get(&parts, "word/styles.xml").unwrap()).unwrap();
@@ -1561,7 +1561,7 @@ fn adjacent_lists_of_another_kind_stay_separate() {
         .unwrap();
         let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
         // The canonical text lists the style the new items are in.
-        let canonical = DocxEngine::text_of(&r.new, &r.remainder, None);
+        let canonical = DocxEngine::text_of(r.new.clone(), &r.remainder, None);
         assert_eq!(
             DocxEngine
                 .import(&out, &ImportOptions::default())
@@ -1594,7 +1594,7 @@ fn adjacent_lists_of_another_kind_stay_separate() {
         CAPS,
     )
     .unwrap();
-    let canonical = DocxEngine::text_of(&r.new, &r.remainder, None);
+    let canonical = DocxEngine::text_of(r.new.clone(), &r.remainder, None);
     assert!(
         canonical.contains("\n- a\n\n1. one\n\nend\n"),
         "{canonical}"
@@ -1665,7 +1665,7 @@ fn the_design_example_round_trips() {
     .unwrap();
     // Its canonical form (as the store keeps it) has a blank line after the
     // heading and between the bullet and the numbered list.
-    let canonical = DocxEngine::text_of(&r.new, &r.remainder, None);
+    let canonical = DocxEngine::text_of(r.new.clone(), &r.remainder, None);
     assert!(
         canonical.contains("- 신규 고객 34곳\n  - 수도권 21곳\n\n1. 다음 분기 목표\n"),
         "{canonical}"
@@ -1772,7 +1772,7 @@ fn a_new_table_takes_the_default_table_style_and_reads_back() {
             .text
             .replace("end\n", &format!("{{style=\"{style}\"}}\n{table}\nend\n"));
         let r = rewrite(&imp.remainder, &imp.text, &new, CAPS).unwrap();
-        let canonical = DocxEngine::text_of(&r.new, &r.remainder, None);
+        let canonical = DocxEngine::text_of(r.new.clone(), &r.remainder, None);
         assert_eq!(canonical.contains("{style="), line, "{style}: {canonical}");
         let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
         assert_eq!(

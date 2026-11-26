@@ -727,7 +727,8 @@ impl<'a> Importer<'a> {
                     let pos = self.buf.len();
                     let keep =
                         self.keep_entry(Kind::Keep, e, path, Some(pos), None, &keep_kind(&e.name));
-                    self.buf.push(Unit::new(Atom::Keep(keep), Marks::NONE));
+                    self.buf
+                        .push(Unit::new(Atom::Keep(Box::new(keep)), Marks::NONE));
                     self.unit_cp.push(u32::MAX);
                 }
                 n if is_blank(n) => {}
@@ -964,7 +965,7 @@ impl<'a> Importer<'a> {
                 }
                 let pos = self.buf.len();
                 let keep = self.keep_entry(Kind::Keep, c, path, Some(pos), Some(run_id), &kind);
-                self.push(Atom::Keep(keep), marks);
+                self.push(Atom::Keep(Box::new(keep)), marks);
             }
             prev_t = is_t;
         }
@@ -988,7 +989,7 @@ impl<'a> Importer<'a> {
         let Some(body) = shown_auto_num(e) else {
             let pos = self.buf.len();
             let keep = self.keep_entry(Kind::Keep, e, path, Some(pos), Some(run_id), "number");
-            self.push(Atom::Keep(keep), marks);
+            self.push(Atom::Keep(Box::new(keep)), marks);
             return;
         };
         let fp_el = fingerprint_auto_num(e);
@@ -1069,7 +1070,7 @@ impl<'a> Importer<'a> {
         let Some(script) = shown_script(e) else {
             let pos = self.buf.len();
             let keep = self.keep_entry(Kind::Keep, e, path, Some(pos), Some(run_id), "math");
-            self.push(Atom::Keep(keep), marks);
+            self.push(Atom::Keep(Box::new(keep)), marks);
             return;
         };
         let mut fp_el = e.clone();
@@ -1106,7 +1107,7 @@ impl<'a> Importer<'a> {
         let Some((kind, body)) = shown_note(c) else {
             let pos = self.buf.len();
             let keep = self.keep_entry(Kind::Keep, c, path, Some(pos), Some(run_id), "footnote");
-            self.push(Atom::Keep(keep), marks);
+            self.push(Atom::Keep(Box::new(keep)), marks);
             return;
         };
         let label = match kind {
@@ -1144,7 +1145,7 @@ impl<'a> Importer<'a> {
                 ..Default::default()
             },
         );
-        self.push(Atom::NoteRef(Note { label, body, kind }), marks);
+        self.push(Atom::NoteRef(Box::new(Note { label, body, kind })), marks);
         let end = self.buf.len();
         let close = self.seq();
         let w = &mut self.entries[idx];

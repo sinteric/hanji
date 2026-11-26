@@ -286,9 +286,10 @@ pub fn resolve(
     }
 }
 
-/// Flat blocks → the Presentation AST, in canonical shape.
+/// Flat blocks → the Presentation AST, in canonical shape. It takes the
+/// blocks, as [`model::unresolve`] does.
 pub fn unresolve(
-    blocks: &[Block],
+    blocks: Vec<Block>,
     front: fmt::FrontMatter,
     keep: &dyn Fn(&str) -> fmt::Keep,
 ) -> fmt::Presentation {
@@ -297,16 +298,22 @@ pub fn unresolve(
         front: front.clone(),
         slides: vec![],
     };
-    let mut k = 0;
-    while k < blocks.len() {
-        let Block::Head(h) = &blocks[k] else {
-            k += 1; // not held by a head: a malformed model
-            continue;
-        };
-        let end = (k + 1..blocks.len())
-            .find(|&x| blocks[x].head().is_some())
-            .unwrap_or(blocks.len());
-        let body = &blocks[k + 1..end];
+    // Each head with the blocks it holds, up to the next head, taken rather
+    // than copied (a slot's text moves into the AST). A block no head holds
+    // is a malformed model's, and is left out.
+    let mut held: Vec<(Head, Vec<Block>)> = vec![];
+    for b in blocks {
+        match b {
+            Block::Head(h) => held.push((h, vec![])),
+            other => {
+                if let Some((_, body)) = held.last_mut() {
+                    body.push(other);
+                }
+            }
+        }
+    }
+    for (h, body) in held {
+        let h = &h;
         let geom = geom_of(h);
         match kind(h) {
             HeadKind::Slide { layout } => pres.slides.push(fmt::Slide {
@@ -326,9 +333,9 @@ pub fn unresolve(
             }
             HeadKind::Shape { id, name } => {
                 let paras = body
-                    .iter()
+                    .into_iter()
                     .filter_map(|b| match b {
-                        Block::Para(Para { content, .. }) => Some(content.clone()),
+                        Block::Para(Para { content, .. }) => Some(content),
                         _ => None,
                     })
                     .collect();
@@ -372,7 +379,6 @@ pub fn unresolve(
                 }
             }
         }
-        k = end;
     }
     pres.normalize();
     pres

@@ -8,7 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 use hanji_core::model::paras;
 use hanji_core::{Block, Entry, Kind, Part};
-use hanji_format::{Atom, Note, NoteKind};
+use hanji_format::{Atom, NoteKind};
 use hanji_package::package;
 use hanji_package::xml::{self, Element, Node};
 
@@ -222,8 +222,8 @@ fn shown_bodies(blocks: &[Block], entries: &[Entry], tag: &str) -> HashMap<Strin
             continue;
         };
         let Some(s) = e.start else { continue };
-        if let Some(Atom::NoteRef(Note { body, .. })) = inl.units.get(s).map(|u| &u.atom) {
-            out.insert(id, body.clone());
+        if let Some(Atom::NoteRef(note)) = inl.units.get(s).map(|u| &u.atom) {
+            out.insert(id, note.body.clone());
         }
     }
     out

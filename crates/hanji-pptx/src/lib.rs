@@ -374,8 +374,9 @@ fn check_size(text: &str, size: Option<(i64, i64)>) -> Result<(), Vec<Diagnostic
 }
 
 impl PptxEngine {
-    /// Model text for resolved blocks and a remainder.
-    pub fn text_of(blocks: &[Block], rem: &Remainder, template: Option<&str>) -> String {
+    /// Model text for resolved blocks and a remainder. It takes the blocks
+    /// (`hanji_core::model::unresolve`).
+    pub fn text_of(blocks: Vec<Block>, rem: &Remainder, template: Option<&str>) -> String {
         let mut front = FrontMatter::presentation("pptx", template);
         front.size = DeckShell::of(rem).ok().and_then(|s| s.deck.size);
         let p = hanji_core::presentation::unresolve(blocks, front, &|id| {
@@ -564,7 +565,7 @@ impl Engine for PptxEngine {
 
     fn import(&self, package: &[u8], opts: &ImportOptions) -> Result<Imported, EngineError> {
         let (blocks, remainder, report, _) = Self::split(package, opts)?;
-        let text = Self::text_of(&blocks, &remainder, opts.template.as_deref());
+        let text = Self::text_of(blocks, &remainder, opts.template.as_deref());
         Ok(Imported::new(text, remainder, report))
     }
 

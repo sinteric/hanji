@@ -435,7 +435,7 @@ pub fn resolve(
                 Some(true) => out.push(Block::Keep(k.id.clone())),
                 Some(false) => out.push(para(
                     styles.default_paragraph.clone(),
-                    single(Atom::Keep(k.clone())),
+                    single(Atom::Keep(Box::new(k.clone()))),
                 )),
                 None => err(format!(
                     "placeholder id=\"{}\" is not in this file; placeholders are never created.",
@@ -692,9 +692,11 @@ fn check_inline(
     }
 }
 
-/// Resolved blocks → the format AST, in canonical shape.
+/// Resolved blocks → the format AST, in canonical shape. It takes the
+/// blocks: their content moves into the AST, so a caller that keeps them
+/// passes a copy.
 pub fn unresolve(
-    blocks: &[Block],
+    blocks: Vec<Block>,
     styles: &StyleSet,
     front: fmt::FrontMatter,
     keep: &dyn Fn(&str) -> fmt::Keep,
@@ -707,9 +709,11 @@ pub fn unresolve(
         lines: styles.lines(),
     };
     let mut values: std::collections::HashMap<String, Props> = Default::default();
-    let mut canon = |style: &str, props: &Props, content: &Inline| -> (Props, Inline) {
+    // A paragraph's props and its characters' props, each made what differs
+    // from its style, in place.
+    let mut canon = |style: &str, props: &mut Props, content: &mut Inline| {
         if !styles.formatting {
-            return (props.clone(), content.clone());
+            return;
         }
         let style = if style.is_empty() {
             styles.default_paragraph.as_str()
@@ -720,81 +724,90 @@ pub fn unresolve(
             .entry(style.to_string())
             .or_insert_with(|| table.values(Some(style)));
         let text = v.only(&fmt::Key::TEXT);
-        let mut c = content.clone();
-        for u in &mut c.units {
+        for u in &mut content.units {
             if !u.props.is_empty() {
                 u.props = u.props.diff(&text);
             }
         }
-        (props.diff(v), c)
+        *props = props.diff(v);
     };
     let blocks: Vec<Block> = blocks
-        .iter()
+        .into_iter()
         .map(|b| match b {
-            Block::Para(p) => {
-                let (props, content) = canon(&p.style, &p.props, &p.content);
-                Block::Para(Para {
-                    props,
-                    content,
-                    ..p.clone()
-                })
+            Block::Para(mut p) => {
+                canon(&p.style, &mut p.props, &mut p.content);
+                Block::Para(p)
             }
-            Block::Table(t) => {
-                let mut t = t.clone();
+            Block::Table(mut t) => {
                 for c in t.rows.iter_mut().flatten() {
                     if let Cell::Text(ps) = c {
                         for p in ps {
-                            let (props, content) = canon(
-                                p.style.as_deref().unwrap_or(&styles.default_paragraph),
-                                &p.props,
-                                &p.content,
-                            );
-                            (p.props, p.content) = (props, content);
+                            let style = p.style.as_deref().unwrap_or(&styles.default_paragraph);
+                            canon(style, &mut p.props, &mut p.content);
                         }
                     }
                 }
                 Block::Table(t)
             }
-            other => other.clone(),
+            other => other,
         })
         .collect();
-    let blocks = &blocks[..];
+    // The style section: the default style, then every style the text
+    // uses, in order of first use (a style no paragraph uses has no line;
+    // the file keeps it). Read before the loop below takes the blocks.
+    let lines = if styles.formatting {
+        used_styles(&blocks, styles)
+            .iter()
+            .filter_map(|n| styles.paragraph_def(n))
+            .map(|s| fmt::StyleLine {
+                name: s.name.clone(),
+                props: s.props.clone(),
+            })
+            .collect()
+    } else {
+        vec![]
+    };
+    // The canonical blocks are this function's own, so each content moves
+    // into the AST rather than being copied: a document's content is a unit
+    // per character, and a copy of it is the largest thing an import holds.
     let mut seen = std::collections::HashSet::new();
     for b in blocks {
-        if let Block::Para(Para {
-            content,
-            item: Some(it),
-            style,
-            props,
-        }) = b
-        {
-            let named = (!style.is_empty() && style != styles.item_style()).then(|| style.clone());
-            let fi = fmt::Item {
-                ordered: it.ordered,
-                level: it.level,
-                content: content.clone(),
-                style: named.filter(|_| styles.formatting),
-                props: props.clone(),
-            };
-            match out.last_mut() {
-                Some(fmt::Block::List(items)) if !it.first => items.push(fi),
-                _ => {
-                    emit_note_defs(&mut out, &mut seen);
-                    out.push(fmt::Block::List(vec![fi]));
+        let b = match b {
+            Block::Para(Para {
+                content,
+                item: Some(it),
+                style,
+                props,
+            }) => {
+                let named = (!style.is_empty() && style != styles.item_style()).then_some(style);
+                let fi = fmt::Item {
+                    ordered: it.ordered,
+                    level: it.level,
+                    content,
+                    style: named.filter(|_| styles.formatting),
+                    props,
+                };
+                match out.last_mut() {
+                    Some(fmt::Block::List(items)) if !it.first => items.push(fi),
+                    _ => {
+                        emit_note_defs(&mut out, &mut seen);
+                        out.push(fmt::Block::List(vec![fi]));
+                    }
                 }
+                continue;
             }
-            continue;
-        }
+            other => other,
+        };
         emit_note_defs(&mut out, &mut seen);
         out.push(match b {
             // A Document has no heads.
             Block::Head(_) => continue,
-            Block::Keep(id) => fmt::Block::Keep(keep(id)),
+            Block::Keep(id) => fmt::Block::Keep(keep(&id)),
             Block::Table(t) => fmt::Block::Table(fmt::Table {
-                style: t.style.clone(),
-                rows: t.rows.clone(),
-                boxes: t.boxes.clone(),
-                place: t.place.clone(),
+                style: t.style,
+                rows: t.rows,
+                boxes: t.boxes,
+                place: t.place,
             }),
             Block::Para(p) => {
                 // Empty: `<p/>` / `<p style="Name"/>`. Spaces only: a `<div>`.
@@ -806,32 +819,17 @@ pub fn unresolve(
                     _ if p.style == styles.default_paragraph && (empty || !blank) => {
                         fmt::ParaStyle::Plain
                     }
-                    _ => fmt::ParaStyle::Named(p.style.clone()),
+                    _ => fmt::ParaStyle::Named(p.style),
                 };
                 fmt::Block::Para(fmt::Para {
                     style,
-                    content: p.content.clone(),
-                    props: p.props.clone(),
+                    content: p.content,
+                    props: p.props,
                 })
             }
         });
     }
     emit_note_defs(&mut out, &mut seen);
-    // The style section: the default style, then every style the text
-    // uses, in order of first use (a style no paragraph uses has no line;
-    // the file keeps it).
-    let lines = if styles.formatting {
-        used_styles(blocks, styles)
-            .iter()
-            .filter_map(|n| styles.paragraph_def(n))
-            .map(|s| fmt::StyleLine {
-                name: s.name.clone(),
-                props: s.props.clone(),
-            })
-            .collect()
-    } else {
-        vec![]
-    };
     let mut d = fmt::Document {
         front,
         styles: lines,

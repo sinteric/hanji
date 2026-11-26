@@ -1261,7 +1261,7 @@ impl<S: Storage> Workspace<S> {
         let f = doc.format;
         f.complete(&mut ra.new, &mut ra.remainder);
         f.engine().export(&ra.text, &ra.remainder)?;
-        let canon = f.text_of(&ra.new, &ra.remainder, doc.template.as_deref());
+        let canon = f.text_of(ra.new.clone(), &ra.remainder, doc.template.as_deref());
         let same_blocks = |t: &str| {
             f.text_model()
                 .unwrap()
