@@ -296,16 +296,13 @@ impl Engine for DocxEngine {
     }
 
     fn export(&self, text: &str, rem: &Remainder) -> Result<Vec<u8>, EngineError> {
-        let (_, blocks) =
+        let (parsed, blocks) =
             hanji_core::model_of(text, rem, self.capabilities()).map_err(EngineError::Invalid)?;
-        // The style section as the text has it.
+        // The style section as the text has it, from the same parse: a
+        // second one held the text's units twice more at a write's peak.
         let mut rem = rem.clone();
-        hanji_core::TextModel::restyle(
-            &hanji_core::DocumentModel,
-            text,
-            &mut rem,
-            self.capabilities(),
-        );
+        hanji_core::model::restyle(&mut rem.styles, &parsed, &blocks);
+        drop(parsed);
         comment::apply(&mut rem.parts, &blocks, &rem.entries).map_err(EngineError::Refused)?;
         note::apply(&mut rem.parts, &blocks, &rem.entries).map_err(EngineError::Refused)?;
         write_package(&rem, export_document(&blocks, &rem)?)

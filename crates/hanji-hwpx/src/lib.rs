@@ -178,16 +178,13 @@ impl Engine for HwpxEngine {
     }
 
     fn export(&self, text: &str, rem: &Remainder) -> Result<Vec<u8>, EngineError> {
-        let (_, blocks) =
+        let (parsed, blocks) =
             hanji_core::model_of(text, rem, self.capabilities()).map_err(EngineError::Invalid)?;
-        // The style section as the text has it.
+        // The style section as the text has it, from the same parse: a
+        // second one held the text's units twice more at a write's peak.
         let mut rem = rem.clone();
-        hanji_core::TextModel::restyle(
-            &hanji_core::DocumentModel,
-            text,
-            &mut rem,
-            self.capabilities(),
-        );
+        hanji_core::model::restyle(&mut rem.styles, &parsed, &blocks);
+        drop(parsed);
         write_package(&rem, export_sections(&blocks, &rem)?)
     }
 }
@@ -350,8 +347,35 @@ impl HwpxEngine {
                     .is_some_and(|w| w.level == i.level)
             })
         };
+        // Where each run of items begins and ends, and the stable items of
+        // each level and kind in order: one pass each, since a search from
+        // every new item would be quadratic in a text of many.
+        let n = blocks.len();
+        let is_item = |k: usize| item_of(&blocks[k]).is_some();
+        let mut lo_of = vec![0; n];
+        for k in 0..n {
+            lo_of[k] = if k > 0 && is_item(k - 1) {
+                lo_of[k - 1]
+            } else {
+                k
+            };
+        }
+        let mut hi_of = vec![0; n];
+        for k in (0..n).rev() {
+            hi_of[k] = if k + 1 < n && is_item(k + 1) {
+                hi_of[k + 1]
+            } else {
+                k
+            };
+        }
+        let mut stable_at: HashMap<(usize, bool), Vec<usize>> = HashMap::new();
+        for k in (0..n).filter(|&k| stable(k)) {
+            if let Some((i, _)) = item_of(&blocks[k]) {
+                stable_at.entry((i.level, i.ordered)).or_default().push(k);
+            }
+        }
         let mut fixes = vec![];
-        for bi in 0..blocks.len() {
+        for bi in 0..n {
             let Some((it, p)) = item_of(&blocks[bi]) else {
                 continue;
             };
@@ -376,25 +400,21 @@ impl HwpxEngine {
             } else if !p.props.only(&ind).is_empty() {
                 continue;
             }
-            let lo = (0..=bi)
-                .rev()
-                .take_while(|&k| item_of(&blocks[k]).is_some())
-                .last()
-                .unwrap_or(bi);
-            let hi = (bi..blocks.len())
-                .take_while(|&k| item_of(&blocks[k]).is_some())
-                .last()
-                .unwrap_or(bi);
-            let mut near: Vec<usize> = (0..blocks.len())
-                .filter(|&k| {
-                    k != bi
-                        && stable(k)
-                        && item_of(&blocks[k])
-                            .is_some_and(|(i, _)| i.level == it.level && i.ordered == it.ordered)
-                })
-                .collect();
-            near.sort_by_key(|&k| (!(lo..=hi).contains(&k), k.abs_diff(bi), k));
-            let Some((_, q)) = near.first().and_then(|&k| item_of(&blocks[k])) else {
+            let (lo, hi) = (lo_of[bi], hi_of[bi]);
+            // In its own list first, then the nearest, then the earlier: the
+            // stable neighbour on either side is the one, since its own list
+            // is the run around it.
+            let at = stable_at
+                .get(&(it.level, it.ordered))
+                .map_or(&[][..], Vec::as_slice);
+            let split = at.partition_point(|&k| k < bi);
+            let before = split.checked_sub(1).map(|i| at[i]);
+            let after = at[split..].iter().copied().find(|&k| k != bi);
+            let near = [before, after]
+                .into_iter()
+                .flatten()
+                .min_by_key(|&k| (!(lo..=hi).contains(&k), k.abs_diff(bi), k));
+            let Some((_, q)) = near.and_then(|k| item_of(&blocks[k])) else {
                 continue;
             };
             let eff = f.of(&style_of(q)).only(&ind).overlay(&q.props.only(&ind));
