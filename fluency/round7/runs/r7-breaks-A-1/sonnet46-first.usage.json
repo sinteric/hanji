@@ -1,0 +1,8 @@
+{
+ "input_tokens": 136153,
+ "output_tokens": 4380,
+ "num_turns": 2,
+ "is_error": false,
+ "duration_ms": 41662,
+ "model": "claude-sonnet-4-6"
+}

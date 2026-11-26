@@ -1,0 +1,47 @@
+{
+ "unit_id": "r7-databar-B-3",
+ "decision": "databar",
+ "candidate": "B",
+ "replicate": 3,
+ "names": {},
+ "fm": {
+  "type": "spreadsheet",
+  "format": "xlsx",
+  "schema": "1"
+ },
+ "seed": "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"KPI\" range=\"A1:E16\">\n\n<table name=\"점수\" range=\"A1:E12\">\n| column | type | format | formula |\n|---|---|---|---|\n| 팀 | text |  |  |\n| 점수 | number | 0 |  |\n| 목표 | number | 0 |  |\n| 가중 | number | 0 |  |\n| 등급 | text |  |  |\n</table>\n\n<conditional-format range=\"B2:B12\" type=\"dataBar\" min-type=\"percentile\" min=\"10\" max-type=\"percentile\" max=\"90\" color=\"#638EC6\"/>\n\n<conditional-format range=\"C2:C12\" type=\"dataBar\" min-type=\"num\" min=\"0\" max-type=\"num\" max=\"100\" color=\"#FFEB84\"/>\n\n<conditional-format range=\"B2:B12\" type=\"cellIs\" operator=\"greaterThan\" formula=\"80\" dxf=\"fill=#C6EFCE\"/>\n\n</sheet>\n",
+ "tasks": [
+  {
+   "task_id": "score3-q1",
+   "kind": "read",
+   "text": "The 점수 column (B) has a data bar. What are its min and max types (and values, if any) and its fill? Answer as `ANSWER: min=<…> max=<…> fill=<…>` using the file's own tokens.",
+   "expect": "ANSWER: min-type=percentile min=10 max-type=percentile max=90 color=#638EC6"
+  },
+  {
+   "task_id": "score3-w",
+   "kind": "write",
+   "text": "Write a new workbook with exactly one sheet 요약, range A1:C6, containing: a table 요약표 on A1:C4 with columns 팀 (text), 점수 (number, format 0), 목표 (number, format 0); one data-bar rule on B2:B4 whose minimum is the smallest value in the range, whose maximum is the largest, and whose fill is #FFEB84. No other items."
+  },
+  {
+   "task_id": "score3-e1",
+   "kind": "edit",
+   "text": "Change the 점수 data bar so its range is B2:B14. Do not change the 목표 bar on C, and do not change the cellIs rule that also sits on B2:B12."
+  },
+  {
+   "task_id": "score3-e2",
+   "kind": "edit",
+   "text": "Change the fill of the 점수 data bar to #FFC7CE. Leave the 목표 bar yellow."
+  },
+  {
+   "task_id": "score3-e3",
+   "kind": "edit",
+   "text": "Change the 점수 data bar so its minimum is the number 0 and its maximum is the number 100 (num types). Keep its fill. Do not edit the cellIs rule that uses 80."
+  },
+  {
+   "task_id": "score3-r",
+   "kind": "refuse",
+   "text": "Add an icon set (3 arrows) on 등급 (E2:E12) and a data bar with a solid axis at the cell midpoint."
+  }
+ ],
+ "unreachable": []
+}

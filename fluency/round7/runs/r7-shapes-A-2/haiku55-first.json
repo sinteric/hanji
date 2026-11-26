@@ -1,0 +1,53 @@
+{
+ "answers": [
+  {
+   "task_id": "region2-q1",
+   "text": "ANSWER: B22:D24 | 목표 미달"
+  },
+  {
+   "task_id": "region2-w",
+   "text": "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"메모\" range=\"A1:D8\">\n\n<table name=\"메모표\" range=\"A1:B3\">\n| column | type | format | formula |\n|---|---|---|---|\n| 지역 | text |  |  |\n| 상태 | text |  |  |\n</table>\n\n<shape name=\"경고\" anchor=\"C2:D3\">목표 미달</shape>\n\n<group name=\"등\">\n<shape name=\"녹\" anchor=\"C5:D6\">녹</shape>\n<shape name=\"적\" anchor=\"C7:D8\">적</shape>\n</group>\n\n</sheet>"
+  },
+  {
+   "task_id": "region2-e1",
+   "edits": [
+    {
+     "old": "<shape name=\"부산 콜아웃\" anchor=\"B22:D24\">목표 미달</shape>",
+     "new": "<shape name=\"부산 콜아웃\" anchor=\"B22:D24\">목표 미달</shape>\n\n<shape name=\"대구 콜아웃\" anchor=\"B26:D28\">대구 3곳, 전년 대비 +4%</shape>"
+    }
+   ]
+  },
+  {
+   "task_id": "region2-e2",
+   "edits": [
+    {
+     "old": "<shape name=\"부산 콜아웃\" anchor=\"B22:D24\">목표 미달</shape>",
+     "new": "<shape name=\"부산 콜아웃\" anchor=\"E22:G24\">목표 미달</shape>"
+    }
+   ]
+  },
+  {
+   "task_id": "region2-e3",
+   "edits": [
+    {
+     "old": "<shape name=\"부산 콜아웃\" anchor=\"B22:D24\">목표 미달</shape>",
+     "new": "<shape name=\"부산 콜아웃\" anchor=\"B22:D24\">목표 달성</shape>"
+    }
+   ]
+  },
+  {
+   "task_id": "region2-e4",
+   "edits": [
+    {
+     "old": "<shape name=\"서울 콜아웃\" anchor=\"B18:D20\">",
+     "new": "<shape name=\"서울 콜아웃\" anchor=\"B18:E21\">"
+    }
+   ]
+  },
+  {
+   "task_id": "region2-r",
+   "text": "REFUSE: Elbow connectors and drop shadows cannot be expressed in this format, which supports only named text shapes with anchors and groups.",
+   "edits": []
+  }
+ ]
+}

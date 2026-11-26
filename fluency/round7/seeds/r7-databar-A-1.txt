@@ -1,0 +1,29 @@
+---
+type: spreadsheet
+format: xlsx
+schema: 1
+---
+
+<sheet name="예산" range="A1:G20">
+
+<table name="월별" range="A1:G16">
+| column | type | format | formula |
+|---|---|---|---|
+| 월 | date | yyyy-mm |  |
+| 수입 | number | #,##0 |  |
+| 지출 | number | #,##0 |  |
+| 잔액 | number | #,##0 | =[@수입]-[@지출] |
+| 실적 | number | #,##0 |  |
+| 목표 | number | #,##0 |  |
+| 달성률 | number | 0% |  |
+</table>
+
+<conditional-format range="D2:D16" type="cellIs" operator="lessThan" formula="0" dxf="fill=#FFC7CE"/>
+
+<conditional-format range="E4:E16" type="dataBar" min="num:0" max="num:월간수입합계" fill="#638EC6"/>
+
+<conditional-format range="G4:G16" type="dataBar" min="min" max="max" fill="#FFC7CE"/>
+
+<keep id="k1" kind="chart" summary="수입·지출 막대"/>
+
+</sheet>

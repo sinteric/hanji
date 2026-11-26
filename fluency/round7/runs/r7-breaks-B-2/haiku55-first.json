@@ -1,0 +1,44 @@
+{
+ "answers": [
+  {
+   "task_id": "ministry2-q1",
+   "text": "ANSWER: page: 지정 공고는 11월 둘째 주에 나갑니다 | column: 업종은 지붕·축사, 벌목, 질식 위험 작업부터입니다"
+  },
+  {
+   "task_id": "ministry2-w",
+   "text": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 산업안전 주간 메모\n\n이번 주 점검은 50인 미만 3곳입니다.<br type=\"page\"/>결과는 금요일에 올립니다.\n\n지붕·축사.<br type=\"column\"/>벌목.\n\n다음 단계 안내는 별도 공지입니다."
+  },
+  {
+   "task_id": "ministry2-e1",
+   "edits": [
+    {
+     "old": "올랐습니다. 일경험",
+     "new": "올랐습니다.<br type=\"page\"/>일경험"
+    }
+   ]
+  },
+  {
+   "task_id": "ministry2-e2",
+   "edits": [
+    {
+     "old": "늘립니다.<br type=\"column\"/>업종은 지붕·축사, 벌목, 질식 위험 작업부터입니다.",
+     "new": "늘립니다. 업종은 지붕·축사, 벌목, <br type=\"column\"/>질식 위험 작업부터입니다."
+    }
+   ]
+  },
+  {
+   "task_id": "ministry2-e3",
+   "edits": [
+    {
+     "old": "지정합니다.<br type=\"page\"/>지정 공고는",
+     "new": "지정합니다. 지정 공고는"
+    }
+   ]
+  },
+  {
+   "task_id": "ministry2-r",
+   "text": "REFUSE: The format has no section breaks, odd-page breaks, or column-count settings, so an odd-page section break with three columns cannot be expressed.",
+   "edits": []
+  }
+ ]
+}

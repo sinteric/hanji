@@ -1,13 +1,18 @@
 //! Edits to the structure text (§5.4: the structure is text the model may
 //! edit): a column's type, format or formula, a new column at the end of a
-//! table, a new table, a new sheet at the end, merged ranges, a deleted
+//! table, a new table, a new sheet at the end, merged ranges, hyperlinks,
+//! notes, data validations, conditional formats, drawing shapes, a deleted
 //! placeholder. Table, sheet and column edits become range operations, so
 //! the text and the operations share one validator and one implementation.
-//! Merged ranges are applied from the `<merge range/>` lines. Any other
-//! change is refused with the form it should take.
+//! Merged ranges, hyperlinks, notes, validations, conditional formats and
+//! drawing shapes are applied from their structure lines. Any other change
+//! is refused with the form it should take.
 
 use hanji_format::ops::{ColumnSpec, RangeOp};
-use hanji_format::sheet::{MergeDecl, SheetItem, Spreadsheet, TableDecl};
+use hanji_format::sheet::{
+    CondFormatDecl, DrawingItem, HyperlinkDecl, MergeDecl, NoteDecl, SheetItem, Spreadsheet,
+    TableDecl, ValidationDecl,
+};
 
 /// Whether two structures are the same (front matter aside).
 pub fn same(a: &Spreadsheet, b: &Spreadsheet) -> bool {
@@ -47,6 +52,63 @@ pub fn merge_ranges(items: &[SheetItem]) -> Vec<&MergeDecl> {
         .iter()
         .filter_map(|i| match i {
             SheetItem::Merge(m) => Some(m),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The `<hyperlink/>` lines of a sheet, in the order written.
+pub fn hyperlinks(items: &[SheetItem]) -> Vec<&HyperlinkDecl> {
+    items
+        .iter()
+        .filter_map(|i| match i {
+            SheetItem::Hyperlink(h) => Some(h),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The `<note/>` lines of a sheet, in the order written.
+pub fn notes(items: &[SheetItem]) -> Vec<&NoteDecl> {
+    items
+        .iter()
+        .filter_map(|i| match i {
+            SheetItem::Note(n) => Some(n),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The `<validation/>` lines of a sheet, in the order written.
+pub fn validations(items: &[SheetItem]) -> Vec<&ValidationDecl> {
+    items
+        .iter()
+        .filter_map(|i| match i {
+            SheetItem::Validation(v) => Some(v),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The `<conditional-format/>` lines of a sheet, in the order written
+/// (Excel's sheet-wide `priority` order).
+pub fn conditional_formats(items: &[SheetItem]) -> Vec<&CondFormatDecl> {
+    items
+        .iter()
+        .filter_map(|i| match i {
+            SheetItem::ConditionalFormat(c) => Some(c.as_ref()),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The `<shape>` / `<group>` lines of a sheet, in the order written.
+pub fn drawing_items(items: &[SheetItem]) -> Vec<DrawingItem> {
+    items
+        .iter()
+        .filter_map(|i| match i {
+            SheetItem::Shape(s) => Some(DrawingItem::Shape(s.clone())),
+            SheetItem::Group(g) => Some(DrawingItem::Group(g.clone())),
             _ => None,
         })
         .collect()

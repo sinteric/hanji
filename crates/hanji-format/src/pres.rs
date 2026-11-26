@@ -830,8 +830,20 @@ fn not_slot_text(b: &Block) -> Option<&'static str> {
         Block::Table(_) => "a table cannot be written in a slot yet; a slide's tables stay in the file as they are.",
         Block::PageBreak => "a slide has no page breaks; slides are separated by a line ---.",
         Block::FootnoteDef(_) => "a presentation has no footnotes.",
+        Block::Para(p) if has_flow_break(&p.content) => {
+            "a slide has no page or column breaks; slides are separated by a line ---."
+        }
+        Block::List(items) if items.iter().any(|it| has_flow_break(&it.content)) => {
+            "a slide has no page or column breaks; slides are separated by a line ---."
+        }
         Block::Para(_) | Block::List(_) | Block::Keep(_) => return None,
     })
+}
+
+fn has_flow_break(i: &Inline) -> bool {
+    i.units
+        .iter()
+        .any(|u| matches!(u.atom, Atom::PageBreak | Atom::ColumnBreak))
 }
 
 const SHAPE_FORM: &str = "a shape line is <shape id=\"…\" name=\"…\" box=\"…\">text</shape>, its id and name as they are in the file; a shape without text is <shape id=\"…\" name=\"…\" box=\"…\"/>, and a new text box is <shape box=\"…\">text</shape>";

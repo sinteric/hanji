@@ -15,6 +15,158 @@
   map is private now; `iter_mut`, `retain` and `FromIterator` replace reaching
   into it). `text_of` and `model::unresolve` take the blocks by value instead
   of copying them. Importing that DOCX peaked at 2.6 GiB and now at 0.9 GiB.
+- Lay out vertical (tbRl) DOCX bodies in their written margin band, as Word
+  16.114 and rdocx's default do. DOCX preview and layout loads no longer call
+  `Document::set_vertical_story_clearance(true)`, so a tall header or footer
+  no longer pushes vertical body text inward. This retires Hanji's use of the
+  sinteric/rdocx clearance reservation.
+- Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx#27 (`dbf115f`),
+  which removes the now unused opt-in clearance reservation from the fork.
+  Rendered output is unchanged.
+- Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx#25 (`571ebef`,
+  on main, which has #24): tensorbee/rdocx S96 sprint sync (Word 0.17.0 /
+  PowerPoint 0.15.0 / shared OOXML 0.15.0). The Hanji tbRl header/footer
+  clearance reservation is now opt-in.
+- Show XLSX drawing shapes as editable `<shape name="Tip"
+  anchor="B25:D27">text</shape>` lines and grouped shapes as a
+  `<group name="Group 1">` … `</group>` wrapper (fluency round 7 A)
+  instead of `<keep kind="shape"/>` / `<keep kind="group"/>`
+  placeholders. Each can be kept, added, removed, retexted or moved by
+  its A1 anchor. A newline in the text is `&#10;`; an empty shape is
+  self-closing. Unedited drawing XML stays byte-identical; geometry,
+  fills, outlines and other styling the syntax does not name stay as the
+  original XML until the shape is retexted. Connectors, charts, pictures,
+  cell-linked text, absolute-anchor objects, and groups that hold those
+  stay placeholders. A sheet with more than 1024 modelled shapes keeps
+  them as placeholders. Corpus keeps: 203 → 197 (xlsx `shape` 5 → 0,
+  `group` 1 → 0).
+- Show XLSX data-bar conditional formats as
+  `<conditional-format range="E4" type="dataBar" min="num:0" max="max" fill="#638EC6"/>`
+  lines (round 7 A: `min`/`max` one token, `fill` the cell-format colour)
+  instead of `<keep kind="conditional-format"/>`. Range, min/max and colour
+  can be kept, added, removed or changed. Line order is still Excel's
+  sheet-wide `priority`; a rewrite groups only adjacent same-range lines.
+  Unedited x14 data-bar extensions (negative fill, axis, gradient, border)
+  stay as stored; a rewrite of the modelled fields patches them in place.
+  A color scale, an icon set, or a dataBar whose x14 extension cannot be
+  carried faithfully stays a placeholder for that sheet. Corpus keeps:
+  204 → 203 (xlsx `conditional-format` 1 → 0).
+- Show a DOCX page or column break inside a paragraph (`w:br type=page` /
+  `type=column`) as `<pagebreak/>` / `<columnbreak/>` at that point instead
+  of a `<keep kind="break"/>` placeholder. A line holding only
+  `<pagebreak/>` is still a page break between paragraphs; `<br/>` is only
+  a line break. Export writes `w:br w:type="page"` / `w:type="column"` in
+  the run; an unedited paragraph stays byte-identical. A `w:br` with
+  `w:clear` or another type, and `w:lastRenderedPageBreak`, stay as they
+  were. hwpx and pptx do not grow an equivalent. Corpus keeps: 206 → 204
+  (docx `break` 2 → 0).
+- Show an HWPX drawing whose `hp:drawText` is ordinary text in one or more
+  paragraphs as that text instead of a `<keep kind="drawing"/>` placeholder.
+  Several paragraphs join with `<br/>`; a shown footnote or endnote inside
+  the box is `[^n]`. Geometry, anchoring, styling and the original XML stay
+  as a `Wrap`. Editing the body rewrites the inner runs and keeps geometry;
+  a shown footnote stays at its mark when paragraphs join or the text
+  around it changes; editing a note inside the box rewrites that note;
+  deleting all of the text removes the object and is reported. Pictures, charts, groups, OLE,
+  empty shapes, and boxes that hold a table or nested objects stay
+  placeholders. XLSX shapes stay placeholders: the spreadsheet grammar has
+  no shape line. Corpus keeps: 207 → 206 (hwpx `drawing` 10 → 9).
+- Show XLSX data validations as editable `<validation range="C2"
+  type="list" formula1="&quot;A,B,C&quot;"/>` lines and `cellIs`/`expression`
+  conditional formats as `<conditional-format range="A1" type="cellIs"
+  operator="greaterThan" formula="5" dxf="fill=#FFC7CE"/>` lines instead
+  of `<keep kind="data-validation"/>` / `<keep kind="conditional-format"/>`
+  placeholders. Each can be kept, added, removed or changed.
+  `formula1`/`formula2` are Excel's formula text: a quoted list keeps its
+  quotes, a range or name stays unquoted. `showInputMessage`/
+  `showErrorMessage` are omitted in the text when on (the default) and
+  written `"false"` when off; a new or rewritten validation writes the XML
+  attribute as `"1"` when on and omits it when off (SpreadsheetML default
+  false). Sheets with more than 1024 of
+  either kind, a conditional format that is not `cellIs` or `expression`
+  (a data bar, color scale or icon set), or a dxf the cell vocabulary
+  cannot write stay placeholders for that sheet. Line order of
+  `<conditional-format/>` is Excel's sheet-wide `priority` (lower wins
+  when formats conflict); a rewrite writes `priority` as the 1-based line
+  index and groups only adjacent lines with the same range. Unedited
+  validation and conditional-format XML stays byte-identical. Corpus keeps: 215 → 207
+  (xlsx `data-validation` 4 → 0, `conditional-format` 5 → 1).
+- Show a DOCX symbol (`w:sym`) as the character Word stored (`w:char`
+  hex → that Unicode scalar) instead of a `<keep kind="symbol"/>`
+  placeholder. Font and the original element stay as a `Wrap`. Untouched
+  content writes the original `w:sym`. Editing the character to something
+  else writes ordinary `w:t` and drops the symbol; deleting it removes
+  the element and is reported. A missing or unreadable `w:char` (not hex,
+  a C0 control) stays a placeholder. The seven corpus symbols are
+  Symbol `F094` (no Adobe Symbol mapping for 0x94): the text shows
+  U+F094, not a guessed lookalike. An HWPX `DIGIT` auto-number
+  (`hp:autoNum`) shows as `prefix + num + suffix` the same way. Editing
+  digits that still match the format updates `num` and keeps the control;
+  other text becomes ordinary `hp:t`; deleting it removes the control.
+  Circled, Hangul and Roman formats stay placeholders. HWPX `hp:compose`
+  (two private-use characters overlapped) stays `<keep kind="text"/>`:
+  showing them as sequential text would be two characters for one glyph.
+  Corpus keeps: 223 → 215 (docx `symbol` 7 → 0, hwpx `number` 1 → 0;
+  hwpx `text` 3 unchanged).
+- Show XLSX cell hyperlinks as editable `<hyperlink range="A1"
+  target="https://example.com"/>` lines (optional `location`, `display`,
+  `tooltip`) and cell notes as `<note range="B2" author="John"
+  text="Some text"/>` lines instead of `<keep kind="hyperlinks"/>` /
+  `<keep kind="notes"/>` placeholders. Each can be kept, added, removed
+  or changed. A newline in note text is `&#10;`. Sheets with more than
+  1024 of either kind, overlapping ranges, a hyperlink whose relationship
+  is not a unique external Target, and threaded comments stay
+  placeholders. Unedited comments, VML drawing and relationship parts stay
+  byte-identical. Corpus keeps: 237 → 223 (xlsx `hyperlinks` 7 → 0, `notes`
+  7 → 0).
+- Show a PPTX text field (`a:fld`: a slide number, a date/time) whose cached
+  result is not blank as that text instead of a `<keep kind="field"/>`
+  placeholder. The field's id, type, `a:rPr` and `a:pPr` stay as a `Wrap`.
+  Editing the text replaces the cached `a:t` and keeps the field;
+  deleting all of it removes the field and is reported. Empty fields
+  (unfilled slide-number placeholders with no cached text) stay
+  placeholders. Corpus keeps: 241 → 237 (pptx `field` 11 → 7).
+
+## 0.8.0 — 2026-11-02
+
+**Breaking / API changes**
+
+- `hanji_format::Atom::NoteRef` payload is `Note { label, body, kind }`
+  instead of a `String` label. `Note` and `NoteKind` are new.
+- `hanji_preview::sfnt::Adjust.line_em: Option<f64>` is
+  `line: Option<Line>` (`Line::Height` is PowerPoint's 1.2 em as before;
+  `Line::Borrowed` is the requested face). `Drawn` and `Family` gain a
+  public `line: Option<[f64; 2]>` field.
+
+- Show a one-paragraph DOCX text box (`w:txbxContent` / VML) whose content
+  is ordinary text as that text instead of a `<keep kind="drawing"/>`
+  placeholder. Geometry, anchoring, styling and the original XML stay as a
+  `Wrap`. Editing the body rewrites `w:t` in Choice and Fallback and keeps
+  those attributes; deleting all of the text removes the object and is
+  reported. Pictures, charts, groups, OLE, empty shapes, and boxes that
+  hold more than one paragraph, a table or nested objects stay
+  placeholders. The same rule applies to an HWPX drawing whose
+  `hp:drawText` is one paragraph of ordinary text. Corpus keeps: 245 → 241
+  (docx `drawing` 26 → 22; hwpx `drawing` 10 unchanged).
+- Borrow the requested face's line height when a DOCX substitute draws East
+  Asian text: the alias table's `line` (ascent and descent in em) is written
+  into the substitute's `hhea` and `OS/2`, so lines are as tall as Word
+  draws them. A face drawn as itself, or by a metric twin, borrows nothing;
+  Latin text borrows nothing. Measured for 맑은 고딕 and 바탕. `sfnt::Adjust`
+  takes `line: Option<Line>` in place of `line_em` (`Line::Height` is
+  PowerPoint's 1.2 em, as before; `Line::Borrowed` is the requested face). A
+  custom resolver passes it with `ResolvedFont::with_line`.
+- `FontOptions::with_system_fonts`: a byte-only caller can search the
+  installed fonts, after its own and the document's and before the bundled
+  faces. New feature `system-fonts` (not built on wasm); `host-fonts` now
+  builds on it. The installed fonts are scanned once per process, and each
+  file is mapped, not read whole.
+- Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx#23 (`4bd556a`,
+  on main `55bb2a2`): a paragraph keeps its space before at the top of a
+  section's first page, as Word does; a Word shape (`wps:wsp`) draws its
+  `a:ln` outline and its text box text sits inside the `bodyPr` insets;
+  and a table with no `w:tblLayout`, an automatic `w:tblW` and no `w:tcW`
+  is sized to its content (hanji writes every table this way).
 - Draw an HWPX text's bold or italic synthetically when the face hanji chose
   has none, in the page display list and the PNG preview, as rhwp does. usvg
   synthesizes neither, so bold text was drawn regular wherever only a regular
@@ -29,11 +181,40 @@
   paragraphs of one style, a PowerPoint layout placeholder inherits the master
   placeholder of its type, and chart labels take the chart's `c:txPr` with a
   one-series chart showing its automatic title.
+- Show an HWPX table that shares a paragraph with one run of text, and a
+  DOCX table whose cells are wrapped in a shown single-cell content control
+  (`w:sdt`), as ordinary GFM pipe tables instead of a `<keep kind="table"/>`
+  placeholder. The mixed HWPX paragraph stays as an `hwpx:anchor` remainder;
+  the cell's `w:sdt` shell stays as a `Wrap`. Nested tables, a row that
+  starts or ends short of the grid (`w:gridBefore` / `w:gridAfter`), text on
+  both sides of an HWPX table, and row-level or unshown content controls
+  stay placeholders. Unwrapping a mixed-paragraph table also surfaces
+  pictures the parent keep had hidden. Corpus keeps: 250 → 245 (hwpx `table`
+  13 → 5, docx `table` 4 → 3; hwpx `drawing` 6 → 10).
+- Show a DOCX or HWPX footnote or endnote whose body is ordinary text in
+  one paragraph as `[^label]` at the reference and `[^label]: body` for
+  the definition, instead of a `<keep kind="footnote"/>` /
+  `<keep kind="endnote"/>` placeholder. Endnotes are labelled `e1`,
+  `e2`, … so they do not collide with footnotes. Canonical form writes
+  each definition after the block that first uses the label. The original
+  run or Hancom control stays as a `Wrap`. Editing the definition
+  rewrites the note's text and keeps the rest; deleting the `[^label]`
+  removes the note and is reported; a note that was not in the file
+  cannot be created. Notes that hold a table, drawing, content
+  control, or several paragraphs stay placeholders. Tracked-change
+  export refuses a change, move or deletion of a note. A footnote inside
+  an HWPX drawing stays inside that drawing's keep. Corpus keeps: 268 →
+  250 (docx `footnote` 7 → 1, `endnote` 3 → 1, hwpx `footnote` 10 → 0).
+  The leftover footnote and endnote keeps are a content-control body
+  (`Bug54849.docx`). `Atom::NoteRef` now carries that `Note` instead of a
+  `String` label.
 - Advance the rdocx/rpptx/oxml-layout family to sinteric/rdocx main `73894d2`
   (S95.4 / rdocx 0.16.4, rpptx and oxml-layout 0.14.4: Word legacy/modern
   form-field authoring, mail merge, relationship/style preservation, body
   read/edit bounds, PowerPoint publisher bounds, CJK line measurement,
   rendering changes, plus an upstream merge).
+- Corpus `<keep/>` placeholders went 268 → 241 since 0.7.0
+  (`docs/keep-census.md`).
 
 ## 0.7.0 — 2026-10-28
 

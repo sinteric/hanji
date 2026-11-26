@@ -1,0 +1,44 @@
+{
+ "answers": [
+  {
+   "task_id": "ministry2-q1",
+   "text": "ANSWER: page: 지정 공고는 11월 둘째 주에 나갑니다 | column: 업종은 지붕·축사, 벌목, 질식 위험 작업부터입니다"
+  },
+  {
+   "task_id": "ministry2-w",
+   "text": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 산업안전 주간 메모\n\n이번 주 점검은 50인 미만 3곳입니다.<pagebreak/>결과는 금요일에 올립니다.\n\n지붕·축사.<columnbreak/>벌목.\n\n다음 단계 안내는 별도 공지입니다.\n"
+  },
+  {
+   "task_id": "ministry2-e1",
+   "edits": [
+    {
+     "old": "청년 고용률은 45.2%로 전년 동기 44.1%보다 1.1%p 올랐습니다. 일경험 프로그램 참여자는 12,400명입니다.\n",
+     "new": "청년 고용률은 45.2%로 전년 동기 44.1%보다 1.1%p 올랐습니다. <pagebreak/>일경험 프로그램 참여자는 12,400명입니다.\n"
+    }
+   ]
+  },
+  {
+   "task_id": "ministry2-e2",
+   "edits": [
+    {
+     "old": "다음 단계로 초소규모 사업장 점검 횟수를 두 배로 늘립니다.<columnbreak/>업종은 지붕·축사, 벌목, 질식 위험 작업부터입니다.\n",
+     "new": "다음 단계로 초소규모 사업장 점검 횟수를 두 배로 늘립니다. 업종은 지붕·축사, 벌목, <columnbreak/>질식 위험 작업부터입니다.\n"
+    }
+   ]
+  },
+  {
+   "task_id": "ministry2-e3",
+   "edits": [
+    {
+     "old": "다음 단계로 대학일자리+센터 30곳을 추가 지정합니다.<pagebreak/>지정 공고는 11월 둘째 주에 나갑니다.\n",
+     "new": "다음 단계로 대학일자리+센터 30곳을 추가 지정합니다. 지정 공고는 11월 둘째 주에 나갑니다.\n"
+    }
+   ]
+  },
+  {
+   "task_id": "ministry2-r",
+   "text": "REFUSE: an odd-page or section break and a change of column count cannot be written.",
+   "edits": []
+  }
+ ]
+}

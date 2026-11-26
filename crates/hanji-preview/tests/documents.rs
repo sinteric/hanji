@@ -302,8 +302,10 @@ fn table_bounds(group: &resvg::usvg::Group, out: &mut Vec<resvg::usvg::Rect>) {
         }
     }
 }
+/// A vertical (tbRl) body keeps its written margin band (72 to 720 pt here)
+/// even under a 120 pt header, as in Word 16.114 and rdocx's default.
 #[test]
-fn vertical_docx_table_svg_stays_inside_the_header_footer_body_band() {
+fn vertical_docx_table_svg_keeps_the_written_margin_band() {
     for alignment in ["left", "center", "right"] {
         for vertical_alignment in ["top", "center", "bottom"] {
             let bytes = docx_vertical::build(alignment, vertical_alignment);
@@ -334,8 +336,8 @@ fn vertical_docx_table_svg_stays_inside_the_header_footer_body_band() {
                     f64::from(rect.bottom()) * to_points,
                 );
                 assert!(
-                    top >= 155.0 && bottom <= 661.0,
-                    "{alignment}/{vertical_alignment}: table y={top}..{bottom} must fit between 156 and 660 pt"
+                    (top - 72.0).abs() < 0.01 && (bottom - 720.0).abs() < 0.01,
+                    "{alignment}/{vertical_alignment}: table y={top}..{bottom} must span the written 72 to 720 pt band"
                 );
             }
         }
@@ -385,12 +387,8 @@ fn docx_selected_story_pages_restore_continuation_room_and_preserve_body_text() 
                         p.page_info(page).unwrap().height / f64::from(tree.size().height());
                     let rect = bounds[0];
                     if vertical {
-                        let top = if page == 0 && first_height == 120 {
-                            156.0
-                        } else {
-                            72.0
-                        };
-                        assert!((f64::from(rect.top()) * to_points - top).abs() < 0.01);
+                        // The written band, whatever the selected header's height.
+                        assert!((f64::from(rect.top()) * to_points - 72.0).abs() < 0.01);
                         assert!((f64::from(rect.bottom()) * to_points - 720.0).abs() < 0.01);
                     } else {
                         assert!((f64::from(rect.left()) * to_points - 72.0).abs() < 0.01);
@@ -413,8 +411,10 @@ fn docx_selected_story_pages_restore_continuation_room_and_preserve_body_text() 
     assert_eq!(horizontal_second_pages[0], horizontal_second_pages[1]);
 }
 
+/// Landscape vertical pages keep the written 72 to 540 pt band under tall
+/// first, default and footer stories.
 #[test]
-fn fractional_landscape_docx_tables_use_selected_story_bands() {
+fn fractional_landscape_docx_tables_keep_the_written_band() {
     let bytes = docx_vertical::fractional_landscape();
     let p =
         render_document_with_fonts(DocumentKind::Docx, &bytes, &FontOptions::default()).unwrap();
@@ -440,14 +440,8 @@ fn fractional_landscape_docx_tables_use_selected_story_bands() {
         table_bounds(tree.root(), &mut bounds);
         assert_eq!(bounds.len(), 1);
         let to_points = p.page_info(page).unwrap().height / f64::from(tree.size().height());
-        let top = if page == 0 {
-            36.0 + 300.05
-        } else {
-            36.0 + 400.05
-        };
-        let bottom = 612.0 - 36.0 - 100.1;
-        assert!((f64::from(bounds[0].top()) * to_points - top).abs() < 0.01);
-        assert!((f64::from(bounds[0].bottom()) * to_points - bottom).abs() < 0.01);
+        assert!((f64::from(bounds[0].top()) * to_points - 72.0).abs() < 0.01);
+        assert!((f64::from(bounds[0].bottom()) * to_points - 540.0).abs() < 0.01);
     }
     for text in [
         "Page one body",

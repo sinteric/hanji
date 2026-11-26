@@ -16,7 +16,10 @@ host-fonts = ["system-fonts", "dep:hanji-store", "oxml-layout/system-fonts"]
 # Scanning maps each font file instead of reading it whole.
 system-fonts = ["fontdb/fs", "fontdb/memmap", "fontdb/fontconfig"]
 # The CLI includes HWPX; small PPTX/DOCX byte-only consumers can omit rhwp.
-hwpx = ["dep:rhwp"]
+# rhwp's svg2pdf turns on fontdb 0.23 `fs`/`memmap`; oxml-layout 0.15's
+# substitution match is then exhaustive only with system-fonts. Byte-only
+# layout still uses the deterministic font managers, which do not scan the host.
+hwpx = ["dep:rhwp", "oxml-layout/system-fonts"]
 
 [dependencies]
 hanji-core.workspace = true

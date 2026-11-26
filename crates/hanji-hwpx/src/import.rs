@@ -51,9 +51,12 @@ pub struct Stats {
 /// - Objects in a run (tables in text, pictures, shapes, form controls,
 ///   footnotes whose body is not ordinary text): inline `Keep`. An
 ///   `hp:equation` whose script the math grammar can hold is `$…$` /
-///   `<math>…</math>` with a `Wrap`. A footnote or endnote whose body is
-///   ordinary text in one paragraph is `[^label]` / `[^label]: body`
-///   with a `Wrap`.
+///   `<math>…</math>` with a `Wrap`. A drawing whose `hp:drawText` is
+///   ordinary text (one or more paragraphs, shown notes as `[^n]`) is
+///   that text with a `Wrap`; `<br/>` joins paragraphs. A
+///   footnote or endnote whose body is ordinary text in one paragraph is
+///   `[^label]` / `[^label]: body` with a `Wrap`. An `hp:autoNum` whose
+///   format is `DIGIT` is `prefix + num + suffix` with a `Wrap`.
 /// - A paragraph holding pipe tables, alone or with one run of other
 ///   content (text before the tables, or after): one table block per
 ///   table, and a paragraph block for the other content when it is there;
@@ -943,8 +946,12 @@ impl<'a> Importer<'a> {
                 );
             } else if c.is("hp:ctrl") && shown_note(c).is_some() {
                 self.note(c, path, run_id, marks);
+            } else if shown_auto_num(c).is_some() {
+                self.auto_num(c, path, run_id, marks);
             } else if c.is("hp:equation") {
                 self.equation(c, path, run_id, marks);
+            } else if let Some(bits) = draw_bits(c) {
+                self.draw_text(c, bits, path, run_id, marks);
             } else {
                 let kind = match c.name.as_str() {
                     "hp:ctrl" => ctrl_kind(c).map_or("control".into(), |k| keep_kind(&k.name)),
@@ -973,6 +980,87 @@ impl<'a> Importer<'a> {
         e.end = Some(end);
         (e.meta.aux_at, e.meta.aux) = tabs.into_iter().unzip();
         Ok(())
+    }
+
+    /// An `hp:autoNum` whose formatted number the model shows: a wrap over
+    /// those characters, holding the original control (DESIGN.md §5.1).
+    /// Format, sequence and the rest stay in the wrap.
+    fn auto_num(&mut self, e: &Element, path: &[usize], run_id: u64, marks: Marks) {
+        let Some(body) = shown_auto_num(e) else {
+            let pos = self.buf.len();
+            let keep = self.keep_entry(Kind::Keep, e, path, Some(pos), Some(run_id), "number");
+            self.push(Atom::Keep(Box::new(keep)), marks);
+            return;
+        };
+        let fp_el = fingerprint_auto_num(e);
+        let f = self.fp(&[Some(&fp_el)]);
+        let at = self.buf.len();
+        let idx = self.entry(
+            Kind::Wrap,
+            vec![e.to_xml()],
+            f,
+            path,
+            Some(at),
+            None,
+            Meta {
+                run: Some(run_id),
+                tag: "hp:autoNum".into(),
+                ..Default::default()
+            },
+        );
+        for ch in body.chars() {
+            self.push(Atom::Char(ch), marks);
+        }
+        let end = self.buf.len();
+        let close = self.seq();
+        let w = &mut self.entries[idx];
+        w.end = Some(end);
+        w.meta.seq_close = close;
+    }
+
+    /// A drawing whose `hp:drawText` the model shows: a wrap over the inner
+    /// characters, notes and paragraph breaks, holding the original object
+    /// (DESIGN.md §5.1). Geometry, anchoring and styling stay in the wrap.
+    fn draw_text(
+        &mut self,
+        e: &Element,
+        bits: Vec<DrawBit<'_>>,
+        path: &[usize],
+        run_id: u64,
+        marks: Marks,
+    ) {
+        let fp_el = fingerprint_drawing(e);
+        let f = self.fp(&[Some(&fp_el)]);
+        let at = self.buf.len();
+        let idx = self.entry(
+            Kind::Wrap,
+            vec![e.to_xml()],
+            f,
+            path,
+            Some(at),
+            None,
+            Meta {
+                run: Some(run_id),
+                tag: e.name.clone(),
+                ..Default::default()
+            },
+        );
+        for b in bits {
+            match b {
+                DrawBit::Text(s) => {
+                    for ch in s.chars() {
+                        self.push(Atom::Char(ch), marks);
+                    }
+                }
+                DrawBit::Break => self.push(Atom::Break, marks),
+                DrawBit::Note(c) => self.note(c, path, run_id, marks),
+            }
+        }
+        let end = self.buf.len();
+        let close = self.seq();
+        let w = &mut self.entries[idx];
+        w.end = Some(end);
+        w.meta.seq_close = close;
     }
 
     /// An `hp:equation` whose script the math grammar can hold: a length-1

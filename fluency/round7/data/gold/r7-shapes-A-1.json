@@ -1,0 +1,53 @@
+{
+ "answers": [
+  {
+   "task_id": "kpi1-q1",
+   "text": "ANSWER: B25:D27 | 매출 배지, 이익 배지"
+  },
+  {
+   "task_id": "kpi1-w",
+   "text": "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"메모\" range=\"A1:D8\">\n\n<table name=\"메모표\" range=\"A1:B4\">\n| column | type | format | formula |\n|---|---|---|---|\n| 항목 | text |  |  |\n| 값 | text |  |  |\n</table>\n\n<shape name=\"오늘\" anchor=\"C2:D3\">오늘은 마감일입니다.</shape>\n\n<group name=\"뱃지\">\n<shape name=\"통과\" anchor=\"C5:D6\">통과</shape>\n<shape name=\"보류\" anchor=\"C7:D8\">보류</shape>\n</group>\n\n</sheet>\n"
+  },
+  {
+   "task_id": "kpi1-e1",
+   "edits": [
+    {
+     "old": "\n</sheet>\n",
+     "new": "\n<shape name=\"환급 안내\" anchor=\"B28:D29\">환급은 다음 달 수입에 넣습니다.</shape>\n\n</sheet>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kpi1-e2",
+   "edits": [
+    {
+     "old": "<shape name=\"입력 안내\" anchor=\"B25:D27\">아래에 입력하면 표가 늘어납니다. 마지막 행에서 Enter.</shape>\n",
+     "new": "<shape name=\"입력 안내\" anchor=\"B28:D30\">아래에 입력하면 표가 늘어납니다. 마지막 행에서 Enter.</shape>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kpi1-e3",
+   "edits": [
+    {
+     "old": "<shape name=\"매출 배지\" anchor=\"F2:G3\">매출 +12%</shape>\n",
+     "new": "<shape name=\"매출 배지\" anchor=\"F2:G3\">매출 +15%</shape>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kpi1-e4",
+   "edits": [
+    {
+     "old": "<shape name=\"이익 배지\" anchor=\"F4:G5\">이익 +8%</shape>\n",
+     "new": "<shape name=\"이익 배지\" anchor=\"F4:H6\">이익 +8%</shape>\n"
+    }
+   ]
+  },
+  {
+   "task_id": "kpi1-r",
+   "text": "REFUSE: a picture and a rotation cannot be written.",
+   "edits": []
+  }
+ ]
+}

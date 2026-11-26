@@ -545,6 +545,12 @@ impl<'a> Convert<'a> {
                 Atom::Math(body) if !self.caps.math => {
                     self.dropped_atom("math", "m", "equation", body, off(k))
                 }
+                Atom::PageBreak if self.to == Format::Hwpx => {
+                    self.dropped_atom("pagebreak", "pb", "pagebreak", "", off(k))
+                }
+                Atom::ColumnBreak if self.to == Format::Hwpx => {
+                    self.dropped_atom("columnbreak", "cb", "columnbreak", "", off(k))
+                }
                 _ if u.props.is_empty() => units.push(u.clone()),
                 _ => {
                     let place = self.line(off(k));
@@ -967,12 +973,15 @@ fn not_carried(rem: &Remainder, from: Format, has_items: bool) -> Vec<NotCarried
                 }
                 "hyperlink" => "hyperlinks (the text stays, the address does not)",
                 "fieldBegin" | "fieldEnd" => "field ranges",
-                "fldChar" | "fldSimple" => {
+                "fldChar" | "fldSimple" | "fld" => {
                     "fields (the result's text stays, the instruction does not)"
                 }
                 "sdt" | "sdt/block" => {
                     "content controls (the text stays, the control properties do not)"
                 }
+                "drawing" | "pict" | "AlternateContent" | "rect" | "ellipse" | "arc"
+                | "polygon" | "curve" | "connectLine" | "line" | "container" | "textart"
+                | "pic" => "text boxes (the text stays, the object does not)",
                 // Shown as math placeholders; size and placement do not cross.
                 "equation" => continue,
                 // A layout hint Word writes for the page it last rendered.

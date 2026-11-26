@@ -33,37 +33,37 @@
   "total": {
     "files": 102,
     "failed": 0,
-    "with_keeps": 59,
-    "keeps": 245
+    "with_keeps": 45,
+    "keeps": 197
   },
   "formats": [
     {
       "format": "docx",
       "files": 13,
       "failed": 0,
-      "with_keeps": 12,
-      "keeps": 130
+      "with_keeps": 10,
+      "keeps": 117
     },
     {
       "format": "hwpx",
       "files": 16,
       "failed": 0,
-      "with_keeps": 10,
-      "keeps": 24
+      "with_keeps": 8,
+      "keeps": 22
     },
     {
       "format": "pptx",
       "files": 27,
       "failed": 0,
       "with_keeps": 16,
-      "keeps": 44
+      "keeps": 40
     },
     {
       "format": "xlsx",
       "files": 46,
       "failed": 0,
-      "with_keeps": 21,
-      "keeps": 47
+      "with_keeps": 11,
+      "keeps": 18
     }
   ],
   "kinds": [
@@ -76,8 +76,8 @@
     {
       "format": "docx",
       "kind": "drawing",
-      "keeps": 26,
-      "files": 10
+      "keeps": 22,
+      "files": 9
     },
     {
       "format": "pptx",
@@ -86,16 +86,10 @@
       "files": 10
     },
     {
-      "format": "pptx",
-      "kind": "field",
-      "keeps": 11,
-      "files": 4
-    },
-    {
       "format": "hwpx",
       "kind": "drawing",
-      "keeps": 10,
-      "files": 7
+      "keeps": 9,
+      "files": 6
     },
     {
       "format": "docx",
@@ -110,8 +104,8 @@
       "files": 6
     },
     {
-      "format": "docx",
-      "kind": "symbol",
+      "format": "pptx",
+      "kind": "field",
       "keeps": 7,
       "files": 1
     },
@@ -120,18 +114,6 @@
       "kind": "picture",
       "keeps": 7,
       "files": 6
-    },
-    {
-      "format": "xlsx",
-      "kind": "hyperlinks",
-      "keeps": 7,
-      "files": 7
-    },
-    {
-      "format": "xlsx",
-      "kind": "notes",
-      "keeps": 7,
-      "files": 7
     },
     {
       "format": "xlsx",
@@ -170,24 +152,6 @@
       "files": 5
     },
     {
-      "format": "xlsx",
-      "kind": "conditional-format",
-      "keeps": 5,
-      "files": 5
-    },
-    {
-      "format": "xlsx",
-      "kind": "shape",
-      "keeps": 5,
-      "files": 3
-    },
-    {
-      "format": "xlsx",
-      "kind": "data-validation",
-      "keeps": 4,
-      "files": 4
-    },
-    {
       "format": "docx",
       "kind": "table",
       "keeps": 3,
@@ -198,12 +162,6 @@
       "kind": "text",
       "keeps": 3,
       "files": 1
-    },
-    {
-      "format": "docx",
-      "kind": "break",
-      "keeps": 2,
-      "files": 2
     },
     {
       "format": "docx",
@@ -232,18 +190,6 @@
     {
       "format": "docx",
       "kind": "footnote",
-      "keeps": 1,
-      "files": 1
-    },
-    {
-      "format": "hwpx",
-      "kind": "number",
-      "keeps": 1,
-      "files": 1
-    },
-    {
-      "format": "xlsx",
-      "kind": "group",
       "keeps": 1,
       "files": 1
     },
@@ -300,11 +246,10 @@
     {
       "path": "prototype/remainder/corpus/form_footnotes.docx",
       "format": "docx",
-      "keeps": 81,
+      "keeps": 74,
       "kinds": {
         "drawing": 5,
-        "field": 69,
-        "symbol": 7
+        "field": 69
       }
     },
     {
@@ -318,9 +263,9 @@
     {
       "path": "prototype/remainder/corpus/loadAndSave.docx",
       "format": "docx",
-      "keeps": 4,
+      "keeps": 3,
       "kinds": {
-        "drawing": 3,
+        "drawing": 2,
         "math": 1
       }
     },
@@ -335,17 +280,14 @@
     {
       "path": "prototype/remainder/corpus/tdf124637_sectionMargin.docx",
       "format": "docx",
-      "keeps": 1,
-      "kinds": {
-        "break": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "prototype/remainder/corpus/tdf154481.docx",
       "format": "docx",
-      "keeps": 4,
+      "keeps": 3,
       "kinds": {
-        "break": 1,
         "drawing": 1,
         "field": 2
       }
@@ -353,10 +295,10 @@
     {
       "path": "prototype/remainder/corpus/testWORD_2006ml.docx",
       "format": "docx",
-      "keeps": 18,
+      "keeps": 16,
       "kinds": {
         "content-control": 4,
-        "drawing": 5,
+        "drawing": 3,
         "field": 2,
         "math": 1,
         "object": 3,
@@ -367,10 +309,8 @@
     {
       "path": "prototype/remainder/corpus/testWORD_various.docx",
       "format": "docx",
-      "keeps": 1,
-      "kinds": {
-        "drawing": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-hwpx/corpus/basic-table-01.hwpx",
@@ -381,10 +321,8 @@
     {
       "path": "crates/hanji-hwpx/corpus/eq-002.hwpx",
       "format": "hwpx",
-      "keeps": 1,
-      "kinds": {
-        "number": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-hwpx/corpus/fdi-2025q2.hwpx",
@@ -412,10 +350,8 @@
     {
       "path": "crates/hanji-hwpx/corpus/footnote-tbox-01.hwpx",
       "format": "hwpx",
-      "keeps": 1,
-      "kinds": {
-        "drawing": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-hwpx/corpus/form-01.hwpx",
@@ -500,10 +436,9 @@
     {
       "path": "crates/hanji-pptx/corpus/60810.pptx",
       "format": "pptx",
-      "keeps": 6,
+      "keeps": 4,
       "kinds": {
-        "diagram": 4,
-        "field": 2
+        "diagram": 4
       }
     },
     {
@@ -593,9 +528,8 @@
     {
       "path": "crates/hanji-pptx/corpus/layouts.pptx",
       "format": "pptx",
-      "keeps": 2,
+      "keeps": 1,
       "kinds": {
-        "field": 1,
         "picture": 1
       }
     },
@@ -683,9 +617,8 @@
     {
       "path": "crates/hanji-pptx/corpus/txt-text.pptx",
       "format": "pptx",
-      "keeps": 2,
+      "keeps": 1,
       "kinds": {
-        "field": 1,
         "table": 1
       }
     },
@@ -720,10 +653,8 @@
     {
       "path": "crates/hanji-xlsx/corpus/DataValidations-49244.xlsx",
       "format": "xlsx",
-      "keeps": 1,
-      "kinds": {
-        "data-validation": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/DateFormatTests.xlsx",
@@ -748,13 +679,8 @@
     {
       "path": "crates/hanji-xlsx/corpus/ExcelWithAttachments.xlsm",
       "format": "xlsx",
-      "keeps": 6,
-      "kinds": {
-        "group": 1,
-        "hyperlinks": 1,
-        "notes": 1,
-        "shape": 3
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/GeneralFormatTests.xlsx",
@@ -783,10 +709,8 @@
     {
       "path": "crates/hanji-xlsx/corpus/SimpleWithComments.xlsx",
       "format": "xlsx",
-      "keeps": 1,
-      "kinds": {
-        "notes": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/StructuredReferences.xlsx",
@@ -811,18 +735,15 @@
     {
       "path": "crates/hanji-xlsx/corpus/WithConditionalFormatting.xlsx",
       "format": "xlsx",
-      "keeps": 1,
-      "kinds": {
-        "conditional-format": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/WithDrawing.xlsx",
       "format": "xlsx",
-      "keeps": 6,
+      "keeps": 5,
       "kinds": {
-        "picture": 5,
-        "shape": 1
+        "picture": 5
       }
     },
     {
@@ -842,34 +763,23 @@
     {
       "path": "crates/hanji-xlsx/corpus/WithVariousData.xlsx",
       "format": "xlsx",
-      "keeps": 2,
-      "kinds": {
-        "hyperlinks": 1,
-        "notes": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/korean-sales-lo.xlsx",
       "format": "xlsx",
-      "keeps": 5,
+      "keeps": 1,
       "kinds": {
-        "chart": 1,
-        "conditional-format": 1,
-        "data-validation": 1,
-        "hyperlinks": 1,
-        "notes": 1
+        "chart": 1
       }
     },
     {
       "path": "crates/hanji-xlsx/corpus/korean-sales.xlsx",
       "format": "xlsx",
-      "keeps": 5,
+      "keeps": 1,
       "kinds": {
-        "chart": 1,
-        "conditional-format": 1,
-        "data-validation": 1,
-        "hyperlinks": 1,
-        "notes": 1
+        "chart": 1
       }
     },
     {
@@ -901,26 +811,20 @@
     {
       "path": "crates/hanji-xlsx/corpus/rx_comment01.xlsx",
       "format": "xlsx",
-      "keeps": 1,
-      "kinds": {
-        "notes": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/rx_cond_format01.xlsx",
       "format": "xlsx",
-      "keeps": 1,
-      "kinds": {
-        "conditional-format": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/rx_data_validation01.xlsx",
       "format": "xlsx",
-      "keeps": 1,
-      "kinds": {
-        "data-validation": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/rx_defined_name01.xlsx",
@@ -937,10 +841,8 @@
     {
       "path": "crates/hanji-xlsx/corpus/rx_hyperlink01.xlsx",
       "format": "xlsx",
-      "keeps": 1,
-      "kinds": {
-        "hyperlinks": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/rx_image01.xlsx",
@@ -977,10 +879,8 @@
     {
       "path": "crates/hanji-xlsx/corpus/rx_table05.xlsx",
       "format": "xlsx",
-      "keeps": 3,
+      "keeps": 1,
       "kinds": {
-        "hyperlinks": 1,
-        "notes": 1,
         "picture": 1
       }
     },
@@ -999,19 +899,15 @@
     {
       "path": "crates/hanji-xlsx/corpus/sharedhyperlink.xlsx",
       "format": "xlsx",
-      "keeps": 1,
-      "kinds": {
-        "hyperlinks": 1
-      }
+      "keeps": 0,
+      "kinds": {}
     },
     {
       "path": "crates/hanji-xlsx/corpus/simple-monthly-budget.xlsx",
       "format": "xlsx",
-      "keeps": 3,
+      "keeps": 1,
       "kinds": {
-        "chart": 1,
-        "conditional-format": 1,
-        "shape": 1
+        "chart": 1
       }
     },
     {

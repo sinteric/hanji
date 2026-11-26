@@ -6,12 +6,12 @@ use std::collections::{BTreeMap, HashMap};
 
 use hanji_core::{Block, Entry, Kind, ListPlan, StyleSet};
 use hanji_format::styled::{self, StyleTable};
-use hanji_format::{Atom, Cell, Inline, Key, Marks, Note, Props, Value};
+use hanji_format::{Atom, Cell, Inline, Key, Marks, Note, Props, Unit, Value};
 use hanji_package::xml::{assemble, escape_text, fragment, is_blank, Element, Node};
 
 use crate::header::{list_heading, list_num, Header, Style};
 use crate::import::{char_key, dims, layout_key, spaces_only};
-use crate::owpml::{self, char_element, ctrl_kind, MARKER_CTRLS};
+use crate::owpml::{self, char_element, ctrl_kind, keep_kind, MARKER_CTRLS};
 use crate::{PackageShell, SectionShell};
 
 pub struct Exporter<'a> {
@@ -679,6 +679,16 @@ impl<'a> Exporter<'a> {
             .filter(|e| e.meta.tag == "hp:equation")
             .filter_map(|e| Some((e.start?, e)))
             .collect();
+        let drawings: Vec<&Entry> = self
+            .at(path, Kind::Wrap)
+            .into_iter()
+            .filter(|e| keep_kind(&e.meta.tag) == "drawing")
+            .collect();
+        let autonums: Vec<&Entry> = self
+            .at(path, Kind::Wrap)
+            .into_iter()
+            .filter(|e| e.meta.tag == "hp:autoNum")
+            .collect();
         let notes: HashMap<usize, &Entry> = self
             .at(path, Kind::Wrap)
             .into_iter()
@@ -825,6 +835,8 @@ impl<'a> Exporter<'a> {
                         &mut tabs,
                         &eqs,
                         &notes,
+                        &drawings,
+                        &autonums,
                     )?;
                     out.push(node(r));
                 }
@@ -835,7 +847,9 @@ impl<'a> Exporter<'a> {
                         .find_map(|m| m.xml.get(1))
                         .map_or_else(|| empty_run(style.char_pr), |x| fragment(x));
                     r.children.clear();
-                    self.fill_run(&mut r, p, s, s, ms, None, &mut tabs, &eqs, &notes)?;
+                    self.fill_run(
+                        &mut r, p, s, s, ms, None, &mut tabs, &eqs, &notes, &drawings, &autonums,
+                    )?;
                     out.push(node(r));
                 }
                 It::Seg(si) => {
@@ -867,7 +881,9 @@ impl<'a> Exporter<'a> {
                     unit_cp[a..b].fill(cp);
                     self.set_char_pr(&mut r, cp, old_style, style);
                     let ms = at.get(&Target::Seg(si)).unwrap_or(&none);
-                    self.fill_run(&mut r, p, a, b, ms, own, &mut tabs, &eqs, &notes)?;
+                    self.fill_run(
+                        &mut r, p, a, b, ms, own, &mut tabs, &eqs, &notes, &drawings, &autonums,
+                    )?;
                     out.push(node(r));
                 }
             }
@@ -907,6 +923,8 @@ impl<'a> Exporter<'a> {
         tabs: &mut HashMap<u64, usize>,
         eqs: &HashMap<usize, &Entry>,
         notes: &HashMap<usize, &Entry>,
+        drawings: &[&Entry],
+        autonums: &[&Entry],
     ) -> Result<(), String> {
         let mut by_pos: BTreeMap<usize, Vec<&Entry>> = BTreeMap::new();
         for m in zw {
@@ -943,6 +961,62 @@ impl<'a> Exporter<'a> {
             }
             if c == b {
                 break;
+            }
+            if let Some(w) = drawings
+                .iter()
+                .copied()
+                .find(|e| e.start.is_some_and(|s| s <= c) && e.end.is_some_and(|en| c < en))
+            {
+                if Some(c) == w.start {
+                    close(&mut t, r);
+                    let span = &p.units[w.start.unwrap()..w.end.unwrap().min(p.units.len())];
+                    r.children.push(node(fragment(&owpml::with_draw_contents(
+                        &w.xml[0],
+                        &draw_out(span),
+                    ))));
+                }
+                continue;
+            }
+            if let Some(w) = autonums
+                .iter()
+                .copied()
+                .find(|e| e.start.is_some_and(|s| s <= c) && e.end.is_some_and(|en| c < en))
+            {
+                if Some(c) == w.start {
+                    let body: String = p.units[w.start.unwrap()..w.end.unwrap().min(p.units.len())]
+                        .iter()
+                        .filter_map(|u| match &u.atom {
+                            Atom::Char(ch) => Some(*ch),
+                            _ => None,
+                        })
+                        .collect();
+                    match owpml::with_auto_num(&w.xml[0], &body) {
+                        Some(xml) => {
+                            close(&mut t, r);
+                            r.children.push(node(fragment(&xml)));
+                        }
+                        None => {
+                            open(&mut t);
+                            let x = t.as_mut().unwrap();
+                            for ch in body.chars() {
+                                match char_element(ch) {
+                                    Some(name) => {
+                                        x.children.push(node(Element::new(name)));
+                                    }
+                                    None => match x.children.last_mut() {
+                                        Some(Node::Text(s)) => {
+                                            s.push_str(&escape_text(&ch.to_string()))
+                                        }
+                                        _ => x
+                                            .children
+                                            .push(Node::Text(escape_text(&ch.to_string()))),
+                                    },
+                                }
+                            }
+                        }
+                    }
+                }
+                continue;
             }
             match &p.units[c].atom {
                 Atom::Char(ch) => {
@@ -997,6 +1071,9 @@ impl<'a> Exporter<'a> {
                         "a page break inside a paragraph cannot be written to hwpx; write <pagebreak/> on its own line"
                             .into(),
                     )
+                }
+                Atom::ColumnBreak => {
+                    return Err("a column break cannot be written to hwpx".into())
                 }
                 Atom::Comment(_) | Atom::Ins(_) | Atom::Del(_) => {
                     return Err(
@@ -1495,6 +1572,32 @@ fn clear_modelled_text(p: &mut Element) {
             e.children.clear();
         }
     });
+}
+
+fn draw_out(span: &[Unit]) -> Vec<owpml::DrawOut> {
+    let mut out = Vec::new();
+    let mut buf = String::new();
+    let flush = |out: &mut Vec<owpml::DrawOut>, buf: &mut String| {
+        if !buf.is_empty() {
+            out.push(owpml::DrawOut::Text(std::mem::take(buf)));
+        }
+    };
+    for u in span {
+        match &u.atom {
+            Atom::Char(ch) => buf.push(*ch),
+            Atom::Break => {
+                flush(&mut out, &mut buf);
+                out.push(owpml::DrawOut::Break);
+            }
+            Atom::NoteRef(n) => {
+                flush(&mut out, &mut buf);
+                out.push(owpml::DrawOut::Note(n.body.clone()));
+            }
+            _ => {}
+        }
+    }
+    flush(&mut out, &mut buf);
+    out
 }
 
 /// A zero-width item whose paragraph went, as a run of its own: a marker

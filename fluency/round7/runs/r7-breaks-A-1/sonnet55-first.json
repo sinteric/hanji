@@ -1,0 +1,44 @@
+{
+ "answers": [
+  {
+   "task_id": "report1-q1",
+   "text": "ANSWER: 첨부 1의 지점별 표는 10월 | 부산 5곳, 대구 3곳, 광주"
+  },
+  {
+   "task_id": "report1-w",
+   "text": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 주간 영업 메모\n\n강남 지점 매출은 잠정치 12억입니다.<pagebreak/>종로 지점은 같은 주 9억입니다.\n\n서울 안건.<columnbreak/>부산 안건.\n\n<pagebreak/>\n\n다음 회의는 금요일 10시입니다.\n"
+  },
+  {
+   "task_id": "report1-e1",
+   "edits": [
+    {
+     "old": "다음과 같이 보고합니다. 매출은",
+     "new": "다음과 같이 보고합니다.<pagebreak/>매출은"
+    }
+   ]
+  },
+  {
+   "task_id": "report1-e2",
+   "edits": [
+    {
+     "old": "인천 0곳.<columnbreak/>부산 5곳, 대구 3곳, 광주 2곳",
+     "new": "인천 0곳. 부산 5곳, 대구 3곳,<columnbreak/>광주 2곳"
+    }
+   ]
+  },
+  {
+   "task_id": "report1-e3",
+   "edits": [
+    {
+     "old": "+4%입니다.<pagebreak/>첨부 1의",
+     "new": "+4%입니다. 첨부 1의"
+    }
+   ]
+  },
+  {
+   "task_id": "report1-r",
+   "text": "REFUSE: Section breaks, margin changes and column-count changes cannot be expressed in this format.",
+   "edits": []
+  }
+ ]
+}

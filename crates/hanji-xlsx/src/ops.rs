@@ -20,16 +20,20 @@ use hanji_format::ops::{
     check_ops, date_of, parse_ops, render_errors, ColumnSpec, Formats, RangeOp, Row, SortKey, Value,
 };
 use hanji_format::sheet::{
-    format_kind, parse_spreadsheet, serialize_spreadsheet, FormatKind, SheetItem,
+    format_kind, parse_spreadsheet, serialize_spreadsheet, Cfvo, CondFormatDecl, FormatKind,
+    HyperlinkDecl, SheetItem, ValidationDecl,
 };
+use hanji_package::opc::{self, Rel};
 use hanji_package::xml::{self, Element, Node};
 
-use crate::book::{Book, SheetInfo, SheetKind, TableCol, TableInfo, CT_SHEET, MAIN_NS, R_NS};
+use crate::book::{
+    Book, SheetInfo, SheetKind, TableCol, TableInfo, CT_SHEET, MAIN_NS, REL_BASE, R_NS,
+};
 use crate::calc::{self, Changed, Recalc};
 use crate::shift::{self, f_element};
 use crate::store::{has_formula, holds, Cell, SHEET_ORDER};
 use crate::value::CellValue;
-use crate::{book_of, model, numfmt, remainder_of, structure, Applied, XlsxEngine};
+use crate::{book_of, model, notes, numfmt, remainder_of, structure, Applied, XlsxEngine};
 
 /// Number formats round 4 lists, allowed in every workbook besides its own and the built-in ones.
 pub const ROUND4_FORMATS: &[&str] = &[
@@ -181,7 +185,7 @@ pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, Eng
     let n_text = text_ops.len();
     for (k, op) in all.iter().enumerate() {
         if k == n_text {
-            apply_merges(&mut book, &parsed, &mut next_id)
+            apply_structure_lines(&mut book, &parsed, &mut next_id)
                 .map_err(|m| refused(format!("the structure text: {m}")))?;
         }
         let which = if k < n_text {
@@ -192,7 +196,7 @@ pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, Eng
         apply_op(&mut book, op, &mut cx).map_err(|m| refused(format!("{which}: {m}")))?;
     }
     if n_text == all.len() {
-        apply_merges(&mut book, &parsed, &mut next_id)
+        apply_structure_lines(&mut book, &parsed, &mut next_id)
             .map_err(|m| refused(format!("the structure text: {m}")))?;
     }
     let recalc = calc::recompute(&mut book, &cx.changed).map_err(refused)?;
@@ -232,6 +236,19 @@ pub fn apply(text: &str, rem: &Remainder, ops_json: &str) -> Result<Applied, Eng
         remainder,
         report,
     })
+}
+
+fn apply_structure_lines(
+    book: &mut Book,
+    parsed: &hanji_format::sheet::Spreadsheet,
+    next_id: &mut u64,
+) -> Result<(), String> {
+    apply_merges(book, parsed, next_id)?;
+    apply_hyperlinks(book, parsed, next_id)?;
+    apply_notes(book, parsed)?;
+    apply_validations(book, parsed, next_id)?;
+    apply_conditional_formats(book, parsed, next_id)?;
+    apply_drawings(book, parsed)
 }
 
 /// Apply the `<merge range/>` lines of `parsed` to each sheet. A sheet that
@@ -362,6 +379,856 @@ fn set_sheet_merges(
     Ok(())
 }
 
+/// Apply the `<hyperlink/>` lines of `parsed` to each sheet. A sheet that
+/// still has a hyperlinks placeholder is left alone.
+fn apply_hyperlinks(
+    book: &mut Book,
+    parsed: &hanji_format::sheet::Spreadsheet,
+    next_id: &mut u64,
+) -> Result<(), String> {
+    for (i, ns) in parsed.sheets.iter().enumerate() {
+        if ns
+            .items
+            .iter()
+            .any(|it| matches!(it, SheetItem::Keep(k) if k.kind == "hyperlinks"))
+        {
+            continue;
+        }
+        let wanted: Vec<HyperlinkDecl> = structure::hyperlinks(&ns.items)
+            .into_iter()
+            .cloned()
+            .collect();
+        let have = model::modelled_hyperlinks(book, i).unwrap_or_default();
+        if have == wanted {
+            continue;
+        }
+        set_sheet_hyperlinks(book, i, &wanted, next_id)?;
+    }
+    Ok(())
+}
+
+fn set_sheet_hyperlinks(
+    book: &mut Book,
+    i: usize,
+    wanted: &[HyperlinkDecl],
+    next_id: &mut u64,
+) -> Result<(), String> {
+    book.load_store(i)?;
+    let prefix = book.store(i).prefix.clone();
+    let scope = xml::scope_of(&book.store(i).skel.root);
+    let part = book.sheets[i].part.clone();
+    let rp = rel_prefix(book, i)?;
+    let mut old: Vec<Entry> = vec![];
+    book.entries.retain(|e| {
+        if e.kind == Kind::Range && e.path.first() == Some(&i) && e.meta.tag == "hyperlink" {
+            old.push(e.clone());
+            false
+        } else {
+            true
+        }
+    });
+    let rels_now = book.rels_of(&part);
+    let decl_of = |e: &Entry| -> Option<HyperlinkDecl> {
+        let el = xml::fragment(&e.xml[0]);
+        let range = CellRange::parse(e.meta.range.as_deref()?)?;
+        let rid = el
+            .attrs
+            .iter()
+            .find(|a| a.0.ends_with(":id"))
+            .map(|a| xml::unescape(&a.1));
+        let location = el.get("location").filter(|s| !s.is_empty());
+        let target = rid.as_ref().and_then(|id| {
+            rels_now
+                .iter()
+                .find(|r| r.id == *id && r.short_type() == "hyperlink" && r.external)
+                .map(|r| r.target.clone())
+        });
+        Some(HyperlinkDecl {
+            range: range.to_string(),
+            target,
+            location,
+            display: el.get("display"),
+            tooltip: el.get("tooltip"),
+        })
+    };
+    let mut unused = vec![true; old.len()];
+    let mut placed: Vec<Option<Entry>> = vec![None; wanted.len()];
+    for (wi, w) in wanted.iter().enumerate() {
+        let Some(k) = old
+            .iter()
+            .enumerate()
+            .find(|(k, e)| unused[*k] && decl_of(e).as_ref() == Some(w))
+        else {
+            continue;
+        };
+        unused[k.0] = false;
+        placed[wi] = Some(k.1.clone());
+    }
+    let leftover: Vec<Entry> = old
+        .into_iter()
+        .enumerate()
+        .filter(|(k, _)| unused[*k])
+        .map(|(_, e)| e)
+        .collect();
+    let mut leftover = leftover.into_iter();
+    let mut seq = book
+        .entries
+        .iter()
+        .filter(|e| e.path.first() == Some(&i))
+        .map(|e| e.seq)
+        .max()
+        .unwrap_or(0);
+    let mut rels = rels_now;
+    let mut used_rids: Vec<String> = vec![];
+    let mut out = vec![];
+    for (w, slot) in wanted.iter().zip(placed) {
+        if let Some(e) = slot {
+            if let Some(id) = hyperlink_rid(&e.xml[0]) {
+                used_rids.push(id);
+            }
+            out.push(e);
+            continue;
+        }
+        if let Some(mut e) = leftover.next() {
+            sync_hyperlink(&mut e, w, &mut rels, &rp, &scope, &mut used_rids);
+            out.push(e);
+            continue;
+        }
+        seq += 1;
+        let mut el = Element::new(&format!("{prefix}hyperlink")).with_attr("ref", &w.range);
+        if let Some(url) = &w.target {
+            let id = opc::free_rel_id(&rels);
+            rels.push(Rel {
+                id: id.clone(),
+                ty: format!("{REL_BASE}hyperlink"),
+                target: url.clone(),
+                external: true,
+            });
+            el = el.with_attr(&format!("{rp}:id"), &id);
+            used_rids.push(id);
+        }
+        if let Some(l) = &w.location {
+            el = el.with_attr("location", l);
+        }
+        if let Some(d) = &w.display {
+            el = el.with_attr("display", d);
+        }
+        if let Some(t) = &w.tooltip {
+            el = el.with_attr("tooltip", t);
+        }
+        out.push(Entry {
+            id: *next_id,
+            kind: Kind::Range,
+            xml: vec![el.to_xml()],
+            fp: xml::canon(&el, &scope),
+            path: vec![i],
+            start: None,
+            end: None,
+            seq,
+            meta: Meta {
+                tag: "hyperlink".into(),
+                range: Some(w.range.clone()),
+                ..Default::default()
+            },
+        });
+        *next_id += 1;
+    }
+    rels.retain(|r| !(r.short_type() == "hyperlink" && r.external && !used_rids.contains(&r.id)));
+    if rels != book.rels_of(&part) {
+        book.set_rels(&part, rels);
+    }
+    book.entries.extend(out);
+    Ok(())
+}
+
+fn hyperlink_rid(xml: &str) -> Option<String> {
+    xml::fragment(xml)
+        .attrs
+        .iter()
+        .find(|a| a.0.ends_with(":id"))
+        .map(|a| xml::unescape(&a.1))
+}
+
+fn sync_hyperlink(
+    e: &mut Entry,
+    w: &HyperlinkDecl,
+    rels: &mut Vec<Rel>,
+    rp: &str,
+    scope: &xml::Scope,
+    used_rids: &mut Vec<String>,
+) {
+    let mut x = xml::fragment(&e.xml[0]);
+    x.set("ref", &w.range);
+    e.meta.range = Some(w.range.clone());
+    let rid_attr = x
+        .attrs
+        .iter()
+        .find(|a| a.0.ends_with(":id"))
+        .map(|a| a.0.clone());
+    let current_id = rid_attr.as_ref().and_then(|k| x.get(k));
+    match (&w.target, current_id, rid_attr) {
+        (Some(url), Some(id), _) => {
+            if let Some(r) = rels.iter_mut().find(|r| r.id == id) {
+                r.target = url.clone();
+            } else {
+                rels.push(Rel {
+                    id: id.clone(),
+                    ty: format!("{REL_BASE}hyperlink"),
+                    target: url.clone(),
+                    external: true,
+                });
+            }
+            used_rids.push(id);
+        }
+        (Some(url), None, _) => {
+            let id = opc::free_rel_id(rels);
+            rels.push(Rel {
+                id: id.clone(),
+                ty: format!("{REL_BASE}hyperlink"),
+                target: url.clone(),
+                external: true,
+            });
+            x.set(&format!("{rp}:id"), &id);
+            used_rids.push(id);
+        }
+        (None, _, Some(attr)) => {
+            x.remove_attr(&attr);
+        }
+        (None, _, None) => {}
+    }
+    set_opt_attr(&mut x, "location", w.location.as_deref());
+    set_opt_attr(&mut x, "display", w.display.as_deref());
+    set_opt_attr(&mut x, "tooltip", w.tooltip.as_deref());
+    e.xml[0] = x.to_xml();
+    e.fp = xml::canon(&x, scope);
+}
+
+fn set_opt_attr(el: &mut Element, k: &str, v: Option<&str>) {
+    match v {
+        Some(v) => el.set(k, v),
+        None => {
+            el.remove_attr(k);
+        }
+    }
+}
+
+fn rel_prefix(book: &mut Book, i: usize) -> Result<String, String> {
+    let st = book.store_mut(i)?;
+    let root = &mut st.skel.root;
+    Ok(
+        match root
+            .attrs
+            .iter()
+            .find(|x| x.1 == R_NS)
+            .and_then(|x| x.0.strip_prefix("xmlns:"))
+        {
+            Some(p) => p.to_string(),
+            None => {
+                root.attrs.push(("xmlns:r".into(), R_NS.into()));
+                "r".into()
+            }
+        },
+    )
+}
+
+fn apply_validations(
+    book: &mut Book,
+    parsed: &hanji_format::sheet::Spreadsheet,
+    next_id: &mut u64,
+) -> Result<(), String> {
+    for (i, ns) in parsed.sheets.iter().enumerate() {
+        if ns
+            .items
+            .iter()
+            .any(|it| matches!(it, SheetItem::Keep(k) if k.kind == "data-validation"))
+        {
+            continue;
+        }
+        let wanted: Vec<ValidationDecl> = structure::validations(&ns.items)
+            .into_iter()
+            .cloned()
+            .collect();
+        let have = model::modelled_validations(book, i).unwrap_or_default();
+        if have == wanted {
+            continue;
+        }
+        set_sheet_validations(book, i, &wanted, next_id)?;
+    }
+    Ok(())
+}
+
+fn set_sheet_validations(
+    book: &mut Book,
+    i: usize,
+    wanted: &[ValidationDecl],
+    next_id: &mut u64,
+) -> Result<(), String> {
+    book.load_store(i)?;
+    let prefix = book.store(i).prefix.clone();
+    let scope = xml::scope_of(&book.store(i).skel.root);
+    let mut old: Vec<Entry> = vec![];
+    book.entries.retain(|e| {
+        if e.kind == Kind::Range && e.path.first() == Some(&i) && e.meta.tag == "dataValidation" {
+            old.push(e.clone());
+            false
+        } else {
+            true
+        }
+    });
+    let mut unused = vec![true; old.len()];
+    let mut placed: Vec<Option<Entry>> = vec![None; wanted.len()];
+    for (wi, w) in wanted.iter().enumerate() {
+        let Some(k) = old
+            .iter()
+            .enumerate()
+            .find(|(k, e)| unused[*k] && model::validation_decl(e).as_ref() == Some(w))
+        else {
+            continue;
+        };
+        unused[k.0] = false;
+        placed[wi] = Some(k.1.clone());
+    }
+    let leftover: Vec<Entry> = old
+        .into_iter()
+        .enumerate()
+        .filter(|(k, _)| unused[*k])
+        .map(|(_, e)| e)
+        .collect();
+    let mut leftover = leftover.into_iter();
+    let mut seq = book
+        .entries
+        .iter()
+        .filter(|e| e.path.first() == Some(&i))
+        .map(|e| e.seq)
+        .max()
+        .unwrap_or(0);
+    let mut out = vec![];
+    for (w, slot) in wanted.iter().zip(placed) {
+        if let Some(e) = slot {
+            out.push(e);
+            continue;
+        }
+        if let Some(mut e) = leftover.next() {
+            sync_validation(&mut e, w, &prefix, &scope);
+            out.push(e);
+            continue;
+        }
+        seq += 1;
+        let el = write_validation(&prefix, w);
+        out.push(Entry {
+            id: *next_id,
+            kind: Kind::Range,
+            xml: vec![el.to_xml()],
+            fp: xml::canon(&el, &scope),
+            path: vec![i],
+            start: None,
+            end: None,
+            seq,
+            meta: Meta {
+                tag: "dataValidation".into(),
+                range: Some(w.range.clone()),
+                ..Default::default()
+            },
+        });
+        *next_id += 1;
+    }
+    book.entries.extend(out);
+    Ok(())
+}
+
+fn write_validation(prefix: &str, w: &ValidationDecl) -> Element {
+    let mut el = Element::new(&format!("{prefix}dataValidation"))
+        .with_attr("type", &w.ty)
+        .with_attr("sqref", &w.range);
+    if let Some(op) = &w.operator {
+        el.set("operator", op);
+    }
+    // allowBlank / showInputMessage / showErrorMessage default false in
+    // CT_DataValidation. Write "1" when on; omit when off. showDropDown is
+    // not in the text (spec default false); leftover XML keeps it.
+    set_xml_on(&mut el, "allowBlank", w.allow_blank);
+    set_xml_on(
+        &mut el,
+        "showInputMessage",
+        w.show_input_message != Some(false),
+    );
+    set_xml_on(
+        &mut el,
+        "showErrorMessage",
+        w.show_error_message != Some(false),
+    );
+    if let Some(s) = &w.prompt_title {
+        el.set("promptTitle", s);
+    }
+    if let Some(s) = &w.prompt {
+        el.set("prompt", s);
+    }
+    if let Some(s) = &w.error_title {
+        el.set("errorTitle", s);
+    }
+    if let Some(s) = &w.error {
+        el.set("error", s);
+    }
+    if let Some(s) = &w.error_style {
+        el.set("errorStyle", s);
+    }
+    set_formula_child(&mut el, prefix, "formula1", w.formula1.as_deref());
+    set_formula_child(&mut el, prefix, "formula2", w.formula2.as_deref());
+    el
+}
+
+fn sync_validation(e: &mut Entry, w: &ValidationDecl, prefix: &str, scope: &xml::Scope) {
+    let mut x = xml::fragment(&e.xml[0]);
+    x.set("type", &w.ty);
+    x.set("sqref", &w.range);
+    e.meta.range = Some(w.range.clone());
+    match &w.operator {
+        Some(op) => x.set("operator", op),
+        None => {
+            x.remove_attr("operator");
+        }
+    }
+    set_xml_on(&mut x, "allowBlank", w.allow_blank);
+    set_xml_on(
+        &mut x,
+        "showInputMessage",
+        w.show_input_message != Some(false),
+    );
+    set_xml_on(
+        &mut x,
+        "showErrorMessage",
+        w.show_error_message != Some(false),
+    );
+    set_opt_attr(&mut x, "promptTitle", w.prompt_title.as_deref());
+    set_opt_attr(&mut x, "prompt", w.prompt.as_deref());
+    set_opt_attr(&mut x, "errorTitle", w.error_title.as_deref());
+    set_opt_attr(&mut x, "error", w.error.as_deref());
+    match &w.error_style {
+        Some(s) => x.set("errorStyle", s),
+        None => {
+            x.remove_attr("errorStyle");
+        }
+    }
+    set_formula_child(&mut x, prefix, "formula1", w.formula1.as_deref());
+    set_formula_child(&mut x, prefix, "formula2", w.formula2.as_deref());
+    e.xml[0] = x.to_xml();
+    e.fp = xml::canon(&x, scope);
+}
+
+fn set_xml_on(el: &mut Element, k: &str, on: bool) {
+    if on {
+        el.set(k, "1");
+    } else {
+        el.remove_attr(k);
+    }
+}
+
+fn set_formula_child(el: &mut Element, prefix: &str, local: &str, v: Option<&str>) {
+    el.children
+        .retain(|n| !matches!(n, Node::El(c) if c.local() == local));
+    let Some(v) = v else {
+        return;
+    };
+    let mut c = Element::new(&format!("{prefix}{local}"));
+    c.children.push(Node::Text(xml::escape_text(v)));
+    const ORDER: [&str; 2] = ["formula1", "formula2"];
+    xml::insert_ordered(el, c, &ORDER);
+}
+
+fn apply_conditional_formats(
+    book: &mut Book,
+    parsed: &hanji_format::sheet::Spreadsheet,
+    next_id: &mut u64,
+) -> Result<(), String> {
+    for (i, ns) in parsed.sheets.iter().enumerate() {
+        if ns
+            .items
+            .iter()
+            .any(|it| matches!(it, SheetItem::Keep(k) if k.kind == "conditional-format"))
+        {
+            continue;
+        }
+        let wanted: Vec<CondFormatDecl> = structure::conditional_formats(&ns.items)
+            .into_iter()
+            .cloned()
+            .collect();
+        let have = model::modelled_conditional_formats(book, i).unwrap_or_default();
+        if have == wanted {
+            continue;
+        }
+        set_sheet_conditional_formats(book, i, &wanted, next_id)?;
+    }
+    Ok(())
+}
+
+fn set_sheet_conditional_formats(
+    book: &mut Book,
+    i: usize,
+    wanted: &[CondFormatDecl],
+    next_id: &mut u64,
+) -> Result<(), String> {
+    book.load_store(i)?;
+    let prefix = book.store(i).prefix.clone();
+    let scope = xml::scope_of(&book.store(i).skel.root);
+    let mut old: Vec<Entry> = vec![];
+    book.entries.retain(|e| {
+        if e.kind == Kind::Range
+            && e.path.first() == Some(&i)
+            && e.meta.tag == "conditionalFormatting"
+        {
+            old.push(e.clone());
+            false
+        } else {
+            true
+        }
+    });
+    // `priority` is sheet-wide. Grouping every same-range rule together
+    // (even when another range sits between them) would renumber those
+    // rules as a block and change which format wins. Adjacent same-range
+    // lines share one `<conditionalFormatting>`; a later line with that
+    // range after a different one is a separate element (Excel allows
+    // several with the same `sqref`).
+    let mut groups: Vec<(String, Vec<&CondFormatDecl>)> = vec![];
+    for w in wanted {
+        match groups.last_mut() {
+            Some((r, rs)) if *r == w.range => rs.push(w),
+            _ => groups.push((w.range.clone(), vec![w])),
+        }
+    }
+    let old_ids: Vec<String> = old
+        .iter()
+        .flat_map(|e| model::entry_x14_ids(&e.xml[0]))
+        .collect();
+    let mut unused = vec![true; old.len()];
+    let mut placed: Vec<Option<Entry>> = vec![None; groups.len()];
+    for (gi, (range, _)) in groups.iter().enumerate() {
+        let Some(k) = old.iter().enumerate().find(|(k, e)| {
+            unused[*k]
+                && e.meta
+                    .range
+                    .as_deref()
+                    .and_then(parse_sqref)
+                    .map(|r| hanji_core::cells::write_sqref(&r))
+                    .as_deref()
+                    == Some(range.as_str())
+        }) else {
+            continue;
+        };
+        unused[k.0] = false;
+        placed[gi] = Some(k.1.clone());
+    }
+    let leftover: Vec<Entry> = old
+        .into_iter()
+        .enumerate()
+        .filter(|(k, _)| unused[*k])
+        .map(|(_, e)| e)
+        .collect();
+    let mut leftover = leftover.into_iter();
+    let mut seq = book
+        .entries
+        .iter()
+        .filter(|e| e.path.first() == Some(&i))
+        .map(|e| e.seq)
+        .max()
+        .unwrap_or(0);
+    // Line order is the sheet-wide priority order; rewrite as 1-based index.
+    let mut priority = 1u32;
+    let mut out = vec![];
+    for ((range, rules), slot) in groups.into_iter().zip(placed) {
+        let mut e = match slot.or_else(|| leftover.next()) {
+            Some(e) => e,
+            None => {
+                seq += 1;
+                let el = Element::new(&format!("{prefix}conditionalFormatting"))
+                    .with_attr("sqref", &range);
+                let n = *next_id;
+                *next_id += 1;
+                Entry {
+                    id: n,
+                    kind: Kind::Range,
+                    xml: vec![el.to_xml()],
+                    fp: xml::canon(&el, &scope),
+                    path: vec![i],
+                    start: None,
+                    end: None,
+                    seq,
+                    meta: Meta {
+                        tag: "conditionalFormatting".into(),
+                        range: Some(range.clone()),
+                        ..Default::default()
+                    },
+                }
+            }
+        };
+        sync_conditional_format(&mut e, &range, &rules, &mut priority, book, &prefix, &scope)?;
+        out.push(e);
+    }
+    sync_x14_data_bars(book, i, &out, &old_ids)?;
+    book.entries.extend(out);
+    Ok(())
+}
+
+fn sync_x14_data_bars(
+    book: &mut Book,
+    i: usize,
+    entries: &[Entry],
+    old_ids: &[String],
+) -> Result<(), String> {
+    let mut patches = vec![];
+    let mut live_ids = vec![];
+    for e in entries {
+        let el = xml::fragment(&e.xml[0]);
+        let range = e.meta.range.as_deref().unwrap_or_default();
+        for rule in el.elements().filter(|c| c.local() == "cfRule") {
+            if let Some(id) = model::cf_rule_x14_id(rule) {
+                live_ids.push(id.clone());
+                if let Some(decl) = model::cf_rule_decl(book, range, rule) {
+                    if decl.ty == "dataBar" {
+                        patches.push((id, decl));
+                    }
+                }
+            }
+        }
+    }
+    let st = book.store_mut(i)?;
+    for (id, decl) in &patches {
+        model::patch_x14_data_bar(&mut st.skel.root, id, decl)?;
+    }
+    model::prune_x14_conditional_formats(&mut st.skel.root, old_ids, &live_ids);
+    Ok(())
+}
+
+fn sync_conditional_format(
+    e: &mut Entry,
+    range: &str,
+    rules: &[&CondFormatDecl],
+    priority: &mut u32,
+    book: &mut Book,
+    prefix: &str,
+    scope: &xml::Scope,
+) -> Result<(), String> {
+    let mut x = xml::fragment(&e.xml[0]);
+    x.set("sqref", range);
+    e.meta.range = Some(range.to_string());
+    let old_rules: Vec<Element> = x
+        .elements()
+        .filter(|c| c.local() == "cfRule")
+        .cloned()
+        .collect();
+    let ext: Vec<Node> = x
+        .children
+        .iter()
+        .filter(|n| matches!(n, Node::El(c) if c.local() == "extLst"))
+        .cloned()
+        .collect();
+    let mut unused = vec![true; old_rules.len()];
+    let mut placed: Vec<Option<Element>> = vec![None; rules.len()];
+    for (ri, w) in rules.iter().enumerate() {
+        let Some(k) = old_rules.iter().enumerate().find(|(k, rule)| {
+            unused[*k] && model::cf_rule_decl(book, range, rule).as_ref() == Some(*w)
+        }) else {
+            continue;
+        };
+        unused[k.0] = false;
+        placed[ri] = Some(k.1.clone());
+    }
+    let leftover: Vec<Element> = old_rules
+        .into_iter()
+        .enumerate()
+        .filter(|(k, _)| unused[*k])
+        .map(|(_, e)| e)
+        .collect();
+    let mut leftover = leftover.into_iter();
+    let mut kids = vec![];
+    for (w, slot) in rules.iter().zip(placed) {
+        let prio = *priority;
+        *priority += 1;
+        if let Some(mut rule) = slot {
+            rule.set("priority", &prio.to_string());
+            kids.push(Node::El(rule));
+            continue;
+        }
+        let mut rule = leftover
+            .next()
+            .unwrap_or_else(|| Element::new(&format!("{prefix}cfRule")));
+        write_cf_rule(&mut rule, w, prio, book, prefix)?;
+        kids.push(Node::El(rule));
+    }
+    kids.extend(ext);
+    x.children = kids;
+    e.xml[0] = x.to_xml();
+    e.fp = xml::canon(&x, scope);
+    Ok(())
+}
+
+fn write_cf_rule(
+    rule: &mut Element,
+    w: &CondFormatDecl,
+    priority: u32,
+    book: &mut Book,
+    prefix: &str,
+) -> Result<(), String> {
+    if w.ty == "dataBar" {
+        return write_data_bar_rule(rule, w, priority, prefix);
+    }
+    rule.set("type", &w.ty);
+    rule.set("priority", &priority.to_string());
+    match &w.operator {
+        Some(op) => rule.set("operator", op),
+        None => {
+            rule.remove_attr("operator");
+        }
+    }
+    if w.stop_if_true {
+        rule.set("stopIfTrue", "1");
+    } else {
+        rule.remove_attr("stopIfTrue");
+    }
+    if w.dxf.is_empty() {
+        rule.remove_attr("dxfId");
+    } else {
+        let id = book.styles.dxf_id_of(&w.dxf)?;
+        rule.set("dxfId", &id.to_string());
+    }
+    let mut rest = vec![];
+    let mut ext = vec![];
+    for n in std::mem::take(&mut rule.children) {
+        match &n {
+            Node::El(c) if c.local() == "formula" => {}
+            Node::El(c) if c.local() == "extLst" => ext.push(n),
+            Node::El(c) if c.local() == "dataBar" => {}
+            _ => rest.push(n),
+        }
+    }
+    rule.children = rest;
+    for v in [&w.formula, &w.formula2].into_iter().flatten() {
+        let mut f = Element::new(&format!("{prefix}formula"));
+        f.children.push(Node::Text(xml::escape_text(v)));
+        rule.children.push(Node::El(f));
+    }
+    rule.children.extend(ext);
+    Ok(())
+}
+
+fn write_data_bar_rule(
+    rule: &mut Element,
+    w: &CondFormatDecl,
+    priority: u32,
+    prefix: &str,
+) -> Result<(), String> {
+    let (Some(min), Some(max), Some(fill)) = (&w.min, &w.max, &w.fill) else {
+        return Err("a dataBar has min, max and fill".into());
+    };
+    let was_bar = rule.get("type").as_deref() == Some("dataBar");
+    rule.set("type", "dataBar");
+    rule.set("priority", &priority.to_string());
+    rule.remove_attr("operator");
+    rule.remove_attr("dxfId");
+    if w.stop_if_true {
+        rule.set("stopIfTrue", "1");
+    } else {
+        rule.remove_attr("stopIfTrue");
+    }
+    let mut bar = None;
+    let mut ext = vec![];
+    let mut rest = vec![];
+    for n in std::mem::take(&mut rule.children) {
+        match &n {
+            Node::El(c) if c.local() == "dataBar" => bar = Some(c.clone()),
+            Node::El(c) if c.local() == "extLst" && was_bar => ext.push(n),
+            Node::El(c) if c.local() == "formula" => {}
+            _ if was_bar => rest.push(n),
+            _ => {}
+        }
+    }
+    let mut bar = bar.unwrap_or_else(|| Element::new(&format!("{prefix}dataBar")));
+    write_data_bar(&mut bar, min, max, fill, prefix)?;
+    rule.children = rest;
+    rule.children.push(Node::El(bar));
+    rule.children.extend(ext);
+    Ok(())
+}
+
+fn write_data_bar(
+    bar: &mut Element,
+    min: &Cfvo,
+    max: &Cfvo,
+    fill: &hanji_format::vocab::Color,
+    prefix: &str,
+) -> Result<(), String> {
+    let cfvo_idx: Vec<usize> = bar
+        .children
+        .iter()
+        .enumerate()
+        .filter_map(|(k, n)| match n {
+            Node::El(c) if c.local() == "cfvo" => Some(k),
+            _ => None,
+        })
+        .collect();
+    if cfvo_idx.len() == 2 {
+        if let Node::El(c) = &mut bar.children[cfvo_idx[0]] {
+            if model::parse_cfvo(c).as_ref() != Some(min) {
+                model::write_cfvo(c, min);
+            }
+        }
+        if let Node::El(c) = &mut bar.children[cfvo_idx[1]] {
+            if model::parse_cfvo(c).as_ref() != Some(max) {
+                model::write_cfvo(c, max);
+            }
+        }
+    } else {
+        bar.children
+            .retain(|n| !matches!(n, Node::El(c) if c.local() == "cfvo"));
+        let mut a = Element::new(&format!("{prefix}cfvo"));
+        model::write_cfvo(&mut a, min);
+        let mut b = Element::new(&format!("{prefix}cfvo"));
+        model::write_cfvo(&mut b, max);
+        bar.children.insert(0, Node::El(b));
+        bar.children.insert(0, Node::El(a));
+    }
+    let has_color = bar.elements().any(|c| c.local() == "color");
+    if has_color {
+        if let Some(c) = bar.elements_mut().find(|c| c.local() == "color") {
+            if crate::format::color_of(Some(c)).as_ref() != Some(fill) {
+                model::put_color(c, fill)?;
+            }
+        }
+    } else {
+        let color = crate::format::color_el(&format!("{prefix}color"), fill)?;
+        bar.children.push(Node::El(color));
+    }
+    Ok(())
+}
+
+fn apply_drawings(
+    book: &mut Book,
+    parsed: &hanji_format::sheet::Spreadsheet,
+) -> Result<(), String> {
+    for (i, ns) in parsed.sheets.iter().enumerate() {
+        if book.sheets.get(i).is_none_or(|s| s.kind != SheetKind::Work) {
+            continue;
+        }
+        let wanted = structure::drawing_items(&ns.items);
+        crate::shapes::apply(book, i, &wanted)?;
+    }
+    Ok(())
+}
+
+fn apply_notes(book: &mut Book, parsed: &hanji_format::sheet::Spreadsheet) -> Result<(), String> {
+    for (i, ns) in parsed.sheets.iter().enumerate() {
+        if ns
+            .items
+            .iter()
+            .any(|it| matches!(it, SheetItem::Keep(k) if k.kind == "notes"))
+        {
+            continue;
+        }
+        let wanted: Vec<_> = structure::notes(&ns.items).into_iter().cloned().collect();
+        notes::apply(book, i, &wanted)?;
+    }
+    Ok(())
+}
+
 /// Remove what a deleted placeholder stood for (§2 rule 8: an explicit act).
 fn drop_keep(book: &mut Book, rem: &Remainder, id: &str, cx: &mut Ctx) -> Result<(), String> {
     let e = rem
@@ -376,6 +1243,16 @@ fn drop_keep(book: &mut Book, rem: &Remainder, id: &str, cx: &mut Ctx) -> Result
         "conditional-format" => "conditionalFormatting",
         "data-validation" => "dataValidation",
         "hyperlinks" => "hyperlink",
+        "notes" => {
+            notes::clear(book, sheet)?;
+            notice(
+                &mut cx.notices,
+                "removed",
+                format!("{} {}", book.sheets[sheet].name, k.kind),
+                format!("the placeholder was deleted: {}", k.summary),
+            );
+            return Ok(());
+        }
         other => {
             return Err(format!(
                 "deleting the {other} placeholder {id} is not supported yet; keep its line <keep id=\"{id}\" …/> (the {other} stays in the file)"

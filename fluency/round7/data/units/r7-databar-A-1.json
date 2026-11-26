@@ -1,0 +1,47 @@
+{
+ "unit_id": "r7-databar-A-1",
+ "decision": "databar",
+ "candidate": "A",
+ "replicate": 1,
+ "names": {},
+ "fm": {
+  "type": "spreadsheet",
+  "format": "xlsx",
+  "schema": "1"
+ },
+ "seed": "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"예산\" range=\"A1:G20\">\n\n<table name=\"월별\" range=\"A1:G16\">\n| column | type | format | formula |\n|---|---|---|---|\n| 월 | date | yyyy-mm |  |\n| 수입 | number | #,##0 |  |\n| 지출 | number | #,##0 |  |\n| 잔액 | number | #,##0 | =[@수입]-[@지출] |\n| 실적 | number | #,##0 |  |\n| 목표 | number | #,##0 |  |\n| 달성률 | number | 0% |  |\n</table>\n\n<conditional-format range=\"D2:D16\" type=\"cellIs\" operator=\"lessThan\" formula=\"0\" dxf=\"fill=#FFC7CE\"/>\n\n<conditional-format range=\"E4:E16\" type=\"dataBar\" min=\"num:0\" max=\"num:월간수입합계\" fill=\"#638EC6\"/>\n\n<conditional-format range=\"G4:G16\" type=\"dataBar\" min=\"min\" max=\"max\" fill=\"#FFC7CE\"/>\n\n<keep id=\"k1\" kind=\"chart\" summary=\"수입·지출 막대\"/>\n\n</sheet>\n",
+ "tasks": [
+  {
+   "task_id": "budget1-q1",
+   "kind": "read",
+   "text": "The 실적 column (E) has a data bar. What are its min, max and fill? Answer as `ANSWER: min=<…> max=<…> fill=<…>` using the file's own tokens.",
+   "expect": "ANSWER: min=num:0 max=num:월간수입합계 fill=#638EC6"
+  },
+  {
+   "task_id": "budget1-w",
+   "kind": "write",
+   "text": "Write a new workbook with exactly one sheet 요약, range A1:C6, containing: a table 요약표 on A1:C4 with columns 지표 (text), 값 (number, format #,##0), 비율 (number, format 0%); one data-bar rule on B2:B4 whose minimum is the number 0, whose maximum is the largest value in the range, and whose fill is #638EC6. No other items."
+  },
+  {
+   "task_id": "budget1-e1",
+   "kind": "edit",
+   "text": "Change the data bar on the 실적 column so its range is E4:E18. Do not change the data bar on 달성률 (G), and do not change the cellIs rule on 잔액."
+  },
+  {
+   "task_id": "budget1-e2",
+   "kind": "edit",
+   "text": "Change the fill colour of the 실적 data bar to #63BE7B. Leave the 달성률 bar's colour as it is."
+  },
+  {
+   "task_id": "budget1-e3",
+   "kind": "edit",
+   "text": "Change the 실적 data bar so its minimum is the smallest value in the range and its maximum is the largest value in the range (the auto min/max types, no number). Keep its fill."
+  },
+  {
+   "task_id": "budget1-r",
+   "kind": "refuse",
+   "text": "Add a 3-color scale on F4:F16 (red-yellow-green) and an icon set on G4:G16."
+  }
+ ],
+ "unreachable": []
+}

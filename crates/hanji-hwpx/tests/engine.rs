@@ -1003,6 +1003,18 @@ fn deleting_the_first_paragraph_keeps_the_section_settings() {
         Err(EngineError::Refused(m)) => assert!(m.contains("two page breaks"), "{m}"),
         other => panic!("{other:?}"),
     }
+    let inline = imp.text.replace("둘째", "둘<pagebreak/>째");
+    match HwpxEngine.export(&inline, &imp.remainder) {
+        Err(EngineError::Refused(m)) => {
+            assert!(m.contains("page break inside a paragraph"), "{m}")
+        }
+        other => panic!("{other:?}"),
+    }
+    let col = imp.text.replace("둘째", "둘<columnbreak/>째");
+    match HwpxEngine.export(&col, &imp.remainder) {
+        Err(EngineError::Refused(m)) => assert!(m.contains("column break"), "{m}"),
+        other => panic!("{other:?}"),
+    }
 }
 
 #[test]
@@ -1638,4 +1650,406 @@ fn deleting_the_footnote_reference_removes_the_control() {
     let sec = section(&export(&r.text, &r.remainder));
     assert!(!sec.contains("<hp:footNote"), "{sec}");
     assert!(sec.contains("값 이다") || sec.contains("값이다"), "{sec}");
+}
+
+fn draw_rect(text: &str) -> String {
+    format!(
+        r#"<hp:rect id="7" zOrder="1" numberingType="PICTURE" textWrap="SQUARE" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None"><hp:sz width="1000" widthRelTo="ABSOLUTE" height="1000" heightRelTo="ABSOLUTE" protect="0"/><hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/><hp:drawText><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="TOP" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0"><hp:p id="0" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="0"><hp:t>{text}</hp:t></hp:run></hp:p></hp:subList></hp:drawText></hp:rect>"#
+    )
+}
+
+#[test]
+fn a_one_paragraph_draw_text_shows_as_ordinary_text() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>앞 </hp:t>{}<hp:t> 뒤</hp:t>",
+        draw_rect("글상자")
+    ))]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("앞 글상자 뒤"), "{}", imp.text);
+    assert!(!imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+}
+
+#[test]
+fn unedited_draw_text_keeps_the_section() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>앞 </hp:t>{}<hp:t> 뒤</hp:t>",
+        draw_rect("글상자")
+    ))]);
+    let imp = import(&pkg);
+    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg));
+}
+
+#[test]
+fn editing_draw_text_writes_it_back_and_keeps_geometry() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>앞 </hp:t>{}<hp:t> 뒤</hp:t>",
+        draw_rect("글상자")
+    ))]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "글상자", "고침", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = export(&r.text, &r.remainder);
+    let sec = section(&out);
+    assert!(sec.contains("<hp:t>고침</hp:t>"), "{sec}");
+    assert!(sec.contains(r#"id="7""#), "{sec}");
+    assert!(sec.contains(r#"width="1000""#), "{sec}");
+    assert!(sec.contains("<hp:drawText>"), "{sec}");
+    let back = import(&out);
+    assert!(back.text.contains("앞 고침 뒤"), "{}", back.text);
+}
+
+#[test]
+fn deleting_draw_text_removes_the_object() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>앞 </hp:t>{}<hp:t> 뒤</hp:t>",
+        draw_rect("글상자")
+    ))]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "앞 글상자 뒤", "앞  뒤", CAPS).unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.2.contains("drawing") || x.2.contains("all of its text")),
+        "{:?}",
+        r.report
+    );
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(!sec.contains("<hp:rect"), "{sec}");
+    assert!(!sec.contains("<hp:drawText"), "{sec}");
+}
+
+#[test]
+fn two_paragraphs_in_draw_text_show_as_ordinary_text() {
+    let inner = draw_rect("a").replace(
+        "<hp:t>a</hp:t></hp:run></hp:p>",
+        "<hp:t>a</hp:t></hp:run></hp:p><hp:p id=\"1\" paraPrIDRef=\"0\" styleIDRef=\"0\" pageBreak=\"0\" columnBreak=\"0\" merged=\"0\"><hp:run charPrIDRef=\"0\"><hp:t>b</hp:t></hp:run></hp:p>",
+    );
+    let pkg = hwpx(&[p_with(&inner)]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("a<br/>b"), "{}", imp.text);
+    assert!(!imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+}
+
+#[test]
+fn unedited_two_paragraph_draw_text_keeps_the_section() {
+    let inner = draw_rect("a").replace(
+        "<hp:t>a</hp:t></hp:run></hp:p>",
+        "<hp:t>a</hp:t></hp:run></hp:p><hp:p id=\"1\" paraPrIDRef=\"0\" styleIDRef=\"0\" pageBreak=\"0\" columnBreak=\"0\" merged=\"0\"><hp:run charPrIDRef=\"0\"><hp:t>b</hp:t></hp:run></hp:p>",
+    );
+    let pkg = hwpx(&[p_with(&inner)]);
+    let imp = import(&pkg);
+    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg));
+}
+
+#[test]
+fn editing_two_paragraph_draw_text_writes_both_and_keeps_geometry() {
+    let inner = draw_rect("a").replace(
+        "<hp:t>a</hp:t></hp:run></hp:p>",
+        "<hp:t>a</hp:t></hp:run></hp:p><hp:p id=\"1\" paraPrIDRef=\"0\" styleIDRef=\"0\" pageBreak=\"0\" columnBreak=\"0\" merged=\"0\"><hp:run charPrIDRef=\"0\"><hp:t>b</hp:t></hp:run></hp:p>",
+    );
+    let pkg = hwpx(&[p_with(&inner)]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "a<br/>b", "x<br/>y", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(sec.contains("<hp:t>x</hp:t>"), "{sec}");
+    assert!(sec.contains("<hp:t>y</hp:t>"), "{sec}");
+    assert!(sec.contains(r#"id="7""#), "{sec}");
+    assert!(sec.contains("<hp:drawText>"), "{sec}");
+    let back = import(&export(&r.text, &r.remainder));
+    assert!(back.text.contains("x<br/>y"), "{}", back.text);
+}
+
+#[test]
+fn a_footnote_in_draw_text_shows_as_a_reference() {
+    let inner = draw_rect("앞").replace(
+        "<hp:t>앞</hp:t>",
+        &format!("<hp:t>앞</hp:t>{}<hp:t>뒤</hp:t>", footnote("1", " 각주")),
+    );
+    let pkg = hwpx(&[p_with(&inner)]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("앞[^1]뒤"), "{}", imp.text);
+    assert!(imp.text.contains("[^1]:  각주"), "{}", imp.text);
+    assert!(!imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+}
+
+#[test]
+fn unedited_draw_text_with_a_footnote_keeps_the_section() {
+    let inner = draw_rect("앞").replace(
+        "<hp:t>앞</hp:t>",
+        &format!("<hp:t>앞</hp:t>{}<hp:t>뒤</hp:t>", footnote("1", " 각주")),
+    );
+    let pkg = hwpx(&[p_with(&inner)]);
+    let imp = import(&pkg);
+    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg));
+}
+
+#[test]
+fn editing_a_footnote_inside_draw_text_writes_it_back_and_keeps_the_box() {
+    let inner = draw_rect("앞").replace(
+        "<hp:t>앞</hp:t>",
+        &format!("<hp:t>앞</hp:t>{}<hp:t>뒤</hp:t>", footnote("1", " 각주")),
+    );
+    let pkg = hwpx(&[p_with(&inner)]);
+    let imp = import(&pkg);
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "[^1]:  각주",
+        "[^1]:  고침",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(sec.contains("<hp:t> 고침</hp:t>"), "{sec}");
+    assert!(sec.contains("<hp:footNote"), "{sec}");
+    assert!(sec.contains(r#"id="7""#), "{sec}");
+    assert!(sec.contains("<hp:t>앞</hp:t>"), "{sec}");
+    let back = import(&export(&r.text, &r.remainder));
+    assert!(back.text.contains("[^1]:  고침"), "{}", back.text);
+    assert!(back.text.contains("앞[^1]뒤"), "{}", back.text);
+}
+
+#[test]
+fn joining_draw_text_paragraphs_keeps_a_footnote() {
+    let inner = draw_rect("a").replace(
+        "<hp:t>a</hp:t></hp:run></hp:p>",
+        &format!(
+            "<hp:t>a</hp:t></hp:run></hp:p><hp:p id=\"1\" paraPrIDRef=\"0\" styleIDRef=\"0\" pageBreak=\"0\" columnBreak=\"0\" merged=\"0\"><hp:run charPrIDRef=\"0\"><hp:t>b</hp:t>{}</hp:run></hp:p>",
+            footnote("1", " 각주")
+        ),
+    );
+    let pkg = hwpx(&[p_with(&inner)]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("a<br/>b[^1]"), "{}", imp.text);
+    let r = edit(&imp.remainder, &imp.text, "a<br/>b[^1]", "ab[^1]", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(sec.contains("<hp:footNote"), "{sec}");
+    assert!(sec.contains("<hp:t> 각주</hp:t>"), "{sec}");
+    let back = import(&export(&r.text, &r.remainder));
+    assert!(back.text.contains("ab[^1]"), "{}", back.text);
+    assert!(back.text.contains("[^1]:  각주"), "{}", back.text);
+}
+
+#[test]
+fn moving_a_footnote_mark_inside_draw_text_keeps_it_at_the_new_place() {
+    let inner = draw_rect("앞").replace(
+        "<hp:t>앞</hp:t>",
+        &format!("<hp:t>앞</hp:t>{}<hp:t>뒤</hp:t>", footnote("1", " 각주")),
+    );
+    let pkg = hwpx(&[p_with(&inner)]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "앞[^1]뒤", "앞뒤[^1]", CAPS).unwrap();
+    assert!(r.report.refused.is_empty(), "{:?}", r.report);
+    assert!(r.text.contains("앞뒤[^1]"), "{}", r.text);
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(sec.contains("<hp:drawText"), "{sec}");
+    assert!(sec.contains(r#"id="7""#), "{sec}");
+    let t = sec.find("<hp:t>앞뒤</hp:t>").unwrap();
+    let ctrl = sec.find("<hp:footNote").unwrap();
+    assert!(t < ctrl, "{sec}");
+    let back = import(&export(&r.text, &r.remainder));
+    assert!(back.text.contains("앞뒤[^1]"), "{}", back.text);
+}
+
+#[test]
+fn editing_draw_text_around_a_footnote_keeps_the_mark() {
+    let inner = draw_rect("앞").replace(
+        "<hp:t>앞</hp:t>",
+        &format!("<hp:t>앞</hp:t>{}<hp:t>뒤</hp:t>", footnote("1", " 각주")),
+    );
+    let pkg = hwpx(&[p_with(&inner)]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "앞[^1]뒤", "앞X[^1]뒤", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let sec = section(&export(&r.text, &r.remainder));
+    let t_before = sec.find("<hp:t>앞X</hp:t>").unwrap();
+    let ctrl = sec.find("<hp:footNote").unwrap();
+    let t_after = sec.find("<hp:t>뒤</hp:t>").unwrap();
+    assert!(t_before < ctrl && ctrl < t_after, "{sec}");
+    let back = import(&export(&r.text, &r.remainder));
+    assert!(back.text.contains("앞X[^1]뒤"), "{}", back.text);
+}
+
+#[test]
+fn deleting_draw_text_with_a_footnote_removes_the_object() {
+    let inner = draw_rect("앞").replace(
+        "<hp:t>앞</hp:t>",
+        &format!("<hp:t>앞</hp:t>{}<hp:t>뒤</hp:t>", footnote("1", " 각주")),
+    );
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>겉 </hp:t>{}<hp:t> 끝</hp:t>",
+        inner
+    ))]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "겉 앞[^1]뒤 끝", "겉  끝", CAPS).unwrap();
+    assert!(
+        r.report.removed.iter().any(|x| x.2.contains("drawing")
+            || x.2.contains("all of its text")
+            || x.2.contains("footnote")),
+        "{:?}",
+        r.report
+    );
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(!sec.contains("<hp:rect"), "{sec}");
+    assert!(!sec.contains("<hp:footNote"), "{sec}");
+}
+
+#[test]
+fn footnote_tbox_corpus_shows_the_box_text_and_its_note() {
+    let pkg = std::fs::read(format!(
+        "{}/corpus/footnote-tbox-01.hwpx",
+        env!("CARGO_MANIFEST_DIR")
+    ))
+    .unwrap();
+    let imp = import(&pkg);
+    assert!(
+        imp.text.contains("여기에 각주") && imp.text.contains("경우"),
+        "{}",
+        imp.text
+    );
+    assert!(imp.text.contains("<br/>"), "{}", imp.text);
+    assert!(imp.text.contains("글상자 내부 각주"), "{}", imp.text);
+    assert!(!imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg));
+}
+
+#[test]
+fn a_draw_text_with_a_newline_in_t_stays_a_placeholder() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>앞 </hp:t>{}<hp:t> 뒤</hp:t>",
+        draw_rect("한\n줄")
+    ))]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+    assert!(!imp.text.contains("한<br/>줄"), "{}", imp.text);
+}
+
+#[test]
+fn a_picture_stays_a_placeholder() {
+    let pic = r#"<hp:pic id="1" zOrder="1" numberingType="PICTURE" textWrap="SQUARE" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None"><hp:img binaryItemIDRef="image1"/><hp:sz width="1000" widthRelTo="ABSOLUTE" height="1000" heightRelTo="ABSOLUTE" protect="0"/><hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="PARA" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/></hp:pic>"#;
+    let pkg = hwpx(&[p_with(pic)]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+}
+
+fn auto_num(num: &str, prefix: &str, suffix: &str) -> String {
+    format!(
+        r#"<hp:ctrl><hp:autoNum num="{num}" numType="ENDNOTE"><hp:autoNumFormat type="DIGIT" userChar="" prefixChar="{prefix}" suffixChar="{suffix}" supscript="0"/></hp:autoNum></hp:ctrl>"#
+    )
+}
+
+#[test]
+fn a_digit_auto_num_shows_as_ordinary_text() {
+    let pkg = hwpx(&[p_with(&format!(
+        "{}<hp:t> ②</hp:t>",
+        auto_num("11", "문", "）")
+    ))]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("문11） ②"), "{}", imp.text);
+    assert!(!imp.text.contains("kind=\"number\""), "{}", imp.text);
+}
+
+#[test]
+fn unedited_auto_num_keeps_the_section() {
+    let pkg = hwpx(&[p_with(&format!(
+        "{}<hp:t> ②</hp:t>",
+        auto_num("11", "문", "）")
+    ))]);
+    let imp = import(&pkg);
+    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg));
+}
+
+#[test]
+fn editing_an_auto_num_updates_the_stored_number() {
+    let pkg = hwpx(&[p_with(&format!(
+        "{}<hp:t> ②</hp:t>",
+        auto_num("11", "문", "）")
+    ))]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "문11）", "문12）", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = export(&r.text, &r.remainder);
+    let sec = section(&out);
+    assert!(sec.contains(r#"num="12""#), "{sec}");
+    assert!(sec.contains(r#"prefixChar="문""#), "{sec}");
+    assert!(sec.contains("<hp:autoNum"), "{sec}");
+    let back = import(&out);
+    assert!(back.text.contains("문12） ②"), "{}", back.text);
+}
+
+#[test]
+fn editing_an_auto_num_to_other_text_writes_ordinary_t() {
+    let pkg = hwpx(&[p_with(&format!(
+        "{}<hp:t> ②</hp:t>",
+        auto_num("11", "문", "）")
+    ))]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "문11）", "hello", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(!sec.contains("<hp:autoNum"), "{sec}");
+    assert!(sec.contains("<hp:t>hello"), "{sec}");
+    let back = import(&export(&r.text, &r.remainder));
+    assert!(back.text.contains("hello ②"), "{}", back.text);
+}
+
+#[test]
+fn deleting_an_auto_num_removes_the_control() {
+    let pkg = hwpx(&[p_with(&format!(
+        "<hp:t>앞 </hp:t>{}<hp:t> 뒤</hp:t>",
+        auto_num("11", "문", "）")
+    ))]);
+    let imp = import(&pkg);
+    let r = edit(&imp.remainder, &imp.text, "앞 문11） 뒤", "앞  뒤", CAPS).unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.2.contains("all of its text")),
+        "{:?}",
+        r.report
+    );
+    let sec = section(&export(&r.text, &r.remainder));
+    assert!(!sec.contains("<hp:autoNum"), "{sec}");
+}
+
+#[test]
+fn a_circled_auto_num_stays_a_placeholder() {
+    let inner = r#"<hp:ctrl><hp:autoNum num="1" numType="ENDNOTE"><hp:autoNumFormat type="CIRCLED_DIGIT" userChar="" prefixChar="" suffixChar="" supscript="0"/></hp:autoNum></hp:ctrl>"#;
+    let pkg = hwpx(&[p_with(inner)]);
+    let imp = import(&pkg);
+    assert!(imp.text.contains("kind=\"number\""), "{}", imp.text);
+    assert_eq!(canon(&export(&imp.text, &imp.remainder)), canon(&pkg));
 }

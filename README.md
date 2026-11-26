@@ -260,7 +260,7 @@ The old binary formats (.doc, .ppt, .xls, .hwp) are not supported.
 
 ## Status and limitations
 
-Version 0.7.0 (release candidate). The format has `schema: 1` and may change before 1.0.
+Version 0.8.0 (release candidate). The format has `schema: 1` and may change before 1.0.
 
 These are not supported yet:
 
@@ -283,7 +283,10 @@ These are not supported yet:
   keeps the address or the field instruction, and Word may compute an
   edited result again when it updates fields. A filled legacy form field
   (`FORMTEXT`) is the same. Empty form fields, checkboxes, and fields
-  without a shown result stay placeholders. A Word content control
+  without a shown result stay placeholders. In pptx, a text field
+  (`a:fld`: a slide number, a date/time) whose cached result is not
+  blank is the same: editing it keeps the field; an empty field stays a
+  placeholder. A Word content control
   (`w:sdt`) whose value is that displayed text (rich or plain text, a
   combo/dropdown, a citation, a TOC or bibliography `docPartObj`) is
   the same: the text is editable and the control properties stay in
@@ -301,8 +304,28 @@ These are not supported yet:
   writes.
 - xlsx: cell styles beyond formats, new charts, renaming or deleting sheets,
   tables and columns, column insert and delete. Merged cells are
-  `<merge range="A1:B2"/>` lines except on a sheet with more than 1024 of
-  them, which stay a placeholder.
+  `<merge range="A1:B2"/>` lines, cell hyperlinks
+  `<hyperlink range="A1" target="https://example.com"/>` (optional
+  `location`, `display`, `tooltip`), notes
+  `<note range="B2" author="John" text="Some text"/>` (a newline in the
+  text is `&#10;`), data validations
+  `<validation range="C2" type="list" formula1="&quot;A,B,C&quot;"/>`
+  (required `range` and `type`; optional `operator`, `formula2`,
+  `allowBlank`, `showInputMessage`, `promptTitle`, `prompt`,
+  `showErrorMessage`, `errorTitle`, `error`, `errorStyle`;
+  `formula1`/`formula2` are Excel's formula text;
+  `showInputMessage`/`showErrorMessage` omitted when on, `"false"` when
+  off) and
+  conditional formats
+  `<conditional-format range="A1" type="cellIs" operator="greaterThan"
+  formula="5" dxf="fill=#FFC7CE"/>` (`cellIs`, `expression` and `dataBar`;
+  `dxf` uses the cell-format vocabulary; a data bar is
+  `type="dataBar" min="num:0" max="max" fill="#638EC6"`), except on a sheet with more
+  than 1024 of that kind, overlapping hyperlink or note ranges, a
+  hyperlink whose relationship is not a unique external Target, a
+  threaded comment, or a conditional format that is not `cellIs`,
+  `expression` or `dataBar` (a color scale or icon set), which stay a
+  placeholder.
 - Native-application fidelity for all DOCX/HWPX features, and XLSX print
   layout and advanced visuals. DOCX/HWPX previews are experimental. XLSX
   previews are bounded read-only worksheet windows with explicit cached

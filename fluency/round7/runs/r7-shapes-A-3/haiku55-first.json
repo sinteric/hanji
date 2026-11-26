@@ -1,0 +1,53 @@
+{
+ "answers": [
+  {
+   "task_id": "exec3-q1",
+   "text": "ANSWER: 증가 화살표 | 화살표"
+  },
+  {
+   "task_id": "exec3-w",
+   "text": "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"메모\" range=\"A1:D8\">\n\n<table name=\"메모표\" range=\"A1:B3\">\n| column | type | format | formula |\n|---|---|---|---|\n| 사업 | text |  |  |\n| 집행률 | number | 0% |  |\n</table>\n\n<shape name=\"제목\" anchor=\"C1:D2\">주간 집행</shape>\n\n<group name=\"표시\">\n<shape name=\"양호\" anchor=\"C4:D5\">양호</shape>\n<shape name=\"주의\" anchor=\"C6:D7\">주의</shape>\n</group>\n\n</sheet>"
+  },
+  {
+   "task_id": "exec3-e1",
+   "edits": [
+    {
+     "old": "<shape name=\"입력 안내\" anchor=\"B20:D22\">행을 추가하려면 마지막 사업명 아래칸에 입력합니다.</shape>",
+     "new": "<shape name=\"입력 안내\" anchor=\"B20:D22\">행을 추가하려면 마지막 사업명 아래칸에 입력합니다.</shape>\n<shape name=\"마감 안내\" anchor=\"B23:D24\">10월 마감은 11월 5일입니다.</shape>"
+    }
+   ]
+  },
+  {
+   "task_id": "exec3-e2",
+   "edits": [
+    {
+     "old": "<shape name=\"표 제목\" anchor=\"A16:C17\">",
+     "new": "<shape name=\"표 제목\" anchor=\"A18:C19\">"
+    }
+   ]
+  },
+  {
+   "task_id": "exec3-e3",
+   "edits": [
+    {
+     "old": "<shape name=\"증가 화살표\" anchor=\"F2:G3\">집행률 82%</shape>",
+     "new": "<shape name=\"증가 화살표\" anchor=\"F2:G3\">집행률 85%</shape>"
+    }
+   ]
+  },
+  {
+   "task_id": "exec3-e4",
+   "edits": [
+    {
+     "old": "<shape name=\"입력 안내\" anchor=\"B20:D22\">",
+     "new": "<shape name=\"입력 안내\" anchor=\"B20:E23\">"
+    }
+   ]
+  },
+  {
+   "task_id": "exec3-r",
+   "text": "REFUSE: This file format cannot express a preset arrow kind, a fill, or an outline; a shape only has a name, an anchor, and text.",
+   "edits": []
+  }
+ ]
+}

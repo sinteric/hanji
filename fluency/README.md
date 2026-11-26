@@ -15,7 +15,9 @@ own kit in [round3/](round3/README.md); its results are in [round3/RESULTS.md](r
 its results are in [round4/RESULTS.md](round4/RESULTS.md). Round 5 (Presentation geometry, §10.9) is in
 [round5/](round5/README.md). Round 6 (direct formatting per kind of file, §10 item 10, proposed) is in
 [round6/](round6/README.md), with the candidates on real corpus samples in [round6/CANDIDATES.md](round6/CANDIDATES.md)
-and the results in [round6/RESULTS.md](round6/RESULTS.md).
+and the results in [round6/RESULTS.md](round6/RESULTS.md). Round 7 (inline page/column breaks, xlsx shapes/groups,
+xlsx dataBar conditional formats) is in [round7/](round7/README.md), with the candidates on the corpus samples
+in [round7/CANDIDATES.md](round7/CANDIDATES.md) and the results in [round7/RESULTS.md](round7/RESULTS.md).
 
 | decision | A | B |
 |---|---|---|

@@ -1,0 +1,26 @@
+---
+type: spreadsheet
+format: xlsx
+schema: 1
+---
+
+<sheet name="달성" range="A1:F18">
+
+<table name="지역" range="A1:F14">
+| column | type | format | formula |
+|---|---|---|---|
+| 지역 | text |  |  |
+| 매출 | number | #,##0 |  |
+| 목표 | number | #,##0 |  |
+| 달성률 | number | 0% |  |
+| 전년 | number | 0% |  |
+| 증감 | number | 0% |  |
+</table>
+
+<conditional-format range="D2:D14" type="dataBar" min="num:0" max="percent:100" fill="#638EC6"/>
+
+<conditional-format range="E2:E14" type="dataBar" min="num:0" max="percent:100" fill="#63BE7B"/>
+
+<conditional-format range="F2:F14" type="cellIs" operator="lessThan" formula="0" dxf="fill=#FFC7CE"/>
+
+</sheet>

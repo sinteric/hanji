@@ -39,47 +39,38 @@ date.
 
 | format | files | failed | with keeps | keeps |
 | ------ | ----: | -----: | ---------: | ----: |
-| docx   |    13 |      0 |         12 |   130 |
-| hwpx   |    16 |      0 |         10 |    24 |
-| pptx   |    27 |      0 |         16 |    44 |
-| xlsx   |    46 |      0 |         21 |    47 |
-| all    |   102 |      0 |         59 |   245 |
+| docx   |    13 |      0 |         10 |   117 |
+| hwpx   |    16 |      0 |          8 |    22 |
+| pptx   |    27 |      0 |         16 |    40 |
+| xlsx   |    46 |      0 |         11 |    18 |
+| all    |   102 |      0 |         45 |   197 |
 
 ## By kind, most first
 
-| format | kind               | keeps | files |
-| ------ | ------------------ | ----: | ----: |
-| docx   | field              |    73 |     3 |
-| docx   | drawing            |    26 |    10 |
-| pptx   | table              |    15 |    10 |
-| pptx   | field              |    11 |     4 |
-| hwpx   | drawing            |    10 |     7 |
-| docx   | object             |     8 |     2 |
-| xlsx   | chart              |     8 |     6 |
-| docx   | symbol             |     7 |     1 |
-| pptx   | picture            |     7 |     6 |
-| xlsx   | hyperlinks         |     7 |     7 |
-| xlsx   | notes              |     7 |     7 |
-| xlsx   | picture            |     7 |     3 |
-| pptx   | diagram            |     6 |     3 |
-| docx   | content-control    |     5 |     2 |
-| hwpx   | form-control       |     5 |     1 |
-| hwpx   | table              |     5 |     3 |
-| pptx   | chart              |     5 |     5 |
-| xlsx   | conditional-format |     5 |     5 |
-| xlsx   | shape              |     5 |     3 |
-| xlsx   | data-validation    |     4 |     4 |
-| docx   | table              |     3 |     2 |
-| hwpx   | text               |     3 |     1 |
-| docx   | break              |     2 |     2 |
-| docx   | math               |     2 |     2 |
-| docx   | tracked-move       |     2 |     1 |
-| xlsx   | pivot-table        |     2 |     1 |
-| docx   | endnote            |     1 |     1 |
-| docx   | footnote           |     1 |     1 |
-| hwpx   | number             |     1 |     1 |
-| xlsx   | group              |     1 |     1 |
-| xlsx   | merged-cells       |     1 |     1 |
+| format | kind            | keeps | files |
+| ------ | --------------- | ----: | ----: |
+| docx   | field           |    73 |     3 |
+| docx   | drawing         |    22 |     9 |
+| pptx   | table           |    15 |    10 |
+| hwpx   | drawing         |     9 |     6 |
+| docx   | object          |     8 |     2 |
+| xlsx   | chart           |     8 |     6 |
+| pptx   | field           |     7 |     1 |
+| pptx   | picture         |     7 |     6 |
+| xlsx   | picture         |     7 |     3 |
+| pptx   | diagram         |     6 |     3 |
+| docx   | content-control |     5 |     2 |
+| hwpx   | form-control    |     5 |     1 |
+| hwpx   | table           |     5 |     3 |
+| pptx   | chart           |     5 |     5 |
+| docx   | table           |     3 |     2 |
+| hwpx   | text            |     3 |     1 |
+| docx   | math            |     2 |     2 |
+| docx   | tracked-move    |     2 |     1 |
+| xlsx   | pivot-table     |     2 |     1 |
+| docx   | endnote         |     1 |     1 |
+| docx   | footnote        |     1 |     1 |
+| xlsx   | merged-cells    |     1 |     1 |
 
 ## By file
 
@@ -90,20 +81,20 @@ date.
 | `prototype/remainder/corpus/delins.docx`                             | docx   |     0 | |
 | `prototype/remainder/corpus/docx4j-tables.docx`                      | docx   |     3 | drawing 1, table 2 |
 | `prototype/remainder/corpus/fdo76098.docx`                           | docx   |     2 | drawing 2 |
-| `prototype/remainder/corpus/form_footnotes.docx`                     | docx   |    81 | drawing 5, field 69, symbol 7 |
+| `prototype/remainder/corpus/form_footnotes.docx`                     | docx   |    74 | drawing 5, field 69 |
 | `prototype/remainder/corpus/korean-report.docx`                      | docx   |     1 | drawing 1 |
-| `prototype/remainder/corpus/loadAndSave.docx`                        | docx   |     4 | drawing 3, math 1 |
+| `prototype/remainder/corpus/loadAndSave.docx`                        | docx   |     3 | drawing 2, math 1 |
 | `prototype/remainder/corpus/sample-docx.docx`                        | docx   |     3 | drawing 3 |
-| `prototype/remainder/corpus/tdf124637_sectionMargin.docx`            | docx   |     1 | break 1 |
-| `prototype/remainder/corpus/tdf154481.docx`                          | docx   |     4 | break 1, drawing 1, field 2 |
-| `prototype/remainder/corpus/testWORD_2006ml.docx`                    | docx   |    18 | content-control 4, drawing 5, field 2, math 1, object 3, table 1, tracked-move 2 |
-| `prototype/remainder/corpus/testWORD_various.docx`                   | docx   |     1 | drawing 1 |
+| `prototype/remainder/corpus/tdf124637_sectionMargin.docx`            | docx   |     0 | |
+| `prototype/remainder/corpus/tdf154481.docx`                          | docx   |     3 | drawing 1, field 2 |
+| `prototype/remainder/corpus/testWORD_2006ml.docx`                    | docx   |    16 | content-control 4, drawing 3, field 2, math 1, object 3, table 1, tracked-move 2 |
+| `prototype/remainder/corpus/testWORD_various.docx`                   | docx   |     0 | |
 | `crates/hanji-hwpx/corpus/basic-table-01.hwpx`                       | hwpx   |     0 | |
-| `crates/hanji-hwpx/corpus/eq-002.hwpx`                               | hwpx   |     1 | number 1 |
+| `crates/hanji-hwpx/corpus/eq-002.hwpx`                               | hwpx   |     0 | |
 | `crates/hanji-hwpx/corpus/fdi-2025q2.hwpx`                           | hwpx   |     1 | drawing 1 |
 | `crates/hanji-hwpx/corpus/field-multipara-clickhere.hwpx`            | hwpx   |     3 | drawing 2, table 1 |
 | `crates/hanji-hwpx/corpus/footnote-01.hwpx`                          | hwpx   |     0 | |
-| `crates/hanji-hwpx/corpus/footnote-tbox-01.hwpx`                     | hwpx   |     1 | drawing 1 |
+| `crates/hanji-hwpx/corpus/footnote-tbox-01.hwpx`                     | hwpx   |     0 | |
 | `crates/hanji-hwpx/corpus/form-01.hwpx`                              | hwpx   |     5 | form-control 5 |
 | `crates/hanji-hwpx/corpus/hcar-001.hwpx`                             | hwpx   |     3 | table 3 |
 | `crates/hanji-hwpx/corpus/hy-002.hwpx`                               | hwpx   |     2 | drawing 2 |
@@ -115,7 +106,7 @@ date.
 | `crates/hanji-hwpx/corpus/table-text.hwpx`                           | hwpx   |     0 | |
 | `crates/hanji-hwpx/corpus/tb-img-03.hwpx`                            | hwpx   |     1 | drawing 1 |
 | `crates/hanji-pptx/corpus/45545_Comment.pptx`                        | pptx   |     0 | |
-| `crates/hanji-pptx/corpus/60810.pptx`                                | pptx   |     6 | diagram 4, field 2 |
+| `crates/hanji-pptx/corpus/60810.pptx`                                | pptx   |     4 | diagram 4 |
 | `crates/hanji-pptx/corpus/EmbeddedVideo.pptx`                        | pptx   |     1 | picture 1 |
 | `crates/hanji-pptx/corpus/SampleShow.pptx`                           | pptx   |     0 | |
 | `crates/hanji-pptx/corpus/SimpleMacro.pptm`                          | pptx   |     0 | |
@@ -127,7 +118,7 @@ date.
 | `crates/hanji-pptx/corpus/audit/synth-modern-pitch.pptx`             | pptx   |     2 | chart 1, table 1 |
 | `crates/hanji-pptx/corpus/ext-rels.pptx`                             | pptx   |     0 | |
 | `crates/hanji-pptx/corpus/korean-deck.pptx`                          | pptx   |     1 | table 1 |
-| `crates/hanji-pptx/corpus/layouts.pptx`                              | pptx   |     2 | field 1, picture 1 |
+| `crates/hanji-pptx/corpus/layouts.pptx`                              | pptx   |     1 | picture 1 |
 | `crates/hanji-pptx/corpus/ph-populated-placeholders.pptx`            | pptx   |     5 | chart 1, diagram 1, picture 2, table 1 |
 | `crates/hanji-pptx/corpus/ph-unpopulated-placeholders.pptx`          | pptx   |     0 | |
 | `crates/hanji-pptx/corpus/prs-notes.pptx`                            | pptx   |     0 | |
@@ -139,51 +130,51 @@ date.
 | `crates/hanji-pptx/corpus/tbl-cell.pptx`                             | pptx   |     4 | table 4 |
 | `crates/hanji-pptx/corpus/turns-deck.pptx`                           | pptx   |     1 | picture 1 |
 | `crates/hanji-pptx/corpus/txt-font-props.pptx`                       | pptx   |     0 | |
-| `crates/hanji-pptx/corpus/txt-text.pptx`                             | pptx   |     2 | field 1, table 1 |
+| `crates/hanji-pptx/corpus/txt-text.pptx`                             | pptx   |     1 | table 1 |
 | `crates/hanji-pptx/corpus/with_japanese.pptx`                        | pptx   |     1 | table 1 |
 | `crates/hanji-xlsx/corpus/50867_with_table.xlsx`                     | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/54084-Greek-beyond-BMP.xlsx`               | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/57893-many-merges.xlsx`                    | xlsx   |     1 | merged-cells 1 |
-| `crates/hanji-xlsx/corpus/DataValidations-49244.xlsx`                | xlsx   |     1 | data-validation 1 |
+| `crates/hanji-xlsx/corpus/DataValidations-49244.xlsx`                | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/DateFormatTests.xlsx`                      | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/ExcelPivotTableSample.xlsx`                | xlsx   |     2 | pivot-table 2 |
 | `crates/hanji-xlsx/corpus/ExcelTables.xlsx`                          | xlsx   |     0 | |
-| `crates/hanji-xlsx/corpus/ExcelWithAttachments.xlsm`                 | xlsx   |     6 | group 1, hyperlinks 1, notes 1, shape 3 |
+| `crates/hanji-xlsx/corpus/ExcelWithAttachments.xlsm`                 | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/GeneralFormatTests.xlsx`                   | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/InlineStrings.xlsx`                        | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/SampleSS.xlsx`                             | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/SimpleMacro.xlsm`                          | xlsx   |     0 | |
-| `crates/hanji-xlsx/corpus/SimpleWithComments.xlsx`                   | xlsx   |     1 | notes 1 |
+| `crates/hanji-xlsx/corpus/SimpleWithComments.xlsx`                   | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/StructuredReferences.xlsx`                 | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/Tables.xlsx`                               | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/WithChart.xlsx`                            | xlsx   |     1 | chart 1 |
-| `crates/hanji-xlsx/corpus/WithConditionalFormatting.xlsx`            | xlsx   |     1 | conditional-format 1 |
-| `crates/hanji-xlsx/corpus/WithDrawing.xlsx`                          | xlsx   |     6 | picture 5, shape 1 |
+| `crates/hanji-xlsx/corpus/WithConditionalFormatting.xlsx`            | xlsx   |     0 | |
+| `crates/hanji-xlsx/corpus/WithDrawing.xlsx`                          | xlsx   |     5 | picture 5 |
 | `crates/hanji-xlsx/corpus/WithTable.xlsx`                            | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/WithThreeCharts.xlsx`                      | xlsx   |     3 | chart 3 |
-| `crates/hanji-xlsx/corpus/WithVariousData.xlsx`                      | xlsx   |     2 | hyperlinks 1, notes 1 |
-| `crates/hanji-xlsx/corpus/korean-sales-lo.xlsx`                      | xlsx   |     5 | chart 1, conditional-format 1, data-validation 1, hyperlinks 1, notes 1 |
-| `crates/hanji-xlsx/corpus/korean-sales.xlsx`                         | xlsx   |     5 | chart 1, conditional-format 1, data-validation 1, hyperlinks 1, notes 1 |
+| `crates/hanji-xlsx/corpus/WithVariousData.xlsx`                      | xlsx   |     0 | |
+| `crates/hanji-xlsx/corpus/korean-sales-lo.xlsx`                      | xlsx   |     1 | chart 1 |
+| `crates/hanji-xlsx/corpus/korean-sales.xlsx`                         | xlsx   |     1 | chart 1 |
 | `crates/hanji-xlsx/corpus/link-external-workbook-b.xlsx`             | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_array_formula01.xlsx`                   | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_autofilter01.xlsx`                      | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_chart_bar01.xlsx`                       | xlsx   |     1 | chart 1 |
-| `crates/hanji-xlsx/corpus/rx_comment01.xlsx`                         | xlsx   |     1 | notes 1 |
-| `crates/hanji-xlsx/corpus/rx_cond_format01.xlsx`                     | xlsx   |     1 | conditional-format 1 |
-| `crates/hanji-xlsx/corpus/rx_data_validation01.xlsx`                 | xlsx   |     1 | data-validation 1 |
+| `crates/hanji-xlsx/corpus/rx_comment01.xlsx`                         | xlsx   |     0 | |
+| `crates/hanji-xlsx/corpus/rx_cond_format01.xlsx`                     | xlsx   |     0 | |
+| `crates/hanji-xlsx/corpus/rx_data_validation01.xlsx`                 | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_defined_name01.xlsx`                    | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_dynamic_array01.xlsx`                   | xlsx   |     0 | |
-| `crates/hanji-xlsx/corpus/rx_hyperlink01.xlsx`                       | xlsx   |     1 | hyperlinks 1 |
+| `crates/hanji-xlsx/corpus/rx_hyperlink01.xlsx`                       | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_image01.xlsx`                           | xlsx   |     1 | picture 1 |
 | `crates/hanji-xlsx/corpus/rx_macro01.xlsm`                           | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_merge_range01.xlsx`                     | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_rich_string01.xlsx`                     | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/rx_table01.xlsx`                           | xlsx   |     0 | |
-| `crates/hanji-xlsx/corpus/rx_table05.xlsx`                           | xlsx   |     3 | hyperlinks 1, notes 1, picture 1 |
+| `crates/hanji-xlsx/corpus/rx_table05.xlsx`                           | xlsx   |     1 | picture 1 |
 | `crates/hanji-xlsx/corpus/rx_table14.xlsx`                           | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/shared_formulas.xlsx`                      | xlsx   |     0 | |
-| `crates/hanji-xlsx/corpus/sharedhyperlink.xlsx`                      | xlsx   |     1 | hyperlinks 1 |
-| `crates/hanji-xlsx/corpus/simple-monthly-budget.xlsx`                | xlsx   |     3 | chart 1, conditional-format 1, shape 1 |
+| `crates/hanji-xlsx/corpus/sharedhyperlink.xlsx`                      | xlsx   |     0 | |
+| `crates/hanji-xlsx/corpus/simple-monthly-budget.xlsx`                | xlsx   |     1 | chart 1 |
 | `crates/hanji-xlsx/corpus/table-sample.xlsx`                         | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/unicodeSheetName.xlsx`                     | xlsx   |     0 | |
 | `crates/hanji-xlsx/corpus/xlookup.xlsx`                              | xlsx   |     0 | |

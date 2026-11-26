@@ -9,16 +9,18 @@ use hanji_core::cells::{parse_sqref, CellRange, CellRef};
 use hanji_core::{Entry, KeepIds, Kind, Meta};
 use hanji_format::cellfmt::{self, CellFormat, FormatLine};
 use hanji_format::sheet::{
-    format_kind, ColumnDecl, FormatKind, MergeDecl, SheetDecl, SheetItem, Spreadsheet, TableDecl,
-    MAX_MERGE_LINES,
+    format_kind, Cfvo, ColumnDecl, CondFormatDecl, DrawingItem, FormatKind, HyperlinkDecl,
+    MergeDecl, SheetDecl, SheetItem, Spreadsheet, TableDecl, ValidationDecl,
+    MAX_CONDITIONAL_FORMAT_LINES, MAX_HYPERLINK_LINES, MAX_MERGE_LINES, MAX_VALIDATION_LINES,
 };
+use hanji_format::vocab::Color;
 use hanji_format::{formula, FrontMatter, Keep};
 use hanji_package::clip;
 use hanji_package::xml::{self, Element, Node};
 
 use crate::book::{Book, SheetKind, TableInfo, ValueKind};
-use crate::drawing;
 use crate::store::SHEET_ORDER;
+use crate::{drawing, notes, shapes};
 
 /// The worksheet children that become range entries: (container, child, anchor attribute).
 pub const RANGE_ELEMENTS: &[(Option<&str>, &str, &str)] = &[
@@ -192,6 +194,15 @@ pub fn keeps(book: &Book) -> Vec<(usize, Keep)> {
             if child == "mergeCell" && modelled_merges(book, i).is_some() {
                 continue;
             }
+            if child == "hyperlink" && modelled_hyperlinks(book, i).is_some() {
+                continue;
+            }
+            if child == "dataValidation" && modelled_validations(book, i).is_some() {
+                continue;
+            }
+            if child == "conditionalFormatting" && modelled_conditional_formats(book, i).is_some() {
+                continue;
+            }
             let ranges: Vec<&str> = book
                 .entries
                 .iter()
@@ -207,6 +218,9 @@ pub fn keeps(book: &Book) -> Vec<(usize, Keep)> {
         match s.kind {
             SheetKind::Work => {
                 for o in drawing::sheet_objects(book, i) {
+                    if o.kind == "notes" && notes::modelled(book, i).is_some() {
+                        continue;
+                    }
                     push(&o.kind, o.summary, &mut out);
                 }
             }
@@ -255,6 +269,614 @@ fn modelled_merges(book: &Book, i: usize) -> Option<Vec<String>> {
         }
     }
     Some(rs.into_iter().map(|r| r.to_string()).collect())
+}
+
+/// This sheet's hyperlinks as `<hyperlink/>` lines, or `None` when they stay
+/// a placeholder: more than [`MAX_HYPERLINK_LINES`], an unparsable ref,
+/// overlapping ranges, a missing or shared relationship, or a relationship
+/// that is not an external hyperlink.
+pub(crate) fn modelled_hyperlinks(book: &Book, i: usize) -> Option<Vec<HyperlinkDecl>> {
+    let part = &book.sheets[i].part;
+    let rels = book.rels_of(part);
+    let mut out = vec![];
+    let mut used_ids: Vec<String> = vec![];
+    for e in &book.entries {
+        if e.kind != Kind::Range || e.path.first() != Some(&i) || e.meta.tag != "hyperlink" {
+            continue;
+        }
+        let r = CellRange::parse(e.meta.range.as_deref()?)?;
+        let el = xml::fragment(&e.xml[0]);
+        let rid = el
+            .attrs
+            .iter()
+            .find(|a| a.0.ends_with(":id"))
+            .map(|a| xml::unescape(&a.1));
+        let location = el.get("location").filter(|s| !s.is_empty());
+        let target = if let Some(id) = &rid {
+            if used_ids.iter().any(|x| x == id) {
+                return None;
+            }
+            let rel = rels.iter().find(|r| r.id == *id)?;
+            if rel.short_type() != "hyperlink" || !rel.external {
+                return None;
+            }
+            used_ids.push(id.clone());
+            Some(rel.target.clone())
+        } else {
+            None
+        };
+        if target.is_none() && location.is_none() {
+            return None;
+        }
+        out.push(HyperlinkDecl {
+            range: r.to_string(),
+            target,
+            location,
+            display: el.get("display"),
+            tooltip: el.get("tooltip"),
+        });
+    }
+    if out.len() > MAX_HYPERLINK_LINES {
+        return None;
+    }
+    let rs: Vec<CellRange> = out
+        .iter()
+        .filter_map(|h| CellRange::parse(&h.range))
+        .collect();
+    if rs.len() != out.len() {
+        return None;
+    }
+    for (a, x) in rs.iter().enumerate() {
+        if rs[a + 1..].iter().any(|y| x.intersects(y)) {
+            return None;
+        }
+    }
+    Some(out)
+}
+
+/// This sheet's data validations as `<validation/>` lines, or `None` when
+/// they stay a placeholder: more than [`MAX_VALIDATION_LINES`], an
+/// unparsable sqref, a missing type, or children other than formula1/2.
+pub(crate) fn modelled_validations(book: &Book, i: usize) -> Option<Vec<ValidationDecl>> {
+    let mut out = vec![];
+    for e in &book.entries {
+        if e.kind != Kind::Range || e.path.first() != Some(&i) || e.meta.tag != "dataValidation" {
+            continue;
+        }
+        out.push(validation_decl(e)?);
+    }
+    if out.len() > MAX_VALIDATION_LINES {
+        return None;
+    }
+    Some(out)
+}
+
+pub(crate) fn validation_decl(e: &Entry) -> Option<ValidationDecl> {
+    let range = parse_sqref(e.meta.range.as_deref()?)?;
+    let el = xml::fragment(&e.xml[0]);
+    if el
+        .elements()
+        .any(|c| !matches!(c.local(), "formula1" | "formula2"))
+    {
+        return None;
+    }
+    let ty = el.get("type").filter(|t| !t.is_empty())?;
+    if !hanji_format::sheet::VALIDATION_TYPES.contains(&ty.as_str()) {
+        return None;
+    }
+    let operator = match el.get("operator").as_deref() {
+        None | Some("between") => None,
+        Some(op) if hanji_format::sheet::VALIDATION_OPERATORS.contains(&op) => Some(op.to_string()),
+        Some(_) => return None,
+    };
+    let error_style = match el.get("errorStyle").as_deref() {
+        None | Some("stop") => None,
+        Some(s) if hanji_format::sheet::VALIDATION_ERROR_STYLES.contains(&s) => Some(s.to_string()),
+        Some(_) => return None,
+    };
+    Some(ValidationDecl {
+        range: hanji_core::cells::write_sqref(&range),
+        ty,
+        operator,
+        formula1: child_text(&el, "formula1"),
+        formula2: child_text(&el, "formula2"),
+        allow_blank: xml_flag(&el, "allowBlank") == Some(true),
+        show_input_message: xml_message_off(&el, "showInputMessage"),
+        show_error_message: xml_message_off(&el, "showErrorMessage"),
+        prompt_title: el.get("promptTitle").filter(|s| !s.is_empty()),
+        prompt: el.get("prompt").filter(|s| !s.is_empty()),
+        error_title: el.get("errorTitle").filter(|s| !s.is_empty()),
+        error: el.get("error").filter(|s| !s.is_empty()),
+        error_style,
+    })
+}
+
+/// This sheet's conditional formats as `<conditional-format/>` lines (one
+/// per `cfRule`), in Excel's sheet-wide `priority` order (stable on ties),
+/// or `None` when they stay a placeholder: more than
+/// [`MAX_CONDITIONAL_FORMAT_LINES`], an unparsable sqref, a rule type other
+/// than `cellIs`/`expression`/`dataBar`, a dataBar whose x14 extension
+/// cannot be patched, or a dxf the text cannot write.
+pub(crate) fn modelled_conditional_formats(book: &Book, i: usize) -> Option<Vec<CondFormatDecl>> {
+    let mut out = vec![];
+    for e in &book.entries {
+        if e.kind != Kind::Range
+            || e.path.first() != Some(&i)
+            || e.meta.tag != "conditionalFormatting"
+        {
+            continue;
+        }
+        out.extend(conditional_format_decls(book, i, e)?);
+    }
+    if out.len() > MAX_CONDITIONAL_FORMAT_LINES {
+        return None;
+    }
+    // Excel `priority` is sheet-wide (lower wins). Ties keep document order.
+    out.sort_by_key(|(p, _)| *p);
+    Some(out.into_iter().map(|(_, d)| d).collect())
+}
+
+fn conditional_format_decls(
+    book: &Book,
+    sheet: usize,
+    e: &Entry,
+) -> Option<Vec<(u32, CondFormatDecl)>> {
+    let range = parse_sqref(e.meta.range.as_deref()?)?;
+    let range = hanji_core::cells::write_sqref(&range);
+    let el = xml::fragment(&e.xml[0]);
+    let mut out = vec![];
+    for rule in el.elements().filter(|c| c.local() == "cfRule") {
+        let decl = cf_rule_decl(book, &range, rule)?;
+        if decl.ty == "dataBar" && !x14_data_bar_ok(book, sheet, &range, rule, &decl) {
+            return None;
+        }
+        out.push((cf_rule_priority(rule), decl));
+    }
+    if el.elements().any(|c| c.local() != "cfRule") {
+        return None;
+    }
+    Some(out)
+}
+
+fn cf_rule_priority(rule: &Element) -> u32 {
+    rule.get("priority")
+        .and_then(|s| s.parse().ok())
+        .unwrap_or(u32::MAX)
+}
+
+pub(crate) fn cf_rule_decl(book: &Book, range: &str, rule: &Element) -> Option<CondFormatDecl> {
+    let ty = rule.get("type")?;
+    if !hanji_format::sheet::CONDITIONAL_FORMAT_TYPES.contains(&ty.as_str()) {
+        return None;
+    }
+    if ty == "dataBar" {
+        return data_bar_decl(range, rule);
+    }
+    if rule
+        .elements()
+        .any(|c| !matches!(c.local(), "formula" | "extLst"))
+    {
+        return None;
+    }
+    let formulas: Vec<String> = rule
+        .elements()
+        .filter(|c| c.local() == "formula")
+        .map(|c| c.text_of(&[c.name.as_str()]))
+        .collect();
+    let operator = match (ty.as_str(), rule.get("operator").as_deref()) {
+        ("expression", _) => None,
+        (_, None) | (_, Some("between")) => None,
+        (_, Some(op)) if hanji_format::sheet::VALIDATION_OPERATORS.contains(&op) => {
+            Some(op.to_string())
+        }
+        _ => return None,
+    };
+    let dxf = match rule.get("dxfId").and_then(|s| s.parse::<u32>().ok()) {
+        Some(id) => book.styles.modelled_dxf(id)?,
+        None => CellFormat::default(),
+    };
+    Some(CondFormatDecl {
+        range: range.to_string(),
+        ty,
+        operator,
+        formula: formulas.first().cloned().filter(|s| !s.is_empty()),
+        formula2: formulas.get(1).cloned().filter(|s| !s.is_empty()),
+        dxf,
+        stop_if_true: xml_flag(rule, "stopIfTrue") == Some(true),
+        min: None,
+        max: None,
+        fill: None,
+    })
+}
+
+fn data_bar_decl(range: &str, rule: &Element) -> Option<CondFormatDecl> {
+    if rule
+        .elements()
+        .any(|c| !matches!(c.local(), "dataBar" | "extLst"))
+    {
+        return None;
+    }
+    let bar = rule.elements().find(|c| c.local() == "dataBar")?;
+    let cfvos: Vec<&Element> = bar.elements().filter(|c| c.local() == "cfvo").collect();
+    if cfvos.len() != 2 {
+        return None;
+    }
+    let color = bar.elements().find(|c| c.local() == "color")?;
+    let min = parse_cfvo(cfvos[0])?;
+    let max = parse_cfvo(cfvos[1])?;
+    let fill = crate::format::color_of(Some(color))?;
+    if !fill.is_writable() {
+        return None;
+    }
+    Some(CondFormatDecl {
+        range: range.to_string(),
+        ty: "dataBar".into(),
+        operator: None,
+        formula: None,
+        formula2: None,
+        dxf: CellFormat::default(),
+        stop_if_true: xml_flag(rule, "stopIfTrue") == Some(true),
+        min: Some(min),
+        max: Some(max),
+        fill: Some(fill),
+    })
+}
+
+/// Excel `cfvo` (main `val=` or x14 `<xm:f>`) → the text token.
+pub(crate) fn parse_cfvo(e: &Element) -> Option<Cfvo> {
+    let raw = e.get("type")?;
+    let ty = match raw.as_str() {
+        "autoMin" => "min",
+        "autoMax" => "max",
+        t if hanji_format::sheet::CFVO_TYPES.contains(&t) => t,
+        _ => return None,
+    };
+    if ty == "min" || ty == "max" {
+        return Some(Cfvo {
+            ty: ty.to_string(),
+            val: None,
+        });
+    }
+    let val = e.get("val").filter(|s| !s.is_empty()).or_else(|| {
+        e.elements()
+            .find(|c| c.local() == "f")
+            .map(|c| c.text_of(&[c.name.as_str()]))
+            .filter(|s| !s.is_empty())
+    })?;
+    Cfvo::parse(&format!("{ty}:{val}")).ok()
+}
+
+/// The `{GUID}` on a `cfRule`'s x14 `id`, when the rule has one.
+pub(crate) fn cf_rule_x14_id(rule: &Element) -> Option<String> {
+    rule.elements()
+        .find(|c| c.local() == "extLst")?
+        .elements()
+        .find_map(|ext| {
+            ext.elements()
+                .find(|c| c.local() == "id")
+                .map(|c| c.text_of(&[c.name.as_str()]))
+        })
+        .filter(|s| !s.is_empty())
+}
+
+/// x14 `conditionalFormattings` on the worksheet, if any.
+pub(crate) fn x14_conditional_formattings(skel: &Element) -> Option<&Element> {
+    skel.elements()
+        .find(|e| e.local() == "extLst")?
+        .elements()
+        .find_map(|ext| {
+            ext.elements()
+                .find(|c| c.local() == "conditionalFormattings")
+        })
+}
+
+fn x14_cf_by_id<'a>(cfs: &'a Element, id: &str) -> Option<&'a Element> {
+    cfs.elements().find(|cf| {
+        cf.local() == "conditionalFormatting"
+            && cf
+                .elements()
+                .any(|r| r.local() == "cfRule" && r.get("id").as_deref() == Some(id))
+    })
+}
+
+fn x14_cf_by_sqref<'a>(cfs: &'a Element, range: &str) -> Option<&'a Element> {
+    cfs.elements().find(|cf| {
+        cf.local() == "conditionalFormatting"
+            && cf
+                .elements()
+                .find(|c| c.local() == "sqref")
+                .map(|c| c.text_of(&[c.name.as_str()]))
+                .as_deref()
+                .and_then(parse_sqref)
+                .map(|r| hanji_core::cells::write_sqref(&r))
+                .as_deref()
+                == Some(range)
+    })
+}
+
+fn x14_data_bar_matches(x14_cf: &Element, range: &str, decl: &CondFormatDecl) -> bool {
+    let sqref = x14_cf
+        .elements()
+        .find(|c| c.local() == "sqref")
+        .map(|c| c.text_of(&[c.name.as_str()]))
+        .as_deref()
+        .and_then(parse_sqref)
+        .map(|r| hanji_core::cells::write_sqref(&r));
+    if sqref.as_deref() != Some(range) {
+        return false;
+    }
+    let Some(rule) = x14_cf.elements().find(|c| c.local() == "cfRule") else {
+        return false;
+    };
+    if rule.get("type").as_deref() != Some("dataBar") {
+        return false;
+    }
+    let Some(bar) = rule.elements().find(|c| c.local() == "dataBar") else {
+        return false;
+    };
+    let cfvos: Vec<&Element> = bar.elements().filter(|c| c.local() == "cfvo").collect();
+    if cfvos.len() != 2 {
+        return false;
+    }
+    if parse_cfvo(cfvos[0]).as_ref() != decl.min.as_ref()
+        || parse_cfvo(cfvos[1]).as_ref() != decl.max.as_ref()
+    {
+        return false;
+    }
+    if let Some(fc) = bar.elements().find(|c| c.local() == "fillColor") {
+        if crate::format::color_of(Some(fc)).as_ref() != decl.fill.as_ref() {
+            return false;
+        }
+    }
+    true
+}
+
+/// Whether the worksheet x14 dataBar (negative fill, axis, gradient, border)
+/// can be patched when this rule's modelled fields change. No x14 is fine.
+fn x14_data_bar_ok(
+    book: &Book,
+    sheet: usize,
+    range: &str,
+    rule: &Element,
+    decl: &CondFormatDecl,
+) -> bool {
+    let Some(cfs) = x14_conditional_formattings(&book.store(sheet).skel.root) else {
+        return true;
+    };
+    match cf_rule_x14_id(rule) {
+        Some(id) => match x14_cf_by_id(cfs, &id) {
+            Some(x14) => x14_data_bar_matches(x14, range, decl),
+            None => false,
+        },
+        None => match x14_cf_by_sqref(cfs, range) {
+            Some(x14) => x14_data_bar_matches(x14, range, decl),
+            None => true,
+        },
+    }
+}
+
+/// GUIDs of x14 ids on every `cfRule` in this conditional-format entry.
+pub(crate) fn entry_x14_ids(xml: &str) -> Vec<String> {
+    xml::fragment(xml)
+        .elements()
+        .filter(|c| c.local() == "cfRule")
+        .filter_map(cf_rule_x14_id)
+        .collect()
+}
+
+/// Set an element's sole text child.
+pub(crate) fn set_element_text(e: &mut Element, v: &str) {
+    e.children = vec![Node::Text(xml::escape_text(v))];
+}
+
+/// Write `ty`/`val` onto a main-document `cfvo`, keeping `autoMin`/`autoMax`
+/// when the text still means min/max.
+pub(crate) fn write_cfvo(e: &mut Element, v: &Cfvo) {
+    let keep_auto = matches!(
+        (e.get("type").as_deref(), v.ty.as_str()),
+        (Some("autoMin"), "min") | (Some("autoMax"), "max")
+    );
+    if !keep_auto {
+        e.set("type", &v.ty);
+    }
+    match &v.val {
+        None => {
+            e.remove_attr("val");
+        }
+        Some(val) => {
+            let xml_val = if v.ty == "formula" {
+                val.trim_start_matches('=')
+            } else {
+                val.as_str()
+            };
+            e.set("val", xml_val);
+        }
+    }
+}
+
+/// Write type and `<xm:f>` on an x14 `cfvo`.
+pub(crate) fn write_x14_cfvo(e: &mut Element, v: &Cfvo) {
+    let keep_auto = matches!(
+        (e.get("type").as_deref(), v.ty.as_str()),
+        (Some("autoMin"), "min") | (Some("autoMax"), "max")
+    );
+    if !keep_auto {
+        e.set("type", &v.ty);
+    }
+    e.remove_attr("val");
+    let Some(val) = &v.val else {
+        e.children
+            .retain(|n| !matches!(n, Node::El(c) if c.local() == "f"));
+        return;
+    };
+    let xml_val = if v.ty == "formula" {
+        val.trim_start_matches('=')
+    } else {
+        val.as_str()
+    };
+    if let Some(f) = e.elements_mut().find(|c| c.local() == "f") {
+        set_element_text(f, xml_val);
+        return;
+    }
+    let mut f = Element::new("xm:f");
+    set_element_text(&mut f, xml_val);
+    e.children.insert(0, Node::El(f));
+}
+
+/// Patch the x14 dataBar linked by `id`: `sqref`, cfvo, fillColor (when present).
+pub(crate) fn patch_x14_data_bar(
+    skel: &mut Element,
+    id: &str,
+    decl: &CondFormatDecl,
+) -> Result<(), String> {
+    let Some(ext_lst) = skel.elements_mut().find(|e| e.local() == "extLst") else {
+        return Ok(());
+    };
+    let mut err = None;
+    ext_lst.walk_mut(&mut |e| {
+        if err.is_some() || e.local() != "conditionalFormatting" {
+            return;
+        }
+        let matches = e
+            .elements()
+            .any(|r| r.local() == "cfRule" && r.get("id").as_deref() == Some(id));
+        if !matches {
+            return;
+        }
+        if let Some(sq) = e.elements_mut().find(|c| c.local() == "sqref") {
+            if sq.text_of(&[sq.name.as_str()]) != decl.range {
+                set_element_text(sq, &decl.range);
+            }
+        }
+        let (Some(min), Some(max), Some(fill)) =
+            (decl.min.as_ref(), decl.max.as_ref(), decl.fill.as_ref())
+        else {
+            return;
+        };
+        let Some(rule) = e.elements_mut().find(|c| c.local() == "cfRule") else {
+            return;
+        };
+        let Some(bar) = rule.elements_mut().find(|c| c.local() == "dataBar") else {
+            return;
+        };
+        let cfvo_idx: Vec<usize> = bar
+            .children
+            .iter()
+            .enumerate()
+            .filter_map(|(k, n)| match n {
+                Node::El(c) if c.local() == "cfvo" => Some(k),
+                _ => None,
+            })
+            .collect();
+        if cfvo_idx.len() != 2 {
+            return;
+        }
+        if let Node::El(c) = &mut bar.children[cfvo_idx[0]] {
+            if parse_cfvo(c).as_ref() != Some(min) {
+                write_x14_cfvo(c, min);
+            }
+        }
+        if let Node::El(c) = &mut bar.children[cfvo_idx[1]] {
+            if parse_cfvo(c).as_ref() != Some(max) {
+                write_x14_cfvo(c, max);
+            }
+        }
+        if let Some(fc) = bar.elements_mut().find(|c| c.local() == "fillColor") {
+            if crate::format::color_of(Some(fc)).as_ref() != Some(fill) {
+                match crate::format::color_el(&fc.name, fill) {
+                    Ok(n) => *fc = n,
+                    Err(m) => err = Some(m),
+                }
+            }
+        }
+    });
+    match err {
+        Some(m) => Err(m),
+        None => Ok(()),
+    }
+}
+
+/// Drop x14 `conditionalFormatting` whose id was on a removed rule.
+pub(crate) fn prune_x14_conditional_formats(
+    skel: &mut Element,
+    old_ids: &[String],
+    live_ids: &[String],
+) {
+    let drop_lst = {
+        let Some(ext_lst) = skel.elements_mut().find(|e| e.local() == "extLst") else {
+            return;
+        };
+        for ext in ext_lst.elements_mut() {
+            let empty = {
+                let Some(cfs) = ext
+                    .elements_mut()
+                    .find(|c| c.local() == "conditionalFormattings")
+                else {
+                    continue;
+                };
+                cfs.children.retain(|n| {
+                    let Node::El(cf) = n else {
+                        return true;
+                    };
+                    if cf.local() != "conditionalFormatting" {
+                        return true;
+                    }
+                    let id = cf
+                        .elements()
+                        .find_map(|r| (r.local() == "cfRule").then(|| r.get("id")).flatten());
+                    !matches!(
+                        id,
+                        Some(id) if old_ids.iter().any(|o| o == &id)
+                            && !live_ids.iter().any(|l| l == &id)
+                    )
+                });
+                !cfs.elements().any(|c| c.local() == "conditionalFormatting")
+            };
+            if empty {
+                ext.children
+                    .retain(|n| !matches!(n, Node::El(c) if c.local() == "conditionalFormattings"));
+            }
+        }
+        ext_lst.children.retain(|n| match n {
+            Node::El(ext) => ext.elements().next().is_some(),
+            _ => true,
+        });
+        !ext_lst.has_elements()
+    };
+    if drop_lst {
+        skel.children
+            .retain(|n| !matches!(n, Node::El(c) if c.local() == "extLst"));
+    }
+}
+
+/// Apply `fill` onto an existing colour element, keeping its name/prefix.
+pub(crate) fn put_color(e: &mut Element, c: &Color) -> Result<(), String> {
+    *e = crate::format::color_el(&e.name, c)?;
+    Ok(())
+}
+
+pub(crate) fn child_text(e: &Element, local: &str) -> Option<String> {
+    e.elements()
+        .find(|c| c.local() == local)
+        .map(|c| c.text_of(&[c.name.as_str()]))
+}
+
+fn xml_flag(e: &Element, k: &str) -> Option<bool> {
+    match e.get(k).as_deref() {
+        Some("1" | "true" | "True") => Some(true),
+        Some("0" | "false" | "False") => Some(false),
+        _ => None,
+    }
+}
+
+/// CT_DataValidation `showInputMessage` / `showErrorMessage` default to false
+/// when absent. The text default is on: omit the attr when true, write
+/// `"false"` when off.
+fn xml_message_off(e: &Element, k: &str) -> Option<bool> {
+    match xml_flag(e, k) {
+        Some(true) => None,
+        _ => Some(false),
+    }
 }
 
 fn list_summary(ranges: &[&str]) -> String {
@@ -385,6 +1007,32 @@ pub fn structure(book: &mut Book, template: Option<&str>) -> Result<Spreadsheet,
                     ms.into_iter()
                         .map(|range| SheetItem::Merge(MergeDecl { range })),
                 );
+            }
+            if let Some(hs) = modelled_hyperlinks(book, i) {
+                items.extend(hs.into_iter().map(SheetItem::Hyperlink));
+            }
+            if let Some(ns) = notes::modelled(book, i) {
+                items.extend(ns.into_iter().map(SheetItem::Note));
+            }
+            if let Some(vs) = modelled_validations(book, i) {
+                items.extend(vs.into_iter().map(SheetItem::Validation));
+            }
+            if let Some(cs) = modelled_conditional_formats(book, i) {
+                items.extend(
+                    cs.into_iter()
+                        .map(|c| SheetItem::ConditionalFormat(Box::new(c))),
+                );
+            }
+            for line in shapes::lines(book, i) {
+                match line {
+                    shapes::DrawingLine::Item(DrawingItem::Shape(s)) => {
+                        items.push(SheetItem::Shape(s));
+                    }
+                    shapes::DrawingLine::Item(DrawingItem::Group(g)) => {
+                        items.push(SheetItem::Group(g));
+                    }
+                    shapes::DrawingLine::Keep(_) => {}
+                }
             }
         }
         items.extend(

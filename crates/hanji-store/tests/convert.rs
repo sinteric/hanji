@@ -172,8 +172,9 @@ fn plain(text: &str) -> String {
 /// The ids of the placeholders a text has, in order: `<keep/>` ids, then a
 /// synthetic `c{n}` / `i{n}` / `d{n}` for each `<comment>` / `<ins>` /
 /// `<del>` conversion drops, then `m{n}` for each `$…$` / `<math>` the
-/// target cannot write.
-fn keep_ids(text: &str, math: bool) -> Vec<String> {
+/// target cannot write, then `pb{n}` / `cb{n}` for each inline
+/// `<pagebreak/>` / `<columnbreak/>` hwpx cannot write.
+fn keep_ids(text: &str, math: bool, breaks: bool) -> Vec<String> {
     let mut ids: Vec<String> = text
         .split("<keep id=\"")
         .skip(1)
@@ -219,6 +220,25 @@ fn keep_ids(text: &str, math: bool) -> Vec<String> {
             Some(0) => rest = &rest[1..],
             Some(i) => rest = &rest[i..],
             None => break,
+        }
+    }
+    if breaks {
+        let mut n_pb = 0usize;
+        let mut n_cb = 0usize;
+        for line in text.lines() {
+            let t = line.trim();
+            if t == "<pagebreak/>" || t == "<pagebreak />" {
+                continue;
+            }
+            n_pb += line.matches("<pagebreak/>").count() + line.matches("<pagebreak />").count();
+            n_cb +=
+                line.matches("<columnbreak/>").count() + line.matches("<columnbreak />").count();
+        }
+        for i in 1..=n_pb {
+            ids.push(format!("pb{i}"));
+        }
+        for i in 1..=n_cb {
+            ids.push(format!("cb{i}"));
         }
     }
     let mut footnotes = 0usize;
@@ -301,7 +321,7 @@ fn every_document_of_the_corpus_crosses_both_ways_with_its_text() {
             "{path}: the text changed"
         );
         // Every placeholder is in the report, each once.
-        let mut ids = keep_ids(&source, other == Format::Docx);
+        let mut ids = keep_ids(&source, other == Format::Docx, other == Format::Hwpx);
         let mut named: Vec<String> = c.placeholders.iter().map(|p| p.id.clone()).collect();
         ids.sort();
         named.sort();
@@ -336,7 +356,7 @@ fn the_report_names_each_placeholder_by_kind_with_its_line() {
     );
     let c = out.conversion.unwrap();
     let source = full_text(&ws, &id);
-    assert_eq!(c.placeholders.len(), 34);
+    assert_eq!(c.placeholders.len(), 32);
     let kinds: Vec<(&str, usize)> = c
         .placeholder_kinds
         .iter()
@@ -347,7 +367,7 @@ fn the_report_names_each_placeholder_by_kind_with_its_line() {
         [
             ("comment", 1),
             ("content-control", 4),
-            ("drawing", 5),
+            ("drawing", 3),
             ("endnote", 1),
             ("field", 2),
             ("footnote", 1),
@@ -675,11 +695,15 @@ fn a_report_has_a_text_for_people() {
         "{t}"
     );
     assert!(
-        t.contains("placeholders dropped, 34 (comment ×1, content-control ×4,"),
+        t.contains("placeholders dropped, 32 (comment ×1, content-control ×4,"),
         "{t}"
     );
     assert!(
         t.contains("fields (the result's text stays, the instruction does not) ×10"),
+        "{t}"
+    );
+    assert!(
+        t.contains("text boxes (the text stays, the object does not) ×2"),
         "{t}"
     );
     assert!(t.contains("Normal → 바탕글:"), "{t}");

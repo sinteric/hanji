@@ -1,0 +1,52 @@
+{
+ "unit_id": "r7-shapes-A-3",
+ "decision": "shapes",
+ "candidate": "A",
+ "replicate": 3,
+ "names": {},
+ "fm": {
+  "type": "spreadsheet",
+  "format": "xlsx",
+  "schema": "1"
+ },
+ "seed": "---\ntype: spreadsheet\nformat: xlsx\nschema: 1\n---\n\n<sheet name=\"집행\" range=\"A1:G24\">\n\n<table name=\"사업\" range=\"A1:D14\">\n| column | type | format | formula |\n|---|---|---|---|\n| 사업 | text |  |  |\n| 예산 | number | #,##0 |  |\n| 집행 | number | #,##0 |  |\n| 집행률 | number | 0% |  |\n</table>\n\n<note range=\"D2\" author=\"작성자\" text=\"집행률 82%는 9월 말 기준.\"/>\n\n<shape name=\"표 제목\" anchor=\"A16:C17\">2026 사업별 집행</shape>\n\n<shape name=\"입력 안내\" anchor=\"B20:D22\">행을 추가하려면 마지막 사업명 아래칸에 입력합니다.</shape>\n\n<group name=\"화살표\">\n<shape name=\"증가 화살표\" anchor=\"F2:G3\">집행률 82%</shape>\n<shape name=\"주의 화살표\" anchor=\"F4:G5\">인건비 초과</shape>\n</group>\n\n<keep id=\"k3\" kind=\"picture\" summary=\"부서 직인\"/>\n\n</sheet>\n",
+ "tasks": [
+  {
+   "task_id": "exec3-q1",
+   "kind": "read",
+   "text": "The file repeats 집행률 82%. Which object is the shape (not the note) that holds those words, and what group is it in? Answer as `ANSWER: <shape name> | <group name>`.",
+   "expect": "ANSWER: 증가 화살표 | 화살표"
+  },
+  {
+   "task_id": "exec3-w",
+   "kind": "write",
+   "text": "Write a new workbook with exactly one sheet 메모, range A1:D8, containing: a table 메모표 on A1:B3 with columns 사업 (text) and 집행률 (number, format 0%); a shape named 제목 anchored C1:D2 text \"주간 집행\"; a group named 표시 of two shapes, 양호 at C4:D5 text \"양호\" and 주의 at C6:D7 text \"주의\". No other items."
+  },
+  {
+   "task_id": "exec3-e1",
+   "kind": "edit",
+   "text": "Add a shape named 마감 안내, anchored B23:D24, with text \"10월 마감은 11월 5일입니다.\""
+  },
+  {
+   "task_id": "exec3-e2",
+   "kind": "edit",
+   "text": "Move 표 제목 so its anchor is A18:C19. Keep its text \"2026 사업별 집행\"."
+  },
+  {
+   "task_id": "exec3-e3",
+   "kind": "edit",
+   "text": "Change the text of 증가 화살표 to \"집행률 85%\". Do not edit the note that says 집행률 82%."
+  },
+  {
+   "task_id": "exec3-e4",
+   "kind": "edit",
+   "text": "Resize 입력 안내 so its anchor is B20:E23. Keep its text."
+  },
+  {
+   "task_id": "exec3-r",
+   "kind": "refuse",
+   "text": "Turn 증가 화살표 into a right-arrow preset (kind=rightArrow) filled accent1, with a 2 pt outline."
+  }
+ ],
+ "unreachable": []
+}

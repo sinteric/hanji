@@ -50,6 +50,17 @@ pub(crate) fn is_revision(e: &Entry) -> bool {
     e.kind == Kind::Wrap && matches!(e.meta.tag.as_str(), "w:ins" | "w:del")
 }
 
+/// A shown text box: a wrap whose XML is the original drawing / VML pict /
+/// AlternateContent.
+pub(crate) fn is_drawing(e: &Entry) -> bool {
+    crate::drawing::is_drawing(e)
+}
+
+/// A shown `w:sym`: a length-1 wrap whose XML is the original symbol.
+pub(crate) fn is_symbol(e: &Entry) -> bool {
+    crate::symbol::is_symbol(e)
+}
+
 /// An inline content control (`w:sdt` around runs): a wrapper whose
 /// children go in `sdtContent`.
 pub(crate) fn is_inline_sdt(e: &Entry) -> bool {

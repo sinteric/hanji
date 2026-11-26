@@ -977,6 +977,135 @@ fn a_bold_page_break_keeps_its_bold() {
     assert_eq!(canon(&out), canon(&pkg));
 }
 
+fn inline_break_body(br: &str, before: &str, after: &str) -> String {
+    format!(
+        "<w:p><w:r><w:t xml:space=\"preserve\">{before}</w:t>{br}<w:t xml:space=\"preserve\">{after}</w:t></w:r></w:p>"
+    )
+}
+
+#[test]
+fn an_inline_page_break_shows_as_pagebreak_inside_the_paragraph() {
+    let pkg = docx(
+        &inline_break_body(r#"<w:br w:type="page"/>"#, "앞.", "뒤"),
+        vec![],
+    );
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(imp.text.contains("앞.<pagebreak/>뒤"), "{}", imp.text);
+    assert!(!imp.text.contains("kind=\"break\""), "{}", imp.text);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&out), canon_doc(&pkg));
+}
+
+#[test]
+fn an_inline_column_break_in_the_same_run_as_text_round_trips() {
+    let body = r#"<w:p><w:r><w:br w:type="column"/><w:t>test</w:t></w:r></w:p>"#;
+    let pkg = docx(body, vec![]);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(imp.text.contains("<columnbreak/>test"), "{}", imp.text);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&out), canon_doc(&pkg));
+}
+
+#[test]
+fn an_inline_page_break_in_its_own_run_then_text_round_trips() {
+    let body = concat!(
+        r#"<w:p><w:r><w:br w:type="page"/></w:r>"#,
+        r#"<w:r><w:lastRenderedPageBreak/><w:t>XXXXXXXXXXXXXXXXXX</w:t></w:r></w:p>"#,
+    );
+    let pkg = docx(body, vec![]);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(
+        imp.text.contains("<pagebreak/>XXXXXXXXXXXXXXXXXX"),
+        "{}",
+        imp.text
+    );
+    assert!(!imp.text.contains("kind=\"break\""), "{}", imp.text);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&out), canon_doc(&pkg));
+    let xml = doc_xml(&out);
+    assert!(xml.contains(r#"<w:lastRenderedPageBreak/>"#), "{xml}");
+}
+
+#[test]
+fn a_break_with_clear_stays_a_placeholder() {
+    let body =
+        r#"<w:p><w:r><w:br w:type="textWrapping" w:clear="all"/><w:t>next</w:t></w:r></w:p>"#;
+    let pkg = docx(body, vec![]);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    assert!(imp.text.contains("kind=\"break\""), "{}", imp.text);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    assert_eq!(canon_doc(&out), canon_doc(&pkg));
+}
+
+#[test]
+fn adding_moving_and_removing_an_inline_break_writes_w_br_in_the_run() {
+    let pkg = docx(&p("앞문장 뒤문장"), vec![]);
+    let imp = DocxEngine.import(&pkg, &ImportOptions::default()).unwrap();
+    let added = edit(
+        &imp.remainder,
+        &imp.text,
+        "앞문장 뒤문장",
+        "앞문장<pagebreak/>뒤문장",
+        CAPS,
+    )
+    .unwrap();
+    assert!(added.report.refused.is_empty(), "{:?}", added.report);
+    assert!(
+        added.text.contains("앞문장<pagebreak/>뒤문장"),
+        "{}",
+        added.text
+    );
+    let out = DocxEngine.export(&added.text, &added.remainder).unwrap();
+    let xml = doc_xml(&out);
+    assert!(xml.contains(r#"<w:br w:type="page"/>"#), "{xml}");
+    assert!(
+        xml.find(r#"<w:br w:type="page"/>"#).unwrap()
+            < xml.find(">뒤문장<").or_else(|| xml.find("뒤문장")).unwrap(),
+        "{xml}"
+    );
+
+    let moved = edit(
+        &added.remainder,
+        &added.text,
+        "앞문장<pagebreak/>뒤문장",
+        "앞문장 뒤<columnbreak/>문장",
+        CAPS,
+    )
+    .unwrap();
+    assert!(moved.report.refused.is_empty(), "{:?}", moved.report);
+    let out = DocxEngine.export(&moved.text, &moved.remainder).unwrap();
+    let xml = doc_xml(&out);
+    assert!(xml.contains(r#"<w:br w:type="column"/>"#), "{xml}");
+    assert!(!xml.contains(r#"w:type="page""#), "{xml}");
+
+    let removed = edit(
+        &moved.remainder,
+        &moved.text,
+        "앞문장 뒤<columnbreak/>문장",
+        "앞문장 뒤문장",
+        CAPS,
+    )
+    .unwrap();
+    assert!(removed.report.refused.is_empty(), "{:?}", removed.report);
+    assert!(
+        !removed.text.contains("<columnbreak/>") && !removed.text.contains("<pagebreak/>"),
+        "{}",
+        removed.text
+    );
+    let out = DocxEngine
+        .export(&removed.text, &removed.remainder)
+        .unwrap();
+    let xml = doc_xml(&out);
+    assert!(!xml.contains("<w:br"), "{xml}");
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        removed.text
+    );
+}
+
 #[test]
 fn overlapping_old_text_is_ambiguous_and_bad_spans_are_refused() {
     let pkg = docx(&p("x aaa"), vec![]);
@@ -3679,4 +3808,308 @@ fn a_footnote_whose_body_holds_a_content_control_stays_a_placeholder() {
         .unwrap();
     assert!(imp.text.contains("kind=\"footnote\""), "{}", imp.text);
     assert!(!imp.text.contains("[^1]"), "{}", imp.text);
+}
+
+fn txbx_p(text: &str) -> String {
+    format!("<w:p><w:r><w:t>{text}</w:t></w:r></w:p>")
+}
+
+fn txbx(inner: &str) -> String {
+    format!(
+        r#"<mc:AlternateContent><mc:Choice Requires="wps"><w:drawing><wp:inline><wp:docPr id="1" name="Text Box 1"/><a:graphic><a:graphicData><wps:wsp><wps:txbx><w:txbxContent>{inner}</w:txbxContent></wps:txbx></wps:wsp></a:graphicData></a:graphic></wp:inline></w:drawing></mc:Choice><mc:Fallback><w:pict><v:shape id="tb1"><v:textbox><w:txbxContent>{inner}</w:txbxContent></v:textbox></v:shape></w:pict></mc:Fallback></mc:AlternateContent>"#
+    )
+}
+
+fn drawing_docx(inner: &str) -> Vec<u8> {
+    docx(
+        &format!("<w:p><w:r><w:t xml:space=\"preserve\">before </w:t></w:r><w:r>{inner}</w:r><w:r><w:t xml:space=\"preserve\"> after</w:t></w:r></w:p>"),
+        vec![],
+    )
+}
+
+#[test]
+fn a_one_paragraph_text_box_shows_as_ordinary_text() {
+    let imp = DocxEngine
+        .import(
+            &drawing_docx(&txbx(&txbx_p("Hello world"))),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    assert!(
+        imp.text.contains("before Hello world after"),
+        "{}",
+        imp.text
+    );
+    assert!(!imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+}
+
+#[test]
+fn unedited_text_box_keeps_document_xml() {
+    use hanji_package::xml;
+    let source = drawing_docx(&txbx(&txbx_p("Hello world")));
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    let before = package::read(&source).unwrap();
+    let after = package::read(&out).unwrap();
+    assert_eq!(
+        xml::canon_part(package::get(&before, "word/document.xml").unwrap()).unwrap(),
+        xml::canon_part(package::get(&after, "word/document.xml").unwrap()).unwrap()
+    );
+}
+
+#[test]
+fn editing_a_text_box_rewrites_choice_and_fallback_and_keeps_geometry() {
+    let imp = DocxEngine
+        .import(
+            &drawing_docx(&txbx(&txbx_p("Hello world"))),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    let r = edit(&imp.remainder, &imp.text, "Hello world", "Hi", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains(">Hi</w:t>"), "{xml}");
+    assert_eq!(xml.matches(">Hi</w:t>").count(), 2, "{xml}");
+    assert!(!xml.contains("Hello world"), "{xml}");
+    assert!(xml.contains("name=\"Text Box 1\""), "{xml}");
+    assert!(
+        xml.contains("mc:Choice") && xml.contains("mc:Fallback"),
+        "{xml}"
+    );
+    assert!(
+        xml.contains("v:shape") && xml.contains("id=\"tb1\""),
+        "{xml}"
+    );
+}
+
+#[test]
+fn deleting_text_box_text_removes_the_object() {
+    let imp = DocxEngine
+        .import(
+            &drawing_docx(&txbx(&txbx_p("Hello world"))),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "before Hello world after",
+        "before  after",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.1 == Kind::Wrap && x.2.contains("all of its text")),
+        "{:?}",
+        r.report
+    );
+    let xml = doc_xml(&DocxEngine.export(&r.text, &r.remainder).unwrap());
+    assert!(
+        !xml.contains("w:drawing") && !xml.contains("w:txbxContent"),
+        "{xml}"
+    );
+    assert!(xml.contains("before") && xml.contains("after"), "{xml}");
+}
+
+#[test]
+fn a_vml_textbox_shows_as_ordinary_text() {
+    let pict = concat!(
+        "<w:pict><v:shape id=\"v1\"><v:textbox>",
+        "<w:txbxContent><w:p><w:r><w:t>VML box</w:t></w:r></w:p></w:txbxContent>",
+        "</v:textbox></v:shape></w:pict>",
+    );
+    let source = drawing_docx(pict);
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("before VML box after"), "{}", imp.text);
+    assert!(!imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    use hanji_package::xml;
+    let before = package::read(&source).unwrap();
+    let after = package::read(&out).unwrap();
+    assert_eq!(
+        xml::canon_part(package::get(&before, "word/document.xml").unwrap()).unwrap(),
+        xml::canon_part(package::get(&after, "word/document.xml").unwrap()).unwrap()
+    );
+}
+
+#[test]
+fn two_paragraphs_in_a_text_box_stay_a_placeholder() {
+    let inner = format!("{}{}", txbx_p("a"), txbx_p("b"));
+    let imp = DocxEngine
+        .import(&drawing_docx(&txbx(&inner)), &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+    assert!(!imp.text.contains("before a"), "{}", imp.text);
+}
+
+#[test]
+fn an_empty_text_box_stays_a_placeholder() {
+    let imp = DocxEngine
+        .import(&drawing_docx(&txbx("<w:p/>")), &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+}
+
+#[test]
+fn a_table_inside_a_text_box_stays_a_placeholder() {
+    let inner = "<w:tbl><w:tr><w:tc><w:p><w:r><w:t>x</w:t></w:r></w:p></w:tc></w:tr></w:tbl>";
+    let imp = DocxEngine
+        .import(&drawing_docx(&txbx(inner)), &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+}
+
+#[test]
+fn a_picture_drawing_stays_a_placeholder() {
+    let pic = concat!(
+        "<w:drawing><wp:inline><wp:docPr id=\"1\" name=\"Picture 1\"/>",
+        "<a:graphic><a:graphicData><pic:pic><pic:blipFill>",
+        "<a:blip r:embed=\"rId1\"/></pic:blipFill></pic:pic></a:graphicData></a:graphic>",
+        "</wp:inline></w:drawing>",
+    );
+    let imp = DocxEngine
+        .import(&drawing_docx(pic), &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("kind=\"drawing\""), "{}", imp.text);
+}
+
+fn sym_docx(inner: &str) -> Vec<u8> {
+    docx(
+        &format!("<w:p><w:r><w:t xml:space=\"preserve\">before </w:t></w:r><w:r>{inner}</w:r><w:r><w:t xml:space=\"preserve\"> after</w:t></w:r></w:p>"),
+        vec![],
+    )
+}
+
+#[test]
+fn a_symbol_shows_as_its_stored_character() {
+    let imp = DocxEngine
+        .import(
+            &sym_docx(r#"<w:sym w:font="Symbol" w:char="F094"/>"#),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    assert!(imp.text.contains("before \u{F094} after"), "{}", imp.text);
+    assert!(!imp.text.contains("kind=\"symbol\""), "{}", imp.text);
+}
+
+#[test]
+fn unedited_symbol_keeps_document_xml() {
+    use hanji_package::xml;
+    let source = sym_docx(r#"<w:sym w:font="Symbol" w:char="F094"/>"#);
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    let before = package::read(&source).unwrap();
+    let after = package::read(&out).unwrap();
+    assert_eq!(
+        xml::canon_part(package::get(&before, "word/document.xml").unwrap()).unwrap(),
+        xml::canon_part(package::get(&after, "word/document.xml").unwrap()).unwrap()
+    );
+}
+
+#[test]
+fn editing_a_symbol_writes_ordinary_text_and_drops_w_sym() {
+    let imp = DocxEngine
+        .import(
+            &sym_docx(r#"<w:sym w:font="Symbol" w:char="F094"/>"#),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    let r = edit(&imp.remainder, &imp.text, "\u{F094}", "X", CAPS).unwrap();
+    assert!(
+        r.report.refused.is_empty() && r.report.removed.is_empty(),
+        "{:?}",
+        r.report
+    );
+    let out = DocxEngine.export(&r.text, &r.remainder).unwrap();
+    assert_eq!(
+        DocxEngine
+            .import(&out, &ImportOptions::default())
+            .unwrap()
+            .text,
+        r.text
+    );
+    let xml = doc_xml(&out);
+    assert!(xml.contains(">X</w:t>"), "{xml}");
+    assert!(!xml.contains("w:sym"), "{xml}");
+}
+
+#[test]
+fn deleting_a_symbol_removes_the_element() {
+    let imp = DocxEngine
+        .import(
+            &sym_docx(r#"<w:sym w:font="Symbol" w:char="F094"/>"#),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    let r = edit(
+        &imp.remainder,
+        &imp.text,
+        "before \u{F094} after",
+        "before  after",
+        CAPS,
+    )
+    .unwrap();
+    assert!(
+        r.report
+            .removed
+            .iter()
+            .any(|x| x.1 == Kind::Wrap && x.2.contains("all of its text")),
+        "{:?}",
+        r.report
+    );
+    let xml = doc_xml(&DocxEngine.export(&r.text, &r.remainder).unwrap());
+    assert!(!xml.contains("w:sym"), "{xml}");
+    assert!(xml.contains("before") && xml.contains("after"), "{xml}");
+}
+
+#[test]
+fn a_symbol_sharing_its_run_with_text_keeps_one_run() {
+    use hanji_package::xml;
+    let source = docx(
+        "<w:p><w:r><w:t>before</w:t><w:sym w:font=\"Symbol\" w:char=\"F094\"/><w:t>after</w:t></w:r></w:p>",
+        vec![],
+    );
+    let imp = DocxEngine
+        .import(&source, &ImportOptions::default())
+        .unwrap();
+    assert!(imp.text.contains("before\u{F094}after"), "{}", imp.text);
+    let out = DocxEngine.export(&imp.text, &imp.remainder).unwrap();
+    let before = package::read(&source).unwrap();
+    let after = package::read(&out).unwrap();
+    assert_eq!(
+        xml::canon_part(package::get(&before, "word/document.xml").unwrap()).unwrap(),
+        xml::canon_part(package::get(&after, "word/document.xml").unwrap()).unwrap()
+    );
+}
+
+#[test]
+fn a_symbol_whose_char_is_a_tab_stays_a_placeholder() {
+    let imp = DocxEngine
+        .import(
+            &sym_docx(r#"<w:sym w:font="Symbol" w:char="0009"/>"#),
+            &ImportOptions::default(),
+        )
+        .unwrap();
+    assert!(imp.text.contains("kind=\"symbol\""), "{}", imp.text);
 }

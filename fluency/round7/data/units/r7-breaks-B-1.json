@@ -1,0 +1,65 @@
+{
+ "unit_id": "r7-breaks-B-1",
+ "decision": "breaks",
+ "candidate": "B",
+ "replicate": 1,
+ "names": {
+  "paragraph_styles": [
+   [
+    "Note",
+    "작은 회색 참고 문단"
+   ],
+   [
+    "표 제목",
+    "표 바로 위의 제목 줄"
+   ]
+  ],
+  "table_styles": [
+   [
+    "표 눈금",
+    "모든 칸에 가는 검은 실선"
+   ]
+  ]
+ },
+ "fm": {
+  "type": "document",
+  "format": "docx",
+  "template": "org/report",
+  "schema": "1"
+ },
+ "seed": "---\ntype: document\nformat: docx\ntemplate: org/report\nschema: 1\n---\n\n# 3분기 영업 보고\n\n영업본부는 2026년 3분기 실적을 다음과 같이 보고합니다. 매출은 전년 대비 +12% 증가했고, 신규 고객 34곳 중 21곳이 수도권입니다.\n\n## 핵심 지표\n\n<div style=\"표 제목\">표 1. 지역별 매출 (억 원)</div>\n\n{style=\"표 눈금\"}\n| 지역 | 지점 | 매출 | 증감 |\n|---|---|---|---|\n| 서울 | 강남 | 120 | +12% |\n| 서울 | 종로 | 95 | +8% |\n| 부산 | 해운대 | 88 | +4% |\n| 합계 | — | 303 | +9% |\n\n수도권 매출은 전년 대비 +12% 늘었고, 지방은 +4%입니다.<br type=\"page\"/>첨부 1의 지점별 표는 10월 말 확정치이며, 잠정치와 다를 수 있습니다.\n\n## 지역별 현황\n\n서울 14곳, 경기 7곳, 인천 0곳.<br type=\"column\"/>부산 5곳, 대구 3곳, 광주 2곳, 그 외 3곳.\n\n신규 고객 중 서울 14곳은 강남·종로에 집중되어 있고, 지방 13곳 중 부산이 5곳입니다.\n\n- 전년 대비 +12% 증가는 수도권 대형 거래 3건이 이끌었습니다.\n- 지방은 전년 대비 +4%로, 부산 해운대 지점이 가장 컸습니다.\n  - 해운대 지점 매출 88억은 잠정치입니다.\n\n<div style=\"Note\">표의 +12%와 본문의 전년 대비 +12%는 같은 내부 집계입니다.</div>\n\n<keep id=\"k3\" kind=\"drawing\" summary=\"조직도, 상자 5개\"/>\n\n<pagebreak/>\n\n# 부록\n\n첨부 1. 지점별 매출 원표는 영업지원팀에 있습니다. 서울 14곳의 명단은 별도 파일입니다.\n\n문의는 영업본부 기획팀 (☎ 02-000-1234)으로 하시기 바랍니다.\n",
+ "tasks": [
+  {
+   "task_id": "report1-q1",
+   "kind": "read",
+   "text": "In the file, the paragraph that reports 수도권 매출 and 지방 증감 has an inline page break. Quote the five words immediately after that page break, then the five words immediately after the inline column break in the 지역별 현황 paragraph. Answer as `ANSWER: <page-break words> | <column-break words>`.",
+   "expect": "ANSWER: 첨부 1의 지점별 표 | 부산 5곳, 대구"
+  },
+  {
+   "task_id": "report1-w",
+   "kind": "write",
+   "text": "Write a new document with exactly these blocks, in this order, and nothing else: a heading level 1 \"주간 영업 메모\"; a default-style paragraph \"강남 지점 매출은 잠정치 12억입니다.\" then an inline page break then \"종로 지점은 같은 주 9억입니다.\"; a default-style paragraph \"서울 안건.\" then an inline column break then \"부산 안건.\"; a page break between paragraphs; a default-style paragraph \"다음 회의는 금요일 10시입니다.\""
+  },
+  {
+   "task_id": "report1-e1",
+   "kind": "edit",
+   "text": "In the opening paragraph (the one that begins 영업본부는), insert an inline page break after the first sentence (after \"보고합니다.\"). Do not change the other page break, and do not touch the other \"전년 대비 +12%\" sentence."
+  },
+  {
+   "task_id": "report1-e2",
+   "kind": "edit",
+   "text": "In the paragraph that lists 서울 14곳, 경기 7곳, 인천 0곳 and then 부산 5곳, move the inline column break so it falls after \"대구 3곳.\" instead of after \"인천 0곳.\". Keep every city count. Do not edit the other paragraph that also says 서울 14곳."
+  },
+  {
+   "task_id": "report1-e3",
+   "kind": "edit",
+   "text": "Remove the inline page break from the paragraph that begins 수도권 매출은 전년 대비 +12%. Keep that paragraph as one paragraph (the two stretches become one, with a space where the break was). Do not remove the page break between paragraphs before 부록, and do not edit the opening paragraph that also says 전년 대비 +12%."
+  },
+  {
+   "task_id": "report1-r",
+   "kind": "refuse",
+   "text": "Insert a next-page section break before the 부록 heading so that heading starts a new section with 2.5 cm margins and two newspaper columns for the rest of the file."
+  }
+ ],
+ "unreachable": []
+}

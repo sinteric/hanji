@@ -1,0 +1,37 @@
+---
+type: spreadsheet
+format: xlsx
+schema: 1
+---
+
+<sheet name="월별수지" range="A1:G30">
+
+<table name="수지" range="A1:D20">
+| column | type | format | formula |
+|---|---|---|---|
+| 월 | date | yyyy-mm |  |
+| 수입 | number | #,##0 |  |
+| 지출 | number | #,##0 |  |
+| 잔액 | number | #,##0 | =[@수입]-[@지출] |
+</table>
+
+<merge range="A1:D1"/>
+
+<note range="C3" author="작성자" text="지출은 카드 승인 기준입니다."/>
+
+<hyperlink range="G2" target="https://example.com/budget"/>
+
+<validation range="B2:B20" type="list" formula1="&quot;급여,부수입,환급&quot;"/>
+
+<conditional-format range="D2:D20" type="cellIs" operator="lessThan" formula="0" dxf="fill=#FFC7CE"/>
+
+<chart type="column" data="수지[월],수지[잔액]" title="월별 잔액"/>
+
+<shape name="입력 안내" anchor="B25:D27" text="아래에 입력하면 표가 늘어납니다. 마지막 행에서 Enter."/>
+
+<shape name="매출 배지" anchor="F2:G3" text="매출 +12%" group="신호등"/>
+<shape name="이익 배지" anchor="F4:G5" text="이익 +8%" group="신호등"/>
+
+<keep id="k1" kind="picture" summary="로고"/>
+
+</sheet>

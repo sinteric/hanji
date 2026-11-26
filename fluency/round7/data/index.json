@@ -1,0 +1,332 @@
+[
+ {
+  "unit_id": "r7-breaks-A-1",
+  "decision": "breaks",
+  "candidate": "A",
+  "replicate": 1,
+  "prompt_file": "prompts/r7-breaks-A-1.md",
+  "prompt_chars": 6758,
+  "seed_chars": 920,
+  "n_tasks": 6,
+  "tasks": [
+   "report1-q1",
+   "report1-w",
+   "report1-e1",
+   "report1-e2",
+   "report1-e3",
+   "report1-r"
+  ]
+ },
+ {
+  "unit_id": "r7-breaks-B-1",
+  "decision": "breaks",
+  "candidate": "B",
+  "replicate": 1,
+  "prompt_file": "prompts/r7-breaks-B-1.md",
+  "prompt_chars": 6768,
+  "seed_chars": 930,
+  "n_tasks": 6,
+  "tasks": [
+   "report1-q1",
+   "report1-w",
+   "report1-e1",
+   "report1-e2",
+   "report1-e3",
+   "report1-r"
+  ]
+ },
+ {
+  "unit_id": "r7-breaks-A-2",
+  "decision": "breaks",
+  "candidate": "A",
+  "replicate": 2,
+  "prompt_file": "prompts/r7-breaks-A-2.md",
+  "prompt_chars": 6644,
+  "seed_chars": 1041,
+  "n_tasks": 6,
+  "tasks": [
+   "ministry2-q1",
+   "ministry2-w",
+   "ministry2-e1",
+   "ministry2-e2",
+   "ministry2-e3",
+   "ministry2-r"
+  ]
+ },
+ {
+  "unit_id": "r7-breaks-B-2",
+  "decision": "breaks",
+  "candidate": "B",
+  "replicate": 2,
+  "prompt_file": "prompts/r7-breaks-B-2.md",
+  "prompt_chars": 6654,
+  "seed_chars": 1051,
+  "n_tasks": 6,
+  "tasks": [
+   "ministry2-q1",
+   "ministry2-w",
+   "ministry2-e1",
+   "ministry2-e2",
+   "ministry2-e3",
+   "ministry2-r"
+  ]
+ },
+ {
+  "unit_id": "r7-breaks-A-3",
+  "decision": "breaks",
+  "candidate": "A",
+  "replicate": 3,
+  "prompt_file": "prompts/r7-breaks-A-3.md",
+  "prompt_chars": 6396,
+  "seed_chars": 844,
+  "n_tasks": 6,
+  "tasks": [
+   "launch3-q1",
+   "launch3-w",
+   "launch3-e1",
+   "launch3-e2",
+   "launch3-e3",
+   "launch3-r"
+  ]
+ },
+ {
+  "unit_id": "r7-breaks-B-3",
+  "decision": "breaks",
+  "candidate": "B",
+  "replicate": 3,
+  "prompt_file": "prompts/r7-breaks-B-3.md",
+  "prompt_chars": 6406,
+  "seed_chars": 854,
+  "n_tasks": 6,
+  "tasks": [
+   "launch3-q1",
+   "launch3-w",
+   "launch3-e1",
+   "launch3-e2",
+   "launch3-e3",
+   "launch3-r"
+  ]
+ },
+ {
+  "unit_id": "r7-shapes-A-1",
+  "decision": "shapes",
+  "candidate": "A",
+  "replicate": 1,
+  "prompt_file": "prompts/r7-shapes-A-1.md",
+  "prompt_chars": 6201,
+  "seed_chars": 945,
+  "n_tasks": 7,
+  "tasks": [
+   "kpi1-q1",
+   "kpi1-w",
+   "kpi1-e1",
+   "kpi1-e2",
+   "kpi1-e3",
+   "kpi1-e4",
+   "kpi1-r"
+  ]
+ },
+ {
+  "unit_id": "r7-shapes-B-1",
+  "decision": "shapes",
+  "candidate": "B",
+  "replicate": 1,
+  "prompt_file": "prompts/r7-shapes-B-1.md",
+  "prompt_chars": 6200,
+  "seed_chars": 944,
+  "n_tasks": 7,
+  "tasks": [
+   "kpi1-q1",
+   "kpi1-w",
+   "kpi1-e1",
+   "kpi1-e2",
+   "kpi1-e3",
+   "kpi1-e4",
+   "kpi1-r"
+  ]
+ },
+ {
+  "unit_id": "r7-shapes-A-2",
+  "decision": "shapes",
+  "candidate": "A",
+  "replicate": 2,
+  "prompt_file": "prompts/r7-shapes-A-2.md",
+  "prompt_chars": 5792,
+  "seed_chars": 720,
+  "n_tasks": 7,
+  "tasks": [
+   "region2-q1",
+   "region2-w",
+   "region2-e1",
+   "region2-e2",
+   "region2-e3",
+   "region2-e4",
+   "region2-r"
+  ]
+ },
+ {
+  "unit_id": "r7-shapes-B-2",
+  "decision": "shapes",
+  "candidate": "B",
+  "replicate": 2,
+  "prompt_file": "prompts/r7-shapes-B-2.md",
+  "prompt_chars": 5809,
+  "seed_chars": 737,
+  "n_tasks": 7,
+  "tasks": [
+   "region2-q1",
+   "region2-w",
+   "region2-e1",
+   "region2-e2",
+   "region2-e3",
+   "region2-e4",
+   "region2-r"
+  ]
+ },
+ {
+  "unit_id": "r7-shapes-A-3",
+  "decision": "shapes",
+  "candidate": "A",
+  "replicate": 3,
+  "prompt_file": "prompts/r7-shapes-A-3.md",
+  "prompt_chars": 5741,
+  "seed_chars": 660,
+  "n_tasks": 7,
+  "tasks": [
+   "exec3-q1",
+   "exec3-w",
+   "exec3-e1",
+   "exec3-e2",
+   "exec3-e3",
+   "exec3-e4",
+   "exec3-r"
+  ]
+ },
+ {
+  "unit_id": "r7-shapes-B-3",
+  "decision": "shapes",
+  "candidate": "B",
+  "replicate": 3,
+  "prompt_file": "prompts/r7-shapes-B-3.md",
+  "prompt_chars": 5741,
+  "seed_chars": 660,
+  "n_tasks": 7,
+  "tasks": [
+   "exec3-q1",
+   "exec3-w",
+   "exec3-e1",
+   "exec3-e2",
+   "exec3-e3",
+   "exec3-e4",
+   "exec3-r"
+  ]
+ },
+ {
+  "unit_id": "r7-databar-A-1",
+  "decision": "databar",
+  "candidate": "A",
+  "replicate": 1,
+  "prompt_file": "prompts/r7-databar-A-1.md",
+  "prompt_chars": 5911,
+  "seed_chars": 726,
+  "n_tasks": 6,
+  "tasks": [
+   "budget1-q1",
+   "budget1-w",
+   "budget1-e1",
+   "budget1-e2",
+   "budget1-e3",
+   "budget1-r"
+  ]
+ },
+ {
+  "unit_id": "r7-databar-B-1",
+  "decision": "databar",
+  "candidate": "B",
+  "replicate": 1,
+  "prompt_file": "prompts/r7-databar-B-1.md",
+  "prompt_chars": 5945,
+  "seed_chars": 760,
+  "n_tasks": 6,
+  "tasks": [
+   "budget1-q1",
+   "budget1-w",
+   "budget1-e1",
+   "budget1-e2",
+   "budget1-e3",
+   "budget1-r"
+  ]
+ },
+ {
+  "unit_id": "r7-databar-A-2",
+  "decision": "databar",
+  "candidate": "A",
+  "replicate": 2,
+  "prompt_file": "prompts/r7-databar-A-2.md",
+  "prompt_chars": 5727,
+  "seed_chars": 637,
+  "n_tasks": 6,
+  "tasks": [
+   "rate2-q1",
+   "rate2-w",
+   "rate2-e1",
+   "rate2-e2",
+   "rate2-e3",
+   "rate2-r"
+  ]
+ },
+ {
+  "unit_id": "r7-databar-B-2",
+  "decision": "databar",
+  "candidate": "B",
+  "replicate": 2,
+  "prompt_file": "prompts/r7-databar-B-2.md",
+  "prompt_chars": 5773,
+  "seed_chars": 683,
+  "n_tasks": 6,
+  "tasks": [
+   "rate2-q1",
+   "rate2-w",
+   "rate2-e1",
+   "rate2-e2",
+   "rate2-e3",
+   "rate2-r"
+  ]
+ },
+ {
+  "unit_id": "r7-databar-A-3",
+  "decision": "databar",
+  "candidate": "A",
+  "replicate": 3,
+  "prompt_file": "prompts/r7-databar-A-3.md",
+  "prompt_chars": 5799,
+  "seed_chars": 609,
+  "n_tasks": 6,
+  "tasks": [
+   "score3-q1",
+   "score3-w",
+   "score3-e1",
+   "score3-e2",
+   "score3-e3",
+   "score3-r"
+  ]
+ },
+ {
+  "unit_id": "r7-databar-B-3",
+  "decision": "databar",
+  "candidate": "B",
+  "replicate": 3,
+  "prompt_file": "prompts/r7-databar-B-3.md",
+  "prompt_chars": 5845,
+  "seed_chars": 655,
+  "n_tasks": 6,
+  "tasks": [
+   "score3-q1",
+   "score3-w",
+   "score3-e1",
+   "score3-e2",
+   "score3-e3",
+   "score3-r"
+  ]
+ }
+]

@@ -284,6 +284,15 @@ fn slot_text_has_no_styles_headings_or_tables() {
         ("<p style=\"Note\"/>\n", "a slide has no paragraph styles"),
         ("| a |\n|---|\n", "a table cannot be written in a slot yet"),
         ("<pagebreak/>\n", "a slide has no page breaks"),
+        (
+            "앞.<pagebreak/>뒤\n",
+            "a slide has no page or column breaks",
+        ),
+        (
+            "서울.<columnbreak/>부산\n",
+            "a slide has no page or column breaks",
+        ),
+        ("<columnbreak/>\n", "a slide has no page or column breaks"),
     ] {
         let e = errors(&format!("\nlayout: Title and Content\n::body::\n{body}"));
         assert!(

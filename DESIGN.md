@@ -1,7 +1,7 @@
 ---
 status: draft
 date: 2026-09-29
-measured: library and project facts below were checked 2026-09-28/29 against crates.io, npm, PyPI, GitHub and project docs; the §5 syntax choices were measured by fluency rounds 1–4 (2026-09-28, two Claude models) and the Presentation geometry by round 5 (2026-09-29, the same models); direct formatting (§10 item 10, proposed) by round 6 (2026-09-30, the same models); the preview font system (§7.1) by font files, engine sources and secondary licence sources (2026-10-01); the remainder anchoring (§10.3) by the remainder prototype (2026-09-28, 13 docx); nothing here has yet been opened in real Office by this project
+measured: library and project facts below were checked 2026-09-28/29 against crates.io, npm, PyPI, GitHub and project docs; the §5 syntax choices were measured by fluency rounds 1–4 (2026-09-28, two Claude models) and the Presentation geometry by round 5 (2026-09-29, the same models); direct formatting (§10 item 10, proposed) by round 6 (2026-09-30, the same models); inline page/column breaks, xlsx shapes/groups and dataBar CF by round 7 (2026-11-10, Sonnet 5.5, Haiku 5.5, Sonnet 4.6); the preview font system (§7.1) by font files, engine sources and secondary licence sources (2026-10-01); the remainder anchoring (§10.3) by the remainder prototype (2026-09-28, 13 docx); nothing here has yet been opened in real Office by this project
 ---
 
 # hanji — office documents for LLM agents (design)
@@ -214,7 +214,8 @@ package ─────────────────────► model
 
 **Shared inline core:** text, `**bold**`, `*italic*`, `~~strike~~`, `<u>`,
 links, footnote references `[^1]`, math `$…$` or `<math>…</math>` (→ OMML /
-HWP equation), line break `<br/>`, `<comment>…</comment>` (a DOCX comment
+HWP equation), line break `<br/>`, Document page/column break `<pagebreak/>` /
+`<columnbreak/>` inside a paragraph, `<comment>…</comment>` (a DOCX comment
 body), `<ins>…</ins>` / `<del>…</del>` (a DOCX tracked insertion or
 deletion), `<field name=…>value</field>` (Word content controls, HWP form
 fields), inline `<keep/>`.
@@ -252,6 +253,14 @@ fields), inline `<keep/>`.
   that would hide the field), or parts sharing a run with the result. A
   blank field whose result is only a hyperlink wrapping an empty nested
   field is one `<keep kind="field"/>`, not four `field-part` keeps.
+- **Fields (pptx):** a DrawingML text field (`a:fld`: a slide number, a
+  date/time) whose cached `a:t` is not blank is read as that text, as a
+  run's is; the field's id, type, `a:rPr` and `a:pPr` stay in the remainder
+  around it (a `Wrap` entry). Editing the text replaces the cached result
+  and keeps the field, so PowerPoint may compute it again when it updates
+  fields. Deleting all of it removes the field, and the report says so; a
+  result split across paragraphs is refused. A field with no result or a
+  blank one (an unfilled slide-number placeholder) stays a `<keep/>`.
 - **Comments (docx):** a comment whose body is ordinary text in one
   paragraph (no table, drawing, tracked change or reply) is
   `<comment>body</comment>` at the balloon (`w:commentReference`). The
@@ -287,8 +296,9 @@ fields), inline `<keep/>`.
   the definition need not be deleted by hand. A note that was not in the
   file cannot be created. A note stays a `<keep/>` when its body is not
   this text (several paragraphs, a table or image, a content control).
-  A footnote inside a drawing (hwpx text box) stays inside that
-  drawing's `<keep/>`. Tracked-change export refuses a change to, move
+  A shown footnote inside an HWPX text box is `[^n]` in that box's
+  text. A footnote inside a drawing the text cannot show stays inside
+  that drawing's `<keep/>`. Tracked-change export refuses a change to, move
   of, or deletion of the reference.
 - **Tracked changes (docx):** a run-level `w:ins` or `w:del` whose inner
   text is one line (runs, proof errors, fields, run-property changes; no
@@ -326,7 +336,17 @@ fields), inline `<keep/>`.
 - **Line break:** `<br/>` is a line break inside one paragraph (docx `w:br`,
   the HWP line break). It is valid in paragraphs, headings, list items and
   table cells, and it never starts a paragraph: a line holding only `<br/>`
-  is a paragraph holding one line break.
+  is a paragraph holding one line break. It takes no attribute.
+- **Page and column breaks (docx):** a page or column break inside a
+  paragraph is `<pagebreak/>` or `<columnbreak/>` at that point; the text
+  before and after stay one paragraph. They take no attribute. A line
+  holding only `<pagebreak/>` is still a page break *between* paragraphs.
+  A line holding only `<columnbreak/>` is a paragraph whose only content is
+  a column break. `<br/>` is only a line break. A `w:br` with `w:clear` or
+  another type stays `<keep kind="break"/>`; `w:lastRenderedPageBreak` stays
+  a run marker. hwpx writes a block `<pagebreak/>` as the next paragraph's
+  `pageBreak` and refuses an inline one; pptx refuses both. *Why:* §6 round
+  7, candidate A (a dedicated tag, not `<br type="page"/>`).
 - **Math:** `$…$` opens at a `$` followed by a non-space and closes at the
   next `$` that follows a non-space and is not followed by a digit (pandoc's
   rule), so `$5 and $10` is text. Math that `$…$` cannot hold is written
@@ -350,6 +370,19 @@ fields), inline `<keep/>`.
   Hancom lays it out when it opens the file). An equation whose script
   the math grammar cannot hold stays `<keep kind="math"/>`. docx math
   (OMML) stays a placeholder; pptx refuses `$…$`.
+- **Text boxes (docx, hwpx):** a drawing whose text box is ordinary text
+  (docx `w:txbxContent` / VML `v:textbox` in one paragraph; hwpx
+  `hp:drawText` in one or more paragraphs) is that text, as a field's
+  result is; geometry, anchoring, styling and the original XML stay in the
+  remainder as a `Wrap`. hwpx paragraphs join with `<br/>`; a shown
+  footnote or endnote inside the box is `[^n]` / `[^en]`. Editing the text
+  rewrites the inner `w:t` / `hp:t` (docx Choice and Fallback together;
+  hwpx keeps a shown note at its mark) and keeps the rest; deleting all
+  of it removes the object and is reported. A
+  box stays `<keep kind="drawing"/>` when its content is not this text (docx
+  several paragraphs; a table, a picture, a chart, a group, OLE, empty; an
+  unshown note). Pictures have no Document image syntax (Presentation
+  `<picture/>` is not that grammar).
 - **Comment:** `<comment>…</comment>` is a DOCX comment body's text, raw up
   to `</comment>` on the same line (an empty one is `<comment/>`). The
   highlighted range is ordinary text; the tag sits at the balloon. hwpx and
@@ -1015,7 +1048,20 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
 
   <merge range="A1:G1"/>
 
-  <keep id="k1" kind="data-validation" summary="B2:B1201"/>
+  <hyperlink range="H4" target="https://example.com/sales"/>
+
+  <note range="A3" author="작성자" text="월은 매월 1일로 적습니다."/>
+
+  <validation range="B2:B1201" type="list" formula1="&quot;강남,서초,송파&quot;"/>
+
+  <conditional-format range="F4:F48" type="cellIs" operator="lessThan" formula="3000000" dxf="fill=#FFC7CE"/>
+  <conditional-format range="E4:E15" type="dataBar" min="num:0" max="max" fill="#638EC6"/>
+
+  <shape name="입력 안내" anchor="B25:D27">아래에 입력하면 표가 늘어납니다.</shape>
+  <group name="신호등">
+  <shape name="매출 배지" anchor="F2:G5">매출 +12%</shape>
+  <shape name="이익 배지" anchor="F2:G5">이익 +8%</shape>
+  </group>
   </sheet>
   ```
 
@@ -1069,12 +1115,59 @@ A grid does not fit a text view, so the Spreadsheet splits in two:
   empty cells in General format). Merged cells are `<merge range="A1:G1"/>`
   lines: the model may keep, add, remove or change them. A merge is a
   rectangle of two or more cells; overlapping or out-of-grid ranges are
-  refused. A sheet with more merged ranges than the text will hold (1,024)
-  keeps them as a `<keep/>` placeholder, because listing tens of thousands
-  of ranges would grow the structure with the grid (rule 11). Validations,
-  conditional formats, notes, pictures and pivot tables are `<keep/>`
-  placeholders (rule 8). A syntax for validations is still open; until then
-  they are placeholders, and a value that breaks one is refused.
+  refused. Cell hyperlinks are
+  `<hyperlink range="H4" target="https://example.com/sales"/>` lines
+  (optional `location` for a sheet cell or defined name, `display` and
+  `tooltip`). Notes are
+  `<note range="A3" author="작성자" text="월은 매월 1일로 적습니다."/>`
+  lines; a newline in the text is `&#10;`. The model may keep, add, remove
+  or change both. Data validations are
+  `<validation range="B2:B1201" type="list" formula1="&quot;강남,서초,송파&quot;"/>`
+  lines (optional `operator`, `formula2`, `allowBlank`, `showInputMessage`,
+  `promptTitle`, `prompt`, `showErrorMessage`, `errorTitle`, `error`,
+  `errorStyle`; `formula1`/`formula2` are Excel's formula text: a quoted
+  list keeps its quotes, a range or name stays unquoted;
+  `showInputMessage`/`showErrorMessage` are omitted when on, the text
+  default, and written `"false"` when off).
+  Conditional formats that the text models (`cellIs`, `expression`,
+  `dataBar`) are
+  `<conditional-format range="F4:F48" type="cellIs" operator="lessThan" formula="3000000" dxf="fill=#FFC7CE"/>`
+  lines, one per rule (`formula2` for `between`, `stopIfTrue`, `dxf` the
+  differential formatting as the cell vocabulary). A data bar is
+  `<conditional-format range="E4:E15" type="dataBar" min="num:0" max="max" fill="#638EC6"/>`
+  (`min`/`max` one token: `min`, `max`, `num:0`, `percent:50`,
+  `percentile:90`, `formula:=A1`; `fill` is `#RRGGBB` or a theme colour).
+  Line order is Excel's
+  sheet-wide `priority` order (lower number wins when formats conflict);
+  import prints lines sorted by that priority (stable on ties), and a
+  rewrite writes `priority` as the 1-based line index. Adjacent lines with
+  the same range share one `conditionalFormatting` element; separate
+  elements with the same `sqref` are valid. The model may keep, add,
+  remove or change them (a data bar: its range, min/max and colour).
+  Unedited x14 data-bar extensions (negative fill, axis, gradient, border)
+  stay as stored; a rewrite of the modelled fields patches those in place.
+  A sheet with more merged ranges, hyperlinks, notes,
+  validations or conditional formats than the text will hold (1,024) keeps
+  that kind as a `<keep/>` placeholder, because listing tens of thousands of
+  ranges would grow the structure with the grid (rule 11). Overlapping
+  hyperlinks or notes, a hyperlink whose
+  relationship is not a unique external Target, and a threaded comment stay
+  placeholders. A conditional format that is not `cellIs`, `expression` or
+  `dataBar` (a color scale or icon set), whose dxf the vocabulary cannot
+  write, or whose x14 data-bar extension cannot be carried faithfully,
+  stays a placeholder for that sheet. Drawing shapes are
+  `<shape name="입력 안내" anchor="B25:D27">text</shape>` lines (a newline
+  in the text is `&#10;`; an empty shape is self-closing). Grouped shapes
+  are a `<group name="신호등">` … `</group>` wrapper; each member is a
+  shape line or a nested group, and members share the group's two-cell or
+  one-cell anchor. The model may keep, add, remove or change them.
+  Geometry, fills, outlines, WordArt and other styling the syntax does not
+  name stay as the original XML. A connector, chart, picture, cell-linked
+  text (`textlink`), an absolute-anchor object, or a group that holds those
+  stays a placeholder. A sheet with more than 1,024 modelled shapes keeps
+  them as placeholders. Pictures and pivot tables are `<keep/>`
+  placeholders (rule 8). A value that breaks a validation is refused when
+  the rule can be checked.
 
 - **Cell data** is read through a row window of one table or range: a pipe
   table whose first column is the read-only sheet row number, then one cell
@@ -1444,6 +1537,50 @@ F1, effective formatting inline; F2o, only what the object sets itself.
   none invalid; theme colours were written as names.
 - Limits: formatting read, written and checked by the kit, not the engines
   or Office; no large docx; one run per prompt; part D at the ceiling.
+
+**Round 7 results (2026-11-10)** — kit in [fluency/round7/](fluency/round7/),
+candidates in [fluency/round7/CANDIDATES.md](fluency/round7/CANDIDATES.md),
+details in [fluency/round7/RESULTS.md](fluency/round7/RESULTS.md). Three
+models (Sonnet 5.5, Haiku 5.5, Sonnet 4.6), 18 blind units, each prompt read
+from its own file with Read as the only tool. It decides three keep-reducing
+syntaxes: docx inline page and column breaks (A dedicated `<pagebreak/>` /
+`<columnbreak/>` vs B `<br type="page"/>` / `<br type="column"/>`); xlsx
+drawing shapes and groups as sheet lines (A element body and a `<group>`
+wrapper vs B self-closing `text=` / `group=`); xlsx dataBar conditional
+formats (A compact `min` / `max` / `fill` vs B `min-type` / `max-type` /
+`color`). 114 tasks × 3 models = 342 answers; 0/342 invalid on the first
+try, so the fix round sent nothing back.
+
+| Decision | landed A / B | chars A / B | Verdict |
+|---|---|---|---|
+| Inline page/column breaks | 45/54 / 45/54 | 4,929 / 5,221 | A: `<pagebreak/>` / `<columnbreak/>` |
+| xlsx shapes/groups | 63/63 / 63/63 | 8,880 / 9,147 | A: `<shape>…</shape>` and `<group>` |
+| xlsx dataBar | 54/54 / 48/54 | 7,455 / 7,980 | A: `min` / `max` / `fill` |
+
+- Landed is first try, of 54 per breaks/databar cell (6 tasks × 3 seeds × 3
+  models) and 63 per shapes cell (7 × 3 × 3). All 342 answers were valid.
+  All 54 refusals refused; every write landed.
+- At run time, breaks e1 and shapes e1 missed 18/18 under both candidates:
+  gold kept a space after the period (`보고합니다. <pagebreak/>`) and
+  appended a new shape before `</sheet>`, while every model inserted the
+  break next to the period without that space and the shape next to the
+  existing callout. Kit strictness, not syntax. After the scorer treats
+  whitespace around an inline break as equivalent and compares drawing
+  items by name rather than sheet order, those 36 answers land, and seven
+  e2 answers that only dropped a space next to the moved break land too
+  (as scored on the day: breaks 32/54 vs 33/54, shapes 54/63 each).
+  Verdicts unchanged.
+- Remaining breaks misses are a five-word quote that ran long (q1) and
+  punctuation around a moved column break (e2: a comma where gold has a
+  period, or two sentences joined without a space). databar B dropped 6 of
+  9 reads that asked for min/max tokens, answering in A's `min=` / `fill=`
+  names even with B's file in front of them.
+- A on all three. breaks: a landed tie, A 6% smaller in answers and it does
+  not overload `<br/>`. shapes: a tie at the ceiling after the kit fix (a
+  tie at 18/21 on the day), A's body and `<group>` also how a grouped shape
+  is written in the seed, 3% smaller in answers. databar: A at the ceiling,
+  B's names are not what models reach for on a read. No engine syntax in
+  this change.
 
 ## 7. Engines (surveyed 2026-09-28)
 
@@ -1907,6 +2044,19 @@ side.
     values so either can be chosen. Open too: page setup, headers and footers
     do not cross (neither engine writes section properties from the text), and
     the report says so.
+12. **Inline page/column breaks, xlsx shapes/groups, and dataBar conditional
+    formats (decided 2026-11-10; all three built)** — by §6 round 7, all
+    three A: docx inline page and column breaks as `<pagebreak/>` /
+    `<columnbreak/>` inside the paragraph (block `<pagebreak/>` and `<br/>`
+    stay as they are); xlsx drawing shapes as `<shape name anchor>text</shape>`
+    with a `<group>` wrapper; xlsx dataBar as `min` / `max` / `fill` on the
+    existing `<conditional-format>` tag. DataBar is in the xlsx engine (§5.4).
+    docx `w:br type=page` / `type=column` inside a paragraph are those tags
+    (tdf154481.docx, tdf124637_sectionMargin.docx);
+    a `w:br` with `w:clear` or another type stays `<keep kind="break"/>`.
+    xlsx shapes/groups are in the engine (simple-monthly-budget.xlsx,
+    WithDrawing.xlsx, ExcelWithAttachments.xlsm). The kit is
+    [fluency/round7/](fluency/round7/).
 
 ## 11. Blind spots
 

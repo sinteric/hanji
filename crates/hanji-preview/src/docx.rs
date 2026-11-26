@@ -23,8 +23,7 @@ pub fn render_with_fonts_and_limits(
     limits: ImageLimits,
 ) -> Result<Preview, String> {
     limits.validate()?;
-    let document = rdocx::Document::from_bytes(bytes)
-        .map_err(|e| format!("rdocx cannot open the document: {e}"))?;
+    let document = open_document(bytes)?;
     let embedded = embedded_fonts(&document);
     let fonts = Fonts::from_options(options, &embedded)?;
     finish_preview_with_limits(build(&document, bytes, &fonts)?, limits)
@@ -38,8 +37,7 @@ pub(crate) fn layout(
     limits: ImageLimits,
 ) -> Result<Preview, String> {
     limits.validate()?;
-    let document = rdocx::Document::from_bytes(bytes)
-        .map_err(|e| format!("rdocx cannot open the document: {e}"))?;
+    let document = open_document(bytes)?;
     let embedded = embedded_fonts(&document);
     let fonts = Fonts::from_options(options, &embedded)?;
     crate::finish_layout(build(&document, bytes, &fonts)?, limits)
@@ -59,11 +57,19 @@ pub fn render_native_with_limits(
     limits: ImageLimits,
 ) -> Result<Preview, String> {
     limits.validate()?;
-    let document = rdocx::Document::from_bytes(bytes)
-        .map_err(|e| format!("rdocx cannot open the document: {e}"))?;
+    let document = open_document(bytes)?;
     let embedded = embedded_fonts(&document);
     let fonts = Fonts::load(&options.font_dirs, &embedded, options.system_fonts);
     finish_preview_with_limits(build(&document, bytes, &fonts)?, limits)
+}
+
+/// Load a DOCX for layout, preview or page count.
+///
+/// A vertical (tbRl) body keeps its written margin band, as in Word 16.114
+/// and rdocx's default. Hanji no longer turns on the fork's opt-in
+/// header/footer clearance reservation.
+fn open_document(bytes: &[u8]) -> Result<rdocx::Document, String> {
+    rdocx::Document::from_bytes(bytes).map_err(|e| format!("rdocx cannot open the document: {e}"))
 }
 
 fn embedded_fonts(document: &rdocx::Document) -> Vec<FontFile> {
@@ -470,7 +476,7 @@ mod tests {
             .unwrap()
             .data = document.as_bytes().into();
         let bytes = package::write(&parts).unwrap();
-        let parsed = rdocx::Document::from_bytes(&bytes).unwrap();
+        let parsed = open_document(&bytes).unwrap();
         // The ascent and descent rdocx was handed for the requested face.
         let line = |resolver: &Substitute| {
             let preview = build(&parsed, &bytes, resolver).unwrap();

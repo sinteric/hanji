@@ -1,0 +1,25 @@
+---
+type: spreadsheet
+format: xlsx
+schema: 1
+---
+
+<sheet name="KPI" range="A1:E16">
+
+<table name="점수" range="A1:E12">
+| column | type | format | formula |
+|---|---|---|---|
+| 팀 | text |  |  |
+| 점수 | number | 0 |  |
+| 목표 | number | 0 |  |
+| 가중 | number | 0 |  |
+| 등급 | text |  |  |
+</table>
+
+<conditional-format range="B2:B12" type="dataBar" min="percentile:10" max="percentile:90" fill="#638EC6"/>
+
+<conditional-format range="C2:C12" type="dataBar" min="num:0" max="num:100" fill="#FFEB84"/>
+
+<conditional-format range="B2:B12" type="cellIs" operator="greaterThan" formula="80" dxf="fill=#C6EFCE"/>
+
+</sheet>

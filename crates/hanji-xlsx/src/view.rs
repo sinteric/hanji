@@ -189,6 +189,50 @@ pub fn full_view(book: &mut Book, rows: u32) -> Result<String, String> {
                         }
                     }
                 }
+                hanji_format::sheet::SheetItem::Hyperlink(h) => {
+                    out.push(hanji_format::sheet::hyperlink_line(h));
+                    while let Some(hanji_format::sheet::SheetItem::Hyperlink(_)) = items.peek() {
+                        if let Some(hanji_format::sheet::SheetItem::Hyperlink(h)) = items.next() {
+                            out.push(hanji_format::sheet::hyperlink_line(h));
+                        }
+                    }
+                }
+                hanji_format::sheet::SheetItem::Note(n) => {
+                    out.push(hanji_format::sheet::note_line(n));
+                    while let Some(hanji_format::sheet::SheetItem::Note(_)) = items.peek() {
+                        if let Some(hanji_format::sheet::SheetItem::Note(n)) = items.next() {
+                            out.push(hanji_format::sheet::note_line(n));
+                        }
+                    }
+                }
+                hanji_format::sheet::SheetItem::Validation(v) => {
+                    out.push(hanji_format::sheet::validation_line(v));
+                    while let Some(hanji_format::sheet::SheetItem::Validation(_)) = items.peek() {
+                        if let Some(hanji_format::sheet::SheetItem::Validation(v)) = items.next() {
+                            out.push(hanji_format::sheet::validation_line(v));
+                        }
+                    }
+                }
+                hanji_format::sheet::SheetItem::ConditionalFormat(c) => {
+                    out.push(hanji_format::sheet::conditional_format_line(c));
+                    while let Some(hanji_format::sheet::SheetItem::ConditionalFormat(_)) =
+                        items.peek()
+                    {
+                        if let Some(hanji_format::sheet::SheetItem::ConditionalFormat(c)) =
+                            items.next()
+                        {
+                            out.push(hanji_format::sheet::conditional_format_line(c));
+                        }
+                    }
+                }
+                hanji_format::sheet::SheetItem::Shape(s) => {
+                    out.push(hanji_format::sheet::shape_line(s));
+                    push_drawing_items(&mut out, &mut items);
+                }
+                hanji_format::sheet::SheetItem::Group(g) => {
+                    out.extend(hanji_format::sheet::group_lines(g));
+                    push_drawing_items(&mut out, &mut items);
+                }
                 hanji_format::sheet::SheetItem::Keep(k) => out.push(format!(
                     "<keep id=\"{}\" kind=\"{}\" summary=\"{}\"/>",
                     k.id,
@@ -227,4 +271,21 @@ pub fn full_view(book: &mut Book, rows: u32) -> Result<String, String> {
         out.push(String::new());
     }
     Ok(out.join("\n"))
+}
+
+fn push_drawing_items<'a, I>(out: &mut Vec<String>, items: &mut std::iter::Peekable<I>)
+where
+    I: Iterator<Item = &'a hanji_format::sheet::SheetItem>,
+{
+    use hanji_format::sheet::SheetItem;
+    while matches!(
+        items.peek(),
+        Some(SheetItem::Shape(_) | SheetItem::Group(_))
+    ) {
+        match items.next() {
+            Some(SheetItem::Shape(s)) => out.push(hanji_format::sheet::shape_line(s)),
+            Some(SheetItem::Group(g)) => out.extend(hanji_format::sheet::group_lines(g)),
+            _ => break,
+        }
+    }
 }

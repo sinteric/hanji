@@ -1104,6 +1104,43 @@ fn br_is_a_line_break_in_paragraphs_headings_cells_and_items() {
 }
 
 #[test]
+fn pagebreak_and_columnbreak_are_inline_and_a_lone_pagebreak_stays_a_block() {
+    let t = doc(
+        "앞.<pagebreak/>뒤\n\n서울.<columnbreak/>부산\n\n<pagebreak/>\n\n<columnbreak/>\n\n# a<pagebreak/>b\n\n| e<columnbreak/>f |\n|---|\n\n- g<pagebreak/>h\n",
+    );
+    let d = parse(&t).unwrap();
+    let count = |i: &Inline, want: &Atom| i.units.iter().filter(|u| &u.atom == want).count();
+    assert!(matches!(&d.blocks[0], Block::Para(p) if count(&p.content, &Atom::PageBreak) == 1));
+    assert!(matches!(&d.blocks[1], Block::Para(p) if count(&p.content, &Atom::ColumnBreak) == 1));
+    assert!(matches!(&d.blocks[2], Block::PageBreak));
+    assert!(
+        matches!(&d.blocks[3], Block::Para(p) if p.content.units == vec![Unit::new(Atom::ColumnBreak, Marks::NONE)])
+    );
+    assert!(matches!(&d.blocks[4], Block::Para(p) if count(&p.content, &Atom::PageBreak) == 1));
+    let Block::Table(table) = &d.blocks[5] else {
+        panic!("{:?}", d.blocks[5]);
+    };
+    let Cell::Text(ps) = &table.rows[0][0] else {
+        panic!("{:?}", table.rows[0][0]);
+    };
+    assert_eq!(count(&ps[0].content, &Atom::ColumnBreak), 1);
+    assert!(
+        matches!(&d.blocks[6], Block::List(items) if count(&items[0].content, &Atom::PageBreak) == 1)
+    );
+    assert_eq!(roundtrip(&t), t);
+    assert_eq!(
+        serialize(&parse(&doc("x<pagebreak>y\n")).unwrap()),
+        doc("x<pagebreak/>y\n")
+    );
+    let e = errors("x<br type=\"page\"/>y\n");
+    assert!(e[0].contains("<br/> takes no attributes"), "{e:?}");
+    let e = errors("x<pagebreak type=\"page\"/>y\n");
+    assert!(e[0].contains("<pagebreak/> takes no attributes"), "{e:?}");
+    let e = errors("x<columnbreak type=\"column\"/>y\n");
+    assert!(e[0].contains("<columnbreak/> takes no attributes"), "{e:?}");
+}
+
+#[test]
 fn the_design_md_example_parses() {
     // DESIGN.md §5.2's example, read from the spec itself so the two cannot drift.
     let spec = include_str!("../../../DESIGN.md");

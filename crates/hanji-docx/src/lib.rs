@@ -8,6 +8,7 @@
 //! remainder must store.
 
 pub mod comment;
+pub mod drawing;
 pub mod export;
 pub mod format;
 pub mod import;
@@ -17,6 +18,7 @@ pub mod ooxml;
 pub mod revision;
 pub mod safety;
 pub mod styles;
+pub mod symbol;
 pub mod track;
 
 pub use hanji_package::{package, xml};
