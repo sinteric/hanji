@@ -67,35 +67,69 @@ pub fn names(rem: &Remainder) -> Names {
     }
 }
 
-/// Parse, validate and resolve model text against a remainder.
+/// Parse, validate and resolve Document text (§5.2) against a remainder.
+/// The parse goes once its blocks are resolved: what is kept of it moves
+/// into the [`Resolved`].
 pub fn model_of(
     text: &str,
     rem: &Remainder,
     caps: Capabilities,
-) -> Result<(Parsed, Vec<Block>), Vec<Diagnostic>> {
+) -> Result<Resolved, Vec<Diagnostic>> {
     let parsed = fmt::parse_with(text, &names(rem))?;
     let blocks = model::resolve(&parsed, text, &rem.styles, caps, &|id| {
         rem.is_block_keep(id)
     })?;
-    Ok((parsed, blocks))
+    let Parsed { doc, map } = parsed;
+    let maps = model::block_maps(&doc.blocks, map);
+    Ok(Resolved {
+        blocks,
+        maps,
+        styles: doc.styles,
+    })
+}
+
+/// A text resolved against a remainder: everything an edit or a write
+/// reads from one parse of it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct Resolved {
+    /// Its model blocks.
+    pub blocks: Vec<Block>,
+    /// Where each block is in the text, in the same order.
+    pub maps: Vec<BlockSrc>,
+    /// Its style section's lines (a Document's, §5.2); none in a grammar
+    /// that has no style section.
+    pub styles: Vec<fmt::StyleLine>,
+}
+
+impl Resolved {
+    /// The blocks and maps of a grammar that has no style section.
+    pub fn new(blocks: Vec<Block>, maps: Vec<BlockSrc>) -> Resolved {
+        Resolved {
+            blocks,
+            maps,
+            styles: vec![],
+        }
+    }
 }
 
 /// A text grammar resolved against a remainder: the Document grammar
 /// (§5.2, [`DocumentModel`]) or a Presentation's (§5.3). Re-anchoring works
 /// on what it gives, whatever the grammar.
 pub trait TextModel {
-    /// Parse and check `text` against `rem`: its model blocks, and where
-    /// each is in the text.
+    /// Parse and check `text` against `rem`: its model blocks, where each is
+    /// in the text, and what the text says beyond them.
     fn resolve(
         &self,
         text: &str,
         rem: &Remainder,
         caps: Capabilities,
-    ) -> Result<(Vec<Block>, Vec<BlockSrc>), Vec<Diagnostic>>;
+    ) -> Result<Resolved, Vec<Diagnostic>>;
 
     /// The new revision's remainder takes what its text says beyond the
-    /// blocks (a Document's style section, §5.2). `text` is valid.
-    fn restyle(&self, _text: &str, _rem: &mut Remainder, _caps: Capabilities) {}
+    /// blocks (a Document's style section, §5.2), from that text's
+    /// [`Resolved`].
+    fn restyle(&self, _new: &Resolved, _rem: &mut Remainder) {}
 }
 
 /// The Document grammar (§5.2).
@@ -107,15 +141,12 @@ impl TextModel for DocumentModel {
         text: &str,
         rem: &Remainder,
         caps: Capabilities,
-    ) -> Result<(Vec<Block>, Vec<BlockSrc>), Vec<Diagnostic>> {
-        let (parsed, blocks) = model_of(text, rem, caps)?;
-        Ok((blocks, model::block_maps(&parsed)))
+    ) -> Result<Resolved, Vec<Diagnostic>> {
+        model_of(text, rem, caps)
     }
 
-    fn restyle(&self, text: &str, rem: &mut Remainder, caps: Capabilities) {
-        if let Ok((parsed, blocks)) = model_of(text, rem, caps) {
-            model::restyle(&mut rem.styles, &parsed, &blocks);
-        }
+    fn restyle(&self, new: &Resolved, rem: &mut Remainder) {
+        model::restyle(&mut rem.styles, &new.styles, &new.blocks);
     }
 }
 
@@ -189,15 +220,18 @@ pub fn reanchor_rewrite_in(
     new_text: &str,
     caps: Capabilities,
 ) -> Result<Reanchored, Refusal> {
-    let (old, _) = m.resolve(old_text, rem, caps).map_err(Refusal::Invalid)?;
-    let (new, _) = m.resolve(new_text, rem, caps).map_err(Refusal::Invalid)?;
-    let alignment = Alignment::design_c(&old, &new);
-    let (mut remainder, report, outcomes) = reanchor(rem, &old, &new, &alignment);
-    m.restyle(new_text, &mut remainder, caps);
+    let old = m
+        .resolve(old_text, rem, caps)
+        .map_err(Refusal::Invalid)?
+        .blocks;
+    let new = m.resolve(new_text, rem, caps).map_err(Refusal::Invalid)?;
+    let alignment = Alignment::design_c(&old, &new.blocks);
+    let (mut remainder, report, outcomes) = reanchor(rem, &old, &new.blocks, &alignment);
+    m.restyle(&new, &mut remainder);
     Ok(Reanchored {
         text: new_text.to_string(),
         old,
-        new,
+        new: new.blocks,
         remainder,
         report,
         outcomes,
@@ -239,15 +273,19 @@ pub fn reanchor_span_in(
     }
     let (s, e, repl) = trim_span(text, start, end, new);
     let new_text = format!("{}{}{}", &text[..s], repl, &text[e..]);
-    let (old, om) = m.resolve(text, rem, caps).map_err(Refusal::Invalid)?;
-    let (nb, nm) = m.resolve(&new_text, rem, caps).map_err(Refusal::Invalid)?;
+    let Resolved {
+        blocks: old,
+        maps: om,
+        ..
+    } = m.resolve(text, rem, caps).map_err(Refusal::Invalid)?;
+    let new = m.resolve(&new_text, rem, caps).map_err(Refusal::Invalid)?;
     let (mut s, mut e) = (s, e);
     let plain = |a: &str, b: &str| plain_text(a) && plain_text(b);
     let mut alignment = exact_alignment(
         &om,
         &old,
-        &nm,
-        &nb,
+        &new.maps,
+        &new.blocks,
         s,
         e,
         repl.len(),
@@ -263,8 +301,8 @@ pub fn reanchor_span_in(
         let al2 = exact_alignment(
             &om,
             &old,
-            &nm,
-            &nb,
+            &new.maps,
+            &new.blocks,
             s2,
             e2,
             r2.len(),
@@ -283,8 +321,8 @@ pub fn reanchor_span_in(
             (s, e, alignment) = (s2, e2, al2);
         }
     }
-    let (mut remainder, mut report, mut outcomes) = reanchor(rem, &old, &nb, &alignment);
-    m.restyle(&new_text, &mut remainder, caps);
+    let (mut remainder, mut report, mut outcomes) = reanchor(rem, &old, &new.blocks, &alignment);
+    m.restyle(&new, &mut remainder);
     refuse_cut_heads(
         rem,
         text,
@@ -296,7 +334,7 @@ pub fn reanchor_span_in(
     Ok(Reanchored {
         text: new_text,
         old,
-        new: nb,
+        new: new.blocks,
         remainder,
         report,
         outcomes,

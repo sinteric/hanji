@@ -38,9 +38,10 @@ fn edited(imp: &Imported, old: &str, new: &str) -> (Vec<Part>, String) {
 /// What a write returns for `text` (§5.1).
 fn canonical(text: &str, rem: &Remainder) -> String {
     use hanji_core::TextModel;
-    let (blocks, _) = PptxModel
+    let blocks = PptxModel
         .resolve(text, rem, CAPS)
-        .unwrap_or_else(|e| panic!("{e:?}"));
+        .unwrap_or_else(|e| panic!("{e:?}"))
+        .blocks;
     PptxEngine::text_of(blocks, rem, None)
 }
 

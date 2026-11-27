@@ -33,8 +33,8 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 
 use hanji_core::{
-    Block, BlockSrc, Capabilities, Engine, EngineError, ImportOptions, ImportReport, Imported,
-    Part, Remainder, StyleSet, TextModel,
+    Block, Capabilities, Engine, EngineError, ImportOptions, ImportReport, Imported, Part,
+    Remainder, Resolved, StyleSet, TextModel,
 };
 use hanji_format::{self as fmt, Diagnostic, FrontMatter, Layout, Names};
 use hanji_package::opc;
@@ -115,13 +115,14 @@ impl TextModel for PptxModel {
         text: &str,
         rem: &Remainder,
         caps: Capabilities,
-    ) -> Result<(Vec<Block>, Vec<BlockSrc>), Vec<Diagnostic>> {
+    ) -> Result<Resolved, Vec<Diagnostic>> {
         let shell = DeckShell::of(rem).map_err(|m| vec![Diagnostic::new(1, 1, m)])?;
         check_size(text, shell.deck.size)?;
-        let (mut blocks, maps) =
-            hanji_core::presentation::model_of(text, &shell.names(rem), caps, &|id| {
-                rem.is_block_keep(id)
-            })?;
+        let Resolved {
+            mut blocks, maps, ..
+        } = hanji_core::presentation::model_of(text, &shell.names(rem), caps, &|id| {
+            rem.is_block_keep(id)
+        })?;
         // A bare slot marker is the slot where its layout puts it (§5.3): its
         // box is the layout's, which the canonical text shows.
         let mut layout = None;
@@ -183,7 +184,7 @@ impl TextModel for PptxModel {
                 }
             }
         }
-        Ok((blocks, maps))
+        Ok(Resolved::new(blocks, maps))
     }
 }
 
@@ -570,9 +571,10 @@ impl Engine for PptxEngine {
     }
 
     fn export(&self, text: &str, rem: &Remainder) -> Result<Vec<u8>, EngineError> {
-        let (blocks, _) = PptxModel
+        let blocks = PptxModel
             .resolve(text, rem, self.capabilities())
-            .map_err(EngineError::Invalid)?;
+            .map_err(EngineError::Invalid)?
+            .blocks;
         write_package(&export_parts(&blocks, rem)?)
     }
 }
@@ -605,9 +607,10 @@ impl PptxEngine {
         rem: &Remainder,
         files: &export::Files,
     ) -> Result<Vec<u8>, EngineError> {
-        let (blocks, _) = PptxModel
+        let blocks = PptxModel
             .resolve(text, rem, self.capabilities())
-            .map_err(EngineError::Invalid)?;
+            .map_err(EngineError::Invalid)?
+            .blocks;
         write_package(&export_parts_with(&blocks, rem, files)?)
     }
 }

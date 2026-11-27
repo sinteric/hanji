@@ -178,13 +178,10 @@ impl Engine for HwpxEngine {
     }
 
     fn export(&self, text: &str, rem: &Remainder) -> Result<Vec<u8>, EngineError> {
-        let (parsed, blocks) =
+        let hanji_core::Resolved { blocks, styles, .. } =
             hanji_core::model_of(text, rem, self.capabilities()).map_err(EngineError::Invalid)?;
-        // The style section as the text has it, from the same parse: a
-        // second one held the text's units twice more at a write's peak.
         let mut rem = rem.clone();
-        hanji_core::model::restyle(&mut rem.styles, &parsed, &blocks);
-        drop(parsed);
+        hanji_core::model::restyle(&mut rem.styles, &styles, &blocks);
         write_package(&rem, export_sections(&blocks, &rem)?)
     }
 }

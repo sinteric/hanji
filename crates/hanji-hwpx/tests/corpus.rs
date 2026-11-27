@@ -143,7 +143,9 @@ fn a_new_table_can_be_added_to_every_file() {
         let r = hanji_core::rewrite(&imp.remainder, &imp.text, &new, caps)
             .unwrap_or_else(|e| panic!("{name}: {e:?}"));
         // As the store returns it: the new table shows the look it takes.
-        let (_, mut blocks) = hanji_core::model_of(&r.text, &r.remainder, caps).unwrap();
+        let mut blocks = hanji_core::model_of(&r.text, &r.remainder, caps)
+            .unwrap()
+            .blocks;
         let mut rem = r.remainder.clone();
         HwpxEngine::complete(&mut blocks, &mut rem);
         let text = HwpxEngine::text_of(blocks, &rem, None);

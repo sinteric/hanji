@@ -195,7 +195,7 @@ fn with_header(pkg: &[u8], f: impl Fn(&str) -> String) -> Vec<u8> {
 
 /// A rewritten text as the store returns it: completed by the engine (§5.2).
 fn completed(text: &str, rem: &hanji_core::Remainder) -> (String, hanji_core::Remainder) {
-    let (_, mut blocks) = hanji_core::model_of(text, rem, CAPS).unwrap();
+    let mut blocks = hanji_core::model_of(text, rem, CAPS).unwrap().blocks;
     let mut rem = rem.clone();
     HwpxEngine::complete(&mut blocks, &mut rem);
     (HwpxEngine::text_of(blocks, &rem, None), rem)

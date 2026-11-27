@@ -1266,7 +1266,7 @@ impl<S: Storage> Workspace<S> {
             f.text_model()
                 .unwrap()
                 .resolve(t, &ra.remainder, f.caps())
-                .is_ok_and(|(b, _)| b == ra.new)
+                .is_ok_and(|r| r.blocks == ra.new)
         };
         let (text, canonicalized) = if canon != ra.text && same_blocks(&canon) {
             (canon, true)
