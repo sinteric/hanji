@@ -100,7 +100,9 @@ impl History {
     /// The imported revision: its text and remainder.
     pub fn new(text: &str, rem: &Remainder) -> Result<History, EngineError> {
         let caps = hanji_core::Engine::capabilities(&DocxEngine);
-        let (_, blocks) = hanji_core::model_of(text, rem, caps).map_err(EngineError::Invalid)?;
+        let blocks = hanji_core::model_of(text, rem, caps)
+            .map_err(EngineError::Invalid)?
+            .blocks;
         Ok(History {
             kept: Kept::identity(&blocks),
             base_blocks: blocks.clone(),

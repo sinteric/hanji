@@ -325,9 +325,10 @@ pub enum SrcKind {
 /// A `[^label]:` line that follows a block is part of that block's range, so
 /// deleting the reference is one exact span (the definition is not a distant
 /// edit at the end of the file).
-pub fn block_maps(parsed: &fmt::Parsed) -> Vec<BlockSrc> {
+/// It takes the parse's source map: each paragraph map moves into its block's.
+pub fn block_maps(blocks: &[fmt::Block], map: fmt::SourceMap) -> Vec<BlockSrc> {
     let mut out: Vec<BlockSrc> = vec![];
-    for (b, m) in parsed.doc.blocks.iter().zip(&parsed.map.blocks) {
+    for (b, m) in blocks.iter().zip(map.blocks) {
         if matches!(b, fmt::Block::FootnoteDef(_)) {
             if let Some(prev) = out.last_mut() {
                 prev.end = prev.end.max(m.end);
@@ -340,22 +341,24 @@ pub fn block_maps(parsed: &fmt::Parsed) -> Vec<BlockSrc> {
 }
 
 /// The sources of one parsed block: one per list item, else one.
-pub(crate) fn push_block_map(out: &mut Vec<BlockSrc>, m: &fmt::BlockMap) {
-    match &m.kind {
-        fmt::BlockMapKind::List(items) => out.extend(items.iter().map(|(s, e, pm)| BlockSrc {
-            start: *s,
-            end: *e,
-            kind: SrcKind::Para(pm.clone()),
-        })),
+fn push_block_map(out: &mut Vec<BlockSrc>, m: fmt::BlockMap) {
+    match m.kind {
+        fmt::BlockMapKind::List(items) => {
+            out.extend(items.into_iter().map(|(start, end, pm)| BlockSrc {
+                start,
+                end,
+                kind: SrcKind::Para(pm),
+            }))
+        }
         fmt::BlockMapKind::Para(pm) => out.push(BlockSrc {
             start: m.start,
             end: m.end,
-            kind: SrcKind::Para(pm.clone()),
+            kind: SrcKind::Para(pm),
         }),
         fmt::BlockMapKind::Table(t) => out.push(BlockSrc {
             start: m.start,
             end: m.end,
-            kind: SrcKind::Table(t.clone()),
+            kind: SrcKind::Table(t),
         }),
         _ => {}
     }
@@ -592,15 +595,15 @@ fn check_styles(
     }
 }
 
-/// After an edit: the style section of `parsed` (the new revision's text)
+/// After an edit: `lines`, the style section of the new revision's text,
 /// in the style set, lines the text wrote over the file's values, a new
 /// line as a new style; a style is shown when the text uses it (its
 /// canonical form has its line).
-pub fn restyle(styles: &mut StyleSet, parsed: &fmt::Parsed, blocks: &[Block]) {
+pub fn restyle(styles: &mut StyleSet, lines: &[fmt::StyleLine], blocks: &[Block]) {
     if !styles.formatting {
         return;
     }
-    for l in &parsed.doc.styles {
+    for l in lines {
         match styles.paragraph.iter_mut().find(|s| s.name == l.name) {
             Some(s) => s.props = l.props.clone(),
             None => styles.paragraph.push(StyleDef {

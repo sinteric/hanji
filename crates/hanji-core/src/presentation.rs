@@ -8,6 +8,7 @@
 
 use hanji_format::{self as fmt, Diagnostic, Names};
 
+use crate::edit::Resolved;
 use crate::model::{self, Block, BlockSrc, Capabilities, Head, Para, Place, SrcKind, StyleSet};
 
 /// Key of every slide head.
@@ -191,7 +192,7 @@ pub fn model_of(
     names: &Names,
     caps: Capabilities,
     is_block_keep: &dyn Fn(&str) -> Option<bool>,
-) -> Result<(Vec<Block>, Vec<BlockSrc>), Vec<Diagnostic>> {
+) -> Result<Resolved, Vec<Diagnostic>> {
     let parsed = fmt::parse_presentation(text, names)?;
     resolve(&parsed, text, caps, is_block_keep)
 }
@@ -209,7 +210,7 @@ pub fn resolve(
     text: &str,
     caps: Capabilities,
     is_block_keep: &dyn Fn(&str) -> Option<bool>,
-) -> Result<(Vec<Block>, Vec<BlockSrc>), Vec<Diagnostic>> {
+) -> Result<Resolved, Vec<Diagnostic>> {
     let styles = no_styles();
     let (mut blocks, mut maps, mut errs) = (vec![], vec![], vec![]);
     for (s, sm) in parsed.pres.slides.iter().zip(&parsed.map.slides) {
@@ -272,14 +273,14 @@ pub fn resolve(
             match model::resolve(&doc, text, &styles, caps, is_block_keep) {
                 Ok(b) => {
                     blocks.extend(b);
-                    maps.extend(model::block_maps(&doc));
+                    maps.extend(model::block_maps(&doc.doc.blocks, doc.map));
                 }
                 Err(e) => errs.extend(e),
             }
         }
     }
     if errs.is_empty() {
-        Ok((blocks, maps))
+        Ok(Resolved::new(blocks, maps))
     } else {
         errs.sort_by_key(|d| (d.line, d.col));
         Err(errs)

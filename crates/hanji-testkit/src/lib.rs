@@ -256,7 +256,12 @@ pub fn ident(n: usize) -> Vec<Option<usize>> {
 /// Where each block of `d` is in its text: `(start, end)`.
 pub fn block_ranges(cx: &Cx, d: &Doc) -> Vec<(usize, usize)> {
     let text = cx.fmt.text_of(&d.blocks, cx.rem);
-    let (_, maps) = cx.fmt.model().resolve(&text, cx.rem, caps(cx.fmt)).unwrap();
+    let maps = cx
+        .fmt
+        .model()
+        .resolve(&text, cx.rem, caps(cx.fmt))
+        .unwrap()
+        .maps;
     maps.iter().map(|m| (m.start, m.end)).collect()
 }
 
@@ -1309,7 +1314,7 @@ pub fn written(fmt: &dyn Format, text: &str, rem: &Remainder) -> Vec<Block> {
     fmt.model()
         .resolve(text, rem, caps(fmt))
         .unwrap_or_else(|e| panic!("{}\n{text}", hanji_format::diag::render(&e)))
-        .0
+        .blocks
 }
 
 fn oracle(d: &Doc, new: &[Block], ed: &Edit) -> HashMap<u64, Outcome> {
@@ -1776,7 +1781,7 @@ fn text_span(
         return differing_span(old_text, new_text);
     }
     if let Some((path, s, e)) = &ed.unit_span {
-        let (_, mut maps) = fmt.model().resolve(old_text, rem, caps(fmt)).unwrap();
+        let mut maps = fmt.model().resolve(old_text, rem, caps(fmt)).unwrap().maps;
         let pm = match maps.swap_remove(path[0]).kind {
             hanji_core::model::SrcKind::Para(pm) => pm,
             hanji_core::model::SrcKind::Table(cells) => {

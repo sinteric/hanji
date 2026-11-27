@@ -24,9 +24,10 @@ fn import(pkg: &[u8]) -> Imported {
 /// The canonical text of `text` (§5.1): what a write returns, bare slot markers with their layout's box.
 fn canonical(text: &str, rem: &Remainder) -> String {
     use hanji_core::TextModel;
-    let (blocks, _) = PptxModel
+    let blocks = PptxModel
         .resolve(text, rem, CAPS)
-        .unwrap_or_else(|e| panic!("{e:?}"));
+        .unwrap_or_else(|e| panic!("{e:?}"))
+        .blocks;
     PptxEngine::text_of(blocks, rem, None)
 }
 

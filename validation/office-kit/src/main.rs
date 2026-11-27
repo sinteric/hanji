@@ -1249,7 +1249,7 @@ fn hwpx(kit: &mut Kit) {
         match hanji_core::rewrite(&rem, &text, &e10.new_text, CAPS) {
             Ok(r) => {
                 // The text as the store returns it (§5.2: a new table's look, widths as Hancom's).
-                let (_, mut blocks) = hanji_core::model_of(&r.text, &r.remainder, CAPS).unwrap();
+                let mut blocks = hanji_core::model_of(&r.text, &r.remainder, CAPS).unwrap().blocks;
                 let mut done = r.remainder.clone();
                 HwpxEngine::complete(&mut blocks, &mut done);
                 let new_text = HwpxEngine::text_of(blocks, &done, None);

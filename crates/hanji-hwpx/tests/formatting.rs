@@ -149,7 +149,9 @@ fn formatting_edits_add_shapes_cloned_from_the_element_s() {
         ],
     );
     // The text as the store returns it: the new style's border snapped to Hancom's widths.
-    let (_, mut blocks) = hanji_core::model_of(&r.text, &r.remainder, CAPS).unwrap();
+    let mut blocks = hanji_core::model_of(&r.text, &r.remainder, CAPS)
+        .unwrap()
+        .blocks;
     let mut rem = r.remainder.clone();
     HwpxEngine::complete(&mut blocks, &mut rem);
     let text = HwpxEngine::text_of(blocks, &rem, None);
