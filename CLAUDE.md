@@ -6,8 +6,9 @@
   kept, changed or excluded in one table, each change and exclusion with its
   reason → [`STYLE.md`](STYLE.md).
 - **Comments in code** — none, in every language, but a problem in something
-  external (with its date, version and why) or something we truly cannot
-  change → [`STYLE.md`](STYLE.md), "Comments in code".
+  external (with its date, version and why), something we truly cannot
+  change, and the public API's doc comments → [`STYLE.md`](STYLE.md),
+  "Comments in code".
 - **Formatting** runs a pinned nightly rustfmt: `python3 scripts/fmt.py`, and
   CI checks it with `--check` ([`STYLE.md`](STYLE.md), "Use the formatting
   tool").
