@@ -80,8 +80,8 @@ held only as well as the reviewer remembers it.
 | [Naming extension traits](https://google.github.io/styleguide/rustguide.html#naming-extension-traits) | adopted | review | |
 | [Naming initialization functions](https://google.github.io/styleguide/rustguide.html#naming-initialization-functions) | adopted | review | A constructor that returns `Result` is `try_new`. Older ones are renamed when their file is next touched. |
 | [Avoid abbreviations](https://google.github.io/styleguide/rustguide.html#avoid-abbreviations) | **changed** (one addition) | review | Format vocabulary counts as known: the format names (`docx`, `pptx`, `xlsx`, `hwpx`, `ooxml`) and the terms in DESIGN.md §3 "Terms and non-goals". |
-| [When and how to write documentation](https://google.github.io/styleguide/rustguide.html#writing-doc) | adopted | review; `missing_docs` once the tree meets it |  |
-| [Unsafe code](https://google.github.io/styleguide/rustguide.html#unsafe) | adopted | clippy `undocumented_unsafe_blocks` (deny), review | |
+| [When and how to write documentation](https://google.github.io/styleguide/rustguide.html#writing-doc) | **changed** | review; `missing_docs` once the tree meets it | Every public item of a library crate has a doc comment, and nothing else does: [§"Comments in code"](#comments-in-code). |
+| [Unsafe code](https://google.github.io/styleguide/rustguide.html#unsafe) | adopted | clippy `undocumented_unsafe_blocks` (deny), review | The `// SAFETY:` comment the lint asks for is the second kind [§"Comments in code"](#comments-in-code) allows. ⚠ The lint sees that the comment exists, not that it is right. |
 | [No unstable features](https://google.github.io/styleguide/rustguide.html#unstable-features) | adopted | the stable compiler | Nightly rustfmt is a formatter, not a language feature. |
 | [Getters and setters](https://google.github.io/styleguide/rustguide.html#getters-and-setters) | adopted | review | |
 | [Accessors that accept closures](https://google.github.io/styleguide/rustguide.html#closure-accessors) | adopted | review | |
@@ -100,9 +100,64 @@ held only as well as the reviewer remembers it.
 | [Don't omit patterns on `non_exhaustive` enums](https://google.github.io/styleguide/rustguide.html#non-exhaustive-enum-matching) | adopted | review |  |
 | [Context strings on assertions](https://google.github.io/styleguide/rustguide.html#assertion-context) | adopted | review | |
 | [Combinator chains vs direct iteration](https://google.github.io/styleguide/rustguide.html#combinator-chains) | adopted | clippy `needless_for_each`, review | |
-| [Don't call `catch_unwind`](https://google.github.io/styleguide/rustguide.html#catch-unwind) | **changed** | review | Allowed in tests that assert a panic, and in a host that embeds hanji (the CLI, a WASM binding) to turn a panic into an error at its own boundary, saying why at the call. The library crates never catch: a caller chooses its own panic strategy. Why: the guide's ban rests on `panic = abort` in Chrome, Android and Fuchsia, and hanji cannot choose that for the programs that link it. |
+| [Don't call `catch_unwind`](https://google.github.io/styleguide/rustguide.html#catch-unwind) | **changed** | review | Allowed in tests that assert a panic, and in a host that embeds hanji (the CLI, a WASM binding) to turn a panic into an error at its own boundary. The library crates never catch: a caller chooses its own panic strategy. Why: the guide's ban rests on `panic = abort` in Chrome, Android and Fuchsia, and hanji cannot choose that for the programs that link it. |
 | [`format!`/`write!` for concatenation](https://google.github.io/styleguide/rustguide.html#prefer-format-or-write) | adopted | review | |
 | [Per-codebase test framework](https://google.github.io/styleguide/rustguide.html#test-framework) [chrome, fuchsia] | **excluded** |  | Those frameworks plug Rust tests into C++ and Fuchsia harnesses. hanji uses `#[test]` under `cargo test`, natively and on wasm32-wasip1. |
+
+## Comments in code
+
+**Code carries no comments** (the owner, 2026-11-27). This binds every
+language here, not only Rust: Python, shell, the TOML and YAML files and the
+CI workflows. A comment is written for one of three things only:
+
+1. **A problem in something external.** A dependency, a compiler, an
+   operating system, a service, or a format someone else defines (Word,
+   PowerPoint, Excel, Hancom Office, the OOXML and OWPML schemas) does something the
+   code has to work around. The comment names that thing and its version,
+   gives the date, and says why:
+   `// <thing> <version>, <date>: <what it does>, so <what this code does>.`
+   When that thing is upgraded, the comment is checked again, and it goes
+   when the problem does.
+2. **Something else we truly cannot change.** Be careful: most things can be
+   changed. hanji's own code, format, tests and tools are all ours, so a
+   comment that explains one of them is a sign that it should change instead.
+3. **The public API.** An item another program can name from a library crate
+   (every crate but `hanji-cli` and `hanji-testkit`) keeps its doc comment,
+   and so does each library crate's own page. A caller reads the API through
+   its rustdoc. This is the owner's choice of 2026-11-27, and it may change.
+   Such a comment says what the item does and what a caller must hold, never
+   how it got there.
+
+What a comment would have said has a home that is checked or kept current:
+what the code is, in its names and types; what it must do, in its tests; how
+a caller uses it, in the public API's doc comments and
+[`README.md`](README.md); why the design is as it is, in
+[`DESIGN.md`](DESIGN.md); how the code got here, in the commit message and
+[`CHANGELOG.md`](CHANGELOG.md).
+
+Why: a comment easily goes stale, and it holds back improving the code in a
+new, bigger scope. A reader believes it, and a change that reworks the code
+has to argue with it first. Measured 2026-11-27, the day the rule was made:
+about one line in seventeen of hanji's Rust was a comment, most of them doc
+comments.
+
+What counts:
+
+- **A doc comment is a comment**: `///`, `//!`, a Python docstring. So is a
+  file or module header and a section banner. Off the public API (3 above),
+  in the CLI, the testkit and the scripts included, a doc comment goes.
+- **A directive a tool reads is not a comment**: a shebang, a `# noqa`,
+  `#[expect(lint, reason = "…")]`. Where the tool asks for a reason, the
+  reason is one line on the directive.
+- **`// SAFETY:` on an `unsafe` block, and `# Safety` on an `unsafe fn`, are
+  the second kind**: they state what makes the code sound, which the compiler
+  cannot check. Before writing one, see whether safe code can do the job.
+- **A file a tool generates** carries what that tool writes. A generator we
+  write is code under this rule.
+
+⚠ Review alone holds this rule: no tool tells a comment of the kinds above
+from any other. The tree does not meet it yet. Until it does, a comment already in
+a file is not a precedent: new code adds none.
 
 ## What the tools cannot see
 
