@@ -160,8 +160,9 @@ the format summary that agents read.
 **Release binaries.** Each [release](https://github.com/sinteric/hanji/releases)
 has `hanji-<version>-<target>.tar.gz` with the `hanji` binary for Linux
 x86_64 and arm64 (static, musl), macOS x86_64 and arm64, and Windows x86_64,
-plus `SHA256SUMS`. (v0.1.0 also had `hanji-mcp`, an MCP server, which has
-since been removed: agents run the CLI.)
+plus `SHA256SUMS`. Each binary is built with `--profile dist`, which carries no
+symbol table and no debug information. (v0.1.0 also had `hanji-mcp`, an MCP
+server, which has since been removed: agents run the CLI.)
 
 **From source** (Rust 1.99 or later):
 

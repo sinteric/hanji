@@ -57,7 +57,7 @@ jobs:
           target='${{ matrix.target }}'
           echo "CC_${target//-/_}=musl-gcc" >> "$GITHUB_ENV"
       - name: build
-        run: cargo build --release --locked --target ${{ matrix.target }} -p hanji-cli
+        run: cargo build --profile dist --locked --target ${{ matrix.target }} -p hanji-cli
       - name: package
         env:
           RELEASE_TARGET: ${{ matrix.target }}
@@ -66,7 +66,7 @@ jobs:
           name="hanji-$version-$RELEASE_TARGET"
           exe=; [[ "$RELEASE_TARGET" == *windows* ]] && exe=.exe
           mkdir -p "dist/$name"
-          cp "target/$RELEASE_TARGET/release/hanji$exe" "dist/$name/"
+          cp "target/$RELEASE_TARGET/dist/hanji$exe" "dist/$name/"
           cp LICENSE-MIT LICENSE-APACHE THIRD_PARTY_NOTICES.md "dist/$name/"
           cd dist
           tar -czf "$name.tar.gz" "$name"
